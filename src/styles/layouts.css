@@ -1,0 +1,285 @@
+/* ===========================================
+   LAYOUTS PADRÃO - Sistema de Cobrança
+   =========================================== */
+
+/* ===== LAYOUT PRINCIPAL ===== */
+.layout-main {
+  @apply min-h-screen bg-gray-50;
+}
+
+.layout-content {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8;
+}
+
+.layout-content-full {
+  @apply w-full px-4 sm:px-6 lg:px-8 py-8;
+}
+
+/* ===== LAYOUT DE DASHBOARD ===== */
+.dashboard-grid {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6;
+}
+
+.dashboard-stats {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8;
+}
+
+.dashboard-main-content {
+  @apply grid grid-cols-1 lg:grid-cols-3 gap-8;
+}
+
+.dashboard-sidebar {
+  @apply lg:col-span-1;
+}
+
+.dashboard-content {
+  @apply lg:col-span-2;
+}
+
+/* ===== LAYOUT DE PÁGINAS ===== */
+.page-container {
+  @apply space-y-8;
+}
+
+.page-header {
+  @apply flex items-center justify-between mb-8;
+}
+
+.page-title {
+  @apply text-2xl font-bold text-gray-900;
+}
+
+.page-subtitle {
+  @apply text-gray-600 mt-1;
+}
+
+.page-actions {
+  @apply flex items-center space-x-4;
+}
+
+/* ===== LAYOUT DE SEÇÕES ===== */
+.section-container {
+  @apply space-y-6;
+}
+
+.section-header {
+  @apply flex items-center justify-between mb-4;
+}
+
+.section-title {
+  @apply text-lg font-semibold text-gray-900;
+}
+
+.section-actions {
+  @apply flex items-center space-x-2;
+}
+
+.section-content {
+  @apply space-y-4;
+}
+
+/* ===== LAYOUT DE FORMULÁRIOS ===== */
+.form-container {
+  @apply max-w-2xl mx-auto;
+}
+
+.form-section {
+  @apply space-y-6;
+}
+
+.form-group {
+  @apply space-y-4;
+}
+
+.form-row {
+  @apply grid grid-cols-1 md:grid-cols-2 gap-4;
+}
+
+.form-actions {
+  @apply flex items-center justify-end space-x-4 pt-6 border-t border-gray-200;
+}
+
+/* ===== LAYOUT DE CARDS ===== */
+.cards-grid {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
+}
+
+.cards-list {
+  @apply space-y-4;
+}
+
+.card-header {
+  @apply flex items-center justify-between p-4 border-b border-gray-200;
+}
+
+.card-content {
+  @apply p-4;
+}
+
+.card-footer {
+  @apply flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50;
+}
+
+/* ===== LAYOUT DE TABELAS ===== */
+.table-section {
+  @apply space-y-4;
+}
+
+.table-header-section {
+  @apply flex items-center justify-between mb-4;
+}
+
+.table-filters {
+  @apply flex items-center space-x-4 mb-4;
+}
+
+.table-controls {
+  @apply flex items-center justify-between py-3 px-6 bg-gray-50 border-b border-gray-200;
+}
+
+.table-pagination {
+  @apply flex items-center justify-between px-6 py-4 border-t border-gray-200;
+}
+
+/* ===== LAYOUT DE MODALS ===== */
+.modal-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50;
+}
+
+.modal-container {
+  @apply bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden;
+}
+
+.modal-header {
+  @apply px-6 py-4 border-b border-gray-200 flex items-center justify-between;
+}
+
+.modal-content {
+  @apply p-6 overflow-y-auto max-h-[60vh];
+}
+
+.modal-footer {
+  @apply px-6 py-4 border-t border-gray-200 flex items-center justify-end space-x-4;
+}
+
+/* ===== LAYOUT DE LISTAS ===== */
+.list-container {
+  @apply divide-y divide-gray-200;
+}
+
+.list-item {
+  @apply py-4 flex items-center justify-between hover:bg-gray-50 transition-colors;
+}
+
+.list-item-content {
+  @apply flex items-center space-x-4 flex-1 min-w-0;
+}
+
+.list-item-actions {
+  @apply flex items-center space-x-2;
+}
+
+/* ===== LAYOUT DE NAVEGAÇÃO ===== */
+.nav-container {
+  @apply bg-white shadow-sm border-b border-gray-200;
+}
+
+.nav-content {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.nav-main {
+  @apply flex items-center justify-between h-16;
+}
+
+.nav-links {
+  @apply flex items-center space-x-8;
+}
+
+.nav-actions {
+  @apply flex items-center space-x-4;
+}
+
+/* ===== LAYOUT RESPONSIVO ===== */
+.responsive-hide-sm {
+  @apply hidden sm:block;
+}
+
+.responsive-hide-md {
+  @apply hidden md:block;
+}
+
+.responsive-hide-lg {
+  @apply hidden lg:block;
+}
+
+.responsive-show-sm {
+  @apply block sm:hidden;
+}
+
+.responsive-show-md {
+  @apply block md:hidden;
+}
+
+.responsive-show-lg {
+  @apply block lg:hidden;
+}
+
+/* ===== LAYOUT DE SIDEBAR ===== */
+.sidebar-container {
+  @apply flex h-screen bg-gray-50;
+}
+
+.sidebar {
+  @apply w-64 bg-white shadow-sm border-r border-gray-200;
+}
+
+.sidebar-content {
+  @apply flex-1 overflow-auto;
+}
+
+.sidebar-header {
+  @apply px-6 py-4 border-b border-gray-200;
+}
+
+.sidebar-nav {
+  @apply mt-6;
+}
+
+.sidebar-nav-item {
+  @apply flex items-center px-6 py-3 text-gray-700 hover:bg-gray-100 transition-colors;
+}
+
+.sidebar-nav-item-active {
+  @apply bg-blue-50 text-blue-700 border-r-2 border-blue-600;
+}
+
+/* ===== UTILITÁRIOS DE ESPAÇAMENTO ===== */
+.spacing-section {
+  @apply mb-8;
+}
+
+.spacing-content {
+  @apply mb-6;
+}
+
+.spacing-item {
+  @apply mb-4;
+}
+
+.spacing-tight {
+  @apply space-y-2;
+}
+
+.spacing-normal {
+  @apply space-y-4;
+}
+
+.spacing-relaxed {
+  @apply space-y-6;
+}
+
+.spacing-loose {
+  @apply space-y-8;
+}
+
