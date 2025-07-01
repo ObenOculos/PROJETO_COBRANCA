@@ -144,7 +144,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => setActiveTab(tab.id as 'details' | 'attempts' | 'action')}
                   className={`flex items-center px-6 py-3 font-medium text-sm ${
                     activeTab === tab.id
                       ? 'border-b-2 border-blue-500 text-blue-600'

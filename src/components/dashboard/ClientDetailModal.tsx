@@ -28,7 +28,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   userType, 
   onClose 
 }) => {
-  const { getSalesByClient, calculateSaleBalance, collections } = useCollection();
+  const { getSalesByClient, calculateSaleBalance } = useCollection();
   const [selectedSaleForPayment, setSelectedSaleForPayment] = useState<SaleGroup | null>(null);
   const [isSalePaymentModalOpen, setIsSalePaymentModalOpen] = useState(false);
   const [isGeneralPaymentModalOpen, setIsGeneralPaymentModalOpen] = useState(false);
