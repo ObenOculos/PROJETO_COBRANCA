@@ -17,6 +17,7 @@ import CollectionTable from './CollectionTable';
 import EnhancedPerformanceChart from './EnhancedPerformanceChart';
 import UserManagement from './UserManagement';
 import EnhancedStoreManagement from './EnhancedStoreManagement';
+import DatabaseUpload from './DatabaseUpload';
 import { ClientAssignment } from '../ClientAssignment';
 import VisitTracking from './VisitTracking';
 import DailyCashReport from './DailyCashReport';
@@ -28,7 +29,7 @@ const ManagerDashboard: React.FC = () => {
   const { getDashboardStats, getCollectorPerformance, getFilteredCollections, getPendingCancellationRequests, collections } = useCollection();
   
   // Recupera a aba ativa do localStorage ou usa 'overview' como padrão
-  const [activeTab, setActiveTab] = useState<'overview' | 'collections' | 'performance' | 'users' | 'stores' | 'clients' | 'visit-tracking'>(() => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'collections' | 'performance' | 'users' | 'stores' | 'clients' | 'visit-tracking' | 'database-upload'>(() => {
     const savedTab = localStorage.getItem('managerActiveTab');
     return (savedTab as any) || 'overview';
   });
@@ -73,10 +74,13 @@ const ManagerDashboard: React.FC = () => {
     { id: 'clients', name: 'Clientes', icon: UserCheck },
     { id: 'visit-tracking', name: 'Acompanhamento', icon: AlertTriangle },
     { id: 'users', name: 'Usuários', icon: Users },
+    { id: 'database-upload', name: 'Upload de Dados', icon: Download },
   ];
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'database-upload':
+        return <DatabaseUpload />;
       case 'overview':
         return (
           <div className="space-y-4 sm:space-y-6">

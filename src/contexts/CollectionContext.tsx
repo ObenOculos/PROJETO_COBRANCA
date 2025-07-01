@@ -1468,7 +1468,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
     };
   };
   
-  const getSalesByClient = (clientDocument: string): SaleGroup[] => {
+  const getSalesByClient = React.useCallback((clientDocument: string): SaleGroup[] => {
     // Agrupar collections por venda
     const salesMap = new Map<number, Collection[]>();
     
@@ -1508,7 +1508,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
         clientDocument
       };
     });
-  };
+  }, [collections, calculateSaleBalance, getSalePayments]);
 
   // Scheduled Visits Functions
   const fetchScheduledVisits = async () => {

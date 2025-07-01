@@ -34,15 +34,6 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     rejectVisitCancellation,
   } = useCollection();
   const { user } = useAuth();
-
-  // Add error boundary to catch any rendering issues
-  if (!scheduledVisits || !users) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-600">Carregando dados das visitas...</div>
-      </div>
-    );
-  }
   
   const [activeTab, setActiveTab] = useState<'visits' | 'cancellations' | 'history'>('visits');
   const [selectedCollector, setSelectedCollector] = useState<string>('all');
@@ -66,6 +57,15 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     const requests = getPendingCancellationRequests();
     setPendingRequests(requests);
   }, [getPendingCancellationRequests]);
+
+  // Add error boundary to catch any rendering issues
+  if (!scheduledVisits || !users) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-gray-600">Carregando dados das visitas...</div>
+      </div>
+    );
+  }
 
   const collectors = users.filter(u => u.type === 'collector');
   

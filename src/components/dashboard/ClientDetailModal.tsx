@@ -46,7 +46,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       pendingValue: sale.pendingValue
     })));
     return sales;
-  }, [getSalesByClient, clientGroup.document, collections, refreshKey]);
+  }, [getSalesByClient, clientGroup.document, refreshKey]);
 
   
   const handleOpenSalePayment = (sale: SaleGroup) => {

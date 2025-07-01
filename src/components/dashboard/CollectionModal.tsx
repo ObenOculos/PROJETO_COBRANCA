@@ -27,9 +27,15 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
   const { updateCollection, addAttempt } = useCollection();
   const [activeTab, setActiveTab] = useState<'details' | 'attempts' | 'action'>('details');
   const [newStatus, setNewStatus] = useState(collection.status || '');
-  const [newAttempt, setNewAttempt] = useState({
-    type: 'call' as 'call' | 'visit' | 'email' | 'whatsapp',
-    result: 'no_answer' as any,
+  const [newAttempt, setNewAttempt] = useState<{
+    type: 'call' | 'visit' | 'email' | 'whatsapp';
+    result: 'no_answer' | 'busy' | 'not_found' | 'promise' | 'refusal' | 'partial_payment' | 'full_payment';
+    notes: string;
+    nextAction: string;
+    nextActionDate: string;
+  }>({
+    type: 'call',
+    result: 'no_answer',
     notes: '',
     nextAction: '',
     nextActionDate: ''
@@ -138,7 +144,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center px-6 py-3 font-medium text-sm ${
                     activeTab === tab.id
                       ? 'border-b-2 border-blue-500 text-blue-600'
@@ -399,7 +405,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                     </label>
                     <select
                       value={newAttempt.type}
-                      onChange={(e) => setNewAttempt({ ...newAttempt, type: e.target.value as any })}
+                      onChange={(e) => setNewAttempt({ ...newAttempt, type: e.target.value as 'call' | 'visit' | 'email' | 'whatsapp' })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="call">Ligação</option>
@@ -415,7 +421,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                     </label>
                     <select
                       value={newAttempt.result}
-                      onChange={(e) => setNewAttempt({ ...newAttempt, result: e.target.value as any })}
+                      onChange={(e) => setNewAttempt({ ...newAttempt, result: e.target.value as 'no_answer' | 'busy' | 'not_found' | 'promise' | 'refusal' | 'partial_payment' | 'full_payment' })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="no_answer">Não atendeu</option>

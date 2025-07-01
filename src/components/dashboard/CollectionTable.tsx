@@ -126,7 +126,7 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
   const clientGroups = useMemo(() => {
     if (userType === 'manager') {
       // Usar as collections filtradas passadas como prop
-      const groupsMap = new Map<string, any>();
+      const groupsMap = new Map<string, ClientGroup>();
       
       collections.forEach(collection => {
         const key = collection.documento || 'sem-documento';
@@ -199,8 +199,8 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
   }, [userType, collections, getClientGroups, collectorId]);
   const filteredClientGroups = showGrouped ? clientGroups.filter(group => {
     // Verificar se o grupo tem parcelas que correspondem às collections filtradas
-    const hasMatchingInstallments = group.sales.some((sale: any) => 
-      sale.installments.some((installment: any) => 
+    const hasMatchingInstallments = group.sales.some((sale: SaleGroup) => 
+      sale.installments.some((installment: Collection) => 
         collections.some(fc => fc.id_parcela === installment.id_parcela)
       )
     );
@@ -210,8 +210,8 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
     // Se collections foram filtradas por status, verificar se o grupo deve aparecer
     const allCollectionIds = new Set(collections.map(c => c.id_parcela));
     const groupCollectionIds = new Set<number>();
-    group.sales.forEach((sale: any) => {
-      sale.installments.forEach((inst: any) => {
+    group.sales.forEach((sale: SaleGroup) => {
+      sale.installments.forEach((inst: Collection) => {
         if (inst.id_parcela) groupCollectionIds.add(inst.id_parcela);
       });
     });
@@ -240,7 +240,7 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
     let filteredGroups = localClientGroups;
     if (userType === 'collector' && statusFilter) {
       filteredGroups = localClientGroups.filter(group => 
-        group.sales.some((sale: any) => {
+        group.sales.some((sale: SaleGroup) => {
           // Determinar o status real da venda baseado nos valores
           let saleRealStatus: string;
           
@@ -276,7 +276,7 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
     
     // Ordenar grupos por cliente
     simpleSalesGroups.sort((a, b) => {
-      let aValue: any, bValue: any;
+      let aValue: string | number | undefined, bValue: string | number | undefined;
       
       switch (sortField) {
         case 'cliente':
@@ -816,7 +816,7 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
               {expandedClients.has(clientGroup.document) && (
                 <div className="px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50 animate-in slide-in-from-top-2 duration-200">
                   <div className="space-y-3">
-                    {clientGroup.sales.map((sale: any) => {
+                    {clientGroup.sales.map((sale: SaleGroup) => {
                       // Determinar o status real da venda baseado nos valores
                       let displayStatus: string;
                       let statusColor: string;
@@ -899,8 +899,8 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
                                 e.stopPropagation();
                                 // Pegar todas as parcelas da venda
                                 const saleCollections = sale.installments
-                                  .map((inst: any) => collections.find((c: any) => c.id_parcela === inst.id_parcela))
-                                  .filter((c: any) => c !== undefined) as Collection[];
+                                  .map((inst: Collection) => collections.find((c: Collection) => c.id_parcela === inst.id_parcela))
+                                  .filter((c: Collection | undefined) => c !== undefined) as Collection[];
                                 
                                 if (saleCollections.length > 0) {
                                   setSelectedSale(saleCollections);
