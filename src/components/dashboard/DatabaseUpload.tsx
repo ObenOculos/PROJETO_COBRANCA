@@ -504,17 +504,6 @@ const DatabaseUpload: React.FC = () => {
         </div>
       )}
 
-      {/* Configuração do Supabase */}
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center">
-        <CheckCircle className="h-5 w-5 mr-3 text-green-700"/>
-        <div>
-          <h3 className="text-sm font-medium text-green-800">Configuração do Supabase</h3>
-          <p className="text-sm text-green-700">
-            Supabase configurado. Use o botão "Testar Conexão" para verificar se está funcionando.
-          </p>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Upload para atualizar status */}
         <div className="border border-gray-200 rounded-lg p-4 space-y-3">
