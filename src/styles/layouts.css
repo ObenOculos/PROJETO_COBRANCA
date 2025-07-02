@@ -283,3 +283,9 @@
   @apply space-y-8;
 }
 
+
+.space-y-4 > :not([hidden]) ~ :not([hidden]) {
+
+    margin-top: 0 !important;
+
+}

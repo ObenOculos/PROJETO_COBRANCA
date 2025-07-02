@@ -73,10 +73,12 @@ export const getCollectionStatuses = (): Array<{value: CollectionStatus, label: 
   ];
 };
 
-export const formatCurrency = (value: number): string => {
+export const formatCurrency = (value: number, includeCents: boolean = true): string => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
-    currency: 'BRL'
+    currency: 'BRL',
+    minimumFractionDigits: includeCents ? 2 : 0,
+    maximumFractionDigits: includeCents ? 2 : 0,
   }).format(value);
 };
 
