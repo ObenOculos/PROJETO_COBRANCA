@@ -11,7 +11,7 @@ import GlobalLoading from './components/common/GlobalLoading';
 
 const AppContent: React.FC = () => {
   const { user, isLoading: authLoading } = useAuth();
-  const { isLoading: collectionLoading } = useCollection();
+  const { loading: collectionLoading } = useCollection();
   const { isLoading: globalLoading, loadingMessage } = useLoading();
   
   // Verifica se QUALQUER loading está ativo
