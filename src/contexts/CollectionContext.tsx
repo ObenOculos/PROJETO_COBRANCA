@@ -957,7 +957,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
 
   const assignCollectorToClients = async (collectorId: string, clientIdentifiers: { document?: string; clientName?: string }[]) => {
     try {
-      setGlobalLoading(true, 'Atribuindo clientes ao cobrador...');
+      // setGlobalLoading(true, 'Atribuindo clientes ao cobrador...'); // Moved to ClientAssignment.tsx
       setLoading(true);
       
       console.log(`Iniciando atribuição de ${clientIdentifiers.length} clientes ao cobrador ${collectorId}`);
@@ -1034,7 +1034,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
 
   const removeCollectorFromClients = async (clientIdentifiers: { document?: string; clientName?: string }[]) => {
     try {
-      setGlobalLoading(true, 'Removendo cobrador dos clientes...');
+      // setGlobalLoading(true, 'Removendo cobrador dos clientes...'); // Moved to ClientAssignment.tsx
       setLoading(true);
       console.log(`Removendo cobrador de ${clientIdentifiers.length} clientes`);
       
