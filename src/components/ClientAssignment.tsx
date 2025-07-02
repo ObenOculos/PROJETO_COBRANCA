@@ -21,6 +21,7 @@ import { Modal } from "./Modal";
 interface ClientWithCollections {
   cliente: string;
   documento: string;
+  uniqueKey: string; // Adicionado para identificar clientes de forma única (documento ou nome)
   collections: Collection[];
   collectorId?: string;
   collectorName?: string;
@@ -184,6 +185,7 @@ export function ClientAssignment() {
         clientsMap.set(key, {
           cliente: collection.cliente || "Cliente sem nome",
           documento: collection.documento || '',
+          uniqueKey: key, // Atribuir a chave única
           collections: [],
           collectorId: collectorId,
           collectorName: collectorName,
@@ -342,20 +344,20 @@ export function ClientAssignment() {
   };
 
   const handleSelectAll = () => {
-    const currentPageDocuments = paginatedClients.map((c) => c.documento);
-    const allCurrentPageSelected = currentPageDocuments.every((doc) =>
-      selectedClients.has(doc)
+    const currentPageUniqueKeys = paginatedClients.map((c) => c.uniqueKey);
+    const allCurrentPageSelected = currentPageUniqueKeys.every((key) =>
+      selectedClients.has(key)
     );
 
     if (allCurrentPageSelected) {
       // Remover todos da página atual
       const newSelected = new Set(selectedClients);
-      currentPageDocuments.forEach((doc) => newSelected.delete(doc));
+      currentPageUniqueKeys.forEach((key) => newSelected.delete(key));
       setSelectedClients(newSelected);
     } else {
       // Adicionar todos da página atual
       const newSelected = new Set(selectedClients);
-      currentPageDocuments.forEach((doc) => newSelected.add(doc));
+      currentPageUniqueKeys.forEach((key) => newSelected.add(key));
       setSelectedClients(newSelected);
     }
   };
@@ -364,16 +366,16 @@ export function ClientAssignment() {
     if (selectedClients.size === filteredClients.length) {
       setSelectedClients(new Set());
     } else {
-      setSelectedClients(new Set(filteredClients.map((c) => c.documento)));
+      setSelectedClients(new Set(filteredClients.map((c) => c.uniqueKey)));
     }
   };
 
-  const handleSelectClient = (documento: string) => {
+  const handleSelectClient = (uniqueKey: string) => {
     const newSelected = new Set(selectedClients);
-    if (newSelected.has(documento)) {
-      newSelected.delete(documento);
+    if (newSelected.has(uniqueKey)) {
+      newSelected.delete(uniqueKey);
     } else {
-      newSelected.add(documento);
+      newSelected.add(uniqueKey);
     }
     setSelectedClients(newSelected);
   };
@@ -401,7 +403,10 @@ export function ClientAssignment() {
     try {
       await assignCollectorToClients(
         selectedCollector,
-        Array.from(selectedClients)
+        Array.from(selectedClients).map(key => {
+          const client = clientsData.find(c => c.uniqueKey === key);
+          return { document: client?.documento, clientName: client?.cliente };
+        })
       );
       // Success notification
       const notification = document.createElement("div");
@@ -484,7 +489,12 @@ export function ClientAssignment() {
         Array.from(selectedClients)
       );
 
-      await removeCollectorFromClients(Array.from(selectedClients));
+      await removeCollectorFromClients(
+        Array.from(selectedClients).map(key => {
+          const client = clientsData.find(c => c.uniqueKey === key);
+          return { document: client?.documento, clientName: client?.cliente };
+        })
+      );
 
       // Success notification
       const notification = document.createElement("div");
@@ -1082,20 +1092,20 @@ export function ClientAssignment() {
 
           return (
             <div
-              key={client.documento || client.cliente}
+              key={client.uniqueKey}
               className={`bg-white rounded-lg shadow-sm border transition-all duration-200 hover:shadow-md cursor-pointer ${
                 isWithoutCollector
                   ? "border-amber-300 bg-amber-50"
                   : "border-gray-200"
               } ${
-                selectedClients.has(client.documento)
+                selectedClients.has(client.uniqueKey)
                   ? "ring-2 ring-blue-500"
                   : ""
               }`}
               onClick={(e) => {
                 // Previne o clique no card quando clicar no checkbox
                 if ((e.target as HTMLElement).tagName !== 'INPUT') {
-                  handleSelectClient(client.documento);
+                  handleSelectClient(client.uniqueKey);
                 }
               }}
             >
@@ -1104,8 +1114,8 @@ export function ClientAssignment() {
                   {/* Larger checkbox for mobile */}
                   <input
                     type="checkbox"
-                    checked={selectedClients.has(client.documento)}
-                    onChange={() => handleSelectClient(client.documento)}
+                    checked={selectedClients.has(client.uniqueKey)}
+                    onChange={() => handleSelectClient(client.uniqueKey)}
                     onClick={(e) => e.stopPropagation()} // Evita duplo clique
                     className="h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500 border-gray-300 rounded mt-1 flex-shrink-0"
                   />

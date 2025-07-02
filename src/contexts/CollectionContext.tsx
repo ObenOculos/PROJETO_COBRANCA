@@ -956,30 +956,43 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
     }
   };
 
-  const assignCollectorToClients = async (collectorId: string, documentos: string[]) => {
+  const assignCollectorToClients = async (collectorId: string, clientIdentifiers: { document?: string; clientName?: string }[]) => {
     try {
       setGlobalLoading(true, 'Atribuindo clientes ao cobrador...');
       setLoading(true);
       
-      console.log(`Iniciando atribuição de ${documentos.length} clientes ao cobrador ${collectorId}`);
+      console.log(`Iniciando atribuição de ${clientIdentifiers.length} clientes ao cobrador ${collectorId}`);
       
-      // Processar em lotes (Limite de 200 clientes por operação para performance e estabilidade)
-      const batchSize = 200; // Tamanho do lote - máximo recomendado
-      
-      if (documentos.length > batchSize) {
-        console.log(`⚠️ Processamento em lotes: ${Math.ceil(documentos.length / batchSize)} lotes de ${batchSize} clientes`);
-      }
+      const batchSize = 200;
       let totalParcelasAtualizadas = 0;
       
-      for (let i = 0; i < documentos.length; i += batchSize) {
-        const batch = documentos.slice(i, i + batchSize);
-        console.log(`Processando lote ${Math.floor(i / batchSize) + 1}: ${batch.length} documentos`);
+      for (let i = 0; i < clientIdentifiers.length; i += batchSize) {
+        const batch = clientIdentifiers.slice(i, i + batchSize);
+        console.log(`Processando lote ${Math.floor(i / batchSize) + 1}: ${batch.length} identificadores`);
         
-        // Buscar todas as parcelas dos clientes deste lote
-        const { data: parcelas, error: fetchError } = await supabase
-          .from('BANCO_DADOS')
-          .select('id_parcela')
-          .in('documento', batch);
+        const documentBatch = batch.filter(id => id.document).map(id => id.document);
+        const clientNameBatch = batch.filter(id => !id.document && id.clientName).map(id => id.clientName);
+
+        let parcelas: { id_parcela: number }[] = [];
+        let fetchError: any = null;
+
+        if (documentBatch.length > 0) {
+          const { data, error } = await supabase
+            .from('BANCO_DADOS')
+            .select('id_parcela')
+            .in('documento', documentBatch);
+          if (error) fetchError = error;
+          if (data) parcelas = parcelas.concat(data);
+        }
+
+        if (clientNameBatch.length > 0 && !fetchError) {
+          const { data, error } = await supabase
+            .from('BANCO_DADOS')
+            .select('id_parcela')
+            .in('cliente', clientNameBatch);
+          if (error) fetchError = error;
+          if (data) parcelas = parcelas.concat(data);
+        }
 
         if (fetchError) {
           console.error('Erro ao buscar parcelas do lote:', fetchError);
@@ -993,7 +1006,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
 
         console.log(`Encontradas ${parcelas.length} parcelas para este lote`);
 
-        // Atualizar todas as parcelas com o novo cobrador
         const { error: updateError } = await supabase
           .from('BANCO_DADOS')
           .update({ user_id: collectorId })
@@ -1009,7 +1021,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
       }
 
       await refreshData();
-      console.log(`✅ Atribuição concluída: ${documentos.length} clientes (${totalParcelasAtualizadas} parcelas) atribuídos ao cobrador ${collectorId}`);
+      console.log(`✅ Atribuição concluída: ${clientIdentifiers.length} clientes (${totalParcelasAtualizadas} parcelas) atribuídos ao cobrador ${collectorId}`);
     } catch (err) {
       console.error('Erro ao atribuir cobrador aos clientes:', err);
       setError(err instanceof Error ? err.message : 'Erro ao atribuir cobrador');
@@ -1020,25 +1032,42 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
     }
   };
 
-  const removeCollectorFromClients = async (documentos: string[]) => {
+  const removeCollectorFromClients = async (clientIdentifiers: { document?: string; clientName?: string }[]) => {
     try {
       setGlobalLoading(true, 'Removendo cobrador dos clientes...');
       setLoading(true);
-      console.log(`Removendo cobrador de ${documentos.length} clientes`);
+      console.log(`Removendo cobrador de ${clientIdentifiers.length} clientes`);
       
-      // Processar em lotes para evitar problemas de performance
       const batchSize = 200;
       let totalParcelasAtualizadas = 0;
 
-      for (let i = 0; i < documentos.length; i += batchSize) {
-        const batch = documentos.slice(i, i + batchSize);
-        console.log(`Processando lote ${Math.floor(i / batchSize) + 1} de ${Math.ceil(documentos.length / batchSize)} (${batch.length} clientes)`);
+      for (let i = 0; i < clientIdentifiers.length; i += batchSize) {
+        const batch = clientIdentifiers.slice(i, i + batchSize);
+        console.log(`Processando lote ${Math.floor(i / batchSize) + 1} de ${Math.ceil(clientIdentifiers.length / batchSize)} (${batch.length} identificadores)`);
         
-        // Buscar todas as parcelas dos clientes neste lote
-        const { data: parcelas, error: fetchError } = await supabase
-          .from('BANCO_DADOS')
-          .select('id_parcela')
-          .in('documento', batch);
+        const documentBatch = batch.filter(id => id.document).map(id => id.document);
+        const clientNameBatch = batch.filter(id => !id.document && id.clientName).map(id => id.clientName);
+
+        let parcelas: { id_parcela: number }[] = [];
+        let fetchError: any = null;
+
+        if (documentBatch.length > 0) {
+          const { data, error } = await supabase
+            .from('BANCO_DADOS')
+            .select('id_parcela')
+            .in('documento', documentBatch);
+          if (error) fetchError = error;
+          if (data) parcelas = parcelas.concat(data);
+        }
+
+        if (clientNameBatch.length > 0 && !fetchError) {
+          const { data, error } = await supabase
+            .from('BANCO_DADOS')
+            .select('id_parcela')
+            .in('cliente', clientNameBatch);
+          if (error) fetchError = error;
+          if (data) parcelas = parcelas.concat(data);
+        }
 
         if (fetchError) {
           console.error('Erro ao buscar parcelas do lote:', fetchError);
@@ -1052,7 +1081,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
 
         console.log(`Encontradas ${parcelas.length} parcelas para este lote`);
 
-        // Atualizar todas as parcelas para remover o cobrador
         const { error: updateError } = await supabase
           .from('BANCO_DADOS')
           .update({ user_id: null })
@@ -1068,7 +1096,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
       }
 
       await refreshData();
-      console.log(`✅ Remoção concluída: ${documentos.length} clientes (${totalParcelasAtualizadas} parcelas) removidos do cobrador`);
+      console.log(`✅ Remoção concluída: ${clientIdentifiers.length} clientes (${totalParcelasAtualizadas} parcelas) removidos do cobrador`);
     } catch (err) {
       console.error('Erro ao remover cobrador dos clientes:', err);
       setError(err instanceof Error ? err.message : 'Erro ao remover cobrador');

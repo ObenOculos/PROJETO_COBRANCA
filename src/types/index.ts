@@ -184,8 +184,8 @@ export interface CollectionContextType {
   updateCollection: (id: number, updates: Partial<Collection>) => Promise<void>;
   assignCollectorToStore: (collectorId: string, storeName: string) => Promise<void>;
   removeCollectorFromStore: (collectorId: string, storeName: string) => Promise<void>;
-  assignCollectorToClients: (collectorId: string, documentos: string[]) => Promise<void>;
-  removeCollectorFromClients: (documentos: string[]) => Promise<void>;
+  assignCollectorToClients: (collectorId: string, clientIdentifiers: { document?: string; clientName?: string }[]) => Promise<void>;
+  removeCollectorFromClients: (clientIdentifiers: { document?: string; clientName?: string }[]) => Promise<void>;
   addAttempt: (collectionId: number, attempt: Omit<CollectionAttempt, 'id'>) => Promise<void>;
   addUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<void>;
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
