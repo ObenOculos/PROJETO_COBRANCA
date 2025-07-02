@@ -129,10 +129,12 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
       const groupsMap = new Map<string, ClientGroup>();
       
       collections.forEach(collection => {
-        const key = collection.documento || 'sem-documento';
+        const key = (collection.documento || collection.cliente || '').trim();
+        if (!key) return; // Ignorar registros sem chave
+
         if (!groupsMap.has(key)) {
           groupsMap.set(key, {
-            clientId: collection.documento || 'sem-documento',
+            clientId: key, // Usar a chave única (documento ou nome)
             client: collection.cliente || 'Cliente não informado',
             document: collection.documento || '',
             phone: collection.telefone || '',

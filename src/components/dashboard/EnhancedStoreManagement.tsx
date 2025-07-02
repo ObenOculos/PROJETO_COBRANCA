@@ -86,6 +86,7 @@ const EnhancedStoreManagement: React.FC = () => {
         totalValue: number;
         receivedValue: number;
         clientDocument: string;
+        clientName: string; // Adicionado clientName aqui
       }>();
 
       storeCollections.forEach(collection => {
@@ -94,7 +95,8 @@ const EnhancedStoreManagement: React.FC = () => {
           salesMap.set(saleKey, {
             totalValue: 0,
             receivedValue: 0,
-            clientDocument: collection.documento || ''
+            clientDocument: collection.documento || '',
+            clientName: collection.cliente || '' // Atribuído clientName aqui
           });
         }
         
@@ -114,7 +116,7 @@ const EnhancedStoreManagement: React.FC = () => {
       const receivedAmount = salesArray.reduce((sum, s) => sum + s.receivedValue, 0);
       const pendingAmount = totalAmount - receivedAmount;
       const conversionRate = salesArray.length > 0 ? (completedSales / salesArray.length) * 100 : 0;
-      const clientsCount = new Set(salesArray.map(s => s.clientDocument)).size;
+      const clientsCount = new Set(salesArray.map(s => s.clientDocument || s.clientName).filter(Boolean)).size;
 
       stats.push({
         storeName,

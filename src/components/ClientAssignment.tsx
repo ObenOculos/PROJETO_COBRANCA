@@ -167,13 +167,14 @@ export function ClientAssignment() {
     const clientsMap = new Map<string, ClientWithCollections>();
 
     collections.forEach((collection) => {
-      // Só processar se tiver documento válido
-      if (!collection.documento || collection.documento.trim() === "") {
-        console.warn("Collection sem documento válido:", collection);
+      // Usar documento como chave principal, ou nome do cliente como fallback
+      const key = (collection.documento || collection.cliente || '').trim();
+
+      // Ignorar se não houver chave
+      if (!key) {
+        console.warn("Collection sem documento ou nome válido:", collection);
         return;
       }
-
-      const key = collection.documento.trim();
 
       if (!clientsMap.has(key)) {
         // Determinar cobrador através da nova função
@@ -182,7 +183,7 @@ export function ClientAssignment() {
 
         clientsMap.set(key, {
           cliente: collection.cliente || "Cliente sem nome",
-          documento: collection.documento,
+          documento: collection.documento || '',
           collections: [],
           collectorId: collectorId,
           collectorName: collectorName,
@@ -1081,7 +1082,7 @@ export function ClientAssignment() {
 
           return (
             <div
-              key={client.documento}
+              key={client.documento || client.cliente}
               className={`bg-white rounded-lg shadow-sm border transition-all duration-200 hover:shadow-md cursor-pointer ${
                 isWithoutCollector
                   ? "border-amber-300 bg-amber-50"

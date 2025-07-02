@@ -269,15 +269,22 @@ const DatabaseUpload: React.FC = () => {
   // Função para inserir novas parcelas no Supabase
   const insertNewParcelasInSupabase = async (data: FileData[], onProgress?: (percentage: number, message: string) => void): Promise<InsertResult> => {
     try {
-      console.log(`🔄 Inserindo ${data.length} novos registros...`);
-      console.log('📄 Dados a serem inseridos:', data);
+      const validData = data.filter(row => row.id_parcela && row.id_parcela.trim() !== '');
+      const invalidRowsCount = data.length - validData.length;
+
+      if (invalidRowsCount > 0) {
+        console.warn(`[DataUpload] Ignorando ${invalidRowsCount} linhas por não terem um id_parcela válido.`);
+      }
+
+      console.log(`🔄 Inserindo ${validData.length} novos registros...`);
+      console.log('📄 Dados a serem inseridos:', validData);
       
       // Dividir os dados em chunks para inserção em lote, se necessário
       const chunkSize = 1000; // Exemplo: inserir 1000 registros por vez
       let successfulInserts = 0;
 
-      for (let i = 0; i < data.length; i += chunkSize) {
-        const chunk = data.slice(i, i + chunkSize);
+      for (let i = 0; i < validData.length; i += chunkSize) {
+        const chunk = validData.slice(i, i + chunkSize);
 
         // Mapear e converter tipos para o chunk
         const processedChunk = chunk.map(row => {
@@ -286,7 +293,7 @@ const DatabaseUpload: React.FC = () => {
           newRow.dias_em_atraso = newRow.dias_em_atraso ? Number(newRow.dias_em_atraso) : null;
           newRow.numero_titulo = newRow.numero_titulo ? Number(newRow.numero_titulo) : null;
           newRow.parcela = newRow.parcela ? Number(newRow.parcela) : null;
-          newRow.id_parcela = newRow.id_parcela ? Number(newRow.id_parcela) : null;
+          newRow.id_parcela = Number(row.id_parcela); // Convertido com segurança após a filtragem
           newRow.venda_n = newRow.venda_n ? Number(newRow.venda_n) : null;
           
           // Converter valores monetários para número ou null se vazio
@@ -321,15 +328,20 @@ const DatabaseUpload: React.FC = () => {
         }
         successfulInserts += chunk.length;
         if (onProgress) {
-          const percentage = Math.round((successfulInserts / data.length) * 100);
-          onProgress(percentage, `Inserindo ${successfulInserts} de ${data.length} novos registros...`);
+          const percentage = Math.round((successfulInserts / validData.length) * 100);
+          onProgress(percentage, `Inserindo ${successfulInserts} de ${validData.length} novos registros...`);
         }
+      }
+
+      let message = `${successfulInserts} parcelas inseridas com sucesso`;
+      if (invalidRowsCount > 0) {
+        message += `. ${invalidRowsCount} linhas foram ignoradas por não possuírem um id_parcela válido.`;
       }
 
       console.log('✅ Dados inseridos com sucesso:', successfulInserts);
       return { 
         success: true, 
-        message: `${successfulInserts} parcelas inseridas com sucesso`,
+        message: message,
         details: null // details will be null as we are inserting in chunks
       };
     } catch (error) {
