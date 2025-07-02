@@ -406,7 +406,6 @@ export function ClientAssignment() {
     });
 
     const totalClients = clientsToProcess.length;
-    let processedCount = 0;
     let successCount = 0;
     let errorCount = 0;
 
@@ -512,7 +511,6 @@ export function ClientAssignment() {
     });
 
     const totalClients = clientsToProcess.length;
-    let processedCount = 0;
     let successCount = 0;
     let errorCount = 0;
 
