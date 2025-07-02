@@ -65,7 +65,7 @@ export function ClientAssignment() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Limite para operações em massa
-  const MAX_BATCH_SIZE = 200;
+  const MAX_BATCH_SIZE = 100;
 
   const collectors = users.filter((user) => user.type === "collector");
 
@@ -400,41 +400,67 @@ export function ClientAssignment() {
     setShowAssignModal(false);
 
     setLoading(true);
-    try {
-      await assignCollectorToClients(
-        selectedCollector,
-        Array.from(selectedClients).map(key => {
-          const client = clientsData.find(c => c.uniqueKey === key);
-          return { document: client?.documento, clientName: client?.cliente };
-        })
-      );
-      // Success notification
+    const clientsToProcess = Array.from(selectedClients).map(key => {
+      const client = clientsData.find(c => c.uniqueKey === key);
+      return { document: client?.documento, clientName: client?.cliente };
+    });
+
+    const totalClients = clientsToProcess.length;
+    let processedCount = 0;
+    let successCount = 0;
+    let errorCount = 0;
+
+    const showNotification = (message: string, type: "success" | "error" | "info") => {
       const notification = document.createElement("div");
-      notification.className =
-        "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
+      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center`;
       notification.innerHTML = `
         <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+          ${type === "success" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' : type === "error" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' : '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>'}
         </svg>
-        ${selectedClients.size} cliente(s) atribuído(s) com sucesso!
+        ${message}
       `;
       document.body.appendChild(notification);
       setTimeout(() => document.body.removeChild(notification), 5000);
+    };
+
+    const processBatch = async (batch: { document?: string; clientName?: string; }[]) => {
+      try {
+        await assignCollectorToClients(selectedCollector, batch);
+        successCount += batch.length;
+      } catch (error) {
+        console.error("Erro ao atribuir cobrador em lote:", error);
+        errorCount += batch.length;
+      } finally {
+        processedCount += batch.length;
+        showNotification(`Processando... ${processedCount}/${totalClients} clientes`, "info");
+      }
+    };
+
+    try {
+      if (totalClients > MAX_BATCH_SIZE) {
+        showNotification(`Iniciando atribuição em lotes. Total: ${totalClients} clientes.`, "info");
+        for (let i = 0; i < totalClients; i += MAX_BATCH_SIZE) {
+          const batch = clientsToProcess.slice(i, i + MAX_BATCH_SIZE);
+          await processBatch(batch);
+          if (i + MAX_BATCH_SIZE < totalClients) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Delay de 1 segundo entre lotes
+          }
+        }
+        if (errorCount === 0) {
+          showNotification(`${successCount} cliente(s) atribuído(s) com sucesso em lotes!`, "success");
+        } else if (successCount === 0) {
+          showNotification(`Erro ao atribuir cobrador a todos os ${errorCount} clientes.`, "error");
+        } else {
+          showNotification(`${successCount} clientes atribuídos, ${errorCount} com erro.`, "error");
+        }
+      } else {
+        await assignCollectorToClients(selectedCollector, clientsToProcess);
+        showNotification(`${totalClients} cliente(s) atribuído(s) com sucesso!`, "success");
+      }
       setSelectedClients(new Set());
     } catch (error) {
-      console.error("Erro ao atribuir cobrador:", error);
-      // Error notification
-      const notification = document.createElement("div");
-      notification.className =
-        "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
-      notification.innerHTML = `
-        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-        </svg>
-        Erro ao atribuir cobrador. Tente novamente.
-      `;
-      document.body.appendChild(notification);
-      setTimeout(() => document.body.removeChild(notification), 5000);
+      console.error("Erro geral ao atribuir cobrador:", error);
+      showNotification("Erro ao atribuir cobrador. Tente novamente.", "error");
     } finally {
       setLoading(false);
     }
@@ -454,7 +480,7 @@ export function ClientAssignment() {
 
     // Verificar se os clientes selecionados realmente têm cobradores
     const selectedClientsData = Array.from(selectedClients)
-      .map((doc) => clientsData.find((c) => c.documento === doc))
+      .map((uniqueKey) => clientsData.find((c) => c.uniqueKey === uniqueKey))
       .filter(Boolean);
 
     const clientsWithCollectors = selectedClientsData.filter(
@@ -483,51 +509,67 @@ export function ClientAssignment() {
     setShowRemoveModal(false);
 
     setLoading(true);
-    try {
-      console.log(
-        "Iniciando remoção de cobradores para:",
-        Array.from(selectedClients)
-      );
+    const clientsToProcess = Array.from(selectedClients).map(key => {
+      const client = clientsData.find(c => c.uniqueKey === key);
+      return { document: client?.documento, clientName: client?.cliente };
+    });
 
-      await removeCollectorFromClients(
-        Array.from(selectedClients).map(key => {
-          const client = clientsData.find(c => c.uniqueKey === key);
-          return { document: client?.documento, clientName: client?.cliente };
-        })
-      );
+    const totalClients = clientsToProcess.length;
+    let processedCount = 0;
+    let successCount = 0;
+    let errorCount = 0;
 
-      // Success notification
+    const showNotification = (message: string, type: "success" | "error" | "info") => {
       const notification = document.createElement("div");
-      notification.className =
-        "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
+      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center`;
       notification.innerHTML = `
         <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+          ${type === "success" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' : type === "error" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' : '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>'}
         </svg>
-        Cobrador removido de ${modalData.clientsWithCollectors || 0} cliente(s)!
+        ${message}
       `;
       document.body.appendChild(notification);
       setTimeout(() => document.body.removeChild(notification), 5000);
+    };
+
+    const processBatch = async (batch: { document?: string; clientName?: string; }[]) => {
+      try {
+        await removeCollectorFromClients(batch);
+        successCount += batch.length;
+      } catch (error) {
+        console.error("Erro ao remover cobrador em lote:", error);
+        errorCount += batch.length;
+      } finally {
+        processedCount += batch.length;
+        showNotification(`Processando remoção... ${processedCount}/${totalClients} clientes`, "info");
+      }
+    };
+
+    try {
+      if (totalClients > MAX_BATCH_SIZE) {
+        showNotification(`Iniciando remoção em lotes. Total: ${totalClients} clientes.`, "info");
+        for (let i = 0; i < totalClients; i += MAX_BATCH_SIZE) {
+          const batch = clientsToProcess.slice(i, i + MAX_BATCH_SIZE);
+          await processBatch(batch);
+          if (i + MAX_BATCH_SIZE < totalClients) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Delay de 1 segundo entre lotes
+          }
+        }
+        if (errorCount === 0) {
+          showNotification(`Cobrador removido de ${successCount} cliente(s) com sucesso em lotes!`, "success");
+        } else if (successCount === 0) {
+          showNotification(`Erro ao remover cobrador de todos os ${errorCount} clientes.`, "error");
+        } else {
+          showNotification(`${successCount} clientes processados, ${errorCount} com erro na remoção.`, "error");
+        }
+      } else {
+        await removeCollectorFromClients(clientsToProcess);
+        showNotification(`Cobrador removido de ${totalClients} cliente(s)!`, "success");
+      }
       setSelectedClients(new Set());
     } catch (error) {
-      console.error("Erro ao remover cobrador:", error);
-      // Error notification with more details
-      const notification = document.createElement("div");
-      notification.className =
-        "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center max-w-md";
-      notification.innerHTML = `
-        <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-        </svg>
-        <div>
-          <div>Erro ao remover cobrador</div>
-          <div class="text-xs mt-1 opacity-90">${
-            error instanceof Error ? error.message : "Erro desconhecido"
-          }</div>
-        </div>
-      `;
-      document.body.appendChild(notification);
-      setTimeout(() => document.body.removeChild(notification), 8000);
+      console.error("Erro geral ao remover cobrador:", error);
+      showNotification("Erro ao remover cobrador. Tente novamente.", "error");
     } finally {
       setLoading(false);
     }

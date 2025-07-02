@@ -1019,7 +1019,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
         console.log(`Lote processado com sucesso. Total de parcelas atualizadas até agora: ${totalParcelasAtualizadas}`);
       }
 
-      await refreshData();
+      // await refreshData(); // Moved outside the loop
+      await refreshData(); // Moved outside the loop
       console.log(`✅ Atribuição concluída: ${clientIdentifiers.length} clientes (${totalParcelasAtualizadas} parcelas) atribuídos ao cobrador ${collectorId}`);
     } catch (err) {
       console.error('Erro ao atribuir cobrador aos clientes:', err);
@@ -1094,7 +1095,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
         console.log(`Lote processado com sucesso. Total de parcelas atualizadas até agora: ${totalParcelasAtualizadas}`);
       }
 
-      await refreshData();
+      // await refreshData(); // Moved outside the loop
+      await refreshData(); // Moved outside the loop
       console.log(`✅ Remoção concluída: ${clientIdentifiers.length} clientes (${totalParcelasAtualizadas} parcelas) removidos do cobrador`);
     } catch (err) {
       console.error('Erro ao remover cobrador dos clientes:', err);
