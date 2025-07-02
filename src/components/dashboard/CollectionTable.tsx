@@ -18,12 +18,16 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
-import { Collection, ClientGroup } from '../../types';
+import { Collection, ClientGroup, SaleGroup } from '../../types';
 import { formatCurrency } from '../../utils/mockData';
 import CollectionModal from './CollectionModal';
 import ClientDetailModal from './ClientDetailModal';
 import SaleDetailsModal from './SaleDetailsModal';
 import { useCollection } from '../../contexts/CollectionContext';
+
+interface ClientGroupWithMapSales extends Omit<ClientGroup, 'sales'> {
+  sales: Map<string, SaleGroup>;
+}
 
 interface CollectionTableProps {
   collections: Collection[];
@@ -126,7 +130,7 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
   const clientGroups = useMemo(() => {
     if (userType === 'manager') {
       // Usar as collections filtradas passadas como prop
-      const groupsMap = new Map<string, ClientGroup>();
+      const groupsMap = new Map<string, ClientGroupWithMapSales>();
       
       collections.forEach(collection => {
         const key = (collection.documento || collection.cliente || '').trim();
@@ -147,11 +151,11 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
             totalValue: 0,
             totalReceived: 0,
             pendingValue: 0,
-            sales: new Map()
+            sales: new Map<string, SaleGroup>() // Initialize sales as a Map
           });
         }
         
-        const group = groupsMap.get(key);
+        const group = groupsMap.get(key)!; // Asserting non-null
         group.totalValue += collection.valor_original || 0;
         group.totalReceived += collection.valor_recebido || 0;
         group.pendingValue = group.totalValue - group.totalReceived;
@@ -173,7 +177,7 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
           });
         }
         
-        const sale = group.sales.get(saleKey);
+        const sale = group.sales.get(saleKey)!; // Asserting non-null
         sale.totalValue += collection.valor_original || 0;
         sale.totalReceived += collection.valor_recebido || 0;
         sale.pendingValue = sale.totalValue - sale.totalReceived;
@@ -193,7 +197,7 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
       return Array.from(groupsMap.values()).map(group => ({
         ...group,
         sales: Array.from(group.sales.values())
-      }));
+      })) as ClientGroup[];
     } else {
       // Para cobradores, usar a função original
       return getClientGroups(collectorId);
