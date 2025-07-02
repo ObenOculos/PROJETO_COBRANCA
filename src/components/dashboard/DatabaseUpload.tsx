@@ -19,6 +19,7 @@ interface InsertResult {
   message?: string;
   error?: string;
   details?: any;
+  invalidRows?: FileData[];
 }
 
 const DatabaseUpload: React.FC = () => {
@@ -99,55 +100,97 @@ const DatabaseUpload: React.FC = () => {
       reader.onload = async (e: ProgressEvent<FileReader>) => {
         try {
           const text = e.target?.result as string;
+          if (!text || text.trim() === '') {
+            return reject(new Error('Arquivo CSV está vazio'));
+          }
+
           const isCSV = file.name.toLowerCase().endsWith('.csv');
-          
-          if (isCSV) {
-            console.log('📄 Processando CSV...');
-            const lines = text.split('\n').filter(line => line.trim());
-            console.log(`📊 Total de linhas: ${lines.length}`);
-            
-            if (lines.length === 0) {
-              reject(new Error('Arquivo CSV está vazio'));
-              return;
-            }
-            
-            // Detectar separador automaticamente
-            const firstLine = lines[0];
-            let separator = ',';
-            if (firstLine.includes(';') && !firstLine.includes(',')) {
-              separator = ';';
-            } else if (firstLine.includes('\t')) {
-              separator = '\t';
-            }
-            
-            console.log(`🔍 Separador detectado: "${separator}"`);
-            
-            const headers = firstLine.split(separator).map(h => h.trim().replace(/"/g, ''));
-            console.log('📋 Headers encontrados:', headers);
-            
-            const data: FileData[] = [];
-            
-            for (let i = 1; i < lines.length; i++) {
-              const values = lines[i].split(separator).map(v => v.trim().replace(/"/g, ''));
-              if (values.length >= 2 && values[0]) { // Garantir que tem pelo menos id_parcela
-                const row: FileData = {};
-                headers.forEach((header, index) => {
-                  row[header] = values[index] || '';
-                });
-                data.push(row);
-                console.log(`📝 Linha ${i}:`, row);
-              } else if (values.length < 2) {
-                console.log(`⚠️ Linha ${i} ignorada (poucos campos):`, values);
-              } else if (!values[0]) {
-                console.log(`⚠️ Linha ${i} ignorada (id_parcela vazio):`, values);
+          if (!isCSV) {
+            return reject(new Error('Formato Excel não implementado. Use CSV.'));
+          }
+
+          console.log('📄 Processando CSV com parser robusto...');
+
+          // Detectar separador
+          const firstLine = text.substring(0, text.indexOf('\n'));
+          let separator = ',';
+          if (firstLine.includes(';') && !firstLine.includes(',')) separator = ';';
+          else if (firstLine.includes('\t')) separator = '\t';
+          console.log(`🔍 Separador detectado: "${separator}"`);
+
+          const rows = [];
+          let currentField = '';
+          let currentRow = [];
+          let inQuotedField = false;
+
+          for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+
+            if (inQuotedField) {
+              if (char === '"') {
+                // Verifica se é uma aspa de escape (duas aspas)
+                if (i + 1 < text.length && text[i + 1] === '"') {
+                  currentField += '"';
+                  i++; // Pula a próxima aspa
+                } else {
+                  inQuotedField = false;
+                }
+              } else {
+                currentField += char;
+              }
+            } else {
+              if (char === '"') {
+                inQuotedField = true;
+              } else if (char === separator) {
+                currentRow.push(currentField);
+                currentField = '';
+              } else if (char === '\n' || char === '\r') {
+                // Fim da linha
+                if (text[i-1] !== '\r' || char !== '\n') { // Lida com \r\n
+                    currentRow.push(currentField);
+                    rows.push(currentRow);
+                    currentRow = [];
+                    currentField = '';
+                }
+                if (char === '\r' && text[i+1] === '\n') {
+                    i++; // Pula o \n
+                }
+              } else {
+                currentField += char;
               }
             }
-            
-            console.log(`✅ ${data.length} registros processados`);
-            resolve(data);
-          } else {
-            reject(new Error('Formato Excel não implementado neste exemplo. Use CSV por enquanto.'));
           }
+          // Adiciona o último campo e linha se houver
+          currentRow.push(currentField);
+          rows.push(currentRow);
+
+          if (rows.length < 2) {
+            return reject(new Error('CSV não contém dados suficientes (cabeçalho + pelo menos uma linha).'));
+          }
+
+          const headers = rows[0].map(h => h.trim());
+          console.log('📋 Headers encontrados:', headers);
+
+          const data: FileData[] = [];
+          for (let i = 1; i < rows.length; i++) {
+            const values = rows[i];
+            // Ignora linhas em branco que podem ter sido adicionadas no final
+            if (values.length === 1 && values[0] === '') continue;
+
+            if (values.length >= headers.length) {
+              const row: FileData = {};
+              headers.forEach((header, index) => {
+                row[header] = values[index] || '';
+              });
+              data.push(row);
+            } else {
+              console.log(`⚠️ Linha ${i + 1} ignorada (número de colunas incompatível com o cabeçalho):`, values);
+            }
+          }
+
+          console.log(`✅ ${data.length} registros processados`);
+          resolve(data);
+
         } catch (error) {
           console.error('❌ Erro ao processar arquivo:', error);
           reject(error);
@@ -270,7 +313,8 @@ const DatabaseUpload: React.FC = () => {
   const insertNewParcelasInSupabase = async (data: FileData[], onProgress?: (percentage: number, message: string) => void): Promise<InsertResult> => {
     try {
       const validData = data.filter(row => row.id_parcela && row.id_parcela.trim() !== '');
-      const invalidRowsCount = data.length - validData.length;
+      const invalidRows = data.filter(row => !row.id_parcela || row.id_parcela.trim() === '');
+      const invalidRowsCount = invalidRows.length;
 
       if (invalidRowsCount > 0) {
         console.warn(`[DataUpload] Ignorando ${invalidRowsCount} linhas por não terem um id_parcela válido.`);
@@ -335,14 +379,15 @@ const DatabaseUpload: React.FC = () => {
 
       let message = `${successfulInserts} parcelas inseridas com sucesso`;
       if (invalidRowsCount > 0) {
-        message += `. ${invalidRowsCount} linhas foram ignoradas por não possuírem um id_parcela válido.`;
+        message += `. ${invalidRowsCount} linhas foram ignoradas. Veja os detalhes no debug.`;
       }
 
       console.log('✅ Dados inseridos com sucesso:', successfulInserts);
       return { 
         success: true, 
         message: message,
-        details: null // details will be null as we are inserting in chunks
+        details: null,
+        invalidRows: invalidRows
       };
     } catch (error) {
       console.error('❌ Exceção ao inserir dados:', error);
@@ -352,6 +397,7 @@ const DatabaseUpload: React.FC = () => {
       };
     }
   };
+
 
   const handleUploadStatus = async () => {
     if (!statusFile) {
@@ -453,9 +499,15 @@ const DatabaseUpload: React.FC = () => {
       
       if (result.success) {
         setUploadStatus(`✅ ${result.message}`);
-        setDebugInfo('✅ Inserção realizada com sucesso!');
         setProgressMessage(`✅ ${result.message}`);
         setProgressPercentage(100);
+
+        if (result.invalidRows && result.invalidRows.length > 0) {
+          const invalidRowsInfo = result.invalidRows.map(row => JSON.stringify(row)).join('\n');
+          setDebugInfo(`✅ Inserção concluída, mas ${result.invalidRows.length} linhas foram ignoradas por falta de id_parcela:\n${invalidRowsInfo}`);
+        } else {
+          setDebugInfo('✅ Todas as novas parcelas foram inseridas com sucesso!');
+        }
       } else {
         setUploadStatus(`❌ Erro: ${result.error}`);
         setDebugInfo(`❌ Erro detalhado: ${result.error}`);
