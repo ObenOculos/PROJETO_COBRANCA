@@ -45,32 +45,49 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Estado para controlar se é o primeiro carregamento
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  
 
   useEffect(() => {
-    // Só carregar dados se o usuário estiver logado
     if (user) {
       console.log('Usuário logado, carregando dados...');
+      setGlobalLoading(true, 'Carregando dados do sistema...');
       
-      // Só mostra loading global se não for o carregamento inicial
-      if (!isInitialLoad) {
-        setGlobalLoading(true, 'Carregando dados do sistema...');
-      }
-      
-      Promise.all([
-        fetchUsers(),
-        fetchCollectorStores(),
-        fetchCollections(),
-        fetchSalePayments(),
-        fetchScheduledVisits()
-      ]).finally(() => {
-        if (!isInitialLoad) {
-          setGlobalLoading(false);
+
+      const fetchData = async () => {
+        try {
+          await Promise.all([
+            fetchUsers(),
+            fetchCollectorStores(),
+            fetchCollections(),
+            fetchSalePayments(),
+            fetchScheduledVisits()
+          ]);
+        } catch (error) {
+          console.error('Erro ao carregar dados iniciais:', error);
+          setError('Erro ao carregar dados iniciais. Tente novamente.');
         }
-        setLoading(false);
-        setIsInitialLoad(false);
-      });
+      };
+
+      // Race the data fetching with a timeout
+      const timeoutPromise = new Promise<void>((resolve) =>
+        setTimeout(() => {
+          console.warn('Tempo limite excedido ao carregar dados. Liberando o estado de carregamento.');
+          resolve(); // Resolve the timeout promise to clear loading state
+        }, 20000) // 20 seconds timeout
+      );
+
+      Promise.race([fetchData(), timeoutPromise])
+        .then(() => {
+          setGlobalLoading(false);
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error('Erro na Promise.race:', error);
+          setError('Erro ao carregar dados. Tente novamente.');
+          setGlobalLoading(false);
+          setLoading(false);
+        });
+
     } else {
       console.log('Usuário não logado, limpando dados...');
       setCollections([]);
@@ -79,15 +96,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
       setSalePayments([]);
       setScheduledVisits([]);
       setLoading(false);
-      if (!isInitialLoad) {
-        setGlobalLoading(false);
-      }
+      setGlobalLoading(false);
     }
   }, [user]);
 
   const fetchCollections = async () => {
     try {
-      setLoading(true);
       setError(null);
       
       console.log('Buscando dados da tabela BANCO_DADOS...');

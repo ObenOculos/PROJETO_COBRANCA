@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { CollectionProvider } from './contexts/CollectionContext';
+import { CollectionProvider, useCollection } from './contexts/CollectionContext';
 import { LoadingProvider, useLoading } from './contexts/LoadingContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import LoginForm from './components/auth/LoginForm';
@@ -11,30 +11,31 @@ import GlobalLoading from './components/common/GlobalLoading';
 
 const AppContent: React.FC = () => {
   const { user, isLoading: authLoading } = useAuth();
+  const { isLoading: collectionLoading } = useCollection();
   const { isLoading: globalLoading, loadingMessage } = useLoading();
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  
+  // Verifica se QUALQUER loading está ativo
+  const isAnyLoading = authLoading || collectionLoading || globalLoading;
+  
+  // Determina a mensagem de loading com prioridade
+  const getLoadingMessage = () => {
+    if (authLoading) return "Verificando sessão...";
+    if (collectionLoading) return "Carregando dados...";
+    if (globalLoading) return loadingMessage;
+    return "Carregando...";
+  };
 
-  // Marca quando o carregamento inicial foi concluído
-  useEffect(() => {
-    if (!authLoading && !globalLoading) {
-      setInitialLoadComplete(true);
-    }
-  }, [authLoading, globalLoading]);
-
-  // Durante o carregamento inicial (autenticação + dados), mostra apenas um loading
-  if (!initialLoadComplete && (authLoading || globalLoading)) {
-    return <GlobalLoading message={authLoading ? "Verificando sessão..." : loadingMessage} />;
+  // Mostra loading enquanto qualquer processo estiver carregando
+  if (isAnyLoading) {
+    return <GlobalLoading message={getLoadingMessage()} />;
   }
 
-  // Após o carregamento inicial, mostra loading apenas para operações específicas
-  if (initialLoadComplete && globalLoading) {
-    return <GlobalLoading message={loadingMessage} />;
-  }
-
+  // Se não há usuário logado, mostra tela de login
   if (!user) {
     return <LoginForm />;
   }
 
+  // Usuário logado e todos os dados carregados - mostra a aplicação
   return (
     <div className="min-h-screen bg-slate-100">
       <Header />

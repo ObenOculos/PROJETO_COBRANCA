@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AuthContextType, User } from '../types';
 import { supabase } from '../lib/supabase';
+import { useLoading } from './LoadingContext';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -20,9 +21,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showInactivityModal, setShowInactivityModal] = useState(false);
+  const { withLoading } = useLoading();
 
   // Configurações de inatividade
-  const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 30 minutos
+  const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutos
   let inactivityTimer: NodeJS.Timeout;
 
   // Função para resetar o timer de inatividade
@@ -40,8 +42,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     // Check for existing session in localStorage
-    const checkSession = () => {
+    const checkSession = async () => {
       try {
+        setIsLoading(true);
+        
+        // Adiciona um pequeno delay para mostrar o loading no refresh
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
         const savedUser = localStorage.getItem('sistema_user');
         if (savedUser) {
           const userData = JSON.parse(savedUser);
@@ -88,64 +95,77 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [user]);
 
   const login = async (login: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    
     try {
-      console.log('Tentando fazer login com:', { login });
-      
-      // Buscar usuário na tabela users
-      const { data: users, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('login', login)
-        .eq('password', password)
-        .limit(1);
+      // Usa withLoading para mostrar loading durante o login
+      const success = await withLoading(
+        (async () => {
+          console.log('Tentando fazer login com:', { login });
+          
+          // Buscar usuário na tabela users
+          const { data: users, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('login', login)
+            .eq('password', password)
+            .limit(1);
 
-      console.log('Resultado da consulta:', { users, userError });
+          console.log('Resultado da consulta:', { users, userError });
 
-      if (userError) {
-        console.error('Erro ao consultar usuários:', userError);
-        setIsLoading(false);
-        return false;
-      }
+          if (userError) {
+            console.error('Erro ao consultar usuários:', userError);
+            return false;
+          }
 
-      if (!users || users.length === 0) {
-        console.log('Usuário não encontrado com essas credenciais');
-        setIsLoading(false);
-        return false;
-      }
+          if (!users || users.length === 0) {
+            console.log('Usuário não encontrado com essas credenciais');
+            return false;
+          }
 
-      const foundUser = users[0];
-      console.log('Usuário encontrado:', foundUser);
+          const foundUser = users[0];
+          console.log('Usuário encontrado:', foundUser);
 
-      // Criar objeto do usuário
-      const userObj: User = {
-        id: foundUser.id,
-        name: foundUser.name,
-        login: foundUser.login,
-        password: foundUser.password,
-        type: foundUser.type as 'manager' | 'collector',
-        createdAt: foundUser.created_at || new Date().toISOString(),
-      };
+          // Criar objeto do usuário
+          const userObj: User = {
+            id: foundUser.id,
+            name: foundUser.name,
+            login: foundUser.login,
+            password: foundUser.password,
+            type: foundUser.type as 'manager' | 'collector',
+            createdAt: foundUser.created_at || new Date().toISOString(),
+          };
 
-      // Salvar na sessão local
-      localStorage.setItem('sistema_user', JSON.stringify(userObj));
-      
-      console.log('Login realizado com sucesso:', userObj);
-      setUser(userObj);
-      setIsLoading(false);
-      return true;
+          // Salvar na sessão local
+          localStorage.setItem('sistema_user', JSON.stringify(userObj));
+          
+          console.log('Login realizado com sucesso:', userObj);
+          setUser(userObj);
+          return true;
+        })(),
+        'Fazendo login...' // Mensagem personalizada
+      );
+
+      return success;
     } catch (err) {
       console.error('Erro no login:', err);
-      setIsLoading(false);
       return false;
     }
   };
 
   const logout = async () => {
     try {
-      localStorage.removeItem('sistema_user');
-      setUser(null);
+      // Usa withLoading para logout se necessário
+      await withLoading(
+        (async () => {
+          localStorage.removeItem('sistema_user');
+          setUser(null);
+          
+          // Limpa o timer de inatividade
+          if (inactivityTimer) {
+            clearTimeout(inactivityTimer);
+          }
+        })(),
+        'Saindo...'
+      );
     } catch (err) {
       console.error('Erro no logout:', err);
       setUser(null);
