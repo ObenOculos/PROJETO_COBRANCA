@@ -58,10 +58,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
           await Promise.all([
             fetchUsers(),
             fetchCollectorStores(),
-            fetchCollections(),
             fetchSalePayments(),
             fetchScheduledVisits()
           ]);
+          
+          // Now fetch collections, which can use the updated collectorStores state
+          await fetchCollections();
         } catch (error) {
           console.error('Erro ao carregar dados iniciais:', error);
           setError('Erro ao carregar dados iniciais. Tente novamente.');
@@ -106,29 +108,26 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
       
       console.log('Buscando dados da tabela BANCO_DADOS...');
       
-      // Primeiro, verificar o total de registros no banco
-      const { count, error: countError } = await supabase
-        .from('BANCO_DADOS')
-        .select('*', { count: 'exact', head: true });
-      
-      if (countError) {
-        console.error('Erro ao contar registros:', countError);
-      } else {
-        console.log('Total de registros no banco:', count);
+      let query = supabase.from('BANCO_DADOS').select('*');
+
+      if (user?.type === 'collector') {
+        const assignedStores = getCollectorStores(user.id);
+        console.log(`Cobrador ${user.name} (${user.id}) tem lojas atribuídas:`, assignedStores);
+        
+        // Fetch collections assigned directly to the collector OR to their assigned stores
+        query = query.or(`user_id.eq.${user.id},nome_da_loja.in.(${assignedStores.join(',')})`);
       }
       
-      // Carregar TODOS os dados sem limite
+      // Carregar TODOS os dados sem limite (ou com limite para o cobrador)
       let allData: any[] = [];
       let from = 0;
-      const pageSize = 1000;
+      const pageSize = 1000; // Still use pagination for large datasets, even with filters
       let hasMore = true;
       
       while (hasMore) {
         console.log(`Carregando registros ${from} a ${from + pageSize - 1}...`);
         
-        const { data: pageData, error: pageError } = await supabase
-          .from('BANCO_DADOS')
-          .select('*')
+        const { data: pageData, error: pageError } = await query
           .range(from, from + pageSize - 1)
           .order('id_parcela', { ascending: true });
           

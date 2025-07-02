@@ -49,7 +49,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Adiciona um pequeno delay para mostrar o loading no refresh
         await new Promise(resolve => setTimeout(resolve, 800));
         
-        const savedUser = localStorage.getItem('sistema_user');
+        const savedUser = sessionStorage.getItem('sistema_user');
         if (savedUser) {
           const userData = JSON.parse(savedUser);
           setUser(userData);
@@ -135,7 +135,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           };
 
           // Salvar na sessão local
-          localStorage.setItem('sistema_user', JSON.stringify(userObj));
+          sessionStorage.setItem('sistema_user', JSON.stringify(userObj));
           
           console.log('Login realizado com sucesso:', userObj);
           setUser(userObj);
@@ -156,7 +156,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Usa withLoading para logout se necessário
       await withLoading(
         (async () => {
-          localStorage.removeItem('sistema_user');
+          sessionStorage.removeItem('sistema_user');
           setUser(null);
           
           // Limpa o timer de inatividade

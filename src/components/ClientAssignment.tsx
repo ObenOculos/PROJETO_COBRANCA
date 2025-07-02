@@ -951,7 +951,7 @@ export function ClientAssignment() {
                     <span className="ml-2 text-sm text-gray-700">
                       Incluir clientes sem data de vencimento
                     </span>
-                  </label>
+                  </label> 
                 </div>
               )}
             </div>
