@@ -185,15 +185,23 @@ const FilterBar: React.FC<FilterBarProps> = ({
           </div>
           <div className="flex items-center">
             {hasActiveFilters && (
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={(e) => {
                   e.stopPropagation();
                   clearFilters();
                 }}
-                className="mr-2 p-1 text-red-600 hover:text-red-800"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                    clearFilters();
+                  }
+                }}
+                className="mr-2 p-1 text-red-600 hover:text-red-800 cursor-pointer"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </div>
             )}
             <svg
               className={`w-4 h-4 text-gray-500 transform transition-transform ${isExpanded ? "rotate-180" : ""}`}
