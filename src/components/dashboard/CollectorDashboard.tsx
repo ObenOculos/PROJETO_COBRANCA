@@ -198,7 +198,7 @@ const CollectorDashboard: React.FC = () => {
 
       case 'collections':
         return (
-          <div className="space-y-4">
+          <div>
             <FilterBar 
               filters={filters} 
               onFilterChange={setFilters} 

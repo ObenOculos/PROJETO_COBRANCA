@@ -259,7 +259,7 @@ const ManagerDashboard: React.FC = () => {
 
             {/* Content based on selected view */}
             {collectionsView === 'table' ? (
-              <div className="space-y-4">
+              <div>
                 <FilterBar 
                   filters={filters} 
                   onFilterChange={setFilters} 

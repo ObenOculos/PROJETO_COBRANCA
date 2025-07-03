@@ -92,7 +92,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-xl shadow-xl max-w-full sm:max-w-lg lg:max-w-4xl w-full max-h-[90vh] overflow-hidden">
+        <div className="bg-white rounded-xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
           {/* Header */}
           <div className="px-4 lg:px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <div className="flex items-center flex-1 min-w-0">
