@@ -870,12 +870,14 @@ export const ClientAssignment = React.memo(() => {
         <div className="p-4 lg:p-6">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="searchTerm" className="block text-sm font-medium text-gray-700 mb-2">
                 Buscar Cliente
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
+                  id="searchTerm"
+                  name="searchTerm"
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -919,10 +921,12 @@ export const ClientAssignment = React.memo(() => {
             <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="filterStatus" className="block text-sm font-medium text-gray-700 mb-2">
                     Status
                   </label>
                   <select
+                    id="filterStatus"
+                    name="filterStatus"
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -934,10 +938,12 @@ export const ClientAssignment = React.memo(() => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="filterCollector" className="block text-sm font-medium text-gray-700 mb-2">
                     Cobrador
                   </label>
                   <select
+                    id="filterCollector"
+                    name="filterCollector"
                     value={filterCollector}
                     onChange={(e) => setFilterCollector(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -952,10 +958,12 @@ export const ClientAssignment = React.memo(() => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="filterCity" className="block text-sm font-medium text-gray-700 mb-2">
                     Cidade
                   </label>
                   <select
+                    id="filterCity"
+                    name="filterCity"
                     value={filterCity}
                     onChange={(e) => {
                       setFilterCity(e.target.value);
@@ -973,10 +981,12 @@ export const ClientAssignment = React.memo(() => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="filterNeighborhood" className="block text-sm font-medium text-gray-700 mb-2">
                     Bairro
                   </label>
                   <select
+                    id="filterNeighborhood"
+                    name="filterNeighborhood"
                     value={filterNeighborhood}
                     onChange={(e) => setFilterNeighborhood(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
@@ -992,10 +1002,12 @@ export const ClientAssignment = React.memo(() => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="filterStore" className="block text-sm font-medium text-gray-700 mb-2">
                     Loja
                   </label>
                   <select
+                    id="filterStore"
+                    name="filterStore"
                     value={filterStore}
                     onChange={(e) => setFilterStore(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1010,10 +1022,12 @@ export const ClientAssignment = React.memo(() => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="filterDateFrom" className="block text-sm font-medium text-gray-700 mb-2">
                     Vencimento De
                   </label>
                   <input
+                    id="filterDateFrom"
+                    name="filterDateFrom"
                     type="date"
                     value={filterDateFrom}
                     onChange={(e) => setFilterDateFrom(e.target.value)}
@@ -1022,10 +1036,12 @@ export const ClientAssignment = React.memo(() => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="filterDateTo" className="block text-sm font-medium text-gray-700 mb-2">
                     Vencimento Até
                   </label>
                   <input
+                    id="filterDateTo"
+                    name="filterDateTo"
                     type="date"
                     value={filterDateTo}
                     onChange={(e) => setFilterDateTo(e.target.value)}
@@ -1038,6 +1054,8 @@ export const ClientAssignment = React.memo(() => {
                 <div className="mt-4">
                   <label className="flex items-center">
                     <input
+                      id="includeWithoutDate"
+                      name="includeWithoutDate"
                       type="checkbox"
                       checked={includeWithoutDate}
                       onChange={(e) =>
@@ -1136,17 +1154,19 @@ export const ClientAssignment = React.memo(() => {
                     {selectedClients.size} cliente
                     {selectedClients.size !== 1 ? "s" : ""} selecionado
                     {selectedClients.size !== 1 ? "s" : ""}
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2 lg:gap-3">
+                  </p>                  
             </div>
                 </div>
 
-                <div className="space-y-3">
-                  <select
-                    value={selectedCollector}
-                    onChange={(e) => setSelectedCollector(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
+                
+                  <div className="space-y-3">
+                <select
+                  id="selectedCollector"
+                  name="selectedCollector"
+                  value={selectedCollector}
+                  onChange={(e) => setSelectedCollector(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
                     <option value="">Selecione um cobrador</option>
                     {collectors.map((collector) => (
                       <option key={collector.id} value={collector.id}>
@@ -1187,7 +1207,7 @@ export const ClientAssignment = React.memo(() => {
                     </button>
                   </div>
                 </div>
-              </div>
+              
 
               {selectedClients.size > MAX_BATCH_SIZE && (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -1239,6 +1259,8 @@ export const ClientAssignment = React.memo(() => {
                 <div className="flex items-start gap-3">
                   {/* Larger checkbox for mobile */}
                   <input
+                    id={`select-client-${client.uniqueKey}`}
+                    name={`select-client-${client.uniqueKey}`}
                     type="checkbox"
                     checked={selectedClients.has(client.uniqueKey)}
                     onChange={() => handleSelectClient(client.uniqueKey)}
@@ -1326,6 +1348,7 @@ export const ClientAssignment = React.memo(() => {
           );
         })}
       </div>
+  
 
       {/* Empty State */}
       {filteredClients.length === 0 && (
@@ -1354,10 +1377,12 @@ export const ClientAssignment = React.memo(() => {
               </div>
 
               <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600 whitespace-nowrap">
+                <label htmlFor="itemsPerPage" className="text-sm text-gray-600 whitespace-nowrap">
                   Mostrar:
                 </label>
                 <select
+                  id="itemsPerPage"
+                  name="itemsPerPage"
                   value={itemsPerPage}
                   onChange={(e) =>
                     handleItemsPerPageChange(Number(e.target.value))
