@@ -70,24 +70,22 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
         }
       };
 
-      // Race the data fetching with a timeout
-      const timeoutPromise = new Promise<void>((resolve) =>
-        setTimeout(() => {
-          console.warn('Tempo limite excedido ao carregar dados. Liberando o estado de carregamento.');
-          resolve(); // Resolve the timeout promise to clear loading state
-        }, 20000) // 20 seconds timeout
-      );
+      // Define a timeout for the data fetching
+      const timeoutId = setTimeout(() => {
+        console.warn('Tempo limite excedido ao carregar dados. Liberando o estado de carregamento.');
+        setGlobalLoading(false);
+        setLoading(false);
+      }, 20000); // 20 seconds timeout
 
-      Promise.race([fetchData(), timeoutPromise])
-        .then(() => {
-          setGlobalLoading(false);
-          setLoading(false);
-        })
+      fetchData()
         .catch((error) => {
-          console.error('Erro na Promise.race:', error);
-          setError('Erro ao carregar dados. Tente novamente.');
-          setGlobalLoading(false);
-          setLoading(false);
+            console.error('Erro ao carregar dados:', error);
+            setError('Erro ao carregar dados. Tente novamente.');
+        })
+        .finally(() => {
+            clearTimeout(timeoutId); // Clear the timeout
+            setGlobalLoading(false);
+            setLoading(false);
         });
 
     } else {
