@@ -698,10 +698,42 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           const key = `${c.documento}-${c.cliente}`;
           return targetClientKeys.has(key);
         });
-      } else {
-        // Para outros filtros, usar lógica de parcela individual
+      // Para outros filtros, incluindo 'pendente', usar lógica de cliente
+      } else if (filters.status?.toLowerCase() === "pendente") {
+        const clientGroups = new Map<string, Collection[]>();
+        filtered.forEach((c) => {
+          const key = `${c.documento}-${c.cliente}`;
+          if (!clientGroups.has(key)) {
+            clientGroups.set(key, []);
+          }
+          clientGroups.get(key)!.push(c);
+        });
+
+        const targetClientKeys = new Set<string>();
+        clientGroups.forEach((clientCollections, clientKey) => {
+          const totalValue = clientCollections.reduce(
+            (sum, c) => sum + c.valor_original,
+            0,
+          );
+          const totalReceived = clientCollections.reduce(
+            (sum, c) => sum + c.valor_recebido,
+            0,
+          );
+          const pendingValue = totalValue - totalReceived;
+
+          // Cliente é pendente se não tem valor recebido E ainda tem valor pendente
+          if (totalReceived <= 0.01 && pendingValue > 0) {
+            targetClientKeys.add(clientKey);
+          }
+        });
+
         filtered = filtered.filter((c) => {
-          // Determinar o status real da parcela baseado na lógica de negócio
+          const key = `${c.documento}-${c.cliente}`;
+          return targetClientKeys.has(key);
+        });
+      } else {
+        // Para qualquer outro status não tratado acima, usar a lógica de parcela individual
+        filtered = filtered.filter((c) => {
           const valorRecebido = c.valor_recebido || 0;
           const valorOriginal = c.valor_original || 0;
 
@@ -715,7 +747,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             realStatus = "parcial";
           }
 
-          // Se existe um status explícito, normalizar manualmente
           if (c.status) {
             const status = c.status.toLowerCase();
             if (
@@ -832,15 +863,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     const clientMap = new Map<string, ClientGroup>();
 
     filteredCollections.forEach((collection) => {
-      if (!collection.cliente || !collection.documento) return;
+      if (!collection.cliente) return; // Cliente name is always required
 
-      const clientId = collection.documento; // Usando documento como identificador único
+      // Use documento as unique identifier if available, otherwise use client name
+      const clientId = collection.documento || collection.cliente;
 
       if (!clientMap.has(clientId)) {
         clientMap.set(clientId, {
           clientId,
           client: collection.cliente,
-          document: collection.documento,
+          document: collection.documento || '',
           phone: collection.telefone || undefined,
           mobile: collection.celular || undefined,
           address: collection.endereco || "",
