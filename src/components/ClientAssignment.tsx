@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Search,
@@ -40,10 +39,9 @@ export const ClientAssignment = React.memo(() => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCollector, setSelectedCollector] = useState<string>("");
   const [selectedClients, setSelectedClients] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [loading, setLoading] = useState(false);
-  
 
   // Novos filtros
   const [filterCollector, setFilterCollector] = useState<string>("");
@@ -59,7 +57,10 @@ export const ClientAssignment = React.memo(() => {
   // Modal states
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
-  const [modalData, setModalData] = useState<{ clientsWithCollectors?: number; totalClients?: number }>({});
+  const [modalData, setModalData] = useState<{
+    clientsWithCollectors?: number;
+    totalClients?: number;
+  }>({});
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
@@ -72,7 +73,7 @@ export const ClientAssignment = React.memo(() => {
 
   // Função utilitária para parsear e normalizar datas
   const parseAndNormalizeDate = (
-    dateStr: string | null | undefined
+    dateStr: string | null | undefined,
   ): Date | null => {
     if (!dateStr || dateStr === "null" || dateStr === "") {
       return null;
@@ -90,7 +91,7 @@ export const ClientAssignment = React.memo(() => {
       else if (dateStr.includes("/")) {
         const [day, month, year] = dateStr.split("/");
         date = new Date(
-          `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+          `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`,
         );
       }
       // Outro formato
@@ -115,7 +116,7 @@ export const ClientAssignment = React.memo(() => {
   // Obter opções únicas para filtros
   const clientsData = useMemo(() => {
     const getCollectorForCollection = (
-      collection: Collection
+      collection: Collection,
     ): { collectorId?: string; collectorName?: string } => {
       if (collection.user_id) {
         const collector = users.find((u) => u.id === collection.user_id);
@@ -127,11 +128,11 @@ export const ClientAssignment = React.memo(() => {
 
       if (collection.nome_da_loja) {
         const storeAssignment = collectorStores.find(
-          (cs) => cs.storeName === collection.nome_da_loja
+          (cs) => cs.storeName === collection.nome_da_loja,
         );
         if (storeAssignment) {
           const collector = users.find(
-            (u) => u.id === storeAssignment.collectorId
+            (u) => u.id === storeAssignment.collectorId,
           );
           return {
             collectorId: storeAssignment.collectorId,
@@ -146,7 +147,7 @@ export const ClientAssignment = React.memo(() => {
     const clientsMap = new Map<string, ClientWithCollections>();
 
     collections.forEach((collection) => {
-      const key = (collection.documento || collection.cliente || '').trim();
+      const key = (collection.documento || collection.cliente || "").trim();
 
       if (!key) {
         console.warn("Collection sem documento ou nome válido:", collection);
@@ -159,7 +160,7 @@ export const ClientAssignment = React.memo(() => {
 
         clientsMap.set(key, {
           cliente: collection.cliente || "Cliente sem nome",
-          documento: collection.documento || '',
+          documento: collection.documento || "",
           uniqueKey: key,
           collections: [],
           collectorId: collectorId,
@@ -232,7 +233,9 @@ export const ClientAssignment = React.memo(() => {
       const matchesNeighborhood =
         !filterNeighborhood || client.bairro === filterNeighborhood;
 
-      const matchesStore = !filterStore || client.collections.some(c => c.nome_da_loja === filterStore);
+      const matchesStore =
+        !filterStore ||
+        client.collections.some((c) => c.nome_da_loja === filterStore);
 
       // Filtro por período de data de vencimento - VERSÃO CORRIGIDA
       const matchesDateRange = (() => {
@@ -345,7 +348,7 @@ export const ClientAssignment = React.memo(() => {
   const handleSelectAll = () => {
     const currentPageUniqueKeys = paginatedClients.map((c) => c.uniqueKey);
     const allCurrentPageSelected = currentPageUniqueKeys.every((key) =>
-      selectedClients.has(key)
+      selectedClients.has(key),
     );
 
     if (allCurrentPageSelected) {
@@ -399,8 +402,8 @@ export const ClientAssignment = React.memo(() => {
     setShowAssignModal(false);
 
     setLoading(true);
-    const clientsToProcess = Array.from(selectedClients).map(key => {
-      const client = clientsData.find(c => c.uniqueKey === key);
+    const clientsToProcess = Array.from(selectedClients).map((key) => {
+      const client = clientsData.find((c) => c.uniqueKey === key);
       return { document: client?.documento, clientName: client?.cliente };
     });
 
@@ -408,20 +411,25 @@ export const ClientAssignment = React.memo(() => {
     let successCount = 0;
     let errorCount = 0;
 
-    const showNotification = (message: string, type: "success" | "error" | "info") => {
-    const notification = document.createElement("div");
-    notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center`;
-    notification.innerHTML = `
+    const showNotification = (
+      message: string,
+      type: "success" | "error" | "info",
+    ) => {
+      const notification = document.createElement("div");
+      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center`;
+      notification.innerHTML = `
       <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
         ${type === "success" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' : type === "error" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' : '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>'}
       </svg>
       ${message}
     `;
-    document.body.appendChild(notification);
-    setTimeout(() => document.body.removeChild(notification), 5000);
-  };
+      document.body.appendChild(notification);
+      setTimeout(() => document.body.removeChild(notification), 5000);
+    };
 
-    const processBatch = async (batch: { document?: string; clientName?: string; }[]) => {
+    const processBatch = async (
+      batch: { document?: string; clientName?: string }[],
+    ) => {
       try {
         await assignCollectorToClients(selectedCollector, batch);
         successCount += batch.length;
@@ -438,19 +446,31 @@ export const ClientAssignment = React.memo(() => {
           const batch = clientsToProcess.slice(i, i + MAX_BATCH_SIZE);
           await processBatch(batch);
           if (i + MAX_BATCH_SIZE < totalClients) {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Delay de 1 segundo entre lotes
+            await new Promise((resolve) => setTimeout(resolve, 1000)); // Delay de 1 segundo entre lotes
           }
         }
         if (errorCount === 0) {
-          showNotification(`${successCount} cliente(s) atribuído(s) com sucesso em lotes!`, "success");
+          showNotification(
+            `${successCount} cliente(s) atribuído(s) com sucesso em lotes!`,
+            "success",
+          );
         } else if (successCount === 0) {
-          showNotification(`Erro ao atribuir cobrador a todos os ${errorCount} clientes.`, "error");
+          showNotification(
+            `Erro ao atribuir cobrador a todos os ${errorCount} clientes.`,
+            "error",
+          );
         } else {
-          showNotification(`${successCount} clientes atribuídos, ${errorCount} com erro.`, "error");
+          showNotification(
+            `${successCount} clientes atribuídos, ${errorCount} com erro.`,
+            "error",
+          );
         }
       } else {
         await assignCollectorToClients(selectedCollector, clientsToProcess);
-        showNotification(`${totalClients} cliente(s) atribuído(s) com sucesso!`, "success");
+        showNotification(
+          `${totalClients} cliente(s) atribuído(s) com sucesso!`,
+          "success",
+        );
       }
       setSelectedClients(new Set());
     } catch (error) {
@@ -479,7 +499,7 @@ export const ClientAssignment = React.memo(() => {
       .filter(Boolean);
 
     const clientsWithCollectors = selectedClientsData.filter(
-      (c) => c?.collectorId
+      (c) => c?.collectorId,
     );
 
     if (clientsWithCollectors.length === 0) {
@@ -495,7 +515,7 @@ export const ClientAssignment = React.memo(() => {
 
     setModalData({
       clientsWithCollectors: clientsWithCollectors.length,
-      totalClients: selectedClients.size
+      totalClients: selectedClients.size,
     });
     setShowRemoveModal(true);
   };
@@ -504,8 +524,8 @@ export const ClientAssignment = React.memo(() => {
     setShowRemoveModal(false);
 
     setLoading(true);
-    const clientsToProcess = Array.from(selectedClients).map(key => {
-      const client = clientsData.find(c => c.uniqueKey === key);
+    const clientsToProcess = Array.from(selectedClients).map((key) => {
+      const client = clientsData.find((c) => c.uniqueKey === key);
       return { document: client?.documento, clientName: client?.cliente };
     });
 
@@ -513,20 +533,25 @@ export const ClientAssignment = React.memo(() => {
     let successCount = 0;
     let errorCount = 0;
 
-    const showNotification = (message: string, type: "success" | "error" | "info") => {
-    const notification = document.createElement("div");
-    notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center`;
-    notification.innerHTML = `
+    const showNotification = (
+      message: string,
+      type: "success" | "error" | "info",
+    ) => {
+      const notification = document.createElement("div");
+      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center`;
+      notification.innerHTML = `
       <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
         ${type === "success" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' : type === "error" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' : '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>'}
       </svg>
       ${message}
     `;
-    document.body.appendChild(notification);
-    setTimeout(() => document.body.removeChild(notification), 5000);
-  };
+      document.body.appendChild(notification);
+      setTimeout(() => document.body.removeChild(notification), 5000);
+    };
 
-    const processBatch = async (batch: { document?: string; clientName?: string; }[]) => {
+    const processBatch = async (
+      batch: { document?: string; clientName?: string }[],
+    ) => {
       try {
         await removeCollectorFromClients(batch);
         successCount += batch.length;
@@ -543,19 +568,31 @@ export const ClientAssignment = React.memo(() => {
           const batch = clientsToProcess.slice(i, i + MAX_BATCH_SIZE);
           await processBatch(batch);
           if (i + MAX_BATCH_SIZE < totalClients) {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Delay de 1 segundo entre lotes
+            await new Promise((resolve) => setTimeout(resolve, 1000)); // Delay de 1 segundo entre lotes
           }
         }
         if (errorCount === 0) {
-          showNotification(`Cobrador removido de ${successCount} cliente(s) com sucesso em lotes!`, "success");
+          showNotification(
+            `Cobrador removido de ${successCount} cliente(s) com sucesso em lotes!`,
+            "success",
+          );
         } else if (successCount === 0) {
-          showNotification(`Erro ao remover cobrador de todos os ${errorCount} clientes.`, "error");
+          showNotification(
+            `Erro ao remover cobrador de todos os ${errorCount} clientes.`,
+            "error",
+          );
         } else {
-          showNotification(`${successCount} clientes processados, ${errorCount} com erro na remoção.`, "error");
+          showNotification(
+            `${successCount} clientes processados, ${errorCount} com erro na remoção.`,
+            "error",
+          );
         }
       } else {
         await removeCollectorFromClients(clientsToProcess);
-        showNotification(`Cobrador removido de ${totalClients} cliente(s)!`, "success");
+        showNotification(
+          `Cobrador removido de ${totalClients} cliente(s)!`,
+          "success",
+        );
       }
       setSelectedClients(new Set());
     } catch (error) {
@@ -597,7 +634,7 @@ export const ClientAssignment = React.memo(() => {
     const unassignedClients = totalClients - assignedClients;
     const totalCollections = clientsData.reduce(
       (sum, c) => sum + c.collections.length,
-      0
+      0,
     );
     const avgCollectionsPerClient =
       totalClients > 0 ? totalCollections / totalClients : 0;
@@ -618,12 +655,12 @@ export const ClientAssignment = React.memo(() => {
   const filteredStats = useMemo(() => {
     const totalFiltered = filteredClients.length;
     const assignedFiltered = filteredClients.filter(
-      (c) => c.collectorId
+      (c) => c.collectorId,
     ).length;
     const unassignedFiltered = totalFiltered - assignedFiltered;
     const totalCollectionsFiltered = filteredClients.reduce(
       (sum, c) => sum + c.collections.length,
-      0
+      0,
     );
 
     return {
@@ -663,7 +700,7 @@ export const ClientAssignment = React.memo(() => {
 
       console.log(
         "Amostra de datas (primeiras 10):",
-        Array.from(sampleDates).slice(0, 10)
+        Array.from(sampleDates).slice(0, 10),
       );
       console.log("Datas válidas/inválidas na amostra:", {
         validCount,
@@ -724,8 +761,6 @@ export const ClientAssignment = React.memo(() => {
         </div>
       </div>
 
-
-
       {/* Overview Statistics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 lg:p-6 rounded-xl border border-blue-200">
@@ -763,7 +798,7 @@ export const ClientAssignment = React.memo(() => {
                   ? Math.round(
                       (filteredStats.assignedFiltered /
                         filteredStats.totalFiltered) *
-                        100
+                        100,
                     ) || 0
                   : Math.round(overviewStats.assignmentRate)}
                 % atribuídos
@@ -787,7 +822,7 @@ export const ClientAssignment = React.memo(() => {
                   ? Math.round(
                       (filteredStats.unassignedFiltered /
                         filteredStats.totalFiltered) *
-                        100
+                        100,
                     ) || 0
                   : Math.round(100 - overviewStats.assignmentRate)}
                 % pendentes
@@ -817,7 +852,6 @@ export const ClientAssignment = React.memo(() => {
           </div>
         </div>
       </div>
-
 
       {/* Search and Filters Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -962,9 +996,7 @@ export const ClientAssignment = React.memo(() => {
                     ))}
                   </select>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Vencimento De
@@ -996,100 +1028,19 @@ export const ClientAssignment = React.memo(() => {
                     <input
                       type="checkbox"
                       checked={includeWithoutDate}
-                      onChange={(e) =>
-                        setIncludeWithoutDate(e.target.checked)
-                      }
+                      onChange={(e) => setIncludeWithoutDate(e.target.checked)}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                     <span className="ml-2 text-sm text-gray-700">
                       Incluir clientes sem data de vencimento
                     </span>
-                  </label> 
+                  </label>
                 </div>
               )}
             </div>
           )}
         </div>
       </div>
-
-                  {/* Assignment Actions */}
-      {selectedClients.size > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-4 lg:p-6">
-            <div className="flex flex-col gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Ações em Massa
-                </h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  {selectedClients.size} cliente
-                  {selectedClients.size !== 1 ? "s" : ""} selecionado
-                  {selectedClients.size !== 1 ? "s" : ""}
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <select
-                  value={selectedCollector}
-                  onChange={(e) => setSelectedCollector(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Selecione um cobrador</option>
-                  {collectors.map((collector) => (
-                    <option key={collector.id} value={collector.id}>
-                      {collector.name}
-                    </option>
-                  ))}
-                </select>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={handleAssignCollectorClick}
-                    disabled={loading || !selectedCollector}
-                    className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-                    ) : (
-                      <UserPlus className="h-4 w-4 mr-2" />
-                    )}
-                    <span className="hidden sm:inline">Atribuir Cobrador</span>
-                    <span className="sm:hidden">Atribuir</span>
-                  </button>
-
-                  <button
-                    onClick={handleRemoveCollectorClick}
-                    disabled={loading}
-                    className="flex-1 flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-                    ) : (
-                      <UserMinus className="h-4 w-4 mr-2" />
-                    )}
-                    <span className="hidden sm:inline">Remover Cobrador</span>
-                    <span className="sm:hidden">Remover</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {selectedClients.size > MAX_BATCH_SIZE && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-center text-amber-700">
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  <span className="text-sm">
-                    Operação será processada em{" "}
-                    {Math.ceil(selectedClients.size / MAX_BATCH_SIZE)} lotes de{" "}
-                    {MAX_BATCH_SIZE} clientes
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
 
       {/* Client List */}
       <div className="space-y-4">
@@ -1130,18 +1081,96 @@ export const ClientAssignment = React.memo(() => {
             )}
           </div>
         </div>
+        {/* Assignment Actions */}
+        {selectedClients.size > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="p-4 lg:p-6">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Ações em Massa
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {selectedClients.size} cliente
+                    {selectedClients.size !== 1 ? "s" : ""} selecionado
+                    {selectedClients.size !== 1 ? "s" : ""}
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <select
+                    value={selectedCollector}
+                    onChange={(e) => setSelectedCollector(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Selecione um cobrador</option>
+                    {collectors.map((collector) => (
+                      <option key={collector.id} value={collector.id}>
+                        {collector.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={handleAssignCollectorClick}
+                      disabled={loading || !selectedCollector}
+                      className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                      ) : (
+                        <UserPlus className="h-4 w-4 mr-2" />
+                      )}
+                      <span className="hidden sm:inline">
+                        Atribuir Cobrador
+                      </span>
+                      <span className="sm:hidden">Atribuir</span>
+                    </button>
+
+                    <button
+                      onClick={handleRemoveCollectorClick}
+                      disabled={loading}
+                      className="flex-1 flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                      ) : (
+                        <UserMinus className="h-4 w-4 mr-2" />
+                      )}
+                      <span className="hidden sm:inline">Remover Cobrador</span>
+                      <span className="sm:hidden">Remover</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {selectedClients.size > MAX_BATCH_SIZE && (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center text-amber-700">
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    <span className="text-sm">
+                      Operação será processada em{" "}
+                      {Math.ceil(selectedClients.size / MAX_BATCH_SIZE)} lotes
+                      de {MAX_BATCH_SIZE} clientes
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Client Cards - Mobile Optimized */}
         {paginatedClients.map((client) => {
           const isWithoutCollector = !client.collectorId;
           const totalValue = client.collections.reduce(
             (sum, c) => sum + c.valor_original,
-            0
+            0,
           );
-          const pendingValue = totalValue - client.collections.reduce(
-            (sum, c) => sum + c.valor_recebido,
-            0
-          );
+          const pendingValue =
+            totalValue -
+            client.collections.reduce((sum, c) => sum + c.valor_recebido, 0);
 
           return (
             <div
@@ -1157,7 +1186,7 @@ export const ClientAssignment = React.memo(() => {
               }`}
               onClick={(e) => {
                 // Previne o clique no card quando clicar no checkbox
-                if ((e.target as HTMLElement).tagName !== 'INPUT') {
+                if ((e.target as HTMLElement).tagName !== "INPUT") {
                   handleSelectClient(client.uniqueKey);
                 }
               }}
@@ -1172,7 +1201,7 @@ export const ClientAssignment = React.memo(() => {
                     onClick={(e) => e.stopPropagation()} // Evita duplo clique
                     className="h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500 border-gray-300 rounded mt-1 flex-shrink-0"
                   />
-                  
+
                   <div className="flex-1 min-w-0">
                     {/* Client info - more compact */}
                     <div className="flex items-start justify-between mb-2">
@@ -1184,10 +1213,11 @@ export const ClientAssignment = React.memo(() => {
                           )}
                         </h4>
                         <p className="text-sm text-gray-600">
-                          {client.documento} • {client.collections.length} parcela{client.collections.length !== 1 ? "s" : ""}
+                          {client.documento} • {client.collections.length}{" "}
+                          parcela{client.collections.length !== 1 ? "s" : ""}
                         </p>
                       </div>
-                      
+
                       {/* Collector status - more prominent */}
                       <div className="flex-shrink-0 ml-2">
                         {client.collectorName ? (
@@ -1207,10 +1237,11 @@ export const ClientAssignment = React.memo(() => {
                       <div className="flex items-center text-sm text-gray-600 mb-3">
                         <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
                         <span className="truncate">
-                          {client.bairro && client.cidade 
+                          {client.bairro && client.cidade
                             ? `${client.bairro}, ${client.cidade}`
-                            : client.cidade || client.bairro || "Localização não informada"
-                          }
+                            : client.cidade ||
+                              client.bairro ||
+                              "Localização não informada"}
                         </span>
                       </div>
                     )}
@@ -1323,7 +1354,7 @@ export const ClientAssignment = React.memo(() => {
                   {
                     length: Math.min(
                       totalPages,
-                      window.innerWidth < 640 ? 3 : 5
+                      window.innerWidth < 640 ? 3 : 5,
                     ),
                   },
                   (_, i) => {
@@ -1356,7 +1387,7 @@ export const ClientAssignment = React.memo(() => {
                         {pageNumber}
                       </button>
                     );
-                  }
+                  },
                 )}
               </div>
 
@@ -1396,13 +1427,18 @@ export const ClientAssignment = React.memo(() => {
               <UserPlus className="h-6 w-6 text-green-600" />
             </div>
           </div>
-          
+
           <div className="text-center">
             <p className="text-gray-700">
-              Você está prestes a atribuir <span className="font-semibold">{selectedClients.size} cliente{selectedClients.size !== 1 ? 's' : ''}</span> ao cobrador:
+              Você está prestes a atribuir{" "}
+              <span className="font-semibold">
+                {selectedClients.size} cliente
+                {selectedClients.size !== 1 ? "s" : ""}
+              </span>{" "}
+              ao cobrador:
             </p>
             <p className="text-lg font-semibold text-gray-900 mt-2">
-              {collectors.find(c => c.id === selectedCollector)?.name}
+              {collectors.find((c) => c.id === selectedCollector)?.name}
             </p>
           </div>
 
@@ -1411,7 +1447,9 @@ export const ClientAssignment = React.memo(() => {
               <div className="flex items-center text-amber-700">
                 <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
                 <span className="text-sm">
-                  A operação será processada em {Math.ceil(selectedClients.size / MAX_BATCH_SIZE)} lotes de {MAX_BATCH_SIZE} clientes
+                  A operação será processada em{" "}
+                  {Math.ceil(selectedClients.size / MAX_BATCH_SIZE)} lotes de{" "}
+                  {MAX_BATCH_SIZE} clientes
                 </span>
               </div>
             </div>
@@ -1455,20 +1493,44 @@ export const ClientAssignment = React.memo(() => {
               <UserMinus className="h-6 w-6 text-red-600" />
             </div>
           </div>
-          
+
           <div className="text-center space-y-3">
             <p className="text-gray-700">
-              Confirma a remoção de cobradores de <span className="font-semibold">{modalData.totalClients} cliente{modalData.totalClients !== 1 ? 's' : ''}</span>?
+              Confirma a remoção de cobradores de{" "}
+              <span className="font-semibold">
+                {modalData.totalClients} cliente
+                {modalData.totalClients !== 1 ? "s" : ""}
+              </span>
+              ?
             </p>
-            
+
             <div className="space-y-1 text-sm text-gray-600">
               <p>
-                <span className="font-medium text-green-600">{modalData.clientsWithCollectors}</span> cliente{modalData.clientsWithCollectors !== 1 ? 's têm' : ' tem'} cobradores atribuídos
+                <span className="font-medium text-green-600">
+                  {modalData.clientsWithCollectors}
+                </span>{" "}
+                cliente
+                {modalData.clientsWithCollectors !== 1 ? "s têm" : " tem"}{" "}
+                cobradores atribuídos
               </p>
               <p>
                 <span className="font-medium text-gray-500">
-                  {(modalData.totalClients || 0) - (modalData.clientsWithCollectors || 0)}
-                </span> cliente{((modalData.totalClients || 0) - (modalData.clientsWithCollectors || 0)) !== 1 ? 's' : ''} já não {((modalData.totalClients || 0) - (modalData.clientsWithCollectors || 0)) !== 1 ? 'possuem' : 'possui'} cobrador
+                  {(modalData.totalClients || 0) -
+                    (modalData.clientsWithCollectors || 0)}
+                </span>{" "}
+                cliente
+                {(modalData.totalClients || 0) -
+                  (modalData.clientsWithCollectors || 0) !==
+                1
+                  ? "s"
+                  : ""}{" "}
+                já não{" "}
+                {(modalData.totalClients || 0) -
+                  (modalData.clientsWithCollectors || 0) !==
+                1
+                  ? "possuem"
+                  : "possui"}{" "}
+                cobrador
               </p>
             </div>
 
@@ -1484,7 +1546,9 @@ export const ClientAssignment = React.memo(() => {
               <div className="flex items-center text-amber-700">
                 <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
                 <span className="text-sm">
-                  A operação será processada em {Math.ceil((modalData.totalClients || 0) / MAX_BATCH_SIZE)} lotes de {MAX_BATCH_SIZE} clientes
+                  A operação será processada em{" "}
+                  {Math.ceil((modalData.totalClients || 0) / MAX_BATCH_SIZE)}{" "}
+                  lotes de {MAX_BATCH_SIZE} clientes
                 </span>
               </div>
             </div>
@@ -1516,4 +1580,4 @@ export const ClientAssignment = React.memo(() => {
       </Modal>
     </div>
   );
-})
+});
