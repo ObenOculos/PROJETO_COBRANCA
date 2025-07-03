@@ -50,6 +50,7 @@ export const ClientAssignment = React.memo(() => {
   const [filterStatus, setFilterStatus] = useState<string>(""); // 'with_collector', 'without_collector', ''
   const [filterCity, setFilterCity] = useState<string>("");
   const [filterNeighborhood, setFilterNeighborhood] = useState<string>("");
+  const [filterStore, setFilterStore] = useState<string>(""); // Novo filtro de loja
   const [filterDateFrom, setFilterDateFrom] = useState<string>("");
   const [filterDateTo, setFilterDateTo] = useState<string>("");
   const [includeWithoutDate, setIncludeWithoutDate] = useState(false);
@@ -202,6 +203,16 @@ export const ClientAssignment = React.memo(() => {
     return Array.from(neighborhoods).sort();
   }, [clientsData, filterCity]);
 
+  const availableStores = useMemo(() => {
+    const stores = new Set<string>();
+    clientsData.forEach((client) => {
+      client.collections.forEach((collection) => {
+        if (collection.nome_da_loja) stores.add(collection.nome_da_loja);
+      });
+    });
+    return Array.from(stores).sort();
+  }, [clientsData]);
+
   const filteredClients = useMemo(() => {
     const filtered = clientsData.filter((client) => {
       const matchesSearch =
@@ -220,6 +231,8 @@ export const ClientAssignment = React.memo(() => {
 
       const matchesNeighborhood =
         !filterNeighborhood || client.bairro === filterNeighborhood;
+
+      const matchesStore = !filterStore || client.collections.some(c => c.nome_da_loja === filterStore);
 
       // Filtro por período de data de vencimento - VERSÃO CORRIGIDA
       const matchesDateRange = (() => {
@@ -289,6 +302,7 @@ export const ClientAssignment = React.memo(() => {
         matchesStatus &&
         matchesCity &&
         matchesNeighborhood &&
+        matchesStore &&
         matchesDateRange
       );
     });
@@ -558,6 +572,7 @@ export const ClientAssignment = React.memo(() => {
     setFilterStatus("");
     setFilterCity("");
     setFilterNeighborhood("");
+    setFilterStore("");
     setFilterDateFrom("");
     setFilterDateTo("");
     setIncludeWithoutDate(false);
@@ -571,6 +586,7 @@ export const ClientAssignment = React.memo(() => {
     filterStatus ||
     filterCity ||
     filterNeighborhood ||
+    filterStore ||
     filterDateFrom ||
     filterDateTo;
 
@@ -924,6 +940,24 @@ export const ClientAssignment = React.memo(() => {
                     {availableNeighborhoods.map((neighborhood) => (
                       <option key={neighborhood} value={neighborhood}>
                         {neighborhood}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Loja
+                  </label>
+                  <select
+                    value={filterStore}
+                    onChange={(e) => setFilterStore(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Todas as Lojas</option>
+                    {availableStores.map((store) => (
+                      <option key={store} value={store}>
+                        {store}
                       </option>
                     ))}
                   </select>
