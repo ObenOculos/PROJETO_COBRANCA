@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CollectionProvider, useCollection } from './contexts/CollectionContext';
 import { LoadingProvider, useLoading } from './contexts/LoadingContext';
@@ -14,23 +14,48 @@ const AppContent: React.FC = () => {
   const { loading: collectionLoading } = useCollection();
   const { isLoading: globalLoading, loadingMessage } = useLoading();
   
-  // Verifica se QUALQUER loading está ativo
-  const isAnyLoading = authLoading || collectionLoading || globalLoading;
-  
-  // Determina a mensagem de loading com prioridade
-  const getLoadingMessage = () => {
-    if (authLoading) return "Verificando sessão...";
-    if (collectionLoading) return "Carregando dados...";
-    if (globalLoading) return loadingMessage;
-    return "Carregando...";
-  };
+  // Estado para controlar transições suaves entre loadings
+  const [loadingState, setLoadingState] = useState({
+    show: true,
+    message: "Verificando sessão..."
+  });
 
-  // Mostra loading enquanto qualquer processo estiver carregando
-  if (isAnyLoading) {
-    return <GlobalLoading message={getLoadingMessage()} />;
+  useEffect(() => {
+    // Prioridade de loading: auth > collection > global
+    if (authLoading) {
+      setLoadingState({
+        show: true,
+        message: "Verificando sessão..."
+      });
+    } else if (user && collectionLoading) {
+      setLoadingState({
+        show: true,
+        message: "Carregando dados..."
+      });
+    } else if (globalLoading) {
+      setLoadingState({
+        show: true,
+        message: loadingMessage || "Carregando..."
+      });
+    } else {
+      // Pequeno delay antes de esconder o loading para evitar flash
+      const timer = setTimeout(() => {
+        setLoadingState({
+          show: false,
+          message: ""
+        });
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [authLoading, user, collectionLoading, globalLoading, loadingMessage]);
+
+  // Mostra loading baseado no estado controlado
+  if (loadingState.show) {
+    return <GlobalLoading message={loadingState.message} />;
   }
 
-  // Se não há usuário logado, mostra tela de login
+  // Se não há usuário, mostra tela de login
   if (!user) {
     return <LoginForm />;
   }

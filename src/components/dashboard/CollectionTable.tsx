@@ -36,7 +36,7 @@ interface CollectionTableProps {
   collectorId?: string;
 }
 
-const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType, showGrouped = true, collectorId }) => {
+const CollectionTable: React.FC<CollectionTableProps> = React.memo(({ collections, userType, showGrouped = true, collectorId }) => {
   const { getClientGroups, loading } = useCollection();
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
   const [selectedClientGroup, setSelectedClientGroup] = useState<ClientGroup | null>(null);
@@ -129,16 +129,15 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
   // Para gerentes, criar grupos de clientes baseados nas collections filtradas
   const clientGroups = useMemo(() => {
     if (userType === 'manager') {
-      // Usar as collections filtradas passadas como prop
       const groupsMap = new Map<string, ClientGroupWithMapSales>();
       
       collections.forEach(collection => {
         const key = (collection.documento || collection.cliente || '').trim();
-        if (!key) return; // Ignorar registros sem chave
+        if (!key) return;
 
         if (!groupsMap.has(key)) {
           groupsMap.set(key, {
-            clientId: key, // Usar a chave única (documento ou nome)
+            clientId: key,
             client: collection.cliente || 'Cliente não informado',
             document: collection.documento || '',
             phone: collection.telefone || '',
@@ -151,16 +150,15 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
             totalValue: 0,
             totalReceived: 0,
             pendingValue: 0,
-            sales: new Map<string, SaleGroup>() // Initialize sales as a Map
+            sales: new Map<string, SaleGroup>()
           });
         }
         
-        const group = groupsMap.get(key)!; // Asserting non-null
+        const group = groupsMap.get(key)!;
         group.totalValue += collection.valor_original || 0;
         group.totalReceived += collection.valor_recebido || 0;
         group.pendingValue = group.totalValue - group.totalReceived;
         
-        // Agrupar por venda
         const saleKey = `${collection.venda_n}-${collection.documento}`;
         if (!group.sales.has(saleKey)) {
           group.sales.set(saleKey, {
@@ -177,13 +175,12 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
           });
         }
         
-        const sale = group.sales.get(saleKey)!; // Asserting non-null
+        const sale = group.sales.get(saleKey)!;
         sale.totalValue += collection.valor_original || 0;
         sale.totalReceived += collection.valor_recebido || 0;
         sale.pendingValue = sale.totalValue - sale.totalReceived;
         sale.installments.push(collection);
         
-        // Determinar status da venda
         if (sale.totalReceived === 0) {
           sale.saleStatus = 'pending';
         } else if (sale.totalReceived >= sale.totalValue) {
@@ -193,40 +190,24 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
         }
       });
       
-      // Converter Map para array e formatar
       return Array.from(groupsMap.values()).map(group => ({
         ...group,
         sales: Array.from(group.sales.values())
       })) as ClientGroup[];
     } else {
-      // Para cobradores, usar a função original
       return getClientGroups(collectorId);
     }
   }, [userType, collections, getClientGroups, collectorId]);
-  const filteredClientGroups = showGrouped ? clientGroups.filter(group => {
-    // Verificar se o grupo tem parcelas que correspondem às collections filtradas
-    const hasMatchingInstallments = group.sales.some((sale: SaleGroup) => 
-      sale.installments.some((installment: Collection) => 
-        collections.some(fc => fc.id_parcela === installment.id_parcela)
+
+  const filteredClientGroups = useMemo(() => {
+    if (!showGrouped) return [];
+    const collectionIds = new Set(collections.map(c => c.id_parcela));
+    return clientGroups.filter(group => 
+      group.sales.some(sale => 
+        sale.installments.some(inst => collectionIds.has(inst.id_parcela))
       )
     );
-    
-    if (!hasMatchingInstallments) return false;
-    
-    // Se collections foram filtradas por status, verificar se o grupo deve aparecer
-    const allCollectionIds = new Set(collections.map(c => c.id_parcela));
-    const groupCollectionIds = new Set<number>();
-    group.sales.forEach((sale: SaleGroup) => {
-      sale.installments.forEach((inst: Collection) => {
-        if (inst.id_parcela) groupCollectionIds.add(inst.id_parcela);
-      });
-    });
-    
-    // Se não há interseção entre collections filtradas e collections do grupo, não mostrar
-    const hasIntersection = Array.from(groupCollectionIds).some(id => allCollectionIds.has(id));
-    
-    return hasIntersection;
-  }) : [];
+  }, [showGrouped, clientGroups, collections]);
 
   // Paginação para grupos de clientes
   const paginatedClientGroups = useMemo(() => {
@@ -240,35 +221,23 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
   const filteredAndGroupedSales = useMemo(() => {
     if (showGrouped) return [];
     
-    const localClientGroups = clientGroups;
-    
-    // Aplicar filtro de status se necessário (apenas para cobradores)
-    let filteredGroups = localClientGroups;
+    let filteredGroups = clientGroups;
     if (userType === 'collector' && statusFilter) {
-      filteredGroups = localClientGroups.filter(group => 
-        group.sales.some((sale: SaleGroup) => {
-          // Determinar o status real da venda baseado nos valores
+      filteredGroups = clientGroups.filter(group => 
+        group.sales.some(sale => {
           let saleRealStatus: string;
-          
-          // Se tem valor recebido e ainda tem valor pendente, é parcial
           if (sale.totalReceived > 0 && sale.pendingValue > 0) {
             saleRealStatus = 'parcial';
-          }
-          // Se não tem valor pendente E tem valor recebido (completamente pago), está pago
-          else if (sale.pendingValue <= 0.01 && sale.totalReceived > 0) {
+          } else if (sale.pendingValue <= 0.01 && sale.totalReceived > 0) {
             saleRealStatus = 'pago';
-          }
-          // Caso contrário, está pendente
-          else {
+          } else {
             saleRealStatus = 'pendente';
           }
-          
           return saleRealStatus === statusFilter.toLowerCase();
         })
       );
     }
     
-    // Converter para formato simples com vendas
     const simpleSalesGroups = filteredGroups.map(group => ({
       client: group.client,
       document: group.document,
@@ -280,7 +249,6 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
       pendingValue: group.pendingValue,
     }));
     
-    // Ordenar grupos por cliente
     simpleSalesGroups.sort((a, b) => {
       let aValue: string | number | undefined, bValue: string | number | undefined;
       
@@ -314,7 +282,7 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
     });
     
     return simpleSalesGroups;
-  }, [clientGroups, userType, collectorId, sortField, sortDirection, statusFilter, showGrouped]);
+  }, [showGrouped, clientGroups, userType, statusFilter, sortField, sortDirection]);
 
   // Paginação para sales agrupadas por cliente
   const paginatedSalesGroups = useMemo(() => {
@@ -1082,6 +1050,6 @@ const CollectionTable: React.FC<CollectionTableProps> = ({ collections, userType
       )}
     </>
   );
-};
+});
 
 export default CollectionTable;

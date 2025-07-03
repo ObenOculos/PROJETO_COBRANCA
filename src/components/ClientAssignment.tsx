@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Search,
   UserPlus,
@@ -29,7 +29,7 @@ interface ClientWithCollections {
   bairro?: string;
 }
 
-export function ClientAssignment() {
+export const ClientAssignment = React.memo(() => {
   const {
     collections,
     users,
@@ -43,7 +43,7 @@ export function ClientAssignment() {
     new Set()
   );
   const [loading, setLoading] = useState(false);
-  const [clientsData, setClientsData] = useState<ClientWithCollections[]>([]);
+  
 
   // Novos filtros
   const [filterCollector, setFilterCollector] = useState<string>("");
@@ -68,25 +68,6 @@ export function ClientAssignment() {
   const MAX_BATCH_SIZE = 100;
 
   const collectors = users.filter((user) => user.type === "collector");
-
-  // Obter opções únicas para filtros
-  const availableCities = useMemo(() => {
-    const cities = new Set<string>();
-    clientsData.forEach((client) => {
-      if (client.cidade) cities.add(client.cidade);
-    });
-    return Array.from(cities).sort();
-  }, [clientsData]);
-
-  const availableNeighborhoods = useMemo(() => {
-    const neighborhoods = new Set<string>();
-    clientsData.forEach((client) => {
-      if (client.bairro && (!filterCity || client.cidade === filterCity)) {
-        neighborhoods.add(client.bairro);
-      }
-    });
-    return Array.from(neighborhoods).sort();
-  }, [clientsData, filterCity]);
 
   // Função utilitária para parsear e normalizar datas
   const parseAndNormalizeDate = (
@@ -130,12 +111,11 @@ export function ClientAssignment() {
     }
   };
 
-  useEffect(() => {
-    // Função para determinar qual cobrador está atribuído a uma collection
+  // Obter opções únicas para filtros
+  const clientsData = useMemo(() => {
     const getCollectorForCollection = (
       collection: Collection
     ): { collectorId?: string; collectorName?: string } => {
-      // 1. Verificar atribuição direta (user_id)
       if (collection.user_id) {
         const collector = users.find((u) => u.id === collection.user_id);
         return {
@@ -144,7 +124,6 @@ export function ClientAssignment() {
         };
       }
 
-      // 2. Verificar atribuição por loja
       if (collection.nome_da_loja) {
         const storeAssignment = collectorStores.find(
           (cs) => cs.storeName === collection.nome_da_loja
@@ -160,32 +139,27 @@ export function ClientAssignment() {
         }
       }
 
-      // 3. Sem atribuição
       return { collectorId: undefined, collectorName: undefined };
     };
 
-    // Agrupar collections por cliente
     const clientsMap = new Map<string, ClientWithCollections>();
 
     collections.forEach((collection) => {
-      // Usar documento como chave principal, ou nome do cliente como fallback
       const key = (collection.documento || collection.cliente || '').trim();
 
-      // Ignorar se não houver chave
       if (!key) {
         console.warn("Collection sem documento ou nome válido:", collection);
         return;
       }
 
       if (!clientsMap.has(key)) {
-        // Determinar cobrador através da nova função
         const { collectorId, collectorName } =
           getCollectorForCollection(collection);
 
         clientsMap.set(key, {
           cliente: collection.cliente || "Cliente sem nome",
           documento: collection.documento || '',
-          uniqueKey: key, // Atribuir a chave única
+          uniqueKey: key,
           collections: [],
           collectorId: collectorId,
           collectorName: collectorName,
@@ -193,7 +167,6 @@ export function ClientAssignment() {
           bairro: collection.bairro || undefined,
         });
       } else {
-        // Se cliente já existe, verificar se há um cobrador mais específico
         const existingClient = clientsMap.get(key)!;
         if (!existingClient.collectorId) {
           const { collectorId, collectorName } =
@@ -208,15 +181,26 @@ export function ClientAssignment() {
       clientsMap.get(key)!.collections.push(collection);
     });
 
-    console.log("Total de collections:", collections.length);
-    console.log("Total de clientes únicos encontrados:", clientsMap.size);
-    console.log(
-      "Clientes com cobrador (direto + loja):",
-      Array.from(clientsMap.values()).filter((c) => c.collectorId).length
-    );
-
-    setClientsData(Array.from(clientsMap.values()));
+    return Array.from(clientsMap.values());
   }, [collections, users, collectorStores]);
+
+  const availableCities = useMemo(() => {
+    const cities = new Set<string>();
+    clientsData.forEach((client) => {
+      if (client.cidade) cities.add(client.cidade);
+    });
+    return Array.from(cities).sort();
+  }, [clientsData]);
+
+  const availableNeighborhoods = useMemo(() => {
+    const neighborhoods = new Set<string>();
+    clientsData.forEach((client) => {
+      if (client.bairro && (!filterCity || client.cidade === filterCity)) {
+        neighborhoods.add(client.bairro);
+      }
+    });
+    return Array.from(neighborhoods).sort();
+  }, [clientsData, filterCity]);
 
   const filteredClients = useMemo(() => {
     const filtered = clientsData.filter((client) => {
@@ -309,9 +293,6 @@ export function ClientAssignment() {
       );
     });
 
-    // Reset para primeira página quando filtros mudarem
-    setCurrentPage(1);
-
     return filtered;
   }, [
     clientsData,
@@ -324,6 +305,10 @@ export function ClientAssignment() {
     filterDateTo,
     includeWithoutDate,
   ]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredClients]);
 
   // Clientes da página atual
   const paginatedClients = useMemo(() => {
@@ -1497,4 +1482,4 @@ export function ClientAssignment() {
       </Modal>
     </div>
   );
-}
+})
