@@ -214,6 +214,53 @@ export const ClientAssignment = React.memo(() => {
     return Array.from(stores).sort();
   }, [clientsData]);
 
+  const activeFilterChips = useMemo(() => {
+    const chips = [];
+
+    if (searchTerm) {
+      chips.push({ label: `Busca: "${searchTerm}"`, onClear: () => setSearchTerm("") });
+    }
+    if (filterCollector) {
+      const collector = collectors.find(c => c.id === filterCollector);
+      chips.push({ label: `Cobrador: ${collector?.name || "Desconhecido"}`, onClear: () => setFilterCollector("") });
+    }
+    if (filterStatus) {
+      const statusLabel = filterStatus === "with_collector" ? "Com Cobrador" : "Sem Cobrador";
+      chips.push({ label: `Status: ${statusLabel}`, onClear: () => setFilterStatus("") });
+    }
+    if (filterCity) {
+      chips.push({ label: `Cidade: ${filterCity}`, onClear: () => setFilterCity("") });
+    }
+    if (filterNeighborhood) {
+      chips.push({ label: `Bairro: ${filterNeighborhood}`, onClear: () => setFilterNeighborhood("") });
+    }
+    if (filterStore) {
+      chips.push({ label: `Loja: ${filterStore}`, onClear: () => setFilterStore("") });
+    }
+    if (filterDateFrom) {
+      chips.push({ label: `De: ${filterDateFrom}`, onClear: () => setFilterDateFrom("") });
+    }
+    if (filterDateTo) {
+      chips.push({ label: `Até: ${filterDateTo}`, onClear: () => setFilterDateTo("") });
+    }
+    if (includeWithoutDate && (filterDateFrom || filterDateTo)) {
+      chips.push({ label: `Incluir sem data`, onClear: () => setIncludeWithoutDate(false) });
+    }
+
+    return chips;
+  }, [
+    searchTerm,
+    filterCollector,
+    filterStatus,
+    filterCity,
+    filterNeighborhood,
+    filterStore,
+    filterDateFrom,
+    filterDateTo,
+    includeWithoutDate,
+    collectors,
+  ]);
+
   const filteredClients = useMemo(() => {
     const filtered = clientsData.filter((client) => {
       const matchesSearch =
@@ -617,15 +664,7 @@ export const ClientAssignment = React.memo(() => {
     setCurrentPage(1);
   };
 
-  const hasActiveFilters =
-    searchTerm ||
-    filterCollector ||
-    filterStatus ||
-    filterCity ||
-    filterNeighborhood ||
-    filterStore ||
-    filterDateFrom ||
-    filterDateTo;
+  const hasActiveFilters = activeFilterChips.length > 0;
 
   // Calculate overview statistics
   const overviewStats = useMemo(() => {
@@ -729,33 +768,6 @@ export const ClientAssignment = React.memo(() => {
               <p className="text-gray-600 mt-1 text-sm lg:text-base">
                 Gerencie a atribuição de clientes aos cobradores
               </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-2 lg:gap-3">
-              {hasActiveFilters && (
-                <button
-                  onClick={clearFilters}
-                  className="flex items-center justify-center px-3 lg:px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Limpar Filtros</span>
-                  <span className="sm:hidden">Limpar</span>
-                </button>
-              )}
-              {selectedClients.size > 0 && (
-                <button
-                  onClick={() => setSelectedClients(new Set())}
-                  className="flex items-center justify-center px-3 lg:px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">
-                    Limpar Seleção ({selectedClients.size})
-                  </span>
-                  <span className="sm:hidden">
-                    Seleção ({selectedClients.size})
-                  </span>
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -1028,7 +1040,9 @@ export const ClientAssignment = React.memo(() => {
                     <input
                       type="checkbox"
                       checked={includeWithoutDate}
-                      onChange={(e) => setIncludeWithoutDate(e.target.checked)}
+                      onChange={(e) =>
+                        setIncludeWithoutDate(e.target.checked)
+                      }
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                     <span className="ml-2 text-sm text-gray-700">
@@ -1037,6 +1051,33 @@ export const ClientAssignment = React.memo(() => {
                   </label>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeFilterChips.length > 0 && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-medium text-gray-700">Filtros Ativos:</h4>
+                <button
+                  onClick={clearFilters}
+                  className="flex items-center px-2 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs font-medium"
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Limpar Todos
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {activeFilterChips.map((chip, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 cursor-pointer hover:bg-blue-200 transition-colors"
+                    onClick={chip.onClear}
+                  >
+                    {chip.label}
+                    <X className="ml-2 h-3 w-3" />
+                  </span>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -1086,6 +1127,7 @@ export const ClientAssignment = React.memo(() => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="p-4 lg:p-6">
               <div className="flex flex-col gap-4">
+
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">
                     Ações em Massa
@@ -1095,6 +1137,8 @@ export const ClientAssignment = React.memo(() => {
                     {selectedClients.size !== 1 ? "s" : ""} selecionado
                     {selectedClients.size !== 1 ? "s" : ""}
                   </p>
+                  <div className="flex flex-col sm:flex-row gap-2 lg:gap-3">
+            </div>
                 </div>
 
                 <div className="space-y-3">
