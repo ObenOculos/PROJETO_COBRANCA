@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { LogOut, User, Menu, X } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import NotificationDropdown from './NotificationDropdown';
+import React, { useState } from "react";
+import { LogOut, User, Menu, X } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import NotificationDropdown from "./NotificationDropdown";
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -16,9 +16,13 @@ const Header: React.FC = () => {
               <span className="text-white font-bold text-sm">SC</span>
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg lg:text-xl font-bold text-gray-900 truncate">Sistema de Cobrança</h1>
+              <h1 className="text-lg lg:text-xl font-bold text-gray-900 truncate">
+                Sistema de Cobrança
+              </h1>
               <p className="text-xs lg:text-sm text-gray-500 truncate">
-                {user?.type === 'manager' ? 'Painel Gerencial' : 'Carteira de Cobrança'}
+                {user?.type === "manager"
+                  ? "Painel Gerencial"
+                  : "Carteira de Cobrança"}
               </p>
             </div>
           </div>
@@ -26,20 +30,22 @@ const Header: React.FC = () => {
           {/* Desktop Menu */}
           <div className="hidden sm:flex items-center space-x-4">
             <NotificationDropdown />
-            
+
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2">
                 <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
                   <User className="h-4 w-4 text-gray-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {user?.name}
+                  </p>
                   <p className="text-xs text-gray-500 capitalize">
-                    {user?.type === 'manager' ? 'Gerente' : 'Cobrador'}
+                    {user?.type === "manager" ? "Gerente" : "Cobrador"}
                   </p>
                 </div>
               </div>
-              
+
               <button
                 onClick={logout}
                 className="p-2 text-gray-400 hover:text-red-600 transition-colors"
@@ -74,13 +80,15 @@ const Header: React.FC = () => {
                   <User className="h-5 w-5 text-gray-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {user?.name}
+                  </p>
                   <p className="text-xs text-gray-500 capitalize">
-                    {user?.type === 'manager' ? 'Gerente' : 'Cobrador'}
+                    {user?.type === "manager" ? "Gerente" : "Cobrador"}
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <NotificationDropdown />
                 <button

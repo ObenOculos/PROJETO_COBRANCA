@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { 
+import React, { useState } from "react";
+import {
   Calendar,
   Clock,
   MapPin,
@@ -14,29 +14,29 @@ import {
   ChevronRight,
   CalendarDays,
   Filter,
-  RefreshCw
-} from 'lucide-react';
-import { useCollection } from '../../contexts/CollectionContext';
-import { useAuth } from '../../contexts/AuthContext';
-import { ScheduledVisit } from '../../types';
-import { formatCurrency } from '../../utils/mockData';
-import ClientDetailModal from './ClientDetailModal';
+  RefreshCw,
+} from "lucide-react";
+import { useCollection } from "../../contexts/CollectionContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { ScheduledVisit } from "../../types";
+import { formatCurrency } from "../../utils/mockData";
+import ClientDetailModal from "./ClientDetailModal";
 
 interface VisitSchedulerProps {
   onClose?: () => void;
 }
 
 const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
-  const { 
-    getClientGroups, 
-    scheduleVisit, 
-    scheduledVisits, 
+  const {
+    getClientGroups,
+    scheduleVisit,
+    scheduledVisits,
     getVisitsByCollector,
     getClientDataForVisit,
     updateVisitStatus,
     requestVisitCancellation,
     rescheduleVisit,
-    collections
+    collections,
   } = useCollection();
   const { user } = useAuth();
 
@@ -44,76 +44,95 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     const today = new Date();
     // Garantir que pegamos a data local, não UTC
     const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
   const [selectedDate] = useState<string>(getLocalDate());
 
-  const [selectedTime] = useState<string>('09:00');
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedClients, setSelectedClients] = useState<Set<string>>(new Set());
-  const [clientSchedules, setClientSchedules] = useState<Map<string, {date: string, time: string}>>(new Map());
-  const [notes, setNotes] = useState<string>('');
+  const [selectedTime] = useState<string>("09:00");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedClients, setSelectedClients] = useState<Set<string>>(
+    new Set(),
+  );
+  const [clientSchedules, setClientSchedules] = useState<
+    Map<string, { date: string; time: string }>
+  >(new Map());
+  const [notes, setNotes] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'schedule' | 'list'>('schedule');
+  const [activeTab, setActiveTab] = useState<"schedule" | "list">("schedule");
   const [currentPage, setCurrentPage] = useState(1);
   const [visitsPerPage] = useState(10);
   const [clientsCurrentPage, setClientsCurrentPage] = useState(1);
   const [clientsPerPage] = useState(20);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
-  const [selectedVisitForCancellation, setSelectedVisitForCancellation] = useState<ScheduledVisit | null>(null);
-  const [cancellationReason, setCancellationReason] = useState('');
+  const [selectedVisitForCancellation, setSelectedVisitForCancellation] =
+    useState<ScheduledVisit | null>(null);
+  const [cancellationReason, setCancellationReason] = useState("");
   const [showClientModal, setShowClientModal] = useState(false);
-  const [selectedClientForModal, setSelectedClientForModal] = useState<any>(null);
+  const [selectedClientForModal, setSelectedClientForModal] =
+    useState<any>(null);
   const [showConflictModal, setShowConflictModal] = useState(false);
-  const [conflictData, setConflictData] = useState<{errors: string[], conflicts: string[]}>({errors: [], conflicts: []});
+  const [conflictData, setConflictData] = useState<{
+    errors: string[];
+    conflicts: string[];
+  }>({ errors: [], conflicts: [] });
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
-    city: '',
-    minValue: '',
-    maxValue: '',
-    visitStatus: '',
+    city: "",
+    minValue: "",
+    maxValue: "",
+    visitStatus: "",
   });
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
-  const [selectedVisitForReschedule, setSelectedVisitForReschedule] = useState<ScheduledVisit | null>(null);
-  
+  const [selectedVisitForReschedule, setSelectedVisitForReschedule] =
+    useState<ScheduledVisit | null>(null);
+
   // Estados para novos modais
   const [showCompletedModal, setShowCompletedModal] = useState(false);
-  const [selectedVisitForCompletion, setSelectedVisitForCompletion] = useState<ScheduledVisit | null>(null);
-  const [showNotFoundConfirmModal, setShowNotFoundConfirmModal] = useState(false);
-  const [showNotFoundObservationModal, setShowNotFoundObservationModal] = useState(false);
-  const [selectedVisitForNotFound, setSelectedVisitForNotFound] = useState<ScheduledVisit | null>(null);
-  const [showPaymentQuestionModal, setShowPaymentQuestionModal] = useState(false);
-  const [selectedVisitForPayment, setSelectedVisitForPayment] = useState<ScheduledVisit | null>(null);
-  const [rescheduleDate, setRescheduleDate] = useState('');
-  const [rescheduleTime, setRescheduleTime] = useState('');
-
+  const [selectedVisitForCompletion, setSelectedVisitForCompletion] =
+    useState<ScheduledVisit | null>(null);
+  const [showNotFoundConfirmModal, setShowNotFoundConfirmModal] =
+    useState(false);
+  const [showNotFoundObservationModal, setShowNotFoundObservationModal] =
+    useState(false);
+  const [selectedVisitForNotFound, setSelectedVisitForNotFound] =
+    useState<ScheduledVisit | null>(null);
+  const [showPaymentQuestionModal, setShowPaymentQuestionModal] =
+    useState(false);
+  const [selectedVisitForPayment, setSelectedVisitForPayment] =
+    useState<ScheduledVisit | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
 
   // Obter clientes do cobrador logado
   const availableClients = React.useMemo(() => {
-    if (!user || user.type !== 'collector') return [];
-    
+    if (!user || user.type !== "collector") return [];
+
     const clientGroups = getClientGroups(user.id);
-    
+
     // Obter visitas ativas (agendadas) do cobrador
-    const activeVisits = getVisitsByCollector(user.id).filter(visit => visit.status === 'agendada');
-    const activeClientDocuments = new Set(activeVisits.map(visit => visit.clientDocument));
-    
-    // Filtrar clientes que não têm visitas ativas E que têm pendências
-    const availableClientGroups = clientGroups.filter(client => 
-      !activeClientDocuments.has(client.document) &&
-      client.pendingValue > 0 // Apenas clientes com valor pendente
+    const activeVisits = getVisitsByCollector(user.id).filter(
+      (visit) => visit.status === "agendada",
     );
-    
+    const activeClientDocuments = new Set(
+      activeVisits.map((visit) => visit.clientDocument),
+    );
+
+    // Filtrar clientes que não têm visitas ativas E que têm pendências
+    const availableClientGroups = clientGroups.filter(
+      (client) =>
+        !activeClientDocuments.has(client.document) && client.pendingValue > 0, // Apenas clientes com valor pendente
+    );
+
     // Aplicar filtros
     let filteredClients = availableClientGroups;
 
     // Filtro de busca por texto
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      filteredClients = filteredClients.filter(client => {
+      filteredClients = filteredClients.filter((client) => {
         return (
           client.client.toLowerCase().includes(searchLower) ||
           client.document.toLowerCase().includes(searchLower) ||
@@ -125,8 +144,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
     // Filtro por cidade
     if (filters.city) {
-      filteredClients = filteredClients.filter(client => 
-        client.city.toLowerCase().includes(filters.city.toLowerCase())
+      filteredClients = filteredClients.filter((client) =>
+        client.city.toLowerCase().includes(filters.city.toLowerCase()),
       );
     }
 
@@ -134,8 +153,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     if (filters.minValue) {
       const minValue = parseFloat(filters.minValue);
       if (!isNaN(minValue)) {
-        filteredClients = filteredClients.filter(client => 
-          client.pendingValue >= minValue
+        filteredClients = filteredClients.filter(
+          (client) => client.pendingValue >= minValue,
         );
       }
     }
@@ -144,49 +163,65 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     if (filters.maxValue) {
       const maxValue = parseFloat(filters.maxValue);
       if (!isNaN(maxValue)) {
-        filteredClients = filteredClients.filter(client => 
-          client.pendingValue <= maxValue
+        filteredClients = filteredClients.filter(
+          (client) => client.pendingValue <= maxValue,
         );
       }
     }
 
     // Filtro por status de visita
     if (filters.visitStatus) {
-      filteredClients = filteredClients.filter(client => {
+      filteredClients = filteredClients.filter((client) => {
         // Get visit status for this client using the same logic as in the component
         const clientVisits = scheduledVisits
-          .filter(visit => 
-            visit.clientDocument === client.document && 
-            visit.status === 'realizada'
+          .filter(
+            (visit) =>
+              visit.clientDocument === client.document &&
+              visit.status === "realizada",
           )
-          .sort((a, b) => new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime());
-        
+          .sort(
+            (a, b) =>
+              new Date(b.scheduledDate).getTime() -
+              new Date(a.scheduledDate).getTime(),
+          );
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
+
         let daysSinceLastVisit: number;
-        
+
         if (clientVisits.length === 0) {
           daysSinceLastVisit = 999; // Never visited
         } else {
           try {
             const visitDateStr = clientVisits[0].scheduledDate;
             let lastVisitDate: Date;
-            
-            if (visitDateStr.includes('-')) {
+
+            if (visitDateStr.includes("-")) {
               // Format YYYY-MM-DD
-              const [year, month, day] = visitDateStr.split('-');
-              lastVisitDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-            } else if (visitDateStr.includes('/')) {
+              const [year, month, day] = visitDateStr.split("-");
+              lastVisitDate = new Date(
+                parseInt(year),
+                parseInt(month) - 1,
+                parseInt(day),
+              );
+            } else if (visitDateStr.includes("/")) {
               // Format DD/MM/YYYY
-              const [day, month, year] = visitDateStr.split('/');
-              lastVisitDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+              const [day, month, year] = visitDateStr.split("/");
+              lastVisitDate = new Date(
+                parseInt(year),
+                parseInt(month) - 1,
+                parseInt(day),
+              );
             } else {
               lastVisitDate = new Date(visitDateStr);
             }
-            
+
             lastVisitDate.setHours(0, 0, 0, 0);
-            daysSinceLastVisit = Math.floor((today.getTime() - lastVisitDate.getTime()) / (1000 * 60 * 60 * 24));
+            daysSinceLastVisit = Math.floor(
+              (today.getTime() - lastVisitDate.getTime()) /
+                (1000 * 60 * 60 * 24),
+            );
             daysSinceLastVisit = Math.max(0, daysSinceLastVisit);
           } catch {
             daysSinceLastVisit = 999;
@@ -195,15 +230,15 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
         // Match filter with status type
         switch (filters.visitStatus) {
-          case 'critical':
+          case "critical":
             return daysSinceLastVisit >= 120;
-          case 'high':
+          case "high":
             return daysSinceLastVisit >= 90 && daysSinceLastVisit < 120;
-          case 'medium':
+          case "medium":
             return daysSinceLastVisit >= 60 && daysSinceLastVisit < 90;
-          case 'low':
+          case "low":
             return daysSinceLastVisit >= 30 && daysSinceLastVisit < 60;
-          case 'recent':
+          case "recent":
             return daysSinceLastVisit < 30;
           default:
             return true;
@@ -212,13 +247,22 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     }
 
     return filteredClients;
-  }, [user, searchTerm, filters, getClientGroups, getVisitsByCollector, scheduledVisits]);
+  }, [
+    user,
+    searchTerm,
+    filters,
+    getClientGroups,
+    getVisitsByCollector,
+    scheduledVisits,
+  ]);
 
   // Contar clientes com visitas ativas
   const clientsWithActiveVisits = React.useMemo(() => {
-    if (!user || user.type !== 'collector') return 0;
-    
-    const activeVisits = getVisitsByCollector(user.id).filter(visit => visit.status === 'agendada');
+    if (!user || user.type !== "collector") return 0;
+
+    const activeVisits = getVisitsByCollector(user.id).filter(
+      (visit) => visit.status === "agendada",
+    );
     return activeVisits.length;
   }, [user, getVisitsByCollector, scheduledVisits]);
 
@@ -236,60 +280,78 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     setClientsCurrentPage(1);
   }, [searchTerm, filters]);
 
-
   // Obter visitas organizadas por data
-  const { todayVisits, upcomingVisits, pastVisits, allVisits } = React.useMemo(() => {
-    if (!user) return { todayVisits: [], upcomingVisits: [], pastVisits: [], allVisits: [] };
-    
-    // Usar a mesma lógica de data local
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${year}-${month}-${day}`;
-    const visits = getVisitsByCollector(user.id);
-    
-    const todayVisits = visits
-      .filter(visit => {
-        // Garantir que a comparação está correta
-        return visit.scheduledDate === todayStr;
-      })
-      .sort((a, b) => {
-        const timeA = a.scheduledTime || '00:00';
-        const timeB = b.scheduledTime || '00:00';
-        return timeA.localeCompare(timeB);
-      });
-    
-    const upcomingVisits = visits
-      .filter(visit => {
-        // Filtrar apenas visitas futuras (não incluir hoje)
-        return visit.scheduledDate > todayStr;
-      })
-      .sort((a, b) => {
-        const dateA = new Date(`${a.scheduledDate} ${a.scheduledTime || '00:00'}`);
-        const dateB = new Date(`${b.scheduledDate} ${b.scheduledTime || '00:00'}`);
+  const { todayVisits, upcomingVisits, pastVisits, allVisits } =
+    React.useMemo(() => {
+      if (!user)
+        return {
+          todayVisits: [],
+          upcomingVisits: [],
+          pastVisits: [],
+          allVisits: [],
+        };
+
+      // Usar a mesma lógica de data local
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, "0");
+      const day = String(today.getDate()).padStart(2, "0");
+      const todayStr = `${year}-${month}-${day}`;
+      const visits = getVisitsByCollector(user.id);
+
+      const todayVisits = visits
+        .filter((visit) => {
+          // Garantir que a comparação está correta
+          return visit.scheduledDate === todayStr;
+        })
+        .sort((a, b) => {
+          const timeA = a.scheduledTime || "00:00";
+          const timeB = b.scheduledTime || "00:00";
+          return timeA.localeCompare(timeB);
+        });
+
+      const upcomingVisits = visits
+        .filter((visit) => {
+          // Filtrar apenas visitas futuras (não incluir hoje)
+          return visit.scheduledDate > todayStr;
+        })
+        .sort((a, b) => {
+          const dateA = new Date(
+            `${a.scheduledDate} ${a.scheduledTime || "00:00"}`,
+          );
+          const dateB = new Date(
+            `${b.scheduledDate} ${b.scheduledTime || "00:00"}`,
+          );
+          return dateA.getTime() - dateB.getTime();
+        });
+
+      const pastVisits = visits
+        .filter((visit) => {
+          // Filtrar visitas passadas que ainda estão com status 'agendada'
+          return visit.scheduledDate < todayStr && visit.status === "agendada";
+        })
+        .sort((a, b) => {
+          const dateA = new Date(
+            `${a.scheduledDate} ${a.scheduledTime || "00:00"}`,
+          );
+          const dateB = new Date(
+            `${b.scheduledDate} ${b.scheduledTime || "00:00"}`,
+          );
+          return dateB.getTime() - dateA.getTime(); // Mais recentes primeiro
+        });
+
+      const allVisits = visits.sort((a, b) => {
+        const dateA = new Date(
+          `${a.scheduledDate} ${a.scheduledTime || "00:00"}`,
+        );
+        const dateB = new Date(
+          `${b.scheduledDate} ${b.scheduledTime || "00:00"}`,
+        );
         return dateA.getTime() - dateB.getTime();
       });
-    
-    const pastVisits = visits
-      .filter(visit => {
-        // Filtrar visitas passadas que ainda estão com status 'agendada'
-        return visit.scheduledDate < todayStr && visit.status === 'agendada';
-      })
-      .sort((a, b) => {
-        const dateA = new Date(`${a.scheduledDate} ${a.scheduledTime || '00:00'}`);
-        const dateB = new Date(`${b.scheduledDate} ${b.scheduledTime || '00:00'}`);
-        return dateB.getTime() - dateA.getTime(); // Mais recentes primeiro
-      });
-    
-    const allVisits = visits.sort((a, b) => {
-      const dateA = new Date(`${a.scheduledDate} ${a.scheduledTime || '00:00'}`);
-      const dateB = new Date(`${b.scheduledDate} ${b.scheduledTime || '00:00'}`);
-      return dateA.getTime() - dateB.getTime();
-    });
-    
-    return { todayVisits, upcomingVisits, pastVisits, allVisits };
-  }, [user, getVisitsByCollector, scheduledVisits]);
+
+      return { todayVisits, upcomingVisits, pastVisits, allVisits };
+    }, [user, getVisitsByCollector, scheduledVisits]);
 
   // Paginação para visitas de hoje
   const paginatedTodayVisits = React.useMemo(() => {
@@ -318,7 +380,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
       // Validar se a data não é no passado (data de hoje é válida)
       const todayString = getLocalDate(); // Usar a mesma função que define a data de hoje
-      
+
       if (schedule.date < todayString) {
         errors.push(`${client.client}: Data não pode ser anterior a hoje`);
         continue;
@@ -335,8 +397,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     // Verificar conflitos
     for (const [dateTime, clients] of scheduleMap.entries()) {
       if (clients.length > 1) {
-        const [date, time] = dateTime.split('_');
-        conflicts.push(`${formatSafeDate(date)} às ${time}: ${clients.join(', ')}`);
+        const [date, time] = dateTime.split("_");
+        conflicts.push(
+          `${formatSafeDate(date)} às ${time}: ${clients.join(", ")}`,
+        );
       }
     }
 
@@ -350,36 +414,45 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
   const handleCloseConflictModal = () => {
     setShowConflictModal(false);
-    setConflictData({errors: [], conflicts: []});
+    setConflictData({ errors: [], conflicts: [] });
   };
 
   const handleFilterChange = (key: string, value: string) => {
-    setFilters(prev => ({
+    setFilters((prev) => ({
       ...prev,
-      [key]: value
+      [key]: value,
     }));
   };
 
   const clearAllFilters = () => {
     setFilters({
-      city: '',
-      minValue: '',
-      maxValue: '',
-      visitStatus: '',
+      city: "",
+      minValue: "",
+      maxValue: "",
+      visitStatus: "",
     });
-    setSearchTerm('');
+    setSearchTerm("");
   };
 
-  const hasActiveFilters = searchTerm || filters.city || filters.minValue || filters.maxValue || filters.visitStatus;
+  const hasActiveFilters =
+    searchTerm ||
+    filters.city ||
+    filters.minValue ||
+    filters.maxValue ||
+    filters.visitStatus;
 
   // Obter lista de cidades únicas (apenas de clientes com pendências)
   const availableCities = React.useMemo(() => {
-    if (!user || user.type !== 'collector') return [];
-    
+    if (!user || user.type !== "collector") return [];
+
     const clientGroups = getClientGroups(user.id);
     // Filtrar apenas clientes com pendências
-    const clientsWithPending = clientGroups.filter(client => client.pendingValue > 0);
-    const cities = [...new Set(clientsWithPending.map(client => client.city))];
+    const clientsWithPending = clientGroups.filter(
+      (client) => client.pendingValue > 0,
+    );
+    const cities = [
+      ...new Set(clientsWithPending.map((client) => client.city)),
+    ];
     return cities.sort();
   }, [user, getClientGroups]);
 
@@ -403,19 +476,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
           const visitDate = clientSchedule?.date || selectedDate;
           const visitTime = clientSchedule?.time || selectedTime;
 
-          const visitData: Omit<ScheduledVisit, 'id' | 'createdAt'> = {
+          const visitData: Omit<ScheduledVisit, "id" | "createdAt"> = {
             collectorId: user!.id,
             clientDocument: client.document,
             clientName: client.client,
             scheduledDate: visitDate,
             scheduledTime: visitTime,
-            status: 'agendada',
+            status: "agendada",
             notes: notes.trim(),
             clientAddress: clientData.address,
             clientNeighborhood: clientData.neighborhood,
             clientCity: clientData.city,
             totalPendingValue: clientData.totalPendingValue,
-            overdueCount: clientData.overdueCount
+            overdueCount: clientData.overdueCount,
           };
 
           await scheduleVisit(visitData);
@@ -429,22 +502,25 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
       // Limpar seleções
       setSelectedClients(new Set());
       setClientSchedules(new Map());
-      setNotes('');
+      setNotes("");
       clearAllFilters();
       setCurrentPage(1);
       setClientsCurrentPage(1);
 
       // Mostrar resultado
       if (successCount > 0) {
-        showSuccessNotification(`${successCount} visita${successCount !== 1 ? 's' : ''} agendada${successCount !== 1 ? 's' : ''} com sucesso!`);
+        showSuccessNotification(
+          `${successCount} visita${successCount !== 1 ? "s" : ""} agendada${successCount !== 1 ? "s" : ""} com sucesso!`,
+        );
       }
       if (errorCount > 0) {
-        alert(`${errorCount} visita${errorCount !== 1 ? 's' : ''} não puderam ser agendada${errorCount !== 1 ? 's' : ''}.`);
+        alert(
+          `${errorCount} visita${errorCount !== 1 ? "s" : ""} não puderam ser agendada${errorCount !== 1 ? "s" : ""}.`,
+        );
       }
-
     } catch (error) {
-      console.error('Erro ao agendar visitas:', error);
-      alert('Erro ao agendar visitas. Tente novamente.');
+      console.error("Erro ao agendar visitas:", error);
+      alert("Erro ao agendar visitas. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -452,7 +528,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
   const handleScheduleMultipleVisits = async () => {
     if (selectedClients.size === 0 || !user) {
-      alert('Selecione pelo menos um cliente para agendar as visitas');
+      alert("Selecione pelo menos um cliente para agendar as visitas");
       return;
     }
 
@@ -460,7 +536,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     const { errors, conflicts } = validateClientSchedules();
 
     if (errors.length > 0) {
-      alert(`Erros encontrados:\n\n${errors.join('\n')}`);
+      alert(`Erros encontrados:\n\n${errors.join("\n")}`);
       return;
     }
 
@@ -473,13 +549,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     await proceedWithScheduling();
   };
 
-  const handleUpdateVisitStatus = async (visitId: string, newStatus: ScheduledVisit['status'], visitNotes?: string) => {
+  const handleUpdateVisitStatus = async (
+    visitId: string,
+    newStatus: ScheduledVisit["status"],
+    visitNotes?: string,
+  ) => {
     try {
       await updateVisitStatus(visitId, newStatus, visitNotes);
-      showSuccessNotification(`Visita marcada como ${getStatusLabel(newStatus)}`);
+      showSuccessNotification(
+        `Visita marcada como ${getStatusLabel(newStatus)}`,
+      );
     } catch (error) {
-      console.error('Erro ao atualizar status da visita:', error);
-      alert('Erro ao atualizar status da visita');
+      console.error("Erro ao atualizar status da visita:", error);
+      alert("Erro ao atualizar status da visita");
     }
   };
 
@@ -492,9 +574,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
   // Função para confirmar conclusão com observação
   const handleConfirmCompletion = async (selectedNote: string) => {
     if (selectedVisitForCompletion) {
-      await handleUpdateVisitStatus(selectedVisitForCompletion.id, 'realizada', selectedNote);
+      await handleUpdateVisitStatus(
+        selectedVisitForCompletion.id,
+        "realizada",
+        selectedNote,
+      );
       setShowCompletedModal(false);
-      
+
       // Abrir modal perguntando sobre pagamento
       setSelectedVisitForPayment(selectedVisitForCompletion);
       setSelectedVisitForCompletion(null);
@@ -517,7 +603,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
   // Função para confirmar "Não Encontrado" com observação
   const handleConfirmNotFound = async (selectedNote: string) => {
     if (selectedVisitForNotFound) {
-      await handleUpdateVisitStatus(selectedVisitForNotFound.id, 'nao_encontrado', selectedNote);
+      await handleUpdateVisitStatus(
+        selectedVisitForNotFound.id,
+        "nao_encontrado",
+        selectedNote,
+      );
       setShowNotFoundObservationModal(false);
       setSelectedVisitForNotFound(null);
     }
@@ -528,7 +618,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     setShowPaymentQuestionModal(false);
     if (selectedVisitForPayment) {
       // Buscar dados do cliente para abrir modal de pagamento
-      const clientData = getClientDataForVisit(selectedVisitForPayment.clientDocument);
+      const clientData = getClientDataForVisit(
+        selectedVisitForPayment.clientDocument,
+      );
       if (clientData) {
         // Criar um ClientGroup mock para o modal de pagamento
         const clientGroup = {
@@ -538,16 +630,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
           phone: clientData.phone,
           mobile: clientData.mobile,
           address: clientData.address,
-          number: '',
+          number: "",
           neighborhood: clientData.neighborhood,
           city: clientData.city,
-          state: '',
+          state: "",
           sales: [],
           totalValue: clientData.totalPendingValue,
           totalReceived: 0,
-          pendingValue: clientData.totalPendingValue
+          pendingValue: clientData.totalPendingValue,
         };
-        
+
         setSelectedClientForModal(clientGroup);
         setShowClientModal(true);
       }
@@ -561,31 +653,46 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     setSelectedVisitForPayment(null);
   };
 
-  const getStatusLabel = (status: ScheduledVisit['status']) => {
+  const getStatusLabel = (status: ScheduledVisit["status"]) => {
     switch (status) {
-      case 'agendada': return 'Agendada';
-      case 'realizada': return 'Realizada';
-      case 'cancelada': return 'Cancelada';
-      case 'nao_encontrado': return 'Não Encontrado';
-      case 'cancelamento_solicitado': return 'Cancelamento Solicitado';
-      default: return status;
+      case "agendada":
+        return "Agendada";
+      case "realizada":
+        return "Realizada";
+      case "cancelada":
+        return "Cancelada";
+      case "nao_encontrado":
+        return "Não Encontrado";
+      case "cancelamento_solicitado":
+        return "Cancelamento Solicitado";
+      default:
+        return status;
     }
   };
 
-  const getStatusColor = (status: ScheduledVisit['status']) => {
+  const getStatusColor = (status: ScheduledVisit["status"]) => {
     switch (status) {
-      case 'agendada': return 'bg-blue-100 text-blue-800';
-      case 'realizada': return 'bg-green-100 text-green-800';
-      case 'cancelada': return 'bg-red-100 text-red-800';
-      case 'nao_encontrado': return 'bg-orange-100 text-orange-800';
-      case 'cancelamento_solicitado': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "agendada":
+        return "bg-blue-100 text-blue-800";
+      case "realizada":
+        return "bg-green-100 text-green-800";
+      case "cancelada":
+        return "bg-red-100 text-red-800";
+      case "nao_encontrado":
+        return "bg-orange-100 text-orange-800";
+      case "cancelamento_solicitado":
+        return "bg-yellow-100 text-yellow-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
-  const showSuccessNotification = (message: string = 'Visita agendada com sucesso!') => {
-    const notification = document.createElement('div');
-    notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center';
+  const showSuccessNotification = (
+    message: string = "Visita agendada com sucesso!",
+  ) => {
+    const notification = document.createElement("div");
+    notification.className =
+      "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
     notification.innerHTML = `
       <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
@@ -603,26 +710,26 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
   const formatSafeDate = (dateString: string) => {
     try {
       let date: Date;
-      
-      if (dateString.includes('-')) {
+
+      if (dateString.includes("-")) {
         // Format YYYY-MM-DD
-        const [year, month, day] = dateString.split('-');
+        const [year, month, day] = dateString.split("-");
         date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      } else if (dateString.includes('/')) {
+      } else if (dateString.includes("/")) {
         // Format DD/MM/YYYY (Brazilian format)
-        const [day, month, year] = dateString.split('/');
+        const [day, month, year] = dateString.split("/");
         date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       } else {
         // Try to parse as is
         date = new Date(dateString);
       }
-      
+
       // Validate that the date is valid
       if (isNaN(date.getTime())) {
         return dateString;
       }
-      
-      return date.toLocaleDateString('pt-BR');
+
+      return date.toLocaleDateString("pt-BR");
     } catch {
       return dateString;
     }
@@ -631,29 +738,29 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
   const formatSafeDateTime = (dateString: string, timeString?: string) => {
     try {
       let date: Date;
-      
-      if (dateString.includes('-')) {
+
+      if (dateString.includes("-")) {
         // Format YYYY-MM-DD
-        const [year, month, day] = dateString.split('-');
+        const [year, month, day] = dateString.split("-");
         date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      } else if (dateString.includes('/')) {
+      } else if (dateString.includes("/")) {
         // Format DD/MM/YYYY (Brazilian format)
-        const [day, month, year] = dateString.split('/');
+        const [day, month, year] = dateString.split("/");
         date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       } else {
         // Try to parse as is
         date = new Date(dateString);
       }
-      
+
       // Validate that the date is valid
       if (isNaN(date.getTime())) {
-        return `${dateString} às ${timeString || '00:00'}`;
+        return `${dateString} às ${timeString || "00:00"}`;
       }
-      
-      const dateFormatted = date.toLocaleDateString('pt-BR');
-      return `${dateFormatted} às ${timeString || '00:00'}`;
+
+      const dateFormatted = date.toLocaleDateString("pt-BR");
+      return `${dateFormatted} às ${timeString || "00:00"}`;
     } catch {
-      return `${dateString} às ${timeString || '00:00'}`;
+      return `${dateString} às ${timeString || "00:00"}`;
     }
   };
 
@@ -664,61 +771,66 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
   const handleConfirmCancellation = async () => {
     if (!selectedVisitForCancellation || !cancellationReason.trim()) {
-      alert('Por favor, informe o motivo do cancelamento');
+      alert("Por favor, informe o motivo do cancelamento");
       return;
     }
 
     try {
-      await requestVisitCancellation(selectedVisitForCancellation.id, cancellationReason.trim());
+      await requestVisitCancellation(
+        selectedVisitForCancellation.id,
+        cancellationReason.trim(),
+      );
       setShowCancellationModal(false);
       setSelectedVisitForCancellation(null);
-      setCancellationReason('');
-      showSuccessNotification('Solicitação de cancelamento enviada para aprovação');
+      setCancellationReason("");
+      showSuccessNotification(
+        "Solicitação de cancelamento enviada para aprovação",
+      );
     } catch (error) {
-      console.error('Erro ao solicitar cancelamento:', error);
-      alert('Erro ao solicitar cancelamento. Tente novamente.');
+      console.error("Erro ao solicitar cancelamento:", error);
+      alert("Erro ao solicitar cancelamento. Tente novamente.");
     }
   };
 
   const handleCloseCancellationModal = () => {
     setShowCancellationModal(false);
     setSelectedVisitForCancellation(null);
-    setCancellationReason('');
+    setCancellationReason("");
   };
 
   const handleOpenRescheduleModal = (visit: ScheduledVisit) => {
     setSelectedVisitForReschedule(visit);
     setRescheduleDate(visit.scheduledDate);
-    setRescheduleTime(visit.scheduledTime || '09:00');
+    setRescheduleTime(visit.scheduledTime || "09:00");
     setShowRescheduleModal(true);
   };
 
   const handleCloseRescheduleModal = () => {
     setShowRescheduleModal(false);
     setSelectedVisitForReschedule(null);
-    setRescheduleDate('');
-    setRescheduleTime('');
+    setRescheduleDate("");
+    setRescheduleTime("");
   };
 
   const handleConfirmReschedule = async () => {
     if (!selectedVisitForReschedule || !rescheduleDate || !rescheduleTime) {
-      alert('Por favor, selecione uma nova data e horário');
+      alert("Por favor, selecione uma nova data e horário");
       return;
     }
 
     try {
       // Usar a nova função rescheduleVisit
       await rescheduleVisit(
-        selectedVisitForReschedule.id, 
+        selectedVisitForReschedule.id,
         rescheduleDate,
-        rescheduleTime
+        rescheduleTime,
       );
 
-      showSuccessNotification('Visita reagendada com sucesso!');
+      showSuccessNotification("Visita reagendada com sucesso!");
       handleCloseRescheduleModal();
     } catch (error) {
-      console.error('Erro ao reagendar visita:', error);
-      alert('Erro ao reagendar visita. Tente novamente.');
+      console.error("Erro ao reagendar visita:", error);
+      alert("Erro ao reagendar visita. Tente novamente.");
     }
   };
 
@@ -738,7 +850,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
   const handleToggleClientSelection = (clientDocument: string) => {
     const newSelection = new Set(selectedClients);
     const newSchedules = new Map(clientSchedules);
-    
+
     if (newSelection.has(clientDocument)) {
       newSelection.delete(clientDocument);
       newSchedules.delete(clientDocument);
@@ -747,10 +859,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
       // Inicializar com data e hora padrão
       newSchedules.set(clientDocument, {
         date: selectedDate,
-        time: selectedTime
+        time: selectedTime,
       });
     }
-    
+
     setSelectedClients(newSelection);
     setClientSchedules(newSchedules);
   };
@@ -758,51 +870,58 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
   const handleSelectAllClients = () => {
     const newSelection = new Set(selectedClients);
     const newSchedules = new Map(clientSchedules);
-    
+
     // Verificar se todos os clientes da página atual estão selecionados
-    const allCurrentPageSelected = paginatedClients.every(client => 
-      selectedClients.has(client.document)
+    const allCurrentPageSelected = paginatedClients.every((client) =>
+      selectedClients.has(client.document),
     );
-    
+
     if (allCurrentPageSelected && paginatedClients.length > 0) {
       // Desmarcar todos da página atual
-      paginatedClients.forEach(client => {
+      paginatedClients.forEach((client) => {
         newSelection.delete(client.document);
         newSchedules.delete(client.document);
       });
     } else {
       // Selecionar todos da página atual
-      paginatedClients.forEach(client => {
+      paginatedClients.forEach((client) => {
         if (!newSelection.has(client.document)) {
           newSelection.add(client.document);
           newSchedules.set(client.document, {
             date: selectedDate,
-            time: selectedTime
+            time: selectedTime,
           });
         }
       });
     }
-    
+
     setSelectedClients(newSelection);
     setClientSchedules(newSchedules);
   };
 
   const getSelectedClientsData = () => {
-    if (!user || user.type !== 'collector') return [];
-    
+    if (!user || user.type !== "collector") return [];
+
     const allClients = getClientGroups(user.id);
-    return allClients.filter(client => selectedClients.has(client.document));
+    return allClients.filter((client) => selectedClients.has(client.document));
   };
 
-  const updateClientSchedule = (clientDocument: string, field: 'date' | 'time', value: string) => {
+  const updateClientSchedule = (
+    clientDocument: string,
+    field: "date" | "time",
+    value: string,
+  ) => {
     const newSchedules = new Map(clientSchedules);
-    const currentSchedule = newSchedules.get(clientDocument) || { date: selectedDate, time: selectedTime };
-    
+    const currentSchedule = newSchedules.get(clientDocument) || {
+      date: selectedDate,
+      time: selectedTime,
+    };
+
     newSchedules.set(clientDocument, {
       ...currentSchedule,
-      [field]: value
+      [field]: value,
     });
-    
+
     setClientSchedules(newSchedules);
   };
 
@@ -811,18 +930,22 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       // Criar data da visita garantindo que não há problemas de fuso horário
-      const [year, month, day] = visitDate.split('-');
-      const visitDateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      const [year, month, day] = visitDate.split("-");
+      const visitDateObj = new Date(
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day),
+      );
       visitDateObj.setHours(0, 0, 0, 0);
-      
+
       const diffTime = today.getTime() - visitDateObj.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      
+
       return Math.max(0, diffDays);
     } catch (error) {
-      console.error('Erro ao calcular dias de atraso da visita:', error);
+      console.error("Erro ao calcular dias de atraso da visita:", error);
       return 0;
     }
   };
@@ -835,8 +958,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
           <div className="flex items-center">
             <Calendar className="h-6 w-6 mr-3" />
             <div>
-              <h2 className="text-lg lg:text-xl font-bold">Agendamento de Visitas</h2>
-              <p className="text-purple-100 text-sm lg:text-base">Gerencie suas visitas aos clientes</p>
+              <h2 className="text-lg lg:text-xl font-bold">
+                Agendamento de Visitas
+              </h2>
+              <p className="text-purple-100 text-sm lg:text-base">
+                Gerencie suas visitas aos clientes
+              </p>
             </div>
           </div>
           {onClose && (
@@ -854,22 +981,22 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
       <div className="border-b border-gray-200">
         <div className="flex">
           <button
-            onClick={() => setActiveTab('schedule')}
+            onClick={() => setActiveTab("schedule")}
             className={`px-6 py-3 font-medium transition-colors ${
-              activeTab === 'schedule'
-                ? 'border-b-2 border-purple-600 text-purple-600'
-                : 'text-gray-600 hover:text-gray-800'
+              activeTab === "schedule"
+                ? "border-b-2 border-purple-600 text-purple-600"
+                : "text-gray-600 hover:text-gray-800"
             }`}
           >
             <Plus className="h-4 w-4 mr-2 inline" />
             Agendar Nova Visita
           </button>
           <button
-            onClick={() => setActiveTab('list')}
+            onClick={() => setActiveTab("list")}
             className={`px-6 py-3 font-medium transition-colors ${
-              activeTab === 'list'
-                ? 'border-b-2 border-purple-600 text-purple-600'
-                : 'text-gray-600 hover:text-gray-800'
+              activeTab === "list"
+                ? "border-b-2 border-purple-600 text-purple-600"
+                : "text-gray-600 hover:text-gray-800"
             }`}
           >
             <Eye className="h-4 w-4 mr-2 inline" />
@@ -879,10 +1006,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
       </div>
 
       <div className="p-4 lg:p-6">
-        {activeTab === 'schedule' ? (
+        {activeTab === "schedule" ? (
           // Aba de Agendamento
           <div className="space-y-6">
-
             {/* Busca e Filtros */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -893,16 +1019,15 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                   <button
                     onClick={() => setShowFilters(!showFilters)}
                     className={`flex items-center px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                      showFilters 
-                        ? 'bg-purple-100 text-purple-700' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      showFilters
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
                   >
                     <Filter className="h-4 w-4 mr-1" />
                     Filtros
                     {hasActiveFilters && (
-                      <span className="ml-1 px-1 py-1 bg-purple-600 text-white text-xs rounded-full">
-                      </span>
+                      <span className="ml-1 px-1 py-1 bg-purple-600 text-white text-xs rounded-full"></span>
                     )}
                   </button>
                   {hasActiveFilters && (
@@ -938,12 +1063,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                       </label>
                       <select
                         value={filters.city}
-                        onChange={(e) => handleFilterChange('city', e.target.value)}
+                        onChange={(e) =>
+                          handleFilterChange("city", e.target.value)
+                        }
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                       >
                         <option value="">Todas as cidades</option>
-                        {availableCities.map(city => (
-                          <option key={city} value={city}>{city}</option>
+                        {availableCities.map((city) => (
+                          <option key={city} value={city}>
+                            {city}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -957,7 +1086,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                         type="number"
                         step="0.01"
                         value={filters.minValue}
-                        onChange={(e) => handleFilterChange('minValue', e.target.value)}
+                        onChange={(e) =>
+                          handleFilterChange("minValue", e.target.value)
+                        }
                         placeholder="R$ 0,00"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                       />
@@ -972,7 +1103,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                         type="number"
                         step="0.01"
                         value={filters.maxValue}
-                        onChange={(e) => handleFilterChange('maxValue', e.target.value)}
+                        onChange={(e) =>
+                          handleFilterChange("maxValue", e.target.value)
+                        }
                         placeholder="R$ 999.999,99"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                       />
@@ -985,11 +1118,15 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                       </label>
                       <select
                         value={filters.visitStatus}
-                        onChange={(e) => handleFilterChange('visitStatus', e.target.value)}
+                        onChange={(e) =>
+                          handleFilterChange("visitStatus", e.target.value)
+                        }
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                       >
                         <option value="">Todos</option>
-                        <option value="critical">🔴 Nunca Visitado / Mais de 120 dias</option>
+                        <option value="critical">
+                          🔴 Nunca Visitado / Mais de 120 dias
+                        </option>
                         <option value="high">🟠 90+ dias sem visita</option>
                         <option value="medium">🟡 60+ dias sem visita</option>
                         <option value="low">🔵 30+ dias sem visita</option>
@@ -1001,17 +1138,42 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                   {hasActiveFilters && (
                     <div className="text-sm text-gray-600 py-4">
                       <span className="font-medium">Filtros ativos:</span>
-                      {searchTerm && <span className="ml-1 px-2 py-1 bg-white rounded border">Busca: "{searchTerm}"</span>}
-                      {filters.city && <span className="ml-1 px-2 py-1 bg-white rounded border">Cidade: {filters.city}</span>}
-                      {filters.minValue && <span className="ml-1 px-2 py-1 bg-white rounded border">Min: R$ {filters.minValue}</span>}
-                      {filters.maxValue && <span className="ml-1 px-2 py-1 bg-white rounded border">Max: R$ {filters.maxValue}</span>}
-                      {filters.visitStatus && <span className="ml-1 px-2 py-1 bg-white rounded border">Status: {
-                        filters.visitStatus === 'critical' ? 'Nunca/120+ dias' :
-                        filters.visitStatus === 'high' ? '90+ dias' :
-                        filters.visitStatus === 'medium' ? '60+ dias' :
-                        filters.visitStatus === 'low' ? '30+ dias' :
-                        filters.visitStatus === 'recent' ? 'Recente' : ''
-                      }</span>}
+                      {searchTerm && (
+                        <span className="ml-1 px-2 py-1 bg-white rounded border">
+                          Busca: "{searchTerm}"
+                        </span>
+                      )}
+                      {filters.city && (
+                        <span className="ml-1 px-2 py-1 bg-white rounded border">
+                          Cidade: {filters.city}
+                        </span>
+                      )}
+                      {filters.minValue && (
+                        <span className="ml-1 px-2 py-1 bg-white rounded border">
+                          Min: R$ {filters.minValue}
+                        </span>
+                      )}
+                      {filters.maxValue && (
+                        <span className="ml-1 px-2 py-1 bg-white rounded border">
+                          Max: R$ {filters.maxValue}
+                        </span>
+                      )}
+                      {filters.visitStatus && (
+                        <span className="ml-1 px-2 py-1 bg-white rounded border">
+                          Status:{" "}
+                          {filters.visitStatus === "critical"
+                            ? "Nunca/120+ dias"
+                            : filters.visitStatus === "high"
+                              ? "90+ dias"
+                              : filters.visitStatus === "medium"
+                                ? "60+ dias"
+                                : filters.visitStatus === "low"
+                                  ? "30+ dias"
+                                  : filters.visitStatus === "recent"
+                                    ? "Recente"
+                                    : ""}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1019,13 +1181,20 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
               {selectedClients.size > 0 && (
                 <div className="mt-2 text-sm text-purple-600 bg-purple-50 rounded-lg p-2">
-                  {selectedClients.size} cliente{selectedClients.size !== 1 ? 's' : ''} selecionado{selectedClients.size !== 1 ? 's' : ''}
+                  {selectedClients.size} cliente
+                  {selectedClients.size !== 1 ? "s" : ""} selecionado
+                  {selectedClients.size !== 1 ? "s" : ""}
                 </div>
               )}
               {clientsWithActiveVisits > 0 && (
                 <div className="mt-2 text-sm text-orange-600 bg-orange-50 rounded-lg p-2 flex items-center">
                   <AlertTriangle className="h-4 w-4 mr-2" />
-                  {clientsWithActiveVisits} cliente{clientsWithActiveVisits !== 1 ? 's' : ''} com visita{clientsWithActiveVisits !== 1 ? 's' : ''} já agendada{clientsWithActiveVisits !== 1 ? 's' : ''} (não {clientsWithActiveVisits !== 1 ? 'aparecem' : 'aparece'} na lista)
+                  {clientsWithActiveVisits} cliente
+                  {clientsWithActiveVisits !== 1 ? "s" : ""} com visita
+                  {clientsWithActiveVisits !== 1 ? "s" : ""} já agendada
+                  {clientsWithActiveVisits !== 1 ? "s" : ""} (não{" "}
+                  {clientsWithActiveVisits !== 1 ? "aparecem" : "aparece"} na
+                  lista)
                 </div>
               )}
             </div>
@@ -1036,38 +1205,55 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 <div className="bg-gray-50 p-3 border-b border-gray-200">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-gray-700">
-                      {hasActiveFilters 
-                        ? `${availableClients.length} cliente${availableClients.length !== 1 ? 's' : ''} encontrado${availableClients.length !== 1 ? 's' : ''}`
-                        : `${availableClients.length} cliente${availableClients.length !== 1 ? 's' : ''} com pendências ${availableClients.length !== 1 ? 'disponíveis' : 'disponível'}`
-                      }
+                      {hasActiveFilters
+                        ? `${availableClients.length} cliente${availableClients.length !== 1 ? "s" : ""} encontrado${availableClients.length !== 1 ? "s" : ""}`
+                        : `${availableClients.length} cliente${availableClients.length !== 1 ? "s" : ""} com pendências ${availableClients.length !== 1 ? "disponíveis" : "disponível"}`}
                     </span>
                     <button
                       onClick={handleSelectAllClients}
                       className="text-sm text-purple-600 hover:text-purple-800 font-medium"
                     >
-                      {paginatedClients.every(client => selectedClients.has(client.document)) && paginatedClients.length > 0
-                        ? 'Desmarcar Página' 
-                        : 'Selecionar Página'
-                      }
+                      {paginatedClients.every((client) =>
+                        selectedClients.has(client.document),
+                      ) && paginatedClients.length > 0
+                        ? "Desmarcar Página"
+                        : "Selecionar Página"}
                     </button>
                   </div>
-                  
+
                   {/* Paginação */}
                   {totalClientsPages > 1 && (
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <span>
-                        Página {clientsCurrentPage} de {totalClientsPages} ({((clientsCurrentPage - 1) * clientsPerPage) + 1}-{Math.min(clientsCurrentPage * clientsPerPage, availableClients.length)} de {availableClients.length})
+                        Página {clientsCurrentPage} de {totalClientsPages} (
+                        {(clientsCurrentPage - 1) * clientsPerPage + 1}-
+                        {Math.min(
+                          clientsCurrentPage * clientsPerPage,
+                          availableClients.length,
+                        )}{" "}
+                        de {availableClients.length})
                       </span>
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => setClientsCurrentPage(Math.max(1, clientsCurrentPage - 1))}
+                          onClick={() =>
+                            setClientsCurrentPage(
+                              Math.max(1, clientsCurrentPage - 1),
+                            )
+                          }
                           disabled={clientsCurrentPage === 1}
                           className="p-1 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <ChevronLeft className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => setClientsCurrentPage(Math.min(totalClientsPages, clientsCurrentPage + 1))}
+                          onClick={() =>
+                            setClientsCurrentPage(
+                              Math.min(
+                                totalClientsPages,
+                                clientsCurrentPage + 1,
+                              ),
+                            )
+                          }
                           disabled={clientsCurrentPage === totalClientsPages}
                           className="p-1 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -1077,33 +1263,41 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="max-h-96 overflow-y-auto p-3">
                   {/* Group clients by neighborhood */}
                   {(() => {
-                    const groupedClients = paginatedClients.reduce((groups, client) => {
-                      const neighborhood = client.neighborhood || 'Outros';
-                      if (!groups[neighborhood]) {
-                        groups[neighborhood] = [];
-                      }
-                      groups[neighborhood].push(client);
-                      return groups;
-                    }, {} as Record<string, typeof paginatedClients>);
+                    const groupedClients = paginatedClients.reduce(
+                      (groups, client) => {
+                        const neighborhood = client.neighborhood || "Outros";
+                        if (!groups[neighborhood]) {
+                          groups[neighborhood] = [];
+                        }
+                        groups[neighborhood].push(client);
+                        return groups;
+                      },
+                      {} as Record<string, typeof paginatedClients>,
+                    );
 
                     const getClientStatus = (client: any) => {
                       // Check days without visit based on last visit
                       const clientVisits = scheduledVisits
-                        .filter(visit => 
-                          visit.clientDocument === client.document && 
-                          visit.status === 'realizada'
+                        .filter(
+                          (visit) =>
+                            visit.clientDocument === client.document &&
+                            visit.status === "realizada",
                         )
-                        .sort((a, b) => new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime());
-                      
+                        .sort(
+                          (a, b) =>
+                            new Date(b.scheduledDate).getTime() -
+                            new Date(a.scheduledDate).getTime(),
+                        );
+
                       const today = new Date();
                       today.setHours(0, 0, 0, 0);
-                      
+
                       let daysSinceLastVisit: number;
-                      
+
                       if (clientVisits.length === 0) {
                         // Never visited - consider as more than 120 days
                         daysSinceLastVisit = 999;
@@ -1112,22 +1306,33 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                         try {
                           const visitDateStr = clientVisits[0].scheduledDate;
                           let lastVisitDate: Date;
-                          
-                          if (visitDateStr.includes('-')) {
+
+                          if (visitDateStr.includes("-")) {
                             // Format YYYY-MM-DD
-                            const [year, month, day] = visitDateStr.split('-');
-                            lastVisitDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-                          } else if (visitDateStr.includes('/')) {
+                            const [year, month, day] = visitDateStr.split("-");
+                            lastVisitDate = new Date(
+                              parseInt(year),
+                              parseInt(month) - 1,
+                              parseInt(day),
+                            );
+                          } else if (visitDateStr.includes("/")) {
                             // Format DD/MM/YYYY
-                            const [day, month, year] = visitDateStr.split('/');
-                            lastVisitDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                            const [day, month, year] = visitDateStr.split("/");
+                            lastVisitDate = new Date(
+                              parseInt(year),
+                              parseInt(month) - 1,
+                              parseInt(day),
+                            );
                           } else {
                             lastVisitDate = new Date(visitDateStr);
                           }
-                          
+
                           lastVisitDate.setHours(0, 0, 0, 0);
-                          daysSinceLastVisit = Math.floor((today.getTime() - lastVisitDate.getTime()) / (1000 * 60 * 60 * 24));
-                          
+                          daysSinceLastVisit = Math.floor(
+                            (today.getTime() - lastVisitDate.getTime()) /
+                              (1000 * 60 * 60 * 24),
+                          );
+
                           // Ensure we don't get negative days
                           daysSinceLastVisit = Math.max(0, daysSinceLastVisit);
                         } catch {
@@ -1138,39 +1343,50 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
                       // Determine status based on days without visit
                       if (daysSinceLastVisit >= 120) {
-                        return { 
-                          type: 'critical', 
-                          label: daysSinceLastVisit === 999 ? 'Nunca Visitado' : 'Mais de 120 dias', 
-                          color: 'bg-red-100 text-red-800 border-red-200',
-                          days: daysSinceLastVisit === 999 ? 'Nunca' : `${daysSinceLastVisit} dias`
+                        return {
+                          type: "critical",
+                          label:
+                            daysSinceLastVisit === 999
+                              ? "Nunca Visitado"
+                              : "Mais de 120 dias",
+                          color: "bg-red-100 text-red-800 border-red-200",
+                          days:
+                            daysSinceLastVisit === 999
+                              ? "Nunca"
+                              : `${daysSinceLastVisit} dias`,
                         };
                       } else if (daysSinceLastVisit >= 90) {
-                        return { 
-                          type: 'high', 
-                          label: '90+ dias', 
-                          color: 'bg-orange-100 text-orange-800 border-orange-200',
-                          days: `${daysSinceLastVisit} dias`
+                        return {
+                          type: "high",
+                          label: "90+ dias",
+                          color:
+                            "bg-orange-100 text-orange-800 border-orange-200",
+                          days: `${daysSinceLastVisit} dias`,
                         };
                       } else if (daysSinceLastVisit >= 60) {
-                        return { 
-                          type: 'medium', 
-                          label: '60+ dias', 
-                          color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-                          days: `${daysSinceLastVisit} dias`
+                        return {
+                          type: "medium",
+                          label: "60+ dias",
+                          color:
+                            "bg-yellow-100 text-yellow-800 border-yellow-200",
+                          days: `${daysSinceLastVisit} dias`,
                         };
                       } else if (daysSinceLastVisit >= 30) {
-                        return { 
-                          type: 'low', 
-                          label: '30+ dias', 
-                          color: 'bg-blue-100 text-blue-800 border-blue-200',
-                          days: `${daysSinceLastVisit} dias`
+                        return {
+                          type: "low",
+                          label: "30+ dias",
+                          color: "bg-blue-100 text-blue-800 border-blue-200",
+                          days: `${daysSinceLastVisit} dias`,
                         };
                       } else {
-                        return { 
-                          type: 'recent', 
-                          label: 'Recente', 
-                          color: 'bg-green-100 text-green-800 border-green-200',
-                          days: daysSinceLastVisit === 0 ? 'Hoje' : `${daysSinceLastVisit} dias`
+                        return {
+                          type: "recent",
+                          label: "Recente",
+                          color: "bg-green-100 text-green-800 border-green-200",
+                          days:
+                            daysSinceLastVisit === 0
+                              ? "Hoje"
+                              : `${daysSinceLastVisit} dias`,
                         };
                       }
                     };
@@ -1178,199 +1394,267 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                     const getLastVisitInfo = (client: any) => {
                       // Get real visit history from scheduled visits
                       const clientVisits = scheduledVisits
-                        .filter(visit => 
-                          visit.clientDocument === client.document && 
-                          visit.status === 'realizada'
+                        .filter(
+                          (visit) =>
+                            visit.clientDocument === client.document &&
+                            visit.status === "realizada",
                         )
-                        .sort((a, b) => new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime());
-                      
+                        .sort(
+                          (a, b) =>
+                            new Date(b.scheduledDate).getTime() -
+                            new Date(a.scheduledDate).getTime(),
+                        );
+
                       const lastVisit = clientVisits[0];
                       if (!lastVisit) return null;
-                      
+
                       return {
                         date: lastVisit.scheduledDate,
-                        result: lastVisit.notes || 'Visita realizada'
+                        result: lastVisit.notes || "Visita realizada",
                       };
                     };
 
-                    return Object.entries(groupedClients).map(([neighborhood, clients]) => (
-                      <div key={neighborhood} className="mb-4">
-                        {/* Neighborhood Header */}
-                        <div className="flex items-center mb-3 pb-2 border-b border-gray-200">
-                          <MapPin className="h-4 w-4 text-gray-500 mr-2" />
-                          <h4 className="text-sm font-medium text-gray-700">{neighborhood}</h4>
-                          <span className="ml-2 text-xs text-gray-500">({clients.length} cliente{clients.length !== 1 ? 's' : ''})</span>
-                        </div>
+                    return Object.entries(groupedClients).map(
+                      ([neighborhood, clients]) => (
+                        <div key={neighborhood} className="mb-4">
+                          {/* Neighborhood Header */}
+                          <div className="flex items-center mb-3 pb-2 border-b border-gray-200">
+                            <MapPin className="h-4 w-4 text-gray-500 mr-2" />
+                            <h4 className="text-sm font-medium text-gray-700">
+                              {neighborhood}
+                            </h4>
+                            <span className="ml-2 text-xs text-gray-500">
+                              ({clients.length} cliente
+                              {clients.length !== 1 ? "s" : ""})
+                            </span>
+                          </div>
 
-                        {/* Client Cards */}
-                        <div className="grid grid-cols-1 gap-3">
-                          {clients.map((client) => {
-                            const status = getClientStatus(client);
-                            const lastVisit = getLastVisitInfo(client);
-                            const isSelected = selectedClients.has(client.document);
+                          {/* Client Cards */}
+                          <div className="grid grid-cols-1 gap-3">
+                            {clients.map((client) => {
+                              const status = getClientStatus(client);
+                              const lastVisit = getLastVisitInfo(client);
+                              const isSelected = selectedClients.has(
+                                client.document,
+                              );
 
-                            return (
-                              <div
-                                key={client.document}
-                                className={`relative bg-white rounded-lg border-2 transition-all duration-200 cursor-pointer hover:shadow-md ${
-                                  isSelected 
-                                    ? 'border-purple-500 bg-purple-50 shadow-md ring-2 ring-purple-200' 
-                                    : 'border-gray-200 hover:border-gray-300'
-                                }`}
-                                onClick={() => handleToggleClientSelection(client.document)}
-                              >
-                                {/* Status Indicator */}
-                                <div className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium border ${status.color}`}>
-                                  {status.label}
-                                </div>
+                              return (
+                                <div
+                                  key={client.document}
+                                  className={`relative bg-white rounded-lg border-2 transition-all duration-200 cursor-pointer hover:shadow-md ${
+                                    isSelected
+                                      ? "border-purple-500 bg-purple-50 shadow-md ring-2 ring-purple-200"
+                                      : "border-gray-200 hover:border-gray-300"
+                                  }`}
+                                  onClick={() =>
+                                    handleToggleClientSelection(client.document)
+                                  }
+                                >
+                                  {/* Status Indicator */}
+                                  <div
+                                    className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium border ${status.color}`}
+                                  >
+                                    {status.label}
+                                  </div>
 
-                                <div className="p-4">
-                                  <div className="flex items-start">
-                                    {/* Large Checkbox */}
-                                    <div className="mr-4 mt-1">
-                                      <input
-                                        type="checkbox"
-                                        checked={isSelected}
-                                        onChange={() => handleToggleClientSelection(client.document)}
-                                        className="h-6 w-6 text-purple-600 focus:ring-2 focus:ring-purple-500 border-2 border-gray-300 rounded-md cursor-pointer"
-                                        onClick={(e) => e.stopPropagation()}
-                                      />
-                                    </div>
-
-                                    <div className="flex-1 min-w-0">
-                                      {/* Client Info */}
-                                      <div className="flex items-start justify-between mb-2">
-                                        <div className="min-w-0 flex-1">
-                                          <h3 className="font-semibold text-gray-900 text-lg truncate">{client.client}</h3>
-                                          <p className="text-sm text-gray-600">{client.document}</p>
-                                        </div>
+                                  <div className="p-4">
+                                    <div className="flex items-start">
+                                      {/* Large Checkbox */}
+                                      <div className="mr-4 mt-1">
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={() =>
+                                            handleToggleClientSelection(
+                                              client.document,
+                                            )
+                                          }
+                                          className="h-6 w-6 text-purple-600 focus:ring-2 focus:ring-purple-500 border-2 border-gray-300 rounded-md cursor-pointer"
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
                                       </div>
 
-                                      {/* Address */}
-                                      <div className="text-sm text-gray-500 mb-3 flex items-center">
-                                        <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
-                                        <span className="truncate">
-                                          {client.address}, {client.number} - {client.city}
-                                        </span>
-                                      </div>
-
-                                      {/* Financial Info */}
-                                      <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center space-x-4">
-                                          <div>
-                                            <p className="text-xs text-gray-500">Valor Pendente</p>
-                                            <p className="text-lg font-bold text-red-600">
-                                              {formatCurrency(client.pendingValue)}
-                                            </p>
-                                          </div>
-                                          <div>
-                                            <p className="text-xs text-gray-500">Total de Parcelas</p>
-                                            <p className="text-sm font-medium text-gray-900">
-                                              {collections.filter(c => c.documento === client.document).length}
+                                      <div className="flex-1 min-w-0">
+                                        {/* Client Info */}
+                                        <div className="flex items-start justify-between mb-2">
+                                          <div className="min-w-0 flex-1">
+                                            <h3 className="font-semibold text-gray-900 text-lg truncate">
+                                              {client.client}
+                                            </h3>
+                                            <p className="text-sm text-gray-600">
+                                              {client.document}
                                             </p>
                                           </div>
                                         </div>
-                                      </div>
 
-                                      {/* Last Visit Info */}
-                                      <div className="bg-gray-50 rounded-md p-2 mb-2">
-                                        {lastVisit ? (
-                                          <div>
+                                        {/* Address */}
+                                        <div className="text-sm text-gray-500 mb-3 flex items-center">
+                                          <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
+                                          <span className="truncate">
+                                            {client.address}, {client.number} -{" "}
+                                            {client.city}
+                                          </span>
+                                        </div>
+
+                                        {/* Financial Info */}
+                                        <div className="flex items-center justify-between mb-3">
+                                          <div className="flex items-center space-x-4">
+                                            <div>
+                                              <p className="text-xs text-gray-500">
+                                                Valor Pendente
+                                              </p>
+                                              <p className="text-lg font-bold text-red-600">
+                                                {formatCurrency(
+                                                  client.pendingValue,
+                                                )}
+                                              </p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-gray-500">
+                                                Total de Parcelas
+                                              </p>
+                                              <p className="text-sm font-medium text-gray-900">
+                                                {
+                                                  collections.filter(
+                                                    (c) =>
+                                                      c.documento ===
+                                                      client.document,
+                                                  ).length
+                                                }
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Last Visit Info */}
+                                        <div className="bg-gray-50 rounded-md p-2 mb-2">
+                                          {lastVisit ? (
+                                            <div>
+                                              <div className="flex items-center text-xs text-gray-600">
+                                                <Clock className="h-3 w-3 mr-1" />
+                                                <span className="font-medium">
+                                                  Última visita:
+                                                </span>
+                                                <span className="ml-1">
+                                                  {formatSafeDate(
+                                                    lastVisit.date,
+                                                  )}
+                                                </span>
+                                              </div>
+                                              <p className="text-xs text-gray-500 mt-1">
+                                                {lastVisit.result}
+                                              </p>
+                                            </div>
+                                          ) : (
+                                            <div className="flex items-center text-xs text-gray-500">
+                                              <Clock className="h-3 w-3 mr-1" />
+                                              <span>
+                                                Nenhuma visita realizada
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Quick Actions */}
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center space-x-2">
+                                            {status.type === "critical" && (
+                                              <div className="flex items-center text-xs text-red-600">
+                                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                                <span>Prioridade Máxima</span>
+                                              </div>
+                                            )}
+                                            {status.type === "high" && (
+                                              <div className="flex items-center text-xs text-orange-600">
+                                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                                <span>Prioridade Alta</span>
+                                              </div>
+                                            )}
+                                            {status.type === "medium" && (
+                                              <div className="flex items-center text-xs text-yellow-600">
+                                                <Clock className="h-3 w-3 mr-1" />
+                                                <span>Atenção</span>
+                                              </div>
+                                            )}
                                             <div className="flex items-center text-xs text-gray-600">
                                               <Clock className="h-3 w-3 mr-1" />
-                                              <span className="font-medium">Última visita:</span>
-                                              <span className="ml-1">{formatSafeDate(lastVisit.date)}</span>
+                                              <span>{status.days}</span>
                                             </div>
-                                            <p className="text-xs text-gray-500 mt-1">{lastVisit.result}</p>
                                           </div>
-                                        ) : (
-                                          <div className="flex items-center text-xs text-gray-500">
-                                            <Clock className="h-3 w-3 mr-1" />
-                                            <span>Nenhuma visita realizada</span>
-                                          </div>
-                                        )}
-                                      </div>
 
-                                      {/* Quick Actions */}
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-2">
-                                          {status.type === 'critical' && (
-                                            <div className="flex items-center text-xs text-red-600">
-                                              <AlertTriangle className="h-3 w-3 mr-1" />
-                                              <span>Prioridade Máxima</span>
+                                          {isSelected && (
+                                            <div className="flex items-center text-purple-600 text-xs font-medium">
+                                              <CheckCircle className="h-4 w-4 mr-1" />
+                                              Selecionado
                                             </div>
                                           )}
-                                          {status.type === 'high' && (
-                                            <div className="flex items-center text-xs text-orange-600">
-                                              <AlertTriangle className="h-3 w-3 mr-1" />
-                                              <span>Prioridade Alta</span>
-                                            </div>
-                                          )}
-                                          {status.type === 'medium' && (
-                                            <div className="flex items-center text-xs text-yellow-600">
-                                              <Clock className="h-3 w-3 mr-1" />
-                                              <span>Atenção</span>
-                                            </div>
-                                          )}
-                                          <div className="flex items-center text-xs text-gray-600">
-                                            <Clock className="h-3 w-3 mr-1" />
-                                            <span>{status.days}</span>
-                                          </div>
                                         </div>
-                                        
-                                        {isSelected && (
-                                          <div className="flex items-center text-purple-600 text-xs font-medium">
-                                            <CheckCircle className="h-4 w-4 mr-1" />
-                                            Selecionado
-                                          </div>
-                                        )}
                                       </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    ));
+                      ),
+                    );
                   })()}
                 </div>
               </div>
             )}
 
-            {availableClients.length === 0 && user && user.type === 'collector' && (
-              <div className="p-4 text-center text-gray-500 border border-gray-200 rounded-lg">
-                {hasActiveFilters ? 'Nenhum cliente encontrado com os filtros aplicados' : 
-                 clientsWithActiveVisits > 0 ? 'Todos os clientes com pendências já têm visitas agendadas' : 
-                 'Nenhum cliente com pendências disponível para agendamento'}
-              </div>
-            )}
+            {availableClients.length === 0 &&
+              user &&
+              user.type === "collector" && (
+                <div className="p-4 text-center text-gray-500 border border-gray-200 rounded-lg">
+                  {hasActiveFilters
+                    ? "Nenhum cliente encontrado com os filtros aplicados"
+                    : clientsWithActiveVisits > 0
+                      ? "Todos os clientes com pendências já têm visitas agendadas"
+                      : "Nenhum cliente com pendências disponível para agendamento"}
+                </div>
+              )}
 
             {/* Cliente(s) Selecionado(s) */}
             {selectedClients.size > 0 && (
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 lg:p-4">
                 <h3 className="font-semibold text-gray-900 mb-2">
-                  {selectedClients.size} Cliente{selectedClients.size !== 1 ? 's' : ''} Selecionado{selectedClients.size !== 1 ? 's' : ''}
+                  {selectedClients.size} Cliente
+                  {selectedClients.size !== 1 ? "s" : ""} Selecionado
+                  {selectedClients.size !== 1 ? "s" : ""}
                 </h3>
                 {selectedClients.size > 0 && (
                   <div className="space-y-3">
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
                       <div className="flex items-center text-sm text-blue-800">
                         <CalendarDays className="h-4 w-4 mr-2" />
-                        <span className="font-medium">Agendamento Individual:</span>
-                        <span className="ml-1">Configure data e horário específicos para cada cliente</span>
+                        <span className="font-medium">
+                          Agendamento Individual:
+                        </span>
+                        <span className="ml-1">
+                          Configure data e horário específicos para cada cliente
+                        </span>
                       </div>
                     </div>
                     <div className="space-y-2 max-h-96 overflow-y-auto">
                       {getSelectedClientsData().map((client) => {
-                        const schedule = clientSchedules.get(client.document) || { date: selectedDate, time: selectedTime };
+                        const schedule = clientSchedules.get(
+                          client.document,
+                        ) || { date: selectedDate, time: selectedTime };
                         return (
-                          <div key={client.document} className="bg-white rounded-lg p-3 border border-gray-200">
+                          <div
+                            key={client.document}
+                            className="bg-white rounded-lg p-3 border border-gray-200"
+                          >
                             <div className="flex items-center justify-between mb-2">
                               <div>
-                                <span className="font-medium text-gray-900">{client.client}</span>
-                                <span className="text-gray-500 ml-2">({client.document})</span>
+                                <span className="font-medium text-gray-900">
+                                  {client.client}
+                                </span>
+                                <span className="text-gray-500 ml-2">
+                                  ({client.document})
+                                </span>
                               </div>
                               <div className="text-red-600 font-medium">
                                 {formatCurrency(client.pendingValue)}
@@ -1386,7 +1670,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                                   <input
                                     type="date"
                                     value={schedule.date}
-                                    onChange={(e) => updateClientSchedule(client.document, 'date', e.target.value)}
+                                    onChange={(e) =>
+                                      updateClientSchedule(
+                                        client.document,
+                                        "date",
+                                        e.target.value,
+                                      )
+                                    }
                                     min={getLocalDate()}
                                     className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                                   />
@@ -1401,7 +1691,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                                   <input
                                     type="time"
                                     value={schedule.time}
-                                    onChange={(e) => updateClientSchedule(client.document, 'time', e.target.value)}
+                                    onChange={(e) =>
+                                      updateClientSchedule(
+                                        client.document,
+                                        "time",
+                                        e.target.value,
+                                      )
+                                    }
                                     className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                                   />
                                 </div>
@@ -1439,12 +1735,20 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 </h3>
                 <div className="space-y-2">
                   {getSelectedClientsData().map((client) => {
-                    const schedule = clientSchedules.get(client.document) || { date: selectedDate, time: selectedTime };
+                    const schedule = clientSchedules.get(client.document) || {
+                      date: selectedDate,
+                      time: selectedTime,
+                    };
                     return (
-                      <div key={client.document} className="flex items-center justify-between text-sm bg-white rounded p-2">
+                      <div
+                        key={client.document}
+                        className="flex items-center justify-between text-sm bg-white rounded p-2"
+                      >
                         <div>
                           <span className="font-medium">{client.client}</span>
-                          <span className="text-gray-500 ml-2">({client.document})</span>
+                          <span className="text-gray-500 ml-2">
+                            ({client.document})
+                          </span>
                         </div>
                         <div className="text-right">
                           <div className="font-medium text-blue-600">
@@ -1464,7 +1768,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 onClick={() => {
                   setSelectedClients(new Set());
                   setClientSchedules(new Map());
-                  setNotes('');
+                  setNotes("");
                   clearAllFilters();
                   setCurrentPage(1);
                   setClientsCurrentPage(1);
@@ -1483,11 +1787,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 ) : (
                   <CheckCircle className="h-4 w-4 mr-2" />
                 )}
-                {loading ? 'Agendando...' : (
-                  selectedClients.size > 0 
-                    ? `Agendar ${selectedClients.size} Visita${selectedClients.size !== 1 ? 's' : ''}`
-                    : 'Agendar Visitas'
-                )}
+                {loading
+                  ? "Agendando..."
+                  : selectedClients.size > 0
+                    ? `Agendar ${selectedClients.size} Visita${selectedClients.size !== 1 ? "s" : ""}`
+                    : "Agendar Visitas"}
               </button>
             </div>
           </div>
@@ -1504,7 +1808,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 {todayVisits.length > visitsPerPage && (
                   <div className="flex items-center justify-center sm:justify-start space-x-2">
                     <button
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      onClick={() =>
+                        setCurrentPage(Math.max(1, currentPage - 1))
+                      }
                       disabled={currentPage === 1}
                       className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                     >
@@ -1514,7 +1820,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                       Página {currentPage} de {totalPages}
                     </span>
                     <button
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      onClick={() =>
+                        setCurrentPage(Math.min(totalPages, currentPage + 1))
+                      }
                       disabled={currentPage === totalPages}
                       className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                     >
@@ -1523,34 +1831,43 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                   </div>
                 )}
               </div>
-              
+
               {todayVisits.length === 0 ? (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
                   <Calendar className="h-8 w-8 text-blue-400 mx-auto mb-2" />
-                  <p className="text-blue-600 font-medium">Nenhuma visita agendada para hoje</p>
-                  <p className="text-blue-500 text-sm">Que tal agendar uma nova visita?</p>
+                  <p className="text-blue-600 font-medium">
+                    Nenhuma visita agendada para hoje
+                  </p>
+                  <p className="text-blue-500 text-sm">
+                    Que tal agendar uma nova visita?
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {paginatedTodayVisits.map((visit) => (
-                    <div key={visit.id} className="border-2 border-blue-300 bg-blue-50 rounded-lg p-3 lg:p-4 hover:shadow-md transition-shadow">
+                    <div
+                      key={visit.id}
+                      className="border-2 border-blue-300 bg-blue-50 rounded-lg p-3 lg:p-4 hover:shadow-md transition-shadow"
+                    >
                       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                         <div className="flex-1">
                           <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <button 
+                            <button
                               onClick={() => handleOpenClientModal(visit)}
                               className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
                             >
                               {visit.clientName}
                             </button>
-                            <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status)}`}>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status)}`}
+                            >
                               {getStatusLabel(visit.status)}
                             </span>
                             <span className="text-sm text-blue-600 font-medium">
-                              {visit.scheduledTime || '00:00'}
+                              {visit.scheduledTime || "00:00"}
                             </span>
                           </div>
-                          
+
                           <div className="text-sm text-gray-600 space-y-1">
                             <div className="flex items-center">
                               <MapPin className="h-4 w-4 mr-2" />
@@ -1559,13 +1876,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             {visit.totalPendingValue && (
                               <div className="flex items-center">
                                 <DollarSign className="h-4 w-4 mr-2" />
-                                Pendente: {formatCurrency(visit.totalPendingValue)}
-                                {visit.overdueCount && visit.overdueCount > 0 && (
-                                  <span className="ml-2 text-red-600">
-                                    <AlertTriangle className="h-4 w-4 inline mr-1" />
-                                    {visit.overdueCount} {visit.overdueCount === 1 ? 'título' : 'títulos'} em atraso
-                                  </span>
-                                )}
+                                Pendente:{" "}
+                                {formatCurrency(visit.totalPendingValue)}
+                                {visit.overdueCount &&
+                                  visit.overdueCount > 0 && (
+                                    <span className="ml-2 text-red-600">
+                                      <AlertTriangle className="h-4 w-4 inline mr-1" />
+                                      {visit.overdueCount}{" "}
+                                      {visit.overdueCount === 1
+                                        ? "título"
+                                        : "títulos"}{" "}
+                                      em atraso
+                                    </span>
+                                  )}
                               </div>
                             )}
                             {visit.notes && (
@@ -1575,8 +1898,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             )}
                           </div>
                         </div>
-                        
-                        {visit.status === 'agendada' && (
+
+                        {visit.status === "agendada" && (
                           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
                             <button
                               onClick={() => handleMarkAsCompleted(visit)}
@@ -1607,10 +1930,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             )}
                           </div>
                         )}
-                        {visit.status === 'cancelamento_solicitado' && (
+                        {visit.status === "cancelamento_solicitado" && (
                           <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-lg">
-                            <div className="font-medium">Cancelamento Solicitado</div>
-                            <div className="text-xs mt-1">Aguardando aprovação do gerente</div>
+                            <div className="font-medium">
+                              Cancelamento Solicitado
+                            </div>
+                            <div className="text-xs mt-1">
+                              Aguardando aprovação do gerente
+                            </div>
                             {visit.cancellationRequestReason && (
                               <div className="text-xs mt-1 italic">
                                 Motivo: {visit.cancellationRequestReason}
@@ -1618,22 +1945,38 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             )}
                           </div>
                         )}
-                        {visit.cancellationRejectedBy && visit.status === 'agendada' && (
-                          <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
-                            <div className="font-medium">Cancelamento Rejeitado pelo Gerente</div>
-                            <div className="text-xs mt-1">A visita permanece agendada</div>
-                            {visit.cancellationRejectionReason && (
-                              <div className="text-xs mt-1 italic">
-                                Motivo da rejeição: {visit.cancellationRejectionReason}
+                        {visit.cancellationRejectedBy &&
+                          visit.status === "agendada" && (
+                            <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+                              <div className="font-medium">
+                                Cancelamento Rejeitado pelo Gerente
                               </div>
-                            )}
-                            {visit.cancellationRejectedAt && (
-                              <div className="text-xs mt-1 text-gray-600">
-                                Rejeitado em: {new Date(visit.cancellationRejectedAt).toLocaleDateString('pt-BR')} às {new Date(visit.cancellationRejectedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              <div className="text-xs mt-1">
+                                A visita permanece agendada
                               </div>
-                            )}
-                          </div>
-                        )}
+                              {visit.cancellationRejectionReason && (
+                                <div className="text-xs mt-1 italic">
+                                  Motivo da rejeição:{" "}
+                                  {visit.cancellationRejectionReason}
+                                </div>
+                              )}
+                              {visit.cancellationRejectedAt && (
+                                <div className="text-xs mt-1 text-gray-600">
+                                  Rejeitado em:{" "}
+                                  {new Date(
+                                    visit.cancellationRejectedAt,
+                                  ).toLocaleDateString("pt-BR")}{" "}
+                                  às{" "}
+                                  {new Date(
+                                    visit.cancellationRejectedAt,
+                                  ).toLocaleTimeString("pt-BR", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
                       </div>
                     </div>
                   ))}
@@ -1648,28 +1991,36 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                   <Calendar className="h-5 w-5 mr-2 text-gray-600" />
                   Próximas Visitas ({upcomingVisits.length})
                 </h3>
-                
+
                 <div className="space-y-3">
                   {upcomingVisits.slice(0, 5).map((visit) => (
-                    <div key={visit.id} className="border border-gray-200 rounded-lg p-3 lg:p-4 hover:shadow-md transition-shadow">
+                    <div
+                      key={visit.id}
+                      className="border border-gray-200 rounded-lg p-3 lg:p-4 hover:shadow-md transition-shadow"
+                    >
                       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                         <div className="flex-1">
                           <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <button 
+                            <button
                               onClick={() => handleOpenClientModal(visit)}
                               className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
                             >
                               {visit.clientName}
                             </button>
-                            <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status)}`}>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status)}`}
+                            >
                               {getStatusLabel(visit.status)}
                             </span>
                           </div>
-                          
+
                           <div className="text-sm text-gray-600 space-y-1">
                             <div className="flex items-center">
                               <Calendar className="h-4 w-4 mr-2" />
-                              {formatSafeDateTime(visit.scheduledDate, visit.scheduledTime)}
+                              {formatSafeDateTime(
+                                visit.scheduledDate,
+                                visit.scheduledTime,
+                              )}
                             </div>
                             <div className="flex items-center">
                               <MapPin className="h-4 w-4 mr-2" />
@@ -1678,13 +2029,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             {visit.totalPendingValue && (
                               <div className="flex items-center">
                                 <DollarSign className="h-4 w-4 mr-2" />
-                                Pendente: {formatCurrency(visit.totalPendingValue)}
-                                {visit.overdueCount && visit.overdueCount > 0 && (
-                                  <span className="ml-2 text-red-600">
-                                    <AlertTriangle className="h-4 w-4 inline mr-1" />
-                                    {visit.overdueCount} {visit.overdueCount === 1 ? 'título' : 'títulos'} em atraso
-                                  </span>
-                                )}
+                                Pendente:{" "}
+                                {formatCurrency(visit.totalPendingValue)}
+                                {visit.overdueCount &&
+                                  visit.overdueCount > 0 && (
+                                    <span className="ml-2 text-red-600">
+                                      <AlertTriangle className="h-4 w-4 inline mr-1" />
+                                      {visit.overdueCount}{" "}
+                                      {visit.overdueCount === 1
+                                        ? "título"
+                                        : "títulos"}{" "}
+                                      em atraso
+                                    </span>
+                                  )}
                               </div>
                             )}
                             {visit.notes && (
@@ -1694,8 +2051,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             )}
                           </div>
                         </div>
-                        
-                        {visit.status === 'agendada' && (
+
+                        {visit.status === "agendada" && (
                           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
                             <button
                               onClick={() => handleMarkAsCompleted(visit)}
@@ -1726,10 +2083,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             )}
                           </div>
                         )}
-                        {visit.status === 'cancelamento_solicitado' && (
+                        {visit.status === "cancelamento_solicitado" && (
                           <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-lg">
-                            <div className="font-medium">Cancelamento Solicitado</div>
-                            <div className="text-xs mt-1">Aguardando aprovação do gerente</div>
+                            <div className="font-medium">
+                              Cancelamento Solicitado
+                            </div>
+                            <div className="text-xs mt-1">
+                              Aguardando aprovação do gerente
+                            </div>
                             {visit.cancellationRequestReason && (
                               <div className="text-xs mt-1 italic">
                                 Motivo: {visit.cancellationRequestReason}
@@ -1737,30 +2098,47 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             )}
                           </div>
                         )}
-                        {visit.cancellationRejectedBy && visit.status === 'agendada' && (
-                          <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
-                            <div className="font-medium">Cancelamento Rejeitado pelo Gerente</div>
-                            <div className="text-xs mt-1">A visita permanece agendada</div>
-                            {visit.cancellationRejectionReason && (
-                              <div className="text-xs mt-1 italic">
-                                Motivo da rejeição: {visit.cancellationRejectionReason}
+                        {visit.cancellationRejectedBy &&
+                          visit.status === "agendada" && (
+                            <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+                              <div className="font-medium">
+                                Cancelamento Rejeitado pelo Gerente
                               </div>
-                            )}
-                            {visit.cancellationRejectedAt && (
-                              <div className="text-xs mt-1 text-gray-600">
-                                Rejeitado em: {new Date(visit.cancellationRejectedAt).toLocaleDateString('pt-BR')} às {new Date(visit.cancellationRejectedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              <div className="text-xs mt-1">
+                                A visita permanece agendada
                               </div>
-                            )}
-                          </div>
-                        )}
+                              {visit.cancellationRejectionReason && (
+                                <div className="text-xs mt-1 italic">
+                                  Motivo da rejeição:{" "}
+                                  {visit.cancellationRejectionReason}
+                                </div>
+                              )}
+                              {visit.cancellationRejectedAt && (
+                                <div className="text-xs mt-1 text-gray-600">
+                                  Rejeitado em:{" "}
+                                  {new Date(
+                                    visit.cancellationRejectedAt,
+                                  ).toLocaleDateString("pt-BR")}{" "}
+                                  às{" "}
+                                  {new Date(
+                                    visit.cancellationRejectedAt,
+                                  ).toLocaleTimeString("pt-BR", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
                       </div>
                     </div>
                   ))}
-                  
+
                   {upcomingVisits.length > 5 && (
                     <div className="text-center py-2">
                       <span className="text-sm text-gray-500">
-                        ... e mais {upcomingVisits.length - 5} visita{upcomingVisits.length - 5 !== 1 ? 's' : ''}
+                        ... e mais {upcomingVisits.length - 5} visita
+                        {upcomingVisits.length - 5 !== 1 ? "s" : ""}
                       </span>
                     </div>
                   )}
@@ -1775,14 +2153,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                   <AlertTriangle className="h-5 w-5 mr-2 text-red-600" />
                   Visitas Atrasadas ({pastVisits.length})
                 </h3>
-                
+
                 <div className="space-y-3">
                   {pastVisits.slice(0, 5).map((visit) => (
-                    <div key={visit.id} className="border-2 border-red-300 bg-red-50 rounded-lg p-3 lg:p-4 hover:shadow-md transition-shadow">
+                    <div
+                      key={visit.id}
+                      className="border-2 border-red-300 bg-red-50 rounded-lg p-3 lg:p-4 hover:shadow-md transition-shadow"
+                    >
                       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                         <div className="flex-1">
                           <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <button 
+                            <button
                               onClick={() => handleOpenClientModal(visit)}
                               className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
                             >
@@ -1792,17 +2173,24 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                               Atrasada
                             </span>
                           </div>
-                          
+
                           <div className="text-sm text-gray-600 space-y-1">
                             <div className="flex items-center text-red-600 font-medium">
                               <Calendar className="h-4 w-4 mr-2" />
-                              {formatSafeDateTime(visit.scheduledDate, visit.scheduledTime)}
+                              {formatSafeDateTime(
+                                visit.scheduledDate,
+                                visit.scheduledTime,
+                              )}
                               {(() => {
-                                const daysLate = getVisitOverdueDays(visit.scheduledDate);
+                                const daysLate = getVisitOverdueDays(
+                                  visit.scheduledDate,
+                                );
                                 if (daysLate > 0) {
                                   return (
                                     <span className="ml-2">
-                                      ({daysLate} {daysLate === 1 ? 'dia' : 'dias'} de atraso)
+                                      ({daysLate}{" "}
+                                      {daysLate === 1 ? "dia" : "dias"} de
+                                      atraso)
                                     </span>
                                   );
                                 }
@@ -1816,7 +2204,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             {visit.totalPendingValue && (
                               <div className="flex items-center">
                                 <DollarSign className="h-4 w-4 mr-2" />
-                                Pendente: {formatCurrency(visit.totalPendingValue)}
+                                Pendente:{" "}
+                                {formatCurrency(visit.totalPendingValue)}
                               </div>
                             )}
                             {visit.notes && (
@@ -1826,7 +2215,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             )}
                           </div>
                         </div>
-                        
+
                         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
                           <button
                             onClick={() => handleMarkAsCompleted(visit)}
@@ -1848,7 +2237,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             Reagendar
                           </button>
                           <button
-                            onClick={() => handleUpdateVisitStatus(visit.id, 'cancelada')}
+                            onClick={() =>
+                              handleUpdateVisitStatus(visit.id, "cancelada")
+                            }
                             className="px-3 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
                           >
                             Cancelar
@@ -1857,11 +2248,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                       </div>
                     </div>
                   ))}
-                  
+
                   {pastVisits.length > 5 && (
                     <div className="text-center py-2">
                       <span className="text-sm text-red-600 font-medium">
-                        ... e mais {pastVisits.length - 5} visita{pastVisits.length - 5 !== 1 ? 's' : ''} atrasada{pastVisits.length - 5 !== 1 ? 's' : ''}
+                        ... e mais {pastVisits.length - 5} visita
+                        {pastVisits.length - 5 !== 1 ? "s" : ""} atrasada
+                        {pastVisits.length - 5 !== 1 ? "s" : ""}
                       </span>
                     </div>
                   )}
@@ -1870,13 +2263,20 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
             )}
 
             {/* Caso não tenha nenhuma visita */}
-            {todayVisits.length === 0 && upcomingVisits.length === 0 && pastVisits.length === 0 && (
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg">Nenhuma visita agendada</p>
-                <p className="text-gray-400 text-sm mt-2">Comece agendando uma nova visita na aba "Agendar Nova Visita"</p>
-              </div>
-            )}
+            {todayVisits.length === 0 &&
+              upcomingVisits.length === 0 &&
+              pastVisits.length === 0 && (
+                <div className="text-center py-8">
+                  <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 text-lg">
+                    Nenhuma visita agendada
+                  </p>
+                  <p className="text-gray-400 text-sm mt-2">
+                    Comece agendando uma nova visita na aba "Agendar Nova
+                    Visita"
+                  </p>
+                </div>
+              )}
           </div>
         )}
       </div>
@@ -1899,17 +2299,22 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 Solicitar Cancelamento de Visita
               </h3>
             </div>
-            
+
             <div className="px-4 lg:px-6 py-4">
               <div className="mb-4">
                 <div className="text-sm text-gray-600 mb-2">
-                  <strong>Cliente:</strong> {selectedVisitForCancellation.clientName}
+                  <strong>Cliente:</strong>{" "}
+                  {selectedVisitForCancellation.clientName}
                 </div>
                 <div className="text-sm text-gray-600 mb-2">
-                  <strong>Data:</strong> {formatSafeDateTime(selectedVisitForCancellation.scheduledDate, selectedVisitForCancellation.scheduledTime)}
+                  <strong>Data:</strong>{" "}
+                  {formatSafeDateTime(
+                    selectedVisitForCancellation.scheduledDate,
+                    selectedVisitForCancellation.scheduledTime,
+                  )}
                 </div>
               </div>
-              
+
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Motivo do cancelamento *
@@ -1923,18 +2328,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                   required
                 />
               </div>
-              
+
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
                 <div className="flex items-start">
                   <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-yellow-700">
-                    <strong>Atenção:</strong> Esta solicitação será enviada para aprovação do gerente. 
-                    A visita permanecerá agendada até que seja aprovada ou rejeitada.
+                    <strong>Atenção:</strong> Esta solicitação será enviada para
+                    aprovação do gerente. A visita permanecerá agendada até que
+                    seja aprovada ou rejeitada.
                   </div>
                 </div>
               </div>
             </div>
-            
+
             <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleCloseCancellationModal}
@@ -1964,20 +2370,26 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 Reagendar Visita
               </h3>
             </div>
-            
+
             <div className="px-4 lg:px-6 py-4">
               <div className="mb-4">
                 <div className="text-sm text-gray-600 mb-2">
-                  <strong>Cliente:</strong> {selectedVisitForReschedule.clientName}
+                  <strong>Cliente:</strong>{" "}
+                  {selectedVisitForReschedule.clientName}
                 </div>
                 <div className="text-sm text-gray-600 mb-2">
-                  <strong>Agendamento atual:</strong> {formatSafeDateTime(selectedVisitForReschedule.scheduledDate, selectedVisitForReschedule.scheduledTime)}
+                  <strong>Agendamento atual:</strong>{" "}
+                  {formatSafeDateTime(
+                    selectedVisitForReschedule.scheduledDate,
+                    selectedVisitForReschedule.scheduledTime,
+                  )}
                 </div>
                 <div className="text-sm text-gray-600 mb-4">
-                  <strong>Endereço:</strong> {selectedVisitForReschedule.clientAddress}
+                  <strong>Endereço:</strong>{" "}
+                  {selectedVisitForReschedule.clientAddress}
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1995,7 +2407,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                     />
                   </div>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Novo Horário *
@@ -2012,17 +2424,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
                 <div className="flex items-start">
                   <Calendar className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-blue-700">
-                    <strong>Dica:</strong> Certifique-se de escolher um horário que permita o deslocamento entre visitas.
+                    <strong>Dica:</strong> Certifique-se de escolher um horário
+                    que permita o deslocamento entre visitas.
                   </div>
                 </div>
               </div>
             </div>
-            
+
             <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleCloseRescheduleModal}
@@ -2076,10 +2489,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                     <Clock className="h-5 w-5 text-orange-600 mr-2" />
                     Conflitos Encontrados
                   </h3>
-                  
+
                   <div className="space-y-3">
                     {conflictData.conflicts.map((conflict, index) => (
-                      <div key={index} className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                      <div
+                        key={index}
+                        className="bg-orange-50 border border-orange-200 rounded-lg p-4"
+                      >
                         <div className="flex items-start">
                           <AlertTriangle className="h-5 w-5 text-orange-600 mr-3 mt-0.5 flex-shrink-0" />
                           <div className="text-sm text-orange-800">
@@ -2093,10 +2509,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
                 {/* Opções */}
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">O que você gostaria de fazer?</h4>
+                  <h4 className="font-medium text-gray-900 mb-2">
+                    O que você gostaria de fazer?
+                  </h4>
                   <ul className="text-sm text-gray-600 space-y-1">
-                    <li>• <strong>Cancelar:</strong> Volte e ajuste os horários manualmente</li>
-                    <li>• <strong>Continuar:</strong> Agende mesmo com conflitos (não recomendado)</li>
+                    <li>
+                      • <strong>Cancelar:</strong> Volte e ajuste os horários
+                      manualmente
+                    </li>
+                    <li>
+                      • <strong>Continuar:</strong> Agende mesmo com conflitos
+                      (não recomendado)
+                    </li>
                   </ul>
                 </div>
               </div>
@@ -2120,7 +2544,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 ) : (
                   <CheckCircle className="h-4 w-4 mr-2" />
                 )}
-                {loading ? 'Agendando...' : 'Continuar Mesmo Assim'}
+                {loading ? "Agendando..." : "Continuar Mesmo Assim"}
               </button>
             </div>
           </div>
@@ -2140,22 +2564,22 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 Cliente: {selectedVisitForCompletion.clientName}
               </p>
             </div>
-            
+
             <div className="px-4 lg:px-6 py-4">
               <p className="text-sm text-gray-700 mb-4">
                 Selecione uma observação sobre como foi a visita:
               </p>
-              
+
               <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2">
                 {[
-                  'Visitado, tudo resolvido com sucesso',
-                  'Visitado, cliente pagou parcialmente',
-                  'Visitado, cliente prometeu pagar em breve',
-                  'Visitado, mas não quis pagar',
-                  'Visitado, cliente em dificuldades financeiras',
-                  'Visitado, cliente solicitou desconto',
-                  'Visitado, cliente mudou de endereço',
-                  'Visitado, cliente contestou a dívida'                  
+                  "Visitado, tudo resolvido com sucesso",
+                  "Visitado, cliente pagou parcialmente",
+                  "Visitado, cliente prometeu pagar em breve",
+                  "Visitado, mas não quis pagar",
+                  "Visitado, cliente em dificuldades financeiras",
+                  "Visitado, cliente solicitou desconto",
+                  "Visitado, cliente mudou de endereço",
+                  "Visitado, cliente contestou a dívida",
                 ].map((note, index) => (
                   <button
                     key={index}
@@ -2166,17 +2590,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                   </button>
                 ))}
               </div>
-              
+
               <div className="mt-4">
                 <button
-                  onClick={() => handleConfirmCompletion('')}
+                  onClick={() => handleConfirmCompletion("")}
                   className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
                 >
                   Marcar como realizada sem observação
                 </button>
               </div>
             </div>
-            
+
             <div className="px-4 lg:px-6 py-4 border-t border-gray-200">
               <button
                 onClick={() => {
@@ -2202,19 +2626,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 Confirmar "Não Encontrado"
               </h3>
             </div>
-            
+
             <div className="px-4 lg:px-6 py-4">
               <p className="text-gray-700 mb-2">
                 <strong>Cliente:</strong> {selectedVisitForNotFound.clientName}
               </p>
               <p className="text-gray-700 mb-4">
-                <strong>Endereço:</strong> {selectedVisitForNotFound.clientAddress}
+                <strong>Endereço:</strong>{" "}
+                {selectedVisitForNotFound.clientAddress}
               </p>
               <p className="text-gray-700">
-                Tem certeza de que deseja marcar esta visita como <strong>"Não Encontrado"</strong>?
+                Tem certeza de que deseja marcar esta visita como{" "}
+                <strong>"Não Encontrado"</strong>?
               </p>
             </div>
-            
+
             <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex space-x-3">
               <button
                 onClick={() => {
@@ -2249,22 +2675,22 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 Cliente: {selectedVisitForNotFound.clientName}
               </p>
             </div>
-            
+
             <div className="px-4 lg:px-6 py-4">
               <p className="text-sm text-gray-700 mb-4">
                 Selecione o motivo de não ter encontrado o cliente:
               </p>
-              
+
               <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2">
                 {[
-                  'Cliente não estava em casa',
-                  'Endereço inexistente ou incorreto',
-                  'Cliente mudou de endereço',
-                  'Imóvel fechado há tempo',
-                  'Vizinhos informaram que cliente não mora mais aqui',
-                  'Cliente evitou o atendimento',
-                  'Endereço é empresa/comércio fechado',
-                  'Não foi possível localizar o endereço'
+                  "Cliente não estava em casa",
+                  "Endereço inexistente ou incorreto",
+                  "Cliente mudou de endereço",
+                  "Imóvel fechado há tempo",
+                  "Vizinhos informaram que cliente não mora mais aqui",
+                  "Cliente evitou o atendimento",
+                  "Endereço é empresa/comércio fechado",
+                  "Não foi possível localizar o endereço",
                 ].map((note, index) => (
                   <button
                     key={index}
@@ -2275,17 +2701,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                   </button>
                 ))}
               </div>
-              
+
               <div className="mt-4">
                 <button
-                  onClick={() => handleConfirmNotFound('')}
+                  onClick={() => handleConfirmNotFound("")}
                   className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
                 >
                   Marcar como não encontrado sem observação
                 </button>
               </div>
             </div>
-            
+
             <div className="px-4 lg:px-6 py-4 border-t border-gray-200">
               <button
                 onClick={() => {
@@ -2314,12 +2740,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 Cliente: {selectedVisitForPayment.clientName}
               </p>
             </div>
-            
+
             <div className="px-4 lg:px-6 py-6">
               <p className="text-gray-700 text-center mb-6">
                 O cliente fez algum pagamento durante esta visita?
               </p>
-              
+
               <div className="flex space-x-3">
                 <button
                   onClick={handleClientMadePayment}

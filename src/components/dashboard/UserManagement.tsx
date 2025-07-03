@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Plus, Edit, Trash2, User, Shield } from 'lucide-react';
-import { useCollection } from '../../contexts/CollectionContext';
-import { User as UserType } from '../../types';
+import React, { useState } from "react";
+import { Plus, Edit, Trash2, User, Shield } from "lucide-react";
+import { useCollection } from "../../contexts/CollectionContext";
+import { User as UserType } from "../../types";
 
 const UserManagement: React.FC = () => {
   const { users, addUser, updateUser, deleteUser } = useCollection();
@@ -10,10 +10,10 @@ const UserManagement: React.FC = () => {
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserType | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
-    login: '',
-    password: '',
-    type: 'collector' as 'manager' | 'collector'
+    name: "",
+    login: "",
+    password: "",
+    type: "collector" as "manager" | "collector",
   });
 
   const handleOpenModal = (user?: UserType) => {
@@ -22,16 +22,16 @@ const UserManagement: React.FC = () => {
       setFormData({
         name: user.name,
         login: user.login,
-        password: '', // Don't show existing password
-        type: user.type
+        password: "", // Don't show existing password
+        type: user.type,
       });
     } else {
       setEditingUser(null);
       setFormData({
-        name: '',
-        login: '',
-        password: '',
-        type: 'collector'
+        name: "",
+        login: "",
+        password: "",
+        type: "collector",
       });
     }
     setIsModalOpen(true);
@@ -41,33 +41,33 @@ const UserManagement: React.FC = () => {
     setIsModalOpen(false);
     setEditingUser(null);
     setFormData({
-      name: '',
-      login: '',
-      password: '',
-      type: 'collector'
+      name: "",
+      login: "",
+      password: "",
+      type: "collector",
     });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (editingUser) {
       const updates: Partial<UserType> = {
         name: formData.name,
         login: formData.login,
-        type: formData.type
+        type: formData.type,
       };
-      
+
       // Only update password if provided
       if (formData.password.trim()) {
         updates.password = formData.password;
       }
-      
+
       updateUser(editingUser.id, updates);
     } else {
       addUser(formData);
     }
-    
+
     handleCloseModal();
   };
 
@@ -96,13 +96,11 @@ const UserManagement: React.FC = () => {
           <div>
             <h2 className="page-title">Gerenciamento de Usuários</h2>
             <p className="page-subtitle">
-              {users.length} usuário{users.length !== 1 ? 's' : ''} cadastrado{users.length !== 1 ? 's' : ''}
+              {users.length} usuário{users.length !== 1 ? "s" : ""} cadastrado
+              {users.length !== 1 ? "s" : ""}
             </p>
           </div>
-          <button
-            onClick={() => handleOpenModal()}
-            className="btn-primary"
-          >
+          <button onClick={() => handleOpenModal()} className="btn-primary">
             <Plus className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Novo Usuário</span>
           </button>
@@ -132,7 +130,9 @@ const UserManagement: React.FC = () => {
                             <User className="h-5 w-5 text-gray-600" />
                           </div>
                           <div>
-                            <div className="font-medium text-gray-900">{user.name}</div>
+                            <div className="font-medium text-gray-900">
+                              {user.name}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -141,23 +141,25 @@ const UserManagement: React.FC = () => {
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex items-center">
-                          {user.type === 'manager' ? (
+                          {user.type === "manager" ? (
                             <Shield className="h-4 w-4 text-purple-600 mr-2" />
                           ) : (
                             <User className="h-4 w-4 text-blue-600 mr-2" />
                           )}
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            user.type === 'manager' 
-                              ? 'bg-purple-100 text-purple-800' 
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {user.type === 'manager' ? 'Gerente' : 'Cobrador'}
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              user.type === "manager"
+                                ? "bg-purple-100 text-purple-800"
+                                : "bg-blue-100 text-blue-800"
+                            }`}
+                          >
+                            {user.type === "manager" ? "Gerente" : "Cobrador"}
                           </span>
                         </div>
                       </td>
                       <td className="table-cell">
                         <div className="text-muted">
-                          {new Date(user.createdAt).toLocaleDateString('pt-BR')}
+                          {new Date(user.createdAt).toLocaleDateString("pt-BR")}
                         </div>
                       </td>
                       <td className="table-cell">
@@ -188,14 +190,19 @@ const UserManagement: React.FC = () => {
           {/* Mobile Cards */}
           <div className="md:hidden space-y-4">
             {users.map((user) => (
-              <div key={user.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div
+                key={user.id}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
+              >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center">
                     <div className="h-12 w-12 bg-gray-100 rounded-full flex items-center justify-center mr-3">
                       <User className="h-6 w-6 text-gray-600" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 text-lg">{user.name}</h3>
+                      <h3 className="font-semibold text-gray-900 text-lg">
+                        {user.name}
+                      </h3>
                       <p className="text-gray-600 text-sm">@{user.login}</p>
                     </div>
                   </div>
@@ -216,24 +223,26 @@ const UserManagement: React.FC = () => {
                     </button>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    {user.type === 'manager' ? (
+                    {user.type === "manager" ? (
                       <Shield className="h-4 w-4 text-purple-600 mr-2" />
                     ) : (
                       <User className="h-4 w-4 text-blue-600 mr-2" />
                     )}
-                    <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${
-                      user.type === 'manager' 
-                        ? 'bg-purple-100 text-purple-800' 
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {user.type === 'manager' ? 'Gerente' : 'Cobrador'}
+                    <span
+                      className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${
+                        user.type === "manager"
+                          ? "bg-purple-100 text-purple-800"
+                          : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {user.type === "manager" ? "Gerente" : "Cobrador"}
                     </span>
                   </div>
                   <div className="text-sm text-gray-500">
-                    {new Date(user.createdAt).toLocaleDateString('pt-BR')}
+                    {new Date(user.createdAt).toLocaleDateString("pt-BR")}
                   </div>
                 </div>
               </div>
@@ -249,7 +258,9 @@ const UserManagement: React.FC = () => {
                   </div>
                 </div>
                 <h3 className="empty-state-title">Nenhum usuário encontrado</h3>
-                <p className="empty-state-description">Comece adicionando um novo usuário ao sistema.</p>
+                <p className="empty-state-description">
+                  Comece adicionando um novo usuário ao sistema.
+                </p>
               </div>
             </div>
           )}
@@ -262,7 +273,7 @@ const UserManagement: React.FC = () => {
           <div className="modal-container max-w-md mx-4">
             <div className="modal-header">
               <h3 className="text-lg font-semibold text-gray-900">
-                {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
+                {editingUser ? "Editar Usuário" : "Novo Usuário"}
               </h3>
             </div>
 
@@ -274,7 +285,9 @@ const UserManagement: React.FC = () => {
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
@@ -287,7 +300,9 @@ const UserManagement: React.FC = () => {
                 <input
                   type="text"
                   value={formData.login}
-                  onChange={(e) => setFormData({ ...formData, login: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, login: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
@@ -295,12 +310,16 @@ const UserManagement: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {editingUser ? 'Nova Senha (deixe em branco para manter a atual)' : 'Senha'}
+                  {editingUser
+                    ? "Nova Senha (deixe em branco para manter a atual)"
+                    : "Senha"}
                 </label>
                 <input
                   type="password"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required={!editingUser}
                 />
@@ -312,7 +331,12 @@ const UserManagement: React.FC = () => {
                 </label>
                 <select
                   value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as 'manager' | 'collector' })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      type: e.target.value as "manager" | "collector",
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="collector">Cobrador</option>
@@ -332,7 +356,7 @@ const UserManagement: React.FC = () => {
                   type="submit"
                   className="w-full sm:w-auto px-4 py-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-center"
                 >
-                  {editingUser ? 'Atualizar' : 'Criar'}
+                  {editingUser ? "Atualizar" : "Criar"}
                 </button>
               </div>
             </form>
@@ -348,16 +372,17 @@ const UserManagement: React.FC = () => {
               <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
                 <Trash2 className="w-6 h-6 text-red-600" />
               </div>
-              
+
               <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
                 Excluir Usuário
               </h3>
-              
+
               <p className="text-gray-600 text-center mb-6">
-                Tem certeza que deseja excluir o usuário <strong>{userToDelete.name}</strong>? 
-                Esta ação não pode ser desfeita.
+                Tem certeza que deseja excluir o usuário{" "}
+                <strong>{userToDelete.name}</strong>? Esta ação não pode ser
+                desfeita.
               </p>
-              
+
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                 <button
                   type="button"

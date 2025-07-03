@@ -1,55 +1,57 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, LogIn, Loader2 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useState } from "react";
+import { Eye, EyeOff, LogIn, Loader2 } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
 
 const LoginForm: React.FC = () => {
-  const [login, setLogin] = useState('');
-  const [password, setPassword] = useState('');
+  const [login, setLogin] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const { login: authenticate, isLoading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    
+    setError("");
+
     if (!login || !password) {
-      setError('Por favor, preencha todos os campos');
+      setError("Por favor, preencha todos os campos");
       return;
     }
 
-    console.log('Submitting login form with:', { login, password });
-    
+    console.log("Submitting login form with:", { login, password });
+
     try {
       const success = await authenticate(login, password);
-      console.log('Authentication result:', success);
-      
+      console.log("Authentication result:", success);
+
       if (!success) {
-        setError('Login ou senha incorretos. Verifique suas credenciais e tente novamente.');
+        setError(
+          "Login ou senha incorretos. Verifique suas credenciais e tente novamente.",
+        );
       }
     } catch (err) {
-      console.error('Login form error:', err);
-      setError('Erro ao fazer login. Tente novamente.');
+      console.error("Login form error:", err);
+      setError("Erro ao fazer login. Tente novamente.");
     }
   };
 
   const handleTestLogin = async (testLogin: string, testPassword: string) => {
     setLogin(testLogin);
     setPassword(testPassword);
-    setError('');
-    
-    console.log('Testing login with:', { testLogin, testPassword });
-    
+    setError("");
+
+    console.log("Testing login with:", { testLogin, testPassword });
+
     try {
       const success = await authenticate(testLogin, testPassword);
-      console.log('Test authentication result:', success);
-      
+      console.log("Test authentication result:", success);
+
       if (!success) {
         setError(`Falha no login de teste para ${testLogin}`);
       }
     } catch (err) {
-      console.error('Test login error:', err);
-      setError('Erro no login de teste');
+      console.error("Test login error:", err);
+      setError("Erro no login de teste");
     }
   };
 
@@ -61,13 +63,18 @@ const LoginForm: React.FC = () => {
             <div className="mx-auto h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center mb-4">
               <LogIn className="h-6 w-6 text-white" />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">Acesso ao Sistema</h2>
+            <h2 className="text-3xl font-bold text-gray-900">
+              Acesso ao Sistema
+            </h2>
             <p className="mt-2 text-gray-600">Entre com suas credenciais</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="login" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="login"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Login
               </label>
               <input
@@ -82,13 +89,16 @@ const LoginForm: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Senha
               </label>
               <div className="relative">
                 <input
                   id="password"
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-3 py-3 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
@@ -127,7 +137,7 @@ const LoginForm: React.FC = () => {
                   Entrando...
                 </>
               ) : (
-                'Entrar'
+                "Entrar"
               )}
             </button>
           </form>
@@ -137,21 +147,21 @@ const LoginForm: React.FC = () => {
               <p className="font-medium mb-3">Credenciais de teste:</p>
               <div className="space-y-2">
                 <button
-                  onClick={() => handleTestLogin('gerente', '123456')}
+                  onClick={() => handleTestLogin("gerente", "123456")}
                   disabled={isLoading}
                   className="w-full text-left p-2 rounded bg-gray-50 hover:bg-gray-100 transition-colors disabled:opacity-50"
                 >
                   <strong>Gerente:</strong> gerente / 123456
                 </button>
                 <button
-                  onClick={() => handleTestLogin('cobrador1', '123456')}
+                  onClick={() => handleTestLogin("cobrador1", "123456")}
                   disabled={isLoading}
                   className="w-full text-left p-2 rounded bg-gray-50 hover:bg-gray-100 transition-colors disabled:opacity-50"
                 >
                   <strong>Cobrador 1:</strong> cobrador1 / 123456
                 </button>
                 <button
-                  onClick={() => handleTestLogin('cobrador2', '123456')}
+                  onClick={() => handleTestLogin("cobrador2", "123456")}
                   disabled={isLoading}
                   className="w-full text-left p-2 rounded bg-gray-50 hover:bg-gray-100 transition-colors disabled:opacity-50"
                 >
