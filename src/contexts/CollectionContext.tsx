@@ -861,18 +861,22 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
 
     const clientMap = new Map<string, ClientGroup>();
+    let skippedCollectionsCount = 0;
 
     filteredCollections.forEach((collection) => {
-      if (!collection.cliente) return; // Cliente name is always required
+      // Group strictly by 'documento' (CPF) as the unique identifier.
+      const clientId = collection.documento?.trim();
 
-      // Use documento as unique identifier if available, otherwise use client name
-      const clientId = collection.documento || collection.cliente;
+      if (!clientId) {
+        skippedCollectionsCount++;
+        return; // Skip collections without a document.
+      }
 
       if (!clientMap.has(clientId)) {
         clientMap.set(clientId, {
           clientId,
-          client: collection.cliente,
-          document: collection.documento || '',
+          client: collection.cliente || "Cliente sem nome",
+          document: clientId,
           phone: collection.telefone || undefined,
           mobile: collection.celular || undefined,
           address: collection.endereco || "",
@@ -889,7 +893,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       const clientGroup = clientMap.get(clientId)!;
 
-      // Agrupar por número da venda (venda_n)
+      // Group by sale number (venda_n)
       let saleGroup = clientGroup.sales.find(
         (s) => s.saleNumber === collection.venda_n,
       );
@@ -912,7 +916,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       if (saleGroup) {
         saleGroup.installments.push(collection);
 
-        // Arredondar para 2 casas decimais para evitar problemas de precisão
         const roundTo2Decimals = (num: number) =>
           Math.round((num + Number.EPSILON) * 100) / 100;
 
@@ -923,7 +926,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           saleGroup.totalReceived + collection.valor_recebido,
         );
 
-        // Calcular valor pendente corretamente
         const pendingForThisInstallment = roundTo2Decimals(
           collection.valor_original - collection.valor_recebido,
         );
@@ -934,7 +936,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }
       }
 
-      // Arredondar para 2 casas decimais para evitar problemas de precisão
       const roundTo2Decimals = (num: number) =>
         Math.round((num + Number.EPSILON) * 100) / 100;
 
@@ -945,7 +946,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         clientGroup.totalReceived + collection.valor_recebido,
       );
 
-      // Calcular valor pendente corretamente
       const pendingForThisCollection = roundTo2Decimals(
         collection.valor_original - collection.valor_recebido,
       );
@@ -955,6 +955,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         );
       }
     });
+
+    if (skippedCollectionsCount > 0) {
+      console.warn(
+        `[getClientGroups] Skipped ${skippedCollectionsCount} collection entries because they were missing a 'documento'.`,
+      );
+    }
 
     return Array.from(clientMap.values()).sort((a, b) =>
       a.client.localeCompare(b.client),
