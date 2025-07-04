@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cobrança Cobradores</string>
+    <string name="title_activity_main">Cobrança Cobradores</string>
+    <string name="package_name">com.foccobrasil.cobrancacobradores</string>
+    <string name="custom_url_scheme">com.foccobrasil.cobrancacobradores</string>
+</resources>
