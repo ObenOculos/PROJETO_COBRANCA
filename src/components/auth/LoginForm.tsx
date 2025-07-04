@@ -35,26 +35,6 @@ const LoginForm: React.FC = () => {
     }
   };
 
-  const handleTestLogin = async (testLogin: string, testPassword: string) => {
-    setLogin(testLogin);
-    setPassword(testPassword);
-    setError("");
-
-    console.log("Testing login with:", { testLogin, testPassword });
-
-    try {
-      const success = await authenticate(testLogin, testPassword);
-      console.log("Test authentication result:", success);
-
-      if (!success) {
-        setError(`Falha no login de teste para ${testLogin}`);
-      }
-    } catch (err) {
-      console.error("Test login error:", err);
-      setError("Erro no login de teste");
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-8">
@@ -141,35 +121,6 @@ const LoginForm: React.FC = () => {
               )}
             </button>
           </form>
-
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <div className="text-sm text-gray-600">
-              <p className="font-medium mb-3">Credenciais de teste:</p>
-              <div className="space-y-2">
-                <button
-                  onClick={() => handleTestLogin("gerente", "123456")}
-                  disabled={isLoading}
-                  className="w-full text-left p-2 rounded bg-gray-50 hover:bg-gray-100 transition-colors disabled:opacity-50"
-                >
-                  <strong>Gerente:</strong> gerente / 123456
-                </button>
-                <button
-                  onClick={() => handleTestLogin("cobrador1", "123456")}
-                  disabled={isLoading}
-                  className="w-full text-left p-2 rounded bg-gray-50 hover:bg-gray-100 transition-colors disabled:opacity-50"
-                >
-                  <strong>Cobrador 1:</strong> cobrador1 / 123456
-                </button>
-                <button
-                  onClick={() => handleTestLogin("cobrador2", "123456")}
-                  disabled={isLoading}
-                  className="w-full text-left p-2 rounded bg-gray-50 hover:bg-gray-100 transition-colors disabled:opacity-50"
-                >
-                  <strong>Cobrador 2:</strong> cobrador2 / 123456
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
