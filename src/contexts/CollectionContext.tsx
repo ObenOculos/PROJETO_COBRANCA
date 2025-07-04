@@ -946,14 +946,23 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         clientGroup.totalReceived + collection.valor_recebido,
       );
 
-      const pendingForThisCollection = roundTo2Decimals(
-        collection.valor_original - collection.valor_recebido,
-      );
-      if (pendingForThisCollection > 0.01) {
-        clientGroup.pendingValue = roundTo2Decimals(
-          clientGroup.pendingValue + pendingForThisCollection,
+      
+    });
+
+    // Calculate pendingValue for each clientGroup and saleGroup after all collections are processed
+    clientMap.forEach((clientGroup) => {
+      const roundTo2Decimals = (num: number) =>
+        Math.round((num + Number.EPSILON) * 100) / 100;
+
+      clientGroup.sales.forEach((saleGroup) => {
+        saleGroup.pendingValue = roundTo2Decimals(
+          saleGroup.totalValue - saleGroup.totalReceived,
         );
-      }
+      });
+
+      clientGroup.pendingValue = roundTo2Decimals(
+        clientGroup.totalValue - clientGroup.totalReceived,
+      );
     });
 
     if (skippedCollectionsCount > 0) {
