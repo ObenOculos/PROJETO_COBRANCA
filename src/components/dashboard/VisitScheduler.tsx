@@ -2572,12 +2572,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
               <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2">
                 {[
-                  "Visitado, tudo resolvido com sucesso",
                   "Visitado, cliente pagou parcialmente",
-                  "Visitado, cliente prometeu pagar em breve",
-                  "Visitado, mas não quis pagar",
-                  "Visitado, cliente em dificuldades financeiras",
-                  "Visitado, cliente solicitou desconto",
                   "Visitado, cliente mudou de endereço",
                   "Visitado, cliente contestou a dívida",
                 ].map((note, index) => (
@@ -2684,12 +2679,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
               <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2">
                 {[
                   "Cliente não estava em casa",
-                  "Endereço inexistente ou incorreto",
                   "Cliente mudou de endereço",
-                  "Imóvel fechado há tempo",
-                  "Vizinhos informaram que cliente não mora mais aqui",
                   "Cliente evitou o atendimento",
-                  "Endereço é empresa/comércio fechado",
                   "Não foi possível localizar o endereço",
                 ].map((note, index) => (
                   <button
