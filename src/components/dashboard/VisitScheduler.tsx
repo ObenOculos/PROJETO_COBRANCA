@@ -49,9 +49,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     return `${year}-${month}-${day}`;
   };
 
+
+  const getDefaultTime = () => {
+    const now = new Date();
+    now.setHours(now.getHours() + 1);
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
   const [selectedDate] = useState<string>(getLocalDate());
 
-  const [selectedTime] = useState<string>("09:00");
+  const [selectedTime] = useState<string>(getDefaultTime());
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedClients, setSelectedClients] = useState<Set<string>>(
     new Set(),
@@ -1641,7 +1650,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                       {getSelectedClientsData().map((client) => {
                         const schedule = clientSchedules.get(
                           client.document,
-                        ) || { date: selectedDate, time: selectedTime };
+                        ) || { date: selectedDate, time: getDefaultTime() };
                         return (
                           <div
                             key={client.document}
@@ -1698,6 +1707,28 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                                         e.target.value,
                                       )
                                     }
+                                    onBlur={(e) => {
+                                      const selectedTime = e.target.value;
+                                      const selectedDate = schedule.date;
+                                      
+                                      // Verificar se é hoje e se o horário é no passado
+                                      if (selectedDate === getLocalDate()) {
+                                        const now = new Date();
+                                        const [hours, minutes] = selectedTime.split(':').map(Number);
+                                        const selectedDateTime = new Date();
+                                        selectedDateTime.setHours(hours, minutes, 0, 0);
+                                        
+                                        // Se o horário selecionado for no passado, resetar para horário padrão
+                                        if (selectedDateTime <= now) {
+                                          alert('Não é possível agendar para um horário no passado. Horário ajustado automaticamente.');
+                                          updateClientSchedule(
+                                            client.document,
+                                            "time",
+                                            getDefaultTime(),
+                                          );
+                                        }
+                                      }
+                                    }}
                                     className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                                   />
                                 </div>
@@ -2572,9 +2603,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
               <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2">
                 {[
-                  "Visitado, cliente pagou parcialmente",
-                  "Visitado, cliente mudou de endereço",
-                  "Visitado, cliente contestou a dívida",
+                  "Visitado e o cliente pagou tudo.",
+                  "Visitado, mas cliente pagou parcialmente",
+                  "Visitado, mas cliente mudou de endereço",
+                  "Visitado, mas cliente contestou a dívida",
                 ].map((note, index) => (
                   <button
                     key={index}

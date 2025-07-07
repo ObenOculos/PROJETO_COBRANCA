@@ -772,39 +772,37 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
       </div>
 
       {/* Google Maps */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="p-3 sm:p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center">
-                <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 mr-2" />
-                <span className="hidden sm:inline">Mapa da Rota</span>
-                <span className="sm:hidden">Mapa</span>
-              </h3>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                {selectedClients.length > 0 && (
+      {selectedClients.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="p-3 sm:p-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center">
+                  <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 mr-2" />
+                  <span className="hidden sm:inline">Mapa da Rota</span>
+                  <span className="sm:hidden">Mapa</span>
+                </h3>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                   <span className="text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
                     {selectedClients.length} selecionado
                     {selectedClients.length !== 1 ? "s" : ""}
                   </span>
-                )}
-                {userLocation && (
-                  <span className="text-green-600 bg-green-100 px-2 py-1 rounded-full flex items-center">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
-                    <span className="hidden sm:inline">Localização obtida</span>
-                    <span className="sm:hidden">GPS ✓</span>
-                  </span>
-                )}
-                {routeOptimized && userLocation && (
-                  <span className="text-blue-600 bg-blue-100 px-2 py-1 rounded-full flex items-center">
-                    <Route className="h-3 w-3 mr-1" />
-                    <span className="hidden sm:inline">Otimizada</span>
-                    <span className="sm:hidden">✓</span>
-                  </span>
-                )}
+                  {userLocation && (
+                    <span className="text-green-600 bg-green-100 px-2 py-1 rounded-full flex items-center">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
+                      <span className="hidden sm:inline">Localização obtida</span>
+                      <span className="sm:hidden">GPS ✓</span>
+                    </span>
+                  )}
+                  {routeOptimized && userLocation && (
+                    <span className="text-blue-600 bg-blue-100 px-2 py-1 rounded-full flex items-center">
+                      <Route className="h-3 w-3 mr-1" />
+                      <span className="hidden sm:inline">Otimizada</span>
+                      <span className="sm:hidden">✓</span>
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-            {selectedClients.length > 0 && (
               <button
                 onClick={openGoogleMapsDirections}
                 className="inline-flex items-center px-2 sm:px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-xs sm:text-sm font-medium"
@@ -814,11 +812,9 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 <span className="hidden sm:inline">Abrir Rota</span>
                 <span className="sm:hidden">Abrir</span>
               </button>
-            )}
+            </div>
           </div>
-        </div>
-        <div className="relative">
-          {selectedClients.length > 0 ? (
+          <div className="relative">
             <iframe
               key={selectedClients.join(",")}
               src={getGoogleMapsUrl()}
@@ -831,22 +827,9 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
               className="w-full h-64 sm:h-96"
               title="Mapa dos clientes selecionados"
             />
-          ) : (
-            <div className="w-full h-64 sm:h-96 bg-gray-100 flex items-center justify-center">
-              <div className="text-center px-4">
-                <MapPin className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-                <p className="text-gray-600 font-medium">
-                  Selecione clientes para visualizar no mapa
-                </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  Os endereços aparecerão automaticamente quando você selecionar
-                  clientes
-                </p>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Client List for Route */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
