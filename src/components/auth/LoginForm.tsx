@@ -1,39 +1,27 @@
 import React, { useState } from "react";
-import { Eye, EyeOff, LogIn, Loader2 } from "lucide-react";
+import { Eye, EyeOff, LogIn, Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
 const LoginForm: React.FC = () => {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
-  const { login: authenticate, isLoading } = useAuth();
+  const { login: authenticate, isLoading, error, clearError } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-
-    if (!login || !password) {
-      setError("Por favor, preencha todos os campos");
-      return;
-    }
 
     console.log("Submitting login form with:", { login, password });
 
     try {
       const success = await authenticate(login, password);
       console.log("Authentication result:", success);
-
-      if (!success) {
-        setError(
-          "Login ou senha incorretos. Verifique suas credenciais e tente novamente.",
-        );
-      }
     } catch (err) {
       console.error("Login form error:", err);
-      setError("Erro ao fazer login. Tente novamente.");
     }
   };
+
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -61,7 +49,10 @@ const LoginForm: React.FC = () => {
                 id="login"
                 type="text"
                 value={login}
-                onChange={(e) => setLogin(e.target.value)}
+                onChange={(e) => {
+                  setLogin(e.target.value);
+                  clearError(); // Limpa erro quando usuário digita
+                }}
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                 placeholder="Digite seu login"
                 disabled={isLoading}
@@ -80,7 +71,10 @@ const LoginForm: React.FC = () => {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    clearError(); // Limpa erro quando usuário digita
+                  }}
                   className="w-full px-3 py-3 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   placeholder="Digite sua senha"
                   disabled={isLoading}
@@ -100,9 +94,13 @@ const LoginForm: React.FC = () => {
               </div>
             </div>
 
+            {/* Mensagem de erro melhorada */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-sm text-red-600">{error}</p>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
+                <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-red-700 font-medium">{error}</p>
+                </div>
               </div>
             )}
 

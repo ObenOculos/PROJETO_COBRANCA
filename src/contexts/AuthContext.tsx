@@ -20,8 +20,14 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showInactivityModal, setShowInactivityModal] = useState(false);
   const { withLoading } = useLoading();
+
+  // Função para limpar o erro de autenticação
+  const clearError = () => {
+    setError(null);
+  };
 
   // Configurações de inatividade
   const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutos
@@ -41,7 +47,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
-    // Check for existing session in localStorage
+    // Check for existing session in sessionStorage
     const checkSession = async () => {
       try {
         setIsLoading(true);
@@ -56,7 +62,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       } catch (err) {
         console.error("Error checking session:", err);
-        localStorage.removeItem("sistema_user");
+        sessionStorage.removeItem("sistema_user"); // Corrigido: usar sessionStorage
       } finally {
         setIsLoading(false);
       }
@@ -96,57 +102,66 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (login: string, password: string): Promise<boolean> => {
     try {
+      // Limpa qualquer erro anterior ao tentar fazer login
+      clearError();
+
+      console.log("Tentando fazer login com:", { login });
+
+      // Função interna para realizar o login
+      const performLogin = async (): Promise<boolean> => {
+        // Buscar usuário na tabela users
+        const { data: users, error: userError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("login", login)
+          .eq("password", password)
+          .limit(1);
+
+        console.log("Resultado da consulta:", { users, userError });
+
+        if (userError) {
+          console.error("Erro ao consultar usuários:", userError);
+          throw new Error("Erro ao consultar banco de dados");
+        }
+
+        if (!users || users.length === 0) {
+          console.log("Usuário não encontrado com essas credenciais");
+          setError("Login ou senha incorretos. Verifique suas credenciais.");
+          return false; // Retorna false explicitamente para credenciais inválidas
+        }
+
+        const foundUser = users[0];
+        console.log("Usuário encontrado:", foundUser);
+
+        // Criar objeto do usuário
+        const userObj: User = {
+          id: foundUser.id,
+          name: foundUser.name,
+          login: foundUser.login,
+          password: foundUser.password,
+          type: foundUser.type as "manager" | "collector",
+          createdAt: foundUser.created_at || new Date().toISOString(),
+        };
+
+        // Salvar na sessão local
+        sessionStorage.setItem("sistema_user", JSON.stringify(userObj));
+
+        console.log("Login realizado com sucesso:", userObj);
+        setUser(userObj);
+        return true; // Retorna true para login bem-sucedido
+      };
+
       // Usa withLoading para mostrar loading durante o login
       const success = await withLoading(
-        (async () => {
-          console.log("Tentando fazer login com:", { login });
-
-          // Buscar usuário na tabela users
-          const { data: users, error: userError } = await supabase
-            .from("users")
-            .select("*")
-            .eq("login", login)
-            .eq("password", password)
-            .limit(1);
-
-          console.log("Resultado da consulta:", { users, userError });
-
-          if (userError) {
-            console.error("Erro ao consultar usuários:", userError);
-            return false;
-          }
-
-          if (!users || users.length === 0) {
-            console.log("Usuário não encontrado com essas credenciais");
-            return false;
-          }
-
-          const foundUser = users[0];
-          console.log("Usuário encontrado:", foundUser);
-
-          // Criar objeto do usuário
-          const userObj: User = {
-            id: foundUser.id,
-            name: foundUser.name,
-            login: foundUser.login,
-            password: foundUser.password,
-            type: foundUser.type as "manager" | "collector",
-            createdAt: foundUser.created_at || new Date().toISOString(),
-          };
-
-          // Salvar na sessão local
-          sessionStorage.setItem("sistema_user", JSON.stringify(userObj));
-
-          console.log("Login realizado com sucesso:", userObj);
-          setUser(userObj);
-          return true;
-        })(),
-        "Fazendo login...", // Mensagem personalizada
+        performLogin(),
+        "Fazendo login..." // Mensagem personalizada
       );
 
+      console.log("Resultado final do login:", success);
       return success;
     } catch (err) {
       console.error("Erro no login:", err);
+      // Importante: retornar false em caso de erro, não undefined
       return false;
     }
   };
@@ -182,6 +197,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     logout,
     isLoading,
+    error,
+    clearError,
   };
 
   return (
@@ -205,7 +222,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth="2"
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
                     ></path>
                   </svg>
                 </div>

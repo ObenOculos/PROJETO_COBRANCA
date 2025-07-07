@@ -165,6 +165,8 @@ export interface AuthContextType {
   login: (login: string, password: string) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
+  error: string | null;
+  clearError: () => void;
 }
 
 // Collection context types

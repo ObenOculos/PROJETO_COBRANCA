@@ -39,12 +39,11 @@ export const LoadingProvider: React.FC<LoadingProviderProps> = ({
   ): Promise<T> => {
     setLoading(true, message);
     try {
-      const result = await promise;
-      setLoading(false);
-      return result;
+      return await promise;
     } catch (error) {
-      setLoading(false);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
