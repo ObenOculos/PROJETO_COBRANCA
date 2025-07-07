@@ -895,11 +895,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Group by sale number (venda_n)
       let saleGroup = clientGroup.sales.find(
-        (s) => s.saleNumber === collection.venda_n,
+        (s) => s.saleNumber === (collection.venda_n || 0),
       );
-      if (!saleGroup && collection.venda_n) {
+      if (!saleGroup) {
         saleGroup = {
-          saleNumber: collection.venda_n,
+          saleNumber: collection.venda_n || 0,
           titleNumber: collection.numero_titulo || 0,
           description: collection.descricao || "",
           installments: [],
@@ -1833,12 +1833,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       collections
         .filter((collection) => collection.documento === clientDocument)
         .forEach((collection) => {
-          if (collection.venda_n) {
-            if (!salesMap.has(collection.venda_n)) {
-              salesMap.set(collection.venda_n, []);
-            }
-            salesMap.get(collection.venda_n)!.push(collection);
+          const saleNumber = collection.venda_n || 0;
+          if (!salesMap.has(saleNumber)) {
+            salesMap.set(saleNumber, []);
           }
+          salesMap.get(saleNumber)!.push(collection);
         });
 
       // Converter para SaleGroup
