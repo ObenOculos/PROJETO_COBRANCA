@@ -9,7 +9,6 @@ import {
   Store,
   UserCheck,
   AlertTriangle,
-  ChevronDown,
   Calendar,
   Target,
   CheckCircle,
@@ -30,7 +29,27 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/mockData";
 
-const ManagerDashboard: React.FC = () => {
+// Export tabs for use in Header
+export const getManagerTabs = (pendingCancellations: number = 0) => [
+  { id: "overview", name: "Visão Geral", icon: BarChart3 },
+  { id: "collections", name: "Cobranças", icon: FileText },
+  { id: "performance", name: "Desempenho", icon: TrendingUp },
+  { id: "stores", name: "Lojas", icon: Store },
+  { id: "clients", name: "Clientes", icon: UserCheck },
+  { id: "visit-tracking", name: "Acompanhamento", icon: AlertTriangle },
+  { id: "users", name: "Usuários", icon: Users },
+  { id: "database-upload", name: "Upload de Dados", icon: Download },
+];
+
+interface ManagerDashboardProps {
+  activeTab?: string;
+  onTabChange?: (tabId: string) => void;
+}
+
+const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ 
+  activeTab: externalActiveTab, 
+  onTabChange 
+}) => {
   const {
     getDashboardStats,
     getCollectorPerformance,
@@ -40,7 +59,7 @@ const ManagerDashboard: React.FC = () => {
   } = useCollection();
 
   // Recupera a aba ativa do localStorage ou usa 'overview' como padrão
-  const [activeTab, setActiveTab] = useState<
+  const [internalActiveTab, setInternalActiveTab] = useState<
     | "overview"
     | "collections"
     | "performance"
@@ -53,6 +72,16 @@ const ManagerDashboard: React.FC = () => {
     const savedTab = localStorage.getItem("managerActiveTab");
     return (savedTab as any) || "overview";
   });
+
+  // Use external activeTab if provided, otherwise use internal state
+  const activeTab = externalActiveTab || internalActiveTab;
+  const setActiveTab = (tabId: string) => {
+    if (onTabChange) {
+      onTabChange(tabId);
+    } else {
+      setInternalActiveTab(tabId as any);
+    }
+  };
 
   const [filters, setFilters] = useState<FilterOptions>({});
   const [collectionsView, setCollectionsView] = useState<
@@ -155,17 +184,7 @@ const ManagerDashboard: React.FC = () => {
   };
   
   const pendingCancellations = getPendingCancellationRequests();
-
-  const tabs = [
-    { id: "overview", name: "Visão Geral", icon: BarChart3 },
-    { id: "collections", name: "Cobranças", icon: FileText },
-    { id: "performance", name: "Desempenho", icon: TrendingUp },
-    { id: "stores", name: "Lojas", icon: Store },
-    { id: "clients", name: "Clientes", icon: UserCheck },
-    { id: "visit-tracking", name: "Acompanhamento", icon: AlertTriangle },
-    { id: "users", name: "Usuários", icon: Users },
-    { id: "database-upload", name: "Upload de Dados", icon: Download },
-  ];
+  const tabs = getManagerTabs(pendingCancellations.length);
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -728,116 +747,34 @@ const ManagerDashboard: React.FC = () => {
   return (
     <div className="min-h-screen">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 lg:py-8">
-        {/* Enhanced Mobile-First Tab Navigation */}
-        <div className="mb-4 sm:mb-6 lg:mb-8">
-          {/* Mobile: Dropdown Menu */}
-          <div className="lg:hidden">
-            <div
-              ref={mobileMenuRef}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 relative"
-            >
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center">
-                  {(() => {
-                    const currentTab = tabs.find((tab) => tab.id === activeTab);
-                    const Icon = currentTab?.icon || BarChart3;
-                    return (
-                      <>
-                        <Icon className="h-5 w-5 mr-3 text-blue-600" />
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {currentTab?.name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            Navegar entre seções
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
-                  {activeTab === "visit-tracking" &&
-                    pendingCancellations.length > 0 && (
-                      <span className="ml-2 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                        {pendingCancellations.length}
-                      </span>
-                    )}
-                </div>
-                <ChevronDown
-                  className={`h-5 w-5 text-gray-400 transition-transform ${isMobileMenuOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-
-              {/* Mobile Dropdown Menu */}
-              {isMobileMenuOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
-                  {tabs.map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => {
-                          setActiveTab(tab.id as any);
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className={`w-full flex items-center px-4 py-3 text-left hover:bg-gray-50 transition-colors relative ${
-                          activeTab === tab.id
-                            ? "bg-blue-50 text-blue-600"
-                            : "text-gray-700"
-                        }`}
-                      >
-                        <Icon
-                          className={`h-5 w-5 mr-3 ${activeTab === tab.id ? "text-blue-600" : "text-gray-400"}`}
-                        />
-                        <span className="font-medium">{tab.name}</span>
-                        {tab.id === "visit-tracking" &&
-                          pendingCancellations.length > 0 && (
-                            <span className="ml-auto h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                              {pendingCancellations.length}
-                            </span>
-                          )}
-                        {activeTab === tab.id && (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600"></div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Desktop: Traditional Tab Navigation */}
-          <div className="hidden lg:block">
-            <div className="border-b border-gray-200">
-              <nav className="flex space-x-1">
-                {tabs.map((tab) => {
-                  const Icon = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id as any)}
-                      className={`flex items-center py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap relative transition-colors ${
-                        activeTab === tab.id
-                          ? "border-blue-500 text-blue-600"
-                          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4 mr-2 flex-shrink-0" />
-                      <span>{tab.name}</span>
-                      {tab.id === "visit-tracking" &&
-                        pendingCancellations.length > 0 && (
-                          <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                            {pendingCancellations.length}
-                          </span>
-                        )}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
+        {/* Desktop Tab Navigation */}
+        <div className="hidden lg:block mb-4 sm:mb-6 lg:mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="flex space-x-1">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex items-center py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap relative transition-colors ${
+                      activeTab === tab.id
+                        ? "border-blue-500 text-blue-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span>{tab.name}</span>
+                    {tab.id === "visit-tracking" &&
+                      pendingCancellations.length > 0 && (
+                        <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                          {pendingCancellations.length}
+                        </span>
+                      )}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
         </div>
 

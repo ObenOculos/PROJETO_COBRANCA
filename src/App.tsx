@@ -8,14 +8,20 @@ import { LoadingProvider, useLoading } from "./contexts/LoadingContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import LoginForm from "./components/auth/LoginForm";
 import Header from "./components/common/Header";
-import ManagerDashboard from "./components/dashboard/ManagerDashboard";
+import ManagerDashboard, { getManagerTabs } from "./components/dashboard/ManagerDashboard";
 import CollectorDashboard from "./components/dashboard/CollectorDashboard";
 import GlobalLoading from "./components/common/GlobalLoading";
 
 const AppContent: React.FC = () => {
   const { user, isLoading: authLoading } = useAuth();
-  const { loading: collectionLoading } = useCollection();
+  const { loading: collectionLoading, getPendingCancellationRequests } = useCollection();
   const { isLoading: globalLoading, loadingMessage } = useLoading();
+
+  // Estado para gerenciar aba ativa do manager
+  const [managerActiveTab, setManagerActiveTab] = useState(() => {
+    const savedTab = localStorage.getItem("managerActiveTab");
+    return savedTab || "overview";
+  });
 
   // Estado para controlar transições suaves entre loadings
   const [loadingState, setLoadingState] = useState({
@@ -64,10 +70,30 @@ const AppContent: React.FC = () => {
   }
 
   // Usuário logado e todos os dados carregados - mostra a aplicação
+  const handleManagerTabChange = (tabId: string) => {
+    setManagerActiveTab(tabId);
+    localStorage.setItem("managerActiveTab", tabId);
+  };
+
+  const pendingCancellations = user?.type === "manager" ? getPendingCancellationRequests() : [];
+  const managerTabs = user?.type === "manager" ? getManagerTabs(pendingCancellations.length) : [];
+
   return (
     <div className="min-h-screen bg-slate-100">
-      <Header />
-      {user.type === "manager" ? <ManagerDashboard /> : <CollectorDashboard />}
+      <Header 
+        tabs={user?.type === "manager" ? managerTabs : []}
+        activeTab={user?.type === "manager" ? managerActiveTab : ""}
+        onTabChange={user?.type === "manager" ? handleManagerTabChange : undefined}
+        pendingCancellations={pendingCancellations.length}
+      />
+      {user.type === "manager" ? (
+        <ManagerDashboard 
+          activeTab={managerActiveTab} 
+          onTabChange={handleManagerTabChange}
+        />
+      ) : (
+        <CollectorDashboard />
+      )}
     </div>
   );
 };
