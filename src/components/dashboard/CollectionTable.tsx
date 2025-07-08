@@ -81,9 +81,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
         return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
       }
       return sortDirection === "asc" ? (
-        <ArrowUp className="h-4 w-4 text-blue-600" />
+        <ArrowUp className="h-4 w-4 text-white" />
       ) : (
-        <ArrowDown className="h-4 w-4 text-blue-600" />
+        <ArrowDown className="h-4 w-4 text-white" />
       );
     };
 
@@ -223,10 +223,34 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     // Paginação para grupos de clientes
     const paginatedClientGroups = useMemo(() => {
       if (!showGrouped) return [];
+      
+      // Apply sorting before pagination
+      let sortedGroups = [...filteredClientGroups];
+      if (userType === "collector") {
+        sortedGroups.sort((a, b) => {
+          switch (sortField) {
+            case "cliente":
+              return sortDirection === "asc"
+                ? a.client.localeCompare(b.client)
+                : b.client.localeCompare(a.client);
+            case "valor":
+              return sortDirection === "asc"
+                ? a.totalValue - b.totalValue
+                : b.totalValue - a.totalValue;
+            case "cidade":
+              return sortDirection === "asc"
+                ? a.city.localeCompare(b.city)
+                : b.city.localeCompare(a.city);
+            default:
+              return 0;
+          }
+        });
+      }
+      
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
-      return filteredClientGroups.slice(startIndex, endIndex);
-    }, [filteredClientGroups, currentPage, itemsPerPage, showGrouped]);
+      return sortedGroups.slice(startIndex, endIndex);
+    }, [filteredClientGroups, currentPage, itemsPerPage, showGrouped, userType, sortField, sortDirection]);
 
     // Filtrar e agrupar sales por cliente (para view simples)
     const filteredAndGroupedSales = useMemo(() => {
@@ -374,6 +398,52 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                 </div>
               </div>
             </div>
+
+            {/* Controles de Ordenação para Cobrador */}
+            {userType === "collector" && (
+              <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-blue-50 border-b border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <span className="text-sm font-semibold text-gray-700">
+                    Ordenar por:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleSort("cliente")}
+                      className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        sortField === "cliente"
+                          ? "bg-blue-600 text-white shadow-md"
+                          : "bg-white text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400"
+                      }`}
+                    >
+                      <span>Nome</span>
+                      {getSortIcon("cliente")}
+                    </button>
+                    <button
+                      onClick={() => handleSort("valor")}
+                      className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        sortField === "valor"
+                          ? "bg-blue-600 text-white shadow-md"
+                          : "bg-white text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400"
+                      }`}
+                    >
+                      <span>Valor</span>
+                      {getSortIcon("valor")}
+                    </button>
+                    <button
+                      onClick={() => handleSort("cidade")}
+                      className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        sortField === "cidade"
+                          ? "bg-blue-600 text-white shadow-md"
+                          : "bg-white text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400"
+                      }`}
+                    >
+                      <span>Cidade</span>
+                      {getSortIcon("cidade")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="divide-y divide-gray-200">
               {paginatedClientGroups.map((clientGroup) => (
@@ -756,29 +826,55 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <span className="text-sm font-semibold text-gray-700">
-                  Vendas:
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={expandAll}
-                    className="flex items-center px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-all duration-200 text-sm font-medium shadow-sm"
-                  >
-                    <ChevronDown className="h-4 w-4 mr-1" />
-                    <span className="hidden sm:inline">Expandir Todas</span>
-                    <span className="sm:hidden">Expandir</span>
-                  </button>
-                  <button
-                    onClick={collapseAll}
-                    className="flex items-center px-3 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-all duration-200 text-sm font-medium shadow-sm"
-                  >
-                    <ChevronUp className="h-4 w-4 mr-1" />
-                    <span className="hidden sm:inline">Retrair Todas</span>
-                    <span className="sm:hidden">Retrair</span>
-                  </button>
+              {userType === "manager" ? (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <span className="text-sm font-semibold text-gray-700">
+                    Vendas:
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={expandAll}
+                      className="flex items-center px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-all duration-200 text-sm font-medium shadow-sm"
+                    >
+                      <ChevronDown className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Expandir Todas</span>
+                      <span className="sm:hidden">Expandir</span>
+                    </button>
+                    <button
+                      onClick={collapseAll}
+                      className="flex items-center px-3 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-all duration-200 text-sm font-medium shadow-sm"
+                    >
+                      <ChevronUp className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Retrair Todas</span>
+                      <span className="sm:hidden">Retrair</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <span className="text-sm font-semibold text-gray-700">
+                    Vendas:
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={expandAll}
+                      className="flex items-center px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-all duration-200 text-sm font-medium shadow-sm"
+                    >
+                      <ChevronDown className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Expandir</span>
+                      <span className="sm:hidden">Exp.</span>
+                    </button>
+                    <button
+                      onClick={collapseAll}
+                      className="flex items-center px-3 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-all duration-200 text-sm font-medium shadow-sm"
+                    >
+                      <ChevronUp className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Retrair</span>
+                      <span className="sm:hidden">Ret.</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
