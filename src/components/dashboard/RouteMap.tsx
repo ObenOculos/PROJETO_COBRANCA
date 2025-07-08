@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { ClientGroup, FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/mockData";
@@ -46,15 +47,42 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
   // Obter visitas do cobrador
   const collectorVisits = useMemo(() => {
     if (!user || user.type !== "collector") return [];
-    return getVisitsByCollector(user.id).filter(
+    let visits = getVisitsByCollector(user.id).filter(
       (visit) => visit.status === "agendada",
     );
-  }, [user, getVisitsByCollector]);
 
-  // Obter coleções filtradas usando o sistema padrão de filtros
+    // Aplicar filtro de período baseado na data de agendamento das visitas
+    // Isso permite filtrar visitas por quando elas foram agendadas, não por vencimento de cobrança
+    if (filters.dateFrom || filters.dateTo) {
+      visits = visits.filter((visit) => {
+        const visitDate = new Date(visit.scheduledDate);
+        
+        if (filters.dateFrom) {
+          const fromDate = new Date(filters.dateFrom);
+          if (visitDate < fromDate) return false;
+        }
+        
+        if (filters.dateTo) {
+          const toDate = new Date(filters.dateTo);
+          toDate.setHours(23, 59, 59, 999); // Fim do dia
+          if (visitDate > toDate) return false;
+        }
+        
+        return true;
+      });
+    }
+
+    return visits;
+  }, [user, getVisitsByCollector, filters.dateFrom, filters.dateTo]);
+
+  // Obter coleções filtradas usando o sistema padrão de filtros (excluindo período)
   const filteredCollections = useMemo(() => {
     if (!user) return [];
-    return getFilteredCollections(filters, "collector", user.id);
+    // Remover filtros de período para as coleções, pois agora aplicamos nas visitas
+    const collectionsFilters = { ...filters };
+    delete collectionsFilters.dateFrom;
+    delete collectionsFilters.dateTo;
+    return getFilteredCollections(collectionsFilters, "collector", user.id);
   }, [filters, user, getFilteredCollections]);
 
   // Agrupar coleções por cliente e aplicar filtros
@@ -159,6 +187,17 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
     return visitDateTime < now;
   };
 
+  // Função para verificar se uma visita foi reagendada
+  const isVisitRescheduled = (visit: any) => {
+    return visit.notes?.includes("Reagendado") || false;
+  };
+
+  // Função para contar quantas vezes foi reagendada
+  const getRescheduleCount = (visit: any) => {
+    if (!visit.notes) return 0;
+    return (visit.notes.match(/Reagendado/g) || []).length;
+  };
+
   // Dados dos clientes organizados por tipo
   const clientData = useMemo(() => {
     const withVisits = filteredClients
@@ -175,6 +214,8 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
           visit?.scheduledDate,
           visit?.scheduledTime,
         );
+        const isRescheduled = isVisitRescheduled(visit);
+        const rescheduleCount = getRescheduleCount(visit);
         return {
           ...client,
           hasVisit: true as const,
@@ -182,8 +223,14 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
           visitTime: visit?.scheduledTime,
           visitId: visit?.id,
           isOverdue,
+          isRescheduled,
+          rescheduleCount,
         };
       });
+
+    // Separar visitas reagendadas das normais
+    const rescheduledVisits = withVisits.filter(client => client.isRescheduled);
+    const normalVisits = withVisits.filter(client => !client.isRescheduled);
 
     const withoutVisits = filteredClients
       .filter(
@@ -197,12 +244,16 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
         hasVisit: false as const,
       }));
 
-    return { withVisits, withoutVisits };
+    return { 
+      withVisits: normalVisits, 
+      rescheduledVisits,
+      withoutVisits 
+    };
   }, [filteredClients, collectorVisits]);
 
   // Todos os clientes para paginação
   const allClients = useMemo(() => {
-    return [...clientData.withVisits, ...clientData.withoutVisits];
+    return [...clientData.withVisits, ...clientData.rescheduledVisits, ...clientData.withoutVisits];
   }, [clientData]);
 
   // Paginação
@@ -213,7 +264,10 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
 
   // Separar clientes paginados por tipo
   const paginatedWithVisits = paginatedClients.filter(
-    (c) => "hasVisit" in c && c.hasVisit,
+    (c) => "hasVisit" in c && c.hasVisit && !c.isRescheduled,
+  );
+  const paginatedRescheduledVisits = paginatedClients.filter(
+    (c) => "hasVisit" in c && c.hasVisit && c.isRescheduled,
   );
   const paginatedWithoutVisits = paginatedClients.filter(
     (c) => !("hasVisit" in c) || !c.hasVisit,
@@ -228,7 +282,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
   };
 
   const handleSelectAll = () => {
-    const allClients = [...clientData.withVisits, ...clientData.withoutVisits];
+    const allClients = [...clientData.withVisits, ...clientData.rescheduledVisits, ...clientData.withoutVisits];
     if (selectedClients.length === allClients.length) {
       setSelectedClients([]);
     } else {
@@ -237,13 +291,14 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
   };
 
   const handleSelectVisitsOnly = () => {
+    const allVisits = [...clientData.withVisits, ...clientData.rescheduledVisits];
     if (
-      selectedClients.length === clientData.withVisits.length &&
-      clientData.withVisits.every((c) => selectedClients.includes(c.document))
+      selectedClients.length === allVisits.length &&
+      allVisits.every((c) => selectedClients.includes(c.document))
     ) {
       setSelectedClients([]);
     } else {
-      setSelectedClients(clientData.withVisits.map((c) => c.document));
+      setSelectedClients(allVisits.map((c) => c.document));
     }
   };
 
@@ -268,7 +323,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
       } else {
         // Fallback: otimização simples por horário de visitas
         setRouteOptimized(true);
-        const selectedWithVisits = clientData.withVisits.filter((c) =>
+        const selectedWithVisits = [...clientData.withVisits, ...clientData.rescheduledVisits].filter((c) =>
           selectedClients.includes(c.document),
         );
         const selectedWithoutVisits = clientData.withoutVisits.filter((c) =>
@@ -591,7 +646,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
           </h2>
 
           {/* Estatísticas - versão mobile mais compacta */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3 mb-3 sm:mb-4">
             <div className="bg-blue-50 p-2 sm:p-3 rounded-lg text-center">
               <div className="text-xs text-blue-600 font-medium mb-1">
                 Total
@@ -610,9 +665,17 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
             </div>
             <div className="bg-orange-50 p-2 sm:p-3 rounded-lg text-center">
               <div className="text-xs text-orange-600 font-medium mb-1">
-                Selecionados
+                Reagendadas
               </div>
               <div className="text-base sm:text-lg font-bold text-orange-900">
+                {clientData.rescheduledVisits.length}
+              </div>
+            </div>
+            <div className="bg-amber-50 p-2 sm:p-3 rounded-lg text-center">
+              <div className="text-xs text-amber-600 font-medium mb-1">
+                Selecionados
+              </div>
+              <div className="text-base sm:text-lg font-bold text-amber-900">
                 {selectedClients.length}
               </div>
             </div>
@@ -678,8 +741,8 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
             <button
               onClick={handleSelectVisitsOnly}
               className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors inline-flex items-center justify-center ${
-                selectedClients.length === clientData.withVisits.length &&
-                clientData.withVisits.every((c) =>
+                selectedClients.length === (clientData.withVisits.length + clientData.rescheduledVisits.length) &&
+                [...clientData.withVisits, ...clientData.rescheduledVisits].every((c) =>
                   selectedClients.includes(c.document),
                 )
                   ? "bg-green-600 text-white hover:bg-green-700"
@@ -688,20 +751,20 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
             >
               <Calendar className="h-4 w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">
-                {selectedClients.length === clientData.withVisits.length &&
-                clientData.withVisits.every((c) =>
+                {selectedClients.length === (clientData.withVisits.length + clientData.rescheduledVisits.length) &&
+                [...clientData.withVisits, ...clientData.rescheduledVisits].every((c) =>
                   selectedClients.includes(c.document),
                 )
-                  ? `✓ Visitas (${clientData.withVisits.length})`
-                  : `Visitas (${clientData.withVisits.length})`}
+                  ? `✓ Visitas (${clientData.withVisits.length + clientData.rescheduledVisits.length})`
+                  : `Visitas (${clientData.withVisits.length + clientData.rescheduledVisits.length})`}
               </span>
               <span className="sm:hidden">
-                {selectedClients.length === clientData.withVisits.length &&
-                clientData.withVisits.every((c) =>
+                {selectedClients.length === (clientData.withVisits.length + clientData.rescheduledVisits.length) &&
+                [...clientData.withVisits, ...clientData.rescheduledVisits].every((c) =>
                   selectedClients.includes(c.document),
                 )
-                  ? `✓ ${clientData.withVisits.length}`
-                  : clientData.withVisits.length}
+                  ? `✓ ${clientData.withVisits.length + clientData.rescheduledVisits.length}`
+                  : clientData.withVisits.length + clientData.rescheduledVisits.length}
               </span>
             </button>
 
@@ -849,6 +912,15 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                   {clientData.withVisits.length} agendada
                   {clientData.withVisits.length !== 1 ? "s" : ""}
                 </span>
+                {clientData.rescheduledVisits.length > 0 && (
+                  <>
+                    <span className="text-gray-400">•</span>
+                    <span className="text-orange-600">
+                      {clientData.rescheduledVisits.length} reagendada
+                      {clientData.rescheduledVisits.length !== 1 ? "s" : ""}
+                    </span>
+                  </>
+                )}
                 {selectedClients.length > 0 && (
                   <>
                     <span className="text-gray-400">•</span>
@@ -889,7 +961,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 <div
                   key={client.document}
                   className={`p-3 sm:p-4 hover:bg-gray-50 transition-colors border-l-2 cursor-pointer ${
-                    client.isOverdue
+                    client.hasVisit && client.isOverdue
                       ? "border-red-500 bg-red-50"
                       : "border-green-400"
                   }`}
@@ -940,24 +1012,170 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center text-xs">
                             <div
-                              className={`h-2 w-2 rounded-full mr-2 ${client.isOverdue ? "bg-red-500" : "bg-green-400"}`}
+                              className={`h-2 w-2 rounded-full mr-2 ${
+                                client.hasVisit && client.isOverdue
+                                  ? "bg-red-500"
+                                  : client.hasVisit && client.isRescheduled
+                                    ? "bg-orange-500"
+                                    : "bg-green-400"
+                              }`}
                             ></div>
                             <span
-                              className={`mr-2 sm:mr-4 font-medium ${client.isOverdue ? "text-red-600" : "text-green-600"}`}
+                              className={`mr-2 sm:mr-4 font-medium ${
+                                client.hasVisit && client.isOverdue
+                                  ? "text-red-600"
+                                  : client.hasVisit && client.isRescheduled
+                                    ? "text-orange-600"
+                                    : "text-green-600"
+                              }`}
                             >
-                              {client.isOverdue ? "Atrasada" : "Agendada"}
+                              {client.hasVisit && client.isOverdue
+                                ? "Atrasada"
+                                : client.hasVisit && client.isRescheduled
+                                  ? "Reagendada"
+                                  : "Agendada"}
                             </span>
+                            {client.hasVisit && client.isRescheduled && (
+                              <RefreshCw className="h-3 w-3 text-orange-600 mr-1" />
+                            )}
+                            {client.hasVisit && client.isRescheduled && client.rescheduleCount > 1 && (
+                              <span className="text-xs text-orange-600 font-medium mr-2 sm:mr-4">
+                                ({client.rescheduleCount}x)
+                              </span>
+                            )}
                             <Clock className="h-3 w-3 text-gray-400 mr-1" />
                             <span
-                              className={`${client.isOverdue ? "text-red-600 font-medium" : "text-gray-600"}`}
+                              className={`${
+                                client.hasVisit && client.isOverdue
+                                  ? "text-red-600 font-medium"
+                                  : client.hasVisit && client.isRescheduled
+                                    ? "text-orange-600"
+                                    : "text-gray-600"
+                              }`}
                             >
-                              {formatDate(client.visitDate)}{" "}
-                              {client.visitTime || ""}
+                              {client.hasVisit ? formatDate(client.visitDate) : ""}{" "}
+                              {client.hasVisit ? client.visitTime || "" : ""}
                             </span>
                           </div>
                           {client.phone && (
                             <button
                               className="inline-flex items-center px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
+                              title="Ligar para cliente"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Phone className="h-3 w-3 mr-1" />
+                              <span className="hidden sm:inline">Ligar</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Endereço */}
+                        <div className="text-xs text-gray-600">
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.number}, ${client.neighborhood}, ${client.city}`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                            <span className="truncate">
+                              {client.address}, {client.number} -{" "}
+                              {client.neighborhood}, {client.city}
+                            </span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* Clientes com visitas reagendadas */}
+          {paginatedRescheduledVisits.length > 0 && (
+            <>
+              <div className="px-4 py-3 bg-orange-50 border-b border-orange-100">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium text-orange-800 flex items-center">
+                    <RefreshCw className="h-4 w-4 text-orange-600 mr-2" />
+                    Visitas Reagendadas
+                  </h4>
+                  <span className="text-xs text-orange-600 font-medium">
+                    {clientData.rescheduledVisits.length}
+                  </span>
+                </div>
+              </div>
+              {paginatedRescheduledVisits.map((client) => (
+                <div
+                  key={client.document}
+                  className="p-3 sm:p-4 hover:bg-gray-50 transition-colors border-l-2 border-orange-500 bg-orange-50 cursor-pointer"
+                  onClick={() => handleToggleClient(client.document)}
+                >
+                  <div className="flex gap-2 sm:gap-3">
+                    <div className="flex-shrink-0 pt-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedClients.includes(client.document)}
+                        onChange={() => handleToggleClient(client.document)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                      />
+                    </div>
+
+                    {routeOptimized &&
+                      selectedClients.includes(client.document) && (
+                        <div className="bg-blue-600 text-white h-5 w-5 sm:h-6 sm:w-6 text-xs font-bold px-1 py-0.5 sm:px-2 sm:py-1 rounded-full flex-shrink-0 flex items-center justify-center">
+                          {selectedClients.indexOf(client.document) + 1}
+                        </div>
+                      )}
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col space-y-2">
+                        {/* Nome e documento */}
+                        <div className="flex items-start justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                              {client.client}
+                            </div>
+                            <div className="text-xs sm:text-sm text-gray-500 font-mono">
+                              {client.document}
+                            </div>
+                          </div>
+                          <div className="text-right ml-2">
+                            <div className="font-semibold text-gray-900 text-sm sm:text-base">
+                              {formatCurrency(client.pendingValue)}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {client.sales.length} venda
+                              {client.sales.length !== 1 ? "s" : ""}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status e horário */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center text-xs">
+                            <div className="h-2 w-2 bg-orange-500 rounded-full mr-2"></div>
+                            <span className="mr-2 sm:mr-4 font-medium text-orange-600">
+                              Reagendada
+                            </span>
+                            <RefreshCw className="h-3 w-3 text-orange-600 mr-1" />
+                            {client.hasVisit && client.rescheduleCount > 1 && (
+                              <span className="text-xs text-orange-600 font-medium mr-2 sm:mr-4">
+                                ({client.rescheduleCount}x)
+                              </span>
+                            )}
+                            <Clock className="h-3 w-3 text-gray-400 mr-1" />
+                            <span className="text-orange-600">
+                              {client.hasVisit ? formatDate(client.visitDate) : ""}{" "}
+                              {client.hasVisit ? client.visitTime || "" : ""}
+                            </span>
+                          </div>
+                          {client.phone && (
+                            <button
+                              className="inline-flex items-center px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded transition-colors"
                               title="Ligar para cliente"
                               onClick={(e) => e.stopPropagation()}
                             >
