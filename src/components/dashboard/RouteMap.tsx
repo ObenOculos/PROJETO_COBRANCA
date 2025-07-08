@@ -878,8 +878,8 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
       )}
 
       {/* Client List for Route */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="px-3 sm:px-4 py-3 sm:py-4 border-b border-gray-200">
+      <div className="rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl px-3 sm:px-4 py-3 sm:py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <h3 className="text-base sm:text-lg font-semibold text-gray-900">
@@ -925,21 +925,22 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
           </div>
         </div>
 
-        <div className="divide-y divide-gray-100">
+        <div className="space-y-4">
           {/* Clientes com visitas agendadas */}
           {paginatedWithVisits.length > 0 && (
-            <>
-              <div className="px-4 py-3 bg-green-50 border-b border-green-100">
+            <div className="mt-4 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-4 py-4 bg-gradient-to-r from-green-50 to-green-100 border-b border-green-200">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium text-green-800 flex items-center">
-                    <Calendar className="h-4 w-4 text-green-600 mr-2" />
+                  <h4 className="text-base font-semibold text-green-900 flex items-center">
+                    <Calendar className="h-5 w-5 text-green-700 mr-2" />
                     Visitas Agendadas
                   </h4>
-                  <span className="text-xs text-green-600 font-medium">
+                  <span className="text-sm text-green-700 font-semibold bg-white/60 px-2 py-1 rounded-full">
                     {clientData.withVisits.length}
                   </span>
                 </div>
               </div>
+              <div className="divide-y divide-gray-100">
               {paginatedWithVisits.map((client) => (
                 <div
                   key={client.document}
@@ -1073,23 +1074,25 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                   </div>
                 </div>
               ))}
-            </>
+              </div>
+            </div>
           )}
 
           {/* Clientes com visitas reagendadas */}
           {paginatedRescheduledVisits.length > 0 && (
-            <>
-              <div className="px-4 py-3 bg-orange-50 border-b border-orange-100">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-4 py-4 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-200">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium text-orange-800 flex items-center">
-                    <RefreshCw className="h-4 w-4 text-orange-600 mr-2" />
+                  <h4 className="text-base font-semibold text-orange-900 flex items-center">
+                    <RefreshCw className="h-5 w-5 text-orange-700 mr-2" />
                     Visitas Reagendadas
                   </h4>
-                  <span className="text-xs text-orange-600 font-medium">
+                  <span className="text-sm text-orange-700 font-semibold bg-white/60 px-2 py-1 rounded-full">
                     {clientData.rescheduledVisits.length}
                   </span>
                 </div>
               </div>
+              <div className="divide-y divide-gray-100">
               {paginatedRescheduledVisits.map((client) => (
                 <div
                   key={client.document}
@@ -1189,23 +1192,25 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                   </div>
                 </div>
               ))}
-            </>
+              </div>
+            </div>
           )}
 
           {/* Clientes sem visitas agendadas */}
           {paginatedWithoutVisits.length > 0 && !filters.visitsOnly && (
-            <>
-              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-4 py-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium text-gray-700 flex items-center">
-                    <Route className="h-4 w-4 text-gray-500 mr-2" />
+                  <h4 className="text-base font-semibold text-gray-800 flex items-center">
+                    <Route className="h-5 w-5 text-gray-600 mr-2" />
                     Sem Agendamento
                   </h4>
-                  <span className="text-xs text-gray-500 font-medium">
+                  <span className="text-sm text-gray-600 font-semibold bg-white/60 px-2 py-1 rounded-full">
                     {clientData.withoutVisits.length}
                   </span>
                 </div>
               </div>
+              <div className="divide-y divide-gray-100">
               {paginatedWithoutVisits.map((client) => (
                 <div
                   key={client.document}
@@ -1294,7 +1299,8 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                   </div>
                 </div>
               ))}
-            </>
+              </div>
+            </div>
           )}
         </div>
 
