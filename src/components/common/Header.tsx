@@ -27,7 +27,7 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-3 lg:py-4">
           <div className="flex items-center flex-1 min-w-0">
             <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
