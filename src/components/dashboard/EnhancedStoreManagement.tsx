@@ -21,6 +21,8 @@ interface StoreStats {
   isFormalAssignment: boolean;
   totalCollections: number;
   totalSales: number;
+  completedSales: number;
+  pendingSales: number;
   totalAmount: number;
   receivedAmount: number;
   pendingAmount: number;
@@ -122,6 +124,11 @@ const EnhancedStoreManagement: React.FC = () => {
         const pending = s.totalValue - s.receivedValue;
         return pending <= 0.01 && s.receivedValue > 0;
       }).length;
+      
+      const pendingSales = salesArray.filter((s) => {
+        const pending = s.totalValue - s.receivedValue;
+        return pending > 0.01; // Vendas com valor pendente
+      }).length;
 
       const totalCollections = salesArray.length;
       const totalAmount = salesArray.reduce((sum, s) => sum + s.totalValue, 0);
@@ -143,6 +150,8 @@ const EnhancedStoreManagement: React.FC = () => {
         isFormalAssignment,
         totalCollections,
         totalSales: salesArray.length,
+        completedSales,
+        pendingSales,
         totalAmount,
         receivedAmount,
         pendingAmount,
@@ -226,15 +235,58 @@ const EnhancedStoreManagement: React.FC = () => {
   };
 
   const exportStoreData = () => {
+    // Headers with better formatting
+    const headers = [
+      "Loja",
+      "Cobrador", 
+      "Status Atribuição",
+      "Total de Vendas",
+      "Vendas Finalizadas",
+      "Vendas Pendentes",
+      "Taxa de Conversão (%)",
+      "Valor Total (R$)",
+      "Valor Recebido (R$)",
+      "Valor Pendente (R$)",
+      "Número de Clientes",
+      "Eficiência (%)",
+      "Ticket Médio (R$)"
+    ];
+
+    // Data rows with proper formatting
+    const rows = storeStats.map((s) => [
+      s.storeName,
+      s.collectorName,
+      s.isFormalAssignment ? "Formal" : s.assignedCollector ? "Informal" : "Não Atribuído",
+      s.totalSales.toString(),
+      s.completedSales.toString(),
+      s.pendingSales.toString(),
+      s.conversionRate.toFixed(1),
+      s.totalAmount.toFixed(2),
+      s.receivedAmount.toFixed(2),
+      s.pendingAmount.toFixed(2),
+      s.clientsCount.toString(),
+      s.totalAmount > 0 ? ((s.receivedAmount / s.totalAmount) * 100).toFixed(1) : "0",
+      s.totalSales > 0 ? (s.totalAmount / s.totalSales).toFixed(2) : "0"
+    ]);
+
+    // Create CSV content with proper encoding
     const csvContent = [
-      "Loja,Cobrador,Vendas,Taxa de Conversão,Valor Total,Valor Recebido,Clientes",
-      ...storeStats.map(
-        (s) =>
-          `"${s.storeName}","${s.collectorName}",${s.totalCollections},${s.conversionRate.toFixed(1)}%,${s.totalAmount},${s.receivedAmount},${s.clientsCount}`,
-      ),
+      headers.join(","),
+      ...rows.map(row => 
+        row.map(cell => {
+          // Escape quotes and wrap in quotes if contains comma, quote, or newline
+          const escaped = cell.toString().replace(/"/g, '""');
+          return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
+        }).join(",")
+      )
     ].join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    // Add BOM for proper UTF-8 encoding in Excel
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], { 
+      type: "text/csv;charset=utf-8;" 
+    });
+    
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `relatorio-lojas-${new Date().toISOString().split("T")[0]}.csv`;
@@ -489,7 +541,7 @@ const EnhancedStoreManagement: React.FC = () => {
                       <div className="flex justify-between text-sm text-gray-600 mb-2">
                         <span>Performance da Loja</span>
                         <span>
-                          {store.totalSales} vendas • {store.clientsCount}{" "}
+                          {store.totalSales} vendas ({store.completedSales} finalizadas, {store.pendingSales} pendentes) • {store.clientsCount}{" "}
                           clientes
                         </span>
                       </div>
@@ -510,37 +562,68 @@ const EnhancedStoreManagement: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Basic Stats */}
-                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-base lg:text-lg font-bold text-blue-600">
-                        {store.totalSales}
+                  {/* Reorganized Stats - Better UX */}
+                  <div className="space-y-4">
+                    {/* Vendas Overview */}
+                    <div>
+                      <h5 className="text-sm font-medium text-gray-700 mb-3">Vendas</h5>
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="text-lg lg:text-xl font-bold text-blue-700">
+                            {store.totalSales}
+                          </div>
+                          <div className="text-xs text-blue-600">Total</div>
+                        </div>
+                        <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div className="text-lg lg:text-xl font-bold text-green-700">
+                            {store.completedSales}
+                          </div>
+                          <div className="text-xs text-green-600">Finalizadas</div>
+                        </div>
+                        <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+                          <div className="text-lg lg:text-xl font-bold text-orange-700">
+                            {store.pendingSales}
+                          </div>
+                          <div className="text-xs text-orange-600">Pendentes</div>
+                        </div>
+                        <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
+                          <div className="text-lg lg:text-xl font-bold text-purple-700">
+                            {store.clientsCount}
+                          </div>
+                          <div className="text-xs text-purple-600">Clientes</div>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-600">Vendas</div>
                     </div>
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-base lg:text-lg font-bold text-gray-900 truncate">
-                        {formatCurrency(store.totalAmount)}
+
+                    {/* Financial Overview */}
+                    <div>
+                      <h5 className="text-sm font-medium text-gray-700 mb-3">Valores Financeiros</h5>
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Valor Total</span>
+                            <span className="text-lg font-bold text-gray-900">
+                              {formatCurrency(store.totalAmount)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-green-600">Recebido</span>
+                            <span className="text-lg font-bold text-green-700">
+                              {formatCurrency(store.receivedAmount)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-red-600">Pendente</span>
+                            <span className="text-lg font-bold text-red-700">
+                              {formatCurrency(store.pendingAmount)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-600">Total</div>
-                    </div>
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-base lg:text-lg font-bold text-green-600 truncate">
-                        {formatCurrency(store.receivedAmount)}
-                      </div>
-                      <div className="text-xs text-gray-600">Recebido</div>
-                    </div>
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-base lg:text-lg font-bold text-red-600 truncate">
-                        {formatCurrency(store.pendingAmount)}
-                      </div>
-                      <div className="text-xs text-gray-600">Pendente</div>
-                    </div>
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-base lg:text-lg font-bold text-purple-600">
-                        {store.clientsCount}
-                      </div>
-                      <div className="text-xs text-gray-600">Clientes</div>
                     </div>
                   </div>
                 </div>
