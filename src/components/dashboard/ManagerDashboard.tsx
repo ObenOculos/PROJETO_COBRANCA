@@ -30,7 +30,7 @@ import { FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/mockData";
 
 // Export tabs for use in Header
-export const getManagerTabs = (pendingCancellations: number = 0) => [
+export const getManagerTabs = (_pendingCancellations: number = 0) => [
   { id: "overview", name: "Visão Geral", icon: BarChart3 },
   { id: "collections", name: "Cobranças", icon: FileText },
   { id: "performance", name: "Desempenho", icon: TrendingUp },
