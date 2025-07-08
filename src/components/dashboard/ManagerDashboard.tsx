@@ -13,6 +13,8 @@ import {
   Calendar,
   Target,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import StatsCard from "../common/StatsCard";
 import FilterBar from "../common/FilterBar";
@@ -58,7 +60,11 @@ const ManagerDashboard: React.FC = () => {
   >("table");
   const [overviewFilter, setOverviewFilter] = useState<"all" | "with-collector">("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const sliderRef = useRef<HTMLDivElement>(null);
 
   // Salva a aba ativa no localStorage sempre que mudar
   useEffect(() => {
@@ -85,6 +91,42 @@ const ManagerDashboard: React.FC = () => {
     };
   }, [isMobileMenuOpen]);
 
+  // Touch handlers for mobile swipe
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe && currentSlide < 2) {
+      setCurrentSlide(currentSlide + 1);
+    }
+    if (isRightSwipe && currentSlide > 0) {
+      setCurrentSlide(currentSlide - 1);
+    }
+    
+    // Reset touch values
+    setTouchStart(0);
+    setTouchEnd(0);
+  };
+
+  const nextSlide = () => {
+    setCurrentSlide(currentSlide < 2 ? currentSlide + 1 : 0);
+  };
+
+  const prevSlide = () => {
+    setCurrentSlide(currentSlide > 0 ? currentSlide - 1 : 2);
+  };
+
   const stats = getDashboardStats();
   const performance = getCollectorPerformance();
   const baseFilteredCollections = getFilteredCollections(filters, "manager");
@@ -96,6 +138,21 @@ const ManagerDashboard: React.FC = () => {
   const overviewCollections = overviewFilter === "with-collector" 
     ? collections.filter(collection => collection.user_id && collection.user_id.trim() !== "")
     : collections;
+  
+  // Calculate metrics based on overview filter
+  const totalAmount = overviewCollections.reduce((sum, c) => sum + c.valor_original, 0);
+  const receivedAmount = overviewCollections.reduce((sum, c) => sum + c.valor_recebido, 0);
+  const totalReceived = overviewCollections.filter(c => c.status?.toLowerCase() === "recebido" || c.valor_recebido > 0).length;
+  const totalCollections = overviewCollections.length;
+  
+  const overviewStats = {
+    totalAmount,
+    receivedAmount,
+    totalReceived,
+    totalCollections,
+    pendingAmount: totalAmount - receivedAmount,
+    conversionRate: totalCollections > 0 ? (totalReceived / totalCollections) * 100 : 0
+  };
   
   const pendingCancellations = getPendingCancellationRequests();
 
@@ -147,9 +204,6 @@ const ManagerDashboard: React.FC = () => {
             .map(s => s.clientDocument)
             .filter(Boolean)
         ).size;
-        const pendingAmount = Array.from(salesMap.values())
-          .filter(s => s.isPending)
-          .reduce((sum, s) => sum + (s.totalValue - s.receivedValue), 0);
         const todayCollections = overviewCollections.filter(c => {
           const today = new Date().toISOString().split('T')[0];
           return c.data_vencimento === today;
@@ -195,164 +249,211 @@ const ManagerDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Primary Stats Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
-              <StatsCard
-                title="Total em Aberto"
-                value={formatCurrency(stats.pendingAmount)}
-                change="+12% vs mês anterior"
-                changeType="positive"
-                icon={DollarSign}
-                iconColor="bg-red-500"
-                onClick={() => setActiveTab("collections")}
-              />
-              <StatsCard
-                title="Total Recebido"
-                value={formatCurrency(stats.receivedAmount)}
-                change="+8% vs mês anterior"
-                changeType="positive"
-                icon={TrendingUp}
-                iconColor="bg-green-500"
-                onClick={() => setActiveTab("collections")}
-              />
-              <StatsCard
-                title="Taxa de Conversão"
-                value={`${stats.conversionRate.toFixed(1)}%`}
-                change="+2.1% vs mês anterior"
-                changeType="positive"
-                icon={BarChart3}
-                iconColor="bg-blue-500"
-                onClick={() => setActiveTab("performance")}
-              />
-              <StatsCard
-                title="Cobradores Ativos"
-                value={stats.collectorsCount.toString()}
-                icon={Users}
-                iconColor="bg-purple-500"
-                onClick={() => setActiveTab("users")}
-              />
-            </div>
-
-            {/* Secondary Stats Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
-              <StatsCard
-                title="Vencimentos Hoje"
-                value={formatCurrency(todayAmount)}
-                change={`${todayCollections.length} títulos`}
-                changeType="neutral"
-                icon={Calendar}
-                iconColor="bg-orange-500"
-                onClick={() => {
-                  const today = new Date().toISOString().split('T')[0];
-                  setFilters({ ...filters, dueDate: today });
-                  setActiveTab("collections");
-                }}
-              />
-              <StatsCard
-                title="Clientes com Pendências"
-                value={clientsWithPendingCount.toString()}
-                change={`${pendingSalesCount} vendas pendentes`}
-                changeType="negative"
-                icon={Users}
-                iconColor="bg-orange-600"
-                onClick={() => {
-                  setActiveTab("collections");
-                }}
-              />
-              <StatsCard
-                title="Vendas Finalizadas"
-                value={completedSalesCount.toString()}
-                change={`${((completedSalesCount / (completedSalesCount + pendingSalesCount)) * 100).toFixed(1)}% concluídas`}
-                changeType="positive"
-                icon={CheckCircle}
-                iconColor="bg-green-500"
-                onClick={() => {
-                  setActiveTab("collections");
-                }}
-              />
-              <StatsCard
-                title="Lojas Ativas"
-                value={storesWithCollections.toString()}
-                change="com cobranças"
-                changeType="neutral"
-                icon={Store}
-                iconColor="bg-indigo-500"
-                onClick={() => setActiveTab("stores")}
-              />
-            </div>
-
-            {/* Key Metrics Summary */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-              {/* Pending Analysis */}
-              <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base lg:text-lg font-semibold text-gray-900">Análise de Pendências</h3>
-                  <Target className="h-5 w-5 text-orange-500" />
-                </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Clientes com pendências</span>
-                    <span className="font-semibold text-gray-900">{clientsWithPendingCount} clientes</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Vendas pendentes</span>
-                    <span className="font-semibold text-orange-600">{pendingSalesCount} vendas</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Vendas finalizadas</span>
-                    <span className="font-semibold text-green-600">{completedSalesCount} vendas</span>
-                  </div>
-                  <div className="pt-3 border-t border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Valor pendente total</span>
-                      <span className="text-lg font-bold text-orange-600">{formatCurrency(pendingAmount)}</span>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      setActiveTab("collections");
-                    }}
-                    className="w-full mt-4 px-4 py-2 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors text-sm font-medium flex items-center justify-center"
+            {/* Métricas Slider */}
+            <div className="">
+              {/* Header with responsive controls */}
+              <div className="flex items-center justify-end">
+                {/* Desktop controls - only arrows */}
+                <div className="hidden sm:flex items-center gap-1">
+                  <button
+                    onClick={prevSlide}
+                    className="p-1 rounded-full hover:bg-gray-100 transition-colors"
                   >
-                    <Target className="h-4 w-4 mr-2" />
-                    Ver Vendas Pendentes
+                    <ChevronLeft className="h-4 w-4 text-gray-600" />
+                  </button>
+                  <button
+                    onClick={nextSlide}
+                    className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                  >
+                    <ChevronRight className="h-4 w-4 text-gray-600" />
                   </button>
                 </div>
               </div>
-
-              {/* Today's Focus */}
-              <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base lg:text-lg font-semibold text-gray-900">Foco do Dia</h3>
-                  <Target className="h-5 w-5 text-blue-500" />
-                </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Vencimentos hoje</span>
-                    <span className="font-semibold text-gray-900">{todayCollections.length} títulos</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Meta de recuperação</span>
-                    <span className="font-semibold text-green-600">85%</span>
-                  </div>
-                  <div className="pt-3 border-t border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Valor a receber hoje</span>
-                      <span className="text-lg font-bold text-blue-600">{formatCurrency(todayAmount)}</span>
+              
+              {/* Slider container with touch support */}
+              <div 
+                ref={sliderRef}
+                className="relative overflow-hidden touch-pan-x mt-0"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                <div 
+                  className="flex transition-transform duration-300 ease-in-out"
+                  style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+                >
+                  {/* Slide 1: Métricas Financeiras */}
+                  <div className="w-full flex-shrink-0">
+                    <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                      <DollarSign className="h-4 w-4 text-blue-600" />
+                      <h4 className="font-medium text-gray-900 text-sm sm:text-base">Métricas Financeiras</h4>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+                      <StatsCard
+                        title="Valor Total"
+                        value={formatCurrency(overviewStats.totalAmount)}
+                        change={`${overviewStats.totalCollections} cobranças`}
+                        changeType="neutral"
+                        icon={DollarSign}
+                        iconColor="bg-blue-500"
+                        onClick={() => setActiveTab("collections")}
+                      />
+                      <StatsCard
+                        title="Total em Aberto"
+                        value={formatCurrency(overviewStats.pendingAmount)}
+                        change="+12% vs mês anterior"
+                        changeType="positive"
+                        icon={DollarSign}
+                        iconColor="bg-red-500"
+                        onClick={() => setActiveTab("collections")}
+                      />
+                      <StatsCard
+                        title="Total Recebido"
+                        value={formatCurrency(overviewStats.receivedAmount)}
+                        change="+8% vs mês anterior"
+                        changeType="positive"
+                        icon={TrendingUp}
+                        iconColor="bg-green-500"
+                        onClick={() => setActiveTab("collections")}
+                      />
+                      <StatsCard
+                        title="Taxa de Conversão"
+                        value={`${overviewStats.conversionRate.toFixed(1)}%`}
+                        change="+2.1% vs mês anterior"
+                        changeType="positive"
+                        icon={BarChart3}
+                        iconColor="bg-blue-500"
+                        onClick={() => setActiveTab("performance")}
+                      />
                     </div>
                   </div>
-                  <button 
-                    onClick={() => {
-                      const today = new Date().toISOString().split('T')[0];
-                      setFilters({ ...filters, dueDate: today });
-                      setActiveTab("collections");
-                    }}
-                    className="w-full mt-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium flex items-center justify-center"
-                  >
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Ver Vencimentos de Hoje
-                  </button>
+
+                  {/* Slide 2: Métricas Operacionais */}
+                  <div className="w-full flex-shrink-0">
+                    <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                      <Target className="h-4 w-4 text-green-600" />
+                      <h4 className="font-medium text-gray-900 text-sm sm:text-base">Métricas Operacionais</h4>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
+                      <StatsCard
+                        title="Vendas Finalizadas"
+                        value={completedSalesCount.toString()}
+                        change={`${((completedSalesCount / (completedSalesCount + pendingSalesCount)) * 100).toFixed(1)}% concluídas`}
+                        changeType="positive"
+                        icon={CheckCircle}
+                        iconColor="bg-green-500"
+                        onClick={() => setActiveTab("collections")}
+                      />
+                      <StatsCard
+                        title="Clientes com Pendências"
+                        value={clientsWithPendingCount.toString()}
+                        change={`${pendingSalesCount} vendas pendentes`}
+                        changeType="negative"
+                        icon={Users}
+                        iconColor="bg-orange-600"
+                        onClick={() => setActiveTab("collections")}
+                      />
+                      <StatsCard
+                        title="Vencimentos Hoje"
+                        value={formatCurrency(todayAmount)}
+                        change={`${todayCollections.length} títulos`}
+                        changeType="neutral"
+                        icon={Calendar}
+                        iconColor="bg-orange-500"
+                        onClick={() => {
+                          const today = new Date().toISOString().split('T')[0];
+                          setFilters({ ...filters, dueDate: today });
+                          setActiveTab("collections");
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Slide 3: Ecossistema de Cobrança */}
+                  <div className="w-full flex-shrink-0">
+                    <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                      <Target className="h-4 w-4 text-indigo-600" />
+                      <h4 className="font-medium text-gray-900 text-sm sm:text-base">Ecossistema de Cobrança</h4>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
+                      <StatsCard
+                        title="Time Ativo"
+                        value={stats.collectorsCount.toString()}
+                        change="cobradores em campo"
+                        changeType="neutral"
+                        icon={Users}
+                        iconColor="bg-purple-500"
+                        onClick={() => setActiveTab("users")}
+                      />
+                      <StatsCard
+                        title="Cobertura da Rede"
+                        value={storesWithCollections.toString()}
+                        change="pontos ativos"
+                        changeType="neutral"
+                        icon={Store}
+                        iconColor="bg-indigo-500"
+                        onClick={() => setActiveTab("stores")}
+                      />
+                      <StatsCard
+                        title="Eficiência Média"
+                        value={`${performance.length > 0 ? (performance.reduce((acc, p) => acc + p.conversionRate, 0) / performance.length).toFixed(1) : '0.0'}%`}
+                        change="conversão da equipe"
+                        changeType="positive"
+                        icon={TrendingUp}
+                        iconColor="bg-green-500"
+                        onClick={() => setActiveTab("performance")}
+                      />
+                    </div>
+                  </div>
                 </div>
+              </div>
+
+              {/* Mobile slide indicators */}
+              <div className="flex sm:hidden justify-center gap-1.5 mt-4">
+                {[0, 1, 2].map((index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentSlide(index)}
+                    className={`w-2 h-2 rounded-full transition-colors touch-manipulation ${
+                      currentSlide === index ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Foco do Dia */}
+            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base lg:text-lg font-semibold text-gray-900">Foco do Dia</h3>
+                <Target className="h-5 w-5 text-blue-500" />
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Vencimentos hoje</span>
+                  <span className="font-semibold text-gray-900">{todayCollections.length} títulos</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Meta de recuperação</span>
+                  <span className="font-semibold text-green-600">85%</span>
+                </div>
+                <div className="pt-3 border-t border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Valor a receber hoje</span>
+                    <span className="text-lg font-bold text-blue-600">{formatCurrency(todayAmount)}</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => {
+                    const today = new Date().toISOString().split('T')[0];
+                    setFilters({ ...filters, dueDate: today });
+                    setActiveTab("collections");
+                  }}
+                  className="w-full mt-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium flex items-center justify-center"
+                >
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Ver Vencimentos de Hoje
+                </button>
               </div>
             </div>
 
