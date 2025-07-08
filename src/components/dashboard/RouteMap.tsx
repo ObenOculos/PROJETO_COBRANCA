@@ -28,7 +28,6 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [routeOptimized, setRouteOptimized] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({});
-  const [showVisitsOnly, setShowVisitsOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [clientsPerPage] = useState(10);
   const [userLocation, setUserLocation] = useState<{
@@ -165,7 +164,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
     let filtered = clientsArray.filter((client) => client.pendingValue > 0);
 
     // Filtro para mostrar apenas clientes com visitas agendadas
-    if (showVisitsOnly) {
+    if (filters.visitsOnly) {
       const clientsWithVisits = collectorVisits.map(
         (visit) => visit.clientDocument,
       );
@@ -175,7 +174,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
     }
 
     return filtered;
-  }, [filteredCollections, clientGroups, showVisitsOnly, collectorVisits]);
+  }, [filteredCollections, clientGroups, filters.visitsOnly, collectorVisits]);
 
   // Função para verificar se uma visita está atrasada
   const isVisitOverdue = (visitDate?: string, visitTime?: string) => {
@@ -815,22 +814,6 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
             </button>
           </div>
 
-          {/* Filtro de visitas - mais compacto no mobile */}
-          <div className="flex items-center gap-2 pt-1">
-            <input
-              type="checkbox"
-              id="showVisitsOnly"
-              checked={showVisitsOnly}
-              onChange={(e) => setShowVisitsOnly(e.target.checked)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="showVisitsOnly" className="text-sm text-gray-700">
-              <span className="hidden sm:inline">
-                Mostrar apenas clientes com visitas agendadas
-              </span>
-              <span className="sm:hidden">Apenas com visitas</span>
-            </label>
-          </div>
         </div>
       </div>
 
@@ -1210,7 +1193,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
           )}
 
           {/* Clientes sem visitas agendadas */}
-          {paginatedWithoutVisits.length > 0 && !showVisitsOnly && (
+          {paginatedWithoutVisits.length > 0 && !filters.visitsOnly && (
             <>
               <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
                 <div className="flex items-center justify-between">

@@ -97,7 +97,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
     filters.minAmount ||
     filters.maxAmount ||
     filters.overdueOnly ||
-    filters.highValueOnly;
+    filters.highValueOnly ||
+    filters.visitsOnly;
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
@@ -416,6 +417,32 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 />
               </div>
             </div>
+
+            {/* Visits Only Filter - Only show for collectors */}
+            {userType === "collector" && (
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Filtro de Visitas
+                </label>
+                <div className="flex items-center space-x-4">
+                  <button
+                    onClick={() =>
+                      onFilterChange({
+                        ...filters,
+                        visitsOnly: !filters.visitsOnly,
+                      })
+                    }
+                    className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                      filters.visitsOnly
+                        ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    {filters.visitsOnly ? "✓ " : ""}Mostrar apenas clientes com visitas agendadas
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Active Filters Summary */}
@@ -481,6 +508,19 @@ const FilterBar: React.FC<FilterBarProps> = ({
                         onFilterChange({ ...filters, city: undefined })
                       }
                       className="ml-1 text-gray-500 hover:text-gray-700"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+                {filters.visitsOnly && (
+                  <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-700">
+                    Apenas com visitas
+                    <button
+                      onClick={() =>
+                        onFilterChange({ ...filters, visitsOnly: undefined })
+                      }
+                      className="ml-1 text-blue-500 hover:text-blue-700"
                     >
                       ×
                     </button>

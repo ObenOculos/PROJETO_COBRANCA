@@ -289,4 +289,5 @@ export interface FilterOptions {
   maxAmount?: number;
   overdueOnly?: boolean;
   highValueOnly?: boolean;
+  visitsOnly?: boolean;
 }
