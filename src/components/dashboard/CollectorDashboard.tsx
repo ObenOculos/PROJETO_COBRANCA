@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   MapPin,
-  Clock,
   Target,
   CheckCircle,
   Users,
@@ -16,7 +15,7 @@ import RouteMap from "./RouteMap";
 import VisitScheduler from "./VisitScheduler";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { FilterOptions, Collection } from "../../types";
+import { FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/mockData";
 
 const CollectorDashboard: React.FC = () => {
@@ -74,15 +73,14 @@ const CollectorDashboard: React.FC = () => {
   const clientGroups = getClientGroups(user?.id);
   const myVisits = getVisitsByCollector(user?.id || "");
 
-  // Agrupar por venda para contar corretamente
+  // Simplified logic - group by sale to count correctly
   const salesMap = new Map<
     string,
     {
       totalValue: number;
       receivedValue: number;
-      status: string;
-      hasOverdue: boolean;
-      installments: Collection[];
+      isPending: boolean;
+      clientDocument: string;
     }
   >();
 
@@ -92,57 +90,40 @@ const CollectorDashboard: React.FC = () => {
       salesMap.set(saleKey, {
         totalValue: 0,
         receivedValue: 0,
-        status: "pendente",
-        hasOverdue: false,
-        installments: [],
+        isPending: false,
+        clientDocument: collection.documento || "",
       });
     }
 
     const sale = salesMap.get(saleKey)!;
     sale.totalValue += collection.valor_original;
     sale.receivedValue += collection.valor_recebido;
-    sale.installments.push(collection);
-
-    if (collection.dias_em_atraso && collection.dias_em_atraso > 0) {
-      sale.hasOverdue = true;
-    }
   });
 
-  // Determinar status das vendas
+  // Determine if each sale is pending (has any amount left to receive)
   salesMap.forEach((sale) => {
-    const pendingValue = sale.totalValue - sale.receivedValue;
-    if (sale.receivedValue > 0 && pendingValue > 0) {
-      sale.status = "parcial";
-    } else if (pendingValue <= 0.01 && sale.receivedValue > 0) {
-      sale.status = "pago";
-      // Se a venda está totalmente paga, não deve mais ser considerada em atraso
-      sale.hasOverdue = false;
-    } else {
-      sale.status = "pendente";
-    }
+    const pendingAmount = sale.totalValue - sale.receivedValue;
+    sale.isPending = pendingAmount > 0.01; // Consider amounts > 1 cent as pending
   });
 
   const totalSales = salesMap.size;
-  const paidSales = Array.from(salesMap.values()).filter(
-    (s) => s.status === "pago",
-  ).length;
-  const partialSales = Array.from(salesMap.values()).filter(
-    (s) => s.status === "parcial",
-  ).length;
-  const pendingSales = Array.from(salesMap.values()).filter(
-    (s) => s.status === "pendente",
-  ).length;
-  const overdueSales = Array.from(salesMap.values()).filter(
-    (s) => s.hasOverdue,
-  ).length;
+  const pendingSales = Array.from(salesMap.values()).filter((s) => s.isPending).length;
+  const completedSales = Array.from(salesMap.values()).filter((s) => !s.isPending).length;
+  
+  // Count unique clients with pending sales
+  const clientsWithPending = new Set(
+    Array.from(salesMap.values())
+      .filter((s) => s.isPending)
+      .map((s) => s.clientDocument)
+      .filter(Boolean)
+  ).size;
 
   const stats = {
     total: totalSales,
     clients: clientGroups.length,
     pending: pendingSales,
-    partial: partialSales,
-    overdue: overdueSales,
-    received: paidSales,
+    completed: completedSales,
+    clientsWithPending: clientsWithPending,
     visits: myVisits.filter((v) => v.status === "agendada").length,
     totalAmount: Array.from(salesMap.values()).reduce(
       (sum, s) => sum + s.totalValue,
@@ -182,15 +163,17 @@ const CollectorDashboard: React.FC = () => {
                 iconColor="bg-blue-500"
               />
               <StatsCard
-                title="Em Atraso"
-                value={stats.overdue.toString()}
-                icon={Clock}
-                iconColor="bg-red-500"
+                title="Clientes com Pendências"
+                value={stats.clientsWithPending.toString()}
+                change={`${stats.pending} vendas pendentes`}
+                changeType="negative"
+                icon={Users}
+                iconColor="bg-orange-500"
               />
               <StatsCard
-                title="Pagas"
-                value={stats.received.toString()}
-                change={`${stats.total > 0 ? ((stats.received / stats.total) * 100).toFixed(1) : 0}%`}
+                title="Vendas Finalizadas"
+                value={stats.completed.toString()}
+                change={`${stats.total > 0 ? ((stats.completed / stats.total) * 100).toFixed(1) : 0}%`}
                 changeType="positive"
                 icon={CheckCircle}
                 iconColor="bg-green-500"

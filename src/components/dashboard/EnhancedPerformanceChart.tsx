@@ -20,8 +20,8 @@ interface EnhancedCollectorPerformance {
   collectorName: string;
   totalSales: number;
   completedSales: number;
-  partialSales: number;
   pendingSales: number;
+  clientsWithPending: number;
   totalAmount: number;
   receivedAmount: number;
   conversionRate: number;
@@ -49,13 +49,13 @@ const EnhancedPerformanceChart: React.FC = () => {
         (c) => c.user_id === collector.id,
       );
 
-      // Group by sale to count correctly
+      // Simplified - Group by sale to count correctly
       const salesMap = new Map<
         string,
         {
           totalValue: number;
           receivedValue: number;
-          status: "pago" | "parcial" | "pendente";
+          isPending: boolean;
           clientDocument: string;
         }
       >();
@@ -66,7 +66,7 @@ const EnhancedPerformanceChart: React.FC = () => {
           salesMap.set(saleKey, {
             totalValue: 0,
             receivedValue: 0,
-            status: "pendente",
+            isPending: false,
             clientDocument: collection.documento || "",
           });
         }
@@ -76,29 +76,22 @@ const EnhancedPerformanceChart: React.FC = () => {
         sale.receivedValue += collection.valor_recebido;
       });
 
-      // Determine sale status
+      // Determine if each sale is pending
       salesMap.forEach((sale) => {
         const pendingValue = sale.totalValue - sale.receivedValue;
-        if (sale.receivedValue > 0 && pendingValue > 0) {
-          sale.status = "parcial";
-        } else if (pendingValue <= 0.01 && sale.receivedValue > 0) {
-          sale.status = "pago";
-        } else {
-          sale.status = "pendente";
-        }
+        sale.isPending = pendingValue > 0.01;
       });
 
       const salesArray = Array.from(salesMap.values());
       const totalSales = salesArray.length;
-      const completedSales = salesArray.filter(
-        (s) => s.status === "pago",
-      ).length;
-      const partialSales = salesArray.filter(
-        (s) => s.status === "parcial",
-      ).length;
-      const pendingSales = salesArray.filter(
-        (s) => s.status === "pendente",
-      ).length;
+      const completedSales = salesArray.filter((s) => !s.isPending).length;
+      const pendingSales = salesArray.filter((s) => s.isPending).length;
+      const clientsWithPending = new Set(
+        salesArray
+          .filter((s) => s.isPending)
+          .map((s) => s.clientDocument)
+          .filter(Boolean)
+      ).size;
       const totalAmount = salesArray.reduce((sum, s) => sum + s.totalValue, 0);
       const receivedAmount = salesArray.reduce(
         (sum, s) => sum + s.receivedValue,
@@ -117,8 +110,8 @@ const EnhancedPerformanceChart: React.FC = () => {
         collectorName: collector.name,
         totalSales,
         completedSales,
-        partialSales,
         pendingSales,
+        clientsWithPending,
         totalAmount,
         receivedAmount,
         conversionRate,
@@ -196,15 +189,70 @@ const EnhancedPerformanceChart: React.FC = () => {
   };
 
   const exportPerformanceData = () => {
+    // Headers with better formatting
+    const headers = [
+      "Cobrador",
+      "Total de Vendas", 
+      "Vendas Finalizadas",
+      "Vendas Pendentes",
+      "Clientes com Pendências",
+      "Taxa de Conversão (%)",
+      "Valor Total (R$)",
+      "Valor Recebido (R$)",
+      "Valor Pendente (R$)",
+      "Eficiência (%)",
+      "Ticket Médio (R$)",
+      "Total de Clientes",
+      "Ranking Taxa",
+      "Ranking Valor"
+    ];
+
+    // Data rows with proper formatting
+    const rows = filteredAndSortedPerformance.map((p) => {
+      const pendingAmount = p.totalAmount - p.receivedAmount;
+      const conversionRanking = enhancedPerformance
+        .sort((a, b) => b.conversionRate - a.conversionRate)
+        .findIndex((collector) => collector.collectorId === p.collectorId) + 1;
+      const valueRanking = enhancedPerformance
+        .sort((a, b) => b.receivedAmount - a.receivedAmount)
+        .findIndex((collector) => collector.collectorId === p.collectorId) + 1;
+        
+      return [
+        p.collectorName,
+        p.totalSales.toString(),
+        p.completedSales.toString(),
+        p.pendingSales.toString(),
+        p.clientsWithPending.toString(),
+        p.conversionRate.toFixed(1),
+        p.totalAmount.toFixed(2),
+        p.receivedAmount.toFixed(2),
+        pendingAmount.toFixed(2),
+        p.efficiency.toFixed(1),
+        p.averageTicket.toFixed(2),
+        p.clientsCount.toString(),
+        conversionRanking.toString(),
+        valueRanking.toString()
+      ];
+    });
+
+    // Create CSV content with proper encoding
     const csvContent = [
-      "Cobrador,Vendas Totais,Vendas Pagas,Taxa de Conversão,Valor Total,Valor Recebido,Eficiência,Clientes",
-      ...filteredAndSortedPerformance.map(
-        (p) =>
-          `"${p.collectorName}",${p.totalSales},${p.completedSales},${p.conversionRate.toFixed(1)}%,${p.totalAmount},${p.receivedAmount},${p.efficiency.toFixed(1)}%,${p.clientsCount}`,
-      ),
+      headers.join(","),
+      ...rows.map(row => 
+        row.map(cell => {
+          // Escape quotes and wrap in quotes if contains comma, quote, or newline
+          const escaped = cell.toString().replace(/"/g, '""');
+          return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
+        }).join(",")
+      )
     ].join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    // Add BOM for proper UTF-8 encoding in Excel
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], { 
+      type: "text/csv;charset=utf-8;" 
+    });
+    
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `desempenho-cobradores-${new Date().toISOString().split("T")[0]}.csv`;
@@ -445,8 +493,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                         )}
                       </h4>
                       <p className="text-sm text-gray-600 mt-1">
-                        {collector.totalSales} vendas • {collector.clientsCount}{" "}
-                        clientes
+                        {collector.totalSales} vendas ({collector.completedSales} finalizadas, {collector.pendingSales} pendentes) • {collector.clientsCount} clientes • {collector.clientsWithPending} com pendências
                       </p>
 
                       {/* Mobile: Show conversion rate below collector info */}
@@ -500,33 +547,87 @@ const EnhancedPerformanceChart: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Basic Stats */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-base lg:text-lg font-bold text-green-600 truncate">
-                        {formatCurrency(collector.receivedAmount)}
-                      </div>
-                      <div className="text-xs text-gray-600">
-                        Valor Recebido
+                  {/* Reorganized Stats - Better UX */}
+                  <div className="space-y-4">
+                    {/* Vendas Overview */}
+                    <div>
+                      <h5 className="text-sm font-medium text-gray-700 mb-3">Vendas</h5>
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="text-lg lg:text-xl font-bold text-blue-700">
+                            {collector.totalSales}
+                          </div>
+                          <div className="text-xs text-blue-600">Total</div>
+                        </div>
+                        <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div className="text-lg lg:text-xl font-bold text-green-700">
+                            {collector.completedSales}
+                          </div>
+                          <div className="text-xs text-green-600">Finalizadas</div>
+                        </div>
+                        <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+                          <div className="text-lg lg:text-xl font-bold text-orange-700">
+                            {collector.pendingSales}
+                          </div>
+                          <div className="text-xs text-orange-600">Pendentes</div>
+                        </div>
+                        <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
+                          <div className="text-lg lg:text-xl font-bold text-purple-700">
+                            {collector.clientsCount}
+                          </div>
+                          <div className="text-xs text-purple-600">Total Clientes</div>
+                        </div>
                       </div>
                     </div>
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-base lg:text-lg font-bold text-blue-600 truncate">
-                        {formatCurrency(collector.averageTicket)}
+
+                    {/* Clientes Overview */}
+                    <div>
+                      <h5 className="text-sm font-medium text-gray-700 mb-3">Status dos Clientes</h5>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div className="text-lg lg:text-xl font-bold text-green-700">
+                            {collector.clientsCount - collector.clientsWithPending}
+                          </div>
+                          <div className="text-xs text-green-600">Clientes Regulares</div>
+                        </div>
+                        <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+                          <div className="text-lg lg:text-xl font-bold text-orange-700">
+                            {collector.clientsWithPending}
+                          </div>
+                          <div className="text-xs text-orange-600">Com Pendências</div>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-600">Ticket Médio</div>
                     </div>
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-base lg:text-lg font-bold text-purple-600">
-                        {collector.efficiency.toFixed(1)}%
+
+                    {/* Performance Overview */}
+                    <div>
+                      <h5 className="text-sm font-medium text-gray-700 mb-3">Performance Financeira</h5>
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-green-600">Valor Recebido</span>
+                            <span className="text-lg font-bold text-green-700">
+                              {formatCurrency(collector.receivedAmount)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-blue-600">Ticket Médio</span>
+                            <span className="text-lg font-bold text-blue-700">
+                              {formatCurrency(collector.averageTicket)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-purple-600">Eficiência</span>
+                            <span className="text-lg font-bold text-purple-700">
+                              {collector.efficiency.toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-600">Eficiência</div>
-                    </div>
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-base lg:text-lg font-bold text-orange-600">
-                        {collector.clientsCount}
-                      </div>
-                      <div className="text-xs text-gray-600">Clientes</div>
                     </div>
                   </div>
 
@@ -541,7 +642,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                           <div className="space-y-2">
                             <div className="flex justify-between p-2 bg-gray-50 rounded">
                               <span className="text-sm text-gray-600">
-                                Pagas Completamente
+                                Vendas Finalizadas
                               </span>
                               <span className="text-sm font-medium text-green-600">
                                 {collector.completedSales}
@@ -549,18 +650,18 @@ const EnhancedPerformanceChart: React.FC = () => {
                             </div>
                             <div className="flex justify-between p-2 bg-gray-50 rounded">
                               <span className="text-sm text-gray-600">
-                                Pagamento Parcial
+                                Vendas Pendentes
                               </span>
-                              <span className="text-sm font-medium text-yellow-600">
-                                {collector.partialSales}
+                              <span className="text-sm font-medium text-orange-600">
+                                {collector.pendingSales}
                               </span>
                             </div>
                             <div className="flex justify-between p-2 bg-gray-50 rounded">
                               <span className="text-sm text-gray-600">
-                                Pendentes
+                                Clientes com Pendências
                               </span>
-                              <span className="text-sm font-medium text-red-600">
-                                {collector.pendingSales}
+                              <span className="text-sm font-medium text-orange-600">
+                                {collector.clientsWithPending}
                               </span>
                             </div>
                           </div>

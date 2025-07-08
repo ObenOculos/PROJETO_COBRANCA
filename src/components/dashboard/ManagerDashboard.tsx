@@ -10,10 +10,9 @@ import {
   UserCheck,
   AlertTriangle,
   ChevronDown,
-  Clock,
   Calendar,
   Target,
-  Activity,
+  CheckCircle,
 } from "lucide-react";
 import StatsCard from "../common/StatsCard";
 import FilterBar from "../common/FilterBar";
@@ -106,22 +105,47 @@ const ManagerDashboard: React.FC = () => {
       case "database-upload":
         return <DatabaseUpload />;
       case "overview":
-        // Calculate additional metrics
-        const overdueCollections = collections.filter(c => c.dias_em_atraso && c.dias_em_atraso > 0);
-        const overdueAmount = overdueCollections.reduce((sum, c) => sum + (c.valor_original - c.valor_recebido), 0);
+        // Simplified metrics - pending vs completed sales and clients
+        // Group by sale to count correctly
+        const salesMap = new Map<string, { isPending: boolean; clientDocument: string; totalValue: number; receivedValue: number }>();
+        collections.forEach((collection) => {
+          const saleKey = `${collection.venda_n}-${collection.documento}`;
+          if (!salesMap.has(saleKey)) {
+            salesMap.set(saleKey, {
+              isPending: false,
+              clientDocument: collection.documento || "",
+              totalValue: 0,
+              receivedValue: 0
+            });
+          }
+          const sale = salesMap.get(saleKey)!;
+          sale.totalValue += collection.valor_original;
+          sale.receivedValue += collection.valor_recebido;
+        });
+
+        // Determine if each sale is pending (has any amount left to receive)
+        salesMap.forEach((sale) => {
+          const pendingAmount = sale.totalValue - sale.receivedValue;
+          sale.isPending = pendingAmount > 0.01; // Consider amounts > 1 cent as pending
+        });
+
+        const pendingSalesCount = Array.from(salesMap.values()).filter(s => s.isPending).length;
+        const completedSalesCount = Array.from(salesMap.values()).filter(s => !s.isPending).length;
+        const clientsWithPendingCount = new Set(
+          Array.from(salesMap.values())
+            .filter(s => s.isPending)
+            .map(s => s.clientDocument)
+            .filter(Boolean)
+        ).size;
+        const pendingAmount = Array.from(salesMap.values())
+          .filter(s => s.isPending)
+          .reduce((sum, s) => sum + (s.totalValue - s.receivedValue), 0);
         const todayCollections = collections.filter(c => {
           const today = new Date().toISOString().split('T')[0];
           return c.data_vencimento === today;
         });
         const todayAmount = todayCollections.reduce((sum, c) => sum + c.valor_original, 0);
-        const averageDaysOverdue = overdueCollections.length > 0 
-          ? overdueCollections.reduce((sum, c) => sum + (c.dias_em_atraso || 0), 0) / overdueCollections.length 
-          : 0;
         const storesWithCollections = new Set(collections.map(c => c.nome_da_loja).filter(Boolean)).size;
-        const partiallyPaidCount = collections.filter(c => c.valor_recebido > 0 && c.valor_recebido < c.valor_original).length;
-        const partiallyPaidAmount = collections
-          .filter(c => c.valor_recebido > 0 && c.valor_recebido < c.valor_original)
-          .reduce((sum, c) => sum + c.valor_recebido, 0);
 
         return (
           <div className="space-y-4 sm:space-y-6">
@@ -179,26 +203,24 @@ const ManagerDashboard: React.FC = () => {
                 }}
               />
               <StatsCard
-                title="Em Atraso"
-                value={formatCurrency(overdueAmount)}
-                change={`${overdueCollections.length} títulos`}
+                title="Clientes com Pendências"
+                value={clientsWithPendingCount.toString()}
+                change={`${pendingSalesCount} vendas pendentes`}
                 changeType="negative"
-                icon={Clock}
-                iconColor="bg-red-600"
+                icon={Users}
+                iconColor="bg-orange-600"
                 onClick={() => {
-                  setFilters({ ...filters, overdueOnly: true });
                   setActiveTab("collections");
                 }}
               />
               <StatsCard
-                title="Pagamentos Parciais"
-                value={formatCurrency(partiallyPaidAmount)}
-                change={`${partiallyPaidCount} títulos`}
-                changeType="neutral"
-                icon={Activity}
-                iconColor="bg-yellow-500"
+                title="Vendas Finalizadas"
+                value={completedSalesCount.toString()}
+                change={`${((completedSalesCount / (completedSalesCount + pendingSalesCount)) * 100).toFixed(1)}% concluídas`}
+                changeType="positive"
+                icon={CheckCircle}
+                iconColor="bg-green-500"
                 onClick={() => {
-                  setFilters({ ...filters, status: "parcial" });
                   setActiveTab("collections");
                 }}
               />
@@ -215,38 +237,39 @@ const ManagerDashboard: React.FC = () => {
 
             {/* Key Metrics Summary */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-              {/* Overdue Analysis */}
+              {/* Pending Analysis */}
               <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base lg:text-lg font-semibold text-gray-900">Análise de Atrasos</h3>
-                  <Clock className="h-5 w-5 text-red-500" />
+                  <h3 className="text-base lg:text-lg font-semibold text-gray-900">Análise de Pendências</h3>
+                  <Target className="h-5 w-5 text-orange-500" />
                 </div>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Média de dias em atraso</span>
-                    <span className="font-semibold text-gray-900">{averageDaysOverdue.toFixed(0)} dias</span>
+                    <span className="text-sm text-gray-600">Clientes com pendências</span>
+                    <span className="font-semibold text-gray-900">{clientsWithPendingCount} clientes</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Taxa de inadimplência</span>
-                    <span className="font-semibold text-red-600">
-                      {collections.length > 0 ? ((overdueCollections.length / collections.length) * 100).toFixed(1) : 0}%
-                    </span>
+                    <span className="text-sm text-gray-600">Vendas pendentes</span>
+                    <span className="font-semibold text-orange-600">{pendingSalesCount} vendas</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Vendas finalizadas</span>
+                    <span className="font-semibold text-green-600">{completedSalesCount} vendas</span>
                   </div>
                   <div className="pt-3 border-t border-gray-200">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Valor total em atraso</span>
-                      <span className="text-lg font-bold text-red-600">{formatCurrency(overdueAmount)}</span>
+                      <span className="text-sm font-medium text-gray-700">Valor pendente total</span>
+                      <span className="text-lg font-bold text-orange-600">{formatCurrency(pendingAmount)}</span>
                     </div>
                   </div>
                   <button 
                     onClick={() => {
-                      setFilters({ ...filters, overdueOnly: true });
                       setActiveTab("collections");
                     }}
-                    className="w-full mt-4 px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium flex items-center justify-center"
+                    className="w-full mt-4 px-4 py-2 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors text-sm font-medium flex items-center justify-center"
                   >
-                    <AlertTriangle className="h-4 w-4 mr-2" />
-                    Ver Títulos em Atraso
+                    <Target className="h-4 w-4 mr-2" />
+                    Ver Vendas Pendentes
                   </button>
                 </div>
               </div>

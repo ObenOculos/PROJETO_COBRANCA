@@ -23,6 +23,7 @@ interface StoreStats {
   totalSales: number;
   completedSales: number;
   pendingSales: number;
+  clientsWithPending: number;
   totalAmount: number;
   receivedAmount: number;
   pendingAmount: number;
@@ -92,14 +93,15 @@ const EnhancedStoreManagement: React.FC = () => {
         "Não atribuído";
       const isFormalAssignment = !!assignment;
 
-      // Group by sale
+      // Simplified - Group by sale
       const salesMap = new Map<
         string,
         {
           totalValue: number;
           receivedValue: number;
           clientDocument: string;
-          clientName: string; // Adicionado clientName aqui
+          clientName: string;
+          isPending: boolean;
         }
       >();
 
@@ -110,7 +112,8 @@ const EnhancedStoreManagement: React.FC = () => {
             totalValue: 0,
             receivedValue: 0,
             clientDocument: collection.documento || "",
-            clientName: collection.cliente || "", // Atribuído clientName aqui
+            clientName: collection.cliente || "",
+            isPending: false,
           });
         }
 
@@ -119,16 +122,21 @@ const EnhancedStoreManagement: React.FC = () => {
         sale.receivedValue += collection.valor_recebido;
       });
 
+      // Determine if each sale is pending
+      salesMap.forEach((sale) => {
+        const pendingAmount = sale.totalValue - sale.receivedValue;
+        sale.isPending = pendingAmount > 0.01;
+      });
+
       const salesArray = Array.from(salesMap.values());
-      const completedSales = salesArray.filter((s) => {
-        const pending = s.totalValue - s.receivedValue;
-        return pending <= 0.01 && s.receivedValue > 0;
-      }).length;
-      
-      const pendingSales = salesArray.filter((s) => {
-        const pending = s.totalValue - s.receivedValue;
-        return pending > 0.01; // Vendas com valor pendente
-      }).length;
+      const completedSales = salesArray.filter((s) => !s.isPending).length;
+      const pendingSales = salesArray.filter((s) => s.isPending).length;
+      const clientsWithPending = new Set(
+        salesArray
+          .filter((s) => s.isPending)
+          .map((s) => s.clientDocument || s.clientName)
+          .filter(Boolean)
+      ).size;
 
       const totalCollections = salesArray.length;
       const totalAmount = salesArray.reduce((sum, s) => sum + s.totalValue, 0);
@@ -152,6 +160,7 @@ const EnhancedStoreManagement: React.FC = () => {
         totalSales: salesArray.length,
         completedSales,
         pendingSales,
+        clientsWithPending,
         totalAmount,
         receivedAmount,
         pendingAmount,
@@ -243,11 +252,12 @@ const EnhancedStoreManagement: React.FC = () => {
       "Total de Vendas",
       "Vendas Finalizadas",
       "Vendas Pendentes",
+      "Clientes com Pendências",
       "Taxa de Conversão (%)",
       "Valor Total (R$)",
       "Valor Recebido (R$)",
       "Valor Pendente (R$)",
-      "Número de Clientes",
+      "Total de Clientes",
       "Eficiência (%)",
       "Ticket Médio (R$)"
     ];
@@ -260,6 +270,7 @@ const EnhancedStoreManagement: React.FC = () => {
       s.totalSales.toString(),
       s.completedSales.toString(),
       s.pendingSales.toString(),
+      s.clientsWithPending.toString(),
       s.conversionRate.toFixed(1),
       s.totalAmount.toFixed(2),
       s.receivedAmount.toFixed(2),
@@ -541,8 +552,7 @@ const EnhancedStoreManagement: React.FC = () => {
                       <div className="flex justify-between text-sm text-gray-600 mb-2">
                         <span>Performance da Loja</span>
                         <span>
-                          {store.totalSales} vendas ({store.completedSales} finalizadas, {store.pendingSales} pendentes) • {store.clientsCount}{" "}
-                          clientes
+                          {store.totalSales} vendas ({store.completedSales} finalizadas, {store.pendingSales} pendentes) • {store.clientsCount} clientes • {store.clientsWithPending} com pendências
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-3">
@@ -590,7 +600,26 @@ const EnhancedStoreManagement: React.FC = () => {
                           <div className="text-lg lg:text-xl font-bold text-purple-700">
                             {store.clientsCount}
                           </div>
-                          <div className="text-xs text-purple-600">Clientes</div>
+                          <div className="text-xs text-purple-600">Total Clientes</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Clientes Overview */}
+                    <div>
+                      <h5 className="text-sm font-medium text-gray-700 mb-3">Status dos Clientes</h5>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div className="text-lg lg:text-xl font-bold text-green-700">
+                            {store.clientsCount - store.clientsWithPending}
+                          </div>
+                          <div className="text-xs text-green-600">Clientes Regulares</div>
+                        </div>
+                        <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+                          <div className="text-lg lg:text-xl font-bold text-orange-700">
+                            {store.clientsWithPending}
+                          </div>
+                          <div className="text-xs text-orange-600">Com Pendências</div>
                         </div>
                       </div>
                     </div>
