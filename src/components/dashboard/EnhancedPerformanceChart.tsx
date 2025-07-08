@@ -492,11 +492,8 @@ const EnhancedPerformanceChart: React.FC = () => {
                           <Award className="h-4 w-4 text-green-600 flex-shrink-0" />
                         )}
                       </h4>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {collector.totalSales} vendas ({collector.completedSales} finalizadas, {collector.pendingSales} pendentes) • {collector.clientsCount} clientes • {collector.clientsWithPending} com pendências
-                      </p>
 
-                      {/* Mobile: Show conversion rate below collector info */}
+                      {/* Mobile: Show conversion rate below collector name */}
                       <div className="mt-2 flex items-center justify-between">
                         <div>
                           <div className="text-xl lg:text-2xl font-bold text-gray-900">
@@ -525,10 +522,9 @@ const EnhancedPerformanceChart: React.FC = () => {
                   {/* Progress Bar */}
                   <div className="mb-4">
                     <div className="flex justify-between text-sm text-gray-600 mb-2">
-                      <span>Progresso das Vendas</span>
+                      <span>Performance do Cobrador</span>
                       <span>
-                        {collector.completedSales} de {collector.totalSales}{" "}
-                        completas
+                        {collector.totalSales} vendas ({collector.completedSales} finalizadas, {collector.pendingSales} pendentes) • {collector.clientsCount} clientes • {collector.clientsWithPending} com pendências
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
@@ -602,7 +598,15 @@ const EnhancedPerformanceChart: React.FC = () => {
                     {/* Performance Overview */}
                     <div>
                       <h5 className="text-sm font-medium text-gray-700 mb-3">Performance Financeira</h5>
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Valor Total</span>
+                            <span className="text-lg font-bold text-gray-700">
+                              {formatCurrency(collector.totalAmount)}
+                            </span>
+                          </div>
+                        </div>
                         <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-green-600">Valor Recebido</span>
@@ -611,11 +615,11 @@ const EnhancedPerformanceChart: React.FC = () => {
                             </span>
                           </div>
                         </div>
-                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="p-4 bg-red-50 rounded-lg border border-red-200">
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-blue-600">Ticket Médio</span>
-                            <span className="text-lg font-bold text-blue-700">
-                              {formatCurrency(collector.averageTicket)}
+                            <span className="text-sm text-red-600">Valor Pendente</span>
+                            <span className="text-lg font-bold text-red-700">
+                              {formatCurrency(collector.totalAmount - collector.receivedAmount)}
                             </span>
                           </div>
                         </div>

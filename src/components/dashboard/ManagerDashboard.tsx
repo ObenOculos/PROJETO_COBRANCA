@@ -56,6 +56,7 @@ const ManagerDashboard: React.FC = () => {
   const [collectionsView, setCollectionsView] = useState<
     "table" | "cash-report"
   >("table");
+  const [overviewFilter, setOverviewFilter] = useState<"all" | "with-collector">("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -86,7 +87,16 @@ const ManagerDashboard: React.FC = () => {
 
   const stats = getDashboardStats();
   const performance = getCollectorPerformance();
-  const filteredCollections = getFilteredCollections(filters, "manager");
+  const baseFilteredCollections = getFilteredCollections(filters, "manager");
+  
+  // Apply collector filter for collections view
+  const filteredCollections = baseFilteredCollections;
+  
+  // Apply overview filter for overview calculations
+  const overviewCollections = overviewFilter === "with-collector" 
+    ? collections.filter(collection => collection.user_id && collection.user_id.trim() !== "")
+    : collections;
+  
   const pendingCancellations = getPendingCancellationRequests();
 
   const tabs = [
@@ -108,7 +118,7 @@ const ManagerDashboard: React.FC = () => {
         // Simplified metrics - pending vs completed sales and clients
         // Group by sale to count correctly
         const salesMap = new Map<string, { isPending: boolean; clientDocument: string; totalValue: number; receivedValue: number }>();
-        collections.forEach((collection) => {
+        overviewCollections.forEach((collection) => {
           const saleKey = `${collection.venda_n}-${collection.documento}`;
           if (!salesMap.has(saleKey)) {
             salesMap.set(saleKey, {
@@ -140,15 +150,51 @@ const ManagerDashboard: React.FC = () => {
         const pendingAmount = Array.from(salesMap.values())
           .filter(s => s.isPending)
           .reduce((sum, s) => sum + (s.totalValue - s.receivedValue), 0);
-        const todayCollections = collections.filter(c => {
+        const todayCollections = overviewCollections.filter(c => {
           const today = new Date().toISOString().split('T')[0];
           return c.data_vencimento === today;
         });
         const todayAmount = todayCollections.reduce((sum, c) => sum + c.valor_original, 0);
-        const storesWithCollections = new Set(collections.map(c => c.nome_da_loja).filter(Boolean)).size;
+        const storesWithCollections = new Set(overviewCollections.map(c => c.nome_da_loja).filter(Boolean)).size;
 
         return (
           <div className="space-y-4 sm:space-y-6">
+            {/* Overview Filter */}
+            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm p-3 sm:p-4 border border-gray-200">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900">
+                  Visão Geral
+                </h2>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <label className="text-sm font-medium text-gray-700">
+                    Filtrar por cobrador:
+                  </label>
+                  <div className="flex bg-gray-100 rounded-md p-0.5">
+                    <button
+                      onClick={() => setOverviewFilter("all")}
+                      className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                        overviewFilter === "all"
+                          ? "bg-white text-blue-600 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Tudo
+                    </button>
+                    <button
+                      onClick={() => setOverviewFilter("with-collector")}
+                      className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                        overviewFilter === "with-collector"
+                          ? "bg-white text-blue-600 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Apenas com cobrador
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Primary Stats Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
               <StatsCard
@@ -503,35 +549,37 @@ const ManagerDashboard: React.FC = () => {
           <div className="space-y-3 sm:space-y-4">
             {/* View Toggle Buttons - Enhanced Mobile */}
             <div className="bg-white rounded-lg sm:rounded-xl shadow-sm p-3 sm:p-4 border border-gray-200">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900">
-                  Cobranças
-                </h2>
-                <div className="flex bg-gray-100 rounded-md p-0.5 w-full sm:w-auto">
-                  <button
-                    onClick={() => setCollectionsView("table")}
-                    className={`flex-1 sm:flex-none px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
-                      collectionsView === "table"
-                        ? "bg-white text-blue-600 shadow-sm"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2 inline" />
-                    <span className="hidden sm:inline">Todas as Cobranças</span>
-                    <span className="sm:hidden">Cobranças</span>
-                  </button>
-                  <button
-                    onClick={() => setCollectionsView("cash-report")}
-                    className={`flex-1 sm:flex-none px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
-                      collectionsView === "cash-report"
-                        ? "bg-white text-blue-600 shadow-sm"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2 inline" />
-                    <span className="hidden sm:inline">Relatório do Caixa</span>
-                    <span className="sm:hidden">Caixa</span>
-                  </button>
+              <div className="flex flex-col gap-3 sm:gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                  <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900">
+                    Cobranças
+                  </h2>
+                  <div className="flex bg-gray-100 rounded-md p-0.5 w-full sm:w-auto">
+                    <button
+                      onClick={() => setCollectionsView("table")}
+                      className={`flex-1 sm:flex-none px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
+                        collectionsView === "table"
+                          ? "bg-white text-blue-600 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2 inline" />
+                      <span className="hidden sm:inline">Todas as Cobranças</span>
+                      <span className="sm:hidden">Cobranças</span>
+                    </button>
+                    <button
+                      onClick={() => setCollectionsView("cash-report")}
+                      className={`flex-1 sm:flex-none px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
+                        collectionsView === "cash-report"
+                          ? "bg-white text-blue-600 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2 inline" />
+                      <span className="hidden sm:inline">Relatório do Caixa</span>
+                      <span className="sm:hidden">Caixa</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
