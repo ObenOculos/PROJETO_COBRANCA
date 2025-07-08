@@ -114,6 +114,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     useState<ScheduledVisit | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
+  const [showTimeWarningModal, setShowTimeWarningModal] = useState(false);
+  const [timeWarningData, setTimeWarningData] = useState<{
+    clientDocument: string;
+    selectedTime: string;
+    suggestedTime: string;
+    previousTime: string;
+  } | null>(null);
 
   // Obter clientes do cobrador logado
   const availableClients = React.useMemo(() => {
@@ -1700,16 +1707,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                                   <input
                                     type="time"
                                     value={schedule.time}
-                                    onChange={(e) =>
-                                      updateClientSchedule(
-                                        client.document,
-                                        "time",
-                                        e.target.value,
-                                      )
-                                    }
-                                    onBlur={(e) => {
+                                    onFocus={(e) => {
+                                      // Armazenar o valor atual antes de qualquer mudança
+                                      e.target.dataset.previousValue = e.target.value;
+                                    }}
+                                    onChange={(e) => {
                                       const selectedTime = e.target.value;
                                       const selectedDate = schedule.date;
+                                      const previousTime = e.target.dataset.previousValue || schedule.time;
                                       
                                       // Verificar se é hoje e se o horário é no passado
                                       if (selectedDate === getLocalDate()) {
@@ -1718,16 +1723,25 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                                         const selectedDateTime = new Date();
                                         selectedDateTime.setHours(hours, minutes, 0, 0);
                                         
-                                        // Se o horário selecionado for no passado, resetar para horário padrão
                                         if (selectedDateTime <= now) {
-                                          alert('Não é possível agendar para um horário no passado. Horário ajustado automaticamente.');
-                                          updateClientSchedule(
-                                            client.document,
-                                            "time",
-                                            getDefaultTime(),
-                                          );
+                                          // Não atualizar o horário ainda, aguardar confirmação do modal
+                                          setTimeWarningData({
+                                            clientDocument: client.document,
+                                            selectedTime: selectedTime,
+                                            suggestedTime: getDefaultTime(),
+                                            previousTime: previousTime,
+                                          });
+                                          setShowTimeWarningModal(true);
+                                          return; // Impedir a atualização
                                         }
                                       }
+                                      
+                                      // Se o horário é válido, atualizar normalmente
+                                      updateClientSchedule(
+                                        client.document,
+                                        "time",
+                                        selectedTime,
+                                      );
                                     }}
                                     className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                                   />
@@ -2783,6 +2797,79 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 >
                   <X className="h-4 w-4 mr-2" />
                   Não fez pagamento
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTimeWarningModal && timeWarningData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Horário Inválido
+                </h3>
+                <button
+                  onClick={() => setShowTimeWarningModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="mb-6">
+                <div className="flex items-center mb-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 mr-2" />
+                  <p className="text-gray-700">
+                    Não é possível agendar para um horário no passado.
+                  </p>
+                </div>
+                
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-gray-600 mb-2">
+                    <strong>Horário selecionado:</strong> {timeWarningData.selectedTime}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <strong>Horário sugerido:</strong> {timeWarningData.suggestedTime}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    updateClientSchedule(
+                      timeWarningData.clientDocument,
+                      "time",
+                      timeWarningData.suggestedTime
+                    );
+                    setShowTimeWarningModal(false);
+                    setTimeWarningData(null);
+                  }}
+                  className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  Usar Horário Sugerido
+                </button>
+                
+                <button
+                  onClick={() => {
+                    // Reverter para o horário anterior
+                    if (timeWarningData.previousTime) {
+                      updateClientSchedule(
+                        timeWarningData.clientDocument,
+                        "time",
+                        timeWarningData.previousTime
+                      );
+                    }
+                    setShowTimeWarningModal(false);
+                    setTimeWarningData(null);
+                  }}
+                  className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Cancelar
                 </button>
               </div>
             </div>
