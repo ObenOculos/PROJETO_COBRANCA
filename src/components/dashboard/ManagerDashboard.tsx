@@ -10,6 +10,10 @@ import {
   UserCheck,
   AlertTriangle,
   ChevronDown,
+  Clock,
+  Calendar,
+  Target,
+  Activity,
 } from "lucide-react";
 import StatsCard from "../common/StatsCard";
 import FilterBar from "../common/FilterBar";
@@ -102,9 +106,26 @@ const ManagerDashboard: React.FC = () => {
       case "database-upload":
         return <DatabaseUpload />;
       case "overview":
+        // Calculate additional metrics
+        const overdueCollections = collections.filter(c => c.dias_em_atraso && c.dias_em_atraso > 0);
+        const overdueAmount = overdueCollections.reduce((sum, c) => sum + (c.valor_original - c.valor_recebido), 0);
+        const todayCollections = collections.filter(c => {
+          const today = new Date().toISOString().split('T')[0];
+          return c.data_vencimento === today;
+        });
+        const todayAmount = todayCollections.reduce((sum, c) => sum + c.valor_original, 0);
+        const averageDaysOverdue = overdueCollections.length > 0 
+          ? overdueCollections.reduce((sum, c) => sum + (c.dias_em_atraso || 0), 0) / overdueCollections.length 
+          : 0;
+        const storesWithCollections = new Set(collections.map(c => c.nome_da_loja).filter(Boolean)).size;
+        const partiallyPaidCount = collections.filter(c => c.valor_recebido > 0 && c.valor_recebido < c.valor_original).length;
+        const partiallyPaidAmount = collections
+          .filter(c => c.valor_recebido > 0 && c.valor_recebido < c.valor_original)
+          .reduce((sum, c) => sum + c.valor_recebido, 0);
+
         return (
           <div className="space-y-4 sm:space-y-6">
-            {/* Stats Cards - Enhanced Mobile Grid */}
+            {/* Primary Stats Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
               <StatsCard
                 title="Total em Aberto"
@@ -113,6 +134,7 @@ const ManagerDashboard: React.FC = () => {
                 changeType="positive"
                 icon={DollarSign}
                 iconColor="bg-red-500"
+                onClick={() => setActiveTab("collections")}
               />
               <StatsCard
                 title="Total Recebido"
@@ -121,6 +143,7 @@ const ManagerDashboard: React.FC = () => {
                 changeType="positive"
                 icon={TrendingUp}
                 iconColor="bg-green-500"
+                onClick={() => setActiveTab("collections")}
               />
               <StatsCard
                 title="Taxa de Conversão"
@@ -129,14 +152,163 @@ const ManagerDashboard: React.FC = () => {
                 changeType="positive"
                 icon={BarChart3}
                 iconColor="bg-blue-500"
+                onClick={() => setActiveTab("performance")}
               />
               <StatsCard
                 title="Cobradores Ativos"
                 value={stats.collectorsCount.toString()}
                 icon={Users}
                 iconColor="bg-purple-500"
+                onClick={() => setActiveTab("users")}
               />
             </div>
+
+            {/* Secondary Stats Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+              <StatsCard
+                title="Vencimentos Hoje"
+                value={formatCurrency(todayAmount)}
+                change={`${todayCollections.length} títulos`}
+                changeType="neutral"
+                icon={Calendar}
+                iconColor="bg-orange-500"
+                onClick={() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  setFilters({ ...filters, dueDate: today });
+                  setActiveTab("collections");
+                }}
+              />
+              <StatsCard
+                title="Em Atraso"
+                value={formatCurrency(overdueAmount)}
+                change={`${overdueCollections.length} títulos`}
+                changeType="negative"
+                icon={Clock}
+                iconColor="bg-red-600"
+                onClick={() => {
+                  setFilters({ ...filters, overdueOnly: true });
+                  setActiveTab("collections");
+                }}
+              />
+              <StatsCard
+                title="Pagamentos Parciais"
+                value={formatCurrency(partiallyPaidAmount)}
+                change={`${partiallyPaidCount} títulos`}
+                changeType="neutral"
+                icon={Activity}
+                iconColor="bg-yellow-500"
+                onClick={() => {
+                  setFilters({ ...filters, status: "parcial" });
+                  setActiveTab("collections");
+                }}
+              />
+              <StatsCard
+                title="Lojas Ativas"
+                value={storesWithCollections.toString()}
+                change="com cobranças"
+                changeType="neutral"
+                icon={Store}
+                iconColor="bg-indigo-500"
+                onClick={() => setActiveTab("stores")}
+              />
+            </div>
+
+            {/* Key Metrics Summary */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+              {/* Overdue Analysis */}
+              <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base lg:text-lg font-semibold text-gray-900">Análise de Atrasos</h3>
+                  <Clock className="h-5 w-5 text-red-500" />
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Média de dias em atraso</span>
+                    <span className="font-semibold text-gray-900">{averageDaysOverdue.toFixed(0)} dias</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Taxa de inadimplência</span>
+                    <span className="font-semibold text-red-600">
+                      {collections.length > 0 ? ((overdueCollections.length / collections.length) * 100).toFixed(1) : 0}%
+                    </span>
+                  </div>
+                  <div className="pt-3 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">Valor total em atraso</span>
+                      <span className="text-lg font-bold text-red-600">{formatCurrency(overdueAmount)}</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setFilters({ ...filters, overdueOnly: true });
+                      setActiveTab("collections");
+                    }}
+                    className="w-full mt-4 px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium flex items-center justify-center"
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Ver Títulos em Atraso
+                  </button>
+                </div>
+              </div>
+
+              {/* Today's Focus */}
+              <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base lg:text-lg font-semibold text-gray-900">Foco do Dia</h3>
+                  <Target className="h-5 w-5 text-blue-500" />
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Vencimentos hoje</span>
+                    <span className="font-semibold text-gray-900">{todayCollections.length} títulos</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Meta de recuperação</span>
+                    <span className="font-semibold text-green-600">85%</span>
+                  </div>
+                  <div className="pt-3 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">Valor a receber hoje</span>
+                      <span className="text-lg font-bold text-blue-600">{formatCurrency(todayAmount)}</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      const today = new Date().toISOString().split('T')[0];
+                      setFilters({ ...filters, dueDate: today });
+                      setActiveTab("collections");
+                    }}
+                    className="w-full mt-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium flex items-center justify-center"
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Ver Vencimentos de Hoje
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Pending Cancellations Alert */}
+            {pendingCancellations.length > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg sm:rounded-xl p-4 lg:p-6">
+                <div className="flex items-start">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h3 className="text-base font-semibold text-gray-900 mb-1">
+                      {pendingCancellations.length} Solicitações de Cancelamento Pendentes
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Existem cancelamentos de visitas aguardando sua aprovação.
+                    </p>
+                    <button
+                      onClick={() => setActiveTab("visit-tracking")}
+                      className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
+                    >
+                      Revisar Solicitações
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Performance Overview - Enhanced Mobile Optimization */}
             <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200">
@@ -181,7 +353,7 @@ const ManagerDashboard: React.FC = () => {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="grid grid-cols-2 gap-2 text-center">
                         <div className="bg-white rounded-md p-2">
                           <div className="font-semibold text-sm text-gray-900">
                             {collector.totalAssigned}
@@ -195,6 +367,12 @@ const ManagerDashboard: React.FC = () => {
                           <div className="text-xs text-gray-600">Pagas</div>
                         </div>
                         <div className="bg-white rounded-md p-2">
+                          <div className="font-semibold text-sm text-blue-600">
+                            {collector.clientCount}
+                          </div>
+                          <div className="text-xs text-gray-600">Clientes</div>
+                        </div>
+                        <div className="bg-white rounded-md p-2">
                           <div className="font-semibold text-xs text-blue-600 truncate">
                             {formatCurrency(collector.receivedAmount)}
                           </div>
@@ -204,10 +382,9 @@ const ManagerDashboard: React.FC = () => {
 
                       {/* Additional mobile info */}
                       <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-600">
-                        Tempo médio:{" "}
-                        <span className="font-medium text-gray-900">
-                          {collector.averageTime.toFixed(0)} dias
-                        </span>
+                        <div className="flex justify-between">
+                          <span>Tempo médio: <span className="font-medium text-gray-900">{collector.averageTime.toFixed(0)} dias</span></span>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -220,6 +397,9 @@ const ManagerDashboard: React.FC = () => {
                       <tr className="border-b border-gray-200">
                         <th className="text-left py-3 px-4 font-medium text-gray-900">
                           Cobrador
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">
+                          Clientes
                         </th>
                         <th className="text-left py-3 px-4 font-medium text-gray-900">
                           Vendas Atribuídas
@@ -239,7 +419,14 @@ const ManagerDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {performance.map((collector) => (
+                      {performance.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-8 text-center text-gray-500">
+                            Nenhum cobrador encontrado
+                          </td>
+                        </tr>
+                      ) : (
+                        performance.map((collector) => (
                         <tr
                           key={collector.collectorId}
                           className="border-b border-gray-100 hover:bg-gray-50"
@@ -248,6 +435,9 @@ const ManagerDashboard: React.FC = () => {
                             <div className="font-medium text-gray-900">
                               {collector.collectorName}
                             </div>
+                          </td>
+                          <td className="py-3 px-4 text-gray-600">
+                            {collector.clientCount}
                           </td>
                           <td className="py-3 px-4 text-gray-600">
                             {collector.totalAssigned}
@@ -275,7 +465,8 @@ const ManagerDashboard: React.FC = () => {
                             {collector.averageTime.toFixed(0)} dias
                           </td>
                         </tr>
-                      ))}
+                      ))
+                    )}
                     </tbody>
                   </table>
                 </div>

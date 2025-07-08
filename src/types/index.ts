@@ -157,6 +157,7 @@ export interface CollectorPerformance {
   receivedAmount: number;
   conversionRate: number;
   averageTime: number;
+  clientCount: number;
 }
 
 // Auth context types

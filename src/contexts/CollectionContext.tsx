@@ -1022,6 +1022,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           assignedStores.includes(c.nome_da_loja || ""),
       );
 
+      // Contar clientes únicos usando documento (CPF) como identificador
+      const uniqueClients = new Set<string>();
+      collectorCollections.forEach((collection) => {
+        if (collection.documento && collection.documento.trim()) {
+          uniqueClients.add(collection.documento.trim());
+        }
+      });
+      const clientCount = uniqueClients.size;
+
       // Agrupar por venda (venda_n + documento)
       const salesMap = new Map<
         string,
@@ -1087,6 +1096,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         receivedAmount,
         conversionRate,
         averageTime,
+        clientCount,
       };
     });
   };

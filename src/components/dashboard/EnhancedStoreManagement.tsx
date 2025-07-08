@@ -511,12 +511,18 @@ const EnhancedStoreManagement: React.FC = () => {
                   )}
 
                   {/* Basic Stats */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
                     <div className="text-center p-3 bg-gray-50 rounded-lg">
                       <div className="text-base lg:text-lg font-bold text-blue-600">
                         {store.totalSales}
                       </div>
                       <div className="text-xs text-gray-600">Vendas</div>
+                    </div>
+                    <div className="text-center p-3 bg-gray-50 rounded-lg">
+                      <div className="text-base lg:text-lg font-bold text-gray-900 truncate">
+                        {formatCurrency(store.totalAmount)}
+                      </div>
+                      <div className="text-xs text-gray-600">Total</div>
                     </div>
                     <div className="text-center p-3 bg-gray-50 rounded-lg">
                       <div className="text-base lg:text-lg font-bold text-green-600 truncate">
