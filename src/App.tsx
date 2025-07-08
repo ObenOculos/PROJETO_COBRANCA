@@ -9,7 +9,7 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 import LoginForm from "./components/auth/LoginForm";
 import Header from "./components/common/Header";
 import ManagerDashboard, { getManagerTabs } from "./components/dashboard/ManagerDashboard";
-import CollectorDashboard from "./components/dashboard/CollectorDashboard";
+import CollectorDashboard, { getCollectorTabs } from "./components/dashboard/CollectorDashboard";
 import GlobalLoading from "./components/common/GlobalLoading";
 
 const AppContent: React.FC = () => {
@@ -20,6 +20,12 @@ const AppContent: React.FC = () => {
   // Estado para gerenciar aba ativa do manager
   const [managerActiveTab, setManagerActiveTab] = useState(() => {
     const savedTab = localStorage.getItem("managerActiveTab");
+    return savedTab || "overview";
+  });
+
+  // Estado para gerenciar aba ativa do collector
+  const [collectorActiveTab, setCollectorActiveTab] = useState(() => {
+    const savedTab = localStorage.getItem("collectorActiveTab");
     return savedTab || "overview";
   });
 
@@ -75,15 +81,21 @@ const AppContent: React.FC = () => {
     localStorage.setItem("managerActiveTab", tabId);
   };
 
+  const handleCollectorTabChange = (tabId: string) => {
+    setCollectorActiveTab(tabId);
+    localStorage.setItem("collectorActiveTab", tabId);
+  };
+
   const pendingCancellations = user?.type === "manager" ? getPendingCancellationRequests() : [];
   const managerTabs = user?.type === "manager" ? getManagerTabs(pendingCancellations.length) : [];
+  const collectorTabs = user?.type === "collector" ? getCollectorTabs() : [];
 
   return (
     <div className="min-h-screen bg-slate-100">
       <Header 
-        tabs={user?.type === "manager" ? managerTabs : []}
-        activeTab={user?.type === "manager" ? managerActiveTab : ""}
-        onTabChange={user?.type === "manager" ? handleManagerTabChange : undefined}
+        tabs={user?.type === "manager" ? managerTabs : collectorTabs}
+        activeTab={user?.type === "manager" ? managerActiveTab : collectorActiveTab}
+        onTabChange={user?.type === "manager" ? handleManagerTabChange : handleCollectorTabChange}
         pendingCancellations={pendingCancellations.length}
       />
       {user.type === "manager" ? (
@@ -92,7 +104,10 @@ const AppContent: React.FC = () => {
           onTabChange={handleManagerTabChange}
         />
       ) : (
-        <CollectorDashboard />
+        <CollectorDashboard 
+          activeTab={collectorActiveTab} 
+          onTabChange={handleCollectorTabChange}
+        />
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   MapPin,
   Target,
@@ -6,7 +6,6 @@ import {
   Users,
   Calendar,
   BarChart3,
-  ChevronDown,
 } from "lucide-react";
 import StatsCard from "../common/StatsCard";
 import FilterBar from "../common/FilterBar";
@@ -18,7 +17,23 @@ import { useAuth } from "../../contexts/AuthContext";
 import { FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/mockData";
 
-const CollectorDashboard: React.FC = () => {
+// Export tabs for use in Header
+export const getCollectorTabs = () => [
+  { id: "overview", name: "Resumo", icon: BarChart3 },
+  { id: "collections", name: "Minha Carteira", icon: Target },
+  { id: "route", name: "Rota de Cobrança", icon: MapPin },
+  { id: "visits", name: "Visitas Agendadas", icon: Calendar },
+];
+
+interface CollectorDashboardProps {
+  activeTab?: string;
+  onTabChange?: (tabId: string) => void;
+}
+
+const CollectorDashboard: React.FC<CollectorDashboardProps> = ({ 
+  activeTab: externalActiveTab, 
+  onTabChange: externalOnTabChange 
+}) => {
   const { user } = useAuth();
   const {
     getCollectorCollections,
@@ -27,42 +42,31 @@ const CollectorDashboard: React.FC = () => {
     getVisitsByCollector,
   } = useCollection();
 
-  // Recupera a aba ativa do localStorage ou usa 'overview' como padrão
-  const [activeTab, setActiveTab] = useState<
+  // Usa a aba externa se fornecida, senão gerencia internamente
+  const [internalActiveTab, setInternalActiveTab] = useState<
     "overview" | "collections" | "route" | "visits"
   >(() => {
     const savedTab = localStorage.getItem("collectorActiveTab");
     return (savedTab as any) || "overview";
   });
 
-  const [filters, setFilters] = useState<FilterOptions>({});
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
-
-  // Salva a aba ativa no localStorage sempre que mudar
-  useEffect(() => {
-    localStorage.setItem("collectorActiveTab", activeTab);
-  }, [activeTab]);
-
-  // Close mobile menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        mobileMenuRef.current &&
-        !mobileMenuRef.current.contains(event.target as Node)
-      ) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-
-    if (isMobileMenuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+  const activeTab = externalActiveTab || internalActiveTab;
+  const setActiveTab = (tab: string) => {
+    if (externalOnTabChange) {
+      externalOnTabChange(tab);
+    } else {
+      setInternalActiveTab(tab as any);
     }
+  };
 
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isMobileMenuOpen]);
+  const [filters, setFilters] = useState<FilterOptions>({});
+
+  // Salva a aba ativa no localStorage apenas quando gerenciado internamente
+  useEffect(() => {
+    if (!externalActiveTab) {
+      localStorage.setItem("collectorActiveTab", internalActiveTab);
+    }
+  }, [internalActiveTab, externalActiveTab]);
 
   const myCollections = getCollectorCollections(user?.id || "");
   const filteredCollections = getFilteredCollections(
@@ -246,128 +250,42 @@ const CollectorDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 lg:py-8">
-        {/* Enhanced Mobile-First Tab Navigation */}
-        <div className="mb-4 sm:mb-6 lg:mb-8">
-          {/* Mobile: Dropdown Menu */}
-          <div className="lg:hidden">
-            <div
-              ref={mobileMenuRef}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 relative"
-            >
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center">
-                  {(() => {
-                    const currentTab = tabs.find((tab) => tab.id === activeTab);
-                    const Icon = currentTab?.icon || BarChart3;
-                    return (
-                      <>
-                        <Icon className="h-5 w-5 mr-3 text-blue-600" />
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {currentTab?.name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            Navegar entre seções
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
-                  {activeTab === "visits" && stats.visits > 0 && (
-                    <span className="ml-2 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                      {stats.visits}
-                    </span>
-                  )}
-                </div>
-                <ChevronDown
-                  className={`h-5 w-5 text-gray-400 transition-transform ${isMobileMenuOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-
-              {/* Mobile Dropdown Menu */}
-              {isMobileMenuOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
-                  {tabs.map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => {
-                          setActiveTab(
-                            tab.id as
-                              | "overview"
-                              | "collections"
-                              | "route"
-                              | "visits",
-                          );
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className={`w-full flex items-center px-4 py-3 text-left hover:bg-gray-50 transition-colors relative ${
-                          activeTab === tab.id
-                            ? "bg-blue-50 text-blue-600"
-                            : "text-gray-700"
-                        }`}
-                      >
-                        <Icon
-                          className={`h-5 w-5 mr-3 ${activeTab === tab.id ? "text-blue-600" : "text-gray-400"}`}
-                        />
-                        <span className="font-medium">{tab.name}</span>
-                        {tab.id === "visits" && stats.visits > 0 && (
-                          <span className="ml-auto h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                            {stats.visits}
-                          </span>
-                        )}
-                        {activeTab === tab.id && (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600"></div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Desktop: Traditional Tab Navigation */}
-          <div className="hidden lg:block">
-            <div className="border-b border-gray-200">
-              <nav className="flex space-x-1">
-                {tabs.map((tab) => {
-                  const Icon = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() =>
-                        setActiveTab(
-                          tab.id as
-                            | "overview"
-                            | "collections"
-                            | "route"
-                            | "visits",
-                        )
-                      }
-                      className={`flex items-center py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap relative transition-colors ${
-                        activeTab === tab.id
-                          ? "border-blue-500 text-blue-600"
-                          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4 mr-2 flex-shrink-0" />
-                      <span>{tab.name}</span>
-                      {tab.id === "visits" && stats.visits > 0 && (
-                        <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                          {stats.visits}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
+      <div className="p-6">
+        {/* Desktop: Traditional Tab Navigation */}
+        <div className="hidden lg:block mb-4 sm:mb-6 lg:mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="flex space-x-1">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() =>
+                      setActiveTab(
+                        tab.id as
+                          | "overview"
+                          | "collections"
+                          | "route"
+                          | "visits",
+                      )
+                    }
+                    className={`flex items-center py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap relative transition-colors ${
+                      activeTab === tab.id
+                        ? "border-blue-500 text-blue-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span>{tab.name}</span>
+                    {tab.id === "visits" && stats.visits > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                        {stats.visits}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
         </div>
 

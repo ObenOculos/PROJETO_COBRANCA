@@ -746,7 +746,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   return (
     <div className="min-h-screen">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 lg:py-8">
+      <div className="p-6">
         {/* Desktop Tab Navigation */}
         <div className="hidden lg:block mb-4 sm:mb-6 lg:mb-8">
           <div className="border-b border-gray-200">
