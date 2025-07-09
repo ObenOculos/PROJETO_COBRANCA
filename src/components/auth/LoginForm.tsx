@@ -45,10 +45,10 @@ const LoginForm: React.FC = () => {
             <div className="mx-auto h-16 w-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center mb-6 shadow-lg transform hover:scale-105 transition-transform duration-300">
               <LogIn className="h-8 w-8 text-white" />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
               Acesso ao Sistema
             </h2>
-            <p className="text-gray-600">Entre com suas credenciais</p>
+            <p className="text-sm lg:text-base text-gray-600">Entre com suas credenciais</p>
             <div className="w-16 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 mx-auto mt-4 rounded-full"></div>
           </div>
 
@@ -57,7 +57,7 @@ const LoginForm: React.FC = () => {
             <div className="group">
               <label
                 htmlFor="login"
-                className="block text-sm font-medium text-gray-700 mb-2 group-focus-within:text-blue-600 transition-colors"
+                className="block text-xs lg:text-sm font-medium text-gray-700 mb-2 group-focus-within:text-blue-600 transition-colors"
               >
                 Login
               </label>
@@ -79,7 +79,7 @@ const LoginForm: React.FC = () => {
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-purple-500/0 to-pink-500/0 rounded-xl opacity-0 group-focus-within:opacity-10 transition-opacity duration-300 pointer-events-none"></div>
               </div>
               {showValidation && !login.trim() && (
-                <p className="mt-1 text-sm text-red-600">Campo obrigatório</p>
+                <p className="mt-1 text-xs lg:text-sm text-red-600">Campo obrigatório</p>
               )}
             </div>
 
@@ -87,7 +87,7 @@ const LoginForm: React.FC = () => {
             <div className="group">
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-2 group-focus-within:text-blue-600 transition-colors"
+                className="block text-xs lg:text-sm font-medium text-gray-700 mb-2 group-focus-within:text-blue-600 transition-colors"
               >
                 Senha
               </label>
@@ -121,7 +121,7 @@ const LoginForm: React.FC = () => {
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-purple-500/0 to-pink-500/0 rounded-xl opacity-0 group-focus-within:opacity-10 transition-opacity duration-300 pointer-events-none"></div>
               </div>
               {showValidation && !password.trim() && (
-                <p className="mt-1 text-sm text-red-600">Campo obrigatório</p>
+                <p className="mt-1 text-xs lg:text-sm text-red-600">Campo obrigatório</p>
               )}
             </div>
 
@@ -130,7 +130,7 @@ const LoginForm: React.FC = () => {
               <div className="bg-red-50/80 backdrop-blur-sm border border-red-200/50 rounded-xl p-4 flex items-start space-x-3 animate-in slide-in-from-top-2 duration-300">
                 <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-sm text-red-700 font-medium">{error}</p>
+                  <p className="text-xs lg:text-sm text-red-700 font-medium">{error}</p>
                 </div>
               </div>
             )}
@@ -139,7 +139,7 @@ const LoginForm: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-4 px-6 rounded-xl hover:from-blue-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 transition-all duration-300 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 active:translate-y-0"
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-4 px-6 rounded-xl hover:from-blue-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 transition-all duration-300 text-base lg:text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 active:translate-y-0"
             >
               {isLoading ? (
                 <>
