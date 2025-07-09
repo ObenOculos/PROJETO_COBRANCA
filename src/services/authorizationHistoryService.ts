@@ -272,7 +272,7 @@ export class AuthorizationHistoryService {
   }> {
     const { data, error } = await supabase
       .from('authorization_history')
-      .select('status');
+      .select('status, expires_at');
 
     if (error) {
       throw new Error(`Failed to get authorization stats: ${error.message}`);
