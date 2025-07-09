@@ -342,21 +342,21 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                 Resumo dos Pagamentos
               </h3>
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
-                  <div className="text-lg sm:text-xl font-bold text-gray-900">
+              <div className="grid grid-cols-2 sm:flex sm:flex-col gap-3">
+                <div className="text-center p-4 bg-white rounded-lg shadow-sm h-20 flex flex-col justify-center">
+                  <div className="text-xl font-bold text-gray-900">
                     {formatCurrency(totalValue)}
                   </div>
-                  <div className="text-xs sm:text-sm text-gray-600">
+                  <div className="text-sm text-gray-600">
                     Valor Total
                   </div>
                 </div>
 
-                <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
-                  <div className="text-lg sm:text-xl font-bold text-green-600">
+                <div className="text-center p-4 bg-white rounded-lg shadow-sm h-20 flex flex-col justify-center">
+                  <div className="text-xl font-bold text-green-600">
                     {formatCurrency(newTotalReceived)}
                   </div>
-                  <div className="text-xs sm:text-sm text-gray-600">
+                  <div className="text-sm text-gray-600">
                     Novo Recebido
                   </div>
                   {totalDifference !== 0 && (
@@ -369,20 +369,20 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                   )}
                 </div>
 
-                <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
-                  <div className="text-lg sm:text-xl font-bold text-red-600">
+                <div className="text-center p-4 bg-white rounded-lg shadow-sm h-20 flex flex-col justify-center">
+                  <div className="text-xl font-bold text-red-600">
                     {formatCurrency(newTotalPending)}
                   </div>
-                  <div className="text-xs sm:text-sm text-gray-600">
+                  <div className="text-sm text-gray-600">
                     Novo Pendente
                   </div>
                 </div>
 
-                <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
-                  <div className="text-lg sm:text-xl font-bold text-purple-600">
+                <div className="text-center p-4 bg-white rounded-lg shadow-sm h-20 flex flex-col justify-center">
+                  <div className="text-xl font-bold text-purple-600">
                     {changes.length}
                   </div>
-                  <div className="text-xs sm:text-sm text-gray-600">
+                  <div className="text-sm text-gray-600">
                     Alterações
                   </div>
                 </div>
