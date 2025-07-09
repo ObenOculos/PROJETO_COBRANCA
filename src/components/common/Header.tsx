@@ -105,7 +105,7 @@ const Header: React.FC<HeaderProps> = ({
           
           {/* Sidebar */}
           <div 
-            className={`fixed left-0 top-0 h-full w-72 bg-white shadow-xl transform transition-all duration-300 ease-out overflow-hidden ${
+            className={`fixed left-0 top-0 h-full w-72 bg-white shadow-xl transform transition-all duration-300 ease-out overflow-hidden flex flex-col ${
               isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
             }`}
           >
@@ -129,36 +129,27 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* User Info */}
             <div className="p-4 border-b border-gray-100">
-              <div className="flex items-center space-x-3 mb-3">
-                <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
-                  <User className="h-5 w-5 text-gray-600" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
+                    <User className="h-5 w-5 text-gray-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">
+                      {user?.name}
+                    </p>
+                    <p className="text-xs text-gray-500 capitalize">
+                      {user?.type === "manager" ? "Gerente" : "Cobrador"}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">
-                    {user?.name}
-                  </p>
-                  <p className="text-xs text-gray-500 capitalize">
-                    {user?.type === "manager" ? "Gerente" : "Cobrador"}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between pt-3 border-t border-gray-200">
                 <NotificationDropdown />
-                <button
-                  onClick={logout}
-                  className="flex items-center space-x-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Sair"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span className="font-medium">Sair</span>
-                </button>
               </div>
             </div>
 
             {/* Navigation */}
             {tabs.length > 0 && (
-              <div className="p-4 h-full overflow-y-auto">
+              <div className="p-4 flex-1 overflow-y-auto">
                 <nav className="space-y-1">
                   {tabs.map((tab) => {
                     const Icon = tab.icon;
@@ -191,6 +182,18 @@ const Header: React.FC<HeaderProps> = ({
                 </nav>
               </div>
             )}
+            
+            {/* Logout Button - Fixed at bottom */}
+            <div className="mt-auto p-4 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={logout}
+                className="w-full flex items-center justify-center space-x-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
+                title="Sair"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Sair do Sistema</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
