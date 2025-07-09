@@ -172,6 +172,29 @@ export class AuthorizationHistoryService {
   }
 
   /**
+   * Expire previous pending requests for the same collector and client
+   */
+  static async expirePreviousRequests(
+    collector_id: string, 
+    client_document: string
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('authorization_history')
+      .update({
+        status: 'expired',
+        processed_at: new Date().toISOString(),
+        processed_by_name: 'Sistema - Nova solicitação'
+      })
+      .eq('collector_id', collector_id)
+      .eq('client_document', client_document)
+      .eq('status', 'pending');
+
+    if (error) {
+      throw new Error(`Failed to expire previous requests: ${error.message}`);
+    }
+  }
+
+  /**
    * Get authorization history with filtering and pagination
    */
   static async getAuthorizationHistory(filters: {

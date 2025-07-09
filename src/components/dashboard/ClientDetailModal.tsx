@@ -46,9 +46,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   const [isRequestingAuth, setIsRequestingAuth] = useState(false);
   const [authRequestSent, setAuthRequestSent] = useState(false);
   const [showApprovalNotification, setShowApprovalNotification] = useState(false);
-  const [showRejectionNotification, setShowRejectionNotification] = useState(false);
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [approvedToken, setApprovedToken] = useState("");
-  const [rejectedToken, setRejectedToken] = useState("");
 
   // Monitorar aprovações e rejeições de token
   React.useEffect(() => {
@@ -77,8 +76,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     const handleTokenRejected = (event: CustomEvent) => {
       const rejectedRequest = event.detail;
       if (rejectedRequest.clientDocument === clientGroup.document && authRequestSent) {
-        setRejectedToken(rejectedRequest.token);
-        setShowRejectionNotification(true);
+        setShowRejectionModal(true);
+        setShowAuthModal(false); // Esconder modal de solicitação
         
         // Notificação do navegador
         if ('Notification' in window && Notification.permission === 'granted') {
@@ -87,11 +86,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             icon: '/favicon.ico'
           });
         }
-        
-        // Auto-hide notification after 10 seconds
-        setTimeout(() => {
-          setShowRejectionNotification(false);
-        }, 10000);
       }
     };
 
@@ -140,9 +134,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             new Date(req.processed_at) > new Date(Date.now() - 30000) // Rejeitado nos últimos 30 segundos
           );
           
-          if (rejectedRequest && !showRejectionNotification) {
-            setRejectedToken(rejectedRequest.token);
-            setShowRejectionNotification(true);
+          if (rejectedRequest && !showRejectionModal) {
+            setShowRejectionModal(true);
+            setShowAuthModal(false); // Esconder modal de solicitação
             
             // Notificação do navegador
             if ('Notification' in window && Notification.permission === 'granted') {
@@ -151,11 +145,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 icon: '/favicon.ico'
               });
             }
-            
-            // Auto-hide notification after 10 seconds
-            setTimeout(() => {
-              setShowRejectionNotification(false);
-            }, 10000);
           }
         } catch (error) {
           console.error('Erro ao verificar status de token:', error);
@@ -175,7 +164,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       window.removeEventListener('tokenRejected', handleTokenRejected as EventListener);
       clearInterval(interval);
     };
-  }, [authRequestSent, clientGroup.document, showApprovalNotification, showRejectionNotification, user]);
+  }, [authRequestSent, clientGroup.document, showApprovalNotification, showRejectionModal, user]);
 
   // Solicitar permissão para notificações
   React.useEffect(() => {
@@ -250,6 +239,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     setAuthError("");
     
     try {
+      // Primeiro, expirar qualquer solicitação anterior pendente para este cliente e cobrador
+      await AuthorizationHistoryService.expirePreviousRequests(user.id, clientGroup.document);
+      
       // Gerar token único
       const token = generateToken();
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutos
@@ -721,38 +713,20 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       </div>
                     </div>
                   </div>
-                ) : showRejectionNotification ? (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 animate-pulse">
-                    <div className="flex items-center">
-                      <div className="bg-red-500 rounded-full p-1 mr-3">
-                        <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-red-700">
-                          Token Rejeitado pelo Gerente!
-                        </p>
-                        <p className="text-sm text-red-600">
-                          Solicite nova autorização se necessário.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                 ) : (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-                    <p className="text-sm text-green-700">
-                      ✅ Solicitação enviada para o gerente! Aguarde a aprovação.
-                    </p>
-                  </div>
+                  !showApprovalNotification && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                      <p className="text-sm text-green-700">
+                        ✅ Solicitação enviada para o gerente! Aguarde a aprovação.
+                      </p>
+                    </div>
+                  )
                 )}
                 
                 <p className="text-gray-600 mb-4">
                   {showApprovalNotification 
                     ? "Token aprovado! Clique em 'Validar Token' para continuar:"
-                    : showRejectionNotification
-                      ? "Sua solicitação foi rejeitada. Você pode solicitar uma nova autorização se necessário."
-                      : "Após a aprovação, digite o token de 6 dígitos fornecido pelo gerente:"
+                    : "Após a aprovação, digite o token de 6 dígitos fornecido pelo gerente:"
                   }
                 </p>
                 
@@ -814,11 +788,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     onClick={() => {
                       setAuthRequestSent(false);
                       setShowApprovalNotification(false);
-                      setShowRejectionNotification(false);
+                      setShowRejectionModal(false);
                       setAuthToken("");
                       setAuthError("");
                       setApprovedToken("");
-                      setRejectedToken("");
                     }}
                     className="w-full px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm"
                   >
@@ -849,6 +822,38 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           onClose={() => setIsGeneralEditModalOpen(false)}
           onSuccess={handleGeneralEditSuccess}
         />
+      )}
+
+      {/* Rejection Modal */}
+      {showRejectionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Solicitação Rejeitada
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">
+                Sua solicitação de autorização foi rejeitada pelo gerente.
+              </p>
+              <button
+                onClick={() => {
+                  setShowRejectionModal(false);
+                  setAuthRequestSent(false);
+                  setAuthToken("");
+                  setAuthError("");
+                }}
+                className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

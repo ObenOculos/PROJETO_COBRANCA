@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Clock, Check, X, AlertCircle, User, FileText, Download, Filter, Search, Calendar, TrendingUp, Loader2 } from "lucide-react";
+import { Clock, Check, X, AlertCircle, User, FileText, Download, Search, TrendingUp, Loader2 } from "lucide-react";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 import { AuthorizationHistory } from "../../types";
 import { useAuth } from "../../contexts/AuthContext";
@@ -11,6 +11,7 @@ const AuthorizationManager: React.FC = () => {
   const [pendingRequests, setPendingRequests] = useState<AuthorizationHistory[]>([]);
   const [processedRequests, setProcessedRequests] = useState<AuthorizationHistory[]>([]);
   const [expiredRequests, setExpiredRequests] = useState<AuthorizationHistory[]>([]);
+  const [hiddenExpiredIds, setHiddenExpiredIds] = useState<Set<string>>(new Set());
   const [historyData, setHistoryData] = useState<AuthorizationHistory[]>([]);
   const [showExpired, setShowExpired] = useState(false);
   const [activeView, setActiveView] = useState<"current" | "history">("current");
@@ -42,7 +43,10 @@ const AuthorizationManager: React.FC = () => {
 
       setPendingRequests(pending);
       setProcessedRequests(processed);
-      setExpiredRequests(expired);
+      
+      // Filtrar expiradas que foram escondidas
+      const visibleExpired = expired.filter(req => !hiddenExpiredIds.has(req.id));
+      setExpiredRequests(visibleExpired);
     } catch (error) {
       console.error('Erro ao carregar solicitações:', error);
     }
@@ -118,6 +122,13 @@ const AuthorizationManager: React.FC = () => {
     }
   }, [activeView, historyFilter, searchTerm, dateFilter, historyPage]);
 
+  // Recarregar solicitações quando hiddenExpiredIds mudar
+  useEffect(() => {
+    if (!loading) {
+      loadCurrentRequests();
+    }
+  }, [hiddenExpiredIds]);
+
   // Aprovar solicitação
   const approveRequest = async (token: string) => {
     if (!user) return;
@@ -187,7 +198,17 @@ const AuthorizationManager: React.FC = () => {
   // Limpar solicitações expiradas
   const clearExpiredRequests = async () => {
     try {
+      // Marcar como expiradas no banco
       await AuthorizationHistoryService.markExpiredRequests();
+      
+      // Adicionar todos os IDs das expiradas atuais ao conjunto de ocultas
+      const expiredIds = new Set(expiredRequests.map(req => req.id));
+      setHiddenExpiredIds(prevIds => new Set([...prevIds, ...expiredIds]));
+      
+      // Limpar a lista de expiradas visíveis
+      setExpiredRequests([]);
+      
+      // Recarregar dados
       await loadCurrentRequests();
       await loadStats();
     } catch (error) {
