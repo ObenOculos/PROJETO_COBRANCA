@@ -332,10 +332,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             <div className="flex items-center flex-1 min-w-0">
               <User className="h-6 w-6 text-blue-600 mr-3 flex-shrink-0" />
               <div className="min-w-0 flex-1">
-                <h2 className="text-lg lg:text-xl font-semibold text-gray-900 truncate">
+                <h2 className="text-sm sm:text-lg lg:text-xl font-semibold text-gray-900 truncate">
                   {clientGroup.client}
                 </h2>
-                <p className="text-sm text-gray-600 truncate">
+                <p className="text-xs sm:text-sm text-gray-600 truncate">
                   {clientGroup.document}
                 </p>
               </div>
@@ -406,10 +406,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           {/* Sales and Collections or Client Data */}
           {showClientData ? (
             <div className="overflow-y-auto max-h-[60vh] p-4 lg:p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
+              <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-4">
                 Dados de Cadastro do Cliente
               </h3>
-              <div className="space-y-3 text-sm text-gray-700">
+              <div className="space-y-3 text-xs sm:text-sm text-gray-700">
                 {Object.entries(clientGroup)
                   .filter(([key]) =>
                     [
@@ -459,7 +459,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           ) : (
             <div className="overflow-y-auto max-h-[60vh]">
               <div className="px-4 lg:px-6 py-4">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-4">
                   Vendas ({clientSales.length} venda
                   {clientSales.length !== 1 ? "s" : ""})
                 </h3>
@@ -497,7 +497,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                 <h4 className="font-medium text-gray-900">
                                   Venda {sale.saleNumber}
                                 </h4>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-xs sm:text-sm text-gray-600">
                                   {sale.installments.length} parcela
                                   {sale.installments.length !== 1 ? "s" : ""}
                                 </p>
@@ -524,7 +524,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
                             <div className="flex items-center gap-3">
                               <div className="text-right">
-                                <div className="text-sm font-medium text-gray-900">
+                                <div className="text-xs sm:text-sm font-medium text-gray-900">
                                   {formatCurrency(sale.totalValue)}
                                 </div>
                                 <div className="text-xs text-green-600 font-medium">
@@ -566,7 +566,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               {/* Sale Summary */}
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="text-center p-3 bg-blue-50 rounded-lg">
-                                  <div className="text-base sm:text-lg font-bold text-blue-600">
+                                  <div className="text-sm sm:text-base lg:text-lg font-bold text-blue-600">
                                     {formatCurrency(
                                       saleBalance.totalValue,
                                       false,
@@ -577,7 +577,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                   </div>
                                 </div>
                                 <div className="text-center p-3 bg-green-50 rounded-lg">
-                                  <div className="text-lg font-bold text-green-600">
+                                  <div className="text-sm sm:text-lg font-bold text-green-600">
                                     {formatCurrency(saleBalance.totalPaid)}
                                   </div>
                                   <div className="text-xs text-gray-600">
@@ -585,7 +585,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                   </div>
                                 </div>
                                 <div className="text-center p-3 bg-red-50 rounded-lg">
-                                  <div className="text-lg font-bold text-red-600">
+                                  <div className="text-sm sm:text-lg font-bold text-red-600">
                                     {formatCurrency(
                                       saleBalance.remainingBalance,
                                     )}
@@ -597,7 +597,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               </div>
 
                               {/* Additional Info */}
-                              <div className="text-sm text-gray-600 pt-2 border-t border-gray-200">
+                              <div className="text-xs sm:text-sm text-gray-600 pt-2 border-t border-gray-200">
                                 <div className="flex justify-between items-center">
                                   <span>Número de parcelas:</span>
                                   <span className="font-medium">
@@ -650,7 +650,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       {showAuthModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-4">
               Autorização Necessária
             </h3>
             
@@ -660,14 +660,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   Para editar pagamentos, é necessária autorização do gerente. 
                   Clique no botão abaixo para solicitar um token de autorização.
                 </p>
-                <p className="text-sm text-amber-600 mb-4">
+                <p className="text-xs sm:text-sm text-amber-600 mb-4">
                   ⚠️ O token expira em 5 minutos após a aprovação.
                 </p>
                 
                 <div className="space-y-4">
                   {authError && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                      <p className="text-sm text-red-700">{authError}</p>
+                      <p className="text-xs sm:text-sm text-red-700">{authError}</p>
                     </div>
                   )}
                   
@@ -708,10 +708,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                         </svg>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-blue-700">
+                        <p className="text-xs sm:text-sm font-medium text-blue-700">
                           Token Aprovado pelo Gerente!
                         </p>
-                        <p className="text-sm text-blue-600">
+                        <p className="text-xs sm:text-sm text-blue-600">
                           Token: <span className="font-mono font-bold">{approvedToken}</span> - Token preenchido automaticamente
                         </p>
                       </div>
@@ -720,7 +720,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 ) : (
                   !approvedToken && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-                      <p className="text-sm text-green-700">
+                      <p className="text-xs sm:text-sm text-green-700">
                         ✅ Solicitação enviada para o gerente! Aguarde a aprovação.
                       </p>
                     </div>
@@ -731,7 +731,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   <div>
                     <label 
                       htmlFor="auth-token"
-                      className="block text-sm font-medium text-gray-700 mb-2"
+                      className="block text-xs sm:text-sm font-medium text-gray-700 mb-2"
                     >
                       Token de Autorização
                     </label>
@@ -741,7 +741,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       type="text"
                       value={authToken}
                       onChange={(e) => setAuthToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg font-mono"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-sm sm:text-lg font-mono"
                       placeholder="000000"
                       maxLength={6}
                       onKeyDown={(e) => e.key === 'Enter' && validateToken()}
@@ -750,7 +750,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   
                   {authError && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                      <p className="text-sm text-red-700">{authError}</p>
+                      <p className="text-xs sm:text-sm text-red-700">{authError}</p>
                     </div>
                   )}
                   
@@ -791,7 +791,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       setApprovedToken("");
                       setProcessedApprovalToken("");
                     }}
-                    className="w-full px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm"
+                    className="w-full px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-xs sm:text-sm"
                   >
                     Solicitar Nova Autorização
                   </button>
@@ -832,10 +832,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-2">
                 Solicitação Rejeitada
               </h3>
-              <p className="text-sm text-gray-600 mb-6">
+              <p className="text-xs sm:text-sm text-gray-600 mb-6">
                 Sua solicitação de autorização foi rejeitada pelo gerente.
               </p>
               <button
