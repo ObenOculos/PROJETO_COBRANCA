@@ -8,6 +8,25 @@ export interface User {
   createdAt: string;
 }
 
+// Authorization history types
+export interface AuthorizationHistory {
+  id: string;
+  token: string;
+  collector_id: string;
+  collector_name: string;
+  client_name: string;
+  client_document: string;
+  requested_at: string;
+  expires_at: string;
+  status: 'pending' | 'approved' | 'rejected' | 'expired';
+  processed_at?: string;
+  processed_by_id?: string;
+  processed_by_name?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Store assignment for collectors
 export interface CollectorStore {
   id: string;

@@ -12,6 +12,8 @@ import {
 import { ClientGroup, SaleGroup } from "../../types";
 import { formatCurrency } from "../../utils/mockData";
 import { useCollection } from "../../contexts/CollectionContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 import SalePaymentModal from "./SalePaymentModal";
 import GeneralPaymentModal from "./GeneralPaymentModal";
 import GeneralPaymentEditModal from "./GeneralPaymentEditModal";
@@ -28,6 +30,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   onClose,
 }) => {
   const { getSalesByClient, calculateSaleBalance } = useCollection();
+  const { user } = useAuth();
   const [selectedSaleForPayment, setSelectedSaleForPayment] =
     useState<SaleGroup | null>(null);
   const [isSalePaymentModalOpen, setIsSalePaymentModalOpen] = useState(false);
@@ -43,9 +46,11 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   const [isRequestingAuth, setIsRequestingAuth] = useState(false);
   const [authRequestSent, setAuthRequestSent] = useState(false);
   const [showApprovalNotification, setShowApprovalNotification] = useState(false);
+  const [showRejectionNotification, setShowRejectionNotification] = useState(false);
   const [approvedToken, setApprovedToken] = useState("");
+  const [rejectedToken, setRejectedToken] = useState("");
 
-  // Monitorar aprovações de token
+  // Monitorar aprovações e rejeições de token
   React.useEffect(() => {
     const handleTokenApproved = (event: CustomEvent) => {
       const approvedRequest = event.detail;
@@ -69,47 +74,108 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       }
     };
 
-    const checkTokenApproval = () => {
-      if (authRequestSent) {
-        const storedRequests = JSON.parse(localStorage.getItem("authRequests") || "[]");
-        const approvedRequest = storedRequests.find((req: any) => 
-          req.status === "approved" && 
-          req.clientDocument === clientGroup.document &&
-          req.expiresAt > Date.now()
-        );
+    const handleTokenRejected = (event: CustomEvent) => {
+      const rejectedRequest = event.detail;
+      if (rejectedRequest.clientDocument === clientGroup.document && authRequestSent) {
+        setRejectedToken(rejectedRequest.token);
+        setShowRejectionNotification(true);
         
-        if (approvedRequest && !showApprovalNotification) {
-          setApprovedToken(approvedRequest.token);
-          setShowApprovalNotification(true);
-          setAuthToken(approvedRequest.token);
+        // Notificação do navegador
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('Token Rejeitado', {
+            body: `Seu token ${rejectedRequest.token} foi rejeitado pelo gerente.`,
+            icon: '/favicon.ico'
+          });
+        }
+        
+        // Auto-hide notification after 10 seconds
+        setTimeout(() => {
+          setShowRejectionNotification(false);
+        }, 10000);
+      }
+    };
+
+    const checkTokenStatus = async () => {
+      if (authRequestSent && user) {
+        try {
+          // Buscar solicitações do usuário atual para este cliente
+          const { data } = await AuthorizationHistoryService.getAuthorizationHistory({
+            searchTerm: clientGroup.document,
+            status: 'all'
+          });
           
-          // Notificação do navegador
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('Token Aprovado!', {
-              body: `Seu token ${approvedRequest.token} foi aprovado pelo gerente.`,
-              icon: '/favicon.ico'
-            });
+          const userRequests = data.filter((req: any) => 
+            req.collector_id === user.id &&
+            req.client_document === clientGroup.document
+          );
+          
+          // Verificar aprovações
+          const approvedRequest = userRequests.find((req: any) => 
+            req.status === 'approved' &&
+            new Date(req.expires_at) > new Date()
+          );
+          
+          if (approvedRequest && !showApprovalNotification) {
+            setApprovedToken(approvedRequest.token);
+            setShowApprovalNotification(true);
+            setAuthToken(approvedRequest.token);
+            
+            // Notificação do navegador
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification('Token Aprovado!', {
+                body: `Seu token ${approvedRequest.token} foi aprovado pelo gerente.`,
+                icon: '/favicon.ico'
+              });
+            }
+            
+            // Auto-hide notification after 10 seconds
+            setTimeout(() => {
+              setShowApprovalNotification(false);
+            }, 10000);
           }
           
-          // Auto-hide notification after 10 seconds
-          setTimeout(() => {
-            setShowApprovalNotification(false);
-          }, 10000);
+          // Verificar rejeições
+          const rejectedRequest = userRequests.find((req: any) => 
+            req.status === 'rejected' &&
+            new Date(req.processed_at) > new Date(Date.now() - 30000) // Rejeitado nos últimos 30 segundos
+          );
+          
+          if (rejectedRequest && !showRejectionNotification) {
+            setRejectedToken(rejectedRequest.token);
+            setShowRejectionNotification(true);
+            
+            // Notificação do navegador
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification('Token Rejeitado', {
+                body: `Seu token ${rejectedRequest.token} foi rejeitado pelo gerente.`,
+                icon: '/favicon.ico'
+              });
+            }
+            
+            // Auto-hide notification after 10 seconds
+            setTimeout(() => {
+              setShowRejectionNotification(false);
+            }, 10000);
+          }
+        } catch (error) {
+          console.error('Erro ao verificar status de token:', error);
         }
       }
     };
 
-    // Listener para aprovação imediata
+    // Listeners para aprovação e rejeição imediatas
     window.addEventListener('tokenApproved', handleTokenApproved as EventListener);
+    window.addEventListener('tokenRejected', handleTokenRejected as EventListener);
     
     // Fallback: verificar periodicamente
-    const interval = setInterval(checkTokenApproval, 3000);
+    const interval = setInterval(checkTokenStatus, 3000);
     
     return () => {
       window.removeEventListener('tokenApproved', handleTokenApproved as EventListener);
+      window.removeEventListener('tokenRejected', handleTokenRejected as EventListener);
       clearInterval(interval);
     };
-  }, [authRequestSent, clientGroup.document, showApprovalNotification]);
+  }, [authRequestSent, clientGroup.document, showApprovalNotification, showRejectionNotification, user]);
 
   // Solicitar permissão para notificações
   React.useEffect(() => {
@@ -178,38 +244,41 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
   // Função para solicitar autorização do gerente
   const requestManagerAuth = async () => {
+    if (!user) return;
+    
     setIsRequestingAuth(true);
     setAuthError("");
     
     try {
       // Gerar token único
       const token = generateToken();
-      const timestamp = Date.now();
-      const expiresAt = timestamp + 5 * 60 * 1000; // 5 minutos
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutos
       
-      // Salvar solicitação no localStorage (em produção seria no backend)
-      const authRequest = {
+      // Criar solicitação no Supabase
+      const authRequest = await AuthorizationHistoryService.createAuthorizationRequest({
         token,
-        collectorName: "Cobrador Atual", // Em produção, pegar do contexto de usuário
-        clientName: clientGroup.client,
-        clientDocument: clientGroup.document,
-        requestedAt: timestamp,
-        expiresAt,
-        status: "pending"
-      };
-      
-      // Salvar no localStorage
-      const existingRequests = JSON.parse(localStorage.getItem("authRequests") || "[]");
-      existingRequests.push(authRequest);
-      localStorage.setItem("authRequests", JSON.stringify(existingRequests));
+        collector_id: user.id,
+        collector_name: user.name,
+        client_name: clientGroup.client,
+        client_document: clientGroup.document,
+        expires_at: expiresAt
+      });
       
       // Disparar evento para notificar o gerente
-      window.dispatchEvent(new CustomEvent("authRequestCreated", { detail: authRequest }));
+      window.dispatchEvent(new CustomEvent("authRequestCreated", { 
+        detail: {
+          token: authRequest.token,
+          collectorName: authRequest.collector_name,
+          clientName: authRequest.client_name,
+          clientDocument: authRequest.client_document
+        }
+      }));
       
       setAuthRequestSent(true);
       setAuthError("");
       
     } catch (error) {
+      console.error('Erro ao solicitar autorização:', error);
       setAuthError("Erro ao solicitar autorização. Tente novamente.");
     } finally {
       setIsRequestingAuth(false);
@@ -217,41 +286,30 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   };
 
   // Função para validar token inserido
-  const validateToken = () => {
-    const storedRequests = JSON.parse(localStorage.getItem("authRequests") || "[]");
-    const request = storedRequests.find((req: any) => 
-      req.token === authToken && 
-      req.status === "approved" && 
-      req.expiresAt > Date.now()
-    );
+  const validateToken = async () => {
+    if (!authToken) return;
     
-    if (request) {
-      // Token válido e aprovado
-      setAuthError("");
-      setShowAuthModal(false);
-      setAuthToken("");
-      setAuthRequestSent(false);
-      setIsGeneralEditModalOpen(true);
+    try {
+      const { isValid, authorization, error } = await AuthorizationHistoryService.validateToken(authToken);
       
-      // Remover token usado
-      const updatedRequests = storedRequests.filter((req: any) => req.token !== authToken);
-      localStorage.setItem("authRequests", JSON.stringify(updatedRequests));
-      
-    } else {
-      // Token inválido
-      const pendingRequest = storedRequests.find((req: any) => 
-        req.token === authToken && req.status === "pending"
-      );
-      
-      if (pendingRequest) {
-        if (pendingRequest.expiresAt < Date.now()) {
-          setAuthError("Token expirado. Solicite nova autorização.");
-        } else {
-          setAuthError("Token ainda não foi aprovado pelo gerente.");
-        }
+      if (isValid && authorization) {
+        // Token válido e aprovado
+        setAuthError("");
+        setShowAuthModal(false);
+        setAuthToken("");
+        setAuthRequestSent(false);
+        setIsGeneralEditModalOpen(true);
+        
+        // Marcar token como usado (opcional - ou deixar expirar naturalmente)
+        // await AuthorizationHistoryService.markTokenAsUsed(authToken);
+        
       } else {
-        setAuthError("Token inválido ou não encontrado.");
+        // Token inválido
+        setAuthError(error || "Token inválido.");
       }
+    } catch (error) {
+      console.error('Erro ao validar token:', error);
+      setAuthError("Erro ao validar token. Tente novamente.");
     }
   };
 
@@ -663,6 +721,24 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       </div>
                     </div>
                   </div>
+                ) : showRejectionNotification ? (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 animate-pulse">
+                    <div className="flex items-center">
+                      <div className="bg-red-500 rounded-full p-1 mr-3">
+                        <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-red-700">
+                          Token Rejeitado pelo Gerente!
+                        </p>
+                        <p className="text-sm text-red-600">
+                          Solicite nova autorização se necessário.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
                     <p className="text-sm text-green-700">
@@ -674,7 +750,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 <p className="text-gray-600 mb-4">
                   {showApprovalNotification 
                     ? "Token aprovado! Clique em 'Validar Token' para continuar:"
-                    : "Após a aprovação, digite o token de 6 dígitos fornecido pelo gerente:"
+                    : showRejectionNotification
+                      ? "Sua solicitação foi rejeitada. Você pode solicitar uma nova autorização se necessário."
+                      : "Após a aprovação, digite o token de 6 dígitos fornecido pelo gerente:"
                   }
                 </p>
                 
@@ -733,7 +811,15 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   <button
                     id="new-request"
                     name="newRequest"
-                    onClick={() => setAuthRequestSent(false)}
+                    onClick={() => {
+                      setAuthRequestSent(false);
+                      setShowApprovalNotification(false);
+                      setShowRejectionNotification(false);
+                      setAuthToken("");
+                      setAuthError("");
+                      setApprovedToken("");
+                      setRejectedToken("");
+                    }}
                     className="w-full px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm"
                   >
                     Solicitar Nova Autorização

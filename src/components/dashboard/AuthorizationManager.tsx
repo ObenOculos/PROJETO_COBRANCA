@@ -1,21 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { Clock, Check, X, AlertCircle, User, FileText, Download, Filter, Search, Calendar, TrendingUp } from "lucide-react";
+import { Clock, Check, X, AlertCircle, User, FileText, Download, Filter, Search, Calendar, TrendingUp, Loader2 } from "lucide-react";
+import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
+import { AuthorizationHistory } from "../../types";
+import { useAuth } from "../../contexts/AuthContext";
 
-interface AuthRequest {
-  token: string;
-  collectorName: string;
-  clientName: string;
-  clientDocument: string;
-  requestedAt: number;
-  expiresAt: number;
-  status: "pending" | "approved" | "rejected" | "expired";
-  processedAt?: number; // Timestamp when approved/rejected
-  processedBy?: string; // Manager who processed the request
-}
+// Remove the old interface since we're using AuthorizationHistory from types
 
 const AuthorizationManager: React.FC = () => {
-  const [requests, setRequests] = useState<AuthRequest[]>([]);
-  const [history, setHistory] = useState<AuthRequest[]>([]);
+  const { user } = useAuth();
+  const [pendingRequests, setPendingRequests] = useState<AuthorizationHistory[]>([]);
+  const [processedRequests, setProcessedRequests] = useState<AuthorizationHistory[]>([]);
+  const [expiredRequests, setExpiredRequests] = useState<AuthorizationHistory[]>([]);
+  const [historyData, setHistoryData] = useState<AuthorizationHistory[]>([]);
   const [showExpired, setShowExpired] = useState(false);
   const [activeView, setActiveView] = useState<"current" | "history">("current");
   const [historyFilter, setHistoryFilter] = useState<"all" | "approved" | "rejected" | "expired">("all");
@@ -23,21 +19,78 @@ const AuthorizationManager: React.FC = () => {
   const [dateFilter, setDateFilter] = useState("");
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPerPage] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [stats, setStats] = useState({
+    total: 0,
+    approved: 0,
+    rejected: 0,
+    expired: 0,
+    approvalRate: 0
+  });
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyTotalPages, setHistoryTotalPages] = useState(0);
 
-  // Carregar solicitações e histórico do localStorage
+  // Carregar dados do Supabase
+  const loadCurrentRequests = async () => {
+    try {
+      const [pending, processed, expired] = await Promise.all([
+        AuthorizationHistoryService.getPendingRequests(),
+        AuthorizationHistoryService.getRecentlyProcessedRequests(),
+        AuthorizationHistoryService.getExpiredRequests()
+      ]);
+
+      setPendingRequests(pending);
+      setProcessedRequests(processed);
+      setExpiredRequests(expired);
+    } catch (error) {
+      console.error('Erro ao carregar solicitações:', error);
+    }
+  };
+
+  const loadHistoryData = async () => {
+    try {
+      const { data, total, totalPages } = await AuthorizationHistoryService.getAuthorizationHistory({
+        status: historyFilter,
+        searchTerm,
+        dateFilter,
+        page: historyPage,
+        limit: historyPerPage
+      });
+
+      setHistoryData(data);
+      setHistoryTotal(total);
+      setHistoryTotalPages(totalPages);
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const statsData = await AuthorizationHistoryService.getAuthorizationStats();
+      setStats(statsData);
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas:', error);
+    }
+  };
+
+  // Carregar dados iniciais
   useEffect(() => {
-    const loadRequests = () => {
-      const storedRequests = JSON.parse(localStorage.getItem("authRequests") || "[]");
-      const storedHistory = JSON.parse(localStorage.getItem("authHistory") || "[]");
-      setRequests(storedRequests);
-      setHistory(storedHistory);
+    const loadInitialData = async () => {
+      setLoading(true);
+      await Promise.all([
+        loadCurrentRequests(),
+        loadStats()
+      ]);
+      setLoading(false);
     };
 
-    loadRequests();
+    loadInitialData();
 
     // Listener para novas solicitações
     const handleNewRequest = (event: CustomEvent) => {
-      loadRequests();
+      loadCurrentRequests();
       // Notificação sonora (opcional)
       if ('Notification' in window) {
         new Notification('Nova solicitação de autorização', {
@@ -49,8 +102,8 @@ const AuthorizationManager: React.FC = () => {
 
     window.addEventListener('authRequestCreated', handleNewRequest as EventListener);
     
-    // Atualizar a cada 10 segundos
-    const interval = setInterval(loadRequests, 10000);
+    // Atualizar a cada 30 segundos
+    const interval = setInterval(loadCurrentRequests, 30000);
 
     return () => {
       window.removeEventListener('authRequestCreated', handleNewRequest as EventListener);
@@ -58,186 +111,140 @@ const AuthorizationManager: React.FC = () => {
     };
   }, []);
 
+  // Recarregar histórico quando filtros mudarem
+  useEffect(() => {
+    if (activeView === 'history') {
+      loadHistoryData();
+    }
+  }, [activeView, historyFilter, searchTerm, dateFilter, historyPage]);
+
   // Aprovar solicitação
-  const approveRequest = (token: string) => {
-    const now = Date.now();
-    const updatedRequests = requests.map(req => 
-      req.token === token ? { 
-        ...req, 
-        status: "approved" as const,
-        processedAt: now,
-        processedBy: "Gerente" // Em produção, pegar do contexto de usuário
-      } : req
-    );
-    setRequests(updatedRequests);
-    localStorage.setItem("authRequests", JSON.stringify(updatedRequests));
+  const approveRequest = async (token: string) => {
+    if (!user) return;
     
-    // Adicionar ao histórico
-    const approvedRequest = updatedRequests.find(req => req.token === token);
-    if (approvedRequest) {
-      const updatedHistory = [...history, approvedRequest];
-      setHistory(updatedHistory);
-      localStorage.setItem("authHistory", JSON.stringify(updatedHistory));
+    setActionLoading(token);
+    try {
+      const approvedRequest = await AuthorizationHistoryService.approveRequest(
+        token,
+        user.id,
+        user.name
+      );
+      
+      // Atualizar listas locais
+      await loadCurrentRequests();
+      await loadStats();
       
       // Disparar evento para notificar o cobrador
       window.dispatchEvent(new CustomEvent("tokenApproved", { 
-        detail: approvedRequest 
+        detail: {
+          token: approvedRequest.token,
+          clientDocument: approvedRequest.client_document,
+          collectorName: approvedRequest.collector_name
+        }
       }));
+      
+    } catch (error) {
+      console.error('Erro ao aprovar solicitação:', error);
+      // Aqui você pode adicionar uma notificação de erro
+    } finally {
+      setActionLoading(null);
     }
   };
 
   // Rejeitar solicitação
-  const rejectRequest = (token: string) => {
-    const now = Date.now();
-    const updatedRequests = requests.map(req => 
-      req.token === token ? { 
-        ...req, 
-        status: "rejected" as const,
-        processedAt: now,
-        processedBy: "Gerente" // Em produção, pegar do contexto de usuário
-      } : req
-    );
-    setRequests(updatedRequests);
-    localStorage.setItem("authRequests", JSON.stringify(updatedRequests));
+  const rejectRequest = async (token: string) => {
+    if (!user) return;
     
-    // Adicionar ao histórico
-    const rejectedRequest = updatedRequests.find(req => req.token === token);
-    if (rejectedRequest) {
-      const updatedHistory = [...history, rejectedRequest];
-      setHistory(updatedHistory);
-      localStorage.setItem("authHistory", JSON.stringify(updatedHistory));
+    setActionLoading(token);
+    try {
+      const rejectedRequest = await AuthorizationHistoryService.rejectRequest(
+        token,
+        user.id,
+        user.name
+      );
+      
+      // Disparar evento para notificar o cobrador
+      window.dispatchEvent(new CustomEvent("tokenRejected", { 
+        detail: {
+          token: rejectedRequest.token,
+          clientDocument: rejectedRequest.client_document,
+          collectorName: rejectedRequest.collector_name
+        }
+      }));
+      
+      // Atualizar listas locais
+      await loadCurrentRequests();
+      await loadStats();
+      
+    } catch (error) {
+      console.error('Erro ao rejeitar solicitação:', error);
+      // Aqui você pode adicionar uma notificação de erro
+    } finally {
+      setActionLoading(null);
     }
   };
 
   // Limpar solicitações expiradas
-  const clearExpiredRequests = () => {
-    const now = Date.now();
-    const expiredRequests = requests.filter(req => req.expiresAt <= now);
-    const activeRequests = requests.filter(req => req.expiresAt > now);
-    
-    // Mover expiradas para o histórico
-    const expiredWithStatus = expiredRequests.map(req => ({
-      ...req,
-      status: "expired" as const,
-      processedAt: now,
-      processedBy: "Sistema"
-    }));
-    
-    if (expiredWithStatus.length > 0) {
-      const updatedHistory = [...history, ...expiredWithStatus];
-      setHistory(updatedHistory);
-      localStorage.setItem("authHistory", JSON.stringify(updatedHistory));
+  const clearExpiredRequests = async () => {
+    try {
+      await AuthorizationHistoryService.markExpiredRequests();
+      await loadCurrentRequests();
+      await loadStats();
+    } catch (error) {
+      console.error('Erro ao limpar solicitações expiradas:', error);
     }
-    
-    setRequests(activeRequests);
-    localStorage.setItem("authRequests", JSON.stringify(activeRequests));
   };
 
-  // Filtrar solicitações
-  const now = Date.now();
-  const pendingRequests = requests.filter(req => req.status === "pending" && req.expiresAt > now);
-  const expiredRequests = requests.filter(req => req.expiresAt <= now);
-  const processedRequests = requests.filter(req => req.status !== "pending" && req.expiresAt > now);
-
-  // Formatar tempo
-  const formatTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString('pt-BR', { 
+  // Funções utilitárias
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('pt-BR', { 
       hour: '2-digit', 
       minute: '2-digit' 
     });
   };
 
-  // Calcular tempo restante
-  const getTimeRemaining = (expiresAt: number) => {
-    const remaining = expiresAt - now;
+  const getTimeRemaining = (expiresAt: string) => {
+    const remaining = new Date(expiresAt).getTime() - Date.now();
+    if (remaining <= 0) return "Expirado";
+    
     const minutes = Math.floor(remaining / 60000);
     const seconds = Math.floor((remaining % 60000) / 1000);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Filtrar histórico
-  const getFilteredHistory = () => {
-    let filtered = history;
-    
-    // Filtrar por status
-    if (historyFilter !== "all") {
-      filtered = filtered.filter(req => {
-        if (historyFilter === "expired") {
-          return req.expiresAt <= now || req.status === "expired";
-        }
-        return req.status === historyFilter;
-      });
-    }
-    
-    // Filtrar por termo de busca
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(req => 
-        req.collectorName.toLowerCase().includes(term) ||
-        req.clientName.toLowerCase().includes(term) ||
-        req.clientDocument.includes(term) ||
-        req.token.includes(term)
-      );
-    }
-    
-    // Filtrar por data
-    if (dateFilter) {
-      const filterDate = new Date(dateFilter);
-      const filterStart = new Date(filterDate.setHours(0, 0, 0, 0)).getTime();
-      const filterEnd = new Date(filterDate.setHours(23, 59, 59, 999)).getTime();
-      filtered = filtered.filter(req => 
-        req.requestedAt >= filterStart && req.requestedAt <= filterEnd
-      );
-    }
-    
-    // Ordenar por data (mais recente primeiro)
-    return filtered.sort((a, b) => b.requestedAt - a.requestedAt);
-  };
-
   // Exportar histórico
-  const exportHistory = () => {
-    const filteredHistory = getFilteredHistory();
-    const csvContent = [
-      "Token,Cobrador,Cliente,Documento,Data Solicitação,Data Processamento,Status,Processado Por",
-      ...filteredHistory.map(req => [
-        req.token,
-        req.collectorName,
-        req.clientName,
-        req.clientDocument,
-        new Date(req.requestedAt).toLocaleString('pt-BR'),
-        req.processedAt ? new Date(req.processedAt).toLocaleString('pt-BR') : '-',
-        req.status === "approved" ? "Aprovado" : req.status === "rejected" ? "Rejeitado" : "Expirado",
-        req.processedBy || '-'
-      ].join(","))
-    ].join("\n");
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `historico-autorizacoes-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const exportHistory = async () => {
+    try {
+      const csvContent = await AuthorizationHistoryService.exportAuthorizationHistory({
+        status: historyFilter,
+        searchTerm,
+        dateFilter
+      });
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `historico-autorizacoes-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erro ao exportar histórico:', error);
+    }
   };
 
-  // Estatísticas do histórico
-  const getHistoryStats = () => {
-    const total = history.length;
-    const approved = history.filter(req => req.status === "approved").length;
-    const rejected = history.filter(req => req.status === "rejected").length;
-    const expired = history.filter(req => req.expiresAt <= now || req.status === "expired").length;
-    
-    const approvalRate = total > 0 ? (approved / total * 100).toFixed(1) : '0.0';
-    
-    return { total, approved, rejected, expired, approvalRate };
-  };
-
-  // Paginação do histórico
-  const filteredHistory = getFilteredHistory();
-  const totalPages = Math.ceil(filteredHistory.length / historyPerPage);
-  const startIndex = (historyPage - 1) * historyPerPage;
-  const paginatedHistory = filteredHistory.slice(startIndex, startIndex + historyPerPage);
-  const historyStats = getHistoryStats();
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            <span className="ml-2 text-gray-600">Carregando solicitações...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -293,7 +300,7 @@ const AuthorizationManager: React.FC = () => {
                   Exportar
                 </button>
                 <span className="text-sm text-gray-500">
-                  {filteredHistory.length} registro{filteredHistory.length !== 1 ? 's' : ''}
+                  {historyTotal} registro{historyTotal !== 1 ? 's' : ''}
                 </span>
               </>
             )}
@@ -315,15 +322,15 @@ const AuthorizationManager: React.FC = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <User className="h-4 w-4 text-gray-600" />
-                      <span className="font-medium text-gray-900">{request.collectorName}</span>
+                      <span className="font-medium text-gray-900">{request.collector_name}</span>
                       <span className="text-xs text-gray-500">
-                        {formatTime(request.requestedAt)}
+                        {formatTime(request.requested_at)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mb-2">
                       <FileText className="h-4 w-4 text-gray-600" />
                       <span className="text-sm text-gray-700">
-                        {request.clientName} ({request.clientDocument})
+                        {request.client_name} ({request.client_document})
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -331,23 +338,33 @@ const AuthorizationManager: React.FC = () => {
                         Token: {request.token}
                       </span>
                       <span className="text-xs text-amber-600">
-                        Expira em: {getTimeRemaining(request.expiresAt)}
+                        Expira em: {getTimeRemaining(request.expires_at)}
                       </span>
                     </div>
                   </div>
                   <div className="flex gap-2 ml-4">
                     <button
                       onClick={() => approveRequest(request.token)}
-                      className="flex items-center px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                      disabled={actionLoading === request.token}
+                      className="flex items-center px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm disabled:opacity-50"
                     >
-                      <Check className="h-4 w-4 mr-1" />
+                      {actionLoading === request.token ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4 mr-1" />
+                      )}
                       Aprovar
                     </button>
                     <button
                       onClick={() => rejectRequest(request.token)}
-                      className="flex items-center px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                      disabled={actionLoading === request.token}
+                      className="flex items-center px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm disabled:opacity-50"
                     >
-                      <X className="h-4 w-4 mr-1" />
+                      {actionLoading === request.token ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <X className="h-4 w-4 mr-1" />
+                      )}
                       Rejeitar
                     </button>
                   </div>
@@ -369,9 +386,9 @@ const AuthorizationManager: React.FC = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <User className="h-4 w-4 text-gray-600" />
-                      <span className="font-medium text-gray-900">{request.collectorName}</span>
+                      <span className="font-medium text-gray-900">{request.collector_name}</span>
                       <span className="text-xs text-gray-500">
-                        {formatTime(request.requestedAt)}
+                        {formatTime(request.requested_at)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -379,7 +396,7 @@ const AuthorizationManager: React.FC = () => {
                         {request.token}
                       </span>
                       <span className="text-sm text-gray-700">
-                        {request.clientName}
+                        {request.client_name}
                       </span>
                     </div>
                   </div>
@@ -417,9 +434,9 @@ const AuthorizationManager: React.FC = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <User className="h-4 w-4 text-gray-600" />
-                      <span className="font-medium text-gray-900">{request.collectorName}</span>
+                      <span className="font-medium text-gray-900">{request.collector_name}</span>
                       <span className="text-xs text-gray-500">
-                        {formatTime(request.requestedAt)}
+                        {formatTime(request.requested_at)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -427,7 +444,7 @@ const AuthorizationManager: React.FC = () => {
                         {request.token}
                       </span>
                       <span className="text-sm text-gray-700">
-                        {request.clientName}
+                        {request.client_name}
                       </span>
                     </div>
                   </div>
@@ -456,7 +473,7 @@ const AuthorizationManager: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-blue-800">Total</p>
-                    <p className="text-2xl font-bold text-blue-900">{historyStats.total}</p>
+                    <p className="text-2xl font-bold text-blue-900">{stats.total}</p>
                   </div>
                   <FileText className="h-8 w-8 text-blue-600" />
                 </div>
@@ -465,7 +482,7 @@ const AuthorizationManager: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-green-800">Aprovadas</p>
-                    <p className="text-2xl font-bold text-green-900">{historyStats.approved}</p>
+                    <p className="text-2xl font-bold text-green-900">{stats.approved}</p>
                   </div>
                   <Check className="h-8 w-8 text-green-600" />
                 </div>
@@ -474,7 +491,7 @@ const AuthorizationManager: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-red-800">Rejeitadas</p>
-                    <p className="text-2xl font-bold text-red-900">{historyStats.rejected}</p>
+                    <p className="text-2xl font-bold text-red-900">{stats.rejected}</p>
                   </div>
                   <X className="h-8 w-8 text-red-600" />
                 </div>
@@ -483,7 +500,7 @@ const AuthorizationManager: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-amber-800">Taxa Aprovação</p>
-                    <p className="text-2xl font-bold text-amber-900">{historyStats.approvalRate}%</p>
+                    <p className="text-2xl font-bold text-amber-900">{stats.approvalRate.toFixed(1)}%</p>
                   </div>
                   <TrendingUp className="h-8 w-8 text-amber-600" />
                 </div>
@@ -552,14 +569,14 @@ const AuthorizationManager: React.FC = () => {
 
             {/* Lista do Histórico */}
             <div className="space-y-3">
-              {paginatedHistory.length === 0 ? (
+              {historyData.length === 0 ? (
                 <div className="text-center py-12">
                   <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-500">Nenhum registro encontrado</p>
                 </div>
               ) : (
-                paginatedHistory.map((request) => (
-                  <div key={`${request.token}-${request.requestedAt}`} className={`border rounded-lg p-4 ${
+                historyData.map((request) => (
+                  <div key={`${request.token}-${request.requested_at}`} className={`border rounded-lg p-4 ${
                     request.status === "approved" ? "bg-green-50 border-green-200" : 
                     request.status === "rejected" ? "bg-red-50 border-red-200" : 
                     "bg-gray-50 border-gray-200"
@@ -568,30 +585,30 @@ const AuthorizationManager: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <User className="h-4 w-4 text-gray-600" />
-                          <span className="font-medium text-gray-900">{request.collectorName}</span>
+                          <span className="font-medium text-gray-900">{request.collector_name}</span>
                           <span className="text-xs text-gray-500">
-                            {formatTime(request.requestedAt)}
+                            {formatTime(request.requested_at)}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 mb-2">
                           <FileText className="h-4 w-4 text-gray-600" />
                           <span className="text-sm text-gray-700">
-                            {request.clientName} ({request.clientDocument})
+                            {request.client_name} ({request.client_document})
                           </span>
                         </div>
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
                             Token: {request.token}
                           </span>
-                          {request.processedAt && (
+                          {request.processed_at && (
                             <span className="text-xs text-gray-500">
-                              Processado em: {formatTime(request.processedAt)}
+                              Processado em: {formatTime(request.processed_at)}
                             </span>
                           )}
                         </div>
-                        {request.processedBy && (
+                        {request.processed_by_name && (
                           <div className="text-xs text-gray-500">
-                            Processado por: {request.processedBy}
+                            Processado por: {request.processed_by_name}
                           </div>
                         )}
                       </div>
@@ -617,10 +634,10 @@ const AuthorizationManager: React.FC = () => {
             </div>
 
             {/* Paginação */}
-            {totalPages > 1 && (
+            {historyTotalPages > 1 && (
               <div className="flex items-center justify-between mt-6">
                 <div className="text-sm text-gray-700">
-                  Mostrando {startIndex + 1} a {Math.min(startIndex + historyPerPage, filteredHistory.length)} de {filteredHistory.length} registros
+                  Mostrando {((historyPage - 1) * historyPerPage) + 1} a {Math.min(historyPage * historyPerPage, historyTotal)} de {historyTotal} registros
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -631,11 +648,11 @@ const AuthorizationManager: React.FC = () => {
                     Anterior
                   </button>
                   <span className="text-sm text-gray-700">
-                    Página {historyPage} de {totalPages}
+                    Página {historyPage} de {historyTotalPages}
                   </span>
                   <button
-                    onClick={() => setHistoryPage(Math.min(totalPages, historyPage + 1))}
-                    disabled={historyPage === totalPages}
+                    onClick={() => setHistoryPage(Math.min(historyTotalPages, historyPage + 1))}
+                    disabled={historyPage === historyTotalPages}
                     className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Próxima
