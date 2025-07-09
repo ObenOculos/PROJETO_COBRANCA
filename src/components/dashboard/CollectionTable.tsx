@@ -381,6 +381,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                         Por página:
                       </label>
                       <select
+                        id="items-per-page"
+                        name="itemsPerPage"
                         value={itemsPerPage}
                         onChange={(e) => {
                           setItemsPerPage(Number(e.target.value));
@@ -408,6 +410,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   </span>
                   <div className="flex flex-wrap gap-2">
                     <button
+                      id="sort-by-cliente"
+                      name="sortByCliente"
                       onClick={() => handleSort("cliente")}
                       className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                         sortField === "cliente"
@@ -419,6 +423,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       {getSortIcon("cliente")}
                     </button>
                     <button
+                      id="sort-by-valor"
+                      name="sortByValor"
                       onClick={() => handleSort("valor")}
                       className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                         sortField === "valor"
@@ -430,6 +436,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       {getSortIcon("valor")}
                     </button>
                     <button
+                      id="sort-by-cidade"
+                      name="sortByCidade"
                       onClick={() => handleSort("cidade")}
                       className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                         sortField === "cidade"
@@ -530,6 +538,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                 <div className="flex items-center space-x-1 sm:space-x-2">
                   {/* Botão Início */}
                   <button
+                    id="pagination-start"
+                    name="paginationStart"
                     onClick={() => setCurrentPage(1)}
                     disabled={currentPage === 1}
                     className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-lg text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
@@ -539,6 +549,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                   {/* Botão Anterior */}
                   <button
+                    id="pagination-previous"
+                    name="paginationPrevious"
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
                     className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-lg text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
@@ -564,6 +576,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       return (
                         <button
                           key={pageNum}
+                          id={`pagination-page-${pageNum}`}
+                          name={`paginationPage${pageNum}`}
                           onClick={() => setCurrentPage(pageNum)}
                           className={`px-2 sm:px-3 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
                             pageNum === currentPage
@@ -579,6 +593,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                   {/* Botão Próxima */}
                   <button
+                    id="pagination-next"
+                    name="paginationNext"
                     onClick={() =>
                       setCurrentPage(Math.min(totalPages, currentPage + 1))
                     }
@@ -591,6 +607,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                   {/* Botão Fim */}
                   <button
+                    id="pagination-end"
+                    name="paginationEnd"
                     onClick={() => setCurrentPage(totalPages)}
                     disabled={currentPage === totalPages}
                     className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-lg text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
@@ -663,6 +681,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                         Por página:
                       </label>
                       <select
+                        id="items-per-page"
+                        name="itemsPerPage"
                         value={itemsPerPage}
                         onChange={(e) => {
                           setItemsPerPage(Number(e.target.value));
@@ -683,6 +703,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
               {userType === "collector" && (
                 <div className="flex items-center gap-3">
                   <button
+                    id="toggle-filters"
+                    name="toggleFilters"
                     onClick={() => setShowFilters(!showFilters)}
                     className={`flex items-center px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
                       showFilters
@@ -706,6 +728,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       Status da Cobrança
                     </label>
                     <select
+                      id="status-filter"
+                      name="statusFilter"
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
                       className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm transition-all duration-200 hover:border-gray-400"
@@ -719,6 +743,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   {statusFilter && (
                     <div className="flex items-end">
                       <button
+                        id="clear-filter"
+                        name="clearFilter"
                         onClick={() => setStatusFilter("")}
                         className="px-3 py-2.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
                       >
@@ -893,7 +919,11 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   <div className="flex items-center justify-between">
                     <div className="flex items-center flex-1 min-w-0">
                       <div className="flex-shrink-0 mr-3">
-                        <button className="p-1 rounded-full bg-white shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200">
+                        <button
+                          id={`client-toggle-${clientGroup.document}`}
+                          name={`clientToggle${clientGroup.document}`}
+                          className="p-1 rounded-full bg-white shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200"
+                        >
                           {expandedClients.has(clientGroup.document) ? (
                             <ChevronUp className="h-4 w-4 text-blue-600" />
                           ) : (
@@ -1049,6 +1079,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                             <div className="flex items-center justify-end space-x-2 mt-3 lg:mt-0">
                               <button
+                                id={`view-sale-${sale.saleNumber}`}
+                                name={`viewSale${sale.saleNumber}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   // Pegar todas as parcelas da venda
@@ -1081,6 +1113,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                                 <>
                                   {/* Phone actions removed - client data structure doesn't include phone/mobile */}
                                   <button
+                                    id={`manage-payments-${sale.saleNumber}`}
+                                    name={`managePayments${sale.saleNumber}`}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       // Convert to ClientGroup format for modal
@@ -1131,6 +1165,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                 </p>
                 {userType === "collector" && statusFilter && (
                   <button
+                    id="clear-all-filters"
+                    name="clearAllFilters"
                     onClick={() => setStatusFilter("")}
                     className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                   >
@@ -1161,6 +1197,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
               <div className="flex items-center space-x-1 sm:space-x-2">
                 {/* Botão Início */}
                 <button
+                  id="pagination-start-2"
+                  name="paginationStart2"
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
                   className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-lg text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
@@ -1170,6 +1208,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                 {/* Botão Anterior */}
                 <button
+                  id="pagination-previous-2"
+                  name="paginationPrevious2"
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
                   className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-lg text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
@@ -1195,6 +1235,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                     return (
                       <button
                         key={pageNum}
+                        id={`pagination-page-${pageNum}-2`}
+                        name={`paginationPage${pageNum}2`}
                         onClick={() => setCurrentPage(pageNum)}
                         className={`px-2 sm:px-3 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
                           pageNum === currentPage
@@ -1210,6 +1252,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                 {/* Botão Próxima */}
                 <button
+                  id="pagination-next-2"
+                  name="paginationNext2"
                   onClick={() =>
                     setCurrentPage(Math.min(totalPages, currentPage + 1))
                   }
@@ -1222,6 +1266,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                 {/* Botão Fim */}
                 <button
+                  id="pagination-end-2"
+                  name="paginationEnd2"
                   onClick={() => setCurrentPage(totalPages)}
                   disabled={currentPage === totalPages}
                   className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-lg text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"

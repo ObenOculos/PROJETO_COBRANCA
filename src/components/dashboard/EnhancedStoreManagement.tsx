@@ -444,10 +444,15 @@ const EnhancedStoreManagement: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label 
+                htmlFor="sort-order"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Ordem
               </label>
               <button
+                id="sort-order"
+                name="sortOrder"
                 onClick={() =>
                   setSortOrder(sortOrder === "asc" ? "desc" : "asc")
                 }

@@ -109,6 +109,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               </div>
             </div>
             <button
+              id="close-modal"
+              name="closeModal"
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
             >
@@ -120,6 +122,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           {userType === "collector" && (
             <div className="mt-4 px-4 lg:px-6 py-0 grid grid-cols-2 sm:grid-cols-4 gap-3">
               <button
+                id="view-client-data"
+                name="viewClientData"
                 onClick={() => setShowClientData(true)}
                 className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
                 title="Ver todos os dados de cadastro do cliente"
@@ -128,6 +132,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 <span className="hidden sm:inline">Ver Dados</span>
               </button>
               <button
+                id="view-client-sales"
+                name="viewClientSales"
                 onClick={() => setShowClientData(false)}
                 className="flex items-center px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium shadow-sm"
                 title="Ver vendas do cliente"
@@ -138,6 +144,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               {clientSales.reduce((sum, sale) => sum + sale.pendingValue, 0) >
                 0 && (
                 <button
+                  id="distribute-payment"
+                  name="distributePayment"
                   onClick={() => setIsGeneralPaymentModalOpen(true)}
                   className="flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium shadow-sm"
                   title="Distribuir pagamento entre parcelas"
@@ -150,6 +158,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               {clientSales.reduce((sum, sale) => sum + sale.totalReceived, 0) >
                 0 && (
                 <button
+                  id="edit-payments"
+                  name="editPayments"
                   onClick={() => setIsGeneralEditModalOpen(true)}
                   className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium shadow-sm"
                   title="Editar valores recebidos"
@@ -238,6 +248,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                         <div className="px-4 py-3 bg-gray-50">
                           <div className="flex items-center justify-between">
                             <div
+                              id={`sale-expansion-${sale.saleNumber}`}
                               className="flex items-center flex-1 cursor-pointer hover:bg-gray-100 p-2 rounded-lg -m-2"
                               onClick={() =>
                                 toggleSaleExpansion(sale.saleNumber)
@@ -297,6 +308,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               {userType === "collector" &&
                                 saleBalance.remainingBalance > 0 && (
                                   <button
+                                    id={`receive-payment-${sale.saleNumber}`}
+                                    name={`receivePayment${sale.saleNumber}`}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleOpenSalePayment(sale);
