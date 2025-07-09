@@ -6,10 +6,12 @@ const LoginForm: React.FC = () => {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
   const { login: authenticate, isLoading, error, clearError } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setShowValidation(true);
     
     if (!login.trim() || !password.trim()) {
       return;
@@ -17,6 +19,7 @@ const LoginForm: React.FC = () => {
     
     try {
       await authenticate(login, password);
+      setShowValidation(false); // Limpa validação apenas se login for bem-sucedido
     } catch (err) {
       console.error("Erro na autenticação:", err);
     }
@@ -68,14 +71,14 @@ const LoginForm: React.FC = () => {
                     clearError();
                   }}
                   className={`w-full px-4 py-4 bg-white/50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-300 placeholder-gray-400 backdrop-blur-sm hover:bg-white/70 ${
-                    !login.trim() ? "border-red-300" : "border-gray-200"
+                    showValidation && !login.trim() ? "border-red-300" : "border-gray-200"
                   }`}
                   placeholder="Digite seu login"
                   disabled={isLoading}
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-purple-500/0 to-pink-500/0 rounded-xl opacity-0 group-focus-within:opacity-10 transition-opacity duration-300 pointer-events-none"></div>
               </div>
-              {!login.trim() && (
+              {showValidation && !login.trim() && (
                 <p className="mt-1 text-sm text-red-600">Campo obrigatório</p>
               )}
             </div>
@@ -98,7 +101,7 @@ const LoginForm: React.FC = () => {
                     clearError();
                   }}
                   className={`w-full px-4 py-4 pr-12 bg-white/50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-300 placeholder-gray-400 backdrop-blur-sm hover:bg-white/70 ${
-                    !password.trim() ? "border-red-300" : "border-gray-200"
+                    showValidation && !password.trim() ? "border-red-300" : "border-gray-200"
                   }`}
                   placeholder="Digite sua senha"
                   disabled={isLoading}
@@ -117,7 +120,7 @@ const LoginForm: React.FC = () => {
                 </button>
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-purple-500/0 to-pink-500/0 rounded-xl opacity-0 group-focus-within:opacity-10 transition-opacity duration-300 pointer-events-none"></div>
               </div>
-              {!password.trim() && (
+              {showValidation && !password.trim() && (
                 <p className="mt-1 text-sm text-red-600">Campo obrigatório</p>
               )}
             </div>
