@@ -123,6 +123,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   // Touch handlers for mobile swipe
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.targetTouches[0].clientX);
+    setTouchEnd(0); // Reset touchEnd
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -269,7 +270,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             </div>
 
             {/* Métricas Slider */}
-            <div className="">
+            <div className="space-y-4">
               {/* Header with responsive controls */}
               <div className="flex items-center justify-end">
                 {/* Desktop controls - only arrows */}
@@ -292,10 +293,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               {/* Slider container with touch support */}
               <div 
                 ref={sliderRef}
-                className="relative overflow-hidden touch-pan-x mt-0"
+                className="relative overflow-hidden mt-0"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
+                style={{ touchAction: 'pan-y pinch-zoom' }}
               >
                 <div 
                   className="flex transition-transform duration-300 ease-in-out"
@@ -746,7 +748,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   return (
     <div className="min-h-screen">
-      <div className="p-6">
+      <div className="p-6 mx-auto" style={{ maxWidth: '90%' }}>
         {/* Desktop Tab Navigation */}
         <div className="hidden lg:block mb-4 sm:mb-6 lg:mb-8">
           <div className="border-b border-gray-200">

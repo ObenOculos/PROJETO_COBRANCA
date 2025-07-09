@@ -1280,7 +1280,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                   )}
                 </div>
 
-                <div className="max-h-96 overflow-y-auto p-3">
+                <div className="max-h-[32rem] overflow-y-auto p-3">
                   {/* Group clients by neighborhood */}
                   {(() => {
                     const groupedClients = paginatedClients.reduce(
@@ -1485,7 +1485,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                                               client.document,
                                             )
                                           }
-                                          className="h-6 w-6 text-purple-600 focus:ring-2 focus:ring-purple-500 border-2 border-gray-300 rounded-md cursor-pointer"
+                                          className="h-4 w-4 sm:h-6 sm:w-6 text-purple-600 focus:ring-2 focus:ring-purple-500 border-2 border-gray-300 rounded-md cursor-pointer"
                                           onClick={(e) => e.stopPropagation()}
                                         />
                                       </div>

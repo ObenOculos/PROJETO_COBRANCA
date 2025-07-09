@@ -250,7 +250,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
   return (
     <div className="min-h-screen">
-      <div className="p-6">
+      <div className="p-6 mx-auto" style={{ maxWidth: '90%' }}>
         {/* Desktop: Traditional Tab Navigation */}
         <div className="hidden lg:block mb-4 sm:mb-6 lg:mb-8">
           <div className="border-b border-gray-200">
