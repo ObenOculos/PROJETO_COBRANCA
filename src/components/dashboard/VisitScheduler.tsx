@@ -1363,8 +1363,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                           type: "critical",
                           label:
                             daysSinceLastVisit === 999
-                              ? "Nunca Visitado"
-                              : "Mais de 120 dias",
+                              ? "Nunca"
+                              : "120 dias",
                           color: "bg-red-100 text-red-800 border-red-200",
                           days:
                             daysSinceLastVisit === 999
