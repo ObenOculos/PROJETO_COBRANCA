@@ -37,6 +37,86 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   const [showClientData, setShowClientData] = useState(false);
   const [expandedSales, setExpandedSales] = useState<Set<number>>(new Set());
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authToken, setAuthToken] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [isRequestingAuth, setIsRequestingAuth] = useState(false);
+  const [authRequestSent, setAuthRequestSent] = useState(false);
+  const [showApprovalNotification, setShowApprovalNotification] = useState(false);
+  const [approvedToken, setApprovedToken] = useState("");
+
+  // Monitorar aprovações de token
+  React.useEffect(() => {
+    const handleTokenApproved = (event: CustomEvent) => {
+      const approvedRequest = event.detail;
+      if (approvedRequest.clientDocument === clientGroup.document && authRequestSent) {
+        setApprovedToken(approvedRequest.token);
+        setShowApprovalNotification(true);
+        setAuthToken(approvedRequest.token);
+        
+        // Notificação do navegador
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('Token Aprovado!', {
+            body: `Seu token ${approvedRequest.token} foi aprovado pelo gerente.`,
+            icon: '/favicon.ico'
+          });
+        }
+        
+        // Auto-hide notification after 10 seconds
+        setTimeout(() => {
+          setShowApprovalNotification(false);
+        }, 10000);
+      }
+    };
+
+    const checkTokenApproval = () => {
+      if (authRequestSent) {
+        const storedRequests = JSON.parse(localStorage.getItem("authRequests") || "[]");
+        const approvedRequest = storedRequests.find((req: any) => 
+          req.status === "approved" && 
+          req.clientDocument === clientGroup.document &&
+          req.expiresAt > Date.now()
+        );
+        
+        if (approvedRequest && !showApprovalNotification) {
+          setApprovedToken(approvedRequest.token);
+          setShowApprovalNotification(true);
+          setAuthToken(approvedRequest.token);
+          
+          // Notificação do navegador
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Token Aprovado!', {
+              body: `Seu token ${approvedRequest.token} foi aprovado pelo gerente.`,
+              icon: '/favicon.ico'
+            });
+          }
+          
+          // Auto-hide notification after 10 seconds
+          setTimeout(() => {
+            setShowApprovalNotification(false);
+          }, 10000);
+        }
+      }
+    };
+
+    // Listener para aprovação imediata
+    window.addEventListener('tokenApproved', handleTokenApproved as EventListener);
+    
+    // Fallback: verificar periodicamente
+    const interval = setInterval(checkTokenApproval, 3000);
+    
+    return () => {
+      window.removeEventListener('tokenApproved', handleTokenApproved as EventListener);
+      clearInterval(interval);
+    };
+  }, [authRequestSent, clientGroup.document, showApprovalNotification]);
+
+  // Solicitar permissão para notificações
+  React.useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
 
   // Obter vendas do cliente usando a nova estrutura
   const clientSales = React.useMemo(() => {
@@ -89,6 +169,104 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       newExpanded.add(saleNumber);
     }
     setExpandedSales(newExpanded);
+  };
+
+  // Gerar token de 6 dígitos
+  const generateToken = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
+
+  // Função para solicitar autorização do gerente
+  const requestManagerAuth = async () => {
+    setIsRequestingAuth(true);
+    setAuthError("");
+    
+    try {
+      // Gerar token único
+      const token = generateToken();
+      const timestamp = Date.now();
+      const expiresAt = timestamp + 5 * 60 * 1000; // 5 minutos
+      
+      // Salvar solicitação no localStorage (em produção seria no backend)
+      const authRequest = {
+        token,
+        collectorName: "Cobrador Atual", // Em produção, pegar do contexto de usuário
+        clientName: clientGroup.client,
+        clientDocument: clientGroup.document,
+        requestedAt: timestamp,
+        expiresAt,
+        status: "pending"
+      };
+      
+      // Salvar no localStorage
+      const existingRequests = JSON.parse(localStorage.getItem("authRequests") || "[]");
+      existingRequests.push(authRequest);
+      localStorage.setItem("authRequests", JSON.stringify(existingRequests));
+      
+      // Disparar evento para notificar o gerente
+      window.dispatchEvent(new CustomEvent("authRequestCreated", { detail: authRequest }));
+      
+      setAuthRequestSent(true);
+      setAuthError("");
+      
+    } catch (error) {
+      setAuthError("Erro ao solicitar autorização. Tente novamente.");
+    } finally {
+      setIsRequestingAuth(false);
+    }
+  };
+
+  // Função para validar token inserido
+  const validateToken = () => {
+    const storedRequests = JSON.parse(localStorage.getItem("authRequests") || "[]");
+    const request = storedRequests.find((req: any) => 
+      req.token === authToken && 
+      req.status === "approved" && 
+      req.expiresAt > Date.now()
+    );
+    
+    if (request) {
+      // Token válido e aprovado
+      setAuthError("");
+      setShowAuthModal(false);
+      setAuthToken("");
+      setAuthRequestSent(false);
+      setIsGeneralEditModalOpen(true);
+      
+      // Remover token usado
+      const updatedRequests = storedRequests.filter((req: any) => req.token !== authToken);
+      localStorage.setItem("authRequests", JSON.stringify(updatedRequests));
+      
+    } else {
+      // Token inválido
+      const pendingRequest = storedRequests.find((req: any) => 
+        req.token === authToken && req.status === "pending"
+      );
+      
+      if (pendingRequest) {
+        if (pendingRequest.expiresAt < Date.now()) {
+          setAuthError("Token expirado. Solicite nova autorização.");
+        } else {
+          setAuthError("Token ainda não foi aprovado pelo gerente.");
+        }
+      } else {
+        setAuthError("Token inválido ou não encontrado.");
+      }
+    }
+  };
+
+  const handleEditPaymentClick = () => {
+    if ((userType as "manager" | "collector") === "manager") {
+      // Gerente pode editar diretamente
+      setIsGeneralEditModalOpen(true);
+    } else {
+      // Cobrador precisa solicitar autorização
+      setShowAuthModal(true);
+      setAuthError("");
+      setAuthToken("");
+      setAuthRequestSent(false);
+      setIsRequestingAuth(false);
+    }
   };
 
   return (
@@ -160,9 +338,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 <button
                   id="edit-payments"
                   name="editPayments"
-                  onClick={() => setIsGeneralEditModalOpen(true)}
+                  onClick={handleEditPaymentClick}
                   className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium shadow-sm"
-                  title="Editar valores recebidos"
+                  title={(userType as "manager" | "collector") === "manager" ? "Editar valores recebidos" : "Solicitar autorização para editar pagamentos"}
                 >
                   <Edit className="h-5 w-5 sm:mr-2" />
                   <span className="hidden sm:inline">Editar Pagamentos</span>
@@ -412,6 +590,159 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           onClose={handleCloseSalePayment}
           onSuccess={handlePaymentSuccess}
         />
+      )}
+
+      {/* Authorization Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Autorização Necessária
+            </h3>
+            
+            {!authRequestSent ? (
+              <>
+                <p className="text-gray-600 mb-4">
+                  Para editar pagamentos, é necessária autorização do gerente. 
+                  Clique no botão abaixo para solicitar um token de autorização.
+                </p>
+                <p className="text-sm text-amber-600 mb-4">
+                  ⚠️ O token expira em 5 minutos após a aprovação.
+                </p>
+                
+                <div className="space-y-4">
+                  {authError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-sm text-red-700">{authError}</p>
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-3">
+                    <button
+                      id="cancel-auth"
+                      name="cancelAuth"
+                      onClick={() => {
+                        setShowAuthModal(false);
+                        setAuthToken("");
+                        setAuthError("");
+                        setAuthRequestSent(false);
+                      }}
+                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      id="request-auth"
+                      name="requestAuth"
+                      onClick={requestManagerAuth}
+                      disabled={isRequestingAuth}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isRequestingAuth ? "Solicitando..." : "Solicitar Autorização"}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {showApprovalNotification ? (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 animate-pulse">
+                    <div className="flex items-center">
+                      <div className="bg-blue-500 rounded-full p-1 mr-3">
+                        <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-blue-700">
+                          🎉 Token Aprovado pelo Gerente!
+                        </p>
+                        <p className="text-sm text-blue-600">
+                          Token: <span className="font-mono font-bold">{approvedToken}</span> - Token preenchido automaticamente
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-green-700">
+                      ✅ Solicitação enviada para o gerente! Aguarde a aprovação.
+                    </p>
+                  </div>
+                )}
+                
+                <p className="text-gray-600 mb-4">
+                  {showApprovalNotification 
+                    ? "Token aprovado! Clique em 'Validar Token' para continuar:"
+                    : "Após a aprovação, digite o token de 6 dígitos fornecido pelo gerente:"
+                  }
+                </p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label 
+                      htmlFor="auth-token"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
+                      Token de Autorização
+                    </label>
+                    <input
+                      id="auth-token"
+                      name="authToken"
+                      type="text"
+                      value={authToken}
+                      onChange={(e) => setAuthToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg font-mono"
+                      placeholder="000000"
+                      maxLength={6}
+                      onKeyDown={(e) => e.key === 'Enter' && validateToken()}
+                    />
+                  </div>
+                  
+                  {authError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-sm text-red-700">{authError}</p>
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-3">
+                    <button
+                      id="cancel-auth"
+                      name="cancelAuth"
+                      onClick={() => {
+                        setShowAuthModal(false);
+                        setAuthToken("");
+                        setAuthError("");
+                        setAuthRequestSent(false);
+                      }}
+                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      id="validate-token"
+                      name="validateToken"
+                      onClick={validateToken}
+                      disabled={authToken.length !== 6}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Validar Token
+                    </button>
+                  </div>
+                  
+                  <button
+                    id="new-request"
+                    name="newRequest"
+                    onClick={() => setAuthRequestSent(false)}
+                    className="w-full px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm"
+                  >
+                    Solicitar Nova Autorização
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {/* General Payment Modal */}

@@ -25,6 +25,7 @@ import DatabaseUpload from "./DatabaseUpload";
 import { ClientAssignment } from "../ClientAssignment";
 import VisitTracking from "./VisitTracking";
 import DailyCashReport from "./DailyCashReport";
+import AuthorizationManager from "./AuthorizationManager";
 import { useCollection } from "../../contexts/CollectionContext";
 import { FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/mockData";
@@ -37,6 +38,7 @@ export const getManagerTabs = (_pendingCancellations: number = 0) => [
   { id: "stores", name: "Lojas", icon: Store },
   { id: "clients", name: "Clientes", icon: UserCheck },
   { id: "visit-tracking", name: "Acompanhamento", icon: AlertTriangle },
+  { id: "authorization", name: "Autorizações", icon: UserCheck },
   { id: "users", name: "Usuários", icon: Users },
   { id: "database-upload", name: "Upload de Dados", icon: Download },
 ];
@@ -67,6 +69,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     | "stores"
     | "clients"
     | "visit-tracking"
+    | "authorization"
     | "database-upload"
   >(() => {
     const savedTab = localStorage.getItem("managerActiveTab");
@@ -737,6 +740,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
       case "visit-tracking":
         return <VisitTracking />;
+
+      case "authorization":
+        return <AuthorizationManager />;
 
       case "users":
         return <UserManagement />;
