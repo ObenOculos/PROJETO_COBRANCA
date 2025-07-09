@@ -48,6 +48,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   const [showApprovalNotification, setShowApprovalNotification] = useState(false);
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [approvedToken, setApprovedToken] = useState("");
+  const [processedApprovalToken, setProcessedApprovalToken] = useState("");
 
   // Monitorar aprovações e rejeições de token
   React.useEffect(() => {
@@ -55,6 +56,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       const approvedRequest = event.detail;
       if (approvedRequest.clientDocument === clientGroup.document && authRequestSent) {
         setApprovedToken(approvedRequest.token);
+        setProcessedApprovalToken(approvedRequest.token);
         setShowApprovalNotification(true);
         setAuthToken(approvedRequest.token);
         
@@ -109,8 +111,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             new Date(req.expires_at) > new Date()
           );
           
-          if (approvedRequest && !showApprovalNotification) {
+          if (approvedRequest && processedApprovalToken !== approvedRequest.token) {
             setApprovedToken(approvedRequest.token);
+            setProcessedApprovalToken(approvedRequest.token);
             setShowApprovalNotification(true);
             setAuthToken(approvedRequest.token);
             
@@ -164,7 +167,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       window.removeEventListener('tokenRejected', handleTokenRejected as EventListener);
       clearInterval(interval);
     };
-  }, [authRequestSent, clientGroup.document, showApprovalNotification, showRejectionModal, user]);
+  }, [authRequestSent, clientGroup.document, showApprovalNotification, showRejectionModal, user, processedApprovalToken]);
 
   // Solicitar permissão para notificações
   React.useEffect(() => {
@@ -267,6 +270,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       }));
       
       setAuthRequestSent(true);
+      setProcessedApprovalToken("");
       setAuthError("");
       
     } catch (error) {
@@ -705,7 +709,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       </div>
                       <div>
                         <p className="text-sm font-medium text-blue-700">
-                          🎉 Token Aprovado pelo Gerente!
+                          Token Aprovado pelo Gerente!
                         </p>
                         <p className="text-sm text-blue-600">
                           Token: <span className="font-mono font-bold">{approvedToken}</span> - Token preenchido automaticamente
@@ -714,21 +718,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     </div>
                   </div>
                 ) : (
-                  !showApprovalNotification && (
+                  !approvedToken && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
                       <p className="text-sm text-green-700">
                         ✅ Solicitação enviada para o gerente! Aguarde a aprovação.
                       </p>
                     </div>
                   )
-                )}
-                
-                <p className="text-gray-600 mb-4">
-                  {showApprovalNotification 
-                    ? "Token aprovado! Clique em 'Validar Token' para continuar:"
-                    : "Após a aprovação, digite o token de 6 dígitos fornecido pelo gerente:"
-                  }
-                </p>
+                )}      
                 
                 <div className="space-y-4">
                   <div>
@@ -792,6 +789,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       setAuthToken("");
                       setAuthError("");
                       setApprovedToken("");
+                      setProcessedApprovalToken("");
                     }}
                     className="w-full px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm"
                   >
