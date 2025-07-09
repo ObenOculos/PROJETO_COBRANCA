@@ -29,6 +29,7 @@ import AuthorizationManager from "./AuthorizationManager";
 import { useCollection } from "../../contexts/CollectionContext";
 import { FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/mockData";
+import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 
 // Export tabs for use in Header
 export const getManagerTabs = (_pendingCancellations: number = 0) => [
@@ -97,11 +98,31 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const [touchEnd, setTouchEnd] = useState(0);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
+  const [pendingAuthorizations, setPendingAuthorizations] = useState(0);
 
   // Salva a aba ativa no localStorage sempre que mudar
   useEffect(() => {
     localStorage.setItem("managerActiveTab", activeTab);
   }, [activeTab]);
+
+  // Busca autorizações pendentes
+  useEffect(() => {
+    const fetchPendingAuthorizations = async () => {
+      try {
+        const pendingRequests = await AuthorizationHistoryService.getPendingRequests();
+        setPendingAuthorizations(pendingRequests.length);
+      } catch (error) {
+        console.error("Erro ao buscar autorizações pendentes:", error);
+      }
+    };
+
+    fetchPendingAuthorizations();
+    
+    // Atualiza a cada 30 segundos
+    const interval = setInterval(fetchPendingAuthorizations, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Close mobile menu when clicking outside
   useEffect(() => {
@@ -779,6 +800,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                           {pendingCancellations.length}
                         </span>
                       )}
+                    {tab.id === "authorization" && pendingAuthorizations > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 w-5 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                        {pendingAuthorizations}
+                      </span>
+                    )}
                   </button>
                 );
               })}

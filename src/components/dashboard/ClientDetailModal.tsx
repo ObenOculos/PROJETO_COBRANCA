@@ -64,7 +64,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification('Token Aprovado!', {
             body: `Seu token ${approvedRequest.token} foi aprovado pelo gerente.`,
-            icon: '/favicon.ico'
+            icon: '/icon_aplicativo.png'
           });
         }
         
@@ -85,7 +85,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification('Token Rejeitado', {
             body: `Seu token ${rejectedRequest.token} foi rejeitado pelo gerente.`,
-            icon: '/favicon.ico'
+            icon: '/icon_aplicativo.png'
           });
         }
       }
@@ -121,7 +121,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             if ('Notification' in window && Notification.permission === 'granted') {
               new Notification('Token Aprovado!', {
                 body: `Seu token ${approvedRequest.token} foi aprovado pelo gerente.`,
-                icon: '/favicon.ico'
+                icon: '/icon_aplicativo.png'
               });
             }
             
@@ -145,7 +145,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             if ('Notification' in window && Notification.permission === 'granted') {
               new Notification('Token Rejeitado', {
                 body: `Seu token ${rejectedRequest.token} foi rejeitado pelo gerente.`,
-                icon: '/favicon.ico'
+                icon: '/icon_aplicativo.png'
               });
             }
           }
