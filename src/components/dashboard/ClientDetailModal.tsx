@@ -360,8 +360,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
                 title="Ver todos os dados de cadastro do cliente"
               >
-                <Info className="h-5 w-5 sm:mr-2" />
-                <span className="hidden sm:inline">Ver Dados</span>
+                <Info className="h-5 w-5 mr-2" />
+                <span className="text-xs sm:text-sm">Ver Dados</span>
               </button>
               <button
                 id="view-client-sales"
@@ -370,8 +370,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 className="flex items-center px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium shadow-sm"
                 title="Ver vendas do cliente"
               >
-                <Receipt className="h-5 w-5 sm:mr-2" />
-                <span className="hidden sm:inline">Ver Vendas</span>
+                <Receipt className="h-5 w-5 mr-2" />
+                <span className="text-xs sm:text-sm">Ver Vendas</span>
               </button>
               {clientSales.reduce((sum, sale) => sum + sale.pendingValue, 0) >
                 0 && (
@@ -382,8 +382,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   className="flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium shadow-sm"
                   title="Distribuir pagamento entre parcelas"
                 >
-                  <CreditCard className="h-5 w-5 sm:mr-2" />
-                  <span className="hidden sm:inline">Distribuir Pagamento</span>
+                  <CreditCard className="h-5 w-5 mr-2" />
+                  <span className="text-xs sm:text-sm">Distribuir Pagamento</span>
                 </button>
               )}
 
@@ -396,8 +396,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium shadow-sm"
                   title={(userType as "manager" | "collector") === "manager" ? "Editar valores recebidos" : "Solicitar autorização para editar pagamentos"}
                 >
-                  <Edit className="h-5 w-5 sm:mr-2" />
-                  <span className="hidden sm:inline">Editar Pagamentos</span>
+                  <Edit className="h-5 w-5 mr-2" />
+                  <span className="text-xs sm:text-sm">Editar Pagamentos</span>
                 </button>
               )}
             </div>
@@ -550,7 +550,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                     title="Receber pagamento da venda"
                                   >
                                     <CreditCard className="h-4 w-4 mr-1" />
-                                    <span className="hidden sm:inline">
+                                    <span className="text-xs sm:text-sm">
                                       Receber
                                     </span>
                                   </button>
