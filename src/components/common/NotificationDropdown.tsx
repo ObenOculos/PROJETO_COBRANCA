@@ -102,7 +102,7 @@ const NotificationDropdown: React.FC = () => {
           />
 
           {/* Modal Content */}
-          <div className="fixed inset-x-4 top-20 bottom-20 bg-white rounded-lg shadow-xl flex flex-col max-h-[calc(100vh-10rem)]">
+          <div className="fixed inset-x-2 top-12 bottom-12 bg-white rounded-lg shadow-xl flex flex-col max-h-[calc(100vh-6rem)]">
             {/* Header */}
             <div className="p-4 border-b border-gray-200 flex-shrink-0">
               <div className="flex items-center justify-between">
@@ -228,7 +228,7 @@ const NotificationDropdown: React.FC = () => {
 
       {/* Desktop Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 flex flex-col sm:flex">
+        <div className="hidden sm:block absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 flex flex-col">
           {/* Header */}
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
