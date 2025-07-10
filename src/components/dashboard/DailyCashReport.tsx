@@ -1049,8 +1049,14 @@ const generatePrintableReport = (
         .summary-item { margin: 5px 0; }
         table { width: 100%; border-collapse: collapse; margin: 20px 0; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
+        th { background-color: #f2f2f2; font-weight: bold; }
         .total { font-weight: bold; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .small-text { font-size: 0.9em; color: #666; }
+        .total-section { margin-top: 30px; padding: 15px; background-color: #f8f9fa; border: 2px solid #dee2e6; border-radius: 5px; }
+        .total-row { display: flex; justify-content: space-between; margin: 5px 0; font-size: 1.1em; }
+        .total-row.grand-total { font-weight: bold; font-size: 1.2em; border-top: 2px solid #333; padding-top: 10px; margin-top: 10px; }
       </style>
     </head>
     <body>
@@ -1079,10 +1085,10 @@ const generatePrintableReport = (
             (c) => `
           <tr>
             <td>${c.collectorName}</td>
-            <td>${formatCurrency(c.receivedAmount)}</td>
-            <td>${c.transactionCount}</td>
-            <td>${c.clients.length}</td>
-            <td>${c.saleNumbers.length > 0 ? `#${c.saleNumbers.join(", #")}` : "-"}</td>
+            <td class="text-right" style="font-weight: bold; color: green;">${formatCurrency(c.receivedAmount)}</td>
+            <td class="text-center">${c.transactionCount}</td>
+            <td class="text-center">${c.clients.length}</td>
+            <td class="small-text">${c.saleNumbers.length > 0 ? `#${c.saleNumbers.join(", #")}` : "-"}</td>
           </tr>
         `,
           )
@@ -1107,18 +1113,68 @@ const generatePrintableReport = (
             (p) => `
           <tr>
             <td>${p.client}</td>
-            <td>${p.saleNumber ? `#${p.saleNumber}` : 'Sem número'}</td>
-            <td>${p.installments.length}</td>
+            <td class="text-center">${p.saleNumber ? `#${p.saleNumber}` : 'Sem número'}</td>
+            <td class="text-center">${p.installments.length}</td>
             <td>${p.store}</td>
-            <td>${formatCurrency(p.totalOriginalValue)}</td>
-            <td style="font-weight: bold; color: green;">${formatCurrency(p.totalReceivedValue)}</td>
-            <td style="font-weight: bold; color: ${p.totalPendingValue > 0 ? 'red' : 'gray'};">${p.totalPendingValue > 0 ? formatCurrency(p.totalPendingValue) : '-'}</td>
+            <td class="text-right">${formatCurrency(p.totalOriginalValue)}</td>
+            <td class="text-right" style="font-weight: bold; color: green;">${formatCurrency(p.totalReceivedValue)}</td>
+            <td class="text-right" style="font-weight: bold; color: ${p.totalPendingValue > 0 ? 'red' : 'gray'};">${p.totalPendingValue > 0 ? formatCurrency(p.totalPendingValue) : '-'}</td>
             <td>${p.collector}</td>
           </tr>
         `,
           )
           .join("")}
       </table>
+      
+      <div class="total-section">
+        <h3 style="margin-top: 0;">Totais Gerais</h3>
+        <div class="total-row">
+          <span>Total de Vendas:</span>
+          <span>${data.totalTransactions}</span>
+        </div>
+        <div class="total-row">
+          <span>Total Devido:</span>
+          <span>${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalOriginalValue, 0))}</span>
+        </div>
+        <div class="total-row">
+          <span>Total Recebido:</span>
+          <span style="color: green;">${formatCurrency(data.totalReceived)}</span>
+        </div>
+        <div class="total-row">
+          <span>Total Pendente:</span>
+          <span style="color: ${data.payments.reduce((sum, p) => sum + p.totalPendingValue, 0) > 0 ? 'red' : 'gray'};">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalPendingValue, 0))}</span>
+        </div>
+        <div class="total-row grand-total">
+          <span>RESULTADO FINAL:</span>
+          <span style="color: green;">${formatCurrency(data.totalReceived)}</span>
+        </div>
+      </div>
+      ` : ''}
+      
+      ${!showDetails && data.payments.length > 0 ? `
+      <div class="total-section">
+        <h3 style="margin-top: 0;">Totais Gerais</h3>
+        <div class="total-row">
+          <span>Total de Vendas:</span>
+          <span>${data.totalTransactions}</span>
+        </div>
+        <div class="total-row">
+          <span>Total Devido:</span>
+          <span>${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalOriginalValue, 0))}</span>
+        </div>
+        <div class="total-row">
+          <span>Total Recebido:</span>
+          <span style="color: green;">${formatCurrency(data.totalReceived)}</span>
+        </div>
+        <div class="total-row">
+          <span>Total Pendente:</span>
+          <span style="color: ${data.payments.reduce((sum, p) => sum + p.totalPendingValue, 0) > 0 ? 'red' : 'gray'};">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalPendingValue, 0))}</span>
+        </div>
+        <div class="total-row grand-total">
+          <span>RESULTADO FINAL:</span>
+          <span style="color: green;">${formatCurrency(data.totalReceived)}</span>
+        </div>
+      </div>
       ` : ''}
     </body>
     </html>
