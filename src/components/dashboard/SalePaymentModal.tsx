@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   CreditCard,
@@ -32,6 +32,16 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
   const [notes, setNotes] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+
+  useEffect(() => {
+    // Desabilitar scroll do body quando o modal estiver aberto
+    document.body.style.overflow = "hidden";
+
+    // Cleanup: restaurar scroll quando o componente for desmontado
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, []);
 
   const saleBalance = calculateSaleBalance(
     saleGroup.saleNumber,
