@@ -13,7 +13,6 @@ import { ClientGroup, SaleGroup } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { formatCurrency } from "../../utils/mockData";
-import { CollectionStatus } from "../../types/status";
 
 interface GeneralPaymentModalProps {
   clientGroup: ClientGroup;
@@ -35,7 +34,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const { updateCollection } = useCollection();
+  const { processGeneralPayment } = useCollection();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [distributionAmount, setDistributionAmount] = useState<string>("");
@@ -171,62 +170,14 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
     try {
       setLoading(true);
 
-      // Aplicar cada mudança por venda
-      for (const item of saleDistribution) {
-        if (item.appliedAmount === 0) continue;
-
-        const { sale, newAmount } = item;
-
-        // Distribuir o valor entre as parcelas da venda
-        const installments =
-          sale.installments?.sort(
-            (a, b) => (a.parcela || 0) - (b.parcela || 0),
-          ) || [];
-        let remainingAmount = newAmount;
-
-        // Primeiro, zerar todas as parcelas
-        for (const installment of installments) {
-          if (!installment.id_parcela) continue;
-
-          await updateCollection(installment.id_parcela, {
-            valor_recebido: 0,
-            status: CollectionStatus.PENDENTE,
-            data_de_recebimento: null,
-          });
-        }
-
-        // Depois, distribuir o valor entre as parcelas
-        for (const installment of installments) {
-          if (!installment.id_parcela || remainingAmount <= 0) continue;
-
-          const installmentValue = installment.valor_original || 0;
-          const appliedAmount = Math.min(remainingAmount, installmentValue);
-
-          const updates: any = {
-            valor_recebido: appliedAmount,
-          };
-
-          // Atualizar status baseado no valor
-          if (appliedAmount === 0) {
-            updates.status = CollectionStatus.PENDENTE;
-            updates.data_de_recebimento = null;
-          } else if (appliedAmount >= installmentValue) {
-            updates.status = CollectionStatus.PAGO;
-            updates.data_de_recebimento = new Date()
-              .toISOString()
-              .split("T")[0];
-          } else {
-            updates.status = CollectionStatus.PARCIAL;
-            updates.data_de_recebimento = new Date()
-              .toISOString()
-              .split("T")[0];
-          }
-
-          await updateCollection(installment.id_parcela, updates);
-
-          remainingAmount -= appliedAmount;
-        }
-      }
+      // Chamar processGeneralPayment com os parâmetros corretos
+      await processGeneralPayment(
+        clientGroup.document || "",
+        parseFloat(distributionAmount) || 0,
+        "dinheiro", // Valor padrão, pode ser adicionado ao formulário futuramente
+        `Distribuição geral de ${formatCurrency(parseFloat(distributionAmount) || 0)}`,
+        user.id
+      );
 
       // Notificação de sucesso
       showSuccessNotification();

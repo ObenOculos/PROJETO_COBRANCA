@@ -234,7 +234,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           collectorId: payment.user_id || "unknown",
           client: payment.cliente || "Cliente não informado",
           totalReceived: 0,
-          originalValue: payment.valor_original,
+          originalValue: 0,
           store: payment.nome_da_loja || "",
           saleNumber: payment.venda_n?.toString() || "",
         });
@@ -242,6 +242,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
       const saleData = salesMap.get(saleKey)!;
       saleData.totalReceived += payment.valor_recebido;
+      saleData.originalValue += payment.valor_original;
     });
 
     // Agrupar por cobrador
@@ -346,8 +347,8 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         dateRangeMode === "single"
           ? formatDate(selectedDate)
           : `${formatDate(selectedDate)} - ${formatDate(endDate)}`,
-      totalReceived: filteredPayments.reduce(
-        (sum, c) => sum + c.valor_recebido,
+      totalReceived: payments.reduce(
+        (sum, p) => sum + p.totalReceivedValue,
         0,
       ),
       totalTransactions: salesMap.size, // Conta vendas únicas em vez de parcelas
