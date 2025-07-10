@@ -1,22 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseConfig } from './supabase-config';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-// Configuração do Supabase carregada das variáveis de ambiente
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Variáveis de ambiente do Supabase não encontradas. Verifique seu arquivo .env');
-}
+// Configuração segura do Supabase
+const config = getSupabaseConfig();
 
 // Validar se a URL do Supabase está formatada corretamente
 try {
-  new URL(supabaseUrl);
+  new URL(config.url);
 } catch (error) {
-  throw new Error(`Formato inválido da VITE_SUPABASE_URL: "${supabaseUrl}". Certifique-se de que é uma URL válida começando com https:// (ex: https://your-project-ref.supabase.co)`);
+  throw new Error(`Formato inválido da URL do Supabase: "${config.url}"`);
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(config.url, config.anonKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
