@@ -12,7 +12,7 @@ import {
 import { SaleGroup, SalePaymentInput } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { formatCurrency } from "../../utils/mockData";
+import { formatCurrency, formatDate } from "../../utils/mockData";
 
 interface SalePaymentModalProps {
   saleGroup: SaleGroup;
@@ -369,10 +369,7 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
                               Parcela {item.installment.parcela}
                             </div>
                             <div className="text-xs sm:text-sm text-gray-600 truncate">
-                              Venc:{" "}
-                              {new Date(
-                                item.installment.data_vencimento || "",
-                              ).toLocaleDateString("pt-BR")}
+                              Venc: {formatDate(item.installment.data_vencimento)}
                             </div>
                           </div>
 

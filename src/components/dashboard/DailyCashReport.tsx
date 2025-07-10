@@ -36,6 +36,7 @@ interface DailyReportData {
     store: string;
     originalValue: number;
     receivedValue: number;
+    pendingValue: number;
     receivedDate: string;
     collector: string;
   }[];
@@ -283,6 +284,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       store: c.nome_da_loja || "",
       originalValue: c.valor_original,
       receivedValue: c.valor_recebido,
+      pendingValue: c.valor_original - c.valor_recebido,
       receivedDate: c.data_de_recebimento || selectedDate,
       collector: users.find((u) => u.id === c.user_id)?.name || "Não atribuído",
     }));
@@ -767,7 +769,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                       {payment.client}
                     </h4>
                     <p className="text-sm text-gray-600">
-                      Venda #{payment.saleNumber}
+                      {payment.saleNumber ? `Venda #${payment.saleNumber}` : `ID Parcela: ${payment.collectionId}`}
                     </p>
                     <p className="text-sm text-gray-600">{payment.store}</p>
                   </div>
@@ -775,13 +777,28 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     <div className="font-bold text-green-600">
                       {formatCurrency(payment.receivedValue)}
                     </div>
-                    <div className="text-xs text-gray-500">
-                      de {formatCurrency(payment.originalValue)}
-                    </div>
                   </div>
                 </div>
-                <div className="text-sm text-gray-600">
-                  Cobrador: {payment.collector}
+                <div className="space-y-1">
+                  <div className="text-sm text-gray-600">
+                    Cobrador: {payment.collector}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-500">Devido:</span>
+                      <div className="font-medium">{formatCurrency(payment.originalValue)}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Recebido:</span>
+                      <div className="font-medium text-green-600">{formatCurrency(payment.receivedValue)}</div>
+                    </div>
+                    {payment.pendingValue > 0 && (
+                      <div>
+                        <span className="text-gray-500">Pendente:</span>
+                        <div className="font-medium text-red-600">{formatCurrency(payment.pendingValue)}</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -796,16 +813,19 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     Cliente
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Venda
+                    Venda/ID
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Loja
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor Original
+                    Valor Devido
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Valor Recebido
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Valor Pendente
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Cobrador
@@ -825,7 +845,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        #{payment.saleNumber}
+                        {payment.saleNumber ? `#${payment.saleNumber}` : `ID: ${payment.collectionId}`}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -841,6 +861,11 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-bold text-green-600">
                         {formatCurrency(payment.receivedValue)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-bold text-red-600">
+                        {payment.pendingValue > 0 ? formatCurrency(payment.pendingValue) : '-'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -909,8 +934,10 @@ const generateReportContent = (
     data.payments.forEach((payment) => {
       lines.push(
         `Cliente: ${payment.client}`,
-        `Venda: #${payment.saleNumber} | Loja: ${payment.store}`,
-        `Valor: ${formatCurrency(payment.receivedValue)} | Cobrador: ${payment.collector}`,
+        `${payment.saleNumber ? `Venda: #${payment.saleNumber}` : `ID Parcela: ${payment.collectionId}`} | Loja: ${payment.store}`,
+        `Valor Devido: ${formatCurrency(payment.originalValue)} | Valor Recebido: ${formatCurrency(payment.receivedValue)}`,
+        `Valor Pendente: ${payment.pendingValue > 0 ? formatCurrency(payment.pendingValue) : 'Quitado'}`,
+        `Cobrador: ${payment.collector}`,
         "",
       );
     });
@@ -973,6 +1000,36 @@ const generatePrintableReport = (
           )
           .join("")}
       </table>
+
+      ${data.payments.length > 0 ? `
+      <h3>Transações Detalhadas</h3>
+      <table>
+        <tr>
+          <th>Cliente</th>
+          <th>Venda/ID</th>
+          <th>Loja</th>
+          <th>Valor Devido</th>
+          <th>Valor Recebido</th>
+          <th>Valor Pendente</th>
+          <th>Cobrador</th>
+        </tr>
+        ${data.payments
+          .map(
+            (p) => `
+          <tr>
+            <td>${p.client}</td>
+            <td>${p.saleNumber ? `#${p.saleNumber}` : `ID: ${p.collectionId}`}</td>
+            <td>${p.store}</td>
+            <td>${formatCurrency(p.originalValue)}</td>
+            <td style="font-weight: bold; color: green;">${formatCurrency(p.receivedValue)}</td>
+            <td style="font-weight: bold; color: ${p.pendingValue > 0 ? 'red' : 'gray'};">${p.pendingValue > 0 ? formatCurrency(p.pendingValue) : '-'}</td>
+            <td>${p.collector}</td>
+          </tr>
+        `,
+          )
+          .join("")}
+      </table>
+      ` : ''}
     </body>
     </html>
   `;
