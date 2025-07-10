@@ -317,7 +317,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               {/* Slider container with touch support */}
               <div 
                 ref={sliderRef}
-                className="relative overflow-hidden mt-0"
+                className="relative overflow-hidden"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
@@ -333,7 +333,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       <DollarSign className="h-4 w-4 text-blue-600" />
                       <h4 className="font-medium text-gray-900 text-sm sm:text-base">Métricas Financeiras</h4>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-4">
                       <StatsCard
                         title="Valor Total"
                         value={formatCurrency(overviewStats.totalAmount)}

@@ -263,29 +263,25 @@ const EnhancedPerformanceChart: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header with Controls */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-4 lg:p-6 border-b border-gray-200">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="min-w-0">
-              <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-                <BarChart3 className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
-                <span className="truncate">Análise de Desempenho</span>
-              </h2>
-              <p className="text-gray-600 mt-1 text-sm lg:text-base">
-                Desempenho detalhado dos cobradores por vendas
-              </p>
-            </div>
-
-            <button
-              onClick={exportPerformanceData}
-              className="flex items-center justify-center px-3 lg:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Exportar Dados</span>
-              <span className="sm:hidden">Exportar</span>
-            </button>
-          </div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6 border-b border-gray-200 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
+            <BarChart3 className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
+            <span className="truncate">Análise de Desempenho</span>
+          </h2>
+          <p className="text-gray-600 mt-1 text-sm lg:text-base">
+            Desempenho detalhado dos cobradores por vendas
+          </p>
         </div>
+
+        <button
+          onClick={exportPerformanceData}
+          className="flex items-center justify-center px-3 lg:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap"
+        >
+          <Download className="h-4 w-4 mr-2" />
+          <span className="hidden sm:inline">Exportar Dados</span>
+          <span className="sm:hidden">Exportar</span>
+        </button>
       </div>
 
       {/* Team Statistics */}

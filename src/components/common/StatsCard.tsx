@@ -33,8 +33,8 @@ const StatsCard: React.FC<StatsCardProps> = ({
 
   return (
     <div
-      className={`bg-white rounded-xl shadow-sm p-4 lg:p-6 border border-gray-100 hover:shadow-md transition-all ${
-        onClick ? "cursor-pointer hover:scale-105 active:scale-95" : ""
+      className={`bg-white rounded-xl shadow-sm p-4 lg:p-6 border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all ${
+        onClick ? "cursor-pointer hover:shadow-lg" : ""
       }`}
       onClick={onClick}
     >
