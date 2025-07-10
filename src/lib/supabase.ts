@@ -21,7 +21,7 @@ export const supabase = createClient(config.url, config.anonKey, {
 
 // Testar a conexão silenciosamente
 supabase.from('users').select('count', { count: 'exact', head: true })
-  .then(({ count, error }) => {
+  .then(({ error }) => {
     if (error) {
       console.error('Erro de conectividade com o banco de dados');
     }
