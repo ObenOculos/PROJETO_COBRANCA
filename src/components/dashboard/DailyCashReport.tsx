@@ -28,6 +28,7 @@ interface DailyReportData {
     receivedAmount: number;
     transactionCount: number;
     clients: string[];
+    saleNumbers: string[];
   }[];
   payments: {
     collectionId: number;
@@ -246,6 +247,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         receivedAmount: number;
         transactionCount: number;
         clients: Set<string>;
+        saleNumbers: Set<string>;
       }
     >();
 
@@ -261,6 +263,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           receivedAmount: 0,
           transactionCount: 0,
           clients: new Set(),
+          saleNumbers: new Set(),
         });
       }
 
@@ -268,12 +271,16 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       collectorData.receivedAmount += sale.totalReceived;
       collectorData.transactionCount += 1; // Conta uma transação por venda
       collectorData.clients.add(sale.client);
+      if (sale.saleNumber) {
+        collectorData.saleNumbers.add(sale.saleNumber);
+      }
     });
 
     // Converter para array
     const collectorSummary = Array.from(collectorMap.values()).map((c) => ({
       ...c,
       clients: Array.from(c.clients),
+      saleNumbers: Array.from(c.saleNumbers).sort(),
     }));
 
     // Preparar lista de pagamentos detalhada (mantém as parcelas para detalhes)
@@ -336,6 +343,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     const printContent = generatePrintableReport(
       reportData,
       dateRangeMode === "range",
+      showDetails,
     );
     const printWindow = window.open("", "_blank");
     if (printWindow) {
@@ -681,6 +689,14 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                       <div className="text-xs text-gray-600">Ticket Médio</div>
                     </div>
                   </div>
+                  {collector.saleNumbers.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <p className="text-xs text-gray-600 mb-1">Vendas:</p>
+                      <p className="text-sm text-gray-800">
+                        #{collector.saleNumbers.join(", #")}
+                      </p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -705,6 +721,9 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ticket Médio
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Números das Vendas
                   </th>
                 </tr>
               </thead>
@@ -739,6 +758,14 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                                 collector.transactionCount
                             : 0,
                         )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900">
+                        {collector.saleNumbers.length > 0 
+                          ? `#${collector.saleNumbers.join(", #")}`
+                          : "-"
+                        }
                       </div>
                     </td>
                   </tr>
@@ -924,6 +951,7 @@ const generateReportContent = (
       `  Valor Recebido: ${formatCurrency(collector.receivedAmount)}`,
       `  Vendas: ${collector.transactionCount}`,
       `  Clientes: ${collector.clients.length}`,
+      `  Números das Vendas: ${collector.saleNumbers.length > 0 ? `#${collector.saleNumbers.join(", #")}` : "Nenhuma venda com número"}`,
       "",
     );
   });
@@ -950,6 +978,7 @@ const generateReportContent = (
 const generatePrintableReport = (
   data: DailyReportData,
   isRangeMode: boolean = false,
+  showDetails: boolean = false,
 ): string => {
   return `
     <!DOCTYPE html>
@@ -986,6 +1015,7 @@ const generatePrintableReport = (
           <th>Valor Recebido</th>
           <th>Vendas</th>
           <th>Clientes</th>
+          <th>Números das Vendas</th>
         </tr>
         ${data.collectorSummary
           .map(
@@ -995,13 +1025,14 @@ const generatePrintableReport = (
             <td>${formatCurrency(c.receivedAmount)}</td>
             <td>${c.transactionCount}</td>
             <td>${c.clients.length}</td>
+            <td>${c.saleNumbers.length > 0 ? `#${c.saleNumbers.join(", #")}` : "-"}</td>
           </tr>
         `,
           )
           .join("")}
       </table>
 
-      ${data.payments.length > 0 ? `
+      ${showDetails && data.payments.length > 0 ? `
       <h3>Transações Detalhadas</h3>
       <table>
         <tr>
