@@ -31,15 +31,21 @@ interface DailyReportData {
     saleNumbers: string[];
   }[];
   payments: {
-    collectionId: number;
+    saleKey: string;
     client: string;
     saleNumber: string;
     store: string;
-    originalValue: number;
-    receivedValue: number;
-    pendingValue: number;
+    totalOriginalValue: number;
+    totalReceivedValue: number;
+    totalPendingValue: number;
     receivedDate: string;
     collector: string;
+    installments: {
+      collectionId: number;
+      originalValue: number;
+      receivedValue: number;
+      pendingValue: number;
+    }[];
   }[];
 }
 
@@ -283,17 +289,56 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       saleNumbers: Array.from(c.saleNumbers).sort(),
     }));
 
-    // Preparar lista de pagamentos detalhada (mantém as parcelas para detalhes)
-    const payments = filteredPayments.map((c) => ({
-      collectionId: c.id_parcela,
-      client: c.cliente || "Cliente não informado",
-      saleNumber: c.venda_n?.toString() || "",
-      store: c.nome_da_loja || "",
-      originalValue: c.valor_original,
-      receivedValue: c.valor_recebido,
-      pendingValue: c.valor_original - c.valor_recebido,
-      receivedDate: c.data_de_recebimento || selectedDate,
-      collector: users.find((u) => u.id === c.user_id)?.name || "Não atribuído",
+    // Agrupar pagamentos por venda para detalhes
+    const salesPaymentMap = new Map<string, {
+      saleKey: string;
+      client: string;
+      saleNumber: string;
+      store: string;
+      totalOriginalValue: number;
+      totalReceivedValue: number;
+      receivedDate: string;
+      collector: string;
+      installments: {
+        collectionId: number;
+        originalValue: number;
+        receivedValue: number;
+        pendingValue: number;
+      }[];
+    }>();
+
+    filteredPayments.forEach((payment) => {
+      const saleKey = `${payment.venda_n}-${payment.documento}-${payment.user_id}`;
+      
+      if (!salesPaymentMap.has(saleKey)) {
+        salesPaymentMap.set(saleKey, {
+          saleKey,
+          client: payment.cliente || "Cliente não informado",
+          saleNumber: payment.venda_n?.toString() || "",
+          store: payment.nome_da_loja || "",
+          totalOriginalValue: 0,
+          totalReceivedValue: 0,
+          receivedDate: payment.data_de_recebimento || selectedDate,
+          collector: users.find((u) => u.id === payment.user_id)?.name || "Não atribuído",
+          installments: [],
+        });
+      }
+
+      const saleData = salesPaymentMap.get(saleKey)!;
+      saleData.totalOriginalValue += payment.valor_original;
+      saleData.totalReceivedValue += payment.valor_recebido;
+      saleData.installments.push({
+        collectionId: payment.id_parcela,
+        originalValue: payment.valor_original,
+        receivedValue: payment.valor_recebido,
+        pendingValue: payment.valor_original - payment.valor_recebido,
+      });
+    });
+
+    // Converter para array e calcular valor pendente total
+    const payments = Array.from(salesPaymentMap.values()).map((sale) => ({
+      ...sale,
+      totalPendingValue: sale.totalOriginalValue - sale.totalReceivedValue,
     }));
 
     return {
@@ -789,20 +834,23 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           {/* Mobile-friendly cards */}
           <div className="lg:hidden divide-y divide-gray-200">
             {reportData.payments.map((payment, index) => (
-              <div key={`${payment.collectionId}-${index}`} className="p-4">
+              <div key={`${payment.saleKey}-${index}`} className="p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
                     <h4 className="font-medium text-gray-900">
                       {payment.client}
                     </h4>
                     <p className="text-sm text-gray-600">
-                      {payment.saleNumber ? `Venda #${payment.saleNumber}` : `ID Parcela: ${payment.collectionId}`}
+                      {payment.saleNumber ? `Venda #${payment.saleNumber}` : `Venda sem número`}
                     </p>
                     <p className="text-sm text-gray-600">{payment.store}</p>
+                    <p className="text-xs text-gray-500">
+                      {payment.installments.length} parcela(s)
+                    </p>
                   </div>
                   <div className="text-right">
                     <div className="font-bold text-green-600">
-                      {formatCurrency(payment.receivedValue)}
+                      {formatCurrency(payment.totalReceivedValue)}
                     </div>
                   </div>
                 </div>
@@ -813,16 +861,16 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>
                       <span className="text-gray-500">Devido:</span>
-                      <div className="font-medium">{formatCurrency(payment.originalValue)}</div>
+                      <div className="font-medium">{formatCurrency(payment.totalOriginalValue)}</div>
                     </div>
                     <div>
                       <span className="text-gray-500">Recebido:</span>
-                      <div className="font-medium text-green-600">{formatCurrency(payment.receivedValue)}</div>
+                      <div className="font-medium text-green-600">{formatCurrency(payment.totalReceivedValue)}</div>
                     </div>
-                    {payment.pendingValue > 0 && (
+                    {payment.totalPendingValue > 0 && (
                       <div>
                         <span className="text-gray-500">Pendente:</span>
-                        <div className="font-medium text-red-600">{formatCurrency(payment.pendingValue)}</div>
+                        <div className="font-medium text-red-600">{formatCurrency(payment.totalPendingValue)}</div>
                       </div>
                     )}
                   </div>
@@ -840,7 +888,10 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     Cliente
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Venda/ID
+                    Venda
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Parcelas
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Loja
@@ -862,7 +913,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {reportData.payments.map((payment, index) => (
                   <tr
-                    key={`${payment.collectionId}-${index}`}
+                    key={`${payment.saleKey}-${index}`}
                     className="hover:bg-gray-50"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -872,7 +923,12 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {payment.saleNumber ? `#${payment.saleNumber}` : `ID: ${payment.collectionId}`}
+                        {payment.saleNumber ? `#${payment.saleNumber}` : 'Sem número'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {payment.installments.length}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -882,17 +938,17 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {formatCurrency(payment.originalValue)}
+                        {formatCurrency(payment.totalOriginalValue)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-bold text-green-600">
-                        {formatCurrency(payment.receivedValue)}
+                        {formatCurrency(payment.totalReceivedValue)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-bold text-red-600">
-                        {payment.pendingValue > 0 ? formatCurrency(payment.pendingValue) : '-'}
+                        {payment.totalPendingValue > 0 ? formatCurrency(payment.totalPendingValue) : '-'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -962,9 +1018,10 @@ const generateReportContent = (
     data.payments.forEach((payment) => {
       lines.push(
         `Cliente: ${payment.client}`,
-        `${payment.saleNumber ? `Venda: #${payment.saleNumber}` : `ID Parcela: ${payment.collectionId}`} | Loja: ${payment.store}`,
-        `Valor Devido: ${formatCurrency(payment.originalValue)} | Valor Recebido: ${formatCurrency(payment.receivedValue)}`,
-        `Valor Pendente: ${payment.pendingValue > 0 ? formatCurrency(payment.pendingValue) : 'Quitado'}`,
+        `${payment.saleNumber ? `Venda: #${payment.saleNumber}` : 'Venda sem número'} | Loja: ${payment.store}`,
+        `Parcelas: ${payment.installments.length}`,
+        `Valor Devido: ${formatCurrency(payment.totalOriginalValue)} | Valor Recebido: ${formatCurrency(payment.totalReceivedValue)}`,
+        `Valor Pendente: ${payment.totalPendingValue > 0 ? formatCurrency(payment.totalPendingValue) : 'Quitado'}`,
         `Cobrador: ${payment.collector}`,
         "",
       );
@@ -1037,7 +1094,8 @@ const generatePrintableReport = (
       <table>
         <tr>
           <th>Cliente</th>
-          <th>Venda/ID</th>
+          <th>Venda</th>
+          <th>Parcelas</th>
           <th>Loja</th>
           <th>Valor Devido</th>
           <th>Valor Recebido</th>
@@ -1049,11 +1107,12 @@ const generatePrintableReport = (
             (p) => `
           <tr>
             <td>${p.client}</td>
-            <td>${p.saleNumber ? `#${p.saleNumber}` : `ID: ${p.collectionId}`}</td>
+            <td>${p.saleNumber ? `#${p.saleNumber}` : 'Sem número'}</td>
+            <td>${p.installments.length}</td>
             <td>${p.store}</td>
-            <td>${formatCurrency(p.originalValue)}</td>
-            <td style="font-weight: bold; color: green;">${formatCurrency(p.receivedValue)}</td>
-            <td style="font-weight: bold; color: ${p.pendingValue > 0 ? 'red' : 'gray'};">${p.pendingValue > 0 ? formatCurrency(p.pendingValue) : '-'}</td>
+            <td>${formatCurrency(p.totalOriginalValue)}</td>
+            <td style="font-weight: bold; color: green;">${formatCurrency(p.totalReceivedValue)}</td>
+            <td style="font-weight: bold; color: ${p.totalPendingValue > 0 ? 'red' : 'gray'};">${p.totalPendingValue > 0 ? formatCurrency(p.totalPendingValue) : '-'}</td>
             <td>${p.collector}</td>
           </tr>
         `,
