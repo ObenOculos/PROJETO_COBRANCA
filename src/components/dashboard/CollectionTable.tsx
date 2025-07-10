@@ -168,7 +168,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           const group = groupsMap.get(key)!;
           group.totalValue += collection.valor_original || 0;
           group.totalReceived += collection.valor_recebido || 0;
-          group.pendingValue = parseFloat((group.totalValue - group.totalReceived).toFixed(2));
+          group.pendingValue = parseFloat(Math.max(0, group.totalValue - group.totalReceived).toFixed(2));
 
           const saleKey = `${collection.venda_n}-${collection.documento}`;
           if (!group.sales.has(saleKey)) {
@@ -189,7 +189,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           const sale = group.sales.get(saleKey)!;
           sale.totalValue += collection.valor_original || 0;
           sale.totalReceived += collection.valor_recebido || 0;
-          sale.pendingValue = sale.totalValue - sale.totalReceived;
+          sale.pendingValue = Math.max(0, sale.totalValue - sale.totalReceived);
           sale.installments.push(collection);
 
           if (sale.totalReceived === 0) {

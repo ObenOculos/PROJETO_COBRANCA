@@ -332,14 +332,14 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         collectionId: payment.id_parcela,
         originalValue: payment.valor_original,
         receivedValue: payment.valor_recebido,
-        pendingValue: payment.valor_original - payment.valor_recebido,
+        pendingValue: Math.max(0, payment.valor_original - payment.valor_recebido),
       });
     });
 
     // Converter para array e calcular valor pendente total
     const payments = Array.from(salesPaymentMap.values()).map((sale) => ({
       ...sale,
-      totalPendingValue: sale.totalOriginalValue - sale.totalReceivedValue,
+      totalPendingValue: Math.max(0, sale.totalOriginalValue - sale.totalReceivedValue),
     }));
 
     return {

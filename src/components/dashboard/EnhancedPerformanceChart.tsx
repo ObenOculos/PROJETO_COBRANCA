@@ -78,7 +78,7 @@ const EnhancedPerformanceChart: React.FC = () => {
 
       // Determine if each sale is pending
       salesMap.forEach((sale) => {
-        const pendingValue = sale.totalValue - sale.receivedValue;
+        const pendingValue = Math.max(0, sale.totalValue - sale.receivedValue);
         sale.isPending = pendingValue > 0.01;
       });
 

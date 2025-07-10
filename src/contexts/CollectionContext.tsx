@@ -624,7 +624,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           (sum, c) => sum + c.valor_recebido,
           0,
         );
-        const pendingValue = totalValue - totalReceived;
+        const pendingValue = Math.max(0, totalValue - totalReceived);
 
         let includeClient = true;
 
@@ -678,7 +678,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             (sum, c) => sum + c.valor_recebido,
             0,
           );
-          const pendingValue = totalValue - totalReceived;
+          const pendingValue = Math.max(0, totalValue - totalReceived);
 
           if (filters.status?.toLowerCase() === "parcial") {
             // Cliente é parcial se tem valor recebido E ainda tem valor pendente
@@ -719,7 +719,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             (sum, c) => sum + c.valor_recebido,
             0,
           );
-          const pendingValue = totalValue - totalReceived;
+          const pendingValue = Math.max(0, totalValue - totalReceived);
 
           // Cliente é pendente se não tem valor recebido E ainda tem valor pendente
           if (totalReceived <= 0.01 && pendingValue > 0) {
@@ -1061,7 +1061,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Determinar status das vendas
       salesMap.forEach((sale) => {
-        const pendingValue = sale.totalValue - sale.receivedValue;
+        const pendingValue = Math.max(0, sale.totalValue - sale.receivedValue);
         if (sale.receivedValue > 0 && pendingValue > 0) {
           sale.status = "parcial";
         } else if (pendingValue <= 0.01 && sale.receivedValue > 0) {
@@ -1863,7 +1863,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           const totalReceived = roundTo2Decimals(
             installments.reduce((sum, inst) => sum + inst.valor_recebido, 0),
           );
-          const pendingValue = roundTo2Decimals(totalValue - totalReceived);
+          const pendingValue = Math.max(0, roundTo2Decimals(totalValue - totalReceived));
 
           const balance = calculateSaleBalance(saleNumber, clientDocument);
           const payments = getSalePayments(saleNumber, clientDocument);

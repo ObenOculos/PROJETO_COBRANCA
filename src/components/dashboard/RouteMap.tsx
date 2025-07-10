@@ -144,7 +144,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
           (sum: number, inst: any) => sum + inst.valor_recebido,
           0,
         );
-        sale.pendingValue = sale.totalValue - sale.totalReceived;
+        sale.pendingValue = Math.max(0, sale.totalValue - sale.totalReceived);
       });
 
       // Atualizar dados do cliente
@@ -157,7 +157,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
         (sum: number, c: any) => sum + c.valor_recebido,
         0,
       );
-      client.pendingValue = client.totalValue - client.totalReceived;
+      client.pendingValue = Math.max(0, client.totalValue - client.totalReceived);
     });
 
     // Filtrar apenas clientes com saldo devedor
