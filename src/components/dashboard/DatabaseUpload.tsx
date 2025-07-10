@@ -85,7 +85,7 @@ const DatabaseUpload: React.FC = () => {
   // Função para testar conexão com Supabase
   const testSupabaseConnection = async () => {
     try {
-      console.log("🔍 Testando conexão com Supabase...");
+      // Testando conexão com o banco de dados...
 
       // Verificar se a tabela existe e conseguimos fazer uma query simples
       const { error, count } = await supabase
@@ -93,12 +93,10 @@ const DatabaseUpload: React.FC = () => {
         .select("*", { count: "exact", head: true });
 
       if (error) {
-        console.error("❌ Erro ao conectar com Supabase:", error);
+        console.error("Erro de conectividade com o banco de dados");
         setDebugInfo(`❌ Erro de conexão: ${error.message}`);
         return false;
       }
-
-      console.log("✅ Conexão com Supabase OK. Total de registros:", count);
       setDebugInfo(`✅ Conexão OK. ${count} registros na tabela BANCO_DADOS`);
       return true;
     } catch (error) {

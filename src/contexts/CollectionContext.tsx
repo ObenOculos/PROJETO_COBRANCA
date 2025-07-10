@@ -382,7 +382,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         throw supabaseError;
       }
 
-      console.log("Resposta do Supabase:", data);
+      // Loja atribuída com sucesso
 
       // Recarregar as atribuições
       await fetchCollectorStores();
@@ -1905,31 +1905,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             'relation "scheduled_visits" does not exist',
           )
         ) {
-          console.log("Tabela scheduled_visits não existe.");
-          console.log("Por favor, execute o seguinte SQL no Supabase:");
-          console.log(`
-            CREATE TABLE scheduled_visits (
-              id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-              collector_id TEXT NOT NULL,
-              client_document TEXT NOT NULL,
-              client_name TEXT NOT NULL,
-              scheduled_date DATE NOT NULL,
-              scheduled_time TIME,
-              status TEXT NOT NULL DEFAULT 'agendada',
-              notes TEXT,
-              client_address TEXT,
-              client_neighborhood TEXT,
-              client_city TEXT,
-              total_pending_value DECIMAL(10,2),
-              overdue_count INTEGER DEFAULT 0,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            );
-            
-            CREATE INDEX idx_scheduled_visits_collector ON scheduled_visits(collector_id);
-            CREATE INDEX idx_scheduled_visits_client ON scheduled_visits(client_document);
-            CREATE INDEX idx_scheduled_visits_date ON scheduled_visits(scheduled_date);
-          `);
+          console.error("Tabela scheduled_visits não existe. Verifique a estrutura do banco de dados.");
+          // Estrutura de tabela necessária não encontrada
         }
 
         // Usar sistema local como fallback
@@ -2042,7 +2019,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Atualizar estado local
       setScheduledVisits((prev) => [...prev, newVisit]);
-      console.log("Visita agendada com sucesso no Supabase:", newVisit);
+      // Visita agendada com sucesso
 
       return newVisit;
     } catch (error) {

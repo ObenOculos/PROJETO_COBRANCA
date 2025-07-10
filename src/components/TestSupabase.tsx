@@ -16,16 +16,12 @@ export function TestSupabase() {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      console.log("📋 Configuração atual:");
-      console.log("- URL:", supabaseUrl);
-      console.log(
-        "- Key:",
-        supabaseKey ? `${supabaseKey.substring(0, 20)}...` : "undefined",
-      );
+      // Verificando configuração (sem expor dados sensíveis)
+      console.log("📋 Verificando configuração do Supabase...");
 
       setTestResult(`🔧 Configuração:
-URL: ${supabaseUrl || "UNDEFINED"}
-Key: ${supabaseKey ? "OK" : "UNDEFINED"}
+URL: ${supabaseUrl ? "✅ Configurada" : "❌ UNDEFINED"}
+Key: ${supabaseKey ? "✅ Configurada" : "❌ UNDEFINED"}
 
 Testando conexão...`);
 
