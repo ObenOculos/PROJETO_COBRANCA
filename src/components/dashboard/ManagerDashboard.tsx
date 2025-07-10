@@ -694,39 +694,36 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         return (
           <div className="space-y-3 sm:space-y-4">
             {/* View Toggle Buttons - Enhanced Mobile */}
-            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm p-3 sm:p-4 border border-gray-200">
-              <div className="flex flex-col gap-3 sm:gap-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                  <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900">
-                    Cobranças
-                  </h2>
-                  <div className="flex bg-gray-100 rounded-md p-0.5 w-full sm:w-auto">
-                    <button
-                      onClick={() => setCollectionsView("table")}
-                      className={`flex-1 sm:flex-none px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
-                        collectionsView === "table"
-                          ? "bg-white text-blue-600 shadow-sm"
-                          : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2 inline" />
-                      <span className="hidden sm:inline">Todas as Cobranças</span>
-                      <span className="sm:hidden">Cobranças</span>
-                    </button>
-                    <button
-                      onClick={() => setCollectionsView("cash-report")}
-                      className={`flex-1 sm:flex-none px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
-                        collectionsView === "cash-report"
-                          ? "bg-white text-blue-600 shadow-sm"
-                          : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2 inline" />
-                      <span className="hidden sm:inline">Relatório do Caixa</span>
-                      <span className="sm:hidden">Caixa</span>
-                    </button>
-                  </div>
-                </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
+                <FileText className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
+                Cobranças
+              </h2>
+              <div className="flex bg-gray-100 rounded-md p-0.5 w-full sm:w-auto">
+                <button
+                  onClick={() => setCollectionsView("table")}
+                  className={`flex-1 sm:flex-none px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
+                    collectionsView === "table"
+                      ? "bg-white text-blue-600 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2 inline" />
+                  <span className="hidden sm:inline">Todas as Cobranças</span>
+                  <span className="sm:hidden">Cobranças</span>
+                </button>
+                <button
+                  onClick={() => setCollectionsView("cash-report")}
+                  className={`flex-1 sm:flex-none px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
+                    collectionsView === "cash-report"
+                      ? "bg-white text-blue-600 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2 inline" />
+                  <span className="hidden sm:inline">Relatório do Caixa</span>
+                  <span className="sm:hidden">Caixa</span>
+                </button>
               </div>
             </div>
 

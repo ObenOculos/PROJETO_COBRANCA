@@ -370,32 +370,25 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                     {filteredClientGroups.length} cliente
                     {filteredClientGroups.length !== 1 ? "s" : ""} com cobranças
                   </p>
-                  <div className="flex items-center gap-4">
-                    {totalPages > 1 && (
-                      <p className="text-sm text-gray-500">
-                        Mostrando {startItem} a {endItem} de {totalItems}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-600">
-                        Por página:
-                      </label>
-                      <select
-                        id="items-per-page"
-                        name="itemsPerPage"
-                        value={itemsPerPage}
-                        onChange={(e) => {
-                          setItemsPerPage(Number(e.target.value));
-                          setCurrentPage(1);
-                        }}
-                        className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                      >
-                        <option value={10}>10</option>
-                        <option value={20}>20</option>
-                        <option value={50}>50</option>
-                        <option value={100}>100</option>
-                      </select>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">
+                      Por página:
+                    </label>
+                    <select
+                      id="items-per-page"
+                      name="itemsPerPage"
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -495,7 +488,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                     <div className="mt-3 flex flex-wrap gap-2">
                       {clientGroup.totalReceived > 0 && (
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                          <TrendingUp className="h-3 w-3 mr-1" />
                           {formatCurrency(clientGroup.totalReceived)} recebido
                         </span>
                       )}
@@ -525,14 +519,10 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-4 sm:px-6 py-4 rounded-b-xl">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-sm text-white text-center sm:text-left">
-                  <span className="font-semibold">Página {currentPage}</span> de{" "}
-                  <span className="font-semibold">{totalPages}</span>
-                  <span className="hidden sm:inline text-purple-100 ml-2">
-                    • {totalItems} clientes total
+                  <span className="font-semibold">Página {currentPage} de {totalPages}</span>
+                  <span className="text-purple-100 ml-2">
+                    • Mostrando {startItem} a {endItem} de {totalItems} clientes
                   </span>
-                  <div className="sm:hidden text-xs text-purple-100 mt-1">
-                    {totalItems} clientes total
-                  </div>
                 </div>
 
                 <div className="flex items-center space-x-1 sm:space-x-2">
@@ -670,32 +660,25 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                     {filteredAndGroupedSales.length} cliente
                     {filteredAndGroupedSales.length !== 1 ? "s" : ""} com vendas
                   </p>
-                  <div className="flex items-center gap-4">
-                    {totalPages > 1 && (
-                      <p className="text-sm text-gray-500">
-                        Mostrando {startItem}-{endItem} de {totalItems}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-600">
-                        Por página:
-                      </label>
-                      <select
-                        id="items-per-page"
-                        name="itemsPerPage"
-                        value={itemsPerPage}
-                        onChange={(e) => {
-                          setItemsPerPage(Number(e.target.value));
-                          setCurrentPage(1);
-                        }}
-                        className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                      >
-                        <option value={10}>10</option>
-                        <option value={20}>20</option>
-                        <option value={50}>50</option>
-                        <option value={100}>100</option>
-                      </select>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">
+                      Por página:
+                    </label>
+                    <select
+                      id="items-per-page"
+                      name="itemsPerPage"
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -757,36 +740,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
             )}
 
             {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600 font-medium">
-                    Mostrando{" "}
-                    <span className="text-purple-600 font-bold">
-                      {startItem}
-                    </span>{" "}
-                    a{" "}
-                    <span className="text-purple-600 font-bold">{endItem}</span>{" "}
-                    de{" "}
-                    <span className="text-purple-600 font-bold">
-                      {totalItems}
-                    </span>{" "}
-                    clientes
-                  </span>
-                  <div className="flex items-center space-x-2 text-sm text-gray-500">
-                    <TrendingUp className="h-4 w-4 text-purple-500" />
-                    <span>
-                      Página{" "}
-                      <span className="font-semibold text-gray-700">
-                        {currentPage}
-                      </span>{" "}
-                      de{" "}
-                      <span className="font-semibold text-gray-700">
-                        {totalPages}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-
+              <div className="p-4 bg-gray-50 rounded-lg border mt-4">
                 {/* Navegação rápida */}
                 <div className="flex items-center gap-2">
                   <button
@@ -965,6 +919,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       <div className="flex flex-col sm:flex-row justify-end gap-1 sm:gap-2 mt-3">
                         {clientGroup.totalReceived > 0 && (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 shadow-sm">
+                            <TrendingUp className="h-3 w-3 mr-1" />
                             {formatCurrency(clientGroup.totalReceived)} recebido
                           </span>
                         )}
@@ -1183,15 +1138,10 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           <div className="bg-gradient-to-r from-purple-600 to-indigo-600 border-t border-gray-200 px-4 sm:px-6 py-4 rounded-b-xl">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-sm text-white text-center sm:text-left">
-                <span className="font-semibold">Página {currentPage}</span> de{" "}
-                <span className="font-semibold">{totalPages}</span>
-                <span className="hidden sm:inline text-purple-100">
-                  {" "}
-                  • {totalItems} clientes total
+                <span className="font-semibold">Página {currentPage} de {totalPages}</span>
+                <span className="text-purple-100 ml-2">
+                  • Mostrando {startItem} a {endItem} de {totalItems} clientes
                 </span>
-                <div className="sm:hidden text-xs text-purple-100 mt-1">
-                  {totalItems} clientes total
-                </div>
               </div>
 
               <div className="flex items-center space-x-1 sm:space-x-2">
