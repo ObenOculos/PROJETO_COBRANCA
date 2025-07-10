@@ -263,7 +263,7 @@ const EnhancedPerformanceChart: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header with Controls */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6 border-b border-gray-200 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6 border-b flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="min-w-0">
           <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
             <BarChart3 className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
