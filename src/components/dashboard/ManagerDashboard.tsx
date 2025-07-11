@@ -90,7 +90,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const [filters, setFilters] = useState<FilterOptions>({});
   const [collectionsView, setCollectionsView] = useState<
     "table" | "cash-report"
-  >("table");
+  >(() => {
+    const saved = localStorage.getItem("managerCollectionsView");
+    return (saved as "table" | "cash-report") || "table";
+  });
   const [overviewFilter, setOverviewFilter] = useState<"all" | "with-collector">("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -104,6 +107,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   useEffect(() => {
     localStorage.setItem("managerActiveTab", activeTab);
   }, [activeTab]);
+
+  // Salva a visualização de cobranças no localStorage sempre que mudar
+  useEffect(() => {
+    localStorage.setItem("managerCollectionsView", collectionsView);
+  }, [collectionsView]);
 
   // Busca autorizações pendentes
   useEffect(() => {

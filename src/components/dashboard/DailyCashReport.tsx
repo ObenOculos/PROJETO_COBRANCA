@@ -127,7 +127,7 @@ const getQuickDateRanges = () => {
 };
 
 const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
-  const { users, salePayments } = useCollection();
+  const { users, salePayments, refreshData } = useCollection();
   const [selectedDate, setSelectedDate] = useState<string>(getCurrentDateBR());
   const [endDate, setEndDate] = useState<string>(getCurrentDateBR());
   const [showDetails, setShowDetails] = useState(false);
@@ -140,18 +140,32 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const [maxAmount, setMaxAmount] = useState<string>("");
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [showUpdateNotification, setShowUpdateNotification] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(0);
 
-  // Detectar mudanças nos salePayments para mostrar notificação
+  // Detectar mudanças significativas nos salePayments para mostrar notificação
   useEffect(() => {
-    setLastUpdate(new Date());
-    setShowUpdateNotification(true);
+    const currentLength = salePayments.length;
+    const storedLength = localStorage.getItem('cashReportSalePaymentsLength');
     
-    // Esconder notificação após 3 segundos
-    const timer = setTimeout(() => {
-      setShowUpdateNotification(false);
-    }, 3000);
+    // Só atualizar se realmente houver mudança no número de pagamentos
+    if (storedLength && parseInt(storedLength) !== currentLength) {
+      setLastUpdate(new Date());
+      setShowUpdateNotification(true);
+      setForceUpdate(prev => prev + 1); // Força re-render
+      
+      // Esconder notificação após 3 segundos
+      const timer = setTimeout(() => {
+        setShowUpdateNotification(false);
+      }, 3000);
 
-    return () => clearTimeout(timer);
+      // Salvar novo length
+      localStorage.setItem('cashReportSalePaymentsLength', currentLength.toString());
+
+      return () => clearTimeout(timer);
+    } else if (!storedLength) {
+      // Primeira vez, apenas salvar sem notificar
+      localStorage.setItem('cashReportSalePaymentsLength', currentLength.toString());
+    }
   }, [salePayments]);
 
   // Quick date range selection
@@ -199,17 +213,35 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
   const reportData = useMemo((): DailyReportData => {
     // Usar dados da tabela sale_payments em vez de collections
+    console.log("🔍 Debug DailyCashReport:", {
+      totalSalePayments: salePayments.length,
+      selectedDate,
+      dateRangeMode,
+      samplePayment: salePayments[0]
+    });
+
     const filteredPayments = salePayments.filter((payment) => {
       // Filtro de data
       const paymentDate = payment.paymentDate;
-      if (!paymentDate) return false;
+      if (!paymentDate) {
+        console.log("❌ Pagamento sem data:", payment);
+        return false;
+      }
 
       const isInDateRange =
         dateRangeMode === "single"
           ? paymentDate === selectedDate
           : paymentDate >= selectedDate && paymentDate <= endDate;
 
-      if (!isInDateRange) return false;
+      if (!isInDateRange) {
+        console.log("❌ Fora do range de data:", {
+          paymentDate,
+          selectedDate,
+          dateRangeMode,
+          isInDateRange
+        });
+        return false;
+      }
 
       // Filtro de cobrador
       if (selectedCollector !== "all" && payment.collectorId !== selectedCollector)
@@ -412,6 +444,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     minAmount,
     maxAmount,
     users,
+    forceUpdate,
   ]);
 
   const handleExportReport = () => {
@@ -475,22 +508,34 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               </p>
             </div>
 
-            <button
-              onClick={() => setShowDetails(!showDetails)}
-              className={`flex items-center justify-center px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium whitespace-nowrap ${
-                showDetails
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">
-                {showDetails ? "Ocultar Detalhes" : "Ver Detalhes"}
-              </span>
-              <span className="sm:hidden">
-                {showDetails ? "Ocultar" : "Detalhes"}
-              </span>
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  await refreshData();
+                  setForceUpdate(prev => prev + 1);
+                }}
+                className="flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                title="Atualizar dados"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setShowDetails(!showDetails)}
+                className={`flex items-center justify-center px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium whitespace-nowrap ${
+                  showDetails
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">
+                  {showDetails ? "Ocultar Detalhes" : "Ver Detalhes"}
+                </span>
+                <span className="sm:hidden">
+                  {showDetails ? "Ocultar" : "Detalhes"}
+                </span>
+              </button>
+            </div>
           </div>
 
           {/* Notificação de atualização */}
