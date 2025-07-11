@@ -49,7 +49,19 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Função para atualizar apenas as collections sem recarregar tudo
+  const refreshCollections = async () => {
+    try {
+      console.log("Atualizando collections em tempo real...");
+      await fetchCollections();
+    } catch (error) {
+      console.error("Erro ao atualizar collections:", error);
+    }
+  };
+
   useEffect(() => {
+    let realtimeChannel: any = null;
+
     if (user) {
       console.log("Usuário logado, carregando dados...");
       setGlobalLoading(true, "Carregando dados do sistema...");
@@ -90,6 +102,40 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           setGlobalLoading(false);
           setLoading(false);
         });
+
+      // Configurar listener em tempo real para mudanças nas tabelas
+      console.log("Configurando listeners em tempo real...");
+      realtimeChannel = supabase
+        .channel('database_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // Escutar todos os eventos (INSERT, UPDATE, DELETE)
+            schema: 'public',
+            table: 'BANCO_DADOS'
+          },
+          (payload) => {
+            console.log('Mudança detectada na tabela BANCO_DADOS:', payload);
+            // Atualizar apenas as collections quando houver mudanças
+            refreshCollections();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // Escutar todos os eventos (INSERT, UPDATE, DELETE)
+            schema: 'public',
+            table: 'sale_payments'
+          },
+          (payload) => {
+            console.log('Mudança detectada na tabela sale_payments:', payload);
+            // Atualizar sale payments quando houver mudanças
+            fetchSalePayments();
+          }
+        )
+        .subscribe((status) => {
+          console.log('Status da conexão em tempo real:', status);
+        });
     } else {
       console.log("Usuário não logado, limpando dados...");
       setCollections([]);
@@ -100,6 +146,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       setLoading(false);
       setGlobalLoading(false);
     }
+
+    // Cleanup: remover listener quando o componente for desmontado ou usuário mudar
+    return () => {
+      if (realtimeChannel) {
+        console.log("Removendo listener em tempo real...");
+        supabase.removeChannel(realtimeChannel);
+      }
+    };
   }, [user]);
 
   const fetchCollections = async () => {

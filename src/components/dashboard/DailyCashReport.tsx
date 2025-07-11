@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Calendar,
   Download,
@@ -9,6 +9,7 @@ import {
   Eye,
   Printer,
   Filter,
+  RefreshCw,
 } from "lucide-react";
 import { Collection } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/mockData";
@@ -137,6 +138,21 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const [selectedStore, setSelectedStore] = useState<string>("all");
   const [minAmount, setMinAmount] = useState<string>("");
   const [maxAmount, setMaxAmount] = useState<string>("");
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [showUpdateNotification, setShowUpdateNotification] = useState(false);
+
+  // Detectar mudanças nas collections para mostrar notificação
+  useEffect(() => {
+    setLastUpdate(new Date());
+    setShowUpdateNotification(true);
+    
+    // Esconder notificação após 3 segundos
+    const timer = setTimeout(() => {
+      setShowUpdateNotification(false);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [collections]);
 
   // Quick date range selection
   const applyQuickDateRange = (
@@ -445,6 +461,14 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               </span>
             </button>
           </div>
+
+          {/* Notificação de atualização */}
+          {showUpdateNotification && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-green-600 animate-pulse">
+              <RefreshCw className="h-4 w-4" />
+              <span>Dados atualizados automaticamente</span>
+            </div>
+          )}
         </div>
 
         {/* Enhanced Filters */}
@@ -628,20 +652,21 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 lg:p-6 rounded-xl border border-green-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-green-700">
-                Total Recebido
-              </p>
-              <p className="text-2xl lg:text-3xl font-bold text-green-900 truncate">
-                {formatCurrency(reportData.totalReceived)}
-              </p>
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 lg:p-6 rounded-xl border border-green-200">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-green-700">
+                  Total Recebido
+                </p>
+                <p className="text-2xl lg:text-3xl font-bold text-green-900 truncate">
+                  {formatCurrency(reportData.totalReceived)}
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 lg:h-10 lg:w-10 text-green-600 flex-shrink-0 ml-3" />
             </div>
-            <DollarSign className="h-8 w-8 lg:h-10 lg:w-10 text-green-600 flex-shrink-0 ml-3" />
           </div>
-        </div>
 
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 lg:p-6 rounded-xl border border-blue-200">
           <div className="flex items-center justify-between">
@@ -669,6 +694,15 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           </div>
         </div>
       </div>
+
+      {/* Indicador de última atualização */}
+      <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
+        <RefreshCw className="h-3 w-3" />
+        <span>
+          Última atualização: {lastUpdate.toLocaleTimeString('pt-BR')}
+        </span>
+      </div>
+    </div>
 
       {/* Collector Summary */}
       {reportData.collectorSummary.length > 0 && (
