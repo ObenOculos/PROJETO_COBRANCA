@@ -1,8 +1,10 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "sistema-cobranca",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "Sistema de cobrança para cobradores - Focco Brasil",
+  "author": "Erick",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
