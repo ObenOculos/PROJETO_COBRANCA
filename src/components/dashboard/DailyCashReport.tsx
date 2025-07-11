@@ -142,56 +142,19 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const [showUpdateNotification, setShowUpdateNotification] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
 
-  // Detectar mudanças significativas nos salePayments para mostrar notificação
+  // Detectar mudanças nos salePayments para mostrar notificação
   useEffect(() => {
-    const currentLength = salePayments.length;
-    const storedLength = localStorage.getItem('cashReportSalePaymentsLength');
+    setLastUpdate(new Date());
+    setShowUpdateNotification(true);
+    setForceUpdate(prev => prev + 1); // Força re-render
     
-    // Só atualizar se realmente houver mudança no número de pagamentos
-    if (storedLength && parseInt(storedLength) !== currentLength) {
-      setLastUpdate(new Date());
-      setShowUpdateNotification(true);
-      setForceUpdate(prev => prev + 1); // Força re-render
-      
-      // Esconder notificação após 3 segundos
-      const timer = setTimeout(() => {
-        setShowUpdateNotification(false);
-      }, 3000);
+    // Esconder notificação após 3 segundos
+    const timer = setTimeout(() => {
+      setShowUpdateNotification(false);
+    }, 3000);
 
-      // Salvar novo length
-      localStorage.setItem('cashReportSalePaymentsLength', currentLength.toString());
-
-      return () => clearTimeout(timer);
-    } else if (!storedLength) {
-      // Primeira vez, apenas salvar sem notificar
-      localStorage.setItem('cashReportSalePaymentsLength', currentLength.toString());
-    }
-  }, [salePayments]);
-
-  // Escutar eventos globais de pagamento processado
-  useEffect(() => {
-    const handlePaymentProcessed = async (event: Event) => {
-      const customEvent = event as CustomEvent;
-      console.log('🔔 Pagamento processado detectado no DailyCashReport:', customEvent.detail);
-      
-      // Forçar atualização dos dados
-      await refreshData();
-      setForceUpdate(prev => prev + 1);
-      setLastUpdate(new Date());
-      setShowUpdateNotification(true);
-      
-      // Esconder notificação após 3 segundos
-      setTimeout(() => {
-        setShowUpdateNotification(false);
-      }, 3000);
-    };
-
-    window.addEventListener('paymentProcessed', handlePaymentProcessed);
-    
-    return () => {
-      window.removeEventListener('paymentProcessed', handlePaymentProcessed);
-    };
-  }, [refreshData]);
+    return () => clearTimeout(timer);
+  }, [salePayments, collections]);
 
   // Quick date range selection
   const applyQuickDateRange = (
@@ -238,35 +201,18 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
   const reportData = useMemo((): DailyReportData => {
     // Usar dados da tabela sale_payments em vez de collections
-    console.log("🔍 Debug DailyCashReport:", {
-      totalSalePayments: salePayments.length,
-      selectedDate,
-      dateRangeMode,
-      samplePayment: salePayments[0]
-    });
 
     const filteredPayments = salePayments.filter((payment) => {
       // Filtro de data
       const paymentDate = payment.paymentDate;
-      if (!paymentDate) {
-        console.log("❌ Pagamento sem data:", payment);
-        return false;
-      }
+      if (!paymentDate) return false;
 
       const isInDateRange =
         dateRangeMode === "single"
           ? paymentDate === selectedDate
           : paymentDate >= selectedDate && paymentDate <= endDate;
 
-      if (!isInDateRange) {
-        console.log("❌ Fora do range de data:", {
-          paymentDate,
-          selectedDate,
-          dateRangeMode,
-          isInDateRange
-        });
-        return false;
-      }
+      if (!isInDateRange) return false;
 
       // Filtro de cobrador
       if (selectedCollector !== "all" && payment.collectorId !== selectedCollector)

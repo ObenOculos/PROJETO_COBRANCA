@@ -1639,17 +1639,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // 6. Atualizar dados do banco (refresh)
       await refreshData();
-
-      // 7. Emitir evento global para notificar componentes
-      window.dispatchEvent(new CustomEvent('paymentProcessed', {
-        detail: { 
-          saleNumber: payment.saleNumber,
-          amount: payment.paymentAmount,
-          collectorId 
-        }
-      }));
-
-      console.log("✅ Pagamento de venda processado com sucesso!");
     } catch (err) {
       console.error("Erro ao processar pagamento de venda:", err);
       setError(
