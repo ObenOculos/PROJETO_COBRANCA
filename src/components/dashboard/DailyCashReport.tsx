@@ -42,7 +42,7 @@ interface DailyReportData {
     receivedDate: string;
     collector: string;
     installments: {
-      collectionId: number;
+      collectionId: number | string;
       originalValue: number;
       receivedValue: number;
       pendingValue: number;
@@ -127,7 +127,7 @@ const getQuickDateRanges = () => {
 };
 
 const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
-  const { users } = useCollection();
+  const { users, salePayments } = useCollection();
   const [selectedDate, setSelectedDate] = useState<string>(getCurrentDateBR());
   const [endDate, setEndDate] = useState<string>(getCurrentDateBR());
   const [showDetails, setShowDetails] = useState(false);
@@ -141,7 +141,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [showUpdateNotification, setShowUpdateNotification] = useState(false);
 
-  // Detectar mudanças nas collections para mostrar notificação
+  // Detectar mudanças nos salePayments para mostrar notificação
   useEffect(() => {
     setLastUpdate(new Date());
     setShowUpdateNotification(true);
@@ -152,7 +152,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [collections]);
+  }, [salePayments]);
 
   // Quick date range selection
   const applyQuickDateRange = (
@@ -198,36 +198,43 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   }, [users]);
 
   const reportData = useMemo((): DailyReportData => {
-    // Aplicar filtros
-    const filteredPayments = collections.filter((c) => {
+    // Usar dados da tabela sale_payments em vez de collections
+    const filteredPayments = salePayments.filter((payment) => {
       // Filtro de data
-      const receivedDate = c.data_de_recebimento;
-      if (!receivedDate || c.valor_recebido <= 0) return false;
+      const paymentDate = payment.paymentDate;
+      if (!paymentDate) return false;
 
       const isInDateRange =
         dateRangeMode === "single"
-          ? receivedDate === selectedDate
-          : receivedDate >= selectedDate && receivedDate <= endDate;
+          ? paymentDate === selectedDate
+          : paymentDate >= selectedDate && paymentDate <= endDate;
 
       if (!isInDateRange) return false;
 
       // Filtro de cobrador
-      if (selectedCollector !== "all" && c.user_id !== selectedCollector)
+      if (selectedCollector !== "all" && payment.collectorId !== selectedCollector)
         return false;
 
-      // Filtro de loja
-      if (selectedStore !== "all" && c.nome_da_loja !== selectedStore)
-        return false;
+      // Filtro de loja (buscar loja das collections para compatibilidade)
+      if (selectedStore !== "all") {
+        const relatedCollection = collections.find(c => 
+          c.documento === payment.clientDocument && 
+          c.venda_n === payment.saleNumber
+        );
+        if (!relatedCollection || relatedCollection.nome_da_loja !== selectedStore) {
+          return false;
+        }
+      }
 
       // Filtro de valor
-      const receivedValue = c.valor_recebido;
-      if (minAmount && receivedValue < parseFloat(minAmount)) return false;
-      if (maxAmount && receivedValue > parseFloat(maxAmount)) return false;
+      const paymentAmount = payment.paymentAmount;
+      if (minAmount && paymentAmount < parseFloat(minAmount)) return false;
+      if (maxAmount && paymentAmount > parseFloat(maxAmount)) return false;
 
       return true;
     });
 
-    // Agrupar por venda para contar vendas únicas em vez de parcelas
+    // Agrupar por pagamento individual (cada pagamento é uma transação única)
     const salesMap = new Map<
       string,
       {
@@ -242,23 +249,28 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     >();
 
     filteredPayments.forEach((payment) => {
-      const saleKey = `${payment.venda_n}-${payment.documento}-${payment.user_id}`;
+      const saleKey = `${payment.saleNumber}-${payment.clientDocument}-${payment.collectorId}-${payment.id}`;
+      
+      // Buscar dados da collection para obter valores originais e loja
+      const relatedCollection = collections.find(c => 
+        c.documento === payment.clientDocument && 
+        c.venda_n === payment.saleNumber
+      );
 
       if (!salesMap.has(saleKey)) {
         salesMap.set(saleKey, {
           saleKey,
-          collectorId: payment.user_id || "unknown",
-          client: payment.cliente || "Cliente não informado",
+          collectorId: payment.collectorId || "unknown",
+          client: payment.clientDocument || "Cliente não informado",
           totalReceived: 0,
-          originalValue: 0,
-          store: payment.nome_da_loja || "",
-          saleNumber: payment.venda_n?.toString() || "",
+          originalValue: relatedCollection?.valor_original || 0,
+          store: relatedCollection?.nome_da_loja || "",
+          saleNumber: payment.saleNumber?.toString() || "",
         });
       }
 
       const saleData = salesMap.get(saleKey)!;
-      saleData.totalReceived += payment.valor_recebido;
-      saleData.originalValue += payment.valor_original;
+      saleData.totalReceived += payment.paymentAmount;
     });
 
     // Agrupar por cobrador
@@ -306,7 +318,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       saleNumbers: Array.from(c.saleNumbers).sort(),
     }));
 
-    // Agrupar pagamentos por venda para detalhes
+    // Mapear pagamentos para detalhes usando sale_payments
     const salesPaymentMap = new Map<string, {
       saleKey: string;
       client: string;
@@ -317,7 +329,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       receivedDate: string;
       collector: string;
       installments: {
-        collectionId: number;
+        collectionId: string;
         originalValue: number;
         receivedValue: number;
         pendingValue: number;
@@ -325,31 +337,49 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     }>();
 
     filteredPayments.forEach((payment) => {
-      const saleKey = `${payment.venda_n}-${payment.documento}-${payment.user_id}`;
+      const saleKey = `${payment.id}`;
+      
+      // Buscar dados da collection para obter valores originais e loja
+      const relatedCollection = collections.find(c => 
+        c.documento === payment.clientDocument && 
+        c.venda_n === payment.saleNumber
+      );
       
       if (!salesPaymentMap.has(saleKey)) {
         salesPaymentMap.set(saleKey, {
           saleKey,
-          client: payment.cliente || "Cliente não informado",
-          saleNumber: payment.venda_n?.toString() || "",
-          store: payment.nome_da_loja || "",
+          client: relatedCollection?.cliente || payment.clientDocument || "Cliente não informado",
+          saleNumber: payment.saleNumber?.toString() || "",
+          store: relatedCollection?.nome_da_loja || "",
           totalOriginalValue: 0,
-          totalReceivedValue: 0,
-          receivedDate: payment.data_de_recebimento || selectedDate,
-          collector: users.find((u) => u.id === payment.user_id)?.name || "Não atribuído",
+          totalReceivedValue: payment.paymentAmount,
+          receivedDate: payment.paymentDate || selectedDate,
+          collector: payment.collectorName || users.find((u) => u.id === payment.collectorId)?.name || "Não atribuído",
           installments: [],
         });
       }
 
       const saleData = salesPaymentMap.get(saleKey)!;
-      saleData.totalOriginalValue += payment.valor_original;
-      saleData.totalReceivedValue += payment.valor_recebido;
-      saleData.installments.push({
-        collectionId: payment.id_parcela,
-        originalValue: payment.valor_original,
-        receivedValue: payment.valor_recebido,
-        pendingValue: Math.max(0, payment.valor_original - payment.valor_recebido),
-      });
+      // Para sale_payments, cada registro representa um pagamento completo
+      if (payment.distributionDetails && Array.isArray(payment.distributionDetails)) {
+        payment.distributionDetails.forEach((detail: any) => {
+          saleData.installments.push({
+            collectionId: detail.installmentId || payment.id,
+            originalValue: detail.originalAmount || 0,
+            receivedValue: detail.appliedAmount || 0,
+            pendingValue: Math.max(0, (detail.originalAmount || 0) - (detail.appliedAmount || 0)),
+          });
+          saleData.totalOriginalValue += detail.originalAmount || 0;
+        });
+      } else {
+        // Fallback se não houver detalhes de distribuição
+        saleData.installments.push({
+          collectionId: payment.id,
+          originalValue: 0,
+          receivedValue: payment.paymentAmount,
+          pendingValue: 0,
+        });
+      }
     });
 
     // Converter para array e calcular valor pendente total
@@ -372,6 +402,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       payments,
     };
   }, [
+    salePayments,
     collections,
     selectedDate,
     endDate,

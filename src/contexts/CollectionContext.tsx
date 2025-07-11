@@ -1391,16 +1391,42 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   const fetchSalePayments = async () => {
     try {
-      console.log("Buscando pagamentos de venda...");
+      console.log("Buscando pagamentos de venda da tabela sale_payments...");
 
-      // Simular dados de pagamentos por enquanto (pode ser implementado com Supabase depois)
-      // Por enquanto, vamos calcular dos dados existentes
-      setSalePayments([]);
+      const { data: payments, error } = await supabase
+        .from("sale_payments")
+        .select("*")
+        .order("payment_date", { ascending: false });
+
+      if (error) {
+        console.error("Erro ao buscar pagamentos:", error);
+        throw error;
+      }
+
+      // Converter para o formato esperado pela aplicação
+      const convertedPayments: SalePayment[] = (payments || []).map(payment => ({
+        id: payment.id,
+        saleNumber: payment.sale_number,
+        clientDocument: payment.client_document,
+        paymentAmount: payment.payment_amount,
+        paymentDate: payment.payment_date,
+        paymentMethod: payment.payment_method,
+        notes: payment.notes,
+        collectorId: payment.collector_id,
+        collectorName: payment.collector_name,
+        createdAt: payment.created_at,
+        distributionDetails: payment.distribution_details || [],
+      }));
+
+      setSalePayments(convertedPayments);
+      console.log(`✅ ${convertedPayments.length} pagamentos carregados da tabela sale_payments`);
     } catch (err) {
       console.error("Erro ao carregar pagamentos de venda:", err);
       setError(
         err instanceof Error ? err.message : "Erro ao carregar pagamentos",
       );
+      // Em caso de erro, definir array vazio
+      setSalePayments([]);
     }
   };
 
@@ -1570,23 +1596,36 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }
       }
 
-      // 4. Registrar o pagamento da venda (futuramente pode ir para uma tabela separada)
-      const salePayment: SalePayment = {
-        id: `${Date.now()}-${Math.random()}`, // ID temporário
-        saleNumber: payment.saleNumber,
-        clientDocument: payment.clientDocument,
-        paymentAmount: payment.paymentAmount,
-        paymentDate: new Date().toISOString().split("T")[0],
-        paymentMethod: payment.paymentMethod,
-        notes: payment.notes,
-        collectorId,
-        collectorName: users.find((u) => u.id === collectorId)?.name,
-        createdAt: new Date().toISOString(),
-        distributionDetails,
+      // 4. Registrar o pagamento na tabela sale_payments
+      const collector = users.find((u) => u.id === collectorId);
+      const client = saleInstallments[0]; // Usar primeira parcela para obter dados do cliente
+      
+      const paymentRecord = {
+        sale_number: payment.saleNumber,
+        client_document: payment.clientDocument,
+        client_name: client?.cliente || "Cliente não informado",
+        payment_amount: payment.paymentAmount,
+        payment_date: new Date().toISOString().split("T")[0],
+        payment_method: payment.paymentMethod,
+        notes: payment.notes || "",
+        collector_id: collectorId,
+        collector_name: collector?.name || "Cobrador não encontrado",
+        distribution_details: distributionDetails,
+        store_name: client?.nome_da_loja || null,
       };
 
-      // Adicionar aos pagamentos locais
-      setSalePayments((prev) => [...prev, salePayment]);
+      const { data: insertedPayment, error: paymentError } = await supabase
+        .from("sale_payments")
+        .insert(paymentRecord)
+        .select()
+        .single();
+
+      if (paymentError) {
+        console.error("Erro ao registrar pagamento na tabela sale_payments:", paymentError);
+        // Não falhar se não conseguir registrar o histórico, apenas logar
+      } else {
+        console.log("✅ Pagamento registrado na tabela sale_payments:", insertedPayment);
+      }
 
       // 5. Atualizar estado local das collections imediatamente
       setCollections((prevCollections) =>
@@ -1754,8 +1793,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }
       }
 
-      // 5. Registrar o pagamento geral (opcional - se a tabela existir)
+      // 5. Registrar o pagamento geral na tabela sale_payments
       try {
+        const collector = users.find((u) => u.id === collectorId);
+        const client = updatedInstallments[0]; // Usar primeira parcela para obter dados do cliente
+        
         const affectedSales = [
           ...new Set(distributionDetails.map((d) => d.saleNumber)),
         ];
@@ -1770,27 +1812,30 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           );
 
           const paymentRecord = {
-            id: crypto.randomUUID(),
             sale_number: saleNumber,
             client_document: clientDocument,
+            client_name: client?.cliente || "Cliente não informado",
             payment_amount: salePaymentAmount,
             payment_date: new Date().toISOString().split("T")[0],
             payment_method: paymentMethod,
             notes: `Pagamento geral do cliente. ${notes}`.trim(),
             collector_id: collectorId,
-            created_at: new Date().toISOString(),
-            distribution_details: JSON.stringify(saleDistribution),
+            collector_name: collector?.name || "Cobrador não encontrado",
+            distribution_details: saleDistribution,
+            store_name: client?.nome_da_loja || null,
           };
 
-          const { error: paymentError } = await supabase
+          const { data: insertedPayment, error: paymentError } = await supabase
             .from("sale_payments")
-            .insert(paymentRecord);
+            .insert(paymentRecord)
+            .select()
+            .single();
 
           if (paymentError) {
-            console.warn(
-              "Tabela sale_payments não encontrada, prosseguindo sem registro de histórico:",
-              paymentError,
-            );
+            console.error("Erro ao registrar pagamento na tabela sale_payments:", paymentError);
+            // Não falhar se não conseguir registrar o histórico, apenas logar
+          } else {
+            console.log("✅ Pagamento registrado na tabela sale_payments:", insertedPayment);
           }
         }
       } catch (historyError) {
