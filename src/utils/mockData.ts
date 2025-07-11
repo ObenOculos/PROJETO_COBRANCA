@@ -1,32 +1,3 @@
-import { User } from '../types';
-
-export const mockUsers: User[] = [
-  {
-    id: '1',
-    name: 'João Silva',
-    login: 'gerente',
-    password: '123456',
-    type: 'manager',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    name: 'Maria Santos',
-    login: 'cobrador1',
-    password: '123456',
-    type: 'collector',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    name: 'Pedro Costa',
-    login: 'cobrador2',
-    password: '123456',
-    type: 'collector',
-    createdAt: new Date().toISOString(),
-  },
-];
-
 import { CollectionStatus, STATUS_COLORS, STATUS_LABELS } from '../types/status';
 
 const normalizeStatus = (status: string | null | undefined): CollectionStatus => {
