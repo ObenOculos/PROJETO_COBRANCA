@@ -15,7 +15,7 @@ import VisitScheduler from "./VisitScheduler";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { FilterOptions } from "../../types";
-import { formatCurrency } from "../../utils/mockData";
+import { formatCurrency } from "../../utils/formatters";
 
 // Export tabs for use in Header
 export const getCollectorTabs = () => [

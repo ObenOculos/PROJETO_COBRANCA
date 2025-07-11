@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
 import { Collection } from "../types";
-import { formatCurrency } from "../utils/mockData";
+import { formatCurrency } from "../utils/formatters";
 import { Modal } from "./Modal";
 
 interface ClientWithCollections {

@@ -15,7 +15,7 @@ import {
   formatCurrency,
   formatDate,
   getStatusLabel,
-} from "../../utils/mockData";
+} from "../../utils/formatters";
 
 interface CollectionModalProps {
   collection: Collection;

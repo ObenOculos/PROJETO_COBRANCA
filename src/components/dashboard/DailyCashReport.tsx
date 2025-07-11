@@ -12,7 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Collection } from "../../types";
-import { formatCurrency, formatDate } from "../../utils/mockData";
+import { formatCurrency, formatDate } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
 
 interface DailyCashReportProps {

@@ -12,7 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { ClientGroup, FilterOptions } from "../../types";
-import { formatCurrency } from "../../utils/mockData";
+import { formatCurrency } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import FilterBar from "../common/FilterBar";

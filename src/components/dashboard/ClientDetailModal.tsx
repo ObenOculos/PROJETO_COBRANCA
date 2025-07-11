@@ -10,7 +10,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { ClientGroup, SaleGroup } from "../../types";
-import { formatCurrency } from "../../utils/mockData";
+import { formatCurrency } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";

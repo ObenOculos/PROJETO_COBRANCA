@@ -12,7 +12,7 @@ import {
 import { SaleGroup, SalePaymentInput } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { formatCurrency, formatDate } from "../../utils/mockData";
+import { formatCurrency, formatDate } from "../../utils/formatters";
 
 interface SalePaymentModalProps {
   saleGroup: SaleGroup;

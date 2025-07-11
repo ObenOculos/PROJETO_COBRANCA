@@ -19,7 +19,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { Collection, ClientGroup, SaleGroup } from "../../types";
-import { formatCurrency } from "../../utils/mockData";
+import { formatCurrency } from "../../utils/formatters";
 import CollectionModal from "./CollectionModal";
 import ClientDetailModal from "./ClientDetailModal";
 import SaleDetailsModal from "./SaleDetailsModal";

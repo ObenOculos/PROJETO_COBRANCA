@@ -14,7 +14,7 @@ import {
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { ScheduledVisit } from "../../types";
-import { formatCurrency } from "../../utils/mockData";
+import { formatCurrency } from "../../utils/formatters";
 
 interface VisitCancellationApprovalProps {
   onClose?: () => void;

@@ -13,7 +13,7 @@ import {
 import { ClientGroup, SaleGroup } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { formatCurrency } from "../../utils/mockData";
+import { formatCurrency } from "../../utils/formatters";
 import { CollectionStatus } from "../../types/status";
 
 interface GeneralPaymentEditModalProps {

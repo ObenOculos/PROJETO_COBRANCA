@@ -3,7 +3,7 @@ import { Search, Filter, X } from "lucide-react";
 import { FilterOptions } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { getAllStatuses } from "../../utils/mockData";
+import { getAllStatuses } from "../../utils/formatters";
 
 interface FilterBarProps {
   filters: FilterOptions;

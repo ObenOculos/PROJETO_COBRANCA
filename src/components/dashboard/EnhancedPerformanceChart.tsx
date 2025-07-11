@@ -13,7 +13,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
-import { formatCurrency } from "../../utils/mockData";
+import { formatCurrency } from "../../utils/formatters";
 
 interface EnhancedCollectorPerformance {
   collectorId: string;

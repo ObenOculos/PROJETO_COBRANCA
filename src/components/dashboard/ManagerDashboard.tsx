@@ -28,7 +28,7 @@ import DailyCashReport from "./DailyCashReport";
 import AuthorizationManager from "./AuthorizationManager";
 import { useCollection } from "../../contexts/CollectionContext";
 import { FilterOptions } from "../../types";
-import { formatCurrency } from "../../utils/mockData";
+import { formatCurrency } from "../../utils/formatters";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 
 // Export tabs for use in Header
