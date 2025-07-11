@@ -1044,35 +1044,245 @@ const generatePrintableReport = (
     <head>
       <title>Relatório do Caixa - ${data.date}</title>
       <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
-        .summary { margin-bottom: 30px; }
-        .summary-item { margin: 5px 0; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; font-weight: bold; }
-        .total { font-weight: bold; }
+        @page { margin: 15mm; size: A4 landscape; }
+        * { box-sizing: border-box; }
+        body { 
+          font-family: 'Arial', sans-serif; 
+          margin: 0; 
+          padding: 0; 
+          line-height: 1.3;
+          color: #333;
+          background: #fff;
+          text-align: center;
+          font-size: 13px;
+        }
+        
+        .container {
+          max-width: 95%;
+          margin: 0 auto;
+          text-align: left;
+        }
+        
+        .header { 
+          text-align: center; 
+          border-bottom: 2px solid #333; 
+          padding: 8px 0; 
+          margin-bottom: 15px; 
+        }
+        
+        .header h1 { 
+          margin: 0 0 4px 0; 
+          color: #333; 
+          font-size: 20px; 
+          font-weight: bold;
+        }
+        
+        .header h2 { 
+          margin: 0; 
+          color: #666; 
+          font-size: 14px; 
+          font-weight: normal;
+        }
+        
+        .summary { 
+          margin: 0 auto 15px auto; 
+          padding: 8px;
+          border: 1px solid #ddd;
+          max-width: 100%;
+        }
+        
+        .summary h3 {
+          margin: 0 0 8px 0;
+          color: #333;
+          font-size: 16px;
+          font-weight: bold;
+          border-bottom: 1px solid #ddd;
+          padding-bottom: 4px;
+        }
+        
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 8px;
+          margin-top: 8px;
+        }
+        
+        .summary-item { 
+          border: 1px solid #eee;
+          padding: 6px;
+        }
+        
+        .summary-item .label {
+          font-size: 11px;
+          color: #666;
+          margin-bottom: 2px;
+        }
+        
+        .summary-item .value {
+          font-size: 14px;
+          font-weight: bold;
+          color: #333;
+        }
+        
+        .section-title {
+          color: #333;
+          font-size: 16px;
+          font-weight: bold;
+          margin: 20px 0 8px 0;
+          padding: 4px 0;
+          border-bottom: 1px solid #ddd;
+        }
+        
+        table { 
+          width: 100%; 
+          border-collapse: collapse; 
+          margin: 8px auto 15px auto;
+          border: 1px solid #ddd;
+        }
+        
+        th { 
+          background: #f5f5f5;
+          color: #333;
+          font-weight: bold;
+          padding: 6px 8px;
+          text-align: center;
+          font-size: 12px;
+          border: 1px solid #ddd;
+        }
+        
+        td { 
+          padding: 6px 8px;
+          border: 1px solid #ddd;
+          font-size: 12px;
+          vertical-align: top;
+          text-align: center;
+        }
+        
+        tr:nth-child(even) { background-color: #fafafa; }
+        
         .text-center { text-align: center; }
         .text-right { text-align: right; }
-        .small-text { font-size: 0.9em; color: #666; }
-        .total-section { margin-top: 30px; padding: 15px; background-color: #f8f9fa; border: 2px solid #dee2e6; border-radius: 5px; }
-        .total-row { display: flex; justify-content: space-between; margin: 5px 0; font-size: 1.1em; }
-        .total-row.grand-total { font-weight: bold; font-size: 1.2em; border-top: 2px solid #333; padding-top: 10px; margin-top: 10px; }
+        .small-text { font-size: 10px; color: #666; }
+        
+        .total-section { 
+          margin: 15px auto 0 auto; 
+          padding: 8px;
+          border: 1px solid #ddd;
+          max-width: 100%;
+        }
+        
+        .totals-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 15px;
+          margin-top: 8px;
+        }
+        
+        .totals-column {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        
+        .total-section h3 {
+          margin: 0 0 8px 0;
+          color: #333;
+          font-size: 16px;
+          font-weight: bold;
+        }
+        
+        .total-row { 
+          display: flex; 
+          justify-content: space-between; 
+          align-items: center;
+          margin: 4px 0; 
+          font-size: 13px;
+          padding: 2px 0;
+        }
+        
+        .total-row .label {
+          color: #333;
+          font-weight: normal;
+        }
+        
+        .total-row .value {
+          font-weight: bold;
+        }
+        
+        .total-row.grand-total { 
+          font-size: 15px;
+          border-top: 2px solid #333; 
+          padding-top: 8px; 
+          margin-top: 8px;
+        }
+        
+        .grand-total .label {
+          color: #333;
+          font-weight: bold;
+        }
+        
+        .grand-total .value {
+          color: #333;
+          font-weight: bold;
+        }
+        
+        .footer {
+          margin-top: 20px;
+          padding-top: 8px;
+          border-top: 1px solid #ddd;
+          text-align: center;
+          color: #666;
+          font-size: 10px;
+        }
+        
+        .generated-info {
+          padding: 6px;
+          margin-top: 15px;
+          font-size: 10px;
+          color: #666;
+          text-align: center;
+          border: 1px solid #ddd;
+        }
+        
+        @media print {
+          .header { break-inside: avoid; }
+          .summary { break-inside: avoid; }
+          .total-section { break-inside: avoid; }
+          table { break-inside: avoid; }
+          tr { break-inside: avoid; }
+        }
       </style>
     </head>
     <body>
-      <div class="header">
-        <h1>Relatório do Caixa ${isRangeMode ? "do Período" : "do Dia"}</h1>
-        <h2>${data.date}</h2>
-      </div>
+      <div class="container">
+        <div class="header">
+          <h1>Relatório do Caixa ${isRangeMode ? "do Período" : "do Dia"}</h1>
+          <h2>${data.date}</h2>
+        </div>
       
       <div class="summary">
-        <div class="summary-item total">Total Recebido: ${formatCurrency(data.totalReceived)}</div>
-        <div class="summary-item">Total de Vendas: ${data.totalTransactions}</div>
-        <div class="summary-item">Cobradores Ativos: ${data.collectorSummary.length}</div>
+        <h3>Resumo Financeiro</h3>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <div class="label">Total Recebido</div>
+            <div class="value">${formatCurrency(data.totalReceived)}</div>
+          </div>
+          <div class="summary-item">
+            <div class="label">Total de Vendas</div>
+            <div class="value">${data.totalTransactions}</div>
+          </div>
+          <div class="summary-item">
+            <div class="label">Cobradores Ativos</div>
+            <div class="value">${data.collectorSummary.length}</div>
+          </div>
+          <div class="summary-item">
+            <div class="label">Ticket Médio</div>
+            <div class="value">${data.totalTransactions > 0 ? formatCurrency(data.totalReceived / data.totalTransactions) : formatCurrency(0)}</div>
+          </div>
+        </div>
       </div>
 
-      <h3>Resumo por Cobrador</h3>
+      <h3 class="section-title">Resumo por Cobrador</h3>
       <table>
         <tr>
           <th>Cobrador</th>
@@ -1086,9 +1296,9 @@ const generatePrintableReport = (
             (c) => `
           <tr>
             <td>${c.collectorName}</td>
-            <td class="text-right" style="font-weight: bold; color: green;">${formatCurrency(c.receivedAmount)}</td>
-            <td class="text-center">${c.transactionCount}</td>
-            <td class="text-center">${c.clients.length}</td>
+            <td style="font-weight: bold; text-align: right;">${formatCurrency(c.receivedAmount)}</td>
+            <td>${c.transactionCount}</td>
+            <td>${c.clients.length}</td>
             <td class="small-text">${c.saleNumbers.length > 0 ? `#${c.saleNumbers.join(", #")}` : "-"}</td>
           </tr>
         `,
@@ -1097,7 +1307,7 @@ const generatePrintableReport = (
       </table>
 
       ${showDetails && data.payments.length > 0 ? `
-      <h3>Transações Detalhadas</h3>
+      <h3 class="section-title">Transações Detalhadas</h3>
       <table>
         <tr>
           <th>Cliente</th>
@@ -1114,12 +1324,12 @@ const generatePrintableReport = (
             (p) => `
           <tr>
             <td>${p.client}</td>
-            <td class="text-center">${p.saleNumber ? `#${p.saleNumber}` : 'Sem número'}</td>
-            <td class="text-center">${p.installments.length}</td>
+            <td>${p.saleNumber ? `#${p.saleNumber}` : 'Sem número'}</td>
+            <td>${p.installments.length}</td>
             <td>${p.store}</td>
-            <td class="text-right">${formatCurrency(p.totalOriginalValue)}</td>
-            <td class="text-right" style="font-weight: bold; color: green;">${formatCurrency(p.totalReceivedValue)}</td>
-            <td class="text-right" style="font-weight: bold; color: ${p.totalPendingValue > 0 ? 'red' : 'gray'};">${p.totalPendingValue > 0 ? formatCurrency(p.totalPendingValue) : '-'}</td>
+            <td style="text-align: right;">${formatCurrency(p.totalOriginalValue)}</td>
+            <td style="font-weight: bold; text-align: right;">${formatCurrency(p.totalReceivedValue)}</td>
+            <td style="text-align: right;">${p.totalPendingValue > 0 ? formatCurrency(p.totalPendingValue) : '-'}</td>
             <td>${p.collector}</td>
           </tr>
         `,
@@ -1129,25 +1339,31 @@ const generatePrintableReport = (
       
       <div class="total-section">
         <h3 style="margin-top: 0;">Totais Gerais</h3>
-        <div class="total-row">
-          <span>Total de Vendas:</span>
-          <span>${data.totalTransactions}</span>
-        </div>
-        <div class="total-row">
-          <span>Total Devido:</span>
-          <span>${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalOriginalValue, 0))}</span>
-        </div>
-        <div class="total-row">
-          <span>Total Recebido:</span>
-          <span style="color: green;">${formatCurrency(data.totalReceived)}</span>
-        </div>
-        <div class="total-row">
-          <span>Total Pendente:</span>
-          <span style="color: ${data.payments.reduce((sum, p) => sum + p.totalPendingValue, 0) > 0 ? 'red' : 'gray'};">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalPendingValue, 0))}</span>
+        <div class="totals-grid">
+          <div class="totals-column">
+            <div class="total-row">
+              <span class="label">Total de Vendas:</span>
+              <span class="value">${data.totalTransactions}</span>
+            </div>
+            <div class="total-row">
+              <span class="label">Total Devido:</span>
+              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalOriginalValue, 0))}</span>
+            </div>
+          </div>
+          <div class="totals-column">
+            <div class="total-row">
+              <span class="label">Total Recebido:</span>
+              <span class="value">${formatCurrency(data.totalReceived)}</span>
+            </div>
+            <div class="total-row">
+              <span class="label">Total Pendente:</span>
+              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalPendingValue, 0))}</span>
+            </div>
+          </div>
         </div>
         <div class="total-row grand-total">
-          <span>RESULTADO FINAL:</span>
-          <span style="color: green;">${formatCurrency(data.totalReceived)}</span>
+          <span class="label">RESULTADO FINAL:</span>
+          <span class="value">${formatCurrency(data.totalReceived)}</span>
         </div>
       </div>
       ` : ''}
@@ -1155,28 +1371,53 @@ const generatePrintableReport = (
       ${!showDetails && data.payments.length > 0 ? `
       <div class="total-section">
         <h3 style="margin-top: 0;">Totais Gerais</h3>
-        <div class="total-row">
-          <span>Total de Vendas:</span>
-          <span>${data.totalTransactions}</span>
-        </div>
-        <div class="total-row">
-          <span>Total Devido:</span>
-          <span>${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalOriginalValue, 0))}</span>
-        </div>
-        <div class="total-row">
-          <span>Total Recebido:</span>
-          <span style="color: green;">${formatCurrency(data.totalReceived)}</span>
-        </div>
-        <div class="total-row">
-          <span>Total Pendente:</span>
-          <span style="color: ${data.payments.reduce((sum, p) => sum + p.totalPendingValue, 0) > 0 ? 'red' : 'gray'};">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalPendingValue, 0))}</span>
+        <div class="totals-grid">
+          <div class="totals-column">
+            <div class="total-row">
+              <span class="label">Total de Vendas:</span>
+              <span class="value">${data.totalTransactions}</span>
+            </div>
+            <div class="total-row">
+              <span class="label">Total Devido:</span>
+              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalOriginalValue, 0))}</span>
+            </div>
+          </div>
+          <div class="totals-column">
+            <div class="total-row">
+              <span class="label">Total Recebido:</span>
+              <span class="value">${formatCurrency(data.totalReceived)}</span>
+            </div>
+            <div class="total-row">
+              <span class="label">Total Pendente:</span>
+              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalPendingValue, 0))}</span>
+            </div>
+          </div>
         </div>
         <div class="total-row grand-total">
-          <span>RESULTADO FINAL:</span>
-          <span style="color: green;">${formatCurrency(data.totalReceived)}</span>
+          <span class="label">RESULTADO FINAL:</span>
+          <span class="value">${formatCurrency(data.totalReceived)}</span>
         </div>
       </div>
       ` : ''}
+      
+      <div class="generated-info">
+        <strong>Relatório Gerado Automaticamente</strong><br>
+        Data de Geração: ${new Date().toLocaleString('pt-BR', { 
+          timeZone: 'America/Sao_Paulo',
+          year: 'numeric',
+          month: '2-digit', 
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        })}<br>
+        Sistema de Gestão de Cobrança
+      </div>
+      
+        <div class="footer">
+          <p>Este relatório contém informações confidenciais da empresa.</p>
+          <p>Para dúvidas ou esclarecimentos, entre em contato com o setor financeiro.</p>
+        </div>
+      </div>
     </body>
     </html>
   `;
