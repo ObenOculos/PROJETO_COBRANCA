@@ -423,7 +423,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         return;
       }
 
-      const { data, error: supabaseError } = await supabase
+      const { error: supabaseError } = await supabase
         .from("collector_stores")
         .insert({
           collector_id: collectorId,
