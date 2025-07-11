@@ -259,7 +259,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         juros_por_dia: parseFloat((row.juros_por_dia || "0").toString().replace(",", ".")),
         multa_aplicada: parseFloat((row.multa_aplicada || "0").toString().replace(",", ".")),
         juros_aplicado: parseFloat((row.juros_aplicado || "0").toString().replace(",", ".")),
-        valor_recebido: parseFloat((row.valor_recebido || "0").toString().replace(",", ".")) - parseFloat((row.multa_paga || "0").toString().replace(",", ".")),
+        valor_recebido: parseFloat((row.valor_recebido || "0").toString().replace(",", ".")),
         data_de_recebimento: row.data_de_recebimento,
         dias_em_atraso: row.dias_em_atraso,
         dias_carencia: parseFloat(row.dias_carencia || "0"),

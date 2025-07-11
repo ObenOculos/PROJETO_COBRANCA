@@ -168,6 +168,31 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     }
   }, [salePayments]);
 
+  // Escutar eventos globais de pagamento processado
+  useEffect(() => {
+    const handlePaymentProcessed = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log('🔔 Pagamento processado detectado no DailyCashReport:', customEvent.detail);
+      
+      // Forçar atualização dos dados
+      await refreshData();
+      setForceUpdate(prev => prev + 1);
+      setLastUpdate(new Date());
+      setShowUpdateNotification(true);
+      
+      // Esconder notificação após 3 segundos
+      setTimeout(() => {
+        setShowUpdateNotification(false);
+      }, 3000);
+    };
+
+    window.addEventListener('paymentProcessed', handlePaymentProcessed);
+    
+    return () => {
+      window.removeEventListener('paymentProcessed', handlePaymentProcessed);
+    };
+  }, [refreshData]);
+
   // Quick date range selection
   const applyQuickDateRange = (
     rangeKey: keyof ReturnType<typeof getQuickDateRanges>,
