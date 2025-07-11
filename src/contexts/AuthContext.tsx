@@ -47,7 +47,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
-    // Check for existing session in sessionStorage
+    // Check for existing session
     const checkSession = async () => {
       try {
         setIsLoading(true);
@@ -55,20 +55,75 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Adiciona um pequeno delay para mostrar o loading no refresh
         await new Promise((resolve) => setTimeout(resolve, 800));
 
-        const savedUser = sessionStorage.getItem("sistema_user");
-        if (savedUser) {
-          const userData = JSON.parse(savedUser);
-          setUser(userData);
+        // Primeiro, verificar se há uma sessão do Supabase válida
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Erro ao verificar sessão do Supabase:", sessionError);
+          sessionStorage.removeItem("sistema_user");
+          return;
+        }
+
+        // Se há sessão no Supabase, recuperar dados do usuário
+        if (session) {
+          console.log("Sessão do Supabase encontrada, recuperando dados do usuário...");
+          
+          // Buscar dados do usuário usando o email da sessão
+          const { data: users, error: userError } = await supabase
+            .from("users")
+            .select("*")
+            .eq("login", session.user.email)
+            .limit(1);
+
+          if (!userError && users && users.length > 0) {
+            const foundUser = users[0];
+            const userObj: User = {
+              id: foundUser.id,
+              name: foundUser.name,
+              login: foundUser.login,
+              password: foundUser.password,
+              type: foundUser.type as "manager" | "collector",
+              createdAt: foundUser.created_at || new Date().toISOString(),
+            };
+
+            // Salvar na sessão local e no estado
+            sessionStorage.setItem("sistema_user", JSON.stringify(userObj));
+            setUser(userObj);
+            console.log("Usuário recuperado da sessão:", userObj);
+          }
+        } else {
+          // Se não há sessão no Supabase, verificar sessionStorage como fallback
+          const savedUser = sessionStorage.getItem("sistema_user");
+          if (savedUser) {
+            const userData = JSON.parse(savedUser);
+            setUser(userData);
+          }
         }
       } catch (err) {
         console.error("Error checking session:", err);
-        sessionStorage.removeItem("sistema_user"); // Corrigido: usar sessionStorage
+        sessionStorage.removeItem("sistema_user");
       } finally {
         setIsLoading(false);
       }
     };
 
     checkSession();
+
+    // Configurar listener para mudanças na autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session);
+      
+      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        if (event === 'SIGNED_OUT') {
+          sessionStorage.removeItem("sistema_user");
+          setUser(null);
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Configurar listeners de atividade quando o usuário estiver logado
@@ -109,7 +164,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Função interna para realizar o login
       const performLogin = async (): Promise<boolean> => {
-        // Buscar usuário na tabela users
+        // Primeiro, buscar usuário na tabela users para validar credenciais
         const { data: users, error: userError } = await supabase
           .from("users")
           .select("*")
@@ -132,6 +187,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         const foundUser = users[0];
         console.log("Usuário encontrado:", foundUser);
+
+        // Tentar criar uma sessão no Supabase usando o email como login
+        // Nota: Isso assume que o campo 'login' contém um email válido
+        try {
+          const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            email: foundUser.login,
+            password: password,
+          });
+
+          if (authError) {
+            console.log("Erro ao criar sessão no Supabase:", authError);
+            // Continuar mesmo se falhar, pois o sistema funciona com sessionStorage
+          } else {
+            console.log("Sessão criada no Supabase com sucesso");
+          }
+        } catch (authErr) {
+          console.log("Falha ao criar sessão no Supabase, continuando com sessionStorage:", authErr);
+        }
 
         // Criar objeto do usuário
         const userObj: User = {
@@ -171,6 +244,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Usa withLoading para logout se necessário
       await withLoading(
         (async () => {
+          // Fazer logout do Supabase
+          try {
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+              console.error("Erro ao fazer logout do Supabase:", error);
+            }
+          } catch (authErr) {
+            console.error("Falha ao fazer logout do Supabase:", authErr);
+          }
+
           sessionStorage.removeItem("sistema_user");
           setUser(null);
 
