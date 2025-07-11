@@ -191,7 +191,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Tentar criar uma sessão no Supabase usando o email como login
         // Nota: Isso assume que o campo 'login' contém um email válido
         try {
-          const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          const { error: authError } = await supabase.auth.signInWithPassword({
             email: foundUser.login,
             password: password,
           });
