@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Clock, Check, X, AlertCircle, User, FileText, Download, Search, TrendingUp, Loader2 } from "lucide-react";
+import { Clock, Check, X, AlertCircle, User, FileText, Download, Search, TrendingUp, Loader2, Shield } from "lucide-react";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 import { AuthorizationHistory } from "../../types";
 import { useAuth } from "../../contexts/AuthContext";
@@ -269,131 +269,172 @@ const AuthorizationManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Solicitações de Autorização
-          </h3>
-          <div className="flex items-center gap-3">
-            {/* Toggle Views */}
-            <div className="flex bg-gray-100 rounded-lg p-0.5">
-              <button
-                onClick={() => setActiveView("current")}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  activeView === "current"
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                Atuais
-              </button>
-              <button
-                onClick={() => setActiveView("history")}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  activeView === "history"
-                    ? "bg-white text-blue-600 shadow-sm"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                Histórico
-              </button>
+      {/* Header + Navigation Combined - Padrão VisitTracking */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-blue-600 flex-shrink-0" />
+            <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
+              <span className="hidden sm:inline">Solicitações de </span>Autorização
+            </h3>
+            {/* Badge com contador total sempre visível */}
+            <div className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">
+              {activeView === "current" ? pendingRequests.length : historyTotal}
             </div>
-            
+          </div>
+        </div>
+        
+        {/* Navegação por Tabs - Desktop com texto, Mobile apenas ícones (padrão 1x2) */}
+        <div className="grid grid-cols-2 sm:flex gap-2">
+          <button
+            onClick={() => setActiveView("current")}
+            className={`flex items-center justify-center px-4 rounded-lg text-sm font-medium transition-colors ${
+              activeView === "current"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+            title="Solicitações Atuais"
+          >
+            <Clock className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Atuais</span>
+          </button>
+          <button
+            onClick={() => setActiveView("history")}
+            className={`flex items-center justify-center px-4 rounded-lg text-sm font-medium transition-colors ${
+              activeView === "history"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+            title="Histórico de Autorizações"
+          >
+            <FileText className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Histórico</span>
+          </button>
+        </div>
+        
+        {/* Ações Contextuais - Sempre visíveis */}
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+          <div className="text-sm text-gray-600">
+            {activeView === "current" 
+              ? `${pendingRequests.length} pendente${pendingRequests.length !== 1 ? 's' : ''}` 
+              : `${historyTotal} registro${historyTotal !== 1 ? 's' : ''}`
+            }
+          </div>
+          <div className="flex gap-2">
             {activeView === "current" ? (
-              <>
-                <button
-                  onClick={clearExpiredRequests}
-                  className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  Limpar Expiradas
-                </button>
-                <span className="text-sm text-gray-500">
-                  {pendingRequests.length} pendente{pendingRequests.length !== 1 ? 's' : ''}
-                </span>
-              </>
+              <button
+                onClick={clearExpiredRequests}
+                className="flex items-center px-3 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                title="Limpar Solicitações Expiradas"
+              >
+                <X className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Limpar Expiradas</span>
+              </button>
             ) : (
-              <>
-                <button
-                  onClick={exportHistory}
-                  className="flex items-center px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                >
-                  <Download className="h-4 w-4 mr-1" />
-                  Exportar
-                </button>
-                <span className="text-sm text-gray-500">
-                  {historyTotal} registro{historyTotal !== 1 ? 's' : ''}
-                </span>
-              </>
+              <button
+                onClick={exportHistory}
+                className="flex items-center px-3 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Exportar Histórico"
+              >
+                <Download className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Exportar</span>
+              </button>
             )}
           </div>
         </div>
+      </div>
 
+      {/* Content Area */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         {activeView === "current" ? (
           <div>
-            {/* Solicitações Pendentes */}
-            {pendingRequests.length > 0 && (
-          <div className="space-y-3 mb-6">
-            <h4 className="text-sm font-medium text-gray-700 flex items-center">
-              <Clock className="h-4 w-4 mr-2 text-amber-500" />
-              Aguardando Aprovação
-            </h4>
-            {pendingRequests.map((request) => (
-              <div key={request.token} className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <User className="h-4 w-4 text-gray-600" />
-                      <span className="font-medium text-gray-900">{request.collector_name}</span>
-                      <span className="text-xs text-gray-500">
-                        {formatTime(request.requested_at)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <FileText className="h-4 w-4 text-gray-600" />
-                      <span className="text-sm text-gray-700">
-                        {request.client_name} ({request.client_document})
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
-                        Token: {request.token}
-                      </span>
-                      <span className="text-xs text-amber-600">
-                        Expira em: {getTimeRemaining(request.expires_at)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 ml-4">
-                    <button
-                      onClick={() => approveRequest(request.token)}
-                      disabled={actionLoading === request.token}
-                      className="flex items-center px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm disabled:opacity-50"
-                    >
-                      {actionLoading === request.token ? (
-                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                      ) : (
-                        <Check className="h-4 w-4 mr-1" />
-                      )}
-                      Aprovar
-                    </button>
-                    <button
-                      onClick={() => rejectRequest(request.token)}
-                      disabled={actionLoading === request.token}
-                      className="flex items-center px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm disabled:opacity-50"
-                    >
-                      {actionLoading === request.token ? (
-                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                      ) : (
-                        <X className="h-4 w-4 mr-1" />
-                      )}
-                      Rejeitar
-                    </button>
-                  </div>
+            {/* Solicitações Pendentes - Design Melhorado */}
+            {pendingRequests.length > 0 ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <Clock className="h-5 w-5 mr-2 text-amber-500" />
+                    Aguardando Aprovação
+                  </h3>
+                  <span className="text-sm text-amber-600 bg-amber-100 px-3 py-1 rounded-full font-medium">
+                    {pendingRequests.length} pendente{pendingRequests.length !== 1 ? 's' : ''}
+                  </span>
                 </div>
+                
+                {pendingRequests.map((request) => (
+                  <div key={request.token} className="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-400 rounded-lg p-3 hover:shadow-md transition-shadow">
+                    {/* Header Mobile Compacto */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="h-8 w-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <User className="h-4 w-4 text-amber-600" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-semibold text-gray-900 truncate text-sm">{request.collector_name}</h4>
+                          <p className="text-xs text-amber-600 font-medium">
+                            {getTimeRemaining(request.expires_at)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500 flex-shrink-0">
+                        {formatTime(request.requested_at)}
+                      </div>
+                    </div>
+                    
+                    {/* Cliente Info - Compacto */}
+                    <div className="flex items-center gap-2 mb-3 p-2 bg-white rounded">
+                      <FileText className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-900 truncate text-sm">{request.client_name}</p>
+                        <p className="text-xs text-gray-600 truncate">{request.client_document}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Ações - Mobile Otimizado */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => approveRequest(request.token)}
+                        disabled={actionLoading === request.token}
+                        className="flex-1 flex items-center justify-center px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 text-sm"
+                        title="Aprovar solicitação"
+                      >
+                        {actionLoading === request.token ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Check className="h-4 w-4 sm:mr-1" />
+                            <span className="hidden sm:inline ml-1">Aprovar</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => rejectRequest(request.token)}
+                        disabled={actionLoading === request.token}
+                        className="flex-1 flex items-center justify-center px-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 text-sm"
+                        title="Rejeitar solicitação"
+                      >
+                        {actionLoading === request.token ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <X className="h-4 w-4 sm:mr-1" />
+                            <span className="hidden sm:inline ml-1">Rejeitar</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            ) : (
+              <div className="text-center py-12">
+                <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Check className="h-8 w-8 text-green-600" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma solicitação pendente</h3>
+                <p className="text-gray-600">Todas as solicitações foram processadas</p>
+              </div>
+            )}
 
         {/* Solicitações Processadas */}
         {processedRequests.length > 0 && (
@@ -580,7 +621,7 @@ const AuthorizationManager: React.FC = () => {
                       setDateFilter("");
                       setHistoryPage(1);
                     }}
-                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="px-4 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                   >
                     Limpar Filtros
                   </button>
@@ -664,7 +705,7 @@ const AuthorizationManager: React.FC = () => {
                   <button
                     onClick={() => setHistoryPage(Math.max(1, historyPage - 1))}
                     disabled={historyPage === 1}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Anterior
                   </button>
@@ -674,7 +715,7 @@ const AuthorizationManager: React.FC = () => {
                   <button
                     onClick={() => setHistoryPage(Math.min(historyTotalPages, historyPage + 1))}
                     disabled={historyPage === historyTotalPages}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Próxima
                   </button>

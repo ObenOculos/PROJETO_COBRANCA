@@ -641,7 +641,7 @@ const DatabaseUpload: React.FC = () => {
         <button
           onClick={testSupabaseConnection}
           disabled={loading}
-          className="inline-flex items-center px-3 py-2 border border-yellow-300 text-sm font-medium rounded-md text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50"
+          className="inline-flex items-center px-3 border border-yellow-300 text-sm font-medium rounded-md text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50"
         >
           <RefreshCcw className="h-4 w-4 mr-2" /> Testar Conexão com Supabase
         </button>

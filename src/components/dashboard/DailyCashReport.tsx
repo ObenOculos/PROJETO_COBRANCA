@@ -3,10 +3,7 @@ import {
   Calendar,
   Download,
   DollarSign,
-  TrendingUp,
-  Users,
   FileText,
-  Eye,
   Printer,
   Filter,
   RefreshCw,
@@ -138,9 +135,22 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const [selectedStore, setSelectedStore] = useState<string>("all");
   const [minAmount, setMinAmount] = useState<string>("");
   const [maxAmount, setMaxAmount] = useState<string>("");
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [, setLastUpdate] = useState<Date>(new Date());
   const [showUpdateNotification, setShowUpdateNotification] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
+  const [showFilters, setShowFilters] = useState(false);
+  const [] = useState(false);
+  
+  // Contador de filtros ativos
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (selectedCollector !== "all") count++;
+    if (selectedStore !== "all") count++;
+    if (minAmount) count++;
+    if (maxAmount) count++;
+    if (dateRangeMode === "range") count++;
+    return count;
+  }, [selectedCollector, selectedStore, minAmount, maxAmount, dateRangeMode]);
 
   // Detectar mudanças nos salePayments para mostrar notificação
   useEffect(() => {
@@ -461,65 +471,73 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header and Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-4 lg:p-6 border-b border-gray-200">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="min-w-0">
-              <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-                <FileText className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
-                <span className="truncate">
-                  Relatório do Caixa
-                  {dateRangeMode === "range" ? " do Período" : ""}
-                </span>
-              </h2>
-              <p className="text-gray-600 mt-1 text-sm lg:text-base">
-                Relatório detalhado de recebimentos
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={async () => {
-                  await refreshData();
-                  setForceUpdate(prev => prev + 1);
-                }}
-                className="flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                title="Atualizar dados"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setShowDetails(!showDetails)}
-                className={`flex items-center justify-center px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium whitespace-nowrap ${
-                  showDetails
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">
-                  {showDetails ? "Ocultar Detalhes" : "Ver Detalhes"}
-                </span>
-                <span className="sm:hidden">
-                  {showDetails ? "Ocultar" : "Detalhes"}
-                </span>
-              </button>
-            </div>
+    <div className="space-y-4">
+      {/* Header Simplificado */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">
+              Relatório do Caixa
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {dateRangeMode === "single" 
+                ? formatDate(selectedDate)
+                : `${formatDate(selectedDate)} até ${formatDate(endDate)}`}
+            </p>
           </div>
-
-          {/* Notificação de atualização */}
-          {showUpdateNotification && (
-            <div className="mt-2 flex items-center gap-2 text-sm text-green-600 animate-pulse">
-              <RefreshCw className="h-4 w-4" />
-              <span>Dados atualizados automaticamente</span>
-            </div>
-          )}
+          
+          {/* Ações Principais */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                await refreshData();
+                setForceUpdate(prev => prev + 1);
+              }}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Atualizar"
+            >
+              <RefreshCw className="h-5 w-5" />
+            </button>
+            
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors relative"
+            >
+              <Filter className="h-5 w-5" />
+              {activeFiltersCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-5 w-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
+            
+            <button
+              onClick={handlePrintReport}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <Printer className="h-5 w-5" />
+            </button>
+            
+            <button
+              onClick={handleExportReport}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <Download className="h-5 w-5" />
+            </button>
+          </div>
         </div>
+        
+        {showUpdateNotification && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-green-600">
+            <RefreshCw className="h-3 w-3 animate-spin" />
+            <span>Atualizado</span>
+          </div>
+        )}
+      </div>
 
-        {/* Enhanced Filters */}
-        <div className="p-4 lg:p-6">
+      {/* Filtros Colapsáveis */}
+      {showFilters && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 animate-in slide-in-from-top-2">
           <div className="space-y-4">
             {/* Date Range Mode Toggle */}
             <div>
@@ -529,7 +547,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               <div className="flex bg-gray-100 rounded-lg p-1 w-full sm:w-auto">
                 <button
                   onClick={() => setDateRangeMode("single")}
-                  className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`flex-1 sm:flex-none px-4 rounded-md text-sm font-medium transition-all duration-200 ${
                     dateRangeMode === "single"
                       ? "bg-white text-blue-600 shadow-sm"
                       : "text-gray-600 hover:text-gray-900"
@@ -539,7 +557,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 </button>
                 <button
                   onClick={() => setDateRangeMode("range")}
-                  className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`flex-1 sm:flex-none px-4 rounded-md text-sm font-medium transition-all duration-200 ${
                     dateRangeMode === "range"
                       ? "bg-white text-blue-600 shadow-sm"
                       : "text-gray-600 hover:text-gray-900"
@@ -696,355 +714,163 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Summary Cards */}
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 lg:p-6 rounded-xl border border-green-200">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-green-700">
-                  Total Recebido
-                </p>
-                <p className="text-2xl lg:text-3xl font-bold text-green-900 truncate">
-                  {formatCurrency(reportData.totalReceived)}
-                </p>
-              </div>
-              <DollarSign className="h-8 w-8 lg:h-10 lg:w-10 text-green-600 flex-shrink-0 ml-3" />
-            </div>
-          </div>
-
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 lg:p-6 rounded-xl border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-blue-700">Vendas</p>
-              <p className="text-2xl lg:text-3xl font-bold text-blue-900">
-                {reportData.totalTransactions}
+      {/* Card Principal - Informação mais importante primeiro */}
+      <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-green-100 text-sm font-medium">Total Recebido</p>
+            <p className="text-4xl font-bold mt-1">
+              {formatCurrency(reportData.totalReceived)}
+            </p>
+            {reportData.totalTransactions > 0 && (
+              <p className="text-green-100 text-sm mt-2">
+                Ticket médio: {formatCurrency(reportData.totalReceived / reportData.totalTransactions)}
               </p>
-            </div>
-            <TrendingUp className="h-8 w-8 lg:h-10 lg:w-10 text-blue-600 flex-shrink-0 ml-3" />
+            )}
           </div>
+          <DollarSign className="h-16 w-16 text-green-200 opacity-50" />
         </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-violet-50 p-4 lg:p-6 rounded-xl border border-purple-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-purple-700">
-                Cobradores Ativos
-              </p>
-              <p className="text-2xl lg:text-3xl font-bold text-purple-900">
-                {reportData.collectorSummary.length}
-              </p>
-            </div>
-            <Users className="h-8 w-8 lg:h-10 lg:w-10 text-purple-600 flex-shrink-0 ml-3" />
+        
+        {/* Métricas secundárias */}
+        <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-green-400">
+          <div>
+            <p className="text-green-100 text-xs">Vendas</p>
+            <p className="text-2xl font-semibold">{reportData.totalTransactions}</p>
+          </div>
+          <div>
+            <p className="text-green-100 text-xs">Cobradores</p>
+            <p className="text-2xl font-semibold">{reportData.collectorSummary.length}</p>
           </div>
         </div>
       </div>
 
-      {/* Indicador de última atualização */}
-      <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
-        <RefreshCw className="h-3 w-3" />
-        <span>
-          Última atualização: {lastUpdate.toLocaleTimeString('pt-BR')}
-        </span>
-      </div>
-    </div>
 
-      {/* Collector Summary */}
+      {/* Seção de Cobradores - Design melhorado */}
       {reportData.collectorSummary.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Resumo por Cobrador
-              </h3>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <button
-                  onClick={handlePrintReport}
-                  className="flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
-                >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Imprimir
-                </button>
-                <button
-                  onClick={handleExportReport}
-                  className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar
-                </button>
-              </div>
-            </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Desempenho por Cobrador
+            </h3>
+            <button
+              onClick={() => setShowDetails(!showDetails)}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              {showDetails ? "Ocultar detalhes" : "Ver detalhes"}
+            </button>
           </div>
-
-          {/* Mobile-friendly cards */}
-          <div className="lg:hidden">
-            <div className="divide-y divide-gray-200">
-              {reportData.collectorSummary.map((collector) => (
-                <div key={collector.collectorId} className="p-4">
-                  <div className="flex items-center justify-between mb-3">
+          
+          {/* Cards de Cobradores */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {reportData.collectorSummary.map((collector) => (
+              <div 
+                key={collector.collectorId} 
+                className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div>
                     <h4 className="font-medium text-gray-900">
                       {collector.collectorName}
                     </h4>
-                    <span className="text-lg font-bold text-green-600">
-                      {formatCurrency(collector.receivedAmount)}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4 text-center text-sm">
-                    <div>
-                      <div className="font-medium text-gray-900">
-                        {collector.transactionCount}
-                      </div>
-                      <div className="text-xs text-gray-600">Vendas</div>
-                    </div>
-                    <div>
-                      <div className="font-medium text-gray-900">
-                        {collector.clients.length}
-                      </div>
-                      <div className="text-xs text-gray-600">Clientes</div>
-                    </div>
-                    <div>
-                      <div className="font-medium text-blue-600">
-                        {formatCurrency(
-                          collector.transactionCount > 0
-                            ? collector.receivedAmount /
-                                collector.transactionCount
-                            : 0,
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-600">Ticket Médio</div>
-                    </div>
-                  </div>
-                  {collector.saleNumbers.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <p className="text-xs text-gray-600 mb-1">Vendas:</p>
-                      <p className="text-sm text-gray-800">
-                        #{collector.saleNumbers.join(", #")}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Desktop table */}
-          <div className="hidden lg:block overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cobrador
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor Recebido
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Vendas
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Clientes
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ticket Médio
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Números das Vendas
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {reportData.collectorSummary.map((collector) => (
-                  <tr key={collector.collectorId} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {collector.collectorName}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-green-600">
-                        {formatCurrency(collector.receivedAmount)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {collector.transactionCount}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {collector.clients.length}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {formatCurrency(
-                          collector.transactionCount > 0
-                            ? collector.receivedAmount /
-                                collector.transactionCount
-                            : 0,
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        {collector.saleNumbers.length > 0 
-                          ? `#${collector.saleNumbers.join(", #")}`
-                          : "-"
-                        }
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Detailed Transactions */}
-      {showDetails && reportData.payments.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-              <Eye className="h-5 w-5 mr-2 text-blue-600" />
-              Transações Detalhadas
-            </h3>
-          </div>
-
-          {/* Mobile-friendly cards */}
-          <div className="lg:hidden divide-y divide-gray-200">
-            {reportData.payments.map((payment, index) => (
-              <div key={`${payment.saleKey}-${index}`} className="p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">
-                      {payment.client}
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      {payment.saleNumber ? `Venda #${payment.saleNumber}` : `Venda sem número`}
-                    </p>
-                    <p className="text-sm text-gray-600">{payment.store}</p>
-                    <p className="text-xs text-gray-500">
-                      {payment.installments.length} parcela(s)
+                    <p className="text-sm text-gray-500">
+                      {collector.transactionCount} vendas
                     </p>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-green-600">
-                      {formatCurrency(payment.totalReceivedValue)}
-                    </div>
+                    <p className="text-lg font-bold text-green-600">
+                      {formatCurrency(collector.receivedAmount)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Ticket: {formatCurrency(
+                        collector.transactionCount > 0
+                          ? collector.receivedAmount / collector.transactionCount
+                          : 0
+                      )}
+                    </p>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <div className="text-sm text-gray-600">
-                    Cobrador: {payment.collector}
+                
+                {collector.saleNumbers.length > 0 && showDetails && (
+                  <div className="pt-3 border-t border-gray-100">
+                    <p className="text-xs text-gray-600 mb-1">Vendas realizadas:</p>
+                    <p className="text-xs text-gray-700 line-clamp-2">
+                      #{collector.saleNumbers.join(", #")}
+                    </p>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div>
-                      <span className="text-gray-500">Devido:</span>
-                      <div className="font-medium">{formatCurrency(payment.totalOriginalValue)}</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Recebido:</span>
-                      <div className="font-medium text-green-600">{formatCurrency(payment.totalReceivedValue)}</div>
-                    </div>
-                    {payment.totalPendingValue > 0 && (
-                      <div>
-                        <span className="text-gray-500">Pendente:</span>
-                        <div className="font-medium text-red-600">{formatCurrency(payment.totalPendingValue)}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
+        </div>
+      )}
 
-          {/* Desktop table */}
-          <div className="hidden lg:block overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cliente
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Venda
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Parcelas
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Loja
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor Devido
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor Recebido
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor Pendente
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cobrador
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {reportData.payments.map((payment, index) => (
-                  <tr
-                    key={`${payment.saleKey}-${index}`}
-                    className="hover:bg-gray-50"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {payment.client}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {payment.saleNumber ? `#${payment.saleNumber}` : 'Sem número'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {payment.installments.length}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {payment.store}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {formatCurrency(payment.totalOriginalValue)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-green-600">
-                        {formatCurrency(payment.totalReceivedValue)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-red-600">
-                        {payment.totalPendingValue > 0 ? formatCurrency(payment.totalPendingValue) : '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {payment.collector}
-                      </div>
-                    </td>
+
+
+      {/* Transações Detalhadas - Melhor organização */}
+      {showDetails && reportData.payments.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Transações Detalhadas
+          </h3>
+          
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              {/* Tabela Responsiva */}
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                      Cliente / Venda
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider hidden sm:table-cell">
+                      Loja
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider hidden md:table-cell">
+                      Cobrador
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">
+                      Valor
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {reportData.payments.map((payment, index) => (
+                    <tr key={`${payment.saleKey}-${index}`} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{payment.client}</p>
+                          <p className="text-xs text-gray-500">
+                            {payment.saleNumber ? `Venda #${payment.saleNumber}` : 'Sem número'}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden sm:table-cell">
+                        <p className="text-sm text-gray-600">{payment.store}</p>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <p className="text-sm text-gray-600">{payment.collector}</p>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <p className="text-sm font-bold text-green-600">
+                          {formatCurrency(payment.totalReceivedValue)}
+                        </p>
+                        {payment.totalPendingValue > 0 && (
+                          <p className="text-xs text-red-600">
+                            Pendente: {formatCurrency(payment.totalPendingValue)}
+                          </p>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
+
 
       {/* Empty State */}
       {reportData.totalTransactions === 0 && (

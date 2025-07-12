@@ -10,7 +10,6 @@ import {
   X,
   MessageSquare,
   User,
-  Eye,
   Filter,
   ChevronDown,
   ChevronUp,
@@ -46,7 +45,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const [expandedCollectors, setExpandedCollectors] = useState<Set<string>>(
     new Set(),
   );
-  const [showAdvancedFilters, setShowAdvancedFilters] =
+  const [] =
     useState<boolean>(false);
   const [overdueFilter, setOverdueFilter] = useState<string>("all"); // 'all', 'overdue', 'not_overdue'
 
@@ -407,100 +406,81 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     }, 5000);
   };
 
+  const [showFilters, setShowFilters] = useState(false);
+
   const renderVisitsTab = () => {
     const groupedVisits = getVisitsByCollectorGrouped();
     const activeFiltersCount = getActiveFiltersCount();
 
     return (
       <div className="space-y-4">
-        {/* Filters Section */}
+        {/* Filtros Colapsáveis */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-4 lg:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Filtros</h3>
-              {activeFiltersCount > 0 && (
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={clearAllFilters}
-                  className="flex items-center justify-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors relative"
                 >
-                  <X className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">
-                    Limpar ({activeFiltersCount})
-                  </span>
-                  <span className="sm:hidden">Limpar</span>
+                  <Filter className="h-5 w-5" />
+                  {activeFiltersCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                      {activeFiltersCount}
+                    </span>
+                  )}
                 </button>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Buscar Cliente
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={clientSearchFilter}
-                    onChange={(e) => setClientSearchFilter(e.target.value)}
-                    placeholder="Nome, documento ou endereço..."
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Cobrador
-                  </label>
-                  <select
-                    value={selectedCollector}
-                    onChange={(e) => setSelectedCollector(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="all">Todos os cobradores</option>
-                    {collectors.map((collector) => (
-                      <option key={collector.id} value={collector.id}>
-                        {collector.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Filtros Avançados
-                  </label>
+                {activeFiltersCount > 0 && (
                   <button
-                    onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                    className={`w-full flex items-center justify-center px-3 py-2 border rounded-lg transition-colors ${
-                      showAdvancedFilters
-                        ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-                        : "border-gray-300 hover:bg-gray-50"
-                    }`}
+                    onClick={clearAllFilters}
+                    className="px-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
                   >
-                    <Filter className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">
-                      {showAdvancedFilters ? "Ocultar" : "Mostrar"} Filtros
-                    </span>
-                    <span className="sm:hidden">
-                      {showAdvancedFilters ? "Ocultar" : "Filtros"}
-                    </span>
-                    {activeFiltersCount > 0 && !showAdvancedFilters && (
-                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {activeFiltersCount}
-                      </span>
-                    )}
+                    Limpar
                   </button>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Advanced Filters */}
-            {showAdvancedFilters && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Busca sempre visível */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Buscar Cliente
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={clientSearchFilter}
+                  onChange={(e) => setClientSearchFilter(e.target.value)}
+                  placeholder="Nome, documento ou endereço..."
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Filtros Colapsáveis */}
+            {showFilters && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 animate-in slide-in-from-top-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Cobrador
+                    </label>
+                    <select
+                      value={selectedCollector}
+                      onChange={(e) => setSelectedCollector(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">Todos os cobradores</option>
+                      {collectors.map((collector) => (
+                        <option key={collector.id} value={collector.id}>
+                          {collector.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Status
@@ -508,16 +488,13 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="all">Todos os status</option>
                       <option value="agendada">Agendada</option>
                       <option value="realizada">Realizada</option>
                       <option value="cancelada">Cancelada</option>
                       <option value="nao_encontrado">Não Encontrado</option>
-                      <option value="cancelamento_solicitado">
-                        Cancelamento Solicitado
-                      </option>
                     </select>
                   </div>
 
@@ -529,7 +506,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       type="date"
                       value={dateFromFilter}
                       onChange={(e) => setDateFromFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
@@ -541,108 +518,15 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       type="date"
                       value={dateToFilter}
                       onChange={(e) => setDateToFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Situação
-                    </label>
-                    <select
-                      value={overdueFilter}
-                      onChange={(e) => setOverdueFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="all">Todas</option>
-                      <option value="overdue">Apenas Atrasadas</option>
-                      <option value="not_overdue">Apenas em Dia</option>
-                    </select>
-                  </div>
                 </div>
-
-                {/* Active Filters Summary */}
-                {activeFiltersCount > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {selectedCollector !== "all" && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                        Cobrador: {getCollectorName(selectedCollector)}
-                        <button
-                          onClick={() => setSelectedCollector("all")}
-                          className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    )}
-
-                    {statusFilter !== "all" && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                        Status: {statusFilter}
-                        <button
-                          onClick={() => setStatusFilter("all")}
-                          className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    )}
-
-                    {clientSearchFilter.trim() && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                        Busca: {clientSearchFilter}
-                        <button
-                          onClick={() => setClientSearchFilter("")}
-                          className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    )}
-
-                    {dateFromFilter && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                        De: {formatSafeDate(dateFromFilter)}
-                        <button
-                          onClick={() => setDateFromFilter("")}
-                          className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    )}
-
-                    {dateToFilter && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                        Até: {formatSafeDate(dateToFilter)}
-                        <button
-                          onClick={() => setDateToFilter("")}
-                          className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    )}
-
-                    {overdueFilter !== "all" && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                        Situação:{" "}
-                        {overdueFilter === "overdue" ? "Atrasadas" : "Em dia"}
-                        <button
-                          onClick={() => setOverdueFilter("all")}
-                          className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </div>
         </div>
-
+        
         {/* Visit Cards */}
         {Object.keys(groupedVisits).length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
@@ -1270,146 +1154,108 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   return (
     <>
       <div className="space-y-6">
-        {/* Header with Controls */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-4 lg:p-6 border-b border-gray-200">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div className="min-w-0">
-                <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-                  <Eye className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
-                  <span className="truncate">Acompanhamento de Visitas</span>
-                </h2>
-                <p className="text-gray-600 mt-1 text-sm lg:text-base">
-                  Gerencie visitas dos cobradores e aprove cancelamentos
-                </p>
-              </div>
-
-              {onClose && (
-                <button
-                  onClick={onClose}
-                  className="flex items-center justify-center px-3 lg:px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium whitespace-nowrap"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Fechar</span>
-                  <span className="sm:hidden">✕</span>
-                </button>
-              )}
+        {/* Header + Navegação Combinados */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Acompanhamento de Visitas
+              </h2>
+              <p className="text-sm text-gray-600 mt-1 hidden sm:block">
+                Gerencie visitas e cancelamentos
+              </p>
             </div>
+            
+            {/* Ação de Fechar */}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
           </div>
 
-          {/* Tabs */}
-          <div className="p-4 lg:p-6">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                onClick={() => setActiveTab("visits")}
-                className={`flex items-center justify-center px-3 lg:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === "visits"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Todas as Visitas</span>
-                <span className="sm:hidden">Visitas</span>
-              </button>
-              <button
-                onClick={() => setActiveTab("cancellations")}
-                className={`flex items-center justify-center px-3 lg:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === "cancellations"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Cancelamentos</span>
-                <span className="sm:hidden">Cancel.</span>
-                {pendingRequests.length > 0 && (
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                    {pendingRequests.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab("history")}
-                className={`flex items-center justify-center px-3 lg:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === "history"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                <Clock className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Histórico</span>
-                <span className="sm:hidden">Hist.</span>
-              </button>
-            </div>
+          {/* Navegação por Tabs - Desktop com texto, Mobile apenas ícones */}
+          <div className="grid grid-cols-3 sm:flex gap-2">
+            <button
+              onClick={() => setActiveTab("visits")}
+              className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === "visits"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+              title="Visitas"
+            >
+              <Calendar className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Visitas</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("cancellations")}
+              className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors relative ${
+                activeTab === "cancellations"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+              title="Cancelamentos"
+            >
+              <AlertTriangle className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Cancelamentos</span>
+              {pendingRequests.length > 0 && (
+                <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium sm:static sm:ml-2 sm:h-auto sm:w-auto sm:px-2 sm:py-0.5 sm:bg-red-100 sm:text-red-800">
+                  {pendingRequests.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === "history"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+              title="Histórico"
+            >
+              <Clock className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Histórico</span>
+            </button>
           </div>
         </div>
 
-        {/* Overview Statistics */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 lg:p-6 rounded-xl border border-blue-200">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-blue-700">
-                  Total de Visitas
+        {/* Card Principal - Visitas Agendadas */}
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-blue-100 text-sm font-medium">Visitas Agendadas</p>
+              <p className="text-4xl font-bold mt-1">
+                {overviewStats.agendadas}
+              </p>
+              {overviewStats.atrasadas > 0 && (
+                <p className="text-red-200 text-sm mt-2 flex items-center">
+                  <AlertTriangle className="h-4 w-4 mr-1" />
+                  {overviewStats.atrasadas} atrasada{overviewStats.atrasadas !== 1 ? "s" : ""}
                 </p>
-                <p className="text-2xl lg:text-3xl font-bold text-blue-900 truncate">
-                  {overviewStats.totalVisits}
-                </p>
-              </div>
-              <Calendar className="h-8 w-8 lg:h-10 lg:w-10 text-blue-600 flex-shrink-0 ml-2" />
+              )}
             </div>
+            <Calendar className="h-16 w-16 text-blue-200 opacity-50" />
           </div>
-
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 lg:p-6 rounded-xl border border-green-200">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-green-700">Realizadas</p>
-                <p className="text-2xl lg:text-3xl font-bold text-green-900">
-                  {overviewStats.realizadas}
-                </p>
-                <p className="text-xs text-green-600 mt-1 truncate">
-                  {overviewStats.totalVisits > 0
-                    ? Math.round(
-                        (overviewStats.realizadas / overviewStats.totalVisits) *
-                          100,
-                      )
-                    : 0}
-                  % do total
-                </p>
-              </div>
-              <CheckCircle className="h-8 w-8 lg:h-10 lg:w-10 text-green-600 flex-shrink-0 ml-2" />
+          
+          {/* Métricas secundárias */}
+          <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-blue-400">
+            <div>
+              <p className="text-blue-100 text-xs">Total</p>
+              <p className="text-2xl font-semibold">{overviewStats.totalVisits}</p>
             </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 lg:p-6 rounded-xl border border-amber-200">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-amber-700">Agendadas</p>
-                <p className="text-2xl lg:text-3xl font-bold text-amber-900">
-                  {overviewStats.agendadas}
-                </p>
-                {overviewStats.atrasadas > 0 && (
-                  <p className="text-xs text-red-600 mt-1 truncate">
-                    {overviewStats.atrasadas} atrasada
-                    {overviewStats.atrasadas !== 1 ? "s" : ""}
-                  </p>
-                )}
-              </div>
-              <Clock className="h-8 w-8 lg:h-10 lg:w-10 text-amber-600 flex-shrink-0 ml-2" />
+            <div>
+              <p className="text-blue-100 text-xs">Realizadas</p>
+              <p className="text-2xl font-semibold">{overviewStats.realizadas}</p>
             </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-red-50 to-pink-50 p-4 lg:p-6 rounded-xl border border-red-200">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-red-700">Pendências</p>
-                <p className="text-2xl lg:text-3xl font-bold text-red-900">
-                  {overviewStats.pendingRequests}
-                </p>
-                <p className="text-xs text-red-600 mt-1">Cancelamentos</p>
-              </div>
-              <AlertTriangle className="h-8 w-8 lg:h-10 lg:w-10 text-red-600 flex-shrink-0 ml-2" />
+            <div>
+              <p className="text-blue-100 text-xs">Pendências</p>
+              <p className="text-2xl font-semibold">{overviewStats.pendingRequests}</p>
             </div>
           </div>
         </div>

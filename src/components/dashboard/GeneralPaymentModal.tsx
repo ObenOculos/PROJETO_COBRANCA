@@ -338,28 +338,28 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                     onClick={() =>
                       setDistributionAmount(totalPending.toFixed(2))
                     }
-                    className="px-4 py-2 text-sm bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 transition-colors font-medium"
+                    className="px-4 text-sm bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 transition-colors font-medium"
                   >
                     Saldo Total ({formatCurrency(totalPending)})
                   </button>
                   <button
                     type="button"
                     onClick={() => setDistributionAmount("100")}
-                    className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
+                    className="px-4 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
                   >
                     R$ 100
                   </button>
                   <button
                     type="button"
                     onClick={() => setDistributionAmount("500")}
-                    className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
+                    className="px-4 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
                   >
                     R$ 500
                   </button>
                   <button
                     type="button"
                     onClick={() => setDistributionAmount("1000")}
-                    className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
+                    className="px-4 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
                   >
                     R$ 1.000
                   </button>
@@ -373,7 +373,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setDistributionMode("auto")}
-                  className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`flex items-center px-4 rounded-lg font-medium transition-colors ${
                     distributionMode === "auto"
                       ? "bg-purple-600 text-white"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -385,7 +385,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setDistributionMode("manual")}
-                  className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`flex items-center px-4 rounded-lg font-medium transition-colors ${
                     distributionMode === "manual"
                       ? "bg-purple-600 text-white"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -572,7 +572,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-full sm:w-auto px-6 py-0 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  className="w-full sm:w-auto px-6 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                 >
                   Cancelar
                 </button>
@@ -584,7 +584,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                     saleDistribution.length === 0 ||
                     !distributionAmount
                   }
-                  className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg"
+                  className="w-full sm:w-auto px-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg"
                 >
                   {loading ? (
                     <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
