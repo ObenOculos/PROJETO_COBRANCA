@@ -547,7 +547,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               <div className="flex bg-gray-100 rounded-lg p-1 w-full sm:w-auto">
                 <button
                   onClick={() => setDateRangeMode("single")}
-                  className={`flex-1 sm:flex-none px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                     dateRangeMode === "single"
                       ? "bg-white text-blue-600 shadow-sm"
                       : "text-gray-600 hover:text-gray-900"
@@ -557,7 +557,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 </button>
                 <button
                   onClick={() => setDateRangeMode("range")}
-                  className={`flex-1 sm:flex-none px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                     dateRangeMode === "range"
                       ? "bg-white text-blue-600 shadow-sm"
                       : "text-gray-600 hover:text-gray-900"

@@ -160,7 +160,7 @@ const Header: React.FC<HeaderProps> = ({
                           onTabChange(tab.id);
                           setIsMobileMenuOpen(false);
                         }}
-                        className={`group w-full flex items-center px-3 rounded-lg text-left transition-colors ${
+                        className={`group w-full flex items-center px-3 py-2 rounded-lg text-left transition-colors ${
                           activeTab === tab.id
                             ? "bg-blue-50 text-blue-700 border-l-3 border-blue-500"
                             : "text-gray-700 hover:bg-gray-50"
@@ -187,7 +187,7 @@ const Header: React.FC<HeaderProps> = ({
             <div className="mt-auto p-4 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={logout}
-                className="w-full flex items-center justify-center space-x-2 px-4 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
+                className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
                 title="Sair"
               >
                 <LogOut className="h-4 w-4" />

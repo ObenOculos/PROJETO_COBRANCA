@@ -126,7 +126,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 status: filters.status === "pendente" ? undefined : "pendente",
               })
             }
-            className={`px-3 text-xs font-medium rounded-full transition-colors ${
+            className={`px-3 py-2 text-xs font-medium rounded-full transition-colors ${
               filters.status === "pendente"
                 ? "bg-red-100 text-red-700 border border-red-300"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -141,7 +141,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 status: filters.status === "pago" ? undefined : "pago",
               })
             }
-            className={`px-3 text-xs font-medium rounded-full transition-colors ${
+            className={`px-3 py-2 text-xs font-medium rounded-full transition-colors ${
               filters.status === "pago"
                 ? "bg-green-100 text-green-700 border border-green-300"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -156,7 +156,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 status: filters.status === "parcial" ? undefined : "parcial",
               })
             }
-            className={`px-3 text-xs font-medium rounded-full transition-colors ${
+            className={`px-3 py-2 text-xs font-medium rounded-full transition-colors ${
               filters.status === "parcial"
                 ? "bg-orange-100 text-orange-700 border border-orange-300"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"

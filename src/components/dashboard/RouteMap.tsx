@@ -730,7 +730,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
           <div className="flex flex-col sm:grid sm:grid-cols-4 gap-2">
             <button
               onClick={handleSelectAll}
-              className="px-3 text-sm text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+              className="px-3 py-2 text-sm text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
             >
               {selectedClients.length === allClients.length
                 ? "Desmarcar"
@@ -739,7 +739,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
 
             <button
               onClick={handleSelectVisitsOnly}
-              className={`px-3 text-sm font-medium rounded-lg transition-colors inline-flex items-center justify-center ${
+              className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors inline-flex items-center justify-center ${
                 selectedClients.length === (clientData.withVisits.length + clientData.rescheduledVisits.length) &&
                 [...clientData.withVisits, ...clientData.rescheduledVisits].every((c) =>
                   selectedClients.includes(c.document),
@@ -770,7 +770,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
             <button
               onClick={getUserLocation}
               disabled={isGettingLocation}
-              className={`inline-flex items-center justify-center px-3 text-sm rounded-lg transition-colors ${
+              className={`inline-flex items-center justify-center px-3 py-2 text-sm rounded-lg transition-colors ${
                 userLocation
                   ? "bg-green-600 text-white hover:bg-green-700"
                   : "bg-orange-600 text-white hover:bg-orange-700"
@@ -851,7 +851,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
               </div>
               <button
                 onClick={openGoogleMapsDirections}
-                className="inline-flex items-center px-2 sm:px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-xs sm:text-sm font-medium"
+                className="inline-flex items-center px-2 sm:px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-xs sm:text-sm font-medium"
                 title="Abrir rota completa no Google Maps"
               >
                 <Navigation className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
@@ -1043,7 +1043,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                           </div>
                           {client.phone && (
                             <button
-                              className="inline-flex items-center px-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
+                              className="inline-flex items-center px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
                               title="Ligar para cliente"
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -1161,7 +1161,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                           </div>
                           {client.phone && (
                             <button
-                              className="inline-flex items-center px-2 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded transition-colors"
+                              className="inline-flex items-center px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded transition-colors"
                               title="Ligar para cliente"
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -1268,7 +1268,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                           </div>
                           {client.phone && (
                             <button
-                              className="inline-flex items-center px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                              className="inline-flex items-center px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
                               title="Ligar para cliente"
                               onClick={(e) => e.stopPropagation()}
                             >

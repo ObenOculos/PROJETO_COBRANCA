@@ -489,7 +489,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
           <div className="flex justify-end">
             <button
               onClick={onClose}
-              className="px-6 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
             >
               Fechar
             </button>

@@ -394,7 +394,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                   <button
                     type="button"
                     onClick={handleClearAll}
-                    className="flex items-center px-4 text-sm bg-red-100 text-red-700 rounded-full hover:bg-red-200 transition-colors font-medium"
+                    className="flex items-center px-4 py-2 text-sm bg-red-100 text-red-700 rounded-full hover:bg-red-200 transition-colors font-medium"
                     title="Zerar todos os valores"
                   >
                     <Trash2 className="h-4 w-4 mr-1" />
@@ -640,7 +640,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                     <button
                       type="button"
                       onClick={onClose}
-                      className="w-full sm:w-auto px-6 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                      className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                     >
                       Cancelar
                     </button>
@@ -648,7 +648,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                     <button
                       type="submit"
                       disabled={loading || changes.length === 0}
-                      className="w-full sm:w-auto px-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg"
+                      className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg"
                     >
                       {loading ? (
                         <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
@@ -690,13 +690,13 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
             <div className="flex gap-3">
               <button
                 onClick={() => setShowClearConfirmModal(false)}
-                className="flex-1 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmClearAll}
-                className="flex-1 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
               >
                 Zerar Tudo
               </button>
