@@ -288,7 +288,7 @@ const AuthorizationManager: React.FC = () => {
         <div className="grid grid-cols-2 sm:flex gap-2">
           <button
             onClick={() => setActiveView("current")}
-            className={`flex items-center justify-center px-4 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors ${
               activeView === "current"
                 ? "bg-blue-600 text-white"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -300,7 +300,7 @@ const AuthorizationManager: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveView("history")}
-            className={`flex items-center justify-center px-4 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors ${
               activeView === "history"
                 ? "bg-blue-600 text-white"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -324,7 +324,7 @@ const AuthorizationManager: React.FC = () => {
             {activeView === "current" ? (
               <button
                 onClick={clearExpiredRequests}
-                className="flex items-center px-3 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="flex items-center px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                 title="Limpar Solicitações Expiradas"
               >
                 <X className="h-4 w-4 sm:mr-1" />
@@ -333,7 +333,7 @@ const AuthorizationManager: React.FC = () => {
             ) : (
               <button
                 onClick={exportHistory}
-                className="flex items-center px-3 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                className="flex items-center px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 title="Exportar Histórico"
               >
                 <Download className="h-4 w-4 sm:mr-1" />
@@ -395,7 +395,7 @@ const AuthorizationManager: React.FC = () => {
                       <button
                         onClick={() => approveRequest(request.token)}
                         disabled={actionLoading === request.token}
-                        className="flex-1 flex items-center justify-center px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 text-sm"
+                        className="flex-1 flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 text-sm"
                         title="Aprovar solicitação"
                       >
                         {actionLoading === request.token ? (
@@ -410,7 +410,7 @@ const AuthorizationManager: React.FC = () => {
                       <button
                         onClick={() => rejectRequest(request.token)}
                         disabled={actionLoading === request.token}
-                        className="flex-1 flex items-center justify-center px-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 text-sm"
+                        className="flex-1 flex items-center justify-center px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 text-sm"
                         title="Rejeitar solicitação"
                       >
                         {actionLoading === request.token ? (
@@ -621,7 +621,7 @@ const AuthorizationManager: React.FC = () => {
                       setDateFilter("");
                       setHistoryPage(1);
                     }}
-                    className="px-4 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                   >
                     Limpar Filtros
                   </button>
@@ -705,7 +705,7 @@ const AuthorizationManager: React.FC = () => {
                   <button
                     onClick={() => setHistoryPage(Math.max(1, historyPage - 1))}
                     disabled={historyPage === 1}
-                    className="px-3 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Anterior
                   </button>
@@ -715,7 +715,7 @@ const AuthorizationManager: React.FC = () => {
                   <button
                     onClick={() => setHistoryPage(Math.min(historyTotalPages, historyPage + 1))}
                     disabled={historyPage === historyTotalPages}
-                    className="px-3 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Próxima
                   </button>

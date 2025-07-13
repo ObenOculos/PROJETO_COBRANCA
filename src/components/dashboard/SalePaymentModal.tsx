@@ -293,21 +293,21 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
                     setPaymentAmount(saleBalance.remainingBalance.toString());
                     setShowPreview(true);
                   }}
-                  className="px-4 text-sm bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors font-medium"
+                  className="px-4 py-2 text-sm bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors font-medium"
                 >
                   Saldo Total ({formatCurrency(saleBalance.remainingBalance)})
                 </button>
                 <button
                   type="button"
                   onClick={() => { setPaymentAmount("100"); setShowPreview(true); }}
-                  className="px-4 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
+                  className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
                 >
                   R$ 100
                 </button>
                 <button
                   type="button"
                   onClick={() => { setPaymentAmount("500"); setShowPreview(true); }}
-                  className="px-4 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
+                  className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
                 >
                   R$ 500
                 </button>
@@ -456,7 +456,7 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-full sm:w-auto px-6 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                 >
                   Cancelar
                 </button>
@@ -464,7 +464,7 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
                 <button
                   type="submit"
                   disabled={loading || !hasValidAmount}
-                  className="w-full sm:w-auto px-6 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg"
+                  className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg"
                 >
                   {loading ? (
                     <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>

@@ -357,7 +357,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 id="view-client-data"
                 name="viewClientData"
                 onClick={() => setShowClientData(true)}
-                className="flex items-center px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
+                className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
                 title="Ver todos os dados de cadastro do cliente"
               >
                 <Info className="h-5 w-5 mr-2" />
@@ -367,7 +367,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 id="view-client-sales"
                 name="viewClientSales"
                 onClick={() => setShowClientData(false)}
-                className="flex items-center px-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium shadow-sm"
+                className="flex items-center px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium shadow-sm"
                 title="Ver vendas do cliente"
               >
                 <Receipt className="h-5 w-5 mr-2" />
@@ -379,7 +379,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   id="distribute-payment"
                   name="distributePayment"
                   onClick={() => setIsGeneralPaymentModalOpen(true)}
-                  className="flex items-center px-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium shadow-sm"
+                  className="flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium shadow-sm"
                   title="Distribuir pagamento entre parcelas"
                 >
                   <CreditCard className="h-5 w-5 mr-2" />
@@ -393,7 +393,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   id="edit-payments"
                   name="editPayments"
                   onClick={handleEditPaymentClick}
-                  className="flex items-center px-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium shadow-sm"
+                  className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium shadow-sm"
                   title={(userType as "manager" | "collector") === "manager" ? "Editar valores recebidos" : "Solicitar autorização para editar pagamentos"}
                 >
                   <Edit className="h-5 w-5 mr-2" />
@@ -546,7 +546,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                       e.stopPropagation();
                                       handleOpenSalePayment(sale);
                                     }}
-                                    className="flex items-center px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium shadow-sm"
+                                    className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium shadow-sm"
                                     title="Receber pagamento da venda"
                                   >
                                     <CreditCard className="h-4 w-4 mr-1" />
@@ -690,7 +690,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       name="requestAuth"
                       onClick={requestManagerAuth}
                       disabled={isRequestingAuth}
-                      className="flex-1 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isRequestingAuth ? "Solicitando..." : "Solicitar Autorização"}
                     </button>
@@ -773,7 +773,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       name="validateToken"
                       onClick={validateToken}
                       disabled={authToken.length !== 6}
-                      className="flex-1 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Validar Token
                     </button>
@@ -791,7 +791,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       setApprovedToken("");
                       setProcessedApprovalToken("");
                     }}
-                    className="w-full px-4 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-xs sm:text-sm"
+                    className="w-full px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-xs sm:text-sm"
                   >
                     Solicitar Nova Autorização
                   </button>
@@ -845,7 +845,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   setAuthToken("");
                   setAuthError("");
                 }}
-                className="w-full px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
               >
                 Fechar
               </button>
