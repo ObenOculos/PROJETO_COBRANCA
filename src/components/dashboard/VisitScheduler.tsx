@@ -21,6 +21,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { ScheduledVisit } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import ClientDetailModal from "./ClientDetailModal";
+import { DateValidationModal } from "../common/DateValidationModal";
 
 interface VisitSchedulerProps {
   onClose?: () => void;
@@ -121,6 +122,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     suggestedTime: string;
     previousTime: string;
   } | null>(null);
+  const [showDateValidationModal, setShowDateValidationModal] = useState(false);
+  const [dateValidationMessage, setDateValidationMessage] = useState("");
 
   // Obter clientes do cobrador logado
   const availableClients = React.useMemo(() => {
@@ -837,7 +840,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     // Validar se a data não está no passado
     const today = getLocalDate();
     if (rescheduleDate < today) {
-      alert("Não é possível agendar visitas para datas passadas");
+      setDateValidationMessage("Não é possível agendar visitas para datas passadas");
+      setShowDateValidationModal(true);
       return;
     }
 
@@ -849,7 +853,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
       selectedDateTime.setHours(hours, minutes, 0, 0);
       
       if (selectedDateTime <= now) {
-        alert("Não é possível agendar visitas para horários passados");
+        setDateValidationMessage("Não é possível agendar visitas para horários passados");
+        setShowDateValidationModal(true);
         return;
       }
     }
@@ -2896,6 +2901,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
           </div>
         </div>
       )}
+
+      {/* DateValidationModal */}
+      <DateValidationModal
+        isOpen={showDateValidationModal}
+        onClose={() => setShowDateValidationModal(false)}
+        message={dateValidationMessage}
+      />
     </div>
   );
 };
