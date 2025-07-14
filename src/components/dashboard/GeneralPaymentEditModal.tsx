@@ -342,7 +342,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                 Resumo dos Pagamentos
               </h3>
 
-              <div className="grid grid-cols-2 sm:flex sm:flex-col gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="text-center p-4 bg-white rounded-lg shadow-sm h-20 flex flex-col justify-center">
                   <div className="text-xl font-bold text-gray-900">
                     {formatCurrency(totalValue)}
@@ -524,7 +524,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                                   onClick={() =>
                                     clearSaleValue(sale.saleNumber)
                                   }
-                                  className="flex-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                                  className="flex-1 p-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
                                 >
                                   Zerar
                                 </button>
@@ -536,7 +536,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                                       sale.totalValue,
                                     )
                                   }
-                                  className="flex-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium"
+                                  className="flex-1 p-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium"
                                 >
                                   Quitar Total
                                 </button>
@@ -640,7 +640,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                     <button
                       type="button"
                       onClick={onClose}
-                      className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                      className="w-full sm:w-auto px-6 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                     >
                       Cancelar
                     </button>
