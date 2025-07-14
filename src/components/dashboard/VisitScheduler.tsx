@@ -816,7 +816,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
   const handleOpenRescheduleModal = (visit: ScheduledVisit) => {
     setSelectedVisitForReschedule(visit);
-    setRescheduleDate(visit.scheduledDate);
+    setRescheduleDate(getLocalDate());
     setRescheduleTime(visit.scheduledTime || "09:00");
     setShowRescheduleModal(true);
   };
@@ -832,6 +832,26 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     if (!selectedVisitForReschedule || !rescheduleDate || !rescheduleTime) {
       alert("Por favor, selecione uma nova data e horário");
       return;
+    }
+
+    // Validar se a data não está no passado
+    const today = getLocalDate();
+    if (rescheduleDate < today) {
+      alert("Não é possível agendar visitas para datas passadas");
+      return;
+    }
+
+    // Validar se a hora não está no passado para hoje
+    if (rescheduleDate === today) {
+      const now = new Date();
+      const [hours, minutes] = rescheduleTime.split(':').map(Number);
+      const selectedDateTime = new Date();
+      selectedDateTime.setHours(hours, minutes, 0, 0);
+      
+      if (selectedDateTime <= now) {
+        alert("Não é possível agendar visitas para horários passados");
+        return;
+      }
     }
 
     try {
