@@ -680,10 +680,10 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                 </div>
               </div>
 
-              {/* Linha 2: Controles de Ação */}
-              <div className="flex items-center justify-between">
-                {/* Ordenação */}
-                <div className="flex items-center space-x-3">
+              {/* Linha 2: Controles de Ação - Modificado para mobile */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0">
+                {/* Ordenação - Agora em linha própria em mobile */}
+                <div className="flex items-center justify-between sm:justify-start sm:space-x-3">
                   <span className="text-sm text-gray-600">Ordenar:</span>
                   <div className="flex space-x-1">
                     <button
@@ -722,26 +722,28 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   </div>
                 </div>
 
-                {/* Controles */}
-                <div className="flex items-center space-x-3">
+                {/* Controles - Agrupados em coluna em mobile */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:space-x-3">
                   {/* Navegação Rápida */}
                   {totalPages > 1 && (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center justify-between sm:justify-start sm:space-x-2">
                       <span className="text-sm text-gray-600">Ir para:</span>
-                      <button
-                        onClick={() => setCurrentPage(1)}
-                        disabled={currentPage === 1}
-                        className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Início
-                      </button>
-                      <button
-                        onClick={() => setCurrentPage(totalPages)}
-                        disabled={currentPage === totalPages}
-                        className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Fim
-                      </button>
+                      <div className="flex space-x-1">
+                        <button
+                          onClick={() => setCurrentPage(1)}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Início
+                        </button>
+                        <button
+                          onClick={() => setCurrentPage(totalPages)}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Fim
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -751,7 +753,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       id="toggle-filters"
                       name="toggleFilters"
                       onClick={() => setShowFilters(!showFilters)}
-                      className={`flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${
+                      className={`flex items-center justify-center sm:justify-start px-3 py-2 rounded-lg text-sm transition-colors ${
                         showFilters
                           ? "bg-blue-600 text-white"
                           : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
@@ -763,7 +765,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   )}
 
                   {/* Expansão */}
-                  <div className="flex items-center space-x-2">
+                  <div className="hidden sm:flex items-center justify-between sm:justify-start sm:space-x-2">
                     <span className="text-sm text-gray-600 hidden sm:inline">Vendas:</span>
                     <div className="flex space-x-1">
                       <button
@@ -880,13 +882,14 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                         {clientGroup.totalReceived > 0 && (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 shadow-sm">
                             <TrendingUp className="h-3 w-3 mr-1" />
-                            {formatCurrency(clientGroup.totalReceived)} recebido
+                            {formatCurrency(clientGroup.totalReceived)}
                           </span>
                         )}
                         {clientGroup.pendingValue > 0 && (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 shadow-sm">
-                            {formatCurrency(clientGroup.pendingValue)} pendente
-                          </span>
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            {formatCurrency(clientGroup.pendingValue)}
+                            </span>
                         )}
                       </div>
                     </div>
@@ -1109,7 +1112,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                 {/* Números das páginas */}
                 <div className="flex space-x-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
                     let pageNum;
                     if (totalPages <= 5) {
                       pageNum = i + 1;
