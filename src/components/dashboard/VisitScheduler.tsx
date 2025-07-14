@@ -1465,15 +1465,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                           }
                         );
 
-                      // DEBUG: Log detalhado para ver a ordenação por created_at
-                      if (clientVisits.length > 1) {
-                        console.log(`🔍 Cliente ${client.document} tem ${clientVisits.length} visitas realizadas (ordenadas por created_at):`);
-                        clientVisits.forEach((visit, i) => {
-                          console.log(`  ${i + 1}. Created: ${visit.createdAt} - "${visit.notes || 'Sem observação'}"`);
-                        });
-                        console.log(`✅ Mais recente: "${clientVisits[0].notes || 'Sem observação'}"`);
-                      }
-
                       const lastVisit = clientVisits[0];
                       if (!lastVisit) return null;
 
