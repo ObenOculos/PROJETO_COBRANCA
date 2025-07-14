@@ -445,7 +445,7 @@ const EnhancedStoreManagement: React.FC = () => {
       </div>
 
       {/* Lista de Lojas */}
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
 
         {filteredAndSortedStores.map((store) => {
           const isExpanded = expandedCards.has(store.storeName);
