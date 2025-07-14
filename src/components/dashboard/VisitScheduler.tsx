@@ -199,9 +199,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
               visit.status === "realizada",
           )
           .sort(
-            (a, b) =>
-              new Date(b.scheduledDate).getTime() -
-              new Date(a.scheduledDate).getTime(),
+            (a, b) => {
+              // Ordenar por created_at (mais recente primeiro)
+              return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            }
           );
 
         const today = new Date();
@@ -213,7 +214,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
           daysSinceLastVisit = 999; // Never visited
         } else {
           try {
-            const visitDateStr = clientVisits[0].scheduledDate;
+            // Usar created_at da visita mais recente
+            const visit = clientVisits[0];
+            const visitDateStr = visit.createdAt.split('T')[0];
             let lastVisitDate: Date;
 
             if (visitDateStr.includes("-")) {
@@ -1341,9 +1344,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             visit.status === "realizada",
                         )
                         .sort(
-                          (a, b) =>
-                            new Date(b.scheduledDate).getTime() -
-                            new Date(a.scheduledDate).getTime(),
+                          (a, b) => {
+                            // Ordenar por created_at (mais recente primeiro)
+                            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                          }
                         );
 
                       const today = new Date();
@@ -1357,7 +1361,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                       } else {
                         // Use the same safe date parsing as the formatSafeDate function
                         try {
-                          const visitDateStr = clientVisits[0].scheduledDate;
+                          // Usar created_at da visita mais recente
+            const visit = clientVisits[0];
+            const visitDateStr = visit.createdAt.split('T')[0];
                           let lastVisitDate: Date;
 
                           if (visitDateStr.includes("-")) {
@@ -1453,16 +1459,26 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             visit.status === "realizada",
                         )
                         .sort(
-                          (a, b) =>
-                            new Date(b.scheduledDate).getTime() -
-                            new Date(a.scheduledDate).getTime(),
+                          (a, b) => {
+                            // Ordenar por created_at (mais recente primeiro)
+                            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                          }
                         );
+
+                      // DEBUG: Log detalhado para ver a ordenação por created_at
+                      if (clientVisits.length > 1) {
+                        console.log(`🔍 Cliente ${client.document} tem ${clientVisits.length} visitas realizadas (ordenadas por created_at):`);
+                        clientVisits.forEach((visit, i) => {
+                          console.log(`  ${i + 1}. Created: ${visit.createdAt} - "${visit.notes || 'Sem observação'}"`);
+                        });
+                        console.log(`✅ Mais recente: "${clientVisits[0].notes || 'Sem observação'}"`);
+                      }
 
                       const lastVisit = clientVisits[0];
                       if (!lastVisit) return null;
 
                       return {
-                        date: lastVisit.scheduledDate,
+                        date: lastVisit.dataVisitaRealizada || lastVisit.scheduledDate,
                         result: lastVisit.notes || "Visita realizada",
                       };
                     };

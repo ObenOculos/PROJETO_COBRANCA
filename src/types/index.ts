@@ -249,6 +249,7 @@ export interface CollectionContextType {
     overdueCount: number;
   } | null;
   rescheduleVisit: (visitId: string, newDate: string, newTime?: string, reason?: string) => Promise<void>;
+  updateScheduledVisitsAfterPayment: (clientDocument: string) => Promise<void>;
 }
 
 // Sale payment types

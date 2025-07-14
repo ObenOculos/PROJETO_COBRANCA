@@ -1195,6 +1195,20 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
+  const refreshDataExceptVisits = async () => {
+    setGlobalLoading(true, "Atualizando dados...");
+    try {
+      await Promise.all([
+        fetchCollections(),
+        fetchUsers(),
+        fetchCollectorStores(),
+        fetchSalePayments(),
+      ]);
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+
   const assignCollectorToClients = async (
     collectorId: string,
     clientIdentifiers: { document?: string; clientName?: string }[],
@@ -1637,8 +1651,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }),
       );
 
-      // 6. Atualizar dados do banco (refresh)
-      await refreshData();
+      // 6. Atualizar dados do banco (refresh collections apenas)
+      await refreshDataExceptVisits();
+
+      // 7. Atualizar visitas agendadas do cliente com dados refreshed
+      await updateScheduledVisitsAfterPayment(payment.clientDocument);
     } catch (err) {
       console.error("Erro ao processar pagamento de venda:", err);
       setError(
@@ -1853,8 +1870,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }),
       );
 
-      // 7. Atualizar dados do banco (refresh)
-      await refreshData();
+      // 7. Atualizar dados do banco (refresh collections apenas)
+      await refreshDataExceptVisits();
+
+      // 8. Atualizar visitas agendadas do cliente com dados refreshed
+      await updateScheduledVisitsAfterPayment(clientDocument);
 
       console.log("✅ Pagamento geral processado com sucesso!");
     } catch (err) {
@@ -2499,6 +2519,84 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     };
   };
 
+  // Função para atualizar visitas agendadas após processamento de pagamentos
+  const updateScheduledVisitsAfterPayment = async (clientDocument: string) => {
+    try {
+      console.log("=== INÍCIO updateScheduledVisitsAfterPayment ===");
+      console.log("Cliente:", clientDocument);
+
+      // Buscar dados atualizados do cliente
+      const clientData = getClientDataForVisit(clientDocument);
+      console.log("Dados do cliente recalculados:", clientData);
+      
+      if (!clientData) {
+        console.log("❌ Dados do cliente não encontrados:", clientDocument);
+        return;
+      }
+
+      // Buscar visitas agendadas deste cliente
+      const clientVisits = scheduledVisits.filter(
+        (visit) => visit.clientDocument === clientDocument && visit.status === "agendada"
+      );
+
+      console.log(`Visitas agendadas encontradas: ${clientVisits.length}`);
+      clientVisits.forEach(visit => {
+        console.log(`- Visita ${visit.id}: Pendente atual: R$ ${visit.totalPendingValue}, Atraso atual: ${visit.overdueCount}`);
+      });
+
+      if (clientVisits.length === 0) {
+        console.log("❌ Nenhuma visita agendada encontrada para o cliente:", clientDocument);
+        return;
+      }
+
+      // Atualizar cada visita agendada no Supabase e estado local
+      for (const visit of clientVisits) {
+        const updateData = {
+          total_pending_value: clientData.totalPendingValue,
+          overdue_count: clientData.overdueCount,
+          updated_at: new Date().toISOString(),
+        };
+
+        console.log(`📝 Atualizando visita ${visit.id}:`);
+        console.log(`   - Pendente: R$ ${visit.totalPendingValue} → R$ ${clientData.totalPendingValue}`);
+        console.log(`   - Atraso: ${visit.overdueCount} → ${clientData.overdueCount}`);
+
+        // Atualizar no Supabase
+        const { error } = await supabase
+          .from("scheduled_visits")
+          .update(updateData)
+          .eq("id", visit.id);
+
+        if (error) {
+          console.error("❌ Erro ao atualizar visita no Supabase:", error);
+        } else {
+          console.log("✅ Visita atualizada no Supabase com sucesso");
+        }
+
+        // Atualizar estado local
+        setScheduledVisits((prev) => {
+          const updated = prev.map((v) =>
+            v.id === visit.id
+              ? {
+                  ...v,
+                  totalPendingValue: clientData.totalPendingValue,
+                  overdueCount: clientData.overdueCount,
+                  updatedAt: new Date().toISOString(),
+                }
+              : v,
+          );
+          console.log("✅ Estado local atualizado");
+          return updated;
+        });
+      }
+
+      console.log("✅ Visitas agendadas atualizadas com sucesso para cliente:", clientDocument);
+      console.log("=== FIM updateScheduledVisitsAfterPayment ===");
+    } catch (error) {
+      console.error("Erro ao atualizar visitas agendadas:", error);
+    }
+  };
+
   const rescheduleVisit = async (
     visitId: string,
     newDate: string,
@@ -2610,6 +2708,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     getVisitsByCollector,
     getClientDataForVisit,
     rescheduleVisit,
+    updateScheduledVisitsAfterPayment,
   };
 
   return (
