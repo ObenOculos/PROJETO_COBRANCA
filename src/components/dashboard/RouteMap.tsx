@@ -661,235 +661,177 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Route Controls */}
-      <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6">
-        <div className="mb-3 sm:mb-0">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-4">
-            Planejamento de Rota
-          </h2>
-
-          {/* Estatísticas - versão mobile mais compacta */}
-          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 sm:gap-3 mb-3 sm:mb-4">
-            <div className="bg-blue-50 p-2 sm:p-3 rounded-lg text-center">
-              <div className="text-xs text-blue-600 font-medium mb-1">
-                Total
+      {/* Header Consolidado - Padrão VisitTracking */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <div className="space-y-4">
+            {/* Linha 1: Título e Estatísticas */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Route className="h-5 w-5 text-blue-600" />
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Planejamento de Rota
+                </h2>
+                <span className="text-sm text-gray-500">
+                  {allClients.length} cliente{allClients.length !== 1 ? "s" : ""}
+                </span>
               </div>
-              <div className="text-base sm:text-lg font-bold text-blue-900">
-                {allClients.length}
-              </div>
-            </div>
-            <div className="bg-red-50 p-2 sm:p-3 rounded-lg text-center">
-              <div className="text-xs text-red-600 font-medium mb-1">
-                Atrasadas
-              </div>
-              <div className="text-base sm:text-lg font-bold text-red-900">
-                {clientData.overdueVisits.length}
-              </div>
-            </div>
-            <div className="bg-green-50 p-2 sm:p-3 rounded-lg text-center">
-              <div className="text-xs text-green-600 font-medium mb-1">
-                Agendadas
-              </div>
-              <div className="text-base sm:text-lg font-bold text-green-900">
-                {clientData.scheduledVisits.length}
-              </div>
-            </div>
-            <div className="bg-orange-50 p-2 sm:p-3 rounded-lg text-center">
-              <div className="text-xs text-orange-600 font-medium mb-1">
-                Reagendadas
-              </div>
-              <div className="text-base sm:text-lg font-bold text-orange-900">
-                {clientData.rescheduledVisits.length}
-              </div>
-            </div>
-            <div className="bg-amber-50 p-2 sm:p-3 rounded-lg text-center">
-              <div className="text-xs text-amber-600 font-medium mb-1">
-                Selecionados
-              </div>
-              <div className="text-base sm:text-lg font-bold text-amber-900">
-                {selectedClients.length}
-              </div>
-            </div>
-            <div className="bg-purple-50 p-2 sm:p-3 rounded-lg text-center">
-              <div className="text-xs text-purple-600 font-medium mb-1">
-                Valor
-              </div>
-              <div className="text-sm sm:text-lg font-bold text-purple-900">
-                {formatCurrency(totalValue)}
-              </div>
-            </div>
-          </div>
-
-          {/* Filtros */}
-          <FilterBar
-            filters={filters}
-            onFilterChange={handleFilterChange}
-            userType={user?.type || "collector"}
-          />
-
-          {/* Route Summary */}
-          {selectedClients.length > 0 && (
-            <div className="bg-blue-50 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div className="flex items-center">
-                  <Navigation className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 mr-2" />
-                  <span className="font-medium text-blue-900 text-sm sm:text-base">
-                    {selectedClients.length} cliente
-                    {selectedClients.length !== 1 ? "s" : ""} selecionado
-                    {selectedClients.length !== 1 ? "s" : ""}
+              <div className="flex items-center space-x-3">
+                {clientData.overdueVisits.length > 0 && (
+                  <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium animate-pulse">
+                    {clientData.overdueVisits.length} atrasada{clientData.overdueVisits.length !== 1 ? "s" : ""}
                   </span>
-                </div>
-                <div className="text-blue-900">
-                  <span className="font-medium text-sm sm:text-base">
-                    Total: {formatCurrency(totalValue)}
+                )}
+                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
+                  {clientData.scheduledVisits.length} agendada{clientData.scheduledVisits.length !== 1 ? "s" : ""}
+                </span>
+                {clientData.rescheduledVisits.length > 0 && (
+                  <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full font-medium">
+                    {clientData.rescheduledVisits.length} reagendada{clientData.rescheduledVisits.length !== 1 ? "s" : ""}
                   </span>
+                )}
+              </div>
+            </div>
+
+            {/* Linha 2: Filtros */}
+            <div>
+              <FilterBar
+                filters={filters}
+                onFilterChange={handleFilterChange}
+                userType={user?.type || "collector"}
+              />
+            </div>
+
+            {/* Linha 3: Controles de Ação */}
+            <div className="flex items-center justify-between">
+              {/* Seleção */}
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Selecionar:</span>
+                <div className="flex space-x-1">
+                  <button
+                    onClick={handleSelectAll}
+                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${
+                      selectedClients.length === allClients.length
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                    }`}
+                  >
+                    {selectedClients.length === allClients.length ? "✓ Todos" : "Todos"}
+                  </button>
+                  <button
+                    onClick={handleSelectVisitsOnly}
+                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${
+                      selectedClients.length === (clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length) &&
+                      [...clientData.overdueVisits, ...clientData.scheduledVisits, ...clientData.rescheduledVisits].every((c) =>
+                        selectedClients.includes(c.document),
+                      )
+                        ? "bg-green-600 text-white"
+                        : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                    }`}
+                  >
+                    <Calendar className="h-4 w-4 mr-1 inline" />
+                    {selectedClients.length === (clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length) &&
+                    [...clientData.overdueVisits, ...clientData.scheduledVisits, ...clientData.rescheduledVisits].every((c) =>
+                      selectedClients.includes(c.document),
+                    )
+                      ? "✓ Visitas"
+                      : "Visitas"}
+                  </button>
                 </div>
               </div>
 
-              {routeOptimized && (
-                <div className="mt-2 sm:mt-3 flex items-center text-xs sm:text-sm text-blue-700">
-                  <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                  <span>Tempo: ~2h 30min | Distância: ~35km</span>
-                </div>
-              )}
+              {/* Ações */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={getUserLocation}
+                  disabled={isGettingLocation}
+                  className={`flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${
+                    userLocation
+                      ? "bg-green-600 text-white hover:bg-green-700"
+                      : "bg-orange-600 text-white hover:bg-orange-700"
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  title={userLocation ? "Localização obtida" : "Obter localização"}
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  {isGettingLocation ? "Obtendo..." : userLocation ? "✓ GPS" : "GPS"}
+                </button>
+                <button
+                  onClick={handleOptimizeRoute}
+                  disabled={selectedClients.length === 0 || isOptimizing}
+                  className={`flex items-center px-3 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    userLocation
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-gray-600 text-white hover:bg-gray-700"
+                  }`}
+                  title={userLocation ? "Otimizar por proximidade" : "Organizar por prioridade"}
+                >
+                  {isOptimizing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Route className="h-4 w-4 mr-2" />
+                  )}
+                  {isOptimizing ? "Otimizando..." : userLocation ? "Otimizar" : "Organizar"}
+                </button>
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Controles - layout mobile e desktop otimizado */}
-        <div className="space-y-2 sm:space-y-0">
-          {/* Grid 1x4 para desktop, layout vertical para mobile */}
-          <div className="flex flex-col sm:grid sm:grid-cols-4 gap-2">
-            <button
-              onClick={handleSelectAll}
-              className="px-3 py-2 text-sm text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
-            >
-              {selectedClients.length === allClients.length
-                ? "Desmarcar"
-                : "Todos"}
-            </button>
-
-            <button
-              onClick={handleSelectVisitsOnly}
-              className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors inline-flex items-center justify-center ${
-                selectedClients.length === (clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length) &&
-                [...clientData.overdueVisits, ...clientData.scheduledVisits, ...clientData.rescheduledVisits].every((c) =>
-                  selectedClients.includes(c.document),
-                )
-                  ? "bg-green-600 text-white hover:bg-green-700"
-                  : "text-green-600 border border-green-600 hover:bg-green-50"
-              }`}
-            >
-              <Calendar className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">
-                {selectedClients.length === (clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length) &&
-                [...clientData.overdueVisits, ...clientData.scheduledVisits, ...clientData.rescheduledVisits].every((c) =>
-                  selectedClients.includes(c.document),
-                )
-                  ? `✓ Visitas (${clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length})`
-                  : `Visitas (${clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length})`}
-              </span>
-              <span className="sm:hidden">
-                {selectedClients.length === (clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length) &&
-                [...clientData.overdueVisits, ...clientData.scheduledVisits, ...clientData.rescheduledVisits].every((c) =>
-                  selectedClients.includes(c.document),
-                )
-                  ? `✓ ${clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length}`
-                  : clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length}
-              </span>
-            </button>
-
-            <button
-              onClick={getUserLocation}
-              disabled={isGettingLocation}
-              className={`inline-flex items-center justify-center px-3 py-2 text-sm rounded-lg transition-colors ${
-                userLocation
-                  ? "bg-green-600 text-white hover:bg-green-700"
-                  : "bg-orange-600 text-white hover:bg-orange-700"
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <MapPin className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">
-                {isGettingLocation
-                  ? "Obtendo..."
-                  : userLocation
-                    ? "✓ Localização"
-                    : "Localização"}
-              </span>
-              <span className="sm:hidden">
-                {isGettingLocation ? "..." : userLocation ? "✓" : "GPS"}
-              </span>
-            </button>
-
-            <button
-              onClick={handleOptimizeRoute}
-              disabled={selectedClients.length === 0 || isOptimizing}
-              className={`inline-flex items-center justify-center px-3 py-2 text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                userLocation
-                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                  : "bg-gray-600 text-white hover:bg-gray-700"
-              }`}
-            >
-              {isOptimizing ? (
-                <Loader2 className="h-4 w-4 mr-1 sm:mr-2 animate-spin" />
-              ) : (
-                <Route className="h-4 w-4 mr-1 sm:mr-2" />
-              )}
-              <span className="hidden sm:inline">
-                {isOptimizing
-                  ? "Otimizando..."
-                  : userLocation
-                    ? "Otimizar"
-                    : "Organizar"}
-              </span>
-              <span className="sm:hidden">{isOptimizing ? "..." : "Rota"}</span>
-            </button>
+            {/* Linha 4: Resumo da Rota (se houver seleções) */}
+            {selectedClients.length > 0 && (
+              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                <div className="flex items-center space-x-2">
+                  <Navigation className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm text-gray-700">
+                    {selectedClients.length} cliente{selectedClients.length !== 1 ? "s" : ""} selecionado{selectedClients.length !== 1 ? "s" : ""}
+                  </span>
+                  {routeOptimized && (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+                      Otimizada
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm font-medium text-gray-900">
+                  Total: {formatCurrency(totalValue)}
+                </div>
+              </div>
+            )}
           </div>
-
         </div>
       </div>
 
       {/* Google Maps */}
       {selectedClients.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="p-3 sm:p-4 border-b border-gray-200">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="px-4 sm:px-6 py-3 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center">
-                  <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 mr-2" />
-                  <span className="hidden sm:inline">Mapa da Rota</span>
-                  <span className="sm:hidden">Mapa</span>
+              <div className="flex items-center space-x-3">
+                <MapPin className="h-5 w-5 text-blue-600" />
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Mapa da Rota
                 </h3>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                  <span className="text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
-                    {selectedClients.length} selecionado
-                    {selectedClients.length !== 1 ? "s" : ""}
-                  </span>
-                  {userLocation && (
-                    <span className="text-green-600 bg-green-100 px-2 py-1 rounded-full flex items-center">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
-                      <span className="hidden sm:inline">Localização obtida</span>
-                      <span className="sm:hidden">GPS ✓</span>
-                    </span>
-                  )}
-                  {routeOptimized && userLocation && (
-                    <span className="text-blue-600 bg-blue-100 px-2 py-1 rounded-full flex items-center">
-                      <Route className="h-3 w-3 mr-1" />
-                      <span className="hidden sm:inline">Otimizada</span>
-                      <span className="sm:hidden">✓</span>
-                    </span>
-                  )}
-                </div>
+                <span className="text-sm text-gray-500">
+                  {selectedClients.length} selecionado{selectedClients.length !== 1 ? "s" : ""}
+                </span>
               </div>
-              <button
-                onClick={openGoogleMapsDirections}
-                className="inline-flex items-center px-2 sm:px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-xs sm:text-sm font-medium"
-                title="Abrir rota completa no Google Maps"
-              >
-                <Navigation className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Abrir Rota</span>
-                <span className="sm:hidden">Abrir</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                {userLocation && (
+                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
+                    GPS ✓
+                  </span>
+                )}
+                {routeOptimized && (
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+                    Otimizada
+                  </span>
+                )}
+                <button
+                  onClick={openGoogleMapsDirections}
+                  className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                  title="Abrir rota completa no Google Maps"
+                >
+                  <Navigation className="h-4 w-4 mr-2" />
+                  Abrir Rota
+                </button>
+              </div>
             </div>
           </div>
           <div className="relative">
