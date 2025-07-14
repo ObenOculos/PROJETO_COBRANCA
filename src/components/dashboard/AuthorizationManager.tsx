@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Clock, Check, X, AlertCircle, User, FileText, Download, Search, TrendingUp, Loader2, Shield } from "lucide-react";
+import { Clock, Check, X, AlertCircle, User, FileText, Download, Search, TrendingUp, Loader2 } from "lucide-react";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 import { AuthorizationHistory } from "../../types";
 import { useAuth } from "../../contexts/AuthContext";
@@ -273,10 +273,9 @@ const AuthorizationManager: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-blue-600 flex-shrink-0" />
-            <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
-              <span className="hidden sm:inline">Solicitações de </span>Autorização
-            </h3>
+            <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
+              Solicitações de Autorização
+            </h2>
             {/* Badge com contador total sempre visível */}
             <div className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">
               {activeView === "current" ? pendingRequests.length : historyTotal}
