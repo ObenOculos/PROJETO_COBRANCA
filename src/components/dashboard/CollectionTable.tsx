@@ -516,11 +516,11 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
           {/* Controles de Paginação */}
           {totalPages > 1 && (
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-4 sm:px-6 py-4 rounded-b-xl">
+            <div className="bg-gray-800 px-4 sm:px-6 py-4 rounded-b-lg">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-sm text-white text-center sm:text-left">
                   <span className="font-semibold">Página {currentPage} de {totalPages}</span>
-                  <span className="text-purple-100 ml-2">
+                  <span className="text-gray-300 ml-2">
                     • Mostrando {startItem} a {endItem} de {totalItems} clientes
                   </span>
                 </div>
@@ -645,214 +645,174 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     // Fallback to simple list view
     return (
       <>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="px-4 sm:px-6 py-4 sm:py-6 border-b border-gray-200">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center">
-                  <DollarSign className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600 mr-3" />
-                  {userType === "manager"
-                    ? "Todas as Cobranças"
-                    : "Minha Carteira"}
-                </h2>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-1">
-                  <p className="text-sm sm:text-base text-gray-600">
-                    {filteredAndGroupedSales.length} cliente
-                    {filteredAndGroupedSales.length !== 1 ? "s" : ""} com vendas
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-600">
-                      Por página:
-                    </label>
-                    <select
-                      id="items-per-page"
-                      name="itemsPerPage"
-                      value={itemsPerPage}
-                      onChange={(e) => {
-                        setItemsPerPage(Number(e.target.value));
-                        setCurrentPage(1);
-                      }}
-                      className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+        <div className="bg-white rounded-lg border border-gray-200">
+          {/* Header Consolidado */}
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <div className="space-y-4">
+              {/* Linha 1: Título e Paginação */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <DollarSign className="h-5 w-5 text-blue-600" />
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {userType === "manager" ? "Todas as Cobranças" : "Minha Carteira"}
+                  </h2>
+                  <span className="text-sm text-gray-500">
+                    {filteredAndGroupedSales.length} cliente{filteredAndGroupedSales.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">Por página:</span>
+                  <select
+                    id="items-per-page"
+                    name="itemsPerPage"
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Linha 2: Controles de Ação */}
+              <div className="flex items-center justify-between">
+                {/* Ordenação */}
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm text-gray-600">Ordenar:</span>
+                  <div className="flex space-x-1">
+                    <button
+                      onClick={() => handleSort("cliente")}
+                      className={`p-2 rounded-lg transition-colors ${
+                        sortField === "cliente"
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-gray-600 hover:bg-gray-100"
+                      }`}
+                      title="Ordenar por Cliente"
                     >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
+                      <User className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleSort("valor")}
+                      className={`p-2 rounded-lg transition-colors ${
+                        sortField === "valor"
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-gray-600 hover:bg-gray-100"
+                      }`}
+                      title="Ordenar por Valor"
+                    >
+                      <DollarSign className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleSort("cidade")}
+                      className={`p-2 rounded-lg transition-colors ${
+                        sortField === "cidade"
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-gray-600 hover:bg-gray-100"
+                      }`}
+                      title="Ordenar por Cidade"
+                    >
+                      <MapPin className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Controles */}
+                <div className="flex items-center space-x-3">
+                  {/* Navegação Rápida */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-600">Ir para:</span>
+                      <button
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Início
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Fim
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Filtros para Collector */}
+                  {userType === "collector" && (
+                    <button
+                      id="toggle-filters"
+                      name="toggleFilters"
+                      onClick={() => setShowFilters(!showFilters)}
+                      className={`flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${
+                        showFilters
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                      }`}
+                    >
+                      <Filter className="h-4 w-4 mr-2" />
+                      Filtros
+                    </button>
+                  )}
+
+                  {/* Expansão */}
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-600 hidden sm:inline">Vendas:</span>
+                    <div className="flex space-x-1">
+                      <button
+                        onClick={expandAll}
+                        className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                        title="Expandir todas as vendas"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={collapseAll}
+                        className="p-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors"
+                        title="Retrair todas as vendas"
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {userType === "collector" && (
-                <div className="flex items-center gap-3">
-                  <button
-                    id="toggle-filters"
-                    name="toggleFilters"
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`flex items-center px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
-                      showFilters
-                        ? "bg-blue-600 text-white shadow-md hover:bg-blue-700"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
-                    }`}
-                  >
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filtros
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Filtros */}
-            {userType === "collector" && showFilters && (
-              <div className="mt-6 p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border border-gray-200 animate-in slide-in-from-top-2 duration-200">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Status da Cobrança
-                    </label>
+              {/* Linha 3: Filtros Expandidos (se ativo) */}
+              {userType === "collector" && showFilters && (
+                <div className="flex items-center space-x-3 pt-2 border-t border-gray-200">
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-gray-600">Status:</label>
                     <select
                       id="status-filter"
                       name="statusFilter"
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm transition-all duration-200 hover:border-gray-400"
+                      className="text-sm border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                     >
-                      <option value="">Todos os status</option>
+                      <option value="">Todos</option>
                       <option value="pendente">Pendente</option>
                       <option value="pago">Pago</option>
                       <option value="parcial">Parcial</option>
                     </select>
                   </div>
                   {statusFilter && (
-                    <div className="flex items-end">
-                      <button
-                        id="clear-filter"
-                        name="clearFilter"
-                        onClick={() => setStatusFilter("")}
-                        className="px-3 py-2.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
-                      >
-                        Limpar filtro
-                      </button>
-                    </div>
+                    <button
+                      id="clear-filter"
+                      name="clearFilter"
+                      onClick={() => setStatusFilter("")}
+                      className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm"
+                    >
+                      Limpar
+                    </button>
                   )}
-                </div>
-              </div>
-            )}
-
-            {totalPages > 1 && (
-              <div className="p-4 bg-gray-50 rounded-lg border mt-4">
-                {/* Navegação rápida */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Início
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Fim
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Controles de Ordenação e Expansão */}
-          <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-gray-50 to-blue-50 border-b border-gray-200">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <span className="text-sm font-semibold text-gray-700">
-                  Ordenar por:
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleSort("cliente")}
-                    className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      sortField === "cliente"
-                        ? "bg-blue-600 text-white shadow-md"
-                        : "bg-white text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400"
-                    }`}
-                  >
-                    <span>Cliente</span>
-                    {getSortIcon("cliente")}
-                  </button>
-                  <button
-                    onClick={() => handleSort("valor")}
-                    className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      sortField === "valor"
-                        ? "bg-blue-600 text-white shadow-md"
-                        : "bg-white text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400"
-                    }`}
-                  >
-                    <span>Valor Total</span>
-                    {getSortIcon("valor")}
-                  </button>
-                  <button
-                    onClick={() => handleSort("cidade")}
-                    className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      sortField === "cidade"
-                        ? "bg-blue-600 text-white shadow-md"
-                        : "bg-white text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400"
-                    }`}
-                  >
-                    <span>Cidade</span>
-                    {getSortIcon("cidade")}
-                  </button>
-                </div>
-              </div>
-
-              {userType === "manager" ? (
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <span className="text-sm font-semibold text-gray-700">
-                    Vendas:
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={expandAll}
-                      className="flex items-center px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-all duration-200 text-sm font-medium shadow-sm"
-                    >
-                      <ChevronDown className="h-4 w-4 mr-1" />
-                      <span className="hidden sm:inline">Expandir Todas</span>
-                      <span className="sm:hidden">Expandir</span>
-                    </button>
-                    <button
-                      onClick={collapseAll}
-                      className="flex items-center px-3 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-all duration-200 text-sm font-medium shadow-sm"
-                    >
-                      <ChevronUp className="h-4 w-4 mr-1" />
-                      <span className="hidden sm:inline">Retrair Todas</span>
-                      <span className="sm:hidden">Retrair</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <span className="text-sm font-semibold text-gray-700">
-                    Vendas:
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={expandAll}
-                      className="flex items-center px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-all duration-200 text-sm font-medium shadow-sm"
-                    >
-                      <ChevronDown className="h-4 w-4 mr-1" />
-                      <span className="hidden sm:inline">Expandir</span>
-                      <span className="sm:hidden">Exp.</span>
-                    </button>
-                    <button
-                      onClick={collapseAll}
-                      className="flex items-center px-3 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-all duration-200 text-sm font-medium shadow-sm"
-                    >
-                      <ChevronUp className="h-4 w-4 mr-1" />
-                      <span className="hidden sm:inline">Retrair</span>
-                      <span className="sm:hidden">Ret.</span>
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
@@ -956,123 +916,104 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                         return (
                           <div
                             key={sale.saleNumber}
-                            className="group flex flex-col lg:flex-row lg:items-center lg:justify-between p-5 bg-gradient-to-r from-white to-gray-50 rounded-xl border border-gray-200 hover:border-blue-400 hover:shadow-xl hover:shadow-blue-100/50 transition-all duration-300 hover:scale-[1.02] hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50"
+                            className="bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
                           >
-                            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 flex-1">
-                              <div className="flex-shrink-0 min-w-0">
-                                <div className="text-sm font-bold text-gray-900 group-hover:text-blue-900 transition-colors">
+                            <div className="p-4">
+                              {/* Header */}
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="font-medium text-gray-900">
                                   Venda #{sale.saleNumber}
                                 </div>
-                                <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600 transition-colors">
-                                  {sale.installments.length} parcela
-                                  {sale.installments.length !== 1 ? "s" : ""}
-                                </div>
-                              </div>
-
-                              <div className="flex-shrink-0 text-center">
-                                <div className="text-sm font-bold text-gray-900 group-hover:text-gray-800 transition-colors">
-                                  {formatCurrency(sale.totalValue)}
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1 group-hover:text-gray-600">
-                                  Valor Total
-                                </div>
-                              </div>
-
-                              {sale.totalReceived > 0 && (
-                                <div className="flex-shrink-0 text-center">
-                                  <div className="text-sm font-bold text-green-600 group-hover:text-green-700 transition-colors">
-                                    {formatCurrency(sale.totalReceived)}
-                                  </div>
-                                  <div className="text-xs text-green-500 mt-1 group-hover:text-green-600">
-                                    Recebido
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="flex-shrink-0 text-center">
-                                <div
-                                  className={`text-sm font-bold transition-colors ${
-                                    sale.pendingValue > 0
-                                      ? "text-red-600 group-hover:text-red-700"
-                                      : "text-green-600 group-hover:text-green-700"
-                                  }`}
-                                >
-                                  {sale.pendingValue > 0
-                                    ? formatCurrency(sale.pendingValue)
-                                    : "Quitado"}
-                                </div>
-                                <div
-                                  className={`text-xs mt-1 transition-colors ${
-                                    sale.pendingValue > 0
-                                      ? "text-red-500 group-hover:text-red-600"
-                                      : "text-green-500 group-hover:text-green-600"
-                                  }`}
-                                >
-                                  {sale.pendingValue > 0
-                                    ? "Pendente"
-                                    : "Finalizado"}
-                                </div>
-                              </div>
-
-                              <div className="flex-shrink-0">
-                                <div className="flex items-center justify-center">
-                                  <div className="mr-2 group-hover:scale-110 transition-transform">
-                                    {getStatusIcon(
-                                      displayStatus === "Quitado"
-                                        ? "recebido"
-                                        : "pendente",
-                                    )}
-                                  </div>
+                                <div className="flex items-center space-x-2">
+                                  {getStatusIcon(
+                                    displayStatus === "Quitado"
+                                      ? "recebido"
+                                      : "pendente",
+                                  )}
                                   <span
-                                    className={`inline-flex px-4 py-2 text-xs font-bold rounded-full shadow-md group-hover:shadow-lg transition-all duration-200 ${statusColor} group-hover:scale-105`}
+                                    className={`inline-flex px-2 py-1 text-xs font-medium rounded ${statusColor}`}
                                   >
                                     {displayStatus}
                                   </span>
                                 </div>
                               </div>
-                            </div>
 
-                            <div className="flex items-center justify-end space-x-2 mt-3 lg:mt-0">
-                              <button
-                                id={`view-sale-${sale.saleNumber}`}
-                                name={`viewSale${sale.saleNumber}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // Pegar todas as parcelas da venda
-                                  const saleCollections = sale.installments
-                                    .map((inst: Collection) =>
-                                      collections.find(
-                                        (c: Collection) =>
-                                          c.id_parcela === inst.id_parcela,
-                                      ),
-                                    )
-                                    .filter(
-                                      (c: Collection | undefined) =>
-                                        c !== undefined,
-                                    ) as Collection[];
+                              {/* Financial info */}
+                              <div className="grid grid-cols-2 gap-4 mb-3">
+                                <div>
+                                  <div className="text-sm text-gray-500">Total</div>
+                                  <div className="font-semibold text-gray-900">
+                                    {formatCurrency(sale.totalValue)}
+                                  </div>
+                                </div>
+                                {sale.totalReceived > 0 && (
+                                  <div>
+                                    <div className="text-sm text-gray-500">Recebido</div>
+                                    <div className="font-semibold text-green-600">
+                                      {formatCurrency(sale.totalReceived)}
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="col-span-2">
+                                  <div className="text-sm text-gray-500">
+                                    {sale.pendingValue > 0 ? "Pendente" : "Status"}
+                                  </div>
+                                  <div
+                                    className={`font-semibold ${
+                                      sale.pendingValue > 0
+                                        ? "text-red-600"
+                                        : "text-green-600"
+                                    }`}
+                                  >
+                                    {sale.pendingValue > 0
+                                      ? formatCurrency(sale.pendingValue)
+                                      : "Quitado"}
+                                  </div>
+                                </div>
+                              </div>
 
-                                  if (saleCollections.length > 0) {
-                                    setSelectedSale(saleCollections);
-                                    setIsSaleModalOpen(true);
-                                  }
-                                }}
-                                className="flex items-center px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 hover:shadow-lg hover:shadow-blue-200 transition-all duration-200 text-sm font-semibold transform hover:scale-105"
-                                title="Ver detalhes da venda"
-                              >
-                                <Eye className="h-4 w-4 mr-1" />
-                                <span className="hidden sm:inline">
-                                  Ver Venda
-                                </span>
-                              </button>
-                              {userType === "collector" && (
-                                <>
-                                  {/* Phone actions removed - client data structure doesn't include phone/mobile */}
+                              {/* Parcelas info */}
+                              <div className="text-sm text-gray-500 mb-3">
+                                {sale.installments.length} parcela
+                                {sale.installments.length !== 1 ? "s" : ""}
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex space-x-2">
+                                <button
+                                  id={`view-sale-${sale.saleNumber}`}
+                                  name={`viewSale${sale.saleNumber}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const saleCollections = sale.installments
+                                      .map((inst: Collection) =>
+                                        collections.find(
+                                          (c: Collection) =>
+                                            c.id_parcela === inst.id_parcela,
+                                        ),
+                                      )
+                                      .filter(
+                                        (c: Collection | undefined) =>
+                                          c !== undefined,
+                                      ) as Collection[];
+
+                                    if (saleCollections.length > 0) {
+                                      setSelectedSale(saleCollections);
+                                      setIsSaleModalOpen(true);
+                                    }
+                                  }}
+                                  className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex-1"
+                                  title="Ver detalhes da venda"
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  <span>Ver Detalhes</span>
+                                </button>
+                                {userType === "collector" && (
                                   <button
                                     id={`manage-payments-${sale.saleNumber}`}
                                     name={`managePayments${sale.saleNumber}`}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      // Convert to ClientGroup format for modal
                                       const clientGroupForModal =
                                         clientGroups.find(
                                           (cg) =>
@@ -1083,16 +1024,14 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                                         handleViewClient(clientGroupForModal);
                                       }
                                     }}
-                                    className="flex items-center px-4 py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 hover:shadow-lg hover:shadow-purple-200 transition-all duration-200 text-sm font-semibold transform hover:scale-105"
+                                    className="flex items-center justify-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm flex-1"
                                     title="Gerenciar pagamentos"
                                   >
-                                    <DollarSign className="h-4 w-4 mr-1" />
-                                    <span className="hidden sm:inline">
-                                      Pagar
-                                    </span>
+                                    <DollarSign className="h-4 w-4 mr-2" />
+                                    <span>Pagar</span>
                                   </button>
-                                </>
-                              )}
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
@@ -1135,11 +1074,11 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
         {/* Controles de Paginação */}
         {totalPages > 1 && (
-          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 border-t border-gray-200 px-4 sm:px-6 py-4 rounded-b-xl">
+          <div className="bg-gray-800 border-t border-gray-200 px-4 sm:px-6 py-4 rounded-b-lg">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-sm text-white text-center sm:text-left">
                 <span className="font-semibold">Página {currentPage} de {totalPages}</span>
-                <span className="text-purple-100 ml-2">
+                <span className="text-gray-300 ml-2">
                   • Mostrando {startItem} a {endItem} de {totalItems} clientes
                 </span>
               </div>
