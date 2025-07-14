@@ -29,7 +29,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
   const [routeOptimized, setRouteOptimized] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({});
   const [currentPage, setCurrentPage] = useState(1);
-  const [clientsPerPage] = useState(10);
+  const [clientsPerPage, setClientsPerPage] = useState(100);
   const [userLocation, setUserLocation] = useState<{
     lat: number;
     lng: number;
@@ -633,6 +633,11 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
   const handleFilterChange = (newFilters: FilterOptions) => {
     setFilters(newFilters);
     setCurrentPage(1); // Resetar página ao filtrar
+  };
+
+  const handleClientsPerPageChange = (newClientsPerPage: number) => {
+    setClientsPerPage(newClientsPerPage);
+    setCurrentPage(1); // Resetar página ao alterar quantidade
   };
 
   const handlePageChange = (page: number) => {
@@ -1367,7 +1372,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
         )}
 
         {/* Paginação */}
-        {totalPages > 1 && (
+        {allClients.length > 0 && (
           <div className="px-3 sm:px-4 py-3 sm:py-4 border-t border-gray-200 bg-gray-50">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3">
               {/* Informações da página */}
@@ -1392,55 +1397,73 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 )}
               </div>
 
-              {/* Controles de paginação */}
-              <div className="flex items-center space-x-1">
-                <button
-                  onClick={handlePreviousPage}
-                  disabled={currentPage === 1}
-                  className="p-1.5 sm:p-2 rounded text-gray-500 hover:text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              {/* Controle de itens por página */}
+              <div className="flex items-center space-x-2 text-xs sm:text-sm text-gray-600">
+                <span>Itens por página:</span>
+                <select
+                  value={clientsPerPage}
+                  onChange={(e) => handleClientsPerPageChange(Number(e.target.value))}
+                  className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-                </button>
-
-                {/* Números das páginas - mobile otimizado */}
-                <div className="flex space-x-1">
-                  {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
-                    let pageNumber;
-
-                    if (totalPages <= 3) {
-                      pageNumber = i + 1;
-                    } else if (currentPage <= 2) {
-                      pageNumber = i + 1;
-                    } else if (currentPage >= totalPages - 1) {
-                      pageNumber = totalPages - 2 + i;
-                    } else {
-                      pageNumber = currentPage - 1 + i;
-                    }
-
-                    return (
-                      <button
-                        key={pageNumber}
-                        onClick={() => handlePageChange(pageNumber)}
-                        className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors ${
-                          currentPage === pageNumber
-                            ? "bg-blue-600 text-white"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-white"
-                        }`}
-                      >
-                        {pageNumber}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages}
-                  className="p-1.5 sm:p-2 rounded text-gray-500 hover:text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-                </button>
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
               </div>
+
+              {/* Controles de paginação */}
+              {totalPages > 1 && (
+                <div className="flex items-center space-x-1">
+                  <button
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                    className="p-1.5 sm:p-2 rounded text-gray-500 hover:text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                  </button>
+
+                  {/* Números das páginas - mobile otimizado */}
+                  <div className="flex space-x-1">
+                    {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                      let pageNumber;
+
+                      if (totalPages <= 3) {
+                        pageNumber = i + 1;
+                      } else if (currentPage <= 2) {
+                        pageNumber = i + 1;
+                      } else if (currentPage >= totalPages - 1) {
+                        pageNumber = totalPages - 2 + i;
+                      } else {
+                        pageNumber = currentPage - 1 + i;
+                      }
+
+                      return (
+                        <button
+                          key={pageNumber}
+                          onClick={() => handlePageChange(pageNumber)}
+                          className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors ${
+                            currentPage === pageNumber
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-600 hover:text-gray-900 hover:bg-white"
+                          }`}
+                        >
+                          {pageNumber}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages}
+                    className="p-1.5 sm:p-2 rounded text-gray-500 hover:text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

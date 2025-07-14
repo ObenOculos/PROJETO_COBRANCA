@@ -1745,6 +1745,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                                       e.target.dataset.previousValue = e.target.value;
                                     }}
                                     onChange={(e) => {
+                                      // Apenas atualizar o valor, sem validação
+                                      updateClientSchedule(
+                                        client.document,
+                                        "time",
+                                        e.target.value,
+                                      );
+                                    }}
+                                    onBlur={(e) => {
                                       const selectedTime = e.target.value;
                                       const selectedDate = schedule.date;
                                       const previousTime = e.target.dataset.previousValue || schedule.time;
@@ -1757,7 +1765,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                                         selectedDateTime.setHours(hours, minutes, 0, 0);
                                         
                                         if (selectedDateTime <= now) {
-                                          // Não atualizar o horário ainda, aguardar confirmação do modal
+                                          // Mostrar modal de aviso
                                           setTimeWarningData({
                                             clientDocument: client.document,
                                             selectedTime: selectedTime,
@@ -1765,16 +1773,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                                             previousTime: previousTime,
                                           });
                                           setShowTimeWarningModal(true);
-                                          return; // Impedir a atualização
+                                          return;
                                         }
                                       }
-                                      
-                                      // Se o horário é válido, atualizar normalmente
-                                      updateClientSchedule(
-                                        client.document,
-                                        "time",
-                                        selectedTime,
-                                      );
                                     }}
                                     className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                                   />
