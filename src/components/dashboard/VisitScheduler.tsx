@@ -555,6 +555,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     const { errors, conflicts } = validateClientSchedules();
 
     if (errors.length > 0) {
+      // Verificar se há erro de data passada
+      const pastDateErrors = errors.filter(error => error.includes("Data não pode ser anterior a hoje"));
+      if (pastDateErrors.length > 0) {
+        setDateValidationMessage("Não é possível agendar visitas para datas passadas");
+        setShowDateValidationModal(true);
+        return;
+      }
+      // Outros erros
       alert(`Erros encontrados:\n\n${errors.join("\n")}`);
       return;
     }
