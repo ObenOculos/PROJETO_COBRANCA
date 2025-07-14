@@ -342,7 +342,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                 Resumo dos Pagamentos
               </h3>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="text-center p-4 bg-white rounded-lg shadow-sm h-20 flex flex-col justify-center">
                   <div className="text-xl font-bold text-gray-900">
                     {formatCurrency(totalValue)}
