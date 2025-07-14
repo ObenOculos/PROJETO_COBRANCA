@@ -2022,6 +2022,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         notes: visit.notes,
         createdAt: visit.created_at,
         updatedAt: visit.updated_at,
+        dataVisitaRealizada: visit.data_visita_realizada,
         clientAddress: visit.client_address,
         clientNeighborhood: visit.client_neighborhood,
         clientCity: visit.client_city,
@@ -2143,6 +2144,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         updateData.notes = notes;
       }
 
+      // Se o status for "realizada", sempre definir a data atual como data da visita realizada
+      if (status === "realizada") {
+        updateData.data_visita_realizada = new Date().toISOString().split('T')[0];
+      }
+
       const { error } = await supabase
         .from("scheduled_visits")
         .update(updateData)
@@ -2162,6 +2168,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
                 status,
                 notes: notes || visit.notes,
                 updatedAt: new Date().toISOString(),
+                // Se o status for "realizada", definir a data atual como data da visita realizada
+                ...(status === "realizada" && {
+                  dataVisitaRealizada: new Date().toISOString().split('T')[0]
+                }),
               }
             : visit,
         ),

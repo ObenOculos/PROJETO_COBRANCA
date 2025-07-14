@@ -47,6 +47,7 @@ export interface ScheduledVisit {
   notes?: string;
   createdAt: string;
   updatedAt?: string;
+  dataVisitaRealizada?: string; // Data em que a visita foi efetivamente realizada (YYYY-MM-DD)
   // Dados do cliente para facilitar exibição
   clientAddress?: string;
   clientNeighborhood?: string;

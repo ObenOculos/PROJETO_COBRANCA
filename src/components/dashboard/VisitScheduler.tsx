@@ -828,7 +828,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
   const handleOpenRescheduleModal = (visit: ScheduledVisit) => {
     setSelectedVisitForReschedule(visit);
     setRescheduleDate(getLocalDate());
-    setRescheduleTime(visit.scheduledTime || "09:00");
+    
+    // Para visitas de hoje, usar hora atual + 1 hora; para outras visitas, manter o horário original
+    const isToday = visit.scheduledDate === getLocalDate();
+    setRescheduleTime(isToday ? getDefaultTime() : (visit.scheduledTime || "09:00"));
+    
     setShowRescheduleModal(true);
   };
 
@@ -2096,10 +2100,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                           <div className="text-sm text-gray-600 space-y-1">
                             <div className="flex items-center">
                               <Calendar className="h-4 w-4 mr-2" />
-                              {formatSafeDateTime(
-                                visit.scheduledDate,
-                                visit.scheduledTime,
-                              )}
+                              {visit.status === "realizada" && visit.dataVisitaRealizada
+                                ? `${formatSafeDateTime(visit.dataVisitaRealizada)} (Realizada)`
+                                : formatSafeDateTime(
+                                    visit.scheduledDate,
+                                    visit.scheduledTime,
+                                  )}
                             </div>
                             <div className="flex items-center">
                               <MapPin className="h-4 w-4 mr-2" />
