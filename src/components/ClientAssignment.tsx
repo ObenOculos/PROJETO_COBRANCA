@@ -7,10 +7,10 @@ import {
   AlertCircle,
   Filter,
   MapPin,
-  X,
   ChevronLeft,
   ChevronRight,
-  ArrowUpDown,
+  Award,
+  Building,
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
 import { Collection } from "../types";
@@ -650,20 +650,6 @@ export const ClientAssignment = React.memo(() => {
     }
   };
 
-  const clearFilters = () => {
-    setSearchTerm("");
-    setFilterCollector("");
-    setFilterStatus("");
-    setFilterCity("");
-    setFilterNeighborhood("");
-    setFilterStore("");
-    setFilterDateFrom("");
-    setFilterDateTo("");
-    setIncludeWithoutDate(false);
-    setShowFilters(false);
-    setCurrentPage(1);
-  };
-
   const hasActiveFilters = activeFilterChips.length > 0;
 
   // Calculate overview statistics
@@ -754,352 +740,215 @@ export const ClientAssignment = React.memo(() => {
     clientsData,
   ]);
 
+  // Calcular estatísticas para o card principal
+  const mainStats = useMemo(() => {
+    const total = hasActiveFilters ? filteredStats.totalFiltered : overviewStats.totalClients;
+    const assigned = hasActiveFilters ? filteredStats.assignedFiltered : overviewStats.assignedClients;
+    const assignmentRate = total > 0 ? (assigned / total) * 100 : 0;
+    
+    return {
+      total,
+      assigned,
+      assignmentRate
+    };
+  }, [hasActiveFilters, filteredStats, overviewStats]);
+
   return (
-    <div className="space-y-6">
-      {/* Header with Controls */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-4 lg:p-6 border-b border-gray-200">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="min-w-0">
-              <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-                <Users className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
-                <span className="truncate">Atribuição de Cobradores</span>
-              </h2>
-              <p className="text-gray-600 mt-1 text-sm lg:text-base">
-                Gerencie a atribuição de clientes aos cobradores
-              </p>
-            </div>
+    <div className="space-y-4">
+      {/* Header Simplificado */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
+              <Users className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
+              Atribuição de Cobradores
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Gerencie a atribuição de {mainStats.total} clientes
+            </p>
+          </div>
+          
+          {/* Ações Principais */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Filtros"
+            >
+              <Filter className="h-5 w-5" />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Overview Statistics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 lg:p-6 rounded-xl border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-blue-700">
-                Total de Clientes
-              </p>
-              <p className="text-2xl lg:text-3xl font-bold text-blue-900 truncate">
-                {hasActiveFilters
-                  ? filteredStats.totalFiltered
-                  : overviewStats.totalClients}
-              </p>
-              {hasActiveFilters && (
-                <p className="text-xs text-blue-600 mt-1">
-                  De {overviewStats.totalClients} total
-                </p>
-              )}
-            </div>
-            <Users className="h-8 w-8 lg:h-10 lg:w-10 text-blue-600 flex-shrink-0 ml-2" />
+      {/* Card Principal - Taxa de Atribuição */}
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-blue-100 text-sm font-medium">Taxa de Atribuição</p>
+            <p className="text-4xl font-bold mt-1">
+              {mainStats.assignmentRate.toFixed(1)}%
+            </p>
+            <p className="text-blue-100 text-sm mt-2">
+              {mainStats.total} clientes cadastrados
+            </p>
           </div>
+          <Award className="h-16 w-16 text-blue-200 opacity-50" />
         </div>
-
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 lg:p-6 rounded-xl border border-green-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-green-700">Com Cobrador</p>
-              <p className="text-2xl lg:text-3xl font-bold text-green-900">
-                {hasActiveFilters
-                  ? filteredStats.assignedFiltered
-                  : overviewStats.assignedClients}
-              </p>
-              <p className="text-xs text-green-600 mt-1">
-                {hasActiveFilters
-                  ? Math.round(
-                      (filteredStats.assignedFiltered /
-                        filteredStats.totalFiltered) *
-                        100,
-                    ) || 0
-                  : Math.round(overviewStats.assignmentRate)}
-                % atribuídos
-              </p>
-            </div>
-            <UserPlus className="h-8 w-8 lg:h-10 lg:w-10 text-green-600 flex-shrink-0 ml-2" />
+        
+        {/* Métricas secundárias */}
+        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-blue-400">
+          <div>
+            <p className="text-blue-100 text-xs">Atribuídos</p>
+            <p className="text-2xl font-semibold">{mainStats.assigned}</p>
           </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 lg:p-6 rounded-xl border border-amber-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-amber-700">Sem Cobrador</p>
-              <p className="text-2xl lg:text-3xl font-bold text-amber-900">
-                {hasActiveFilters
-                  ? filteredStats.unassignedFiltered
-                  : overviewStats.unassignedClients}
-              </p>
-              <p className="text-xs text-amber-600 mt-1">
-                {hasActiveFilters
-                  ? Math.round(
-                      (filteredStats.unassignedFiltered /
-                        filteredStats.totalFiltered) *
-                        100,
-                    ) || 0
-                  : Math.round(100 - overviewStats.assignmentRate)}
-                % pendentes
-              </p>
-            </div>
-            <AlertCircle className="h-8 w-8 lg:h-10 lg:w-10 text-amber-600 flex-shrink-0 ml-2" />
+          <div>
+            <p className="text-blue-100 text-xs">Pendentes</p>
+            <p className="text-2xl font-semibold">{mainStats.total - mainStats.assigned}</p>
           </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-violet-50 p-4 lg:p-6 rounded-xl border border-purple-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-purple-700">
-                Total Parcelas
-              </p>
-              <p className="text-2xl lg:text-3xl font-bold text-purple-900">
-                {hasActiveFilters
-                  ? filteredStats.totalCollectionsFiltered
-                  : overviewStats.totalCollections}
-              </p>
-              <p className="text-xs text-purple-600 mt-1">
-                Média: {overviewStats.avgCollectionsPerClient.toFixed(1)} por
-                cliente
-              </p>
-            </div>
-            <ArrowUpDown className="h-8 w-8 lg:h-10 lg:w-10 text-purple-600 flex-shrink-0 ml-2" />
+          <div>
+            <p className="text-blue-100 text-xs">Cobradores</p>
+            <p className="text-2xl font-semibold">{collectors.length}</p>
           </div>
         </div>
       </div>
 
-      {/* Search and Filters Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-4 lg:p-6">
-          <div className="space-y-4">
+      {/* Filtros Colapsáveis */}
+      {showFilters && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 animate-in slide-in-from-top-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
-              <label htmlFor="searchTerm" className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <Search className="h-4 w-4 mr-1" />
                 Buscar Cliente
               </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  id="searchTerm"
-                  name="searchTerm"
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Nome do cliente ou documento..."
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Nome ou documento..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
 
             <div>
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`w-full flex items-center justify-center px-3 py-2 border rounded-lg transition-colors ${
-                  showFilters
-                    ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-                    : "border-gray-300 hover:bg-gray-50"
-                }`}
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <Users className="h-4 w-4 mr-1" />
+                Cobrador
+              </label>
+              <select
+                value={filterCollector}
+                onChange={(e) => setFilterCollector(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <Filter className="h-4 w-4 mr-2" />
-                {showFilters ? "Ocultar" : "Mostrar"} Filtros
-                {hasActiveFilters && !showFilters && (
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {
-                      [
-                        filterCollector,
-                        filterStatus,
-                        filterCity,
-                        filterNeighborhood,
-                        filterDateFrom,
-                        filterDateTo,
-                      ].filter(Boolean).length
-                    }
-                  </span>
-                )}
+                <option value="">Todos os cobradores</option>
+                {collectors.map((collector) => (
+                  <option key={collector.id} value={collector.id}>
+                    {collector.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <AlertCircle className="h-4 w-4 mr-1" />
+                Status
+              </label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Todos os status</option>
+                <option value="with_collector">Com cobrador</option>
+                <option value="without_collector">Sem cobrador</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <MapPin className="h-4 w-4 mr-1" />
+                Cidade
+              </label>
+              <select
+                value={filterCity}
+                onChange={(e) => {
+                  setFilterCity(e.target.value);
+                  setFilterNeighborhood("");
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Todas as cidades</option>
+                {availableCities.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <MapPin className="h-4 w-4 mr-1" />
+                Bairro
+              </label>
+              <select
+                value={filterNeighborhood}
+                onChange={(e) => setFilterNeighborhood(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!filterCity}
+              >
+                <option value="">Todos os bairros</option>
+                {availableNeighborhoods.map((neighborhood) => (
+                  <option key={neighborhood} value={neighborhood}>
+                    {neighborhood}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <Building className="h-4 w-4 mr-1" />
+                Loja
+              </label>
+              <select
+                value={filterStore}
+                onChange={(e) => setFilterStore(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Todas as lojas</option>
+                {availableStores.map((store) => (
+                  <option key={store} value={store}>
+                    {store}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="col-span-full">
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setFilterCollector("");
+                  setFilterStatus("");
+                  setFilterCity("");
+                  setFilterNeighborhood("");
+                  setFilterStore("");
+                  setFilterDateFrom("");
+                  setFilterDateTo("");
+                  setIncludeWithoutDate(false);
+                  setCurrentPage(1);
+                }}
+                className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+              >
+                Limpar Filtros
               </button>
             </div>
           </div>
-
-          {/* Expanded Filters */}
-          {showFilters && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label htmlFor="filterStatus" className="block text-sm font-medium text-gray-700 mb-2">
-                    Status
-                  </label>
-                  <select
-                    id="filterStatus"
-                    name="filterStatus"
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Todos</option>
-                    <option value="with_collector">Com Cobrador</option>
-                    <option value="without_collector">Sem Cobrador</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="filterCollector" className="block text-sm font-medium text-gray-700 mb-2">
-                    Cobrador
-                  </label>
-                  <select
-                    id="filterCollector"
-                    name="filterCollector"
-                    value={filterCollector}
-                    onChange={(e) => setFilterCollector(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Todos os Cobradores</option>
-                    {collectors.map((collector) => (
-                      <option key={collector.id} value={collector.id}>
-                        {collector.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="filterCity" className="block text-sm font-medium text-gray-700 mb-2">
-                    Cidade
-                  </label>
-                  <select
-                    id="filterCity"
-                    name="filterCity"
-                    value={filterCity}
-                    onChange={(e) => {
-                      setFilterCity(e.target.value);
-                      setFilterNeighborhood("");
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Todas as Cidades</option>
-                    {availableCities.map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="filterNeighborhood" className="block text-sm font-medium text-gray-700 mb-2">
-                    Bairro
-                  </label>
-                  <select
-                    id="filterNeighborhood"
-                    name="filterNeighborhood"
-                    value={filterNeighborhood}
-                    onChange={(e) => setFilterNeighborhood(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-                    disabled={!filterCity}
-                  >
-                    <option value="">Todos os Bairros</option>
-                    {availableNeighborhoods.map((neighborhood) => (
-                      <option key={neighborhood} value={neighborhood}>
-                        {neighborhood}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="filterStore" className="block text-sm font-medium text-gray-700 mb-2">
-                    Loja
-                  </label>
-                  <select
-                    id="filterStore"
-                    name="filterStore"
-                    value={filterStore}
-                    onChange={(e) => setFilterStore(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Todas as Lojas</option>
-                    {availableStores.map((store) => (
-                      <option key={store} value={store}>
-                        {store}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="filterDateFrom" className="block text-sm font-medium text-gray-700 mb-2">
-                    Vencimento De
-                  </label>
-                  <input
-                    id="filterDateFrom"
-                    name="filterDateFrom"
-                    type="date"
-                    value={filterDateFrom}
-                    onChange={(e) => setFilterDateFrom(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="filterDateTo" className="block text-sm font-medium text-gray-700 mb-2">
-                    Vencimento Até
-                  </label>
-                  <input
-                    id="filterDateTo"
-                    name="filterDateTo"
-                    type="date"
-                    value={filterDateTo}
-                    onChange={(e) => setFilterDateTo(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {(filterDateFrom || filterDateTo) && (
-                <div className="mt-4">
-                  <label className="flex items-center">
-                    <input
-                      id="includeWithoutDate"
-                      name="includeWithoutDate"
-                      type="checkbox"
-                      checked={includeWithoutDate}
-                      onChange={(e) =>
-                        setIncludeWithoutDate(e.target.checked)
-                      }
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">
-                      Incluir clientes sem data de vencimento
-                    </span>
-                  </label>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeFilterChips.length > 0 && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-medium text-gray-700">Filtros Ativos:</h4>
-                <button
-                  onClick={clearFilters}
-                  className="flex items-center px-2 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs font-medium"
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Limpar Todos
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {activeFilterChips.map((chip, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 cursor-pointer hover:bg-blue-200 transition-colors"
-                    onClick={chip.onClear}
-                  >
-                    {chip.label}
-                    <X className="ml-2 h-3 w-3" />
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
-      </div>
+      )}
 
       {/* Client List */}
       <div className="space-y-4">

@@ -6,10 +6,13 @@ import {
   Search,
   Download,
   BarChart3,
-  TrendingUp,
   Building,
   ChevronDown,
   ChevronUp,
+  FileText,
+  Users,
+  DollarSign,
+  Award,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
@@ -28,6 +31,8 @@ interface StoreStats {
   receivedAmount: number;
   pendingAmount: number;
   conversionRate: number;
+  efficiency: number;
+  averageTicket: number;
   clientsCount: number;
 }
 
@@ -147,6 +152,8 @@ const EnhancedStoreManagement: React.FC = () => {
       const pendingAmount = totalAmount - receivedAmount;
       const conversionRate =
         salesArray.length > 0 ? (completedSales / salesArray.length) * 100 : 0;
+      const efficiency = totalAmount > 0 ? (receivedAmount / totalAmount) * 100 : 0;
+      const averageTicket = salesArray.length > 0 ? totalAmount / salesArray.length : 0;
       const clientsCount = new Set(
         salesArray.map((s) => s.clientDocument || s.clientName).filter(Boolean),
       ).size;
@@ -165,6 +172,8 @@ const EnhancedStoreManagement: React.FC = () => {
         receivedAmount,
         pendingAmount,
         conversionRate,
+        efficiency,
+        averageTicket,
         clientsCount,
       });
     });
@@ -314,184 +323,129 @@ const EnhancedStoreManagement: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-4 lg:p-6 border-b border-gray-200">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="min-w-0">
-              <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-                <Building className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
-                <span className="truncate">Acompanhamento de Lojas</span>
-              </h2>
-              <p className="text-gray-600 mt-1 text-sm lg:text-base">
-                Monitore performance e status das lojas
-              </p>
-            </div>
-
+    <div className="space-y-4">
+      {/* Header Simplificado */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
+              <Building className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
+              Acompanhamento de Lojas
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Performance e status das {overviewStats.totalStores} lojas
+            </p>
+          </div>
+          
+          {/* Ações Principais */}
+          <div className="flex items-center gap-2">
+            {overviewStats.unassignedStores > 0 && (
+              <span className="flex items-center text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full font-medium">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                {overviewStats.unassignedStores} sem atribuição
+              </span>
+            )}
+            
             <button
               onClick={exportStoreData}
-              className="flex items-center justify-center px-3 lg:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Exportar"
             >
-              <Download className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Exportar Dados</span>
-              <span className="sm:hidden">Exportar</span>
+              <Download className="h-5 w-5" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Overview Statistics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 lg:p-6 rounded-xl border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-blue-700">
-                Total de Lojas
-              </p>
-              <p className="text-2xl lg:text-3xl font-bold text-blue-900 truncate">
-                {overviewStats.totalStores}
-              </p>
-            </div>
-            <Building className="h-8 w-8 lg:h-10 lg:w-10 text-blue-600 flex-shrink-0 ml-2" />
+      {/* Card Principal - Taxa de Conversão Média */}
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-blue-100 text-sm font-medium">Taxa de Conversão Média</p>
+            <p className="text-4xl font-bold mt-1">
+              {overviewStats.avgConversionRate.toFixed(1)}%
+            </p>
+            <p className="text-blue-100 text-sm mt-2">
+              {overviewStats.totalStores} lojas cadastradas
+            </p>
           </div>
+          <Award className="h-16 w-16 text-blue-200 opacity-50" />
         </div>
-
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 lg:p-6 rounded-xl border border-green-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-green-700">
-                Lojas Atribuídas
-              </p>
-              <p className="text-2xl lg:text-3xl font-bold text-green-900">
-                {overviewStats.assignedStores}
-              </p>
-            </div>
-            <CheckCircle className="h-8 w-8 lg:h-10 lg:w-10 text-green-600 flex-shrink-0 ml-2" />
+        
+        {/* Métricas secundárias */}
+        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-blue-400">
+          <div>
+            <p className="text-blue-100 text-xs">Receita</p>
+            <p className="text-2xl font-semibold">{formatCurrency(overviewStats.totalRevenue, false)}</p>
           </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-violet-50 p-4 lg:p-6 rounded-xl border border-purple-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-purple-700">Taxa Média</p>
-              <p className="text-2xl lg:text-3xl font-bold text-purple-900 truncate">
-                {overviewStats.avgConversionRate.toFixed(1)}%
-              </p>
-            </div>
-            <TrendingUp className="h-8 w-8 lg:h-10 lg:w-10 text-purple-600 flex-shrink-0 ml-2" />
+          <div>
+            <p className="text-blue-100 text-xs">Atribuídas</p>
+            <p className="text-2xl font-semibold">{overviewStats.assignedStores}</p>
           </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 lg:p-6 rounded-xl border border-orange-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-orange-700">
-                Receita Total
-              </p>
-              <p className="text-2xl lg:text-3xl font-bold text-orange-900 truncate">
-                {formatCurrency(overviewStats.totalRevenue)}
-              </p>
-            </div>
-            <BarChart3 className="h-8 w-8 lg:h-10 lg:w-10 text-orange-600 flex-shrink-0 ml-2" />
+          <div>
+            <p className="text-blue-100 text-xs">Vendas</p>
+            <p className="text-2xl font-semibold">{overviewStats.totalSales}</p>
           </div>
         </div>
       </div>
 
-      {/* Search and Filters */}
-      <div className="p-4 lg:p-6 border-b border-gray-200 bg-white rounded-xl">
-        <div className="space-y-4">
-          <div>
-            <label
-              htmlFor="store-search"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Buscar
-            </label>
+      {/* Filtros Compactos com Ícones */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          {/* Busca */}
+          <div className="flex-1">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                id="store-search"
-                name="storeSearch"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Nome da loja ou cobrador..."
+                placeholder="Buscar loja ou cobrador..."
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="sort-by"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Ordenar Por
-              </label>
-              <select
-                id="sort-by"
-                name="sortBy"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="storeName">Nome da Loja</option>
-                <option value="conversionRate">Taxa de Conversão</option>
-                <option value="totalAmount">Valor Total</option>
-              </select>
-            </div>
+          {/* Ordenação com Ícones */}
+          <div className="flex items-center gap-2">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="pl-3 pr-8 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm"
+            >
+              <option value="storeName">🏪 Nome</option>
+              <option value="conversionRate">📊 Taxa</option>
+              <option value="totalAmount">💰 Valor</option>
+            </select>
 
-            <div>
-              <label 
-                htmlFor="sort-order"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Ordem
-              </label>
-              <button
-                id="sort-order"
-                name="sortOrder"
-                onClick={() =>
-                  setSortOrder(sortOrder === "asc" ? "desc" : "asc")
-                }
-                className="w-full flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                {sortOrder === "asc" ? (
-                  <>
-                    <ChevronUp className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Crescente</span>
-                    <span className="sm:hidden">↑</span>
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Decrescente</span>
-                    <span className="sm:hidden">↓</span>
-                  </>
-                )}
-              </button>
-            </div>
+            <button
+              onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+              className={`flex items-center justify-center p-2 rounded-lg transition-colors ${
+                sortOrder === "desc" 
+                  ? "bg-blue-50 text-blue-600 hover:bg-blue-100" 
+                  : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+              }`}
+              title={sortOrder === "desc" ? "Maior primeiro" : "Menor primeiro"}
+            >
+              {sortOrder === "desc" ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+
+          {/* Contador */}
+          <div className="flex items-center text-sm text-gray-600">
+            <BarChart3 className="h-4 w-4 mr-1" />
+            <span className="font-medium">{filteredAndSortedStores.length}</span>
+            <span className="hidden sm:inline ml-1">lojas</span>
           </div>
         </div>
       </div>
 
-      {/* Store Cards */}
+      {/* Lista de Lojas */}
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <h3 className="text-base lg:text-lg font-semibold text-gray-900">
-            Lojas ({filteredAndSortedStores.length})
-          </h3>
-          <div className="text-sm text-gray-600">
-            {overviewStats.unassignedStores > 0 && (
-              <span className="text-amber-600 whitespace-nowrap">
-                {overviewStats.unassignedStores} loja
-                {overviewStats.unassignedStores !== 1 ? "s" : ""} sem atribuição
-              </span>
-            )}
-          </div>
-        </div>
 
         {filteredAndSortedStores.map((store) => {
           const isExpanded = expandedCards.has(store.storeName);
@@ -500,223 +454,214 @@ const EnhancedStoreManagement: React.FC = () => {
           return (
             <div
               key={store.storeName}
-              className={`bg-white rounded-xl shadow-sm border transition-all duration-200 hover:shadow-md ${
+              className={`bg-white rounded-xl shadow-sm border-2 transition-all duration-200 hover:shadow-lg ${
                 isUnassigned
-                  ? "border-amber-300 bg-amber-50"
-                  : "border-gray-200"
+                  ? "border-amber-200 hover:border-amber-300"
+                  : store.conversionRate >= 70
+                  ? "border-green-200 hover:border-green-300"
+                  : store.conversionRate >= 40
+                  ? "border-blue-200 hover:border-blue-300"
+                  : "border-red-200 hover:border-red-300"
               }`}
             >
-              <div className="p-4 lg:p-6">
-                <div className="flex flex-col gap-4">
-                  {/* Mobile: Stack vertically for better readability */}
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`h-10 w-10 lg:h-12 lg:w-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        isUnassigned ? "bg-amber-100" : "bg-blue-100"
-                      }`}
-                    >
-                      <Store
-                        className={`h-5 w-5 lg:h-6 lg:w-6 ${isUnassigned ? "text-amber-600" : "text-blue-600"}`}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-base lg:text-lg font-semibold text-gray-900 flex items-center flex-wrap gap-2">
-                        <span className="truncate">{store.storeName}</span>
-                        {isUnassigned && (
-                          <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                        )}
-                      </h4>
-
-                      {/* Mobile: Show conversion rate below store name */}
-                      <div className="mt-2 flex items-center justify-between">
-                        <div>
-                          <div className="text-xl lg:text-2xl font-bold text-gray-900">
-                            {store.conversionRate.toFixed(1)}%
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            Taxa de Conversão
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => toggleCardExpansion(store.storeName)}
-                          className="p-2 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-                        >
-                          {isExpanded ? (
-                            <ChevronUp className="h-5 w-5" />
-                          ) : (
-                            <ChevronDown className="h-5 w-5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Progress Bar */}
-                  {!isUnassigned && (
-                    <div className="mb-4">
-                      <div className="flex justify-between text-sm text-gray-600 mb-2">
-                        <span>Performance da Loja</span>
-                        <span>
-                          {store.totalSales} vendas ({store.completedSales} finalizadas, {store.pendingSales} pendentes) • {store.clientsCount} clientes • {store.clientsWithPending} com pendências
+              <div className="p-5">
+                {/* Header com Métrica Principal */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                      <Store className={`h-5 w-5 ${
+                        isUnassigned ? "text-amber-600" : 
+                        store.conversionRate >= 70 ? "text-green-600" :
+                        store.conversionRate >= 40 ? "text-blue-600" : "text-red-600"
+                      }`} />
+                      {store.storeName}
+                      {isUnassigned && (
+                        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full font-medium">
+                          Sem atribuição
                         </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-3">
-                        <div
-                          className={`h-3 rounded-full transition-all duration-500 ${
-                            store.conversionRate >= 70
-                              ? "bg-green-500"
-                              : store.conversionRate >= 40
-                                ? "bg-yellow-500"
-                                : "bg-red-500"
-                          }`}
-                          style={{
-                            width: `${Math.min(store.conversionRate, 100)}%`,
-                          }}
-                        ></div>
-                      </div>
+                      )}
+                    </h4>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {store.collectorName}
+                      {store.isFormalAssignment && !isUnassigned && (
+                        <span className="text-xs text-green-600 ml-1">(Formal)</span>
+                      )}
+                    </p>
+                  </div>
+                  
+                  {/* Métrica Principal Destacada */}
+                  <div className="text-right">
+                    <div className={`text-3xl font-bold ${
+                      store.conversionRate >= 70 ? "text-green-600" :
+                      store.conversionRate >= 40 ? "text-blue-600" : "text-red-600"
+                    }`}>
+                      {store.conversionRate.toFixed(1)}%
                     </div>
-                  )}
-
-                  {/* Reorganized Stats - Better UX */}
-                  <div className="space-y-4">
-                    {/* Vendas Overview */}
-                    <div>
-                      <h5 className="text-sm font-medium text-gray-700 mb-3">Vendas</h5>
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                          <div className="text-lg lg:text-xl font-bold text-blue-700">
-                            {store.totalSales}
-                          </div>
-                          <div className="text-xs text-blue-600">Total</div>
-                        </div>
-                        <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
-                          <div className="text-lg lg:text-xl font-bold text-green-700">
-                            {store.completedSales}
-                          </div>
-                          <div className="text-xs text-green-600">Finalizadas</div>
-                        </div>
-                        <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
-                          <div className="text-lg lg:text-xl font-bold text-orange-700">
-                            {store.pendingSales}
-                          </div>
-                          <div className="text-xs text-orange-600">Pendentes</div>
-                        </div>
-                        <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
-                          <div className="text-lg lg:text-xl font-bold text-purple-700">
-                            {store.clientsCount}
-                          </div>
-                          <div className="text-xs text-purple-600">Total Clientes</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Clientes Overview */}
-                    <div>
-                      <h5 className="text-sm font-medium text-gray-700 mb-3">Status dos Clientes</h5>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                        <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
-                          <div className="text-lg lg:text-xl font-bold text-green-700">
-                            {store.clientsCount - store.clientsWithPending}
-                          </div>
-                          <div className="text-xs text-green-600">Clientes Regulares</div>
-                        </div>
-                        <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
-                          <div className="text-lg lg:text-xl font-bold text-orange-700">
-                            {store.clientsWithPending}
-                          </div>
-                          <div className="text-xs text-orange-600">Com Pendências</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Financial Overview */}
-                    <div>
-                      <h5 className="text-sm font-medium text-gray-700 mb-3">Valores Financeiros</h5>
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Valor Total</span>
-                            <span className="text-lg font-bold text-gray-900">
-                              {formatCurrency(store.totalAmount)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-green-600">Recebido</span>
-                            <span className="text-lg font-bold text-green-700">
-                              {formatCurrency(store.receivedAmount)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-red-600">Pendente</span>
-                            <span className="text-lg font-bold text-red-700">
-                              {formatCurrency(store.pendingAmount)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    <div className="text-xs text-gray-500">conversão</div>
                   </div>
                 </div>
 
-                {/* Expanded Details */}
-                {isExpanded && !isUnassigned && (
-                  <div className="mt-4 lg:mt-6 pt-4 lg:pt-6 border-t border-gray-200">
-                    <div>
-                      <h5 className="font-medium text-gray-900 mb-3">
-                        Informações Financeiras
-                      </h5>
-                      <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-4">
-                        <div className="flex justify-between lg:flex-col lg:text-center p-3 bg-gray-50 rounded-lg">
-                          <span className="text-sm text-gray-600 lg:mb-1">
-                            Valor Total
-                          </span>
-                          <span className="text-sm font-medium text-gray-900 truncate">
-                            {formatCurrency(store.totalAmount)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between lg:flex-col lg:text-center p-3 bg-gray-50 rounded-lg">
-                          <span className="text-sm text-gray-600 lg:mb-1">
-                            Eficiência
-                          </span>
-                          <span className="text-sm font-medium text-green-600">
-                            {store.totalAmount > 0
-                              ? (
-                                  (store.receivedAmount / store.totalAmount) *
-                                  100
-                                ).toFixed(1)
-                              : 0}
-                            %
-                          </span>
-                        </div>
-                        <div className="flex justify-between lg:flex-col lg:text-center p-3 bg-gray-50 rounded-lg">
-                          <span className="text-sm text-gray-600 lg:mb-1">
-                            Ticket Médio
-                          </span>
-                          <span className="text-sm font-medium text-blue-600 truncate">
-                            {formatCurrency(
-                              store.totalSales > 0
-                                ? store.totalAmount / store.totalSales
-                                : 0,
-                            )}
-                          </span>
-                        </div>
+                {/* Métricas Resumidas com Ícones */}
+                {!isUnassigned && (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                    <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                      <div className="bg-gray-100 rounded-full p-2 mr-3">
+                        <FileText className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-gray-900">{store.totalSales}</div>
+                        <div className="text-xs text-gray-600">vendas</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center p-3 bg-green-50 rounded-lg">
+                      <div className="bg-green-100 rounded-full p-2 mr-3">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-green-700">{store.completedSales}</div>
+                        <div className="text-xs text-green-600">finalizadas</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center p-3 bg-orange-50 rounded-lg">
+                      <div className="bg-orange-100 rounded-full p-2 mr-3">
+                        <AlertCircle className="h-4 w-4 text-orange-600" />
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-orange-700">{store.pendingSales}</div>
+                        <div className="text-xs text-orange-600">pendentes</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center p-3 bg-purple-50 rounded-lg">
+                      <div className="bg-purple-100 rounded-full p-2 mr-3">
+                        <Users className="h-4 w-4 text-purple-600" />
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-purple-700">{store.clientsCount}</div>
+                        <div className="text-xs text-purple-600">clientes</div>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Unassigned Store Info */}
+                {/* Barra de Progresso Visual */}
+                {!isUnassigned && (
+                  <div className="mb-4">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          store.conversionRate >= 70
+                            ? "bg-gradient-to-r from-green-500 to-green-600"
+                            : store.conversionRate >= 40
+                              ? "bg-gradient-to-r from-blue-500 to-blue-600"
+                              : "bg-gradient-to-r from-red-500 to-red-600"
+                        }`}
+                        style={{
+                          width: `${Math.min(store.conversionRate, 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Valores Financeiros com Ícones */}
+                {!isUnassigned && (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center">
+                      <BarChart3 className="h-4 w-4 text-gray-500 mr-2" />
+                      <div className="text-center">
+                        <div className="text-xs text-gray-600">Total</div>
+                        <div className="text-sm font-bold text-gray-900">{formatCurrency(store.totalAmount)}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                      <div className="text-center">
+                        <div className="text-xs text-green-600">Recebido</div>
+                        <div className="text-sm font-bold text-green-700">{formatCurrency(store.receivedAmount)}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <AlertCircle className="h-4 w-4 text-red-500 mr-2" />
+                      <div className="text-center">
+                        <div className="text-xs text-red-600">Pendente</div>
+                        <div className="text-sm font-bold text-red-700">{formatCurrency(store.pendingAmount)}</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => toggleCardExpansion(store.storeName)}
+                      className={`p-2 rounded-lg transition-colors ${
+                        isExpanded ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                      title={isExpanded ? "Ocultar detalhes" : "Ver mais detalhes"}
+                    >
+                      {isExpanded ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Detalhes Expandidos com Ícones */}
+                {isExpanded && !isUnassigned && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      <div className="flex items-center p-3 bg-amber-50 rounded-lg">
+                        <div className="bg-amber-100 rounded-full p-2 mr-3">
+                          <AlertCircle className="h-4 w-4 text-amber-600" />
+                        </div>
+                        <div>
+                          <div className="text-lg font-bold text-amber-700">
+                            {store.clientsWithPending}
+                          </div>
+                          <div className="text-xs text-amber-600">clientes inadimplentes</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center p-3 bg-green-50 rounded-lg">
+                        <div className="bg-green-100 rounded-full p-2 mr-3">
+                          <DollarSign className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div>
+                          <div className="text-lg font-bold text-green-700">
+                            {formatCurrency(store.averageTicket)}
+                          </div>
+                          <div className="text-xs text-green-600">ticket médio</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <div className="flex items-center">
+                          <Award className="h-4 w-4 text-blue-600 mr-2" />
+                          <span className="text-blue-700 font-medium">Eficiência de Recebimento</span>
+                        </div>
+                        <span className="font-bold text-blue-900">
+                          {store.efficiency.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-blue-200 rounded-full h-2">
+                        <div
+                          className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500"
+                          style={{ width: `${Math.min(store.efficiency, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Estado de Loja Não Atribuída */}
                 {isUnassigned && (
-                  <div className="mt-4 p-3 lg:p-4 bg-amber-50 rounded-lg border border-amber-200">
-                    <div className="flex items-center text-amber-700">
-                      <AlertCircle className="h-4 w-4 lg:h-5 lg:w-5 mr-2 flex-shrink-0" />
-                      <span className="text-sm font-medium">
-                        Esta loja não possui cobrador atribuído
-                      </span>
+                  <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-amber-700">
+                        <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                        <div>
+                          <div className="font-medium">Loja sem atribuição</div>
+                          <div className="text-sm">Necessário atribuir um cobrador responsável</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
