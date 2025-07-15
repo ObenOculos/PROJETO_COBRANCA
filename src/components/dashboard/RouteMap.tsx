@@ -11,8 +11,6 @@ import {
   Loader2,
   RefreshCw,
   Filter,
-  CheckCircle,
-  XCircle,
 } from "lucide-react";
 import { ClientGroup, FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
