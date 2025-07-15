@@ -1958,8 +1958,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     const totalValue = roundTo2Decimals(
       saleInstallments.reduce((sum, inst) => sum + inst.valor_original, 0),
     );
+    // Limitar o valor pago ao valor original para evitar valores negativos
     const totalPaid = roundTo2Decimals(
-      saleInstallments.reduce((sum, inst) => sum + inst.valor_recebido, 0),
+      Math.min(
+        totalValue,
+        saleInstallments.reduce((sum, inst) => sum + inst.valor_recebido, 0)
+      )
     );
     const remainingBalance = roundTo2Decimals(totalValue - totalPaid);
 
@@ -1976,9 +1980,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     const installmentBreakdown = saleInstallments.map((inst) => ({
       installmentId: inst.id_parcela,
       originalValue: inst.valor_original,
-      paidValue: inst.valor_recebido,
+      paidValue: Math.min(inst.valor_original, inst.valor_recebido), // Limitar valor pago ao valor original
       remainingValue: roundTo2Decimals(
-        inst.valor_original - inst.valor_recebido,
+        Math.max(0, inst.valor_original - inst.valor_recebido),
       ),
       status: inst.status || "pendente",
     }));
@@ -2024,8 +2028,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           const totalValue = roundTo2Decimals(
             installments.reduce((sum, inst) => sum + inst.valor_original, 0),
           );
+          // Limitar o valor recebido ao valor original para evitar valores negativos
           const totalReceived = roundTo2Decimals(
-            installments.reduce((sum, inst) => sum + inst.valor_recebido, 0),
+            Math.min(
+              totalValue,
+              installments.reduce((sum, inst) => sum + inst.valor_recebido, 0)
+            )
           );
           const pendingValue = Math.max(
             0,
@@ -2055,11 +2063,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         description: `Renegociada (${individualInstallments.length} parcela${individualInstallments.length !== 1 ? 's' : ''})`,
         installments: individualInstallments,
         totalValue: individualInstallments.reduce((sum, inst) => sum + inst.valor_original, 0),
-        totalReceived: individualInstallments.reduce((sum, inst) => sum + inst.valor_recebido, 0),
-        pendingValue: Math.max(0, individualInstallments.reduce((sum, inst) => sum + (inst.valor_original - inst.valor_recebido), 0)),
+        totalReceived: Math.min(
+          individualInstallments.reduce((sum, inst) => sum + inst.valor_original, 0),
+          individualInstallments.reduce((sum, inst) => sum + inst.valor_recebido, 0)
+        ),
+        pendingValue: Math.max(0, individualInstallments.reduce((sum, inst) => sum + Math.max(0, inst.valor_original - inst.valor_recebido), 0)),
         saleStatus: (() => {
           const totalValue = individualInstallments.reduce((sum, inst) => sum + inst.valor_original, 0);
-          const totalReceived = individualInstallments.reduce((sum, inst) => sum + inst.valor_recebido, 0);
+          const totalReceived = Math.min(
+            totalValue,
+            individualInstallments.reduce((sum, inst) => sum + inst.valor_recebido, 0)
+          );
           const pendingValue = totalValue - totalReceived;
           
           if (totalReceived === 0) return "pending" as const;
