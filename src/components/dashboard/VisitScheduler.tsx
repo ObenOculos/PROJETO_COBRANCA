@@ -27,7 +27,7 @@ interface VisitSchedulerProps {
   onClose?: () => void;
 }
 
-const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
+const VisitScheduler: React.FC<VisitSchedulerProps> = ({ }) => {
   const {
     getClientGroups,
     scheduleVisit,
