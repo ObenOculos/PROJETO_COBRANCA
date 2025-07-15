@@ -1941,7 +1941,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   ): SaleBalance => {
     const saleInstallments = collections.filter(
       (collection) =>
-        collection.venda_n === saleNumber &&
+        (collection.venda_n === saleNumber || collection.id_parcela === saleNumber) &&
         collection.documento === clientDocument,
     );
 
@@ -1990,24 +1990,31 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     (clientDocument: string): SaleGroup[] => {
       // Agrupar collections por venda
       const salesMap = new Map<number, Collection[]>();
-
+      const individualInstallments: Collection[] = [];
+      
       collections
         .filter((collection) => collection.documento === clientDocument)
         .forEach((collection) => {
-          const saleNumber = collection.venda_n || 0;
-          if (!salesMap.has(saleNumber)) {
-            salesMap.set(saleNumber, []);
+          const saleNumber = collection.venda_n;
+          
+          // Se não há número de venda, trata como parcela individual
+          if (!saleNumber) {
+            individualInstallments.push(collection);
+          } else {
+            // Agrupa por número de venda
+            if (!salesMap.has(saleNumber)) {
+              salesMap.set(saleNumber, []);
+            }
+            salesMap.get(saleNumber)!.push(collection);
           }
-          salesMap.get(saleNumber)!.push(collection);
         });
-
-      // Converter para SaleGroup
-      return Array.from(salesMap.entries()).map(
+      
+      // Converter vendas agrupadas para SaleGroup
+      const saleGroups = Array.from(salesMap.entries()).map(
         ([saleNumber, installments]) => {
           // Arredondar para 2 casas decimais para evitar problemas de precisão
           const roundTo2Decimals = (num: number) =>
             Math.round((num + Number.EPSILON) * 100) / 100;
-
           const totalValue = roundTo2Decimals(
             installments.reduce((sum, inst) => sum + inst.valor_original, 0),
           );
@@ -2018,10 +2025,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             0,
             roundTo2Decimals(totalValue - totalReceived),
           );
-
           const balance = calculateSaleBalance(saleNumber, clientDocument);
           const payments = getSalePayments(saleNumber, clientDocument);
-
           return {
             saleNumber,
             titleNumber: installments[0]?.numero_titulo || 0,
@@ -2036,6 +2041,36 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           };
         },
       );
+      
+      // Converter parcelas individuais para SaleGroup (cada parcela é uma "venda")
+      const individualSaleGroups = individualInstallments.map((installment) => {
+        const roundTo2Decimals = (num: number) =>
+          Math.round((num + Number.EPSILON) * 100) / 100;
+        const totalValue = roundTo2Decimals(installment.valor_original);
+        const totalReceived = roundTo2Decimals(installment.valor_recebido);
+        const pendingValue = Math.max(0, roundTo2Decimals(totalValue - totalReceived));
+        
+        // Usar o ID da parcela como número de venda para parcelas individuais
+        const saleNumber = installment.id_parcela;
+        const balance = calculateSaleBalance(saleNumber, clientDocument);
+        const payments = getSalePayments(saleNumber, clientDocument);
+        
+        return {
+          saleNumber,
+          titleNumber: installment.numero_titulo || 0,
+          description: installment.descricao || `Parcela ${installment.id_parcela}`,
+          installments: [installment],
+          totalValue,
+          totalReceived,
+          pendingValue,
+          saleStatus: balance.status,
+          payments,
+          clientDocument,
+        };
+      });
+      
+      // Retornar vendas agrupadas + parcelas individuais
+      return [...saleGroups, ...individualSaleGroups];
     },
     [collections, calculateSaleBalance, getSalePayments],
   );
