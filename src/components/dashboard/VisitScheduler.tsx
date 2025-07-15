@@ -1017,30 +1017,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
   return (
     <div className="bg-white rounded-xl shadow-lg">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 lg:px-6 py-4 rounded-t-xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <Calendar className="h-6 w-6 mr-3" />
-            <div>
-              <h2 className="text-lg lg:text-xl font-bold">
-                Agendamento de Visitas
-              </h2>
-              <p className="text-purple-100 text-sm lg:text-base">
-                Gerencie suas visitas aos clientes
-              </p>
-            </div>
-          </div>
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          )}
-        </div>
-      </div>
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
@@ -1945,7 +1921,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
                   <Calendar className="h-8 w-8 text-blue-400 mx-auto mb-2" />
                   <p className="text-blue-600 font-medium">
-                    Nenhuma visita agendada para hoje
+                    Nenhuma. "" visita agendada para hoje
                   </p>
                   <p className="text-blue-500 text-sm">
                     Que tal agendar uma nova visita?

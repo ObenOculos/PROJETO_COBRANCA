@@ -707,35 +707,6 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="px-4 py-4 border-b border-gray-200 bg-gray-50">
           <div className="space-y-3">
-            {/* Linha 1: Título e Status */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <Route className="h-5 w-5 text-blue-600" />
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Planejamento de Rota
-                </h2>
-              </div>
-
-              {/* Status Badges - Compacto */}
-              <div className="flex items-center space-x-1">
-                {clientData.overdueVisits.length > 0 && (
-                  <div className="flex items-center space-x-1 px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium">
-                    <XCircle className="h-3 w-3" />
-                    <span>{clientData.overdueVisits.length}</span>
-                  </div>
-                )}
-                <div className="flex items-center space-x-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
-                  <CheckCircle className="h-3 w-3" />
-                  <span>{clientData.scheduledVisits.length}</span>
-                </div>
-                {clientData.rescheduledVisits.length > 0 && (
-                  <div className="flex items-center space-x-1 px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full font-medium">
-                    <Clock className="h-3 w-3" />
-                    <span>{clientData.rescheduledVisits.length}</span>
-                  </div>
-                )}
-              </div>
-            </div>
 
             {/* Linha 2: Controles Principais */}
             <div className="flex items-center justify-between gap-3">
@@ -930,7 +901,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
 
       {/* Client List for Route */}
       <div className="rounded-lg shadow-sm overflow-hidden">
-        <div className="bg-white rounded-xl px-3 sm:px-4 py-3 sm:py-4 border-b border-gray-200">
+        <div className="bg-white mb-2 rounded-xl px-3 sm:px-4 py-3 sm:py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <h3 className="text-base sm:text-lg font-semibold text-gray-900">
