@@ -46,6 +46,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
     type: "success" | "error" | "info";
   }>({ title: "", message: "", type: "info" });
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [geolocationError, setGeolocationError] = useState<string | null>(null);
 
   // Obter visitas do cobrador
   const collectorVisits = useMemo(() => {
@@ -456,6 +457,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
           lng: position.coords.longitude,
         });
         setIsGettingLocation(false);
+        setGeolocationError(null); // Limpar erro ao obter localização
 
         setModalContent({
           title: "Localização Obtida!",
@@ -472,7 +474,8 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
         switch (error.code) {
           case error.PERMISSION_DENIED:
             errorMessage =
-              "Permissão negada. Verifique as configurações de localização do seu navegador.";
+              "Você negou o acesso à localização. Para otimizar a rota, por favor, habilite a permissão e tente novamente.";
+            setGeolocationError(errorMessage); // Definir a mensagem de erro
             break;
           case error.POSITION_UNAVAILABLE:
             errorMessage =
@@ -563,6 +566,12 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
       type: "success",
     });
     setShowModal(true);
+  };
+
+  // Função para tentar obter a localização novamente
+  const handleRetryLocation = () => {
+    setGeolocationError(null);
+    getUserLocation();
   };
 
   // Função para gerar URL do Google Maps com rota entre múltiplos destinos
@@ -669,7 +678,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="">
       {/* Header Otimizado - Mobile First */}
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="px-4 py-4 border-b border-gray-200 bg-gray-50">
@@ -816,6 +825,19 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 </div>
               </div>
             )}
+
+            {/* Linha 5: Erro de Geolocalização */}
+            {geolocationError && (
+              <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg mt-3">
+                <span className="text-sm text-red-700">{geolocationError}</span>
+                <button
+                  onClick={handleRetryLocation}
+                  className="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors"
+                >
+                  Tentar Novamente
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -828,7 +850,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
               <div className="flex items-center space-x-3">
                 <MapPin className="h-5 w-5 text-blue-600" />
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Mapa da Rota
+                  Maps
                 </h3>
               </div>
               <div className="flex items-center space-x-2">
@@ -848,7 +870,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                   title="Abrir rota completa no Google Maps"
                 >
                   <Navigation className="h-4 w-4 mr-2" />
-                  Abrir Rota
+                  Rota
                 </button>
               </div>
             </div>
@@ -927,7 +949,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="">
           {/* Clientes com visitas atrasadas - PRIORIDADE MÁXIMA */}
           {paginatedOverdueVisits.length > 0 && (
             <div className="mt-4 bg-white rounded-lg shadow-sm border-2 border-red-500 overflow-hidden">
