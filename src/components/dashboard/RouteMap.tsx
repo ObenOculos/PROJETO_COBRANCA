@@ -678,7 +678,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
   };
 
   return (
-    <div className="">
+    <div className="space-y-4 mt-0">
       {/* Header Otimizado - Mobile First */}
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="px-4 py-4 border-b border-gray-200 bg-gray-50">
@@ -717,7 +717,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
             <div className="flex items-center justify-between gap-3">
               {/* Seleção Rápida */}
               <div className="flex items-center space-x-2">
-                <div className="flex bg-gray-100 rounded-lg p-1">
+                <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
                   <button
                     onClick={handleSelectAll}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -730,7 +730,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                   </button>
                   <button
                     onClick={handleSelectVisitsOnly}
-                    className={`px-3 py-1.5 roundepx-3 pt-1 pb-2 rounded-md text-sm font-medium transition-colors bg-white text-gray-900 shadow-sm ${
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                       selectedClients.length === (clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length) &&
                       [...clientData.overdueVisits, ...clientData.scheduledVisits, ...clientData.rescheduledVisits].every((c) =>
                         selectedClients.includes(c.document),
@@ -949,7 +949,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
           </div>
         </div>
 
-        <div className="">
+        <div className="space-y-4">
           {/* Clientes com visitas atrasadas - PRIORIDADE MÁXIMA */}
           {paginatedOverdueVisits.length > 0 && (
             <div className="mt-4 bg-white rounded-lg shadow-sm border-2 border-red-500 overflow-hidden">
