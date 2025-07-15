@@ -16,11 +16,11 @@ interface HeaderProps {
   pendingCancellations?: number;
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-  tabs = [], 
-  activeTab = "", 
-  onTabChange = () => {}, 
-  pendingCancellations = 0 
+const Header: React.FC<HeaderProps> = ({
+  tabs = [],
+  activeTab = "",
+  onTabChange = () => {},
+  pendingCancellations = 0,
 }) => {
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -90,23 +90,25 @@ const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Mobile Sidebar Overlay */}
-        <div className={`sm:hidden fixed inset-0 z-50 transition-all duration-300 ease-in-out ${
-          isMobileMenuOpen 
-            ? 'opacity-100 pointer-events-auto' 
-            : 'opacity-0 pointer-events-none'
-        }`}>
+        <div
+          className={`sm:hidden fixed inset-0 z-50 transition-all duration-300 ease-in-out ${
+            isMobileMenuOpen
+              ? "opacity-100 pointer-events-auto"
+              : "opacity-0 pointer-events-none"
+          }`}
+        >
           {/* Backdrop with enhanced blur */}
-          <div 
+          <div
             className={`absolute inset-0 bg-black backdrop-blur-md transition-all duration-300 ease-in-out ${
-              isMobileMenuOpen ? 'bg-opacity-60' : 'bg-opacity-0'
+              isMobileMenuOpen ? "bg-opacity-60" : "bg-opacity-0"
             }`}
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          
+
           {/* Sidebar */}
-          <div 
+          <div
             className={`fixed left-0 top-0 h-full w-72 bg-white shadow-xl transform transition-all duration-300 ease-out overflow-hidden flex flex-col ${
-              isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+              isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
             }`}
           >
             {/* Simple header */}
@@ -116,7 +118,9 @@ const Header: React.FC<HeaderProps> = ({
                   <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
                     <span className="text-white font-semibold text-sm">SC</span>
                   </div>
-                  <h2 className="text-lg font-semibold text-gray-900">Sistema de Cobrança</h2>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Sistema de Cobrança
+                  </h2>
                 </div>
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}
@@ -166,23 +170,28 @@ const Header: React.FC<HeaderProps> = ({
                             : "text-gray-700 hover:bg-gray-50"
                         }`}
                       >
-                        <Icon className={`h-5 w-5 mr-3 ${
-                          activeTab === tab.id ? "text-blue-600" : "text-gray-400"
-                        }`} />
+                        <Icon
+                          className={`h-5 w-5 mr-3 ${
+                            activeTab === tab.id
+                              ? "text-blue-600"
+                              : "text-gray-400"
+                          }`}
+                        />
                         <span className="font-medium">{tab.name}</span>
-                        
-                        {tab.id === "visit-tracking" && pendingCancellations > 0 && (
-                          <span className="ml-auto h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                            {pendingCancellations}
-                          </span>
-                        )}
+
+                        {tab.id === "visit-tracking" &&
+                          pendingCancellations > 0 && (
+                            <span className="ml-auto h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                              {pendingCancellations}
+                            </span>
+                          )}
                       </button>
                     );
                   })}
                 </nav>
               </div>
             )}
-            
+
             {/* Logout Button - Fixed at bottom */}
             <div className="mt-auto p-4 border-t border-gray-200 bg-gray-50">
               <button

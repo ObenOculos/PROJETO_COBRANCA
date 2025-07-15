@@ -45,8 +45,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const [expandedCollectors, setExpandedCollectors] = useState<Set<string>>(
     new Set(),
   );
-  const [] =
-    useState<boolean>(false);
+  const [] = useState<boolean>(false);
   const [overdueFilter, setOverdueFilter] = useState<string>("all"); // 'all', 'overdue', 'not_overdue'
 
   // Estados para cancelamentos
@@ -526,7 +525,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             )}
           </div>
         </div>
-        
+
         {/* Visit Cards */}
         {Object.keys(groupedVisits).length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
@@ -1166,7 +1165,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 Gerencie visitas e cancelamentos
               </p>
             </div>
-            
+
             {/* Ação de Fechar */}
             {onClose && (
               <button
@@ -1229,33 +1228,42 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
         <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-100 text-sm font-medium">Visitas Agendadas</p>
+              <p className="text-blue-100 text-sm font-medium">
+                Visitas Agendadas
+              </p>
               <p className="text-4xl font-bold mt-1">
                 {overviewStats.agendadas}
               </p>
               {overviewStats.atrasadas > 0 && (
                 <p className="text-red-200 text-sm mt-2 flex items-center">
                   <AlertTriangle className="h-4 w-4 mr-1" />
-                  {overviewStats.atrasadas} atrasada{overviewStats.atrasadas !== 1 ? "s" : ""}
+                  {overviewStats.atrasadas} atrasada
+                  {overviewStats.atrasadas !== 1 ? "s" : ""}
                 </p>
               )}
             </div>
             <Calendar className="h-16 w-16 text-blue-200 opacity-50" />
           </div>
-          
+
           {/* Métricas secundárias */}
           <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-blue-400">
             <div>
               <p className="text-blue-100 text-xs">Total</p>
-              <p className="text-2xl font-semibold">{overviewStats.totalVisits}</p>
+              <p className="text-2xl font-semibold">
+                {overviewStats.totalVisits}
+              </p>
             </div>
             <div>
               <p className="text-blue-100 text-xs">Realizadas</p>
-              <p className="text-2xl font-semibold">{overviewStats.realizadas}</p>
+              <p className="text-2xl font-semibold">
+                {overviewStats.realizadas}
+              </p>
             </div>
             <div>
               <p className="text-blue-100 text-xs">Pendências</p>
-              <p className="text-2xl font-semibold">{overviewStats.pendingRequests}</p>
+              <p className="text-2xl font-semibold">
+                {overviewStats.pendingRequests}
+              </p>
             </div>
           </div>
         </div>

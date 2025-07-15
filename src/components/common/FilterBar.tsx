@@ -194,7 +194,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                   clearFilters();
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
+                  if (e.key === "Enter" || e.key === " ") {
                     e.stopPropagation();
                     clearFilters();
                   }
@@ -438,7 +438,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
                         : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                     }`}
                   >
-                    {filters.visitsOnly ? "✓ " : ""}Mostrar apenas clientes com visitas agendadas
+                    {filters.visitsOnly ? "✓ " : ""}Mostrar apenas clientes com
+                    visitas agendadas
                   </button>
                 </div>
               </div>

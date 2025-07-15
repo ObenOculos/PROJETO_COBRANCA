@@ -49,9 +49,9 @@ interface ManagerDashboardProps {
   onTabChange?: (tabId: string) => void;
 }
 
-const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ 
-  activeTab: externalActiveTab, 
-  onTabChange 
+const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
+  activeTab: externalActiveTab,
+  onTabChange,
 }) => {
   const {
     getDashboardStats,
@@ -94,7 +94,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     const saved = localStorage.getItem("managerCollectionsView");
     return (saved as "table" | "cash-report") || "table";
   });
-  const [overviewFilter, setOverviewFilter] = useState<"all" | "with-collector">("all");
+  const [overviewFilter, setOverviewFilter] = useState<
+    "all" | "with-collector"
+  >("all");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
@@ -117,7 +119,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   useEffect(() => {
     const fetchPendingAuthorizations = async () => {
       try {
-        const pendingRequests = await AuthorizationHistoryService.getPendingRequests();
+        const pendingRequests =
+          await AuthorizationHistoryService.getPendingRequests();
         setPendingAuthorizations(pendingRequests.length);
       } catch (error) {
         console.error("Erro ao buscar autorizações pendentes:", error);
@@ -125,7 +128,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     };
 
     fetchPendingAuthorizations();
-    
+
     // Atualiza a cada 30 segundos
     const interval = setInterval(fetchPendingAuthorizations, 30000);
 
@@ -164,7 +167,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
-    
+
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
@@ -175,7 +178,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     if (isRightSwipe && currentSlide > 0) {
       setCurrentSlide(currentSlide - 1);
     }
-    
+
     // Reset touch values
     setTouchStart(0);
     setTouchEnd(0);
@@ -192,30 +195,43 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const stats = getDashboardStats();
   const performance = getCollectorPerformance();
   const baseFilteredCollections = getFilteredCollections(filters, "manager");
-  
+
   // Apply collector filter for collections view
   const filteredCollections = baseFilteredCollections;
-  
+
   // Apply overview filter for overview calculations
-  const overviewCollections = overviewFilter === "with-collector" 
-    ? collections.filter(collection => collection.user_id && collection.user_id.trim() !== "")
-    : collections;
-  
+  const overviewCollections =
+    overviewFilter === "with-collector"
+      ? collections.filter(
+          (collection) =>
+            collection.user_id && collection.user_id.trim() !== "",
+        )
+      : collections;
+
   // Calculate metrics based on overview filter
-  const totalAmount = overviewCollections.reduce((sum, c) => sum + c.valor_original, 0);
-  const receivedAmount = overviewCollections.reduce((sum, c) => sum + c.valor_recebido, 0);
-  const totalReceived = overviewCollections.filter(c => c.status?.toLowerCase() === "recebido" || c.valor_recebido > 0).length;
+  const totalAmount = overviewCollections.reduce(
+    (sum, c) => sum + c.valor_original,
+    0,
+  );
+  const receivedAmount = overviewCollections.reduce(
+    (sum, c) => sum + c.valor_recebido,
+    0,
+  );
+  const totalReceived = overviewCollections.filter(
+    (c) => c.status?.toLowerCase() === "recebido" || c.valor_recebido > 0,
+  ).length;
   const totalCollections = overviewCollections.length;
-  
+
   const overviewStats = {
     totalAmount,
     receivedAmount,
     totalReceived,
     totalCollections,
     pendingAmount: totalAmount - receivedAmount,
-    conversionRate: totalCollections > 0 ? (totalReceived / totalCollections) * 100 : 0
+    conversionRate:
+      totalCollections > 0 ? (totalReceived / totalCollections) * 100 : 0,
   };
-  
+
   const pendingCancellations = getPendingCancellationRequests();
   const tabs = getManagerTabs(pendingCancellations.length);
 
@@ -226,7 +242,15 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       case "overview":
         // Simplified metrics - pending vs completed sales and clients
         // Group by sale to count correctly
-        const salesMap = new Map<string, { isPending: boolean; clientDocument: string; totalValue: number; receivedValue: number }>();
+        const salesMap = new Map<
+          string,
+          {
+            isPending: boolean;
+            clientDocument: string;
+            totalValue: number;
+            receivedValue: number;
+          }
+        >();
         overviewCollections.forEach((collection) => {
           const saleKey = `${collection.venda_n}-${collection.documento}`;
           if (!salesMap.has(saleKey)) {
@@ -234,7 +258,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               isPending: false,
               clientDocument: collection.documento || "",
               totalValue: 0,
-              receivedValue: 0
+              receivedValue: 0,
             });
           }
           const sale = salesMap.get(saleKey)!;
@@ -248,20 +272,29 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
           sale.isPending = pendingAmount > 0.01; // Consider amounts > 1 cent as pending
         });
 
-        const pendingSalesCount = Array.from(salesMap.values()).filter(s => s.isPending).length;
-        const completedSalesCount = Array.from(salesMap.values()).filter(s => !s.isPending).length;
+        const pendingSalesCount = Array.from(salesMap.values()).filter(
+          (s) => s.isPending,
+        ).length;
+        const completedSalesCount = Array.from(salesMap.values()).filter(
+          (s) => !s.isPending,
+        ).length;
         const clientsWithPendingCount = new Set(
           Array.from(salesMap.values())
-            .filter(s => s.isPending)
-            .map(s => s.clientDocument)
-            .filter(Boolean)
+            .filter((s) => s.isPending)
+            .map((s) => s.clientDocument)
+            .filter(Boolean),
         ).size;
-        const todayCollections = overviewCollections.filter(c => {
-          const today = new Date().toISOString().split('T')[0];
+        const todayCollections = overviewCollections.filter((c) => {
+          const today = new Date().toISOString().split("T")[0];
           return c.data_vencimento === today;
         });
-        const todayAmount = todayCollections.reduce((sum, c) => sum + c.valor_original, 0);
-        const storesWithCollections = new Set(overviewCollections.map(c => c.nome_da_loja).filter(Boolean)).size;
+        const todayAmount = todayCollections.reduce(
+          (sum, c) => sum + c.valor_original,
+          0,
+        );
+        const storesWithCollections = new Set(
+          overviewCollections.map((c) => c.nome_da_loja).filter(Boolean),
+        ).size;
 
         return (
           <div className="space-y-4 sm:space-y-6">
@@ -321,17 +354,17 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   </button>
                 </div>
               </div>
-              
+
               {/* Slider container with touch support */}
-              <div 
+              <div
                 ref={sliderRef}
                 className="relative overflow-hidden"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
-                style={{ touchAction: 'pan-y pinch-zoom' }}
+                style={{ touchAction: "pan-y pinch-zoom" }}
               >
-                <div 
+                <div
                   className="flex transition-transform duration-300 ease-in-out"
                   style={{ transform: `translateX(-${currentSlide * 100}%)` }}
                 >
@@ -339,7 +372,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   <div className="w-full flex-shrink-0">
                     <div className="flex items-center gap-2 mb-3 sm:mb-4">
                       <DollarSign className="h-4 w-4 text-blue-600" />
-                      <h4 className="font-medium text-gray-900 text-sm sm:text-base">Métricas Financeiras</h4>
+                      <h4 className="font-medium text-gray-900 text-sm sm:text-base">
+                        Métricas Financeiras
+                      </h4>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-4">
                       <StatsCard
@@ -385,7 +420,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   <div className="w-full flex-shrink-0">
                     <div className="flex items-center gap-2 mb-3 sm:mb-4">
                       <Target className="h-4 w-4 text-green-600" />
-                      <h4 className="font-medium text-gray-900 text-sm sm:text-base">Métricas Operacionais</h4>
+                      <h4 className="font-medium text-gray-900 text-sm sm:text-base">
+                        Métricas Operacionais
+                      </h4>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
                       <StatsCard
@@ -414,7 +451,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         icon={Calendar}
                         iconColor="bg-orange-500"
                         onClick={() => {
-                          const today = new Date().toISOString().split('T')[0];
+                          const today = new Date().toISOString().split("T")[0];
                           setFilters({ ...filters, dueDate: today });
                           setActiveTab("collections");
                         }}
@@ -426,7 +463,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   <div className="w-full flex-shrink-0">
                     <div className="flex items-center gap-2 mb-3 sm:mb-4">
                       <Target className="h-4 w-4 text-indigo-600" />
-                      <h4 className="font-medium text-gray-900 text-sm sm:text-base">Ecossistema de Cobrança</h4>
+                      <h4 className="font-medium text-gray-900 text-sm sm:text-base">
+                        Ecossistema de Cobrança
+                      </h4>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
                       <StatsCard
@@ -449,7 +488,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       />
                       <StatsCard
                         title="Eficiência Média"
-                        value={`${performance.length > 0 ? (performance.reduce((acc, p) => acc + p.conversionRate, 0) / performance.length).toFixed(1) : '0.0'}%`}
+                        value={`${performance.length > 0 ? (performance.reduce((acc, p) => acc + p.conversionRate, 0) / performance.length).toFixed(1) : "0.0"}%`}
                         change="conversão da equipe"
                         changeType="positive"
                         icon={TrendingUp}
@@ -468,7 +507,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     key={index}
                     onClick={() => setCurrentSlide(index)}
                     className={`w-2 h-2 rounded-full transition-colors touch-manipulation ${
-                      currentSlide === index ? 'bg-blue-600' : 'bg-gray-300'
+                      currentSlide === index ? "bg-blue-600" : "bg-gray-300"
                     }`}
                   />
                 ))}
@@ -478,27 +517,39 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             {/* Foco do Dia */}
             <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base lg:text-lg font-semibold text-gray-900">Foco do Dia</h3>
+                <h3 className="text-base lg:text-lg font-semibold text-gray-900">
+                  Foco do Dia
+                </h3>
                 <Target className="h-5 w-5 text-blue-500" />
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Vencimentos hoje</span>
-                  <span className="font-semibold text-gray-900">{todayCollections.length} títulos</span>
+                  <span className="text-sm text-gray-600">
+                    Vencimentos hoje
+                  </span>
+                  <span className="font-semibold text-gray-900">
+                    {todayCollections.length} títulos
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Meta de recuperação</span>
+                  <span className="text-sm text-gray-600">
+                    Meta de recuperação
+                  </span>
                   <span className="font-semibold text-green-600">85%</span>
                 </div>
                 <div className="pt-3 border-t border-gray-200">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">Valor a receber hoje</span>
-                    <span className="text-lg font-bold text-blue-600">{formatCurrency(todayAmount)}</span>
+                    <span className="text-sm font-medium text-gray-700">
+                      Valor a receber hoje
+                    </span>
+                    <span className="text-lg font-bold text-blue-600">
+                      {formatCurrency(todayAmount)}
+                    </span>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => {
-                    const today = new Date().toISOString().split('T')[0];
+                    const today = new Date().toISOString().split("T")[0];
                     setFilters({ ...filters, dueDate: today });
                     setActiveTab("collections");
                   }}
@@ -517,7 +568,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" />
                   <div className="flex-1">
                     <h3 className="text-base font-semibold text-gray-900 mb-1">
-                      {pendingCancellations.length} Solicitações de Cancelamento Pendentes
+                      {pendingCancellations.length} Solicitações de Cancelamento
+                      Pendentes
                     </h3>
                     <p className="text-sm text-gray-600 mb-3">
                       Existem cancelamentos de visitas aguardando sua aprovação.
@@ -606,7 +658,12 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       {/* Additional mobile info */}
                       <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-600">
                         <div className="flex justify-between">
-                          <span>Tempo médio: <span className="font-medium text-gray-900">{collector.averageTime.toFixed(0)} dias</span></span>
+                          <span>
+                            Tempo médio:{" "}
+                            <span className="font-medium text-gray-900">
+                              {collector.averageTime.toFixed(0)} dias
+                            </span>
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -644,52 +701,55 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     <tbody>
                       {performance.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="py-8 text-center text-gray-500">
+                          <td
+                            colSpan={7}
+                            className="py-8 text-center text-gray-500"
+                          >
                             Nenhum cobrador encontrado
                           </td>
                         </tr>
                       ) : (
                         performance.map((collector) => (
-                        <tr
-                          key={collector.collectorId}
-                          className="border-b border-gray-100 hover:bg-gray-50"
-                        >
-                          <td className="py-3 px-4">
-                            <div className="font-medium text-gray-900">
-                              {collector.collectorName}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-gray-600">
-                            {collector.clientCount}
-                          </td>
-                          <td className="py-3 px-4 text-gray-600">
-                            {collector.totalAssigned}
-                          </td>
-                          <td className="py-3 px-4 text-gray-600">
-                            {collector.totalReceived}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span
-                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                collector.conversionRate >= 50
-                                  ? "bg-green-100 text-green-800"
-                                  : collector.conversionRate >= 25
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-red-100 text-red-800"
-                              }`}
-                            >
-                              {collector.conversionRate.toFixed(1)}%
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-gray-600">
-                            {formatCurrency(collector.receivedAmount)}
-                          </td>
-                          <td className="py-3 px-4 text-gray-600">
-                            {collector.averageTime.toFixed(0)} dias
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                          <tr
+                            key={collector.collectorId}
+                            className="border-b border-gray-100 hover:bg-gray-50"
+                          >
+                            <td className="py-3 px-4">
+                              <div className="font-medium text-gray-900">
+                                {collector.collectorName}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-gray-600">
+                              {collector.clientCount}
+                            </td>
+                            <td className="py-3 px-4 text-gray-600">
+                              {collector.totalAssigned}
+                            </td>
+                            <td className="py-3 px-4 text-gray-600">
+                              {collector.totalReceived}
+                            </td>
+                            <td className="py-3 px-4">
+                              <span
+                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  collector.conversionRate >= 50
+                                    ? "bg-green-100 text-green-800"
+                                    : collector.conversionRate >= 25
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {collector.conversionRate.toFixed(1)}%
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-gray-600">
+                              {formatCurrency(collector.receivedAmount)}
+                            </td>
+                            <td className="py-3 px-4 text-gray-600">
+                              {collector.averageTime.toFixed(0)} dias
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -805,11 +865,12 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                           {pendingCancellations.length}
                         </span>
                       )}
-                    {tab.id === "authorization" && pendingAuthorizations > 0 && (
-                      <span className="absolute -top-1 -right-1 h-5 w-5 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                        {pendingAuthorizations}
-                      </span>
-                    )}
+                    {tab.id === "authorization" &&
+                      pendingAuthorizations > 0 && (
+                        <span className="absolute -top-1 -right-1 h-5 w-5 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                          {pendingAuthorizations}
+                        </span>
+                      )}
                   </button>
                 );
               })}

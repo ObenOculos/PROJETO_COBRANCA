@@ -8,13 +8,18 @@ import { LoadingProvider, useLoading } from "./contexts/LoadingContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import LoginForm from "./components/auth/LoginForm";
 import Header from "./components/common/Header";
-import ManagerDashboard, { getManagerTabs } from "./components/dashboard/ManagerDashboard";
-import CollectorDashboard, { getCollectorTabs } from "./components/dashboard/CollectorDashboard";
+import ManagerDashboard, {
+  getManagerTabs,
+} from "./components/dashboard/ManagerDashboard";
+import CollectorDashboard, {
+  getCollectorTabs,
+} from "./components/dashboard/CollectorDashboard";
 import GlobalLoading from "./components/common/GlobalLoading";
 
 const AppContent: React.FC = () => {
   const { user, isLoading: authLoading } = useAuth();
-  const { loading: collectionLoading, getPendingCancellationRequests } = useCollection();
+  const { loading: collectionLoading, getPendingCancellationRequests } =
+    useCollection();
   const { isLoading: globalLoading, loadingMessage } = useLoading();
 
   // Estado para gerenciar aba ativa do manager
@@ -86,26 +91,34 @@ const AppContent: React.FC = () => {
     localStorage.setItem("collectorActiveTab", tabId);
   };
 
-  const pendingCancellations = user?.type === "manager" ? getPendingCancellationRequests() : [];
-  const managerTabs = user?.type === "manager" ? getManagerTabs(pendingCancellations.length) : [];
+  const pendingCancellations =
+    user?.type === "manager" ? getPendingCancellationRequests() : [];
+  const managerTabs =
+    user?.type === "manager" ? getManagerTabs(pendingCancellations.length) : [];
   const collectorTabs = user?.type === "collector" ? getCollectorTabs() : [];
 
   return (
     <div className="min-h-screen bg-slate-100">
-      <Header 
+      <Header
         tabs={user?.type === "manager" ? managerTabs : collectorTabs}
-        activeTab={user?.type === "manager" ? managerActiveTab : collectorActiveTab}
-        onTabChange={user?.type === "manager" ? handleManagerTabChange : handleCollectorTabChange}
+        activeTab={
+          user?.type === "manager" ? managerActiveTab : collectorActiveTab
+        }
+        onTabChange={
+          user?.type === "manager"
+            ? handleManagerTabChange
+            : handleCollectorTabChange
+        }
         pendingCancellations={pendingCancellations.length}
       />
       {user.type === "manager" ? (
-        <ManagerDashboard 
-          activeTab={managerActiveTab} 
+        <ManagerDashboard
+          activeTab={managerActiveTab}
           onTabChange={handleManagerTabChange}
         />
       ) : (
-        <CollectorDashboard 
-          activeTab={collectorActiveTab} 
+        <CollectorDashboard
+          activeTab={collectorActiveTab}
           onTabChange={handleCollectorTabChange}
         />
       )}

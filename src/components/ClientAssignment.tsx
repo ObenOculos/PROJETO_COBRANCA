@@ -218,33 +218,61 @@ export const ClientAssignment = React.memo(() => {
     const chips = [];
 
     if (searchTerm) {
-      chips.push({ label: `Busca: "${searchTerm}"`, onClear: () => setSearchTerm("") });
+      chips.push({
+        label: `Busca: "${searchTerm}"`,
+        onClear: () => setSearchTerm(""),
+      });
     }
     if (filterCollector) {
-      const collector = collectors.find(c => c.id === filterCollector);
-      chips.push({ label: `Cobrador: ${collector?.name || "Desconhecido"}`, onClear: () => setFilterCollector("") });
+      const collector = collectors.find((c) => c.id === filterCollector);
+      chips.push({
+        label: `Cobrador: ${collector?.name || "Desconhecido"}`,
+        onClear: () => setFilterCollector(""),
+      });
     }
     if (filterStatus) {
-      const statusLabel = filterStatus === "with_collector" ? "Com Cobrador" : "Sem Cobrador";
-      chips.push({ label: `Status: ${statusLabel}`, onClear: () => setFilterStatus("") });
+      const statusLabel =
+        filterStatus === "with_collector" ? "Com Cobrador" : "Sem Cobrador";
+      chips.push({
+        label: `Status: ${statusLabel}`,
+        onClear: () => setFilterStatus(""),
+      });
     }
     if (filterCity) {
-      chips.push({ label: `Cidade: ${filterCity}`, onClear: () => setFilterCity("") });
+      chips.push({
+        label: `Cidade: ${filterCity}`,
+        onClear: () => setFilterCity(""),
+      });
     }
     if (filterNeighborhood) {
-      chips.push({ label: `Bairro: ${filterNeighborhood}`, onClear: () => setFilterNeighborhood("") });
+      chips.push({
+        label: `Bairro: ${filterNeighborhood}`,
+        onClear: () => setFilterNeighborhood(""),
+      });
     }
     if (filterStore) {
-      chips.push({ label: `Loja: ${filterStore}`, onClear: () => setFilterStore("") });
+      chips.push({
+        label: `Loja: ${filterStore}`,
+        onClear: () => setFilterStore(""),
+      });
     }
     if (filterDateFrom) {
-      chips.push({ label: `De: ${filterDateFrom}`, onClear: () => setFilterDateFrom("") });
+      chips.push({
+        label: `De: ${filterDateFrom}`,
+        onClear: () => setFilterDateFrom(""),
+      });
     }
     if (filterDateTo) {
-      chips.push({ label: `Até: ${filterDateTo}`, onClear: () => setFilterDateTo("") });
+      chips.push({
+        label: `Até: ${filterDateTo}`,
+        onClear: () => setFilterDateTo(""),
+      });
     }
     if (includeWithoutDate && (filterDateFrom || filterDateTo)) {
-      chips.push({ label: `Incluir sem data`, onClear: () => setIncludeWithoutDate(false) });
+      chips.push({
+        label: `Incluir sem data`,
+        onClear: () => setIncludeWithoutDate(false),
+      });
     }
 
     return chips;
@@ -742,14 +770,18 @@ export const ClientAssignment = React.memo(() => {
 
   // Calcular estatísticas para o card principal
   const mainStats = useMemo(() => {
-    const total = hasActiveFilters ? filteredStats.totalFiltered : overviewStats.totalClients;
-    const assigned = hasActiveFilters ? filteredStats.assignedFiltered : overviewStats.assignedClients;
+    const total = hasActiveFilters
+      ? filteredStats.totalFiltered
+      : overviewStats.totalClients;
+    const assigned = hasActiveFilters
+      ? filteredStats.assignedFiltered
+      : overviewStats.assignedClients;
     const assignmentRate = total > 0 ? (assigned / total) * 100 : 0;
-    
+
     return {
       total,
       assigned,
-      assignmentRate
+      assignmentRate,
     };
   }, [hasActiveFilters, filteredStats, overviewStats]);
 
@@ -767,7 +799,7 @@ export const ClientAssignment = React.memo(() => {
               Gerencie a atribuição de {mainStats.total} clientes
             </p>
           </div>
-          
+
           {/* Ações Principais */}
           <div className="flex items-center gap-2">
             <button
@@ -785,7 +817,9 @@ export const ClientAssignment = React.memo(() => {
       <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-blue-100 text-sm font-medium">Taxa de Atribuição</p>
+            <p className="text-blue-100 text-sm font-medium">
+              Taxa de Atribuição
+            </p>
             <p className="text-4xl font-bold mt-1">
               {mainStats.assignmentRate.toFixed(1)}%
             </p>
@@ -795,7 +829,7 @@ export const ClientAssignment = React.memo(() => {
           </div>
           <Award className="h-16 w-16 text-blue-200 opacity-50" />
         </div>
-        
+
         {/* Métricas secundárias */}
         <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-blue-400">
           <div>
@@ -804,7 +838,9 @@ export const ClientAssignment = React.memo(() => {
           </div>
           <div>
             <p className="text-blue-100 text-xs">Pendentes</p>
-            <p className="text-2xl font-semibold">{mainStats.total - mainStats.assigned}</p>
+            <p className="text-2xl font-semibold">
+              {mainStats.total - mainStats.assigned}
+            </p>
           </div>
           <div>
             <p className="text-blue-100 text-xs">Cobradores</p>
@@ -994,7 +1030,6 @@ export const ClientAssignment = React.memo(() => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="p-4 lg:p-6">
               <div className="flex flex-col gap-4">
-
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">
                     Ações em Massa
@@ -1003,12 +1038,11 @@ export const ClientAssignment = React.memo(() => {
                     {selectedClients.size} cliente
                     {selectedClients.size !== 1 ? "s" : ""} selecionado
                     {selectedClients.size !== 1 ? "s" : ""}
-                  </p>                  
-            </div>
+                  </p>
                 </div>
+              </div>
 
-                
-                  <div className="space-y-3">
+              <div className="space-y-3">
                 <select
                   id="selectedCollector"
                   name="selectedCollector"
@@ -1016,47 +1050,44 @@ export const ClientAssignment = React.memo(() => {
                   onChange={(e) => setSelectedCollector(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                    <option value="">Selecione um cobrador</option>
-                    {collectors.map((collector) => (
-                      <option key={collector.id} value={collector.id}>
-                        {collector.name}
-                      </option>
-                    ))}
-                  </select>
+                  <option value="">Selecione um cobrador</option>
+                  {collectors.map((collector) => (
+                    <option key={collector.id} value={collector.id}>
+                      {collector.name}
+                    </option>
+                  ))}
+                </select>
 
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button
-                      onClick={handleAssignCollectorClick}
-                      disabled={loading || !selectedCollector}
-                      className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? (
-                        <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-                      ) : (
-                        <UserPlus className="h-4 w-4 mr-2" />
-                      )}
-                      <span className="hidden sm:inline">
-                        Atribuir Cobrador
-                      </span>
-                      <span className="sm:hidden">Atribuir</span>
-                    </button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={handleAssignCollectorClick}
+                    disabled={loading || !selectedCollector}
+                    className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                    ) : (
+                      <UserPlus className="h-4 w-4 mr-2" />
+                    )}
+                    <span className="hidden sm:inline">Atribuir Cobrador</span>
+                    <span className="sm:hidden">Atribuir</span>
+                  </button>
 
-                    <button
-                      onClick={handleRemoveCollectorClick}
-                      disabled={loading}
-                      className="flex-1 flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? (
-                        <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-                      ) : (
-                        <UserMinus className="h-4 w-4 mr-2" />
-                      )}
-                      <span className="hidden sm:inline">Remover Cobrador</span>
-                      <span className="sm:hidden">Remover</span>
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleRemoveCollectorClick}
+                    disabled={loading}
+                    className="flex-1 flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                    ) : (
+                      <UserMinus className="h-4 w-4 mr-2" />
+                    )}
+                    <span className="hidden sm:inline">Remover Cobrador</span>
+                    <span className="sm:hidden">Remover</span>
+                  </button>
                 </div>
-              
+              </div>
 
               {selectedClients.size > MAX_BATCH_SIZE && (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -1197,7 +1228,6 @@ export const ClientAssignment = React.memo(() => {
           );
         })}
       </div>
-  
 
       {/* Empty State */}
       {filteredClients.length === 0 && (
@@ -1226,7 +1256,10 @@ export const ClientAssignment = React.memo(() => {
               </div>
 
               <div className="flex items-center gap-2">
-                <label htmlFor="itemsPerPage" className="text-sm text-gray-600 whitespace-nowrap">
+                <label
+                  htmlFor="itemsPerPage"
+                  className="text-sm text-gray-600 whitespace-nowrap"
+                >
                   Mostrar:
                 </label>
                 <select

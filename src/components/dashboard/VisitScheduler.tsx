@@ -50,7 +50,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     return `${year}-${month}-${day}`;
   };
 
-
   const getDefaultTime = () => {
     const now = new Date();
     now.setHours(now.getHours() + 1);
@@ -198,12 +197,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
               visit.clientDocument === client.document &&
               visit.status === "realizada",
           )
-          .sort(
-            (a, b) => {
-              // Ordenar por created_at (mais recente primeiro)
-              return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-            }
-          );
+          .sort((a, b) => {
+            // Ordenar por created_at (mais recente primeiro)
+            return (
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+          });
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -216,7 +215,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
           try {
             // Usar created_at da visita mais recente
             const visit = clientVisits[0];
-            const visitDateStr = visit.createdAt.split('T')[0];
+            const visitDateStr = visit.createdAt.split("T")[0];
             let lastVisitDate: Date;
 
             if (visitDateStr.includes("-")) {
@@ -559,9 +558,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
 
     if (errors.length > 0) {
       // Verificar se há erro de data passada
-      const pastDateErrors = errors.filter(error => error.includes("Data não pode ser anterior a hoje"));
+      const pastDateErrors = errors.filter((error) =>
+        error.includes("Data não pode ser anterior a hoje"),
+      );
       if (pastDateErrors.length > 0) {
-        setDateValidationMessage("Não é possível agendar visitas para datas passadas");
+        setDateValidationMessage(
+          "Não é possível agendar visitas para datas passadas",
+        );
         setShowDateValidationModal(true);
         return;
       }
@@ -831,11 +834,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
   const handleOpenRescheduleModal = (visit: ScheduledVisit) => {
     setSelectedVisitForReschedule(visit);
     setRescheduleDate(getLocalDate());
-    
+
     // Para visitas de hoje, usar hora atual + 1 hora; para outras visitas, manter o horário original
     const isToday = visit.scheduledDate === getLocalDate();
-    setRescheduleTime(isToday ? getDefaultTime() : (visit.scheduledTime || "09:00"));
-    
+    setRescheduleTime(
+      isToday ? getDefaultTime() : visit.scheduledTime || "09:00",
+    );
+
     setShowRescheduleModal(true);
   };
 
@@ -855,7 +860,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     // Validar se a data não está no passado
     const today = getLocalDate();
     if (rescheduleDate < today) {
-      setDateValidationMessage("Não é possível agendar visitas para datas passadas");
+      setDateValidationMessage(
+        "Não é possível agendar visitas para datas passadas",
+      );
       setShowDateValidationModal(true);
       return;
     }
@@ -863,12 +870,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
     // Validar se a hora não está no passado para hoje
     if (rescheduleDate === today) {
       const now = new Date();
-      const [hours, minutes] = rescheduleTime.split(':').map(Number);
+      const [hours, minutes] = rescheduleTime.split(":").map(Number);
       const selectedDateTime = new Date();
       selectedDateTime.setHours(hours, minutes, 0, 0);
-      
+
       if (selectedDateTime <= now) {
-        setDateValidationMessage("Não é possível agendar visitas para horários passados");
+        setDateValidationMessage(
+          "Não é possível agendar visitas para horários passados",
+        );
         setShowDateValidationModal(true);
         return;
       }
@@ -1081,8 +1090,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
                   >
-                    <Filter className="h-4 w-4 mr-1" />
-                    Filtros
+                    <Filter className="h-4 w-4" />
                     {hasActiveFilters && (
                       <span className="ml-1 px-1 py-1 bg-purple-600 text-white text-xs rounded-full"></span>
                     )}
@@ -1260,65 +1268,63 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
             {availableClients.length > 0 && (
               <div className="border border-gray-200 rounded-lg">
                 <div className="bg-gray-50 p-3 border-b border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">
-                      {hasActiveFilters
-                        ? `${availableClients.length} cliente${availableClients.length !== 1 ? "s" : ""} encontrado${availableClients.length !== 1 ? "s" : ""}`
-                        : `${availableClients.length} cliente${availableClients.length !== 1 ? "s" : ""} com pendências ${availableClients.length !== 1 ? "disponíveis" : "disponível"}`}
-                    </span>
-                    <button
-                      onClick={handleSelectAllClients}
-                      className="text-sm text-purple-600 hover:text-purple-800 font-medium"
-                    >
-                      {paginatedClients.every((client) =>
-                        selectedClients.has(client.document),
-                      ) && paginatedClients.length > 0
-                        ? "Desmarcar Página"
-                        : "Selecionar Página"}
-                    </button>
-                  </div>
-
-                  {/* Paginação */}
-                  {totalClientsPages > 1 && (
-                    <div className="flex items-center justify-between text-sm text-gray-600">
-                      <span>
-                        Página {clientsCurrentPage} de {totalClientsPages} (
-                        {(clientsCurrentPage - 1) * clientsPerPage + 1}-
-                        {Math.min(
-                          clientsCurrentPage * clientsPerPage,
-                          availableClients.length,
-                        )}{" "}
-                        de {availableClients.length})
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-gray-700">
+                        {availableClients.length} cliente
+                        {availableClients.length !== 1 ? "s" : ""} disponível
+                        {availableClients.length !== 1 ? "s" : ""}
                       </span>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() =>
-                            setClientsCurrentPage(
-                              Math.max(1, clientsCurrentPage - 1),
-                            )
-                          }
-                          disabled={clientsCurrentPage === 1}
-                          className="p-1 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() =>
-                            setClientsCurrentPage(
-                              Math.min(
-                                totalClientsPages,
-                                clientsCurrentPage + 1,
-                              ),
-                            )
-                          }
-                          disabled={clientsCurrentPage === totalClientsPages}
-                          className="p-1 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </div>
+                      {totalClientsPages > 1 && (
+                        <span className="ml-2 text-xs text-gray-500">
+                          (Página {clientsCurrentPage} de {totalClientsPages})
+                        </span>
+                      )}
                     </div>
-                  )}
+
+                    <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                      <button
+                        onClick={handleSelectAllClients}
+                        className="text-sm text-purple-600 hover:text-purple-800 font-medium"
+                      >
+                        {paginatedClients.every((client) =>
+                          selectedClients.has(client.document),
+                        ) && paginatedClients.length > 0
+                          ? "Desmarcar Página"
+                          : "Selecionar Página"}
+                      </button>
+
+                      {totalClientsPages > 1 && (
+                        <div className="flex items-center space-x-1">
+                          <button
+                            onClick={() =>
+                              setClientsCurrentPage(
+                                Math.max(1, clientsCurrentPage - 1),
+                              )
+                            }
+                            disabled={clientsCurrentPage === 1}
+                            className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setClientsCurrentPage(
+                                Math.min(
+                                  totalClientsPages,
+                                  clientsCurrentPage + 1,
+                                ),
+                              )
+                            }
+                            disabled={clientsCurrentPage === totalClientsPages}
+                            className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="max-h-[32rem] overflow-y-auto p-3">
@@ -1344,12 +1350,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             visit.clientDocument === client.document &&
                             visit.status === "realizada",
                         )
-                        .sort(
-                          (a, b) => {
-                            // Ordenar por created_at (mais recente primeiro)
-                            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-                          }
-                        );
+                        .sort((a, b) => {
+                          // Ordenar por created_at (mais recente primeiro)
+                          return (
+                            new Date(b.createdAt).getTime() -
+                            new Date(a.createdAt).getTime()
+                          );
+                        });
 
                       const today = new Date();
                       today.setHours(0, 0, 0, 0);
@@ -1363,8 +1370,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                         // Use the same safe date parsing as the formatSafeDate function
                         try {
                           // Usar created_at da visita mais recente
-            const visit = clientVisits[0];
-            const visitDateStr = visit.createdAt.split('T')[0];
+                          const visit = clientVisits[0];
+                          const visitDateStr = visit.createdAt.split("T")[0];
                           let lastVisitDate: Date;
 
                           if (visitDateStr.includes("-")) {
@@ -1406,9 +1413,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                         return {
                           type: "critical",
                           label:
-                            daysSinceLastVisit === 999
-                              ? "Nunca"
-                              : "120 dias",
+                            daysSinceLastVisit === 999 ? "Nunca" : "120 dias",
                           color: "bg-red-100 text-red-800 border-red-200",
                           days:
                             daysSinceLastVisit === 999
@@ -1459,18 +1464,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                             visit.clientDocument === client.document &&
                             visit.status === "realizada",
                         )
-                        .sort(
-                          (a, b) => {
-                            // Ordenar por created_at (mais recente primeiro)
-                            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-                          }
-                        );
+                        .sort((a, b) => {
+                          // Ordenar por created_at (mais recente primeiro)
+                          return (
+                            new Date(b.createdAt).getTime() -
+                            new Date(a.createdAt).getTime()
+                          );
+                        });
 
                       const lastVisit = clientVisits[0];
                       if (!lastVisit) return null;
 
                       return {
-                        date: lastVisit.dataVisitaRealizada || lastVisit.scheduledDate,
+                        date:
+                          lastVisit.dataVisitaRealizada ||
+                          lastVisit.scheduledDate,
                         result: lastVisit.notes || "Visita realizada",
                       };
                     };
@@ -1754,7 +1762,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                                     value={schedule.time}
                                     onFocus={(e) => {
                                       // Armazenar o valor atual antes de qualquer mudança
-                                      e.target.dataset.previousValue = e.target.value;
+                                      e.target.dataset.previousValue =
+                                        e.target.value;
                                     }}
                                     onChange={(e) => {
                                       // Apenas atualizar o valor, sem validação
@@ -1767,15 +1776,24 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                                     onBlur={(e) => {
                                       const selectedTime = e.target.value;
                                       const selectedDate = schedule.date;
-                                      const previousTime = e.target.dataset.previousValue || schedule.time;
-                                      
+                                      const previousTime =
+                                        e.target.dataset.previousValue ||
+                                        schedule.time;
+
                                       // Verificar se é hoje e se o horário é no passado
                                       if (selectedDate === getLocalDate()) {
                                         const now = new Date();
-                                        const [hours, minutes] = selectedTime.split(':').map(Number);
+                                        const [hours, minutes] = selectedTime
+                                          .split(":")
+                                          .map(Number);
                                         const selectedDateTime = new Date();
-                                        selectedDateTime.setHours(hours, minutes, 0, 0);
-                                        
+                                        selectedDateTime.setHours(
+                                          hours,
+                                          minutes,
+                                          0,
+                                          0,
+                                        );
+
                                         if (selectedDateTime <= now) {
                                           // Mostrar modal de aviso
                                           setTimeWarningData({
@@ -2108,7 +2126,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                           <div className="text-sm text-gray-600 space-y-1">
                             <div className="flex items-center">
                               <Calendar className="h-4 w-4 mr-2" />
-                              {visit.status === "realizada" && visit.dataVisitaRealizada
+                              {visit.status === "realizada" &&
+                              visit.dataVisitaRealizada
                                 ? `${formatSafeDateTime(visit.dataVisitaRealizada)} (Realizada)`
                                 : formatSafeDateTime(
                                     visit.scheduledDate,
@@ -2867,7 +2886,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                   <X size={24} />
                 </button>
               </div>
-              
+
               <div className="mb-6">
                 <div className="flex items-center mb-3">
                   <AlertTriangle className="w-5 h-5 text-amber-500 mr-2" />
@@ -2875,24 +2894,26 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                     Não é possível agendar para um horário no passado.
                   </p>
                 </div>
-                
+
                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
                   <p className="text-sm text-gray-600 mb-2">
-                    <strong>Horário selecionado:</strong> {timeWarningData.selectedTime}
+                    <strong>Horário selecionado:</strong>{" "}
+                    {timeWarningData.selectedTime}
                   </p>
                   <p className="text-sm text-gray-600">
-                    <strong>Horário sugerido:</strong> {timeWarningData.suggestedTime}
+                    <strong>Horário sugerido:</strong>{" "}
+                    {timeWarningData.suggestedTime}
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex gap-3">
                 <button
                   onClick={() => {
                     updateClientSchedule(
                       timeWarningData.clientDocument,
                       "time",
-                      timeWarningData.suggestedTime
+                      timeWarningData.suggestedTime,
                     );
                     setShowTimeWarningModal(false);
                     setTimeWarningData(null);
@@ -2901,7 +2922,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                 >
                   Usar Horário Sugerido
                 </button>
-                
+
                 <button
                   onClick={() => {
                     // Reverter para o horário anterior
@@ -2909,7 +2930,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
                       updateClientSchedule(
                         timeWarningData.clientDocument,
                         "time",
-                        timeWarningData.previousTime
+                        timeWarningData.previousTime,
                       );
                     }
                     setShowTimeWarningModal(false);

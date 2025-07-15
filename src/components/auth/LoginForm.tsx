@@ -12,11 +12,11 @@ const LoginForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setShowValidation(true);
-    
+
     if (!login.trim() || !password.trim()) {
       return;
     }
-    
+
     try {
       await authenticate(login, password);
       setShowValidation(false); // Limpa validação apenas se login for bem-sucedido
@@ -48,7 +48,9 @@ const LoginForm: React.FC = () => {
             <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
               Acesso ao Sistema
             </h2>
-            <p className="text-sm lg:text-base text-gray-600">Entre com suas credenciais</p>
+            <p className="text-sm lg:text-base text-gray-600">
+              Entre com suas credenciais
+            </p>
             <div className="w-16 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 mx-auto mt-4 rounded-full"></div>
           </div>
 
@@ -71,7 +73,9 @@ const LoginForm: React.FC = () => {
                     clearError();
                   }}
                   className={`w-full px-4 py-4 bg-white/50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-300 placeholder-gray-400 backdrop-blur-sm hover:bg-white/70 ${
-                    showValidation && !login.trim() ? "border-red-300" : "border-gray-200"
+                    showValidation && !login.trim()
+                      ? "border-red-300"
+                      : "border-gray-200"
                   }`}
                   placeholder="Digite seu login"
                   disabled={isLoading}
@@ -79,7 +83,9 @@ const LoginForm: React.FC = () => {
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-purple-500/0 to-pink-500/0 rounded-xl opacity-0 group-focus-within:opacity-10 transition-opacity duration-300 pointer-events-none"></div>
               </div>
               {showValidation && !login.trim() && (
-                <p className="mt-1 text-xs lg:text-sm text-red-600">Campo obrigatório</p>
+                <p className="mt-1 text-xs lg:text-sm text-red-600">
+                  Campo obrigatório
+                </p>
               )}
             </div>
 
@@ -101,7 +107,9 @@ const LoginForm: React.FC = () => {
                     clearError();
                   }}
                   className={`w-full px-4 py-4 pr-12 bg-white/50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-300 placeholder-gray-400 backdrop-blur-sm hover:bg-white/70 ${
-                    showValidation && !password.trim() ? "border-red-300" : "border-gray-200"
+                    showValidation && !password.trim()
+                      ? "border-red-300"
+                      : "border-gray-200"
                   }`}
                   placeholder="Digite sua senha"
                   disabled={isLoading}
@@ -121,7 +129,9 @@ const LoginForm: React.FC = () => {
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-purple-500/0 to-pink-500/0 rounded-xl opacity-0 group-focus-within:opacity-10 transition-opacity duration-300 pointer-events-none"></div>
               </div>
               {showValidation && !password.trim() && (
-                <p className="mt-1 text-xs lg:text-sm text-red-600">Campo obrigatório</p>
+                <p className="mt-1 text-xs lg:text-sm text-red-600">
+                  Campo obrigatório
+                </p>
               )}
             </div>
 
@@ -130,7 +140,9 @@ const LoginForm: React.FC = () => {
               <div className="bg-red-50/80 backdrop-blur-sm border border-red-200/50 rounded-xl p-4 flex items-start space-x-3 animate-in slide-in-from-top-2 duration-300">
                 <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-xs lg:text-sm text-red-700 font-medium">{error}</p>
+                  <p className="text-xs lg:text-sm text-red-700 font-medium">
+                    {error}
+                  </p>
                 </div>
               </div>
             )}

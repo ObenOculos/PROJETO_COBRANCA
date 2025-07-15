@@ -168,7 +168,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           const group = groupsMap.get(key)!;
           group.totalValue += collection.valor_original || 0;
           group.totalReceived += collection.valor_recebido || 0;
-          group.pendingValue = parseFloat(Math.max(0, group.totalValue - group.totalReceived).toFixed(2));
+          group.pendingValue = parseFloat(
+            Math.max(0, group.totalValue - group.totalReceived).toFixed(2),
+          );
 
           const saleKey = `${collection.venda_n}-${collection.documento}`;
           if (!group.sales.has(saleKey)) {
@@ -223,7 +225,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     // Paginação para grupos de clientes
     const paginatedClientGroups = useMemo(() => {
       if (!showGrouped) return [];
-      
+
       // Apply sorting before pagination
       let sortedGroups = [...filteredClientGroups];
       if (userType === "collector") {
@@ -246,11 +248,19 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           }
         });
       }
-      
+
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
       return sortedGroups.slice(startIndex, endIndex);
-    }, [filteredClientGroups, currentPage, itemsPerPage, showGrouped, userType, sortField, sortDirection]);
+    }, [
+      filteredClientGroups,
+      currentPage,
+      itemsPerPage,
+      showGrouped,
+      userType,
+      sortField,
+      sortDirection,
+    ]);
 
     // Filtrar e agrupar sales por cliente (para view simples)
     const filteredAndGroupedSales = useMemo(() => {
@@ -371,9 +381,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                     {filteredClientGroups.length !== 1 ? "s" : ""} com cobranças
                   </p>
                   <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-600">
-                      Por página:
-                    </label>
+                    <label className="text-sm text-gray-600">Por página:</label>
                     <select
                       id="items-per-page"
                       name="itemsPerPage"
@@ -519,7 +527,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
             <div className="bg-gray-800 px-4 sm:px-6 py-4 rounded-b-lg">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-sm text-white text-center sm:text-left">
-                  <span className="font-semibold">Página {currentPage} de {totalPages}</span>
+                  <span className="font-semibold">
+                    Página {currentPage} de {totalPages}
+                  </span>
                   <span className="text-gray-300 ml-2">
                     • Mostrando {startItem} a {endItem} de {totalItems} clientes
                   </span>
@@ -654,10 +664,13 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                 <div className="flex items-center space-x-3">
                   <DollarSign className="h-5 w-5 text-blue-600" />
                   <h2 className="text-lg font-semibold text-gray-900">
-                    {userType === "manager" ? "Todas as Cobranças" : "Minha Carteira"}
+                    {userType === "manager"
+                      ? "Todas as Cobranças"
+                      : "Minha Carteira"}
                   </h2>
                   <span className="text-sm text-gray-500">
-                    {filteredAndGroupedSales.length} cliente{filteredAndGroupedSales.length !== 1 ? "s" : ""}
+                    {filteredAndGroupedSales.length} cliente
+                    {filteredAndGroupedSales.length !== 1 ? "s" : ""}
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -766,7 +779,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                   {/* Expansão */}
                   <div className="hidden sm:flex items-center justify-between sm:justify-start sm:space-x-2">
-                    <span className="text-sm text-gray-600 hidden sm:inline">Vendas:</span>
+                    <span className="text-sm text-gray-600 hidden sm:inline">
+                      Vendas:
+                    </span>
                     <div className="flex space-x-1">
                       <button
                         onClick={expandAll}
@@ -889,7 +904,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 shadow-sm">
                             <AlertCircle className="h-3 w-3 mr-1" />
                             {formatCurrency(clientGroup.pendingValue)}
-                            </span>
+                          </span>
                         )}
                       </div>
                     </div>
@@ -944,14 +959,18 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                               {/* Financial info */}
                               <div className="grid grid-cols-2 gap-4 mb-3">
                                 <div>
-                                  <div className="text-sm text-gray-500">Total</div>
+                                  <div className="text-sm text-gray-500">
+                                    Total
+                                  </div>
                                   <div className="font-semibold text-gray-900">
                                     {formatCurrency(sale.totalValue)}
                                   </div>
                                 </div>
                                 {sale.totalReceived > 0 && (
                                   <div>
-                                    <div className="text-sm text-gray-500">Recebido</div>
+                                    <div className="text-sm text-gray-500">
+                                      Recebido
+                                    </div>
                                     <div className="font-semibold text-green-600">
                                       {formatCurrency(sale.totalReceived)}
                                     </div>
@@ -959,7 +978,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                                 )}
                                 <div className="col-span-2">
                                   <div className="text-sm text-gray-500">
-                                    {sale.pendingValue > 0 ? "Pendente" : "Status"}
+                                    {sale.pendingValue > 0
+                                      ? "Pendente"
+                                      : "Status"}
                                   </div>
                                   <div
                                     className={`font-semibold ${
@@ -1080,7 +1101,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           <div className="bg-gray-800 border-t border-gray-200 px-4 sm:px-6 py-4 rounded-b-lg">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-sm text-white text-center sm:text-left">
-                <span className="font-semibold">Página {currentPage} de {totalPages}</span>
+                <span className="font-semibold">
+                  Página {currentPage} de {totalPages}
+                </span>
                 <span className="text-gray-300 ml-2">
                   • Mostrando {startItem} a {endItem} de {totalItems} clientes
                 </span>

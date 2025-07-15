@@ -140,7 +140,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const [forceUpdate, setForceUpdate] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [] = useState(false);
-  
+
   // Contador de filtros ativos
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -156,8 +156,8 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   useEffect(() => {
     setLastUpdate(new Date());
     setShowUpdateNotification(true);
-    setForceUpdate(prev => prev + 1); // Força re-render
-    
+    setForceUpdate((prev) => prev + 1); // Força re-render
+
     // Esconder notificação após 3 segundos
     const timer = setTimeout(() => {
       setShowUpdateNotification(false);
@@ -225,16 +225,23 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       if (!isInDateRange) return false;
 
       // Filtro de cobrador
-      if (selectedCollector !== "all" && payment.collectorId !== selectedCollector)
+      if (
+        selectedCollector !== "all" &&
+        payment.collectorId !== selectedCollector
+      )
         return false;
 
       // Filtro de loja (buscar loja das collections para compatibilidade)
       if (selectedStore !== "all") {
-        const relatedCollection = collections.find(c => 
-          c.documento === payment.clientDocument && 
-          c.venda_n === payment.saleNumber
+        const relatedCollection = collections.find(
+          (c) =>
+            c.documento === payment.clientDocument &&
+            c.venda_n === payment.saleNumber,
         );
-        if (!relatedCollection || relatedCollection.nome_da_loja !== selectedStore) {
+        if (
+          !relatedCollection ||
+          relatedCollection.nome_da_loja !== selectedStore
+        ) {
           return false;
         }
       }
@@ -263,11 +270,12 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
     filteredPayments.forEach((payment) => {
       const saleKey = `${payment.saleNumber}-${payment.clientDocument}-${payment.collectorId}-${payment.id}`;
-      
+
       // Buscar dados da collection para obter valores originais e loja
-      const relatedCollection = collections.find(c => 
-        c.documento === payment.clientDocument && 
-        c.venda_n === payment.saleNumber
+      const relatedCollection = collections.find(
+        (c) =>
+          c.documento === payment.clientDocument &&
+          c.venda_n === payment.saleNumber,
       );
 
       if (!salesMap.has(saleKey)) {
@@ -332,55 +340,71 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     }));
 
     // Mapear pagamentos para detalhes usando sale_payments
-    const salesPaymentMap = new Map<string, {
-      saleKey: string;
-      client: string;
-      saleNumber: string;
-      store: string;
-      totalOriginalValue: number;
-      totalReceivedValue: number;
-      receivedDate: string;
-      collector: string;
-      installments: {
-        collectionId: string;
-        originalValue: number;
-        receivedValue: number;
-        pendingValue: number;
-      }[];
-    }>();
+    const salesPaymentMap = new Map<
+      string,
+      {
+        saleKey: string;
+        client: string;
+        saleNumber: string;
+        store: string;
+        totalOriginalValue: number;
+        totalReceivedValue: number;
+        receivedDate: string;
+        collector: string;
+        installments: {
+          collectionId: string;
+          originalValue: number;
+          receivedValue: number;
+          pendingValue: number;
+        }[];
+      }
+    >();
 
     filteredPayments.forEach((payment) => {
       const saleKey = `${payment.id}`;
-      
+
       // Buscar dados da collection para obter valores originais e loja
-      const relatedCollection = collections.find(c => 
-        c.documento === payment.clientDocument && 
-        c.venda_n === payment.saleNumber
+      const relatedCollection = collections.find(
+        (c) =>
+          c.documento === payment.clientDocument &&
+          c.venda_n === payment.saleNumber,
       );
-      
+
       if (!salesPaymentMap.has(saleKey)) {
         salesPaymentMap.set(saleKey, {
           saleKey,
-          client: relatedCollection?.cliente || payment.clientDocument || "Cliente não informado",
+          client:
+            relatedCollection?.cliente ||
+            payment.clientDocument ||
+            "Cliente não informado",
           saleNumber: payment.saleNumber?.toString() || "",
           store: relatedCollection?.nome_da_loja || "",
           totalOriginalValue: 0,
           totalReceivedValue: payment.paymentAmount,
           receivedDate: payment.paymentDate || selectedDate,
-          collector: payment.collectorName || users.find((u) => u.id === payment.collectorId)?.name || "Não atribuído",
+          collector:
+            payment.collectorName ||
+            users.find((u) => u.id === payment.collectorId)?.name ||
+            "Não atribuído",
           installments: [],
         });
       }
 
       const saleData = salesPaymentMap.get(saleKey)!;
       // Para sale_payments, cada registro representa um pagamento completo
-      if (payment.distributionDetails && Array.isArray(payment.distributionDetails)) {
+      if (
+        payment.distributionDetails &&
+        Array.isArray(payment.distributionDetails)
+      ) {
         payment.distributionDetails.forEach((detail: any) => {
           saleData.installments.push({
             collectionId: detail.installmentId || payment.id,
             originalValue: detail.originalAmount || 0,
             receivedValue: detail.appliedAmount || 0,
-            pendingValue: Math.max(0, (detail.originalAmount || 0) - (detail.appliedAmount || 0)),
+            pendingValue: Math.max(
+              0,
+              (detail.originalAmount || 0) - (detail.appliedAmount || 0),
+            ),
           });
           saleData.totalOriginalValue += detail.originalAmount || 0;
         });
@@ -398,7 +422,10 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     // Converter para array e calcular valor pendente total
     const payments = Array.from(salesPaymentMap.values()).map((sale) => ({
       ...sale,
-      totalPendingValue: Math.max(0, sale.totalOriginalValue - sale.totalReceivedValue),
+      totalPendingValue: Math.max(
+        0,
+        sale.totalOriginalValue - sale.totalReceivedValue,
+      ),
     }));
 
     return {
@@ -406,10 +433,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         dateRangeMode === "single"
           ? formatDate(selectedDate)
           : `${formatDate(selectedDate)} - ${formatDate(endDate)}`,
-      totalReceived: payments.reduce(
-        (sum, p) => sum + p.totalReceivedValue,
-        0,
-      ),
+      totalReceived: payments.reduce((sum, p) => sum + p.totalReceivedValue, 0),
       totalTransactions: salesMap.size, // Conta vendas únicas em vez de parcelas
       collectorSummary,
       payments,
@@ -480,25 +504,25 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               Relatório do Caixa
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              {dateRangeMode === "single" 
+              {dateRangeMode === "single"
                 ? formatDate(selectedDate)
                 : `${formatDate(selectedDate)} até ${formatDate(endDate)}`}
             </p>
           </div>
-          
+
           {/* Ações Principais */}
           <div className="flex items-center gap-2">
             <button
               onClick={async () => {
                 await refreshData();
-                setForceUpdate(prev => prev + 1);
+                setForceUpdate((prev) => prev + 1);
               }}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
               title="Atualizar"
             >
               <RefreshCw className="h-5 w-5" />
             </button>
-            
+
             <button
               onClick={() => setShowFilters(!showFilters)}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors relative"
@@ -510,14 +534,14 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 </span>
               )}
             </button>
-            
+
             <button
               onClick={handlePrintReport}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <Printer className="h-5 w-5" />
             </button>
-            
+
             <button
               onClick={handleExportReport}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
@@ -526,7 +550,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             </button>
           </div>
         </div>
-        
+
         {showUpdateNotification && (
           <div className="mt-2 flex items-center gap-2 text-xs text-green-600">
             <RefreshCw className="h-3 w-3 animate-spin" />
@@ -726,26 +750,32 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             </p>
             {reportData.totalTransactions > 0 && (
               <p className="text-green-100 text-sm mt-2">
-                Ticket médio: {formatCurrency(reportData.totalReceived / reportData.totalTransactions)}
+                Ticket médio:{" "}
+                {formatCurrency(
+                  reportData.totalReceived / reportData.totalTransactions,
+                )}
               </p>
             )}
           </div>
           <DollarSign className="h-16 w-16 text-green-200 opacity-50" />
         </div>
-        
+
         {/* Métricas secundárias */}
         <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-green-400">
           <div>
             <p className="text-green-100 text-xs">Vendas</p>
-            <p className="text-2xl font-semibold">{reportData.totalTransactions}</p>
+            <p className="text-2xl font-semibold">
+              {reportData.totalTransactions}
+            </p>
           </div>
           <div>
             <p className="text-green-100 text-xs">Cobradores</p>
-            <p className="text-2xl font-semibold">{reportData.collectorSummary.length}</p>
+            <p className="text-2xl font-semibold">
+              {reportData.collectorSummary.length}
+            </p>
           </div>
         </div>
       </div>
-
 
       {/* Seção de Cobradores - Design melhorado */}
       {reportData.collectorSummary.length > 0 && (
@@ -761,12 +791,12 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               {showDetails ? "Ocultar detalhes" : "Ver detalhes"}
             </button>
           </div>
-          
+
           {/* Cards de Cobradores */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {reportData.collectorSummary.map((collector) => (
-              <div 
-                key={collector.collectorId} 
+              <div
+                key={collector.collectorId}
                 className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-start justify-between mb-3">
@@ -783,18 +813,22 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                       {formatCurrency(collector.receivedAmount)}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Ticket: {formatCurrency(
+                      Ticket:{" "}
+                      {formatCurrency(
                         collector.transactionCount > 0
-                          ? collector.receivedAmount / collector.transactionCount
-                          : 0
+                          ? collector.receivedAmount /
+                              collector.transactionCount
+                          : 0,
                       )}
                     </p>
                   </div>
                 </div>
-                
+
                 {collector.saleNumbers.length > 0 && showDetails && (
                   <div className="pt-3 border-t border-gray-100">
-                    <p className="text-xs text-gray-600 mb-1">Vendas realizadas:</p>
+                    <p className="text-xs text-gray-600 mb-1">
+                      Vendas realizadas:
+                    </p>
                     <p className="text-xs text-gray-700 line-clamp-2">
                       #{collector.saleNumbers.join(", #")}
                     </p>
@@ -806,15 +840,13 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         </div>
       )}
 
-
-
       {/* Transações Detalhadas - Melhor organização */}
       {showDetails && reportData.payments.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">
             Transações Detalhadas
           </h3>
-          
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               {/* Tabela Responsiva */}
@@ -837,12 +869,19 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {reportData.payments.map((payment, index) => (
-                    <tr key={`${payment.saleKey}-${index}`} className="hover:bg-gray-50">
+                    <tr
+                      key={`${payment.saleKey}-${index}`}
+                      className="hover:bg-gray-50"
+                    >
                       <td className="px-4 py-3">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{payment.client}</p>
+                          <p className="text-sm font-medium text-gray-900">
+                            {payment.client}
+                          </p>
                           <p className="text-xs text-gray-500">
-                            {payment.saleNumber ? `Venda #${payment.saleNumber}` : 'Sem número'}
+                            {payment.saleNumber
+                              ? `Venda #${payment.saleNumber}`
+                              : "Sem número"}
                           </p>
                         </div>
                       </td>
@@ -850,7 +889,9 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                         <p className="text-sm text-gray-600">{payment.store}</p>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <p className="text-sm text-gray-600">{payment.collector}</p>
+                        <p className="text-sm text-gray-600">
+                          {payment.collector}
+                        </p>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <p className="text-sm font-bold text-green-600">
@@ -858,7 +899,8 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                         </p>
                         {payment.totalPendingValue > 0 && (
                           <p className="text-xs text-red-600">
-                            Pendente: {formatCurrency(payment.totalPendingValue)}
+                            Pendente:{" "}
+                            {formatCurrency(payment.totalPendingValue)}
                           </p>
                         )}
                       </td>
@@ -870,7 +912,6 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           </div>
         </div>
       )}
-
 
       {/* Empty State */}
       {reportData.totalTransactions === 0 && (
@@ -926,10 +967,10 @@ const generateReportContent = (
     data.payments.forEach((payment) => {
       lines.push(
         `Cliente: ${payment.client}`,
-        `${payment.saleNumber ? `Venda: #${payment.saleNumber}` : 'Venda sem número'} | Loja: ${payment.store}`,
+        `${payment.saleNumber ? `Venda: #${payment.saleNumber}` : "Venda sem número"} | Loja: ${payment.store}`,
         `Parcelas: ${payment.installments.length}`,
         `Valor Devido: ${formatCurrency(payment.totalOriginalValue)} | Valor Recebido: ${formatCurrency(payment.totalReceivedValue)}`,
-        `Valor Pendente: ${payment.totalPendingValue > 0 ? formatCurrency(payment.totalPendingValue) : 'Quitado'}`,
+        `Valor Pendente: ${payment.totalPendingValue > 0 ? formatCurrency(payment.totalPendingValue) : "Quitado"}`,
         `Cobrador: ${payment.collector}`,
         "",
       );
@@ -1213,7 +1254,9 @@ const generatePrintableReport = (
           .join("")}
       </table>
 
-      ${showDetails && data.payments.length > 0 ? `
+      ${
+        showDetails && data.payments.length > 0
+          ? `
       <h3 class="section-title">Transações Detalhadas</h3>
       <table>
         <tr>
@@ -1231,12 +1274,12 @@ const generatePrintableReport = (
             (p) => `
           <tr>
             <td>${p.client}</td>
-            <td>${p.saleNumber ? `#${p.saleNumber}` : 'Sem número'}</td>
+            <td>${p.saleNumber ? `#${p.saleNumber}` : "Sem número"}</td>
             <td>${p.installments.length}</td>
             <td>${p.store}</td>
             <td style="text-align: right;">${formatCurrency(p.totalOriginalValue)}</td>
             <td style="font-weight: bold; text-align: right;">${formatCurrency(p.totalReceivedValue)}</td>
-            <td style="text-align: right;">${p.totalPendingValue > 0 ? formatCurrency(p.totalPendingValue) : '-'}</td>
+            <td style="text-align: right;">${p.totalPendingValue > 0 ? formatCurrency(p.totalPendingValue) : "-"}</td>
             <td>${p.collector}</td>
           </tr>
         `,
@@ -1273,9 +1316,13 @@ const generatePrintableReport = (
           <span class="value">${formatCurrency(data.totalReceived)}</span>
         </div>
       </div>
-      ` : ''}
+      `
+          : ""
+      }
       
-      ${!showDetails && data.payments.length > 0 ? `
+      ${
+        !showDetails && data.payments.length > 0
+          ? `
       <div class="total-section">
         <h3 style="margin-top: 0;">Totais Gerais</h3>
         <div class="totals-grid">
@@ -1305,17 +1352,19 @@ const generatePrintableReport = (
           <span class="value">${formatCurrency(data.totalReceived)}</span>
         </div>
       </div>
-      ` : ''}
+      `
+          : ""
+      }
       
       <div class="generated-info">
         <strong>Relatório Gerado Automaticamente</strong><br>
-        Data de Geração: ${new Date().toLocaleString('pt-BR', { 
-          timeZone: 'America/Sao_Paulo',
-          year: 'numeric',
-          month: '2-digit', 
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
+        Data de Geração: ${new Date().toLocaleString("pt-BR", {
+          timeZone: "America/Sao_Paulo",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
         })}<br>
         Sistema de Gestão de Cobrança
       </div>

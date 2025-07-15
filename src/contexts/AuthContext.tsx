@@ -56,8 +56,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await new Promise((resolve) => setTimeout(resolve, 800));
 
         // Primeiro, verificar se há uma sessão do Supabase válida
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
         if (sessionError) {
           console.error("Erro ao verificar sessão do Supabase:", sessionError);
           sessionStorage.removeItem("sistema_user");
@@ -66,8 +69,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Se há sessão no Supabase, recuperar dados do usuário
         if (session) {
-          console.log("Sessão do Supabase encontrada, recuperando dados do usuário...");
-          
+          console.log(
+            "Sessão do Supabase encontrada, recuperando dados do usuário...",
+          );
+
           // Buscar dados do usuário usando o email da sessão
           const { data: users, error: userError } = await supabase
             .from("users")
@@ -110,11 +115,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkSession();
 
     // Configurar listener para mudanças na autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event, session);
-      
-      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
-        if (event === 'SIGNED_OUT') {
+
+      if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
+        if (event === "SIGNED_OUT") {
           sessionStorage.removeItem("sistema_user");
           setUser(null);
         }
@@ -203,7 +210,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log("Sessão criada no Supabase com sucesso");
           }
         } catch (authErr) {
-          console.log("Falha ao criar sessão no Supabase, continuando com sessionStorage:", authErr);
+          console.log(
+            "Falha ao criar sessão no Supabase, continuando com sessionStorage:",
+            authErr,
+          );
         }
 
         // Criar objeto do usuário
@@ -227,7 +237,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Usa withLoading para mostrar loading durante o login
       const success = await withLoading(
         performLogin(),
-        "Fazendo login..." // Mensagem personalizada
+        "Fazendo login...", // Mensagem personalizada
       );
 
       console.log("Resultado final do login:", success);

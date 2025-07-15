@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { Clock, Check, X, AlertCircle, User, FileText, Download, Search, TrendingUp, Loader2 } from "lucide-react";
+import {
+  Clock,
+  Check,
+  X,
+  AlertCircle,
+  User,
+  FileText,
+  Download,
+  Search,
+  TrendingUp,
+  Loader2,
+} from "lucide-react";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 import { AuthorizationHistory } from "../../types";
 import { useAuth } from "../../contexts/AuthContext";
@@ -8,14 +19,26 @@ import { useAuth } from "../../contexts/AuthContext";
 
 const AuthorizationManager: React.FC = () => {
   const { user } = useAuth();
-  const [pendingRequests, setPendingRequests] = useState<AuthorizationHistory[]>([]);
-  const [processedRequests, setProcessedRequests] = useState<AuthorizationHistory[]>([]);
-  const [expiredRequests, setExpiredRequests] = useState<AuthorizationHistory[]>([]);
-  const [hiddenExpiredIds, setHiddenExpiredIds] = useState<Set<string>>(new Set());
+  const [pendingRequests, setPendingRequests] = useState<
+    AuthorizationHistory[]
+  >([]);
+  const [processedRequests, setProcessedRequests] = useState<
+    AuthorizationHistory[]
+  >([]);
+  const [expiredRequests, setExpiredRequests] = useState<
+    AuthorizationHistory[]
+  >([]);
+  const [hiddenExpiredIds, setHiddenExpiredIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [historyData, setHistoryData] = useState<AuthorizationHistory[]>([]);
   const [showExpired, setShowExpired] = useState(false);
-  const [activeView, setActiveView] = useState<"current" | "history">("current");
-  const [historyFilter, setHistoryFilter] = useState<"all" | "approved" | "rejected" | "expired">("all");
+  const [activeView, setActiveView] = useState<"current" | "history">(
+    "current",
+  );
+  const [historyFilter, setHistoryFilter] = useState<
+    "all" | "approved" | "rejected" | "expired"
+  >("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [historyPage, setHistoryPage] = useState(1);
@@ -27,7 +50,7 @@ const AuthorizationManager: React.FC = () => {
     approved: 0,
     rejected: 0,
     expired: 0,
-    approvalRate: 0
+    approvalRate: 0,
   });
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyTotalPages, setHistoryTotalPages] = useState(0);
@@ -38,44 +61,48 @@ const AuthorizationManager: React.FC = () => {
       const [pending, processed, expired] = await Promise.all([
         AuthorizationHistoryService.getPendingRequests(),
         AuthorizationHistoryService.getRecentlyProcessedRequests(),
-        AuthorizationHistoryService.getExpiredRequests()
+        AuthorizationHistoryService.getExpiredRequests(),
       ]);
 
       setPendingRequests(pending);
       setProcessedRequests(processed);
-      
+
       // Filtrar expiradas que foram escondidas
-      const visibleExpired = expired.filter(req => !hiddenExpiredIds.has(req.id));
+      const visibleExpired = expired.filter(
+        (req) => !hiddenExpiredIds.has(req.id),
+      );
       setExpiredRequests(visibleExpired);
     } catch (error) {
-      console.error('Erro ao carregar solicitações:', error);
+      console.error("Erro ao carregar solicitações:", error);
     }
   };
 
   const loadHistoryData = async () => {
     try {
-      const { data, total, totalPages } = await AuthorizationHistoryService.getAuthorizationHistory({
-        status: historyFilter,
-        searchTerm,
-        dateFilter,
-        page: historyPage,
-        limit: historyPerPage
-      });
+      const { data, total, totalPages } =
+        await AuthorizationHistoryService.getAuthorizationHistory({
+          status: historyFilter,
+          searchTerm,
+          dateFilter,
+          page: historyPage,
+          limit: historyPerPage,
+        });
 
       setHistoryData(data);
       setHistoryTotal(total);
       setHistoryTotalPages(totalPages);
     } catch (error) {
-      console.error('Erro ao carregar histórico:', error);
+      console.error("Erro ao carregar histórico:", error);
     }
   };
 
   const loadStats = async () => {
     try {
-      const statsData = await AuthorizationHistoryService.getAuthorizationStats();
+      const statsData =
+        await AuthorizationHistoryService.getAuthorizationStats();
       setStats(statsData);
     } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
+      console.error("Erro ao carregar estatísticas:", error);
     }
   };
 
@@ -83,10 +110,7 @@ const AuthorizationManager: React.FC = () => {
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true);
-      await Promise.all([
-        loadCurrentRequests(),
-        loadStats()
-      ]);
+      await Promise.all([loadCurrentRequests(), loadStats()]);
       setLoading(false);
     };
 
@@ -96,28 +120,34 @@ const AuthorizationManager: React.FC = () => {
     const handleNewRequest = (event: CustomEvent) => {
       loadCurrentRequests();
       // Notificação sonora (opcional)
-      if ('Notification' in window) {
-        new Notification('Nova solicitação de autorização', {
+      if ("Notification" in window) {
+        new Notification("Nova solicitação de autorização", {
           body: `${event.detail.collectorName} solicitou autorização para editar pagamentos`,
-          icon: '/favicon.ico'
+          icon: "/favicon.ico",
         });
       }
     };
 
-    window.addEventListener('authRequestCreated', handleNewRequest as EventListener);
-    
+    window.addEventListener(
+      "authRequestCreated",
+      handleNewRequest as EventListener,
+    );
+
     // Atualizar a cada 30 segundos
     const interval = setInterval(loadCurrentRequests, 30000);
 
     return () => {
-      window.removeEventListener('authRequestCreated', handleNewRequest as EventListener);
+      window.removeEventListener(
+        "authRequestCreated",
+        handleNewRequest as EventListener,
+      );
       clearInterval(interval);
     };
   }, []);
 
   // Recarregar histórico quando filtros mudarem
   useEffect(() => {
-    if (activeView === 'history') {
+    if (activeView === "history") {
       loadHistoryData();
     }
   }, [activeView, historyFilter, searchTerm, dateFilter, historyPage]);
@@ -132,30 +162,31 @@ const AuthorizationManager: React.FC = () => {
   // Aprovar solicitação
   const approveRequest = async (token: string) => {
     if (!user) return;
-    
+
     setActionLoading(token);
     try {
       const approvedRequest = await AuthorizationHistoryService.approveRequest(
         token,
         user.id,
-        user.name
+        user.name,
       );
-      
+
       // Atualizar listas locais
       await loadCurrentRequests();
       await loadStats();
-      
+
       // Disparar evento para notificar o cobrador
-      window.dispatchEvent(new CustomEvent("tokenApproved", { 
-        detail: {
-          token: approvedRequest.token,
-          clientDocument: approvedRequest.client_document,
-          collectorName: approvedRequest.collector_name
-        }
-      }));
-      
+      window.dispatchEvent(
+        new CustomEvent("tokenApproved", {
+          detail: {
+            token: approvedRequest.token,
+            clientDocument: approvedRequest.client_document,
+            collectorName: approvedRequest.collector_name,
+          },
+        }),
+      );
     } catch (error) {
-      console.error('Erro ao aprovar solicitação:', error);
+      console.error("Erro ao aprovar solicitação:", error);
       // Aqui você pode adicionar uma notificação de erro
     } finally {
       setActionLoading(null);
@@ -165,30 +196,31 @@ const AuthorizationManager: React.FC = () => {
   // Rejeitar solicitação
   const rejectRequest = async (token: string) => {
     if (!user) return;
-    
+
     setActionLoading(token);
     try {
       const rejectedRequest = await AuthorizationHistoryService.rejectRequest(
         token,
         user.id,
-        user.name
+        user.name,
       );
-      
+
       // Disparar evento para notificar o cobrador
-      window.dispatchEvent(new CustomEvent("tokenRejected", { 
-        detail: {
-          token: rejectedRequest.token,
-          clientDocument: rejectedRequest.client_document,
-          collectorName: rejectedRequest.collector_name
-        }
-      }));
-      
+      window.dispatchEvent(
+        new CustomEvent("tokenRejected", {
+          detail: {
+            token: rejectedRequest.token,
+            clientDocument: rejectedRequest.client_document,
+            collectorName: rejectedRequest.collector_name,
+          },
+        }),
+      );
+
       // Atualizar listas locais
       await loadCurrentRequests();
       await loadStats();
-      
     } catch (error) {
-      console.error('Erro ao rejeitar solicitação:', error);
+      console.error("Erro ao rejeitar solicitação:", error);
       // Aqui você pode adicionar uma notificação de erro
     } finally {
       setActionLoading(null);
@@ -200,57 +232,58 @@ const AuthorizationManager: React.FC = () => {
     try {
       // Marcar como expiradas no banco
       await AuthorizationHistoryService.markExpiredRequests();
-      
+
       // Adicionar todos os IDs das expiradas atuais ao conjunto de ocultas
-      const expiredIds = new Set(expiredRequests.map(req => req.id));
-      setHiddenExpiredIds(prevIds => new Set([...prevIds, ...expiredIds]));
-      
+      const expiredIds = new Set(expiredRequests.map((req) => req.id));
+      setHiddenExpiredIds((prevIds) => new Set([...prevIds, ...expiredIds]));
+
       // Limpar a lista de expiradas visíveis
       setExpiredRequests([]);
-      
+
       // Recarregar dados
       await loadCurrentRequests();
       await loadStats();
     } catch (error) {
-      console.error('Erro ao limpar solicitações expiradas:', error);
+      console.error("Erro ao limpar solicitações expiradas:", error);
     }
   };
 
   // Funções utilitárias
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('pt-BR', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return new Date(dateString).toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const getTimeRemaining = (expiresAt: string) => {
     const remaining = new Date(expiresAt).getTime() - Date.now();
     if (remaining <= 0) return "Expirado";
-    
+
     const minutes = Math.floor(remaining / 60000);
     const seconds = Math.floor((remaining % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
   // Exportar histórico
   const exportHistory = async () => {
     try {
-      const csvContent = await AuthorizationHistoryService.exportAuthorizationHistory({
-        status: historyFilter,
-        searchTerm,
-        dateFilter
-      });
-      
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+      const csvContent =
+        await AuthorizationHistoryService.exportAuthorizationHistory({
+          status: historyFilter,
+          searchTerm,
+          dateFilter,
+        });
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `historico-autorizacoes-${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `historico-autorizacoes-${new Date().toISOString().split("T")[0]}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Erro ao exportar histórico:', error);
+      console.error("Erro ao exportar histórico:", error);
     }
   };
 
@@ -260,7 +293,9 @@ const AuthorizationManager: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-            <span className="ml-2 text-gray-600">Carregando solicitações...</span>
+            <span className="ml-2 text-gray-600">
+              Carregando solicitações...
+            </span>
           </div>
         </div>
       </div>
@@ -282,7 +317,7 @@ const AuthorizationManager: React.FC = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Navegação por Tabs - Desktop com texto, Mobile apenas ícones (padrão 1x2) */}
         <div className="grid grid-cols-2 sm:flex gap-2">
           <button
@@ -310,14 +345,13 @@ const AuthorizationManager: React.FC = () => {
             <span className="hidden sm:inline">Histórico</span>
           </button>
         </div>
-        
+
         {/* Ações Contextuais - Sempre visíveis */}
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
           <div className="text-sm text-gray-600">
-            {activeView === "current" 
-              ? `${pendingRequests.length} pendente${pendingRequests.length !== 1 ? 's' : ''}` 
-              : `${historyTotal} registro${historyTotal !== 1 ? 's' : ''}`
-            }
+            {activeView === "current"
+              ? `${pendingRequests.length} pendente${pendingRequests.length !== 1 ? "s" : ""}`
+              : `${historyTotal} registro${historyTotal !== 1 ? "s" : ""}`}
           </div>
           <div className="flex gap-2">
             {activeView === "current" ? (
@@ -356,12 +390,16 @@ const AuthorizationManager: React.FC = () => {
                     Aguardando Aprovação
                   </h3>
                   <span className="text-sm text-amber-600 bg-amber-100 px-3 py-1 rounded-full font-medium">
-                    {pendingRequests.length} pendente{pendingRequests.length !== 1 ? 's' : ''}
+                    {pendingRequests.length} pendente
+                    {pendingRequests.length !== 1 ? "s" : ""}
                   </span>
                 </div>
-                
+
                 {pendingRequests.map((request) => (
-                  <div key={request.token} className="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-400 rounded-lg p-3 hover:shadow-md transition-shadow">
+                  <div
+                    key={request.token}
+                    className="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-400 rounded-lg p-3 hover:shadow-md transition-shadow"
+                  >
                     {/* Header Mobile Compacto */}
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -369,7 +407,9 @@ const AuthorizationManager: React.FC = () => {
                           <User className="h-4 w-4 text-amber-600" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <h4 className="font-semibold text-gray-900 truncate text-sm">{request.collector_name}</h4>
+                          <h4 className="font-semibold text-gray-900 truncate text-sm">
+                            {request.collector_name}
+                          </h4>
                           <p className="text-xs text-amber-600 font-medium">
                             {getTimeRemaining(request.expires_at)}
                           </p>
@@ -379,16 +419,20 @@ const AuthorizationManager: React.FC = () => {
                         {formatTime(request.requested_at)}
                       </div>
                     </div>
-                    
+
                     {/* Cliente Info - Compacto */}
                     <div className="flex items-center gap-2 mb-3 p-2 bg-white rounded">
                       <FileText className="h-4 w-4 text-blue-600 flex-shrink-0" />
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-900 truncate text-sm">{request.client_name}</p>
-                        <p className="text-xs text-gray-600 truncate">{request.client_document}</p>
+                        <p className="font-medium text-gray-900 truncate text-sm">
+                          {request.client_name}
+                        </p>
+                        <p className="text-xs text-gray-600 truncate">
+                          {request.client_document}
+                        </p>
                       </div>
                     </div>
-                    
+
                     {/* Ações - Mobile Otimizado */}
                     <div className="flex gap-2">
                       <button
@@ -402,7 +446,9 @@ const AuthorizationManager: React.FC = () => {
                         ) : (
                           <>
                             <Check className="h-4 w-4 sm:mr-1" />
-                            <span className="hidden sm:inline ml-1">Aprovar</span>
+                            <span className="hidden sm:inline ml-1">
+                              Aprovar
+                            </span>
                           </>
                         )}
                       </button>
@@ -417,7 +463,9 @@ const AuthorizationManager: React.FC = () => {
                         ) : (
                           <>
                             <X className="h-4 w-4 sm:mr-1" />
-                            <span className="hidden sm:inline ml-1">Rejeitar</span>
+                            <span className="hidden sm:inline ml-1">
+                              Rejeitar
+                            </span>
                           </>
                         )}
                       </button>
@@ -430,101 +478,130 @@ const AuthorizationManager: React.FC = () => {
                 <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Check className="h-8 w-8 text-green-600" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma solicitação pendente</h3>
-                <p className="text-gray-600">Todas as solicitações foram processadas</p>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Nenhuma solicitação pendente
+                </h3>
+                <p className="text-gray-600">
+                  Todas as solicitações foram processadas
+                </p>
               </div>
             )}
 
-        {/* Solicitações Processadas */}
-        {processedRequests.length > 0 && (
-          <div className="space-y-3 mb-6">
-            <h4 className="text-sm font-medium text-gray-700">Processadas Recentemente</h4>
-            {processedRequests.map((request) => (
-              <div key={request.token} className={`border rounded-lg p-4 ${
-                request.status === "approved" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <User className="h-4 w-4 text-gray-600" />
-                      <span className="font-medium text-gray-900">{request.collector_name}</span>
-                      <span className="text-xs text-gray-500">
-                        {formatTime(request.requested_at)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
-                        {request.token}
-                      </span>
-                      <span className="text-sm text-gray-700">
-                        {request.client_name}
-                      </span>
+            {/* Solicitações Processadas */}
+            {processedRequests.length > 0 && (
+              <div className="space-y-3 mb-6">
+                <h4 className="text-sm font-medium text-gray-700">
+                  Processadas Recentemente
+                </h4>
+                {processedRequests.map((request) => (
+                  <div
+                    key={request.token}
+                    className={`border rounded-lg p-4 ${
+                      request.status === "approved"
+                        ? "bg-green-50 border-green-200"
+                        : "bg-red-50 border-red-200"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <User className="h-4 w-4 text-gray-600" />
+                          <span className="font-medium text-gray-900">
+                            {request.collector_name}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {formatTime(request.requested_at)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                            {request.token}
+                          </span>
+                          <span className="text-sm text-gray-700">
+                            {request.client_name}
+                          </span>
+                        </div>
+                      </div>
+                      <div
+                        className={`flex items-center px-3 py-1 rounded-full text-sm ${
+                          request.status === "approved"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {request.status === "approved" ? (
+                          <>
+                            <Check className="h-4 w-4 mr-1" /> Aprovado
+                          </>
+                        ) : (
+                          <>
+                            <X className="h-4 w-4 mr-1" /> Rejeitado
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className={`flex items-center px-3 py-1 rounded-full text-sm ${
-                    request.status === "approved" 
-                      ? "bg-green-100 text-green-800" 
-                      : "bg-red-100 text-red-800"
-                  }`}>
-                    {request.status === "approved" ? (
-                      <><Check className="h-4 w-4 mr-1" /> Aprovado</>
-                    ) : (
-                      <><X className="h-4 w-4 mr-1" /> Rejeitado</>
-                    )}
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        {/* Solicitações Expiradas */}
-        {expiredRequests.length > 0 && (
-          <div className="space-y-3">
-            <button
-              onClick={() => setShowExpired(!showExpired)}
-              className="flex items-center text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              <AlertCircle className="h-4 w-4 mr-2 text-red-500" />
-              Expiradas ({expiredRequests.length})
-              {showExpired ? " - Ocultar" : " - Mostrar"}
-            </button>
-            {showExpired && expiredRequests.map((request) => (
-              <div key={request.token} className="bg-gray-50 border border-gray-200 rounded-lg p-4 opacity-60">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <User className="h-4 w-4 text-gray-600" />
-                      <span className="font-medium text-gray-900">{request.collector_name}</span>
-                      <span className="text-xs text-gray-500">
-                        {formatTime(request.requested_at)}
-                      </span>
+            {/* Solicitações Expiradas */}
+            {expiredRequests.length > 0 && (
+              <div className="space-y-3">
+                <button
+                  onClick={() => setShowExpired(!showExpired)}
+                  className="flex items-center text-sm font-medium text-gray-700 hover:text-gray-900"
+                >
+                  <AlertCircle className="h-4 w-4 mr-2 text-red-500" />
+                  Expiradas ({expiredRequests.length})
+                  {showExpired ? " - Ocultar" : " - Mostrar"}
+                </button>
+                {showExpired &&
+                  expiredRequests.map((request) => (
+                    <div
+                      key={request.token}
+                      className="bg-gray-50 border border-gray-200 rounded-lg p-4 opacity-60"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <User className="h-4 w-4 text-gray-600" />
+                            <span className="font-medium text-gray-900">
+                              {request.collector_name}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {formatTime(request.requested_at)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                              {request.token}
+                            </span>
+                            <span className="text-sm text-gray-700">
+                              {request.client_name}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-xs text-red-600 font-medium">
+                          Expirado
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
-                        {request.token}
-                      </span>
-                      <span className="text-sm text-gray-700">
-                        {request.client_name}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-xs text-red-600 font-medium">
-                    Expirado
-                  </span>
-                </div>
+                  ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
             {/* Estado vazio */}
-            {pendingRequests.length === 0 && processedRequests.length === 0 && expiredRequests.length === 0 && (
-              <div className="text-center py-12">
-                <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">Nenhuma solicitação de autorização</p>
-              </div>
-            )}
+            {pendingRequests.length === 0 &&
+              processedRequests.length === 0 &&
+              expiredRequests.length === 0 && (
+                <div className="text-center py-12">
+                  <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">
+                    Nenhuma solicitação de autorização
+                  </p>
+                </div>
+              )}
           </div>
         ) : (
           <div>
@@ -534,7 +611,9 @@ const AuthorizationManager: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-blue-800">Total</p>
-                    <p className="text-2xl font-bold text-blue-900">{stats.total}</p>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {stats.total}
+                    </p>
                   </div>
                   <FileText className="h-8 w-8 text-blue-600" />
                 </div>
@@ -542,8 +621,12 @@ const AuthorizationManager: React.FC = () => {
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-green-800">Aprovadas</p>
-                    <p className="text-2xl font-bold text-green-900">{stats.approved}</p>
+                    <p className="text-sm font-medium text-green-800">
+                      Aprovadas
+                    </p>
+                    <p className="text-2xl font-bold text-green-900">
+                      {stats.approved}
+                    </p>
                   </div>
                   <Check className="h-8 w-8 text-green-600" />
                 </div>
@@ -551,8 +634,12 @@ const AuthorizationManager: React.FC = () => {
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-red-800">Rejeitadas</p>
-                    <p className="text-2xl font-bold text-red-900">{stats.rejected}</p>
+                    <p className="text-sm font-medium text-red-800">
+                      Rejeitadas
+                    </p>
+                    <p className="text-2xl font-bold text-red-900">
+                      {stats.rejected}
+                    </p>
                   </div>
                   <X className="h-8 w-8 text-red-600" />
                 </div>
@@ -560,8 +647,12 @@ const AuthorizationManager: React.FC = () => {
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-amber-800">Taxa Aprovação</p>
-                    <p className="text-2xl font-bold text-amber-900">{stats.approvalRate.toFixed(1)}%</p>
+                    <p className="text-sm font-medium text-amber-800">
+                      Taxa Aprovação
+                    </p>
+                    <p className="text-2xl font-bold text-amber-900">
+                      {stats.approvalRate.toFixed(1)}%
+                    </p>
                   </div>
                   <TrendingUp className="h-8 w-8 text-amber-600" />
                 </div>
@@ -637,16 +728,23 @@ const AuthorizationManager: React.FC = () => {
                 </div>
               ) : (
                 historyData.map((request) => (
-                  <div key={`${request.token}-${request.requested_at}`} className={`border rounded-lg p-4 ${
-                    request.status === "approved" ? "bg-green-50 border-green-200" : 
-                    request.status === "rejected" ? "bg-red-50 border-red-200" : 
-                    "bg-gray-50 border-gray-200"
-                  }`}>
+                  <div
+                    key={`${request.token}-${request.requested_at}`}
+                    className={`border rounded-lg p-4 ${
+                      request.status === "approved"
+                        ? "bg-green-50 border-green-200"
+                        : request.status === "rejected"
+                          ? "bg-red-50 border-red-200"
+                          : "bg-gray-50 border-gray-200"
+                    }`}
+                  >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <User className="h-4 w-4 text-gray-600" />
-                          <span className="font-medium text-gray-900">{request.collector_name}</span>
+                          <span className="font-medium text-gray-900">
+                            {request.collector_name}
+                          </span>
                           <span className="text-xs text-gray-500">
                             {formatTime(request.requested_at)}
                           </span>
@@ -673,19 +771,27 @@ const AuthorizationManager: React.FC = () => {
                           </div>
                         )}
                       </div>
-                      <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                        request.status === "approved" 
-                          ? "bg-green-100 text-green-800" 
-                          : request.status === "rejected"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-gray-100 text-gray-800"
-                      }`}>
+                      <div
+                        className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                          request.status === "approved"
+                            ? "bg-green-100 text-green-800"
+                            : request.status === "rejected"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
                         {request.status === "approved" ? (
-                          <><Check className="h-4 w-4 mr-1" /> Aprovado</>
+                          <>
+                            <Check className="h-4 w-4 mr-1" /> Aprovado
+                          </>
                         ) : request.status === "rejected" ? (
-                          <><X className="h-4 w-4 mr-1" /> Rejeitado</>
+                          <>
+                            <X className="h-4 w-4 mr-1" /> Rejeitado
+                          </>
                         ) : (
-                          <><Clock className="h-4 w-4 mr-1" /> Expirado</>
+                          <>
+                            <Clock className="h-4 w-4 mr-1" /> Expirado
+                          </>
                         )}
                       </div>
                     </div>
@@ -698,7 +804,9 @@ const AuthorizationManager: React.FC = () => {
             {historyTotalPages > 1 && (
               <div className="flex items-center justify-between mt-6">
                 <div className="text-sm text-gray-700">
-                  Mostrando {((historyPage - 1) * historyPerPage) + 1} a {Math.min(historyPage * historyPerPage, historyTotal)} de {historyTotal} registros
+                  Mostrando {(historyPage - 1) * historyPerPage + 1} a{" "}
+                  {Math.min(historyPage * historyPerPage, historyTotal)} de{" "}
+                  {historyTotal} registros
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -712,7 +820,11 @@ const AuthorizationManager: React.FC = () => {
                     Página {historyPage} de {historyTotalPages}
                   </span>
                   <button
-                    onClick={() => setHistoryPage(Math.min(historyTotalPages, historyPage + 1))}
+                    onClick={() =>
+                      setHistoryPage(
+                        Math.min(historyTotalPages, historyPage + 1),
+                      )
+                    }
                     disabled={historyPage === historyTotalPages}
                     className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >

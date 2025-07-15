@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-import { getSupabaseConfig } from './supabase-config';
+import { createClient } from "@supabase/supabase-js";
+import { getSupabaseConfig } from "./supabase-config";
 
 // Configuração segura do Supabase
 const config = getSupabaseConfig();
@@ -15,15 +15,17 @@ export const supabase = createClient(config.url, config.anonKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
-    detectSessionInUrl: false
-  }
+    detectSessionInUrl: false,
+  },
 });
 
 // Testar a conexão silenciosamente
-supabase.from('users').select('count', { count: 'exact', head: true })
+supabase
+  .from("users")
+  .select("count", { count: "exact", head: true })
   .then(({ error }) => {
     if (error) {
-      console.error('Erro de conectividade com o banco de dados');
+      console.error("Erro de conectividade com o banco de dados");
     }
     // Conexão OK - sem logs em produção
   });

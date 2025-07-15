@@ -60,18 +60,18 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
     if (filters.dateFrom || filters.dateTo) {
       visits = visits.filter((visit) => {
         const visitDate = new Date(visit.scheduledDate);
-        
+
         if (filters.dateFrom) {
           const fromDate = new Date(filters.dateFrom);
           if (visitDate < fromDate) return false;
         }
-        
+
         if (filters.dateTo) {
           const toDate = new Date(filters.dateTo);
           toDate.setHours(23, 59, 59, 999); // Fim do dia
           if (visitDate > toDate) return false;
         }
-        
+
         return true;
       });
     }
@@ -162,7 +162,10 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
         (sum: number, c: any) => sum + c.valor_recebido,
         0,
       );
-      client.pendingValue = Math.max(0, client.totalValue - client.totalReceived);
+      client.pendingValue = Math.max(
+        0,
+        client.totalValue - client.totalReceived,
+      );
     });
 
     // Filtrar apenas clientes com saldo devedor
@@ -233,9 +236,13 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
       });
 
     // Segmentação melhorada: Atrasadas, Agendadas, Reagendadas
-    const overdueVisits = withVisits.filter(client => client.isOverdue);
-    const rescheduledVisits = withVisits.filter(client => client.isRescheduled && !client.isOverdue);
-    const scheduledVisits = withVisits.filter(client => !client.isOverdue && !client.isRescheduled);
+    const overdueVisits = withVisits.filter((client) => client.isOverdue);
+    const rescheduledVisits = withVisits.filter(
+      (client) => client.isRescheduled && !client.isOverdue,
+    );
+    const scheduledVisits = withVisits.filter(
+      (client) => !client.isOverdue && !client.isRescheduled,
+    );
 
     const withoutVisits = filteredClients
       .filter(
@@ -249,19 +256,24 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
         hasVisit: false as const,
       }));
 
-    return { 
+    return {
       overdueVisits,
-      scheduledVisits, 
+      scheduledVisits,
       rescheduledVisits,
       withoutVisits,
       // Manter compatibilidade com código existente
-      withVisits: scheduledVisits
+      withVisits: scheduledVisits,
     };
   }, [filteredClients, collectorVisits]);
 
   // Todos os clientes para paginação - ordem de prioridade: atrasadas, agendadas, reagendadas, sem agendamento
   const allClients = useMemo(() => {
-    return [...clientData.overdueVisits, ...clientData.scheduledVisits, ...clientData.rescheduledVisits, ...clientData.withoutVisits];
+    return [
+      ...clientData.overdueVisits,
+      ...clientData.scheduledVisits,
+      ...clientData.rescheduledVisits,
+      ...clientData.withoutVisits,
+    ];
   }, [clientData]);
 
   // Paginação
@@ -293,7 +305,12 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
   };
 
   const handleSelectAll = () => {
-    const allClientsList = [...clientData.overdueVisits, ...clientData.scheduledVisits, ...clientData.rescheduledVisits, ...clientData.withoutVisits];
+    const allClientsList = [
+      ...clientData.overdueVisits,
+      ...clientData.scheduledVisits,
+      ...clientData.rescheduledVisits,
+      ...clientData.withoutVisits,
+    ];
     if (selectedClients.length === allClientsList.length) {
       setSelectedClients([]);
     } else {
@@ -302,7 +319,11 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
   };
 
   const handleSelectVisitsOnly = () => {
-    const allVisits = [...clientData.overdueVisits, ...clientData.scheduledVisits, ...clientData.rescheduledVisits];
+    const allVisits = [
+      ...clientData.overdueVisits,
+      ...clientData.scheduledVisits,
+      ...clientData.rescheduledVisits,
+    ];
     if (
       selectedClients.length === allVisits.length &&
       allVisits.every((c) => selectedClients.includes(c.document))
@@ -340,8 +361,8 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
         const selectedScheduledVisits = clientData.scheduledVisits.filter((c) =>
           selectedClients.includes(c.document),
         );
-        const selectedRescheduledVisits = clientData.rescheduledVisits.filter((c) =>
-          selectedClients.includes(c.document),
+        const selectedRescheduledVisits = clientData.rescheduledVisits.filter(
+          (c) => selectedClients.includes(c.document),
         );
         const selectedWithoutVisits = clientData.withoutVisits.filter((c) =>
           selectedClients.includes(c.document),
@@ -365,7 +386,10 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
         ];
 
         setSelectedClients(optimizedOrder.map((c) => c.document));
-        const totalVisits = selectedOverdueVisits.length + selectedScheduledVisits.length + selectedRescheduledVisits.length;
+        const totalVisits =
+          selectedOverdueVisits.length +
+          selectedScheduledVisits.length +
+          selectedRescheduledVisits.length;
         setModalContent({
           title: "Rota Otimizada por Prioridade!",
           message: `${totalVisits} visita${totalVisits !== 1 ? "s foram organizadas" : " foi organizada"} por prioridade: ${selectedOverdueVisits.length} atrasada${selectedOverdueVisits.length !== 1 ? "s" : ""}, ${selectedScheduledVisits.length} agendada${selectedScheduledVisits.length !== 1 ? "s" : ""}, ${selectedRescheduledVisits.length} reagendada${selectedRescheduledVisits.length !== 1 ? "s" : ""}.`,
@@ -691,7 +715,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                   Planejamento de Rota
                 </h2>
               </div>
-              
+
               {/* Status Badges - Compacto */}
               <div className="flex items-center space-x-1">
                 {clientData.overdueVisits.length > 0 && (
@@ -731,10 +755,15 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                   <button
                     onClick={handleSelectVisitsOnly}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                      selectedClients.length === (clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length) &&
-                      [...clientData.overdueVisits, ...clientData.scheduledVisits, ...clientData.rescheduledVisits].every((c) =>
-                        selectedClients.includes(c.document),
-                      )
+                      selectedClients.length ===
+                        clientData.overdueVisits.length +
+                          clientData.scheduledVisits.length +
+                          clientData.rescheduledVisits.length &&
+                      [
+                        ...clientData.overdueVisits,
+                        ...clientData.scheduledVisits,
+                        ...clientData.rescheduledVisits,
+                      ].every((c) => selectedClients.includes(c.document))
                         ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-600 hover:text-gray-900"
                     }`}
@@ -758,7 +787,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 >
                   <Filter className="h-4 w-4" />
                 </button>
-                
+
                 <button
                   onClick={getUserLocation}
                   disabled={isGettingLocation}
@@ -770,10 +799,14 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 >
                   <MapPin className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">
-                    {isGettingLocation ? "Obtendo..." : userLocation ? "GPS OK" : "GPS"}
+                    {isGettingLocation
+                      ? "Obtendo..."
+                      : userLocation
+                        ? "GPS OK"
+                        : "GPS"}
                   </span>
                 </button>
-                
+
                 <button
                   onClick={handleOptimizeRoute}
                   disabled={selectedClients.length === 0 || isOptimizing}
@@ -789,7 +822,11 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                     <Route className="h-4 w-4 sm:mr-2" />
                   )}
                   <span className="hidden sm:inline">
-                    {isOptimizing ? "Otimizando..." : userLocation ? "Otimizar" : "Organizar"}
+                    {isOptimizing
+                      ? "Otimizando..."
+                      : userLocation
+                        ? "Otimizar"
+                        : "Organizar"}
                   </span>
                 </button>
               </div>
@@ -812,7 +849,8 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 <div className="flex items-center space-x-2">
                   <Navigation className="h-4 w-4 text-blue-600" />
                   <span className="text-sm text-gray-700">
-                    {selectedClients.length} selecionado{selectedClients.length !== 1 ? "s" : ""}
+                    {selectedClients.length} selecionado
+                    {selectedClients.length !== 1 ? "s" : ""}
                   </span>
                   {routeOptimized && (
                     <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
@@ -849,9 +887,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <MapPin className="h-5 w-5 text-blue-600" />
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Maps
-                </h3>
+                <h3 className="text-lg font-semibold text-gray-900">Maps</h3>
               </div>
               <div className="flex items-center space-x-2">
                 {userLocation && (
@@ -901,9 +937,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 Clientes
               </h3>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs sm:text-sm">
-                <span className="text-gray-600">
-                  {allClients.length} total
-                </span>
+                <span className="text-gray-600">{allClients.length} total</span>
                 {clientData.overdueVisits.length > 0 && (
                   <span className="text-red-600 font-medium">
                     {clientData.overdueVisits.length} atrasada(s)
@@ -950,99 +984,101 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 </div>
               </div>
               <div className="divide-y divide-gray-100">
-              {paginatedOverdueVisits.map((client) => (
-                <div
-                  key={client.document}
-                  className="p-3 sm:p-4 hover:bg-red-50 transition-colors border-l-4 border-red-500 bg-red-50 cursor-pointer"
-                  onClick={() => handleToggleClient(client.document)}
-                >
-                  <div className="flex gap-2 sm:gap-3">
-                    <div className="flex-shrink-0 pt-1">
-                      <input
-                        type="checkbox"
-                        checked={selectedClients.includes(client.document)}
-                        onChange={() => handleToggleClient(client.document)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-                      />
-                    </div>
+                {paginatedOverdueVisits.map((client) => (
+                  <div
+                    key={client.document}
+                    className="p-3 sm:p-4 hover:bg-red-50 transition-colors border-l-4 border-red-500 bg-red-50 cursor-pointer"
+                    onClick={() => handleToggleClient(client.document)}
+                  >
+                    <div className="flex gap-2 sm:gap-3">
+                      <div className="flex-shrink-0 pt-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedClients.includes(client.document)}
+                          onChange={() => handleToggleClient(client.document)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                        />
+                      </div>
 
-                    {routeOptimized &&
-                      selectedClients.includes(client.document) && (
-                        <div className="bg-blue-600 text-white h-5 w-5 sm:h-6 sm:w-6 text-xs font-bold px-1 py-0.5 sm:px-2 sm:py-1 rounded-full flex-shrink-0 flex items-center justify-center">
-                          {selectedClients.indexOf(client.document) + 1}
-                        </div>
-                      )}
+                      {routeOptimized &&
+                        selectedClients.includes(client.document) && (
+                          <div className="bg-blue-600 text-white h-5 w-5 sm:h-6 sm:w-6 text-xs font-bold px-1 py-0.5 sm:px-2 sm:py-1 rounded-full flex-shrink-0 flex items-center justify-center">
+                            {selectedClients.indexOf(client.document) + 1}
+                          </div>
+                        )}
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col space-y-2">
-                        {/* Nome e documento */}
-                        <div className="flex items-start justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium text-gray-900 text-sm sm:text-base truncate">
-                              {client.client}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col space-y-2">
+                          {/* Nome e documento */}
+                          <div className="flex items-start justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                                {client.client}
+                              </div>
+                              <div className="text-xs sm:text-sm text-gray-500 font-mono">
+                                {client.document}
+                              </div>
                             </div>
-                            <div className="text-xs sm:text-sm text-gray-500 font-mono">
-                              {client.document}
+                            <div className="text-right ml-2">
+                              <div className="font-semibold text-gray-900 text-sm sm:text-base">
+                                {formatCurrency(client.pendingValue)}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {client.sales.length} venda
+                                {client.sales.length !== 1 ? "s" : ""}
+                              </div>
                             </div>
                           </div>
-                          <div className="text-right ml-2">
-                            <div className="font-semibold text-gray-900 text-sm sm:text-base">
-                              {formatCurrency(client.pendingValue)}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {client.sales.length} venda
-                              {client.sales.length !== 1 ? "s" : ""}
-                            </div>
-                          </div>
-                        </div>
 
-                        {/* Status e horário */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center text-xs">
-                            <div className="h-2 w-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
-                            <span className="mr-2 sm:mr-4 font-bold text-red-600">
-                              ⚠️ ATRASADA
-                            </span>
-                            <Clock className="h-3 w-3 text-gray-400 mr-1" />
-                            <span className="text-red-600 font-medium">
-                              {client.hasVisit ? formatDate(client.visitDate) : ""}{" "}
-                              {client.hasVisit ? client.visitTime || "" : ""}
-                            </span>
+                          {/* Status e horário */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center text-xs">
+                              <div className="h-2 w-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
+                              <span className="mr-2 sm:mr-4 font-bold text-red-600">
+                                ⚠️ ATRASADA
+                              </span>
+                              <Clock className="h-3 w-3 text-gray-400 mr-1" />
+                              <span className="text-red-600 font-medium">
+                                {client.hasVisit
+                                  ? formatDate(client.visitDate)
+                                  : ""}{" "}
+                                {client.hasVisit ? client.visitTime || "" : ""}
+                              </span>
+                            </div>
+                            {client.phone && (
+                              <button
+                                className="inline-flex items-center px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                                title="Ligar para cliente"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Phone className="h-3 w-3 mr-1" />
+                                <span className="hidden sm:inline">Ligar</span>
+                              </button>
+                            )}
                           </div>
-                          {client.phone && (
-                            <button
-                              className="inline-flex items-center px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
-                              title="Ligar para cliente"
+
+                          {/* Endereço */}
+                          <div className="text-xs text-gray-600">
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.number}, ${client.neighborhood}, ${client.city}`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <Phone className="h-3 w-3 mr-1" />
-                              <span className="hidden sm:inline">Ligar</span>
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Endereço */}
-                        <div className="text-xs text-gray-600">
-                          <a
-                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.number}, ${client.neighborhood}, ${client.city}`)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                            <span className="truncate">
-                              {client.address}, {client.number} -{" "}
-                              {client.neighborhood}, {client.city}
-                            </span>
-                          </a>
+                              <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                              <span className="truncate">
+                                {client.address}, {client.number} -{" "}
+                                {client.neighborhood}, {client.city}
+                              </span>
+                            </a>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
               </div>
             </div>
           )}
@@ -1062,99 +1098,101 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 </div>
               </div>
               <div className="divide-y divide-gray-100">
-              {paginatedScheduledVisits.map((client) => (
-                <div
-                  key={client.document}
-                  className="p-3 sm:p-4 hover:bg-gray-50 transition-colors border-l-2 border-green-400 cursor-pointer"
-                  onClick={() => handleToggleClient(client.document)}
-                >
-                  <div className="flex gap-2 sm:gap-3">
-                    <div className="flex-shrink-0 pt-1">
-                      <input
-                        type="checkbox"
-                        checked={selectedClients.includes(client.document)}
-                        onChange={() => handleToggleClient(client.document)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                      />
-                    </div>
+                {paginatedScheduledVisits.map((client) => (
+                  <div
+                    key={client.document}
+                    className="p-3 sm:p-4 hover:bg-gray-50 transition-colors border-l-2 border-green-400 cursor-pointer"
+                    onClick={() => handleToggleClient(client.document)}
+                  >
+                    <div className="flex gap-2 sm:gap-3">
+                      <div className="flex-shrink-0 pt-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedClients.includes(client.document)}
+                          onChange={() => handleToggleClient(client.document)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                        />
+                      </div>
 
-                    {routeOptimized &&
-                      selectedClients.includes(client.document) && (
-                        <div className="bg-blue-600 text-white h-5 w-5 sm:h-6 sm:w-6 text-xs font-bold px-1 py-0.5 sm:px-2 sm:py-1 rounded-full flex-shrink-0 flex items-center justify-center">
-                          {selectedClients.indexOf(client.document) + 1}
-                        </div>
-                      )}
+                      {routeOptimized &&
+                        selectedClients.includes(client.document) && (
+                          <div className="bg-blue-600 text-white h-5 w-5 sm:h-6 sm:w-6 text-xs font-bold px-1 py-0.5 sm:px-2 sm:py-1 rounded-full flex-shrink-0 flex items-center justify-center">
+                            {selectedClients.indexOf(client.document) + 1}
+                          </div>
+                        )}
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col space-y-2">
-                        {/* Nome e documento */}
-                        <div className="flex items-start justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium text-gray-900 text-sm sm:text-base truncate">
-                              {client.client}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col space-y-2">
+                          {/* Nome e documento */}
+                          <div className="flex items-start justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                                {client.client}
+                              </div>
+                              <div className="text-xs sm:text-sm text-gray-500 font-mono">
+                                {client.document}
+                              </div>
                             </div>
-                            <div className="text-xs sm:text-sm text-gray-500 font-mono">
-                              {client.document}
+                            <div className="text-right ml-2">
+                              <div className="font-semibold text-gray-900 text-sm sm:text-base">
+                                {formatCurrency(client.pendingValue)}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {client.sales.length} venda
+                                {client.sales.length !== 1 ? "s" : ""}
+                              </div>
                             </div>
                           </div>
-                          <div className="text-right ml-2">
-                            <div className="font-semibold text-gray-900 text-sm sm:text-base">
-                              {formatCurrency(client.pendingValue)}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {client.sales.length} venda
-                              {client.sales.length !== 1 ? "s" : ""}
-                            </div>
-                          </div>
-                        </div>
 
-                        {/* Status e horário */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center text-xs">
-                            <div className="h-2 w-2 bg-green-400 rounded-full mr-2"></div>
-                            <span className="mr-2 sm:mr-4 font-medium text-green-600">
-                              Agendada
-                            </span>
-                            <Clock className="h-3 w-3 text-gray-400 mr-1" />
-                            <span className="text-gray-600">
-                              {client.hasVisit ? formatDate(client.visitDate) : ""}{" "}
-                              {client.hasVisit ? client.visitTime || "" : ""}
-                            </span>
+                          {/* Status e horário */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center text-xs">
+                              <div className="h-2 w-2 bg-green-400 rounded-full mr-2"></div>
+                              <span className="mr-2 sm:mr-4 font-medium text-green-600">
+                                Agendada
+                              </span>
+                              <Clock className="h-3 w-3 text-gray-400 mr-1" />
+                              <span className="text-gray-600">
+                                {client.hasVisit
+                                  ? formatDate(client.visitDate)
+                                  : ""}{" "}
+                                {client.hasVisit ? client.visitTime || "" : ""}
+                              </span>
+                            </div>
+                            {client.phone && (
+                              <button
+                                className="inline-flex items-center px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
+                                title="Ligar para cliente"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Phone className="h-3 w-3 mr-1" />
+                                <span className="hidden sm:inline">Ligar</span>
+                              </button>
+                            )}
                           </div>
-                          {client.phone && (
-                            <button
-                              className="inline-flex items-center px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
-                              title="Ligar para cliente"
+
+                          {/* Endereço */}
+                          <div className="text-xs text-gray-600">
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.number}, ${client.neighborhood}, ${client.city}`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <Phone className="h-3 w-3 mr-1" />
-                              <span className="hidden sm:inline">Ligar</span>
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Endereço */}
-                        <div className="text-xs text-gray-600">
-                          <a
-                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.number}, ${client.neighborhood}, ${client.city}`)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                            <span className="truncate">
-                              {client.address}, {client.number} -{" "}
-                              {client.neighborhood}, {client.city}
-                            </span>
-                          </a>
+                              <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                              <span className="truncate">
+                                {client.address}, {client.number} -{" "}
+                                {client.neighborhood}, {client.city}
+                              </span>
+                            </a>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
               </div>
             </div>
           )}
@@ -1174,105 +1212,108 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 </div>
               </div>
               <div className="divide-y divide-gray-100">
-              {paginatedRescheduledVisits.map((client) => (
-                <div
-                  key={client.document}
-                  className="p-3 sm:p-4 hover:bg-gray-50 transition-colors border-l-2 border-orange-500 bg-orange-50 cursor-pointer"
-                  onClick={() => handleToggleClient(client.document)}
-                >
-                  <div className="flex gap-2 sm:gap-3">
-                    <div className="flex-shrink-0 pt-1">
-                      <input
-                        type="checkbox"
-                        checked={selectedClients.includes(client.document)}
-                        onChange={() => handleToggleClient(client.document)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
-                      />
-                    </div>
+                {paginatedRescheduledVisits.map((client) => (
+                  <div
+                    key={client.document}
+                    className="p-3 sm:p-4 hover:bg-gray-50 transition-colors border-l-2 border-orange-500 bg-orange-50 cursor-pointer"
+                    onClick={() => handleToggleClient(client.document)}
+                  >
+                    <div className="flex gap-2 sm:gap-3">
+                      <div className="flex-shrink-0 pt-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedClients.includes(client.document)}
+                          onChange={() => handleToggleClient(client.document)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                        />
+                      </div>
 
-                    {routeOptimized &&
-                      selectedClients.includes(client.document) && (
-                        <div className="bg-blue-600 text-white h-5 w-5 sm:h-6 sm:w-6 text-xs font-bold px-1 py-0.5 sm:px-2 sm:py-1 rounded-full flex-shrink-0 flex items-center justify-center">
-                          {selectedClients.indexOf(client.document) + 1}
-                        </div>
-                      )}
+                      {routeOptimized &&
+                        selectedClients.includes(client.document) && (
+                          <div className="bg-blue-600 text-white h-5 w-5 sm:h-6 sm:w-6 text-xs font-bold px-1 py-0.5 sm:px-2 sm:py-1 rounded-full flex-shrink-0 flex items-center justify-center">
+                            {selectedClients.indexOf(client.document) + 1}
+                          </div>
+                        )}
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col space-y-2">
-                        {/* Nome e documento */}
-                        <div className="flex items-start justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium text-gray-900 text-sm sm:text-base truncate">
-                              {client.client}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col space-y-2">
+                          {/* Nome e documento */}
+                          <div className="flex items-start justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                                {client.client}
+                              </div>
+                              <div className="text-xs sm:text-sm text-gray-500 font-mono">
+                                {client.document}
+                              </div>
                             </div>
-                            <div className="text-xs sm:text-sm text-gray-500 font-mono">
-                              {client.document}
+                            <div className="text-right ml-2">
+                              <div className="font-semibold text-gray-900 text-sm sm:text-base">
+                                {formatCurrency(client.pendingValue)}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {client.sales.length} venda
+                                {client.sales.length !== 1 ? "s" : ""}
+                              </div>
                             </div>
                           </div>
-                          <div className="text-right ml-2">
-                            <div className="font-semibold text-gray-900 text-sm sm:text-base">
-                              {formatCurrency(client.pendingValue)}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {client.sales.length} venda
-                              {client.sales.length !== 1 ? "s" : ""}
-                            </div>
-                          </div>
-                        </div>
 
-                        {/* Status e horário */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center text-xs">
-                            <div className="h-2 w-2 bg-orange-500 rounded-full mr-2"></div>
-                            <span className="mr-2 sm:mr-4 font-medium text-orange-600">
-                              Reagendada
-                            </span>
-                            <RefreshCw className="h-3 w-3 text-orange-600 mr-1" />
-                            {client.hasVisit && client.rescheduleCount > 1 && (
-                              <span className="text-xs text-orange-600 font-medium mr-2 sm:mr-4">
-                                ({client.rescheduleCount}x)
+                          {/* Status e horário */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center text-xs">
+                              <div className="h-2 w-2 bg-orange-500 rounded-full mr-2"></div>
+                              <span className="mr-2 sm:mr-4 font-medium text-orange-600">
+                                Reagendada
                               </span>
+                              <RefreshCw className="h-3 w-3 text-orange-600 mr-1" />
+                              {client.hasVisit &&
+                                client.rescheduleCount > 1 && (
+                                  <span className="text-xs text-orange-600 font-medium mr-2 sm:mr-4">
+                                    ({client.rescheduleCount}x)
+                                  </span>
+                                )}
+                              <Clock className="h-3 w-3 text-gray-400 mr-1" />
+                              <span className="text-orange-600">
+                                {client.hasVisit
+                                  ? formatDate(client.visitDate)
+                                  : ""}{" "}
+                                {client.hasVisit ? client.visitTime || "" : ""}
+                              </span>
+                            </div>
+                            {client.phone && (
+                              <button
+                                className="inline-flex items-center px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded transition-colors"
+                                title="Ligar para cliente"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Phone className="h-3 w-3 mr-1" />
+                                <span className="hidden sm:inline">Ligar</span>
+                              </button>
                             )}
-                            <Clock className="h-3 w-3 text-gray-400 mr-1" />
-                            <span className="text-orange-600">
-                              {client.hasVisit ? formatDate(client.visitDate) : ""}{" "}
-                              {client.hasVisit ? client.visitTime || "" : ""}
-                            </span>
                           </div>
-                          {client.phone && (
-                            <button
-                              className="inline-flex items-center px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded transition-colors"
-                              title="Ligar para cliente"
+
+                          {/* Endereço */}
+                          <div className="text-xs text-gray-600">
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.number}, ${client.neighborhood}, ${client.city}`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <Phone className="h-3 w-3 mr-1" />
-                              <span className="hidden sm:inline">Ligar</span>
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Endereço */}
-                        <div className="text-xs text-gray-600">
-                          <a
-                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.number}, ${client.neighborhood}, ${client.city}`)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                            <span className="truncate">
-                              {client.address}, {client.number} -{" "}
-                              {client.neighborhood}, {client.city}
-                            </span>
-                          </a>
+                              <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                              <span className="truncate">
+                                {client.address}, {client.number} -{" "}
+                                {client.neighborhood}, {client.city}
+                              </span>
+                            </a>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
               </div>
             </div>
           )}
@@ -1292,94 +1333,94 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 </div>
               </div>
               <div className="divide-y divide-gray-100">
-              {paginatedWithoutVisits.map((client) => (
-                <div
-                  key={client.document}
-                  className="p-3 sm:p-4 hover:bg-gray-50 transition-colors border-l-2 border-gray-300 cursor-pointer"
-                  onClick={() => handleToggleClient(client.document)}
-                >
-                  <div className="flex gap-2 sm:gap-3">
-                    <div className="flex-shrink-0 pt-1">
-                      <input
-                        type="checkbox"
-                        checked={selectedClients.includes(client.document)}
-                        onChange={() => handleToggleClient(client.document)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                    </div>
+                {paginatedWithoutVisits.map((client) => (
+                  <div
+                    key={client.document}
+                    className="p-3 sm:p-4 hover:bg-gray-50 transition-colors border-l-2 border-gray-300 cursor-pointer"
+                    onClick={() => handleToggleClient(client.document)}
+                  >
+                    <div className="flex gap-2 sm:gap-3">
+                      <div className="flex-shrink-0 pt-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedClients.includes(client.document)}
+                          onChange={() => handleToggleClient(client.document)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </div>
 
-                    {routeOptimized &&
-                      selectedClients.includes(client.document) && (
-                        <div className="bg-blue-600 text-white h-5 w-5 sm:h-6 sm:w-6 text-xs font-bold px-1 py-0.5 sm:px-2 sm:py-1 rounded-full flex-shrink-0 flex items-center justify-center">
-                          {selectedClients.indexOf(client.document) + 1}
-                        </div>
-                      )}
+                      {routeOptimized &&
+                        selectedClients.includes(client.document) && (
+                          <div className="bg-blue-600 text-white h-5 w-5 sm:h-6 sm:w-6 text-xs font-bold px-1 py-0.5 sm:px-2 sm:py-1 rounded-full flex-shrink-0 flex items-center justify-center">
+                            {selectedClients.indexOf(client.document) + 1}
+                          </div>
+                        )}
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col space-y-2">
-                        {/* Nome e documento */}
-                        <div className="flex items-start justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium text-gray-900 text-sm sm:text-base truncate">
-                              {client.client}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col space-y-2">
+                          {/* Nome e documento */}
+                          <div className="flex items-start justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                                {client.client}
+                              </div>
+                              <div className="text-xs sm:text-sm text-gray-500 font-mono">
+                                {client.document}
+                              </div>
                             </div>
-                            <div className="text-xs sm:text-sm text-gray-500 font-mono">
-                              {client.document}
+                            <div className="text-right ml-2">
+                              <div className="font-semibold text-gray-900 text-sm sm:text-base">
+                                {formatCurrency(client.pendingValue)}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {client.sales.length} venda
+                                {client.sales.length !== 1 ? "s" : ""}
+                              </div>
                             </div>
                           </div>
-                          <div className="text-right ml-2">
-                            <div className="font-semibold text-gray-900 text-sm sm:text-base">
-                              {formatCurrency(client.pendingValue)}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {client.sales.length} venda
-                              {client.sales.length !== 1 ? "s" : ""}
-                            </div>
-                          </div>
-                        </div>
 
-                        {/* Status */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center text-xs">
-                            <div className="h-2 w-2 bg-red-400 rounded-full mr-2"></div>
-                            <span className="text-red-600">
-                              Sem agendamento
-                            </span>
+                          {/* Status */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center text-xs">
+                              <div className="h-2 w-2 bg-red-400 rounded-full mr-2"></div>
+                              <span className="text-red-600">
+                                Sem agendamento
+                              </span>
+                            </div>
+                            {client.phone && (
+                              <button
+                                className="inline-flex items-center px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                                title="Ligar para cliente"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Phone className="h-3 w-3 mr-1" />
+                                <span className="hidden sm:inline">Ligar</span>
+                              </button>
+                            )}
                           </div>
-                          {client.phone && (
-                            <button
-                              className="inline-flex items-center px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-                              title="Ligar para cliente"
+
+                          {/* Endereço */}
+                          <div className="text-xs text-gray-600">
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.number}, ${client.neighborhood}, ${client.city}`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <Phone className="h-3 w-3 mr-1" />
-                              <span className="hidden sm:inline">Ligar</span>
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Endereço */}
-                        <div className="text-xs text-gray-600">
-                          <a
-                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.address}, ${client.number}, ${client.neighborhood}, ${client.city}`)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                            <span className="truncate">
-                              {client.address}, {client.number} -{" "}
-                              {client.neighborhood}, {client.city}
-                            </span>
-                          </a>
+                              <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                              <span className="truncate">
+                                {client.address}, {client.number} -{" "}
+                                {client.neighborhood}, {client.city}
+                              </span>
+                            </a>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
               </div>
             </div>
           )}
@@ -1423,7 +1464,9 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 <span>Itens por página:</span>
                 <select
                   value={clientsPerPage}
-                  onChange={(e) => handleClientsPerPageChange(Number(e.target.value))}
+                  onChange={(e) =>
+                    handleClientsPerPageChange(Number(e.target.value))
+                  }
                   className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value={5}>5</option>

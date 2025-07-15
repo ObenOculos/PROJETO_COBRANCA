@@ -1,11 +1,5 @@
 import React, { useState, useMemo } from "react";
-import {
-  Users,
-  Award,
-  Filter,
-  Download,
-  FileText,
-} from "lucide-react";
+import { Users, Award, Filter, Download, FileText } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
 
@@ -36,23 +30,67 @@ const EnhancedPerformanceChart: React.FC = () => {
 
   // Função auxiliar para converter números em extenso
   const numeroParaExtenso = (num: number): string => {
-    const unidades = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
-    const dezenas = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
-    const dezenasEspeciais = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
-    const centenas = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
-    
-    if (num === 0) return 'zero';
-    if (num === 100) return 'cem';
-    if (num === 1000) return 'mil';
-    
+    const unidades = [
+      "",
+      "um",
+      "dois",
+      "três",
+      "quatro",
+      "cinco",
+      "seis",
+      "sete",
+      "oito",
+      "nove",
+    ];
+    const dezenas = [
+      "",
+      "",
+      "vinte",
+      "trinta",
+      "quarenta",
+      "cinquenta",
+      "sessenta",
+      "setenta",
+      "oitenta",
+      "noventa",
+    ];
+    const dezenasEspeciais = [
+      "dez",
+      "onze",
+      "doze",
+      "treze",
+      "quatorze",
+      "quinze",
+      "dezesseis",
+      "dezessete",
+      "dezoito",
+      "dezenove",
+    ];
+    const centenas = [
+      "",
+      "cento",
+      "duzentos",
+      "trezentos",
+      "quatrocentos",
+      "quinhentos",
+      "seiscentos",
+      "setecentos",
+      "oitocentos",
+      "novecentos",
+    ];
+
+    if (num === 0) return "zero";
+    if (num === 100) return "cem";
+    if (num === 1000) return "mil";
+
     const partes = [];
-    
+
     // Centenas
     const c = Math.floor(num / 100);
     if (c > 0) {
       partes.push(centenas[c]);
     }
-    
+
     // Dezenas e unidades
     const resto = num % 100;
     if (resto >= 10 && resto <= 19) {
@@ -63,48 +101,48 @@ const EnhancedPerformanceChart: React.FC = () => {
       if (d > 0) partes.push(dezenas[d]);
       if (u > 0) partes.push(unidades[u]);
     }
-    
-    return partes.join(' e ');
+
+    return partes.join(" e ");
   };
 
   // Função para formatar valores grandes em mobile
   const formatMobileCurrency = (value: number) => {
     const isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
-    
+
     if (!isMobile) {
       return formatCurrency(value, false);
     }
-    
+
     const intValue = Math.floor(value);
-    
+
     if (intValue === 0) {
-      return 'R$ 0';
+      return "R$ 0";
     }
-    
+
     // Determinar a escala e formatar
-    let mainValue = '';
+    let mainValue = "";
     let extensoParts = [];
-    
+
     if (intValue >= 1000000) {
       // Milhões
       const milhoes = Math.floor(intValue / 1000000);
       const resto = intValue % 1000000;
       mainValue = `R$ ${milhoes}M`;
-      
+
       if (resto > 0) {
         const milRestantes = Math.floor(resto / 1000);
         const unidadesRestantes = resto % 1000;
-        
+
         if (milRestantes > 0) {
           const milExtenso = numeroParaExtenso(milRestantes);
           extensoParts.push(`${milExtenso} mil`);
         }
-        
+
         if (unidadesRestantes > 0) {
           const unidadesExtenso = numeroParaExtenso(unidadesRestantes);
           extensoParts.push(`${unidadesExtenso} reais`);
         } else if (extensoParts.length > 0) {
-          extensoParts.push('reais');
+          extensoParts.push("reais");
         }
       }
     } else if (intValue >= 10000) {
@@ -112,7 +150,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       const mil = Math.floor(intValue / 1000);
       const resto = intValue % 1000;
       mainValue = `R$ ${mil} mil`;
-      
+
       if (resto > 0) {
         const restoExtenso = numeroParaExtenso(resto);
         extensoParts.push(`${restoExtenso} reais`);
@@ -122,7 +160,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       const mil = Math.floor(intValue / 1000);
       const resto = intValue % 1000;
       mainValue = `R$ ${mil} mil`;
-      
+
       if (resto > 0) {
         const restoExtenso = numeroParaExtenso(resto);
         extensoParts.push(`${restoExtenso} reais`);
@@ -131,14 +169,16 @@ const EnhancedPerformanceChart: React.FC = () => {
       // Menos de mil
       return `R$ ${intValue}`;
     }
-    
-    const extensoText = extensoParts.join(' e ');
-    
+
+    const extensoText = extensoParts.join(" e ");
+
     return (
       <div className="flex flex-col items-start">
         <span className="text-2xl font-semibold">{mainValue}</span>
         {extensoText && (
-          <span className="text-xs text-blue-200 opacity-90">{extensoText}</span>
+          <span className="text-xs text-blue-200 opacity-90">
+            {extensoText}
+          </span>
         )}
       </div>
     );
@@ -194,7 +234,7 @@ const EnhancedPerformanceChart: React.FC = () => {
         salesArray
           .filter((s) => s.isPending)
           .map((s) => s.clientDocument)
-          .filter(Boolean)
+          .filter(Boolean),
       ).size;
       const totalAmount = salesArray.reduce((sum, s) => sum + s.totalValue, 0);
       const receivedAmount = salesArray.reduce(
@@ -282,12 +322,11 @@ const EnhancedPerformanceChart: React.FC = () => {
     };
   }, [enhancedPerformance]);
 
-
   const exportPerformanceData = () => {
     // Headers with better formatting
     const headers = [
       "Cobrador",
-      "Total de Vendas", 
+      "Total de Vendas",
       "Vendas Finalizadas",
       "Vendas Pendentes",
       "Clientes com Pendências",
@@ -299,19 +338,23 @@ const EnhancedPerformanceChart: React.FC = () => {
       "Ticket Médio (R$)",
       "Total de Clientes",
       "Ranking Taxa",
-      "Ranking Valor"
+      "Ranking Valor",
     ];
 
     // Data rows with proper formatting
     const rows = filteredAndSortedPerformance.map((p) => {
       const pendingAmount = p.totalAmount - p.receivedAmount;
-      const conversionRanking = enhancedPerformance
-        .sort((a, b) => b.conversionRate - a.conversionRate)
-        .findIndex((collector) => collector.collectorId === p.collectorId) + 1;
-      const valueRanking = enhancedPerformance
-        .sort((a, b) => b.receivedAmount - a.receivedAmount)
-        .findIndex((collector) => collector.collectorId === p.collectorId) + 1;
-        
+      const conversionRanking =
+        enhancedPerformance
+          .sort((a, b) => b.conversionRate - a.conversionRate)
+          .findIndex((collector) => collector.collectorId === p.collectorId) +
+        1;
+      const valueRanking =
+        enhancedPerformance
+          .sort((a, b) => b.receivedAmount - a.receivedAmount)
+          .findIndex((collector) => collector.collectorId === p.collectorId) +
+        1;
+
       return [
         p.collectorName,
         p.totalSales.toString(),
@@ -326,28 +369,30 @@ const EnhancedPerformanceChart: React.FC = () => {
         p.averageTicket.toFixed(2),
         p.clientsCount.toString(),
         conversionRanking.toString(),
-        valueRanking.toString()
+        valueRanking.toString(),
       ];
     });
 
     // Create CSV content with proper encoding
     const csvContent = [
       headers.join(","),
-      ...rows.map(row => 
-        row.map(cell => {
-          // Escape quotes and wrap in quotes if contains comma, quote, or newline
-          const escaped = cell.toString().replace(/"/g, '""');
-          return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
-        }).join(",")
-      )
+      ...rows.map((row) =>
+        row
+          .map((cell) => {
+            // Escape quotes and wrap in quotes if contains comma, quote, or newline
+            const escaped = cell.toString().replace(/"/g, '""');
+            return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
+          })
+          .join(","),
+      ),
     ].join("\n");
 
     // Add BOM for proper UTF-8 encoding in Excel
     const BOM = "\uFEFF";
-    const blob = new Blob([BOM + csvContent], { 
-      type: "text/csv;charset=utf-8;" 
+    const blob = new Blob([BOM + csvContent], {
+      type: "text/csv;charset=utf-8;",
     });
-    
+
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `desempenho-cobradores-${new Date().toISOString().split("T")[0]}.csv`;
@@ -357,7 +402,7 @@ const EnhancedPerformanceChart: React.FC = () => {
 
   // Estado para controlar filtros no mobile
   const [showFilters, setShowFilters] = useState(false);
-  
+
   // Contador de filtros ativos
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -373,14 +418,14 @@ const EnhancedPerformanceChart: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-                <FileText className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
-                Análise de Desempenho
+              <FileText className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
+              Análise de Desempenho
             </h2>
             <p className="text-sm text-gray-600 mt-1">
               Ranking de vendas por cobrador
             </p>
           </div>
-          
+
           {/* Ações Principais */}
           <div className="flex items-center gap-2">
             <button
@@ -394,7 +439,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                 </span>
               )}
             </button>
-            
+
             <button
               onClick={exportPerformanceData}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
@@ -410,7 +455,9 @@ const EnhancedPerformanceChart: React.FC = () => {
       <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-blue-100 text-sm font-medium">Taxa de Conversão Média</p>
+            <p className="text-blue-100 text-sm font-medium">
+              Taxa de Conversão Média
+            </p>
             <p className="text-4xl font-bold mt-1">
               {teamStats.avgConversionRate.toFixed(1)}%
             </p>
@@ -420,7 +467,7 @@ const EnhancedPerformanceChart: React.FC = () => {
           </div>
           <Award className="h-16 w-16 text-blue-200 opacity-50" />
         </div>
-        
+
         {/* Métricas secundárias */}
         <div className="grid grid-cols-[1fr_1.5fr_1fr] gap-4 mt-6 pt-6 border-t border-blue-400">
           <div>
@@ -429,11 +476,15 @@ const EnhancedPerformanceChart: React.FC = () => {
           </div>
           <div>
             <p className="text-blue-100 text-xs">Recebido</p>
-            <div className="text-2xl font-semibold">{formatMobileCurrency(teamStats.totalReceived)}</div>
+            <div className="text-2xl font-semibold">
+              {formatMobileCurrency(teamStats.totalReceived)}
+            </div>
           </div>
           <div>
             <p className="text-blue-100 text-xs">Eficiência</p>
-            <p className="text-2xl font-semibold">{teamStats.teamEfficiency.toFixed(0)}%</p>
+            <p className="text-2xl font-semibold">
+              {teamStats.teamEfficiency.toFixed(0)}%
+            </p>
           </div>
         </div>
       </div>
@@ -514,7 +565,9 @@ const EnhancedPerformanceChart: React.FC = () => {
           </h3>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+              onClick={() =>
+                setSortOrder(sortOrder === "desc" ? "asc" : "desc")
+              }
               className="text-sm text-blue-600 hover:text-blue-700 font-medium"
             >
               {sortOrder === "desc" ? "↓ Maior primeiro" : "↑ Menor primeiro"}
@@ -532,16 +585,20 @@ const EnhancedPerformanceChart: React.FC = () => {
               <div
                 key={collector.collectorId}
                 className={`bg-white rounded-lg border p-4 hover:shadow-md transition-shadow ${
-                  isTopPerformer ? "border-blue-300 bg-blue-50" : "border-gray-200"
+                  isTopPerformer
+                    ? "border-blue-300 bg-blue-50"
+                    : "border-gray-200"
                 }`}
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                      rankingPosition <= 3 
-                        ? "bg-blue-100 text-blue-700" 
-                        : "bg-gray-100 text-gray-600"
-                    }`}>
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                        rankingPosition <= 3
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
                       {rankingPosition}
                     </div>
                     <div>
@@ -563,7 +620,9 @@ const EnhancedPerformanceChart: React.FC = () => {
                   {/* Taxa de Conversão com Barra de Progresso */}
                   <div>
                     <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm text-gray-600">Taxa de Conversão</span>
+                      <span className="text-sm text-gray-600">
+                        Taxa de Conversão
+                      </span>
                       <span className="text-lg font-bold text-gray-900">
                         {collector.conversionRate.toFixed(1)}%
                       </span>
@@ -577,22 +636,28 @@ const EnhancedPerformanceChart: React.FC = () => {
                               ? "bg-yellow-500"
                               : "bg-red-500"
                         }`}
-                        style={{ width: `${Math.min(collector.conversionRate, 100)}%` }}
+                        style={{
+                          width: `${Math.min(collector.conversionRate, 100)}%`,
+                        }}
                       />
                     </div>
                   </div>
 
                   {/* Valor Recebido */}
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Valor Recebido</span>
+                    <span className="text-sm text-gray-600">
+                      Valor Recebido
+                    </span>
                     <span className="text-lg font-bold text-green-600 sm:block hidden">
                       {formatCurrency(collector.receivedAmount)}
                     </span>
                     <div className="text-lg font-bold text-green-600 sm:hidden">
-                      {collector.receivedAmount < 10000 
-                        ? formatCurrency(collector.receivedAmount, false).replace(/,\d{2}$/, '')
-                        : `R$ ${Math.floor(collector.receivedAmount / 1000)}k`
-                      }
+                      {collector.receivedAmount < 10000
+                        ? formatCurrency(
+                            collector.receivedAmount,
+                            false,
+                          ).replace(/,\d{2}$/, "")
+                        : `R$ ${Math.floor(collector.receivedAmount / 1000)}k`}
                     </div>
                   </div>
 

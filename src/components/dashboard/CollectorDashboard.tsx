@@ -30,9 +30,9 @@ interface CollectorDashboardProps {
   onTabChange?: (tabId: string) => void;
 }
 
-const CollectorDashboard: React.FC<CollectorDashboardProps> = ({ 
-  activeTab: externalActiveTab, 
-  onTabChange: externalOnTabChange 
+const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
+  activeTab: externalActiveTab,
+  onTabChange: externalOnTabChange,
 }) => {
   const { user } = useAuth();
   const {
@@ -111,15 +111,19 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   });
 
   const totalSales = salesMap.size;
-  const pendingSales = Array.from(salesMap.values()).filter((s) => s.isPending).length;
-  const completedSales = Array.from(salesMap.values()).filter((s) => !s.isPending).length;
-  
+  const pendingSales = Array.from(salesMap.values()).filter(
+    (s) => s.isPending,
+  ).length;
+  const completedSales = Array.from(salesMap.values()).filter(
+    (s) => !s.isPending,
+  ).length;
+
   // Count unique clients with pending sales
   const clientsWithPending = new Set(
     Array.from(salesMap.values())
       .filter((s) => s.isPending)
       .map((s) => s.clientDocument)
-      .filter(Boolean)
+      .filter(Boolean),
   ).size;
 
   const stats = {

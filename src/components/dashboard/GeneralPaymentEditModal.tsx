@@ -347,18 +347,14 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                   <div className="text-xl font-bold text-gray-900">
                     {formatCurrency(totalValue)}
                   </div>
-                  <div className="text-sm text-gray-600">
-                    Valor Total
-                  </div>
+                  <div className="text-sm text-gray-600">Valor Total</div>
                 </div>
 
                 <div className="text-center p-4 bg-white rounded-lg shadow-sm h-20 flex flex-col justify-center">
                   <div className="text-xl font-bold text-green-600">
                     {formatCurrency(newTotalReceived)}
                   </div>
-                  <div className="text-sm text-gray-600">
-                    Novo Recebido
-                  </div>
+                  <div className="text-sm text-gray-600">Novo Recebido</div>
                   {totalDifference !== 0 && (
                     <div
                       className={`text-xs font-medium mt-1 ${totalDifference > 0 ? "text-green-600" : "text-red-600"}`}
@@ -373,18 +369,14 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                   <div className="text-xl font-bold text-red-600">
                     {formatCurrency(newTotalPending)}
                   </div>
-                  <div className="text-sm text-gray-600">
-                    Novo Pendente
-                  </div>
+                  <div className="text-sm text-gray-600">Novo Pendente</div>
                 </div>
 
                 <div className="text-center p-4 bg-white rounded-lg shadow-sm h-20 flex flex-col justify-center">
                   <div className="text-xl font-bold text-purple-600">
                     {changes.length}
                   </div>
-                  <div className="text-sm text-gray-600">
-                    Alterações
-                  </div>
+                  <div className="text-sm text-gray-600">Alterações</div>
                 </div>
               </div>
 

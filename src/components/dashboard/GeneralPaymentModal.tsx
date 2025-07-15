@@ -176,7 +176,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
         parseFloat(distributionAmount) || 0,
         "dinheiro", // Valor padrão, pode ser adicionado ao formulário futuramente
         `Distribuição geral de ${formatCurrency(parseFloat(distributionAmount) || 0)}`,
-        user.id
+        user.id,
       );
 
       // Notificação de sucesso

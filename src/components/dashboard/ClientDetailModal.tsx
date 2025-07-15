@@ -45,7 +45,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   const [authError, setAuthError] = useState("");
   const [isRequestingAuth, setIsRequestingAuth] = useState(false);
   const [authRequestSent, setAuthRequestSent] = useState(false);
-  const [showApprovalNotification, setShowApprovalNotification] = useState(false);
+  const [showApprovalNotification, setShowApprovalNotification] =
+    useState(false);
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [approvedToken, setApprovedToken] = useState("");
   const [processedApprovalToken, setProcessedApprovalToken] = useState("");
@@ -54,20 +55,23 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   React.useEffect(() => {
     const handleTokenApproved = (event: CustomEvent) => {
       const approvedRequest = event.detail;
-      if (approvedRequest.clientDocument === clientGroup.document && authRequestSent) {
+      if (
+        approvedRequest.clientDocument === clientGroup.document &&
+        authRequestSent
+      ) {
         setApprovedToken(approvedRequest.token);
         setProcessedApprovalToken(approvedRequest.token);
         setShowApprovalNotification(true);
         setAuthToken(approvedRequest.token);
-        
+
         // Notificação do navegador
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('Token Aprovado!', {
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("Token Aprovado!", {
             body: `Seu token ${approvedRequest.token} foi aprovado pelo gerente.`,
-            icon: '/icon_aplicativo.png'
+            icon: "/icon_aplicativo.png",
           });
         }
-        
+
         // Auto-hide notification after 10 seconds
         setTimeout(() => {
           setShowApprovalNotification(false);
@@ -77,15 +81,18 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
     const handleTokenRejected = (event: CustomEvent) => {
       const rejectedRequest = event.detail;
-      if (rejectedRequest.clientDocument === clientGroup.document && authRequestSent) {
+      if (
+        rejectedRequest.clientDocument === clientGroup.document &&
+        authRequestSent
+      ) {
         setShowRejectionModal(true);
         setShowAuthModal(false); // Esconder modal de solicitação
-        
+
         // Notificação do navegador
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('Token Rejeitado', {
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("Token Rejeitado", {
             body: `Seu token ${rejectedRequest.token} foi rejeitado pelo gerente.`,
-            icon: '/icon_aplicativo.png'
+            icon: "/icon_aplicativo.png",
           });
         }
       }
@@ -95,83 +102,115 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       if (authRequestSent && user) {
         try {
           // Buscar solicitações do usuário atual para este cliente
-          const { data } = await AuthorizationHistoryService.getAuthorizationHistory({
-            searchTerm: clientGroup.document,
-            status: 'all'
-          });
-          
-          const userRequests = data.filter((req: any) => 
-            req.collector_id === user.id &&
-            req.client_document === clientGroup.document
+          const { data } =
+            await AuthorizationHistoryService.getAuthorizationHistory({
+              searchTerm: clientGroup.document,
+              status: "all",
+            });
+
+          const userRequests = data.filter(
+            (req: any) =>
+              req.collector_id === user.id &&
+              req.client_document === clientGroup.document,
           );
-          
+
           // Verificar aprovações
-          const approvedRequest = userRequests.find((req: any) => 
-            req.status === 'approved' &&
-            new Date(req.expires_at) > new Date()
+          const approvedRequest = userRequests.find(
+            (req: any) =>
+              req.status === "approved" &&
+              new Date(req.expires_at) > new Date(),
           );
-          
-          if (approvedRequest && processedApprovalToken !== approvedRequest.token) {
+
+          if (
+            approvedRequest &&
+            processedApprovalToken !== approvedRequest.token
+          ) {
             setApprovedToken(approvedRequest.token);
             setProcessedApprovalToken(approvedRequest.token);
             setShowApprovalNotification(true);
             setAuthToken(approvedRequest.token);
-            
+
             // Notificação do navegador
-            if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification('Token Aprovado!', {
+            if (
+              "Notification" in window &&
+              Notification.permission === "granted"
+            ) {
+              new Notification("Token Aprovado!", {
                 body: `Seu token ${approvedRequest.token} foi aprovado pelo gerente.`,
-                icon: '/icon_aplicativo.png'
+                icon: "/icon_aplicativo.png",
               });
             }
-            
+
             // Auto-hide notification after 10 seconds
             setTimeout(() => {
               setShowApprovalNotification(false);
             }, 10000);
           }
-          
+
           // Verificar rejeições
-          const rejectedRequest = userRequests.find((req: any) => 
-            req.status === 'rejected' &&
-            new Date(req.processed_at) > new Date(Date.now() - 30000) // Rejeitado nos últimos 30 segundos
+          const rejectedRequest = userRequests.find(
+            (req: any) =>
+              req.status === "rejected" &&
+              new Date(req.processed_at) > new Date(Date.now() - 30000), // Rejeitado nos últimos 30 segundos
           );
-          
+
           if (rejectedRequest && !showRejectionModal) {
             setShowRejectionModal(true);
             setShowAuthModal(false); // Esconder modal de solicitação
-            
+
             // Notificação do navegador
-            if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification('Token Rejeitado', {
+            if (
+              "Notification" in window &&
+              Notification.permission === "granted"
+            ) {
+              new Notification("Token Rejeitado", {
                 body: `Seu token ${rejectedRequest.token} foi rejeitado pelo gerente.`,
-                icon: '/icon_aplicativo.png'
+                icon: "/icon_aplicativo.png",
               });
             }
           }
         } catch (error) {
-          console.error('Erro ao verificar status de token:', error);
+          console.error("Erro ao verificar status de token:", error);
         }
       }
     };
 
     // Listeners para aprovação e rejeição imediatas
-    window.addEventListener('tokenApproved', handleTokenApproved as EventListener);
-    window.addEventListener('tokenRejected', handleTokenRejected as EventListener);
-    
+    window.addEventListener(
+      "tokenApproved",
+      handleTokenApproved as EventListener,
+    );
+    window.addEventListener(
+      "tokenRejected",
+      handleTokenRejected as EventListener,
+    );
+
     // Fallback: verificar periodicamente
     const interval = setInterval(checkTokenStatus, 3000);
-    
+
     return () => {
-      window.removeEventListener('tokenApproved', handleTokenApproved as EventListener);
-      window.removeEventListener('tokenRejected', handleTokenRejected as EventListener);
+      window.removeEventListener(
+        "tokenApproved",
+        handleTokenApproved as EventListener,
+      );
+      window.removeEventListener(
+        "tokenRejected",
+        handleTokenRejected as EventListener,
+      );
       clearInterval(interval);
     };
-  }, [authRequestSent, clientGroup.document, showApprovalNotification, showRejectionModal, user, processedApprovalToken]);
+  }, [
+    authRequestSent,
+    clientGroup.document,
+    showApprovalNotification,
+    showRejectionModal,
+    user,
+    processedApprovalToken,
+  ]);
 
   // Solicitar permissão para notificações
   React.useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
+    if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
   }, []);
@@ -237,44 +276,49 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   // Função para solicitar autorização do gerente
   const requestManagerAuth = async () => {
     if (!user) return;
-    
+
     setIsRequestingAuth(true);
     setAuthError("");
-    
+
     try {
       // Primeiro, expirar qualquer solicitação anterior pendente para este cliente e cobrador
-      await AuthorizationHistoryService.expirePreviousRequests(user.id, clientGroup.document);
-      
+      await AuthorizationHistoryService.expirePreviousRequests(
+        user.id,
+        clientGroup.document,
+      );
+
       // Gerar token único
       const token = generateToken();
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutos
-      
+
       // Criar solicitação no Supabase
-      const authRequest = await AuthorizationHistoryService.createAuthorizationRequest({
-        token,
-        collector_id: user.id,
-        collector_name: user.name,
-        client_name: clientGroup.client,
-        client_document: clientGroup.document,
-        expires_at: expiresAt
-      });
-      
+      const authRequest =
+        await AuthorizationHistoryService.createAuthorizationRequest({
+          token,
+          collector_id: user.id,
+          collector_name: user.name,
+          client_name: clientGroup.client,
+          client_document: clientGroup.document,
+          expires_at: expiresAt,
+        });
+
       // Disparar evento para notificar o gerente
-      window.dispatchEvent(new CustomEvent("authRequestCreated", { 
-        detail: {
-          token: authRequest.token,
-          collectorName: authRequest.collector_name,
-          clientName: authRequest.client_name,
-          clientDocument: authRequest.client_document
-        }
-      }));
-      
+      window.dispatchEvent(
+        new CustomEvent("authRequestCreated", {
+          detail: {
+            token: authRequest.token,
+            collectorName: authRequest.collector_name,
+            clientName: authRequest.client_name,
+            clientDocument: authRequest.client_document,
+          },
+        }),
+      );
+
       setAuthRequestSent(true);
       setProcessedApprovalToken("");
       setAuthError("");
-      
     } catch (error) {
-      console.error('Erro ao solicitar autorização:', error);
+      console.error("Erro ao solicitar autorização:", error);
       setAuthError("Erro ao solicitar autorização. Tente novamente.");
     } finally {
       setIsRequestingAuth(false);
@@ -284,10 +328,11 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   // Função para validar token inserido
   const validateToken = async () => {
     if (!authToken) return;
-    
+
     try {
-      const { isValid, authorization, error } = await AuthorizationHistoryService.validateToken(authToken);
-      
+      const { isValid, authorization, error } =
+        await AuthorizationHistoryService.validateToken(authToken);
+
       if (isValid && authorization) {
         // Token válido e aprovado
         setAuthError("");
@@ -295,16 +340,15 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         setAuthToken("");
         setAuthRequestSent(false);
         setIsGeneralEditModalOpen(true);
-        
+
         // Marcar token como usado (opcional - ou deixar expirar naturalmente)
         // await AuthorizationHistoryService.markTokenAsUsed(authToken);
-        
       } else {
         // Token inválido
         setAuthError(error || "Token inválido.");
       }
     } catch (error) {
-      console.error('Erro ao validar token:', error);
+      console.error("Erro ao validar token:", error);
       setAuthError("Erro ao validar token. Tente novamente.");
     }
   };
@@ -383,7 +427,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   title="Distribuir pagamento entre parcelas"
                 >
                   <CreditCard className="h-5 w-5 mr-2" />
-                  <span className="text-xs sm:text-sm">Distribuir Pagamento</span>
+                  <span className="text-xs sm:text-sm">
+                    Distribuir Pagamento
+                  </span>
                 </button>
               )}
 
@@ -394,7 +440,11 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   name="editPayments"
                   onClick={handleEditPaymentClick}
                   className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium shadow-sm"
-                  title={(userType as "manager" | "collector") === "manager" ? "Editar valores recebidos" : "Solicitar autorização para editar pagamentos"}
+                  title={
+                    (userType as "manager" | "collector") === "manager"
+                      ? "Editar valores recebidos"
+                      : "Solicitar autorização para editar pagamentos"
+                  }
                 >
                   <Edit className="h-5 w-5 mr-2" />
                   <span className="text-xs sm:text-sm">Editar Pagamentos</span>
@@ -653,24 +703,26 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-4">
               Autorização Necessária
             </h3>
-            
+
             {!authRequestSent ? (
               <>
                 <p className="text-gray-600 mb-4">
-                  Para editar pagamentos, é necessária autorização do gerente. 
+                  Para editar pagamentos, é necessária autorização do gerente.
                   Clique no botão abaixo para solicitar um token de autorização.
                 </p>
                 <p className="text-xs sm:text-sm text-amber-600 mb-4">
                   ⚠️ O token expira em 5 minutos após a aprovação.
                 </p>
-                
+
                 <div className="space-y-4">
                   {authError && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                      <p className="text-xs sm:text-sm text-red-700">{authError}</p>
+                      <p className="text-xs sm:text-sm text-red-700">
+                        {authError}
+                      </p>
                     </div>
                   )}
-                  
+
                   <div className="flex gap-3">
                     <button
                       id="cancel-auth"
@@ -692,7 +744,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       disabled={isRequestingAuth}
                       className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isRequestingAuth ? "Solicitando..." : "Solicitar Autorização"}
+                      {isRequestingAuth
+                        ? "Solicitando..."
+                        : "Solicitar Autorização"}
                     </button>
                   </div>
                 </div>
@@ -703,8 +757,16 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 animate-pulse">
                     <div className="flex items-center">
                       <div className="bg-blue-500 rounded-full p-1 mr-3">
-                        <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                        <svg
+                          className="h-4 w-4 text-white"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
                         </svg>
                       </div>
                       <div>
@@ -712,7 +774,11 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                           Token Aprovado pelo Gerente!
                         </p>
                         <p className="text-xs sm:text-sm text-blue-600">
-                          Token: <span className="font-mono font-bold">{approvedToken}</span> - Token preenchido automaticamente
+                          Token:{" "}
+                          <span className="font-mono font-bold">
+                            {approvedToken}
+                          </span>{" "}
+                          - Token preenchido automaticamente
                         </p>
                       </div>
                     </div>
@@ -721,15 +787,16 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   !approvedToken && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
                       <p className="text-xs sm:text-sm text-green-700">
-                        ✅ Solicitação enviada para o gerente! Aguarde a aprovação.
+                        ✅ Solicitação enviada para o gerente! Aguarde a
+                        aprovação.
                       </p>
                     </div>
                   )
-                )}      
-                
+                )}
+
                 <div className="space-y-4">
                   <div>
-                    <label 
+                    <label
                       htmlFor="auth-token"
                       className="block text-xs sm:text-sm font-medium text-gray-700 mb-2"
                     >
@@ -740,20 +807,26 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       name="authToken"
                       type="text"
                       value={authToken}
-                      onChange={(e) => setAuthToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      onChange={(e) =>
+                        setAuthToken(
+                          e.target.value.replace(/\D/g, "").slice(0, 6),
+                        )
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-sm sm:text-lg font-mono"
                       placeholder="000000"
                       maxLength={6}
-                      onKeyDown={(e) => e.key === 'Enter' && validateToken()}
+                      onKeyDown={(e) => e.key === "Enter" && validateToken()}
                     />
                   </div>
-                  
+
                   {authError && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                      <p className="text-xs sm:text-sm text-red-700">{authError}</p>
+                      <p className="text-xs sm:text-sm text-red-700">
+                        {authError}
+                      </p>
                     </div>
                   )}
-                  
+
                   <div className="flex gap-3">
                     <button
                       id="cancel-auth"
@@ -778,7 +851,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       Validar Token
                     </button>
                   </div>
-                  
+
                   <button
                     id="new-request"
                     name="newRequest"
@@ -828,8 +901,18 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
             <div className="text-center">
               <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
-                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="h-6 w-6 text-red-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth="1.5"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </div>
               <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-2">

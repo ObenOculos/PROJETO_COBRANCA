@@ -189,7 +189,8 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
                 Receber Pagamento da Venda
               </h2>
               <p className="text-sm text-green-100 truncate">
-                Venda #{saleGroup.saleNumber} - {saleGroup.installments[0]?.cliente}
+                Venda #{saleGroup.saleNumber} -{" "}
+                {saleGroup.installments[0]?.cliente}
               </p>
             </div>
           </div>
@@ -215,21 +216,27 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
                   <div className="text-lg sm:text-xl font-bold text-gray-900">
                     {formatCurrency(saleBalance.totalValue)}
                   </div>
-                  <div className="text-xs sm:text-sm text-gray-600">Valor Total</div>
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Valor Total
+                  </div>
                 </div>
 
                 <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
                   <div className="text-lg sm:text-xl font-bold text-green-600">
                     {formatCurrency(saleBalance.totalPaid)}
                   </div>
-                  <div className="text-xs sm:text-sm text-gray-600">Já Recebido</div>
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Já Recebido
+                  </div>
                 </div>
 
                 <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
                   <div className="text-lg sm:text-xl font-bold text-red-600">
                     {formatCurrency(saleBalance.remainingBalance)}
                   </div>
-                  <div className="text-xs sm:text-sm text-gray-600">Saldo Devedor</div>
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Saldo Devedor
+                  </div>
                 </div>
               </div>
 
@@ -299,14 +306,20 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setPaymentAmount("100"); setShowPreview(true); }}
+                  onClick={() => {
+                    setPaymentAmount("100");
+                    setShowPreview(true);
+                  }}
                   className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
                 >
                   R$ 100
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setPaymentAmount("500"); setShowPreview(true); }}
+                  onClick={() => {
+                    setPaymentAmount("500");
+                    setShowPreview(true);
+                  }}
                   className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
                 >
                   R$ 500
@@ -374,7 +387,8 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
                               Parcela {item.installment.parcela}
                             </h4>
                             <div className="text-sm text-gray-600">
-                              Venc: {formatDate(item.installment.data_vencimento)}
+                              Venc:{" "}
+                              {formatDate(item.installment.data_vencimento)}
                             </div>
                           </div>
                           <div className="text-right">
@@ -425,7 +439,8 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
                       </div>
                     ))}
 
-                    {parseFloat(paymentAmount) > saleBalance.remainingBalance && (
+                    {parseFloat(paymentAmount) >
+                      saleBalance.remainingBalance && (
                       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                         <div className="flex items-center text-yellow-800">
                           <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
@@ -434,8 +449,10 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
                           </span>
                         </div>
                         <p className="text-yellow-700 text-sm mt-1">
-                          O valor excede o saldo em {formatCurrency(
-                            parseFloat(paymentAmount) - saleBalance.remainingBalance
+                          O valor excede o saldo em{" "}
+                          {formatCurrency(
+                            parseFloat(paymentAmount) -
+                              saleBalance.remainingBalance,
                           )}
                         </p>
                       </div>
@@ -444,7 +461,9 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Todas as parcelas já estão quitadas</p>
+                    <p className="text-sm">
+                      Todas as parcelas já estão quitadas
+                    </p>
                   </div>
                 )}
               </div>

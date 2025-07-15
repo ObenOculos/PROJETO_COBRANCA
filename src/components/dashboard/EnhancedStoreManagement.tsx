@@ -19,23 +19,67 @@ import { formatCurrency } from "../../utils/formatters";
 
 // Função auxiliar para converter números em extenso
 const numeroParaExtenso = (num: number): string => {
-  const unidades = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
-  const dezenas = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
-  const dezenasEspeciais = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
-  const centenas = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
-  
-  if (num === 0) return 'zero';
-  if (num === 100) return 'cem';
-  if (num === 1000) return 'mil';
-  
+  const unidades = [
+    "",
+    "um",
+    "dois",
+    "três",
+    "quatro",
+    "cinco",
+    "seis",
+    "sete",
+    "oito",
+    "nove",
+  ];
+  const dezenas = [
+    "",
+    "",
+    "vinte",
+    "trinta",
+    "quarenta",
+    "cinquenta",
+    "sessenta",
+    "setenta",
+    "oitenta",
+    "noventa",
+  ];
+  const dezenasEspeciais = [
+    "dez",
+    "onze",
+    "doze",
+    "treze",
+    "quatorze",
+    "quinze",
+    "dezesseis",
+    "dezessete",
+    "dezoito",
+    "dezenove",
+  ];
+  const centenas = [
+    "",
+    "cento",
+    "duzentos",
+    "trezentos",
+    "quatrocentos",
+    "quinhentos",
+    "seiscentos",
+    "setecentos",
+    "oitocentos",
+    "novecentos",
+  ];
+
+  if (num === 0) return "zero";
+  if (num === 100) return "cem";
+  if (num === 1000) return "mil";
+
   const partes = [];
-  
+
   // Centenas
   const c = Math.floor(num / 100);
   if (c > 0) {
     partes.push(centenas[c]);
   }
-  
+
   // Dezenas e unidades
   const resto = num % 100;
   if (resto >= 10 && resto <= 19) {
@@ -46,48 +90,48 @@ const numeroParaExtenso = (num: number): string => {
     if (d > 0) partes.push(dezenas[d]);
     if (u > 0) partes.push(unidades[u]);
   }
-  
-  return partes.join(' e ');
+
+  return partes.join(" e ");
 };
 
 // Função para formatar valores grandes em mobile
 const formatMobileCurrency = (value: number) => {
   const isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
-  
+
   if (!isMobile) {
     return formatCurrency(value, false);
   }
-  
+
   const intValue = Math.floor(value);
-  
+
   if (intValue === 0) {
-    return 'R$ 0';
+    return "R$ 0";
   }
-  
+
   // Determinar a escala e formatar
-  let mainValue = '';
+  let mainValue = "";
   let extensoParts = [];
-  
+
   if (intValue >= 1000000) {
     // Milhões
     const milhoes = Math.floor(intValue / 1000000);
     const resto = intValue % 1000000;
     mainValue = `R$ ${milhoes}M`;
-    
+
     if (resto > 0) {
       const milRestantes = Math.floor(resto / 1000);
       const unidadesRestantes = resto % 1000;
-      
+
       if (milRestantes > 0) {
         const milExtenso = numeroParaExtenso(milRestantes);
         extensoParts.push(`${milExtenso} mil`);
       }
-      
+
       if (unidadesRestantes > 0) {
         const unidadesExtenso = numeroParaExtenso(unidadesRestantes);
         extensoParts.push(`${unidadesExtenso} reais`);
       } else if (extensoParts.length > 0) {
-        extensoParts.push('reais');
+        extensoParts.push("reais");
       }
     }
   } else if (intValue >= 10000) {
@@ -95,7 +139,7 @@ const formatMobileCurrency = (value: number) => {
     const mil = Math.floor(intValue / 1000);
     const resto = intValue % 1000;
     mainValue = `R$ ${mil} mil`;
-    
+
     if (resto > 0) {
       const restoExtenso = numeroParaExtenso(resto);
       extensoParts.push(`${restoExtenso} reais`);
@@ -105,7 +149,7 @@ const formatMobileCurrency = (value: number) => {
     const mil = Math.floor(intValue / 1000);
     const resto = intValue % 1000;
     mainValue = `R$ ${mil} mil`;
-    
+
     if (resto > 0) {
       const restoExtenso = numeroParaExtenso(resto);
       extensoParts.push(`${restoExtenso} reais`);
@@ -114,9 +158,9 @@ const formatMobileCurrency = (value: number) => {
     // Menos de mil
     return `R$ ${intValue}`;
   }
-  
-  const extensoText = extensoParts.join(' e ');
-  
+
+  const extensoText = extensoParts.join(" e ");
+
   return (
     <div className="flex flex-col items-start">
       <span className="text-2xl font-semibold">{mainValue}</span>
@@ -250,7 +294,7 @@ const EnhancedStoreManagement: React.FC = () => {
         salesArray
           .filter((s) => s.isPending)
           .map((s) => s.clientDocument || s.clientName)
-          .filter(Boolean)
+          .filter(Boolean),
       ).size;
 
       const totalCollections = salesArray.length;
@@ -262,8 +306,10 @@ const EnhancedStoreManagement: React.FC = () => {
       const pendingAmount = totalAmount - receivedAmount;
       const conversionRate =
         salesArray.length > 0 ? (completedSales / salesArray.length) * 100 : 0;
-      const efficiency = totalAmount > 0 ? (receivedAmount / totalAmount) * 100 : 0;
-      const averageTicket = salesArray.length > 0 ? totalAmount / salesArray.length : 0;
+      const efficiency =
+        totalAmount > 0 ? (receivedAmount / totalAmount) * 100 : 0;
+      const averageTicket =
+        salesArray.length > 0 ? totalAmount / salesArray.length : 0;
       const clientsCount = new Set(
         salesArray.map((s) => s.clientDocument || s.clientName).filter(Boolean),
       ).size;
@@ -366,7 +412,7 @@ const EnhancedStoreManagement: React.FC = () => {
     // Headers with better formatting
     const headers = [
       "Loja",
-      "Cobrador", 
+      "Cobrador",
       "Status Atribuição",
       "Total de Vendas",
       "Vendas Finalizadas",
@@ -378,14 +424,18 @@ const EnhancedStoreManagement: React.FC = () => {
       "Valor Pendente (R$)",
       "Total de Clientes",
       "Eficiência (%)",
-      "Ticket Médio (R$)"
+      "Ticket Médio (R$)",
     ];
 
     // Data rows with proper formatting
     const rows = storeStats.map((s) => [
       s.storeName,
       s.collectorName,
-      s.isFormalAssignment ? "Formal" : s.assignedCollector ? "Informal" : "Não Atribuído",
+      s.isFormalAssignment
+        ? "Formal"
+        : s.assignedCollector
+          ? "Informal"
+          : "Não Atribuído",
       s.totalSales.toString(),
       s.completedSales.toString(),
       s.pendingSales.toString(),
@@ -395,28 +445,32 @@ const EnhancedStoreManagement: React.FC = () => {
       s.receivedAmount.toFixed(2),
       s.pendingAmount.toFixed(2),
       s.clientsCount.toString(),
-      s.totalAmount > 0 ? ((s.receivedAmount / s.totalAmount) * 100).toFixed(1) : "0",
-      s.totalSales > 0 ? (s.totalAmount / s.totalSales).toFixed(2) : "0"
+      s.totalAmount > 0
+        ? ((s.receivedAmount / s.totalAmount) * 100).toFixed(1)
+        : "0",
+      s.totalSales > 0 ? (s.totalAmount / s.totalSales).toFixed(2) : "0",
     ]);
 
     // Create CSV content with proper encoding
     const csvContent = [
       headers.join(","),
-      ...rows.map(row => 
-        row.map(cell => {
-          // Escape quotes and wrap in quotes if contains comma, quote, or newline
-          const escaped = cell.toString().replace(/"/g, '""');
-          return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
-        }).join(",")
-      )
+      ...rows.map((row) =>
+        row
+          .map((cell) => {
+            // Escape quotes and wrap in quotes if contains comma, quote, or newline
+            const escaped = cell.toString().replace(/"/g, '""');
+            return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
+          })
+          .join(","),
+      ),
     ].join("\n");
 
     // Add BOM for proper UTF-8 encoding in Excel
     const BOM = "\uFEFF";
-    const blob = new Blob([BOM + csvContent], { 
-      type: "text/csv;charset=utf-8;" 
+    const blob = new Blob([BOM + csvContent], {
+      type: "text/csv;charset=utf-8;",
     });
-    
+
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `relatorio-lojas-${new Date().toISOString().split("T")[0]}.csv`;
@@ -446,7 +500,7 @@ const EnhancedStoreManagement: React.FC = () => {
               Performance e status das {overviewStats.totalStores} lojas
             </p>
           </div>
-          
+
           {/* Ações Principais */}
           <div className="flex items-center gap-2">
             {overviewStats.unassignedStores > 0 && (
@@ -455,7 +509,7 @@ const EnhancedStoreManagement: React.FC = () => {
                 {overviewStats.unassignedStores} sem atribuição
               </span>
             )}
-            
+
             <button
               onClick={exportStoreData}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
@@ -471,7 +525,9 @@ const EnhancedStoreManagement: React.FC = () => {
       <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-blue-100 text-sm font-medium">Taxa de Conversão Média</p>
+            <p className="text-blue-100 text-sm font-medium">
+              Taxa de Conversão Média
+            </p>
             <p className="text-4xl font-bold mt-1">
               {overviewStats.avgConversionRate.toFixed(1)}%
             </p>
@@ -481,16 +537,20 @@ const EnhancedStoreManagement: React.FC = () => {
           </div>
           <Award className="h-16 w-16 text-blue-200 opacity-50" />
         </div>
-        
+
         {/* Métricas secundárias */}
         <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-4 mt-6 pt-6 border-t border-blue-400">
           <div>
             <p className="text-blue-100 text-xs">Receita</p>
-            <div className="text-2xl font-semibold">{formatMobileCurrency(overviewStats.totalRevenue)}</div>
+            <div className="text-2xl font-semibold">
+              {formatMobileCurrency(overviewStats.totalRevenue)}
+            </div>
           </div>
           <div>
             <p className="text-blue-100 text-xs">Atribuídas</p>
-            <p className="text-2xl font-semibold">{overviewStats.assignedStores}</p>
+            <p className="text-2xl font-semibold">
+              {overviewStats.assignedStores}
+            </p>
           </div>
           <div>
             <p className="text-blue-100 text-xs">Vendas</p>
@@ -525,12 +585,12 @@ const EnhancedStoreManagement: React.FC = () => {
               <option value="conversionRate">Taxa</option>
               <option value="totalAmount">Valor</option>
             </select>
-            
+
             <button
               onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
               className={`flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200 ${
-                sortOrder === "desc" 
-                  ? "bg-blue-100 text-blue-600 hover:bg-blue-200" 
+                sortOrder === "desc"
+                  ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
               title={sortOrder === "desc" ? "Decrescente" : "Crescente"}
@@ -546,7 +606,9 @@ const EnhancedStoreManagement: React.FC = () => {
           {/* Contador */}
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <BarChart3 className="h-4 w-4" />
-            <span className="font-medium">{filteredAndSortedStores.length}</span>
+            <span className="font-medium">
+              {filteredAndSortedStores.length}
+            </span>
             <span className="hidden sm:inline">lojas</span>
           </div>
         </div>
@@ -554,7 +616,6 @@ const EnhancedStoreManagement: React.FC = () => {
 
       {/* Lista de Lojas */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-
         {filteredAndSortedStores.map((store) => {
           const isExpanded = expandedCards.has(store.storeName);
           const isUnassigned = !store.assignedCollector;
@@ -566,10 +627,10 @@ const EnhancedStoreManagement: React.FC = () => {
                 isUnassigned
                   ? "border-amber-200 hover:border-amber-300"
                   : store.conversionRate >= 70
-                  ? "border-green-200 hover:border-green-300"
-                  : store.conversionRate >= 40
-                  ? "border-blue-200 hover:border-blue-300"
-                  : "border-red-200 hover:border-red-300"
+                    ? "border-green-200 hover:border-green-300"
+                    : store.conversionRate >= 40
+                      ? "border-blue-200 hover:border-blue-300"
+                      : "border-red-200 hover:border-red-300"
               }`}
             >
               <div className="p-5">
@@ -577,11 +638,17 @@ const EnhancedStoreManagement: React.FC = () => {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                      <Store className={`h-5 w-5 ${
-                        isUnassigned ? "text-amber-600" : 
-                        store.conversionRate >= 70 ? "text-green-600" :
-                        store.conversionRate >= 40 ? "text-blue-600" : "text-red-600"
-                      }`} />
+                      <Store
+                        className={`h-5 w-5 ${
+                          isUnassigned
+                            ? "text-amber-600"
+                            : store.conversionRate >= 70
+                              ? "text-green-600"
+                              : store.conversionRate >= 40
+                                ? "text-blue-600"
+                                : "text-red-600"
+                        }`}
+                      />
                       {store.storeName}
                       {isUnassigned && (
                         <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full font-medium">
@@ -592,17 +659,24 @@ const EnhancedStoreManagement: React.FC = () => {
                     <p className="text-sm text-gray-600 mt-1">
                       {store.collectorName}
                       {store.isFormalAssignment && !isUnassigned && (
-                        <span className="text-xs text-green-600 ml-1">(Formal)</span>
+                        <span className="text-xs text-green-600 ml-1">
+                          (Formal)
+                        </span>
                       )}
                     </p>
                   </div>
-                  
+
                   {/* Métrica Principal Destacada */}
                   <div className="text-right">
-                    <div className={`text-3xl font-bold ${
-                      store.conversionRate >= 70 ? "text-green-600" :
-                      store.conversionRate >= 40 ? "text-blue-600" : "text-red-600"
-                    }`}>
+                    <div
+                      className={`text-3xl font-bold ${
+                        store.conversionRate >= 70
+                          ? "text-green-600"
+                          : store.conversionRate >= 40
+                            ? "text-blue-600"
+                            : "text-red-600"
+                      }`}
+                    >
                       {store.conversionRate.toFixed(1)}%
                     </div>
                     <div className="text-xs text-gray-500">conversão</div>
@@ -617,7 +691,9 @@ const EnhancedStoreManagement: React.FC = () => {
                         <FileText className="h-4 w-4 text-gray-600" />
                       </div>
                       <div>
-                        <div className="text-lg font-bold text-gray-900">{store.totalSales}</div>
+                        <div className="text-lg font-bold text-gray-900">
+                          {store.totalSales}
+                        </div>
                         <div className="text-xs text-gray-600">vendas</div>
                       </div>
                     </div>
@@ -626,8 +702,12 @@ const EnhancedStoreManagement: React.FC = () => {
                         <CheckCircle className="h-4 w-4 text-green-600" />
                       </div>
                       <div>
-                        <div className="text-lg font-bold text-green-700">{store.completedSales}</div>
-                        <div className="text-xs text-green-600">finalizadas</div>
+                        <div className="text-lg font-bold text-green-700">
+                          {store.completedSales}
+                        </div>
+                        <div className="text-xs text-green-600">
+                          finalizadas
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center p-3 bg-orange-50 rounded-lg">
@@ -635,7 +715,9 @@ const EnhancedStoreManagement: React.FC = () => {
                         <AlertCircle className="h-4 w-4 text-orange-600" />
                       </div>
                       <div>
-                        <div className="text-lg font-bold text-orange-700">{store.pendingSales}</div>
+                        <div className="text-lg font-bold text-orange-700">
+                          {store.pendingSales}
+                        </div>
                         <div className="text-xs text-orange-600">pendentes</div>
                       </div>
                     </div>
@@ -644,7 +726,9 @@ const EnhancedStoreManagement: React.FC = () => {
                         <Users className="h-4 w-4 text-purple-600" />
                       </div>
                       <div>
-                        <div className="text-lg font-bold text-purple-700">{store.clientsCount}</div>
+                        <div className="text-lg font-bold text-purple-700">
+                          {store.clientsCount}
+                        </div>
                         <div className="text-xs text-purple-600">clientes</div>
                       </div>
                     </div>
@@ -678,32 +762,57 @@ const EnhancedStoreManagement: React.FC = () => {
                       <BarChart3 className="h-4 w-4 text-gray-500 mr-2 sm:block hidden" />
                       <div className="text-center">
                         <div className="text-xs text-gray-600">Total</div>
-                        <div className="text-sm font-bold text-gray-900 sm:block hidden">{formatCurrency(store.totalAmount)}</div>
-                        <div className="text-sm font-bold text-gray-900 sm:hidden">{formatCurrency(store.totalAmount, false).replace(/,\d{2}$/, '')}</div>
+                        <div className="text-sm font-bold text-gray-900 sm:block hidden">
+                          {formatCurrency(store.totalAmount)}
+                        </div>
+                        <div className="text-sm font-bold text-gray-900 sm:hidden">
+                          {formatCurrency(store.totalAmount, false).replace(
+                            /,\d{2}$/,
+                            "",
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center">
                       <CheckCircle className="h-4 w-4 text-green-500 mr-2 sm:block hidden" />
                       <div className="text-center">
                         <div className="text-xs text-green-600">Recebido</div>
-                        <div className="text-sm font-bold text-green-700 sm:block hidden">{formatCurrency(store.receivedAmount)}</div>
-                        <div className="text-sm font-bold text-green-700 sm:hidden">{formatCurrency(store.receivedAmount, false).replace(/,\d{2}$/, '')}</div>
+                        <div className="text-sm font-bold text-green-700 sm:block hidden">
+                          {formatCurrency(store.receivedAmount)}
+                        </div>
+                        <div className="text-sm font-bold text-green-700 sm:hidden">
+                          {formatCurrency(store.receivedAmount, false).replace(
+                            /,\d{2}$/,
+                            "",
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center">
                       <AlertCircle className="h-4 w-4 text-red-500 mr-2 sm:block hidden" />
                       <div className="text-center">
                         <div className="text-xs text-red-600">Pendente</div>
-                        <div className="text-sm font-bold text-red-700 sm:block hidden">{formatCurrency(store.pendingAmount)}</div>
-                        <div className="text-sm font-bold text-red-700 sm:hidden">{formatCurrency(store.pendingAmount, false).replace(/,\d{2}$/, '')}</div>
+                        <div className="text-sm font-bold text-red-700 sm:block hidden">
+                          {formatCurrency(store.pendingAmount)}
+                        </div>
+                        <div className="text-sm font-bold text-red-700 sm:hidden">
+                          {formatCurrency(store.pendingAmount, false).replace(
+                            /,\d{2}$/,
+                            "",
+                          )}
+                        </div>
                       </div>
                     </div>
                     <button
                       onClick={() => toggleCardExpansion(store.storeName)}
                       className={`p-2 rounded-lg transition-colors ${
-                        isExpanded ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        isExpanded
+                          ? "bg-blue-100 text-blue-600"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       }`}
-                      title={isExpanded ? "Ocultar detalhes" : "Ver mais detalhes"}
+                      title={
+                        isExpanded ? "Ocultar detalhes" : "Ver mais detalhes"
+                      }
                     >
                       {isExpanded ? (
                         <ChevronUp className="h-4 w-4" />
@@ -713,7 +822,7 @@ const EnhancedStoreManagement: React.FC = () => {
                     </button>
                   </div>
                 )}
-                
+
                 {/* Detalhes Expandidos com Ícones */}
                 {isExpanded && !isUnassigned && (
                   <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
@@ -726,7 +835,9 @@ const EnhancedStoreManagement: React.FC = () => {
                           <div className="text-lg font-bold text-amber-700">
                             {store.clientsWithPending}
                           </div>
-                          <div className="text-xs text-amber-600">clientes inadimplentes</div>
+                          <div className="text-xs text-amber-600">
+                            clientes inadimplentes
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center p-3 bg-green-50 rounded-lg">
@@ -737,16 +848,20 @@ const EnhancedStoreManagement: React.FC = () => {
                           <div className="text-lg font-bold text-green-700">
                             {formatCurrency(store.averageTicket)}
                           </div>
-                          <div className="text-xs text-green-600">ticket médio</div>
+                          <div className="text-xs text-green-600">
+                            ticket médio
+                          </div>
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
                       <div className="flex items-center justify-between text-sm mb-2">
                         <div className="flex items-center">
                           <Award className="h-4 w-4 text-blue-600 mr-2" />
-                          <span className="text-blue-700 font-medium">Eficiência de Recebimento</span>
+                          <span className="text-blue-700 font-medium">
+                            Eficiência de Recebimento
+                          </span>
                         </div>
                         <span className="font-bold text-blue-900">
                           {store.efficiency.toFixed(1)}%
@@ -755,7 +870,9 @@ const EnhancedStoreManagement: React.FC = () => {
                       <div className="w-full bg-blue-200 rounded-full h-2">
                         <div
                           className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500"
-                          style={{ width: `${Math.min(store.efficiency, 100)}%` }}
+                          style={{
+                            width: `${Math.min(store.efficiency, 100)}%`,
+                          }}
                         />
                       </div>
                     </div>
@@ -770,7 +887,9 @@ const EnhancedStoreManagement: React.FC = () => {
                         <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
                         <div>
                           <div className="font-medium">Loja sem atribuição</div>
-                          <div className="text-sm">Necessário atribuir um cobrador responsável</div>
+                          <div className="text-sm">
+                            Necessário atribuir um cobrador responsável
+                          </div>
                         </div>
                       </div>
                     </div>

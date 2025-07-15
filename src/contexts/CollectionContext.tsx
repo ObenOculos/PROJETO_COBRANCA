@@ -106,35 +106,35 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // Configurar listener em tempo real para mudanças nas tabelas
       console.log("Configurando listeners em tempo real...");
       realtimeChannel = supabase
-        .channel('database_changes')
+        .channel("database_changes")
         .on(
-          'postgres_changes',
+          "postgres_changes",
           {
-            event: '*', // Escutar todos os eventos (INSERT, UPDATE, DELETE)
-            schema: 'public',
-            table: 'BANCO_DADOS'
+            event: "*", // Escutar todos os eventos (INSERT, UPDATE, DELETE)
+            schema: "public",
+            table: "BANCO_DADOS",
           },
           (payload) => {
-            console.log('Mudança detectada na tabela BANCO_DADOS:', payload);
+            console.log("Mudança detectada na tabela BANCO_DADOS:", payload);
             // Atualizar apenas as collections quando houver mudanças
             refreshCollections();
-          }
+          },
         )
         .on(
-          'postgres_changes',
+          "postgres_changes",
           {
-            event: '*', // Escutar todos os eventos (INSERT, UPDATE, DELETE)
-            schema: 'public',
-            table: 'sale_payments'
+            event: "*", // Escutar todos os eventos (INSERT, UPDATE, DELETE)
+            schema: "public",
+            table: "sale_payments",
           },
           (payload) => {
-            console.log('Mudança detectada na tabela sale_payments:', payload);
+            console.log("Mudança detectada na tabela sale_payments:", payload);
             // Atualizar sale payments quando houver mudanças
             fetchSalePayments();
-          }
+          },
         )
         .subscribe((status) => {
-          console.log('Status da conexão em tempo real:', status);
+          console.log("Status da conexão em tempo real:", status);
         });
     } else {
       console.log("Usuário não logado, limpando dados...");
@@ -253,20 +253,40 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         nome_da_loja: row.nome_da_loja,
         data_lancamento: row.data_lancamento,
         data_vencimento: row.data_vencimento,
-        valor_original: parseFloat((row.valor_original || "0").toString().replace(",", ".")),
-        valor_reajustado: parseFloat((row.valor_reajustado || "0").toString().replace(",", ".")),
+        valor_original: parseFloat(
+          (row.valor_original || "0").toString().replace(",", "."),
+        ),
+        valor_reajustado: parseFloat(
+          (row.valor_reajustado || "0").toString().replace(",", "."),
+        ),
         multa: parseFloat((row.multa || "0").toString().replace(",", ".")),
-        juros_por_dia: parseFloat((row.juros_por_dia || "0").toString().replace(",", ".")),
-        multa_aplicada: parseFloat((row.multa_aplicada || "0").toString().replace(",", ".")),
-        juros_aplicado: parseFloat((row.juros_aplicado || "0").toString().replace(",", ".")),
-        valor_recebido: parseFloat((row.valor_recebido || "0").toString().replace(",", ".")),
+        juros_por_dia: parseFloat(
+          (row.juros_por_dia || "0").toString().replace(",", "."),
+        ),
+        multa_aplicada: parseFloat(
+          (row.multa_aplicada || "0").toString().replace(",", "."),
+        ),
+        juros_aplicado: parseFloat(
+          (row.juros_aplicado || "0").toString().replace(",", "."),
+        ),
+        valor_recebido: parseFloat(
+          (row.valor_recebido || "0").toString().replace(",", "."),
+        ),
         data_de_recebimento: row.data_de_recebimento,
         dias_em_atraso: row.dias_em_atraso,
         dias_carencia: parseFloat(row.dias_carencia || "0"),
-        desconto: parseFloat((row.desconto || "0").toString().replace(",", ".")),
-        acrescimo: parseFloat((row.acrescimo || "0").toString().replace(",", ".")),
-        multa_paga: parseFloat((row.multa_paga || "0").toString().replace(",", ".")),
-        juros_pago: parseFloat((row.juros_pago || "0").toString().replace(",", ".")),
+        desconto: parseFloat(
+          (row.desconto || "0").toString().replace(",", "."),
+        ),
+        acrescimo: parseFloat(
+          (row.acrescimo || "0").toString().replace(",", "."),
+        ),
+        multa_paga: parseFloat(
+          (row.multa_paga || "0").toString().replace(",", "."),
+        ),
+        juros_pago: parseFloat(
+          (row.juros_pago || "0").toString().replace(",", "."),
+        ),
         tipo_de_cobranca: row.tipo_de_cobranca,
         numero_titulo: row.numero_titulo,
         parcela: row.parcela,
@@ -752,7 +772,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           const key = `${c.documento}-${c.cliente}`;
           return targetClientKeys.has(key);
         });
-      // Para outros filtros, incluindo 'pendente', usar lógica de cliente
+        // Para outros filtros, incluindo 'pendente', usar lógica de cliente
       } else if (filters.status?.toLowerCase() === "pendente") {
         const clientGroups = new Map<string, Collection[]>();
         filtered.forEach((c) => {
@@ -999,8 +1019,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       clientGroup.totalReceived = roundTo2Decimals(
         clientGroup.totalReceived + collection.valor_recebido,
       );
-
-      
     });
 
     // Calculate pendingValue for each clientGroup and saleGroup after all collections are processed
@@ -1418,22 +1436,26 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }
 
       // Converter para o formato esperado pela aplicação
-      const convertedPayments: SalePayment[] = (payments || []).map(payment => ({
-        id: payment.id,
-        saleNumber: payment.sale_number,
-        clientDocument: payment.client_document,
-        paymentAmount: payment.payment_amount,
-        paymentDate: payment.payment_date,
-        paymentMethod: payment.payment_method,
-        notes: payment.notes,
-        collectorId: payment.collector_id,
-        collectorName: payment.collector_name,
-        createdAt: payment.created_at,
-        distributionDetails: payment.distribution_details || [],
-      }));
+      const convertedPayments: SalePayment[] = (payments || []).map(
+        (payment) => ({
+          id: payment.id,
+          saleNumber: payment.sale_number,
+          clientDocument: payment.client_document,
+          paymentAmount: payment.payment_amount,
+          paymentDate: payment.payment_date,
+          paymentMethod: payment.payment_method,
+          notes: payment.notes,
+          collectorId: payment.collector_id,
+          collectorName: payment.collector_name,
+          createdAt: payment.created_at,
+          distributionDetails: payment.distribution_details || [],
+        }),
+      );
 
       setSalePayments(convertedPayments);
-      console.log(`✅ ${convertedPayments.length} pagamentos carregados da tabela sale_payments`);
+      console.log(
+        `✅ ${convertedPayments.length} pagamentos carregados da tabela sale_payments`,
+      );
     } catch (err) {
       console.error("Erro ao carregar pagamentos de venda:", err);
       setError(
@@ -1613,7 +1635,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // 4. Registrar o pagamento na tabela sale_payments
       const collector = users.find((u) => u.id === collectorId);
       const client = saleInstallments[0]; // Usar primeira parcela para obter dados do cliente
-      
+
       const paymentRecord = {
         sale_number: payment.saleNumber,
         client_document: payment.clientDocument,
@@ -1635,10 +1657,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         .single();
 
       if (paymentError) {
-        console.error("Erro ao registrar pagamento na tabela sale_payments:", paymentError);
+        console.error(
+          "Erro ao registrar pagamento na tabela sale_payments:",
+          paymentError,
+        );
         // Não falhar se não conseguir registrar o histórico, apenas logar
       } else {
-        console.log("✅ Pagamento registrado na tabela sale_payments:", insertedPayment);
+        console.log(
+          "✅ Pagamento registrado na tabela sale_payments:",
+          insertedPayment,
+        );
       }
 
       // 5. Atualizar estado local das collections imediatamente
@@ -1812,7 +1840,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       try {
         const collector = users.find((u) => u.id === collectorId);
         const client = updatedInstallments[0]; // Usar primeira parcela para obter dados do cliente
-        
+
         const affectedSales = [
           ...new Set(distributionDetails.map((d) => d.saleNumber)),
         ];
@@ -1847,10 +1875,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             .single();
 
           if (paymentError) {
-            console.error("Erro ao registrar pagamento na tabela sale_payments:", paymentError);
+            console.error(
+              "Erro ao registrar pagamento na tabela sale_payments:",
+              paymentError,
+            );
             // Não falhar se não conseguir registrar o histórico, apenas logar
           } else {
-            console.log("✅ Pagamento registrado na tabela sale_payments:", insertedPayment);
+            console.log(
+              "✅ Pagamento registrado na tabela sale_payments:",
+              insertedPayment,
+            );
           }
         }
       } catch (historyError) {
@@ -1980,7 +2014,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           const totalReceived = roundTo2Decimals(
             installments.reduce((sum, inst) => sum + inst.valor_recebido, 0),
           );
-          const pendingValue = Math.max(0, roundTo2Decimals(totalValue - totalReceived));
+          const pendingValue = Math.max(
+            0,
+            roundTo2Decimals(totalValue - totalReceived),
+          );
 
           const balance = calculateSaleBalance(saleNumber, clientDocument);
           const payments = getSalePayments(saleNumber, clientDocument);
@@ -2022,7 +2059,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             'relation "scheduled_visits" does not exist',
           )
         ) {
-          console.error("Tabela scheduled_visits não existe. Verifique a estrutura do banco de dados.");
+          console.error(
+            "Tabela scheduled_visits não existe. Verifique a estrutura do banco de dados.",
+          );
           // Estrutura de tabela necessária não encontrada
         }
 
@@ -2166,7 +2205,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Se o status for "realizada", sempre definir a data atual como data da visita realizada
       if (status === "realizada") {
-        updateData.data_visita_realizada = new Date().toISOString().split('T')[0];
+        updateData.data_visita_realizada = new Date()
+          .toISOString()
+          .split("T")[0];
       }
 
       const { error } = await supabase
@@ -2190,7 +2231,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
                 updatedAt: new Date().toISOString(),
                 // Se o status for "realizada", definir a data atual como data da visita realizada
                 ...(status === "realizada" && {
-                  dataVisitaRealizada: new Date().toISOString().split('T')[0]
+                  dataVisitaRealizada: new Date().toISOString().split("T")[0],
                 }),
               }
             : visit,
@@ -2528,7 +2569,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // Buscar dados atualizados do cliente
       const clientData = getClientDataForVisit(clientDocument);
       console.log("Dados do cliente recalculados:", clientData);
-      
+
       if (!clientData) {
         console.log("❌ Dados do cliente não encontrados:", clientDocument);
         return;
@@ -2536,16 +2577,23 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Buscar visitas agendadas deste cliente
       const clientVisits = scheduledVisits.filter(
-        (visit) => visit.clientDocument === clientDocument && visit.status === "agendada"
+        (visit) =>
+          visit.clientDocument === clientDocument &&
+          visit.status === "agendada",
       );
 
       console.log(`Visitas agendadas encontradas: ${clientVisits.length}`);
-      clientVisits.forEach(visit => {
-        console.log(`- Visita ${visit.id}: Pendente atual: R$ ${visit.totalPendingValue}, Atraso atual: ${visit.overdueCount}`);
+      clientVisits.forEach((visit) => {
+        console.log(
+          `- Visita ${visit.id}: Pendente atual: R$ ${visit.totalPendingValue}, Atraso atual: ${visit.overdueCount}`,
+        );
       });
 
       if (clientVisits.length === 0) {
-        console.log("❌ Nenhuma visita agendada encontrada para o cliente:", clientDocument);
+        console.log(
+          "❌ Nenhuma visita agendada encontrada para o cliente:",
+          clientDocument,
+        );
         return;
       }
 
@@ -2558,8 +2606,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         };
 
         console.log(`📝 Atualizando visita ${visit.id}:`);
-        console.log(`   - Pendente: R$ ${visit.totalPendingValue} → R$ ${clientData.totalPendingValue}`);
-        console.log(`   - Atraso: ${visit.overdueCount} → ${clientData.overdueCount}`);
+        console.log(
+          `   - Pendente: R$ ${visit.totalPendingValue} → R$ ${clientData.totalPendingValue}`,
+        );
+        console.log(
+          `   - Atraso: ${visit.overdueCount} → ${clientData.overdueCount}`,
+        );
 
         // Atualizar no Supabase
         const { error } = await supabase
@@ -2590,7 +2642,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         });
       }
 
-      console.log("✅ Visitas agendadas atualizadas com sucesso para cliente:", clientDocument);
+      console.log(
+        "✅ Visitas agendadas atualizadas com sucesso para cliente:",
+        clientDocument,
+      );
       console.log("=== FIM updateScheduledVisitsAfterPayment ===");
     } catch (error) {
       console.error("Erro ao atualizar visitas agendadas:", error);

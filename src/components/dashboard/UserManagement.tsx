@@ -94,7 +94,9 @@ const UserManagement: React.FC = () => {
         {/* Header */}
         <div className="page-header">
           <div>
-            <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center-title">Gerenciamento de Usuários</h2>
+            <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center-title">
+              Gerenciamento de Usuários
+            </h2>
             <p className="page-subtitle">
               {users.length} usuário{users.length !== 1 ? "s" : ""} cadastrado
               {users.length !== 1 ? "s" : ""}
