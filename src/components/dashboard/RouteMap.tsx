@@ -10,6 +10,9 @@ import {
   ChevronRight,
   Loader2,
   RefreshCw,
+  Filter,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { ClientGroup, FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
@@ -28,6 +31,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [routeOptimized, setRouteOptimized] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({});
+  const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [clientsPerPage, setClientsPerPage] = useState(100);
   const [userLocation, setUserLocation] = useState<{
@@ -670,42 +674,62 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50">
           <div className="space-y-4">
-            {/* Linha 1: Título e Estatísticas */}
+            {/* Linha 1: Título e Controles */}
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <Route className="h-5 w-5 text-blue-600" />
                 <h2 className="text-lg font-semibold text-gray-900">
                   Planejamento de Rota
                 </h2>
-                <span className="text-sm text-gray-500">
-                  {allClients.length} cliente{allClients.length !== 1 ? "s" : ""}
-                </span>
               </div>
-              <div className="flex items-center space-x-3">
-                {clientData.overdueVisits.length > 0 && (
-                  <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium animate-pulse">
-                    {clientData.overdueVisits.length} atrasada{clientData.overdueVisits.length !== 1 ? "s" : ""}
-                  </span>
-                )}
-                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
-                  {clientData.scheduledVisits.length} agendada{clientData.scheduledVisits.length !== 1 ? "s" : ""}
-                </span>
-                {clientData.rescheduledVisits.length > 0 && (
-                  <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full font-medium">
-                    {clientData.rescheduledVisits.length} reagendada{clientData.rescheduledVisits.length !== 1 ? "s" : ""}
-                  </span>
-                )}
+              
+              {/* Controles com Ícones */}
+              <div className="flex items-center space-x-2">
+                {/* Filtros */}
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    showFilters
+                      ? "bg-blue-100 text-blue-700 border border-blue-200"
+                      : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                  }`}
+                >
+                  <Filter className="h-4 w-4" />
+                  <span className="hidden sm:inline">Filtros</span>
+                </button>
+                
+                {/* Estatísticas Compactas */}
+                <div className="flex items-center space-x-2">
+                  {clientData.overdueVisits.length > 0 && (
+                    <div className="flex items-center space-x-1 px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium">
+                      <XCircle className="h-3 w-3" />
+                      <span>{clientData.overdueVisits.length}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
+                    <CheckCircle className="h-3 w-3" />
+                    <span>{clientData.scheduledVisits.length}</span>
+                  </div>
+                  {clientData.rescheduledVisits.length > 0 && (
+                    <div className="flex items-center space-x-1 px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full font-medium">
+                      <Clock className="h-3 w-3" />
+                      <span>{clientData.rescheduledVisits.length}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Linha 2: Filtros */}
-            <div>
-              <FilterBar
-                filters={filters}
-                onFilterChange={handleFilterChange}
-                userType={user?.type || "collector"}
-              />
-            </div>
+            {/* Linha 2: Filtros Colapsáveis */}
+            {showFilters && (
+              <div className="animate-in slide-in-from-top-2">
+                <FilterBar
+                  filters={filters}
+                  onFilterChange={handleFilterChange}
+                  userType={user?.type || "collector"}
+                />
+              </div>
+            )}
 
             {/* Linha 3: Controles de Ação */}
             <div className="flex items-center justify-between">
