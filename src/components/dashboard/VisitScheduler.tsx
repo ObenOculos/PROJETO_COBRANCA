@@ -1061,6 +1061,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ onClose }) => {
         </div>
       </div>
 
+      {/* Filtro e Listagem */}
       <div className="p-4 lg:p-6">
         {activeTab === "schedule" ? (
           // Aba de Agendamento

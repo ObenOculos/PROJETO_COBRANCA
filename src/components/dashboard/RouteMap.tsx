@@ -898,44 +898,29 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                <span className="hidden sm:inline">Clientes para Rota</span>
-                <span className="sm:hidden">Clientes</span>
+                Clientes
               </h3>
-              <div className="flex flex-wrap items-center gap-2 mt-1 text-xs sm:text-sm">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs sm:text-sm">
                 <span className="text-gray-600">
-                  {allClients.length} total{allClients.length !== 1 ? "s" : ""}
+                  {allClients.length} total
                 </span>
                 {clientData.overdueVisits.length > 0 && (
-                  <>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-red-600 font-medium">
-                      {clientData.overdueVisits.length} atrasada
-                      {clientData.overdueVisits.length !== 1 ? "s" : ""}
-                    </span>
-                  </>
+                  <span className="text-red-600 font-medium">
+                    {clientData.overdueVisits.length} atrasada(s)
+                  </span>
                 )}
-                <span className="text-gray-400">•</span>
                 <span className="text-green-600">
-                  {clientData.scheduledVisits.length} agendada
-                  {clientData.scheduledVisits.length !== 1 ? "s" : ""}
+                  {clientData.scheduledVisits.length} agendada(s)
                 </span>
                 {clientData.rescheduledVisits.length > 0 && (
-                  <>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-orange-600">
-                      {clientData.rescheduledVisits.length} reagendada
-                      {clientData.rescheduledVisits.length !== 1 ? "s" : ""}
-                    </span>
-                  </>
+                  <span className="text-orange-600">
+                    {clientData.rescheduledVisits.length} reagendada(s)
+                  </span>
                 )}
                 {selectedClients.length > 0 && (
-                  <>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-blue-600 font-medium">
-                      {selectedClients.length} selecionado
-                      {selectedClients.length !== 1 ? "s" : ""}
-                    </span>
-                  </>
+                  <span className="text-blue-600 font-medium">
+                    {selectedClients.length} selecionada(s)
+                  </span>
                 )}
               </div>
             </div>
