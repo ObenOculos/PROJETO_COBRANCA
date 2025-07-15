@@ -670,11 +670,11 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Header Consolidado - Padrão VisitTracking */}
+      {/* Header Otimizado - Mobile First */}
       <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <div className="space-y-4">
-            {/* Linha 1: Título e Controles */}
+        <div className="px-4 py-4 border-b border-gray-200 bg-gray-50">
+          <div className="space-y-3">
+            {/* Linha 1: Título e Status */}
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <Route className="h-5 w-5 text-blue-600" />
@@ -683,46 +683,112 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 </h2>
               </div>
               
-              {/* Controles com Ícones */}
-              <div className="flex items-center space-x-2">
-                {/* Filtros */}
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    showFilters
-                      ? "bg-blue-100 text-blue-700 border border-blue-200"
-                      : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                  }`}
-                >
-                  <Filter className="h-4 w-4" />
-                  <span className="hidden sm:inline">Filtros</span>
-                </button>
-                
-                {/* Estatísticas Compactas */}
-                <div className="flex items-center space-x-2">
-                  {clientData.overdueVisits.length > 0 && (
-                    <div className="flex items-center space-x-1 px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium">
-                      <XCircle className="h-3 w-3" />
-                      <span>{clientData.overdueVisits.length}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center space-x-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
-                    <CheckCircle className="h-3 w-3" />
-                    <span>{clientData.scheduledVisits.length}</span>
+              {/* Status Badges - Compacto */}
+              <div className="flex items-center space-x-1">
+                {clientData.overdueVisits.length > 0 && (
+                  <div className="flex items-center space-x-1 px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium">
+                    <XCircle className="h-3 w-3" />
+                    <span>{clientData.overdueVisits.length}</span>
                   </div>
-                  {clientData.rescheduledVisits.length > 0 && (
-                    <div className="flex items-center space-x-1 px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full font-medium">
-                      <Clock className="h-3 w-3" />
-                      <span>{clientData.rescheduledVisits.length}</span>
-                    </div>
-                  )}
+                )}
+                <div className="flex items-center space-x-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
+                  <CheckCircle className="h-3 w-3" />
+                  <span>{clientData.scheduledVisits.length}</span>
                 </div>
+                {clientData.rescheduledVisits.length > 0 && (
+                  <div className="flex items-center space-x-1 px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full font-medium">
+                    <Clock className="h-3 w-3" />
+                    <span>{clientData.rescheduledVisits.length}</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Linha 2: Filtros Colapsáveis */}
+            {/* Linha 2: Controles Principais */}
+            <div className="flex items-center justify-between gap-3">
+              {/* Seleção Rápida */}
+              <div className="flex items-center space-x-2">
+                <div className="flex bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={handleSelectAll}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      selectedClients.length === allClients.length
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  <button
+                    onClick={handleSelectVisitsOnly}
+                    className={`px-3 py-1.5 roundepx-3 pt-1 pb-2 rounded-md text-sm font-medium transition-colors bg-white text-gray-900 shadow-sm ${
+                      selectedClients.length === (clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length) &&
+                      [...clientData.overdueVisits, ...clientData.scheduledVisits, ...clientData.rescheduledVisits].every((c) =>
+                        selectedClients.includes(c.document),
+                      )
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    <Calendar className="h-4 w-4 inline sm:hidden" />
+                    <span className="hidden sm:inline">Visitas</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Ações Principais */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    showFilters
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                  }`}
+                  title="Filtros"
+                >
+                  <Filter className="h-4 w-4" />
+                </button>
+                
+                <button
+                  onClick={getUserLocation}
+                  disabled={isGettingLocation}
+                  className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    userLocation
+                      ? "bg-green-600 text-white hover:bg-green-700"
+                      : "bg-orange-600 text-white hover:bg-orange-700"
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <MapPin className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">
+                    {isGettingLocation ? "Obtendo..." : userLocation ? "GPS OK" : "GPS"}
+                  </span>
+                </button>
+                
+                <button
+                  onClick={handleOptimizeRoute}
+                  disabled={selectedClients.length === 0 || isOptimizing}
+                  className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    userLocation
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-gray-600 text-white hover:bg-gray-700"
+                  }`}
+                >
+                  {isOptimizing ? (
+                    <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
+                  ) : (
+                    <Route className="h-4 w-4 sm:mr-2" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {isOptimizing ? "Otimizando..." : userLocation ? "Otimizar" : "Organizar"}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Linha 3: Filtros Colapsáveis */}
             {showFilters && (
-              <div className="animate-in slide-in-from-top-2">
+              <div className="animate-in slide-in-from-top-2 duration-200">
                 <FilterBar
                   filters={filters}
                   onFilterChange={handleFilterChange}
@@ -731,86 +797,13 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
               </div>
             )}
 
-            {/* Linha 3: Controles de Ação */}
-            <div className="flex items-center justify-between">
-              {/* Seleção */}
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-600">Selecionar:</span>
-                <div className="flex space-x-1">
-                  <button
-                    onClick={handleSelectAll}
-                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-                      selectedClients.length === allClients.length
-                        ? "bg-blue-600 text-white"
-                        : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                    }`}
-                  >
-                    {selectedClients.length === allClients.length ? "✓ Todos" : "Todos"}
-                  </button>
-                  <button
-                    onClick={handleSelectVisitsOnly}
-                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-                      selectedClients.length === (clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length) &&
-                      [...clientData.overdueVisits, ...clientData.scheduledVisits, ...clientData.rescheduledVisits].every((c) =>
-                        selectedClients.includes(c.document),
-                      )
-                        ? "bg-green-600 text-white"
-                        : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                    }`}
-                  >
-                    <Calendar className="h-4 w-4 mr-1 inline" />
-                    {selectedClients.length === (clientData.overdueVisits.length + clientData.scheduledVisits.length + clientData.rescheduledVisits.length) &&
-                    [...clientData.overdueVisits, ...clientData.scheduledVisits, ...clientData.rescheduledVisits].every((c) =>
-                      selectedClients.includes(c.document),
-                    )
-                      ? "✓ Visitas"
-                      : "Visitas"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Ações */}
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={getUserLocation}
-                  disabled={isGettingLocation}
-                  className={`flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${
-                    userLocation
-                      ? "bg-green-600 text-white hover:bg-green-700"
-                      : "bg-orange-600 text-white hover:bg-orange-700"
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  title={userLocation ? "Localização obtida" : "Obter localização"}
-                >
-                  <MapPin className="h-4 w-4 mr-2" />
-                  {isGettingLocation ? "Obtendo..." : userLocation ? "✓ GPS" : "GPS"}
-                </button>
-                <button
-                  onClick={handleOptimizeRoute}
-                  disabled={selectedClients.length === 0 || isOptimizing}
-                  className={`flex items-center px-3 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                    userLocation
-                      ? "bg-blue-600 text-white hover:bg-blue-700"
-                      : "bg-gray-600 text-white hover:bg-gray-700"
-                  }`}
-                  title={userLocation ? "Otimizar por proximidade" : "Organizar por prioridade"}
-                >
-                  {isOptimizing ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Route className="h-4 w-4 mr-2" />
-                  )}
-                  {isOptimizing ? "Otimizando..." : userLocation ? "Otimizar" : "Organizar"}
-                </button>
-              </div>
-            </div>
-
-            {/* Linha 4: Resumo da Rota (se houver seleções) */}
+            {/* Linha 4: Resumo da Seleção */}
             {selectedClients.length > 0 && (
-              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+              <div className="flex items-center justify-between pt-3 border-t border-gray-200">
                 <div className="flex items-center space-x-2">
                   <Navigation className="h-4 w-4 text-blue-600" />
                   <span className="text-sm text-gray-700">
-                    {selectedClients.length} cliente{selectedClients.length !== 1 ? "s" : ""} selecionado{selectedClients.length !== 1 ? "s" : ""}
+                    {selectedClients.length} selecionado{selectedClients.length !== 1 ? "s" : ""}
                   </span>
                   {routeOptimized && (
                     <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
@@ -818,8 +811,8 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                     </span>
                   )}
                 </div>
-                <div className="text-sm font-medium text-gray-900">
-                  Total: {formatCurrency(totalValue)}
+                <div className="text-sm font-semibold text-gray-900">
+                  {formatCurrency(totalValue)}
                 </div>
               </div>
             )}
@@ -837,9 +830,6 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 <h3 className="text-lg font-semibold text-gray-900">
                   Mapa da Rota
                 </h3>
-                <span className="text-sm text-gray-500">
-                  {selectedClients.length} selecionado{selectedClients.length !== 1 ? "s" : ""}
-                </span>
               </div>
               <div className="flex items-center space-x-2">
                 {userLocation && (
