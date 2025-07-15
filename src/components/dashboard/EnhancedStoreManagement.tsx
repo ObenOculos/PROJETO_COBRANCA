@@ -17,6 +17,116 @@ import {
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
 
+// Função auxiliar para converter números em extenso
+const numeroParaExtenso = (num: number): string => {
+  const unidades = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
+  const dezenas = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+  const dezenasEspeciais = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+  const centenas = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
+  
+  if (num === 0) return 'zero';
+  if (num === 100) return 'cem';
+  if (num === 1000) return 'mil';
+  
+  const partes = [];
+  
+  // Centenas
+  const c = Math.floor(num / 100);
+  if (c > 0) {
+    partes.push(centenas[c]);
+  }
+  
+  // Dezenas e unidades
+  const resto = num % 100;
+  if (resto >= 10 && resto <= 19) {
+    partes.push(dezenasEspeciais[resto - 10]);
+  } else {
+    const d = Math.floor(resto / 10);
+    const u = resto % 10;
+    if (d > 0) partes.push(dezenas[d]);
+    if (u > 0) partes.push(unidades[u]);
+  }
+  
+  return partes.join(' e ');
+};
+
+// Função para formatar valores grandes em mobile
+const formatMobileCurrency = (value: number) => {
+  const isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
+  
+  if (!isMobile) {
+    return formatCurrency(value, false);
+  }
+  
+  const intValue = Math.floor(value);
+  
+  if (intValue === 0) {
+    return 'R$ 0';
+  }
+  
+  // Determinar a escala e formatar
+  let mainValue = '';
+  let extensoParts = [];
+  
+  if (intValue >= 1000000) {
+    // Milhões
+    const milhoes = Math.floor(intValue / 1000000);
+    const resto = intValue % 1000000;
+    mainValue = `R$ ${milhoes}M`;
+    
+    if (resto > 0) {
+      const milRestantes = Math.floor(resto / 1000);
+      const unidadesRestantes = resto % 1000;
+      
+      if (milRestantes > 0) {
+        const milExtenso = numeroParaExtenso(milRestantes);
+        extensoParts.push(`${milExtenso} mil`);
+      }
+      
+      if (unidadesRestantes > 0) {
+        const unidadesExtenso = numeroParaExtenso(unidadesRestantes);
+        extensoParts.push(`${unidadesExtenso} reais`);
+      } else if (extensoParts.length > 0) {
+        extensoParts.push('reais');
+      }
+    }
+  } else if (intValue >= 10000) {
+    // Dezenas de milhares
+    const mil = Math.floor(intValue / 1000);
+    const resto = intValue % 1000;
+    mainValue = `R$ ${mil} mil`;
+    
+    if (resto > 0) {
+      const restoExtenso = numeroParaExtenso(resto);
+      extensoParts.push(`${restoExtenso} reais`);
+    }
+  } else if (intValue >= 1000) {
+    // Milhares
+    const mil = Math.floor(intValue / 1000);
+    const resto = intValue % 1000;
+    mainValue = `R$ ${mil} mil`;
+    
+    if (resto > 0) {
+      const restoExtenso = numeroParaExtenso(resto);
+      extensoParts.push(`${restoExtenso} reais`);
+    }
+  } else {
+    // Menos de mil
+    return `R$ ${intValue}`;
+  }
+  
+  const extensoText = extensoParts.join(' e ');
+  
+  return (
+    <div className="flex flex-col items-start">
+      <span className="text-2xl font-semibold">{mainValue}</span>
+      {extensoText && (
+        <span className="text-xs text-blue-200 opacity-90">{extensoText}</span>
+      )}
+    </div>
+  );
+};
+
 interface StoreStats {
   storeName: string;
   assignedCollector: string;
@@ -373,10 +483,10 @@ const EnhancedStoreManagement: React.FC = () => {
         </div>
         
         {/* Métricas secundárias */}
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-blue-400">
+        <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-4 mt-6 pt-6 border-t border-blue-400">
           <div>
             <p className="text-blue-100 text-xs">Receita</p>
-            <p className="text-2xl font-semibold">{formatCurrency(overviewStats.totalRevenue, false)}</p>
+            <div className="text-2xl font-semibold">{formatMobileCurrency(overviewStats.totalRevenue)}</div>
           </div>
           <div>
             <p className="text-blue-100 text-xs">Atribuídas</p>
@@ -567,24 +677,27 @@ const EnhancedStoreManagement: React.FC = () => {
                 {!isUnassigned && (
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center">
-                      <BarChart3 className="h-4 w-4 text-gray-500 mr-2" />
+                      <BarChart3 className="h-4 w-4 text-gray-500 mr-2 sm:block hidden" />
                       <div className="text-center">
                         <div className="text-xs text-gray-600">Total</div>
-                        <div className="text-sm font-bold text-gray-900">{formatCurrency(store.totalAmount)}</div>
+                        <div className="text-sm font-bold text-gray-900 sm:block hidden">{formatCurrency(store.totalAmount)}</div>
+                        <div className="text-sm font-bold text-gray-900 sm:hidden">{formatCurrency(store.totalAmount, false).replace(/,\d{2}$/, '')}</div>
                       </div>
                     </div>
                     <div className="flex items-center">
-                      <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                      <CheckCircle className="h-4 w-4 text-green-500 mr-2 sm:block hidden" />
                       <div className="text-center">
                         <div className="text-xs text-green-600">Recebido</div>
-                        <div className="text-sm font-bold text-green-700">{formatCurrency(store.receivedAmount)}</div>
+                        <div className="text-sm font-bold text-green-700 sm:block hidden">{formatCurrency(store.receivedAmount)}</div>
+                        <div className="text-sm font-bold text-green-700 sm:hidden">{formatCurrency(store.receivedAmount, false).replace(/,\d{2}$/, '')}</div>
                       </div>
                     </div>
                     <div className="flex items-center">
-                      <AlertCircle className="h-4 w-4 text-red-500 mr-2" />
+                      <AlertCircle className="h-4 w-4 text-red-500 mr-2 sm:block hidden" />
                       <div className="text-center">
                         <div className="text-xs text-red-600">Pendente</div>
-                        <div className="text-sm font-bold text-red-700">{formatCurrency(store.pendingAmount)}</div>
+                        <div className="text-sm font-bold text-red-700 sm:block hidden">{formatCurrency(store.pendingAmount)}</div>
+                        <div className="text-sm font-bold text-red-700 sm:hidden">{formatCurrency(store.pendingAmount, false).replace(/,\d{2}$/, '')}</div>
                       </div>
                     </div>
                     <button
@@ -602,7 +715,7 @@ const EnhancedStoreManagement: React.FC = () => {
                     </button>
                   </div>
                 )}
-
+                
                 {/* Detalhes Expandidos com Ícones */}
                 {isExpanded && !isUnassigned && (
                   <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">

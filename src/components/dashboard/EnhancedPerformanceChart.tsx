@@ -34,6 +34,116 @@ const EnhancedPerformanceChart: React.FC = () => {
   const [] = useState<Set<string>>(new Set());
   const [filterMinRate, setFilterMinRate] = useState<string>("");
 
+  // Função auxiliar para converter números em extenso
+  const numeroParaExtenso = (num: number): string => {
+    const unidades = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
+    const dezenas = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+    const dezenasEspeciais = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+    const centenas = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
+    
+    if (num === 0) return 'zero';
+    if (num === 100) return 'cem';
+    if (num === 1000) return 'mil';
+    
+    const partes = [];
+    
+    // Centenas
+    const c = Math.floor(num / 100);
+    if (c > 0) {
+      partes.push(centenas[c]);
+    }
+    
+    // Dezenas e unidades
+    const resto = num % 100;
+    if (resto >= 10 && resto <= 19) {
+      partes.push(dezenasEspeciais[resto - 10]);
+    } else {
+      const d = Math.floor(resto / 10);
+      const u = resto % 10;
+      if (d > 0) partes.push(dezenas[d]);
+      if (u > 0) partes.push(unidades[u]);
+    }
+    
+    return partes.join(' e ');
+  };
+
+  // Função para formatar valores grandes em mobile
+  const formatMobileCurrency = (value: number) => {
+    const isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
+    
+    if (!isMobile) {
+      return formatCurrency(value, false);
+    }
+    
+    const intValue = Math.floor(value);
+    
+    if (intValue === 0) {
+      return 'R$ 0';
+    }
+    
+    // Determinar a escala e formatar
+    let mainValue = '';
+    let extensoParts = [];
+    
+    if (intValue >= 1000000) {
+      // Milhões
+      const milhoes = Math.floor(intValue / 1000000);
+      const resto = intValue % 1000000;
+      mainValue = `R$ ${milhoes}M`;
+      
+      if (resto > 0) {
+        const milRestantes = Math.floor(resto / 1000);
+        const unidadesRestantes = resto % 1000;
+        
+        if (milRestantes > 0) {
+          const milExtenso = numeroParaExtenso(milRestantes);
+          extensoParts.push(`${milExtenso} mil`);
+        }
+        
+        if (unidadesRestantes > 0) {
+          const unidadesExtenso = numeroParaExtenso(unidadesRestantes);
+          extensoParts.push(`${unidadesExtenso} reais`);
+        } else if (extensoParts.length > 0) {
+          extensoParts.push('reais');
+        }
+      }
+    } else if (intValue >= 10000) {
+      // Dezenas de milhares
+      const mil = Math.floor(intValue / 1000);
+      const resto = intValue % 1000;
+      mainValue = `R$ ${mil} mil`;
+      
+      if (resto > 0) {
+        const restoExtenso = numeroParaExtenso(resto);
+        extensoParts.push(`${restoExtenso} reais`);
+      }
+    } else if (intValue >= 1000) {
+      // Milhares
+      const mil = Math.floor(intValue / 1000);
+      const resto = intValue % 1000;
+      mainValue = `R$ ${mil} mil`;
+      
+      if (resto > 0) {
+        const restoExtenso = numeroParaExtenso(resto);
+        extensoParts.push(`${restoExtenso} reais`);
+      }
+    } else {
+      // Menos de mil
+      return `R$ ${intValue}`;
+    }
+    
+    const extensoText = extensoParts.join(' e ');
+    
+    return (
+      <div className="flex flex-col items-start">
+        <span className="text-2xl font-semibold">{mainValue}</span>
+        {extensoText && (
+          <span className="text-xs text-blue-200 opacity-90">{extensoText}</span>
+        )}
+      </div>
+    );
+  };
+
   // Calculate enhanced performance data
   const enhancedPerformance = useMemo((): EnhancedCollectorPerformance[] => {
     const collectors = users.filter((u) => u.type === "collector");
@@ -312,14 +422,14 @@ const EnhancedPerformanceChart: React.FC = () => {
         </div>
         
         {/* Métricas secundárias */}
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-blue-400">
+        <div className="grid grid-cols-[1fr_1.5fr_1fr] gap-4 mt-6 pt-6 border-t border-blue-400">
           <div>
             <p className="text-blue-100 text-xs">Vendas</p>
             <p className="text-2xl font-semibold">{teamStats.totalSales}</p>
           </div>
           <div>
             <p className="text-blue-100 text-xs">Recebido</p>
-            <p className="text-2xl font-semibold">{formatCurrency(teamStats.totalReceived, false)}</p>
+            <div className="text-2xl font-semibold">{formatMobileCurrency(teamStats.totalReceived)}</div>
           </div>
           <div>
             <p className="text-blue-100 text-xs">Eficiência</p>
@@ -475,9 +585,15 @@ const EnhancedPerformanceChart: React.FC = () => {
                   {/* Valor Recebido */}
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Valor Recebido</span>
-                    <span className="text-lg font-bold text-green-600">
+                    <span className="text-lg font-bold text-green-600 sm:block hidden">
                       {formatCurrency(collector.receivedAmount)}
                     </span>
+                    <div className="text-lg font-bold text-green-600 sm:hidden">
+                      {collector.receivedAmount < 10000 
+                        ? formatCurrency(collector.receivedAmount, false).replace(/,\d{2}$/, '')
+                        : `R$ ${Math.floor(collector.receivedAmount / 1000)}k`
+                      }
+                    </div>
                   </div>
 
                   {/* Estatísticas Resumidas */}
