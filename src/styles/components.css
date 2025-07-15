@@ -10,7 +10,7 @@
 
 /* ===== CONTAINERS ===== */
 .container-main {
-  @apply bg-white rounded-xl shadow-sm overflow-hidden;
+  @apply bg-transparent shadow-none rounded-xl overflow-hidden sm:bg-white sm:shadow-sm;
 }
 
 .container-section {

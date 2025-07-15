@@ -499,43 +499,41 @@ const EnhancedStoreManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Filtros Compactos com Ícones */}
+      {/* Filtros Minimalistas */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex items-center gap-2">
           {/* Busca */}
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar loja ou cobrador..."
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar loja ou cobrador..."
+              className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors text-sm"
+            />
           </div>
 
-          {/* Ordenação com Ícones */}
+          {/* Ordenação Minimalista */}
           <div className="flex items-center gap-2">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="pl-3 pr-8 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm"
+              className="pl-3 pr-8 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors text-sm min-w-[120px]"
             >
-              <option value="storeName">🏪 Nome</option>
-              <option value="conversionRate">📊 Taxa</option>
-              <option value="totalAmount">💰 Valor</option>
+              <option value="storeName">Nome</option>
+              <option value="conversionRate">Taxa</option>
+              <option value="totalAmount">Valor</option>
             </select>
-
+            
             <button
               onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-              className={`flex items-center justify-center p-2 rounded-lg transition-colors ${
+              className={`flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200 ${
                 sortOrder === "desc" 
-                  ? "bg-blue-50 text-blue-600 hover:bg-blue-100" 
-                  : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                  ? "bg-blue-100 text-blue-600 hover:bg-blue-200" 
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
-              title={sortOrder === "desc" ? "Maior primeiro" : "Menor primeiro"}
+              title={sortOrder === "desc" ? "Decrescente" : "Crescente"}
             >
               {sortOrder === "desc" ? (
                 <ChevronDown className="h-4 w-4" />
@@ -546,10 +544,10 @@ const EnhancedStoreManagement: React.FC = () => {
           </div>
 
           {/* Contador */}
-          <div className="flex items-center text-sm text-gray-600">
-            <BarChart3 className="h-4 w-4 mr-1" />
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <BarChart3 className="h-4 w-4" />
             <span className="font-medium">{filteredAndSortedStores.length}</span>
-            <span className="hidden sm:inline ml-1">lojas</span>
+            <span className="hidden sm:inline">lojas</span>
           </div>
         </div>
       </div>
