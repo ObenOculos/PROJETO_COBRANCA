@@ -507,7 +507,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                       <Target className="w-6 h-6 text-indigo-600" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-gray-800">Metas</h2>
+                      <h2 className="font-semibold text-gray-900">Metas</h2>
                     </div>
                   </div>
                   <div className="text-sm text-gray-600 bg-white px-4 py-2 rounded-xl border border-gray-200">
@@ -782,7 +782,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                       <BarChart3 className="w-6 h-6 text-blue-600" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-gray-800">
+                      <h2 className="font-semibold text-gray-900">
                         Resumo Financeiro
                       </h2>
                       <p className="text-sm text-gray-600">

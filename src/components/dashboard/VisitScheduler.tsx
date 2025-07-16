@@ -1016,7 +1016,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg">
+    <div className="bg-white rounded-2xl shadow-lg">
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <div className="flex">

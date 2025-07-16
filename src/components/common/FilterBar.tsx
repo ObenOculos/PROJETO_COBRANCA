@@ -101,9 +101,9 @@ const FilterBar: React.FC<FilterBarProps> = ({
     filters.visitsOnly;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 mb-4">
       {/* Search Bar */}
-      <div className="p-6">
+      <div className="p-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
@@ -117,7 +117,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
       </div>
 
       {/* Quick Filter Pills */}
-      <div className="px-6 pb-4">
+      <div className="px-4 pb-4">
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() =>
@@ -168,7 +168,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
       </div>
 
       {/* Filter Toggle Button */}
-      <div className="px-6 pb-4">
+      <div className="px-4 pb-4">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="w-full flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -223,7 +223,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
       {/* Expanded Filters */}
       {isExpanded && (
-        <div className="px-4 sm:px-6 pb-6 space-y-4 border-t border-gray-200 pt-4">
+        <div className="px-4 sm:px-4 pb-6 space-y-4 border-t border-gray-200 pt-4">
           {/* Grid de filtros responsivo */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Status Filter */}

@@ -15,6 +15,7 @@ import CollectorDashboard, {
   getCollectorTabs,
 } from "./components/dashboard/CollectorDashboard";
 import GlobalLoading from "./components/common/GlobalLoading";
+import OfflineIndicator from "./components/common/OfflineIndicator";
 
 const AppContent: React.FC = () => {
   const { user, isLoading: authLoading } = useAuth();
@@ -122,6 +123,7 @@ const AppContent: React.FC = () => {
           onTabChange={handleCollectorTabChange}
         />
       )}
+      <OfflineIndicator />
     </div>
   );
 };
