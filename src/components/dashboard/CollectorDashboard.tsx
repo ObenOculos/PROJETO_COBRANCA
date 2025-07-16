@@ -18,8 +18,10 @@ import {
   Zap,
   Rocket,
   ThumbsUp,
+  AlertCircle,
+  Clock,
+  CalendarCheck,
 } from "lucide-react";
-import StatsCard from "../common/StatsCard";
 import FilterBar from "../common/FilterBar";
 import CollectionTable from "./CollectionTable";
 import RouteMap from "./RouteMap";
@@ -214,6 +216,131 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     return { text: "Hora de começar!", icon: Target };
   };
 
+  // Componente consolidado para clientes
+  const ClientsCard = () => (
+    <div className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-purple-300 transition-colors cursor-pointer"
+         onClick={() => setActiveTab("collections")}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-purple-500 rounded-lg">
+            <Users className="w-4 h-4 text-white" />
+          </div>
+          <h3 className="font-semibold text-gray-900">Clientes</h3>
+        </div>
+        <div className="text-2xl font-bold text-gray-900">
+          {stats.clients}
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-1">
+            <AlertCircle className="w-3 h-3 text-orange-500" />
+            <span className="text-gray-600">Com pendências</span>
+          </div>
+          <span className="font-medium text-orange-600">{stats.clientsWithPending}</span>
+        </div>
+        
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-1">
+            <CheckCircle className="w-3 h-3 text-green-500" />
+            <span className="text-gray-600">Em dia</span>
+          </div>
+          <span className="font-medium text-green-600">{stats.clients - stats.clientsWithPending}</span>
+        </div>
+        
+        <div className="pt-2 border-t border-gray-100">
+          <div className="text-xs text-gray-500">
+            {stats.pending} vendas pendentes
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Componente consolidado para vendas
+  const SalesCard = () => (
+    <div className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-blue-300 transition-colors">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-blue-500 rounded-lg">
+            <Target className="w-4 h-4 text-white" />
+          </div>
+          <h3 className="font-semibold text-gray-900">Vendas</h3>
+        </div>
+        <div className="text-2xl font-bold text-gray-900">
+          {stats.total}
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-1">
+            <CheckCircle className="w-3 h-3 text-green-500" />
+            <span className="text-gray-600">Finalizadas</span>
+          </div>
+          <span className="font-medium text-green-600">{stats.completed}</span>
+        </div>
+        
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3 text-orange-500" />
+            <span className="text-gray-600">Pendentes</span>
+          </div>
+          <span className="font-medium text-orange-600">{stats.pending}</span>
+        </div>
+        
+        <div className="pt-2 border-t border-gray-100">
+          <div className="text-xs text-gray-500">
+            {stats.total > 0 ? ((stats.completed / stats.total) * 100).toFixed(1) : 0}% concluídas
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Componente consolidado para visitas
+  const VisitsCard = () => (
+    <div className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-orange-300 transition-colors cursor-pointer"
+         onClick={() => setActiveTab("visits")}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-orange-500 rounded-lg">
+            <Calendar className="w-4 h-4 text-white" />
+          </div>
+          <h3 className="font-semibold text-gray-900">Visitas</h3>
+        </div>
+        <div className="text-2xl font-bold text-gray-900">
+          {stats.visitStats.scheduled}
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-1">
+            <Sun className="w-3 h-3 text-yellow-500" />
+            <span className="text-gray-600">Hoje</span>
+          </div>
+          <span className="font-medium text-yellow-600">{stats.visitStats.today}</span>
+        </div>
+        
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-1">
+            <CheckCircle className="w-3 h-3 text-green-500" />
+            <span className="text-gray-600">Realizadas</span>
+          </div>
+          <span className="font-medium text-green-600">{stats.visitStats.completed}</span>
+        </div>
+        
+        <div className="pt-2 border-t border-gray-100">
+          <div className="text-xs text-gray-500">
+            {stats.visitStats.scheduled + stats.visitStats.completed} visitas no total
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   // Salva a aba ativa no localStorage apenas quando gerenciado internamente
   useEffect(() => {
     if (!externalActiveTab) {
@@ -282,13 +409,33 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       .filter(Boolean),
   ).size;
 
+  // Calcular métricas de visitas
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  
+  const visitStats = {
+    today: myVisits.filter(v => {
+      // Para visitas agendadas, usar scheduled_date
+      // Para visitas realizadas, usar data_visita_realizada se existir
+      if (v.status === 'agendada') {
+        return v.scheduledDate === todayStr;
+      } else if (v.status === 'realizada' && v.dataVisitaRealizada) {
+        return v.dataVisitaRealizada === todayStr;
+      }
+      return false;
+    }).length,
+    scheduled: myVisits.filter(v => v.status === 'agendada').length,
+    completed: myVisits.filter(v => v.status === 'realizada').length,
+  };
+
   const stats = {
     total: totalSales,
     clients: clientGroups.length,
     pending: pendingSales,
     completed: completedSales,
     clientsWithPending: clientsWithPending,
-    visits: myVisits.filter((v) => v.status === "agendada").length,
+    visits: visitStats.scheduled,
+    visitStats: visitStats,
     totalAmount: Array.from(salesMap.values()).reduce(
       (sum, s) => sum + s.totalValue,
       0,
@@ -313,43 +460,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           
           <div className="space-y-6">
             {/* Enhanced Mobile Stats Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
-              <StatsCard
-                title="Clientes"
-                value={stats.clients.toString()}
-                icon={Users}
-                iconColor="bg-purple-500"
-                onClick={() => setActiveTab("collections")}
-              />
-              <StatsCard
-                title="Vendas"
-                value={stats.total.toString()}
-                icon={Target}
-                iconColor="bg-blue-500"
-              />
-              <StatsCard
-                title="Clientes com Pendências"
-                value={stats.clientsWithPending.toString()}
-                change={`${stats.pending} vendas pendentes`}
-                changeType="negative"
-                icon={Users}
-                iconColor="bg-orange-500"
-              />
-              <StatsCard
-                title="Vendas Finalizadas"
-                value={stats.completed.toString()}
-                change={`${stats.total > 0 ? ((stats.completed / stats.total) * 100).toFixed(1) : 0}%`}
-                changeType="positive"
-                icon={CheckCircle}
-                iconColor="bg-green-500"
-              />
-              <StatsCard
-                title="Visitas"
-                value={stats.visits.toString()}
-                icon={Calendar}
-                iconColor="bg-orange-500"
-                onClick={() => setActiveTab("visits")}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
+              <ClientsCard />
+              <SalesCard />
+              <VisitsCard />
             </div>
 
 
@@ -389,7 +503,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                 {/* Layout Desktop: Grid 3x2 */}
                 <div className="hidden lg:grid lg:grid-cols-3 lg:gap-8">
                   {/* Coluna Hoje */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-yellow-200">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-indigo-200">
                     <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center gap-2 justify-center">
                       <Sun className="w-5 h-5 text-yellow-500" />
                       Hoje
@@ -562,29 +676,48 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
               </div>
             </div>
 
-                        {/* Performance Summary - Mobile Optimized */}
-            <div className="bg-white rounded-xl shadow-sm p-4 lg:p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Resumo Financeiro
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <div className="text-xl lg:text-2xl font-bold text-blue-600">
-                    {formatCurrency(stats.totalAmount)}
+            {/* Resumo Financeiro */}
+            <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-2xl border border-blue-200 overflow-hidden">
+              {/* Header */}
+              <div className="bg-white/80 backdrop-blur-sm p-6 border-b border-blue-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-xl">
+                      <BarChart3 className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-800">
+                        Resumo Financeiro
+                      </h2>
+                      <p className="text-sm text-gray-600">
+                        Acompanhe o desempenho financeiro da sua carteira
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-600">Valor Total</div>
                 </div>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <div className="text-xl lg:text-2xl font-bold text-green-600">
-                    {formatCurrency(stats.receivedAmount)}
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-blue-200 text-center">
+                    <div className="text-2xl lg:text-3xl font-bold text-blue-600 mb-2">
+                      {formatCurrency(stats.totalAmount)}
+                    </div>
+                    <div className="text-sm text-gray-600 font-medium">Valor Total</div>
                   </div>
-                  <div className="text-sm text-gray-600">Valor Recebido</div>
-                </div>
-                <div className="text-center p-4 bg-red-50 rounded-lg">
-                  <div className="text-xl lg:text-2xl font-bold text-red-600">
-                    {formatCurrency(stats.totalAmount - stats.receivedAmount)}
+                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-green-200 text-center">
+                    <div className="text-2xl lg:text-3xl font-bold text-green-600 mb-2">
+                      {formatCurrency(stats.receivedAmount)}
+                    </div>
+                    <div className="text-sm text-gray-600 font-medium">Valor Recebido</div>
                   </div>
-                  <div className="text-sm text-gray-600">Valor Pendente</div>
+                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-orange-200 text-center">
+                    <div className="text-2xl lg:text-3xl font-bold text-orange-600 mb-2">
+                      {formatCurrency(stats.totalAmount - stats.receivedAmount)}
+                    </div>
+                    <div className="text-sm text-gray-600 font-medium">Valor Pendente</div>
+                  </div>
                 </div>
               </div>
             </div>
