@@ -460,10 +460,12 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           
           <div className="space-y-6">
             {/* Enhanced Mobile Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
               <ClientsCard />
               <SalesCard />
-              <VisitsCard />
+              <div className="col-span-2 lg:col-span-1">
+                <VisitsCard />
+              </div>
             </div>
 
 
