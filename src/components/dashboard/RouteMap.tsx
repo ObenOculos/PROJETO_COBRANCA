@@ -705,7 +705,6 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="px-4 py-4 border-b border-gray-200 bg-gray-50">
           <div className="space-y-3">
-
             {/* Linha 2: Controles Principais */}
             <div className="flex items-center justify-between gap-3">
               {/* Seleção Rápida */}

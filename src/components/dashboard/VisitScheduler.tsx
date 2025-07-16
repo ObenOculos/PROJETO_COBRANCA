@@ -27,7 +27,7 @@ interface VisitSchedulerProps {
   onClose?: () => void;
 }
 
-const VisitScheduler: React.FC<VisitSchedulerProps> = ({ }) => {
+const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   const {
     getClientGroups,
     scheduleVisit,
@@ -1017,7 +1017,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({ }) => {
 
   return (
     <div className="bg-white rounded-xl shadow-lg">
-
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <div className="flex">

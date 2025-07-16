@@ -26,13 +26,14 @@ const RadialApprovalChart: React.FC<Props> = ({
   level,
   motivationalMessage,
 }) => {
-  const percentage = value !== undefined ? value : (goal > 0 ? (current / goal) * 100 : 0);
+  const percentage =
+    value !== undefined ? value : goal > 0 ? (current / goal) * 100 : 0;
 
   const formatValue = (val: number) => {
     if (isCurrency) {
-      return val.toLocaleString('pt-BR', { 
+      return val.toLocaleString("pt-BR", {
         minimumFractionDigits: 0,
-        maximumFractionDigits: 0
+        maximumFractionDigits: 0,
       });
     }
     return val.toFixed(0);
@@ -42,14 +43,16 @@ const RadialApprovalChart: React.FC<Props> = ({
     <div className="w-auto mx-auto flex flex-col items-center bg-gradient-to-br from-white to-gray-50 rounded-2xl p-4 border border-gray-200 hover:border-gray-300 transition-all duration-300">
       {/* Badge de nível */}
       {level && (
-        <div className={`flex items-center gap-2 mb-2 px-2 py-1 rounded-full ${level.bgColor}`}>
+        <div
+          className={`flex items-center gap-2 mb-2 px-2 py-1 rounded-full ${level.bgColor}`}
+        >
           <level.icon className={`w-4 h-4 ${level.color}`} />
           <span className={`text-xs font-bold ${level.color}`}>
             {level.name}
           </span>
         </div>
       )}
-      
+
       {/* Gráfico circular */}
       <div className="w-20 h-20 mb-2">
         <CircularProgressbar
@@ -57,19 +60,24 @@ const RadialApprovalChart: React.FC<Props> = ({
           text={`${percentage.toFixed(0)}%`}
           styles={buildStyles({
             textSize: "16px",
-            pathColor: percentage >= 100 ? "#10b981" : percentage >= 70 ? "#22c55e" : percentage >= 40 ? "#facc15" : "#ef4444",
+            pathColor:
+              percentage >= 100
+                ? "#10b981"
+                : percentage >= 70
+                  ? "#22c55e"
+                  : percentage >= 40
+                    ? "#facc15"
+                    : "#ef4444",
             textColor: "#111827",
             trailColor: "#e5e7eb",
             pathTransition: "stroke-dashoffset 0.5s ease 0s",
           })}
         />
       </div>
-      
+
       {/* Informações */}
       <div className="text-center">
-        <p className="text-xs font-semibold text-gray-700 mb-1">
-          {title}
-        </p>
+        <p className="text-xs font-semibold text-gray-700 mb-1">{title}</p>
         {showValues && goal > 0 && (
           <p className="text-xs text-gray-500 font-medium">
             {formatValue(current)}/{formatValue(goal)}

@@ -1939,17 +1939,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     saleNumber: number,
     clientDocument: string,
   ): SaleBalance => {
-    const saleInstallments = collections.filter(
-      (collection) => {
-        if (saleNumber === 0) {
-          // Para vendas renegociadas (saleNumber = 0), buscar parcelas sem venda_n
-          return !collection.venda_n && collection.documento === clientDocument;
-        } else {
-          // Para vendas normais, buscar por venda_n
-          return collection.venda_n === saleNumber && collection.documento === clientDocument;
-        }
+    const saleInstallments = collections.filter((collection) => {
+      if (saleNumber === 0) {
+        // Para vendas renegociadas (saleNumber = 0), buscar parcelas sem venda_n
+        return !collection.venda_n && collection.documento === clientDocument;
+      } else {
+        // Para vendas normais, buscar por venda_n
+        return (
+          collection.venda_n === saleNumber &&
+          collection.documento === clientDocument
+        );
       }
-    );
+    });
 
     // Arredondar para 2 casas decimais para evitar problemas de precisão
     const roundTo2Decimals = (num: number) =>
@@ -1962,8 +1963,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     const totalPaid = roundTo2Decimals(
       Math.min(
         totalValue,
-        saleInstallments.reduce((sum, inst) => sum + inst.valor_recebido, 0)
-      )
+        saleInstallments.reduce((sum, inst) => sum + inst.valor_recebido, 0),
+      ),
     );
     const remainingBalance = roundTo2Decimals(totalValue - totalPaid);
 
@@ -2001,12 +2002,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // Agrupar collections por venda
       const salesMap = new Map<number, Collection[]>();
       const individualInstallments: Collection[] = [];
-      
+
       collections
         .filter((collection) => collection.documento === clientDocument)
         .forEach((collection) => {
           const saleNumber = collection.venda_n;
-          
+
           // Se não há número de venda, trata como parcela individual
           if (!saleNumber) {
             individualInstallments.push(collection);
@@ -2018,7 +2019,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             salesMap.get(saleNumber)!.push(collection);
           }
         });
-      
+
       // Converter vendas agrupadas para SaleGroup
       const saleGroups = Array.from(salesMap.entries()).map(
         ([saleNumber, installments]) => {
@@ -2032,8 +2033,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           const totalReceived = roundTo2Decimals(
             Math.min(
               totalValue,
-              installments.reduce((sum, inst) => sum + inst.valor_recebido, 0)
-            )
+              installments.reduce((sum, inst) => sum + inst.valor_recebido, 0),
+            ),
           );
           const pendingValue = Math.max(
             0,
@@ -2055,35 +2056,63 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           };
         },
       );
-      
+
       // Converter parcelas individuais para uma única "Venda Renegociada"
-      const renegotiatedSaleGroups = individualInstallments.length > 0 ? [{
-        saleNumber: 0, // Usar 0 para identificar como renegociada
-        titleNumber: individualInstallments[0]?.numero_titulo || 0,
-        description: `Renegociada (${individualInstallments.length} parcela${individualInstallments.length !== 1 ? 's' : ''})`,
-        installments: individualInstallments,
-        totalValue: individualInstallments.reduce((sum, inst) => sum + inst.valor_original, 0),
-        totalReceived: Math.min(
-          individualInstallments.reduce((sum, inst) => sum + inst.valor_original, 0),
-          individualInstallments.reduce((sum, inst) => sum + inst.valor_recebido, 0)
-        ),
-        pendingValue: Math.max(0, individualInstallments.reduce((sum, inst) => sum + Math.max(0, inst.valor_original - inst.valor_recebido), 0)),
-        saleStatus: (() => {
-          const totalValue = individualInstallments.reduce((sum, inst) => sum + inst.valor_original, 0);
-          const totalReceived = Math.min(
-            totalValue,
-            individualInstallments.reduce((sum, inst) => sum + inst.valor_recebido, 0)
-          );
-          const pendingValue = totalValue - totalReceived;
-          
-          if (totalReceived === 0) return "pending" as const;
-          if (pendingValue <= 0.01) return "fully_paid" as const;
-          return "partially_paid" as const;
-        })(),
-        payments: getSalePayments(0, clientDocument), // Usar 0 para buscar pagamentos da renegociada
-        clientDocument,
-      }] : [];
-      
+      const renegotiatedSaleGroups =
+        individualInstallments.length > 0
+          ? [
+              {
+                saleNumber: 0, // Usar 0 para identificar como renegociada
+                titleNumber: individualInstallments[0]?.numero_titulo || 0,
+                description: `Renegociada (${individualInstallments.length} parcela${individualInstallments.length !== 1 ? "s" : ""})`,
+                installments: individualInstallments,
+                totalValue: individualInstallments.reduce(
+                  (sum, inst) => sum + inst.valor_original,
+                  0,
+                ),
+                totalReceived: Math.min(
+                  individualInstallments.reduce(
+                    (sum, inst) => sum + inst.valor_original,
+                    0,
+                  ),
+                  individualInstallments.reduce(
+                    (sum, inst) => sum + inst.valor_recebido,
+                    0,
+                  ),
+                ),
+                pendingValue: Math.max(
+                  0,
+                  individualInstallments.reduce(
+                    (sum, inst) =>
+                      sum +
+                      Math.max(0, inst.valor_original - inst.valor_recebido),
+                    0,
+                  ),
+                ),
+                saleStatus: (() => {
+                  const totalValue = individualInstallments.reduce(
+                    (sum, inst) => sum + inst.valor_original,
+                    0,
+                  );
+                  const totalReceived = Math.min(
+                    totalValue,
+                    individualInstallments.reduce(
+                      (sum, inst) => sum + inst.valor_recebido,
+                      0,
+                    ),
+                  );
+                  const pendingValue = totalValue - totalReceived;
+
+                  if (totalReceived === 0) return "pending" as const;
+                  if (pendingValue <= 0.01) return "fully_paid" as const;
+                  return "partially_paid" as const;
+                })(),
+                payments: getSalePayments(0, clientDocument), // Usar 0 para buscar pagamentos da renegociada
+                clientDocument,
+              },
+            ]
+          : [];
+
       // Retornar vendas agrupadas + venda renegociada
       return [...saleGroups, ...renegotiatedSaleGroups];
     },

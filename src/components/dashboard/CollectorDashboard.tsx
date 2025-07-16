@@ -88,42 +88,46 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     const goals = {
       daily: { visits: 10, payments: 5000 },
       weekly: { visits: 50, payments: 25000 },
-      monthly: { visits: 200, payments: 100000 }
+      monthly: { visits: 200, payments: 100000 },
     };
 
     // Filtrar pagamentos do cobrador atual
-    const collectorPayments = payments.filter(p => p.collectorId === user?.id);
+    const collectorPayments = payments.filter(
+      (p) => p.collectorId === user?.id,
+    );
 
     // Função para comparar datas (apenas dia)
     const isSameDay = (date1: Date, date2: Date) => {
-      return date1.toISOString().split('T')[0] === date2.toISOString().split('T')[0];
+      return (
+        date1.toISOString().split("T")[0] === date2.toISOString().split("T")[0]
+      );
     };
 
     const today = new Date();
-    
-    const dailyPayments = collectorPayments.filter(p => {
+
+    const dailyPayments = collectorPayments.filter((p) => {
       // Verificar se a data é uma string no formato YYYY-MM-DD ou se já é um objeto Date
       let paymentDate;
-      if (typeof p.paymentDate === 'string') {
+      if (typeof p.paymentDate === "string") {
         // Se é string, pode ser no formato YYYY-MM-DD (date do SQL)
-        paymentDate = new Date(p.paymentDate + 'T00:00:00');
+        paymentDate = new Date(p.paymentDate + "T00:00:00");
       } else {
         paymentDate = new Date(p.paymentDate);
       }
-      
+
       return isSameDay(paymentDate, today);
     });
 
     // Função para processar data de visita
     const processVisitDate = (dateStr: string) => {
-      if (typeof dateStr === 'string') {
-        return new Date(dateStr + 'T00:00:00');
+      if (typeof dateStr === "string") {
+        return new Date(dateStr + "T00:00:00");
       }
       return new Date(dateStr);
     };
 
-    const todayVisits = visits.filter(v => {
-      if (v.status !== 'realizada') return false;
+    const todayVisits = visits.filter((v) => {
+      if (v.status !== "realizada") return false;
       const dateToCheck = v.dataVisitaRealizada || v.scheduledDate;
       const visitDate = processVisitDate(dateToCheck);
       return isSameDay(visitDate, today);
@@ -133,32 +137,36 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     const metrics = {
       daily: {
         visits: todayVisits.length,
-        payments: dailyPayments.reduce((sum, p) => sum + p.paymentAmount, 0)
+        payments: dailyPayments.reduce((sum, p) => sum + p.paymentAmount, 0),
       },
       weekly: {
-        visits: visits.filter(v => {
-          if (v.status !== 'realizada') return false;
+        visits: visits.filter((v) => {
+          if (v.status !== "realizada") return false;
           const dateToCheck = v.dataVisitaRealizada || v.scheduledDate;
           const visitDate = processVisitDate(dateToCheck);
           return visitDate >= startOfWeek;
         }).length,
-        payments: collectorPayments.filter(p => {
-          const paymentDate = new Date(p.paymentDate);
-          return paymentDate >= startOfWeek;
-        }).reduce((sum, p) => sum + p.paymentAmount, 0)
+        payments: collectorPayments
+          .filter((p) => {
+            const paymentDate = new Date(p.paymentDate);
+            return paymentDate >= startOfWeek;
+          })
+          .reduce((sum, p) => sum + p.paymentAmount, 0),
       },
       monthly: {
-        visits: visits.filter(v => {
-          if (v.status !== 'realizada') return false;
+        visits: visits.filter((v) => {
+          if (v.status !== "realizada") return false;
           const dateToCheck = v.dataVisitaRealizada || v.scheduledDate;
           const visitDate = processVisitDate(dateToCheck);
           return visitDate >= startOfMonth;
         }).length,
-        payments: collectorPayments.filter(p => {
-          const paymentDate = new Date(p.paymentDate);
-          return paymentDate >= startOfMonth;
-        }).reduce((sum, p) => sum + p.paymentAmount, 0)
-      }
+        payments: collectorPayments
+          .filter((p) => {
+            const paymentDate = new Date(p.paymentDate);
+            return paymentDate >= startOfMonth;
+          })
+          .reduce((sum, p) => sum + p.paymentAmount, 0),
+      },
     };
 
     return { metrics, goals };
@@ -167,49 +175,57 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   // Funções para gamificação
   const getPerformanceLevel = (current: number, goal: number) => {
     const percentage = goal > 0 ? (current / goal) * 100 : 0;
-    if (percentage >= 100) return { 
-      icon: Trophy, 
-      name: "Lendário", 
-      color: "text-yellow-500", 
-      bgColor: "bg-yellow-50" 
-    };
-    if (percentage >= 90) return { 
-      icon: Diamond, 
-      name: "Diamante", 
-      color: "text-blue-500", 
-      bgColor: "bg-blue-50" 
-    };
-    if (percentage >= 70) return { 
-      icon: Award, 
-      name: "Ouro", 
-      color: "text-yellow-600", 
-      bgColor: "bg-yellow-50" 
-    };
-    if (percentage >= 50) return { 
-      icon: Medal, 
-      name: "Prata", 
-      color: "text-gray-500", 
-      bgColor: "bg-gray-50" 
-    };
-    if (percentage >= 30) return { 
-      icon: ThumbsUp, 
-      name: "Bronze", 
-      color: "text-orange-600", 
-      bgColor: "bg-orange-50" 
-    };
-    return { 
-      icon: Flame, 
-      name: "Iniciante", 
-      color: "text-red-500", 
-      bgColor: "bg-red-50" 
+    if (percentage >= 100)
+      return {
+        icon: Trophy,
+        name: "Lendário",
+        color: "text-yellow-500",
+        bgColor: "bg-yellow-50",
+      };
+    if (percentage >= 90)
+      return {
+        icon: Diamond,
+        name: "Diamante",
+        color: "text-blue-500",
+        bgColor: "bg-blue-50",
+      };
+    if (percentage >= 70)
+      return {
+        icon: Award,
+        name: "Ouro",
+        color: "text-yellow-600",
+        bgColor: "bg-yellow-50",
+      };
+    if (percentage >= 50)
+      return {
+        icon: Medal,
+        name: "Prata",
+        color: "text-gray-500",
+        bgColor: "bg-gray-50",
+      };
+    if (percentage >= 30)
+      return {
+        icon: ThumbsUp,
+        name: "Bronze",
+        color: "text-orange-600",
+        bgColor: "bg-orange-50",
+      };
+    return {
+      icon: Flame,
+      name: "Iniciante",
+      color: "text-red-500",
+      bgColor: "bg-red-50",
     };
   };
 
   const getMotivationalMessage = (current: number, goal: number) => {
     const percentage = goal > 0 ? (current / goal) * 100 : 0;
-    if (percentage >= 100) return { text: "Incrível! Meta superada!", icon: Rocket };
-    if (percentage >= 90) return { text: "Quase lá! Última tacada!", icon: Zap };
-    if (percentage >= 70) return { text: "Excelente progresso!", icon: TrendingUp };
+    if (percentage >= 100)
+      return { text: "Incrível! Meta superada!", icon: Rocket };
+    if (percentage >= 90)
+      return { text: "Quase lá! Última tacada!", icon: Zap };
+    if (percentage >= 70)
+      return { text: "Excelente progresso!", icon: TrendingUp };
     if (percentage >= 50) return { text: "No caminho certo!", icon: ThumbsUp };
     if (percentage >= 30) return { text: "Vamos acelerar!", icon: Zap };
     return { text: "Hora de começar!", icon: Target };
@@ -217,8 +233,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
   // Componente consolidado para clientes
   const ClientsCard = () => (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-purple-300 transition-colors cursor-pointer"
-         onClick={() => setActiveTab("collections")}>
+    <div
+      className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-purple-300 transition-colors cursor-pointer"
+      onClick={() => setActiveTab("collections")}
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="p-2 bg-purple-500 rounded-lg">
@@ -226,28 +244,30 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           </div>
           <h3 className="font-semibold text-gray-900">Clientes</h3>
         </div>
-        <div className="text-1xl font-bold text-gray-900">
-          {stats.clients}
-        </div>
+        <div className="text-1xl font-bold text-gray-900">{stats.clients}</div>
       </div>
-      
+
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-1">
             <AlertCircle className="w-3 h-3 text-orange-500" />
             <span className="text-gray-600">Pendentes</span>
           </div>
-          <span className="font-medium text-orange-600">{stats.clientsWithPending}</span>
+          <span className="font-medium text-orange-600">
+            {stats.clientsWithPending}
+          </span>
         </div>
-        
+
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-1">
             <CheckCircle className="w-3 h-3 text-green-500" />
             <span className="text-gray-600">Em dia</span>
           </div>
-          <span className="font-medium text-green-600">{stats.clients - stats.clientsWithPending}</span>
+          <span className="font-medium text-green-600">
+            {stats.clients - stats.clientsWithPending}
+          </span>
         </div>
-        
+
         <div className="pt-2 border-t border-gray-100">
           <div className="text-xs text-gray-500">
             {stats.pending} vendas pendentes
@@ -267,11 +287,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           </div>
           <h3 className="font-semibold text-gray-900">Vendas</h3>
         </div>
-        <div className="text-1xl font-bold text-gray-900">
-          {stats.total}
-        </div>
+        <div className="text-1xl font-bold text-gray-900">{stats.total}</div>
       </div>
-      
+
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-1">
@@ -280,7 +298,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           </div>
           <span className="font-medium text-green-600">{stats.completed}</span>
         </div>
-        
+
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-1">
             <Clock className="w-3 h-3 text-orange-500" />
@@ -288,10 +306,13 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           </div>
           <span className="font-medium text-orange-600">{stats.pending}</span>
         </div>
-        
+
         <div className="pt-2 border-t border-gray-100">
           <div className="text-xs text-gray-500">
-            {stats.total > 0 ? ((stats.completed / stats.total) * 100).toFixed(1) : 0}% concluídas
+            {stats.total > 0
+              ? ((stats.completed / stats.total) * 100).toFixed(1)
+              : 0}
+            % concluídas
           </div>
         </div>
       </div>
@@ -300,8 +321,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
   // Componente consolidado para visitas
   const VisitsCard = () => (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-orange-300 transition-colors cursor-pointer"
-         onClick={() => setActiveTab("visits")}>
+    <div
+      className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-orange-300 transition-colors cursor-pointer"
+      onClick={() => setActiveTab("visits")}
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="p-2 bg-orange-500 rounded-lg">
@@ -313,27 +336,32 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           {stats.visitStats.scheduled}
         </div>
       </div>
-      
+
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-1">
             <Sun className="w-3 h-3 text-yellow-500" />
             <span className="text-gray-600">Hoje</span>
           </div>
-          <span className="font-medium text-yellow-600">{stats.visitStats.today}</span>
+          <span className="font-medium text-yellow-600">
+            {stats.visitStats.today}
+          </span>
         </div>
-        
+
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-1">
             <CheckCircle className="w-3 h-3 text-green-500" />
             <span className="text-gray-600">Realizadas</span>
           </div>
-          <span className="font-medium text-green-600">{stats.visitStats.completed}</span>
+          <span className="font-medium text-green-600">
+            {stats.visitStats.completed}
+          </span>
         </div>
-        
+
         <div className="pt-2 border-t border-gray-100">
           <div className="text-xs text-gray-500">
-            {stats.visitStats.scheduled + stats.visitStats.completed} visitas no total
+            {stats.visitStats.scheduled + stats.visitStats.completed} visitas no
+            total
           </div>
         </div>
       </div>
@@ -355,9 +383,12 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   );
   const clientGroups = getClientGroups(user?.id);
   const myVisits = getVisitsByCollector(user?.id || "");
-  
+
   // Calcular métricas gamificadas
-  const { metrics: periodMetrics, goals } = getMetricsByPeriod(salePayments, myVisits);
+  const { metrics: periodMetrics, goals } = getMetricsByPeriod(
+    salePayments,
+    myVisits,
+  );
 
   // Simplified logic - group by sale to count correctly
   const salesMap = new Map<
@@ -410,21 +441,21 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
   // Calcular métricas de visitas
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  
+  const todayStr = today.toISOString().split("T")[0];
+
   const visitStats = {
-    today: myVisits.filter(v => {
+    today: myVisits.filter((v) => {
       // Para visitas agendadas, usar scheduled_date
       // Para visitas realizadas, usar data_visita_realizada se existir
-      if (v.status === 'agendada') {
+      if (v.status === "agendada") {
         return v.scheduledDate === todayStr;
-      } else if (v.status === 'realizada' && v.dataVisitaRealizada) {
+      } else if (v.status === "realizada" && v.dataVisitaRealizada) {
         return v.dataVisitaRealizada === todayStr;
       }
       return false;
     }).length,
-    scheduled: myVisits.filter(v => v.status === 'agendada').length,
-    completed: myVisits.filter(v => v.status === 'realizada').length,
+    scheduled: myVisits.filter((v) => v.status === "agendada").length,
+    completed: myVisits.filter((v) => v.status === "realizada").length,
   };
 
   const stats = {
@@ -456,7 +487,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     switch (activeTab) {
       case "overview":
         return (
-          
           <div className="space-y-6">
             {/* Enhanced Mobile Stats Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
@@ -467,8 +497,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
               </div>
             </div>
 
-
-            
             {/* Métricas Gamificadas */}
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-200 overflow-hidden">
               {/* Header */}
@@ -479,17 +507,15 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                       <Target className="w-6 h-6 text-indigo-600" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-gray-800">
-                        Metas
-                      </h2>
+                      <h2 className="text-xl font-bold text-gray-800">Metas</h2>
                     </div>
                   </div>
                   <div className="text-sm text-gray-600 bg-white px-4 py-2 rounded-xl border border-gray-200">
                     <div className="font-medium">
-                      {new Date().toLocaleDateString('pt-BR', { 
-                        weekday: 'long', 
-                        day: 'numeric', 
-                        month: 'long' 
+                      {new Date().toLocaleDateString("pt-BR", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
                       })}
                     </div>
                   </div>
@@ -513,8 +539,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         title="Visitas Realizadas"
                         showValues={true}
                         isCurrency={false}
-                        level={getPerformanceLevel(periodMetrics.daily.visits, goals.daily.visits)}
-                        motivationalMessage={getMotivationalMessage(periodMetrics.daily.visits, goals.daily.visits)}
+                        level={getPerformanceLevel(
+                          periodMetrics.daily.visits,
+                          goals.daily.visits,
+                        )}
+                        motivationalMessage={getMotivationalMessage(
+                          periodMetrics.daily.visits,
+                          goals.daily.visits,
+                        )}
                       />
                       <RadialApprovalChart
                         current={periodMetrics.daily.payments}
@@ -522,8 +554,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         title="Valor Recebido"
                         showValues={true}
                         isCurrency={true}
-                        level={getPerformanceLevel(periodMetrics.daily.payments, goals.daily.payments)}
-                        motivationalMessage={getMotivationalMessage(periodMetrics.daily.payments, goals.daily.payments)}
+                        level={getPerformanceLevel(
+                          periodMetrics.daily.payments,
+                          goals.daily.payments,
+                        )}
+                        motivationalMessage={getMotivationalMessage(
+                          periodMetrics.daily.payments,
+                          goals.daily.payments,
+                        )}
                       />
                     </div>
                   </div>
@@ -541,8 +579,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         title="Visitas Realizadas"
                         showValues={true}
                         isCurrency={false}
-                        level={getPerformanceLevel(periodMetrics.weekly.visits, goals.weekly.visits)}
-                        motivationalMessage={getMotivationalMessage(periodMetrics.weekly.visits, goals.weekly.visits)}
+                        level={getPerformanceLevel(
+                          periodMetrics.weekly.visits,
+                          goals.weekly.visits,
+                        )}
+                        motivationalMessage={getMotivationalMessage(
+                          periodMetrics.weekly.visits,
+                          goals.weekly.visits,
+                        )}
                       />
                       <RadialApprovalChart
                         current={periodMetrics.weekly.payments}
@@ -550,8 +594,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         title="Valor Recebido"
                         showValues={true}
                         isCurrency={true}
-                        level={getPerformanceLevel(periodMetrics.weekly.payments, goals.weekly.payments)}
-                        motivationalMessage={getMotivationalMessage(periodMetrics.weekly.payments, goals.weekly.payments)}
+                        level={getPerformanceLevel(
+                          periodMetrics.weekly.payments,
+                          goals.weekly.payments,
+                        )}
+                        motivationalMessage={getMotivationalMessage(
+                          periodMetrics.weekly.payments,
+                          goals.weekly.payments,
+                        )}
                       />
                     </div>
                   </div>
@@ -569,8 +619,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         title="Visitas Realizadas"
                         showValues={true}
                         isCurrency={false}
-                        level={getPerformanceLevel(periodMetrics.monthly.visits, goals.monthly.visits)}
-                        motivationalMessage={getMotivationalMessage(periodMetrics.monthly.visits, goals.monthly.visits)}
+                        level={getPerformanceLevel(
+                          periodMetrics.monthly.visits,
+                          goals.monthly.visits,
+                        )}
+                        motivationalMessage={getMotivationalMessage(
+                          periodMetrics.monthly.visits,
+                          goals.monthly.visits,
+                        )}
                       />
                       <RadialApprovalChart
                         current={periodMetrics.monthly.payments}
@@ -578,8 +634,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         title="Valor Recebido"
                         showValues={true}
                         isCurrency={true}
-                        level={getPerformanceLevel(periodMetrics.monthly.payments, goals.monthly.payments)}
-                        motivationalMessage={getMotivationalMessage(periodMetrics.monthly.payments, goals.monthly.payments)}
+                        level={getPerformanceLevel(
+                          periodMetrics.monthly.payments,
+                          goals.monthly.payments,
+                        )}
+                        motivationalMessage={getMotivationalMessage(
+                          periodMetrics.monthly.payments,
+                          goals.monthly.payments,
+                        )}
                       />
                     </div>
                   </div>
@@ -600,8 +662,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         title="Visitas Realizadas"
                         showValues={true}
                         isCurrency={false}
-                        level={getPerformanceLevel(periodMetrics.daily.visits, goals.daily.visits)}
-                        motivationalMessage={getMotivationalMessage(periodMetrics.daily.visits, goals.daily.visits)}
+                        level={getPerformanceLevel(
+                          periodMetrics.daily.visits,
+                          goals.daily.visits,
+                        )}
+                        motivationalMessage={getMotivationalMessage(
+                          periodMetrics.daily.visits,
+                          goals.daily.visits,
+                        )}
                       />
                       <RadialApprovalChart
                         current={periodMetrics.daily.payments}
@@ -609,12 +677,18 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         title="Valor Recebido"
                         showValues={true}
                         isCurrency={true}
-                        level={getPerformanceLevel(periodMetrics.daily.payments, goals.daily.payments)}
-                        motivationalMessage={getMotivationalMessage(periodMetrics.daily.payments, goals.daily.payments)}
+                        level={getPerformanceLevel(
+                          periodMetrics.daily.payments,
+                          goals.daily.payments,
+                        )}
+                        motivationalMessage={getMotivationalMessage(
+                          periodMetrics.daily.payments,
+                          goals.daily.payments,
+                        )}
                       />
                     </div>
                   </div>
-                  
+
                   {/* Metas Semanais */}
                   <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-blue-200">
                     <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
@@ -628,8 +702,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         title="Visitas Realizadas"
                         showValues={true}
                         isCurrency={false}
-                        level={getPerformanceLevel(periodMetrics.weekly.visits, goals.weekly.visits)}
-                        motivationalMessage={getMotivationalMessage(periodMetrics.weekly.visits, goals.weekly.visits)}
+                        level={getPerformanceLevel(
+                          periodMetrics.weekly.visits,
+                          goals.weekly.visits,
+                        )}
+                        motivationalMessage={getMotivationalMessage(
+                          periodMetrics.weekly.visits,
+                          goals.weekly.visits,
+                        )}
                       />
                       <RadialApprovalChart
                         current={periodMetrics.weekly.payments}
@@ -637,12 +717,18 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         title="Valor Recebido"
                         showValues={true}
                         isCurrency={true}
-                        level={getPerformanceLevel(periodMetrics.weekly.payments, goals.weekly.payments)}
-                        motivationalMessage={getMotivationalMessage(periodMetrics.weekly.payments, goals.weekly.payments)}
+                        level={getPerformanceLevel(
+                          periodMetrics.weekly.payments,
+                          goals.weekly.payments,
+                        )}
+                        motivationalMessage={getMotivationalMessage(
+                          periodMetrics.weekly.payments,
+                          goals.weekly.payments,
+                        )}
                       />
                     </div>
                   </div>
-                  
+
                   {/* Metas Mensais */}
                   <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-purple-200">
                     <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
@@ -656,8 +742,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         title="Visitas Realizadas"
                         showValues={true}
                         isCurrency={false}
-                        level={getPerformanceLevel(periodMetrics.monthly.visits, goals.monthly.visits)}
-                        motivationalMessage={getMotivationalMessage(periodMetrics.monthly.visits, goals.monthly.visits)}
+                        level={getPerformanceLevel(
+                          periodMetrics.monthly.visits,
+                          goals.monthly.visits,
+                        )}
+                        motivationalMessage={getMotivationalMessage(
+                          periodMetrics.monthly.visits,
+                          goals.monthly.visits,
+                        )}
                       />
                       <RadialApprovalChart
                         current={periodMetrics.monthly.payments}
@@ -665,8 +757,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         title="Valor Recebido"
                         showValues={true}
                         isCurrency={true}
-                        level={getPerformanceLevel(periodMetrics.monthly.payments, goals.monthly.payments)}
-                        motivationalMessage={getMotivationalMessage(periodMetrics.monthly.payments, goals.monthly.payments)}
+                        level={getPerformanceLevel(
+                          periodMetrics.monthly.payments,
+                          goals.monthly.payments,
+                        )}
+                        motivationalMessage={getMotivationalMessage(
+                          periodMetrics.monthly.payments,
+                          goals.monthly.payments,
+                        )}
                       />
                     </div>
                   </div>
@@ -702,19 +800,25 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                     <div className="text-1xl lg:text-3xl font-bold text-blue-600 mb-2">
                       {formatCurrency(stats.totalAmount)}
                     </div>
-                    <div className="text-sm text-gray-600 font-medium">Valor Total</div>
+                    <div className="text-sm text-gray-600 font-medium">
+                      Valor Total
+                    </div>
                   </div>
                   <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-green-200 text-center">
                     <div className="text-1xl lg:text-3xl font-bold text-green-600 mb-2">
                       {formatCurrency(stats.receivedAmount)}
                     </div>
-                    <div className="text-sm text-gray-600 font-medium">Valor Recebido</div>
+                    <div className="text-sm text-gray-600 font-medium">
+                      Valor Recebido
+                    </div>
                   </div>
                   <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-orange-200 text-center">
                     <div className="text-1xl lg:text-3xl font-bold text-orange-600 mb-2">
                       {formatCurrency(stats.totalAmount - stats.receivedAmount)}
                     </div>
-                    <div className="text-sm text-gray-600 font-medium">Valor Pendente</div>
+                    <div className="text-sm text-gray-600 font-medium">
+                      Valor Pendente
+                    </div>
                   </div>
                 </div>
               </div>
