@@ -50,6 +50,15 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
     Record<number, string>
   >({});
 
+  // Desabilitar scroll do body quando o modal estiver aberto
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, []);
+
   // Calcular totais com validações
   const totalValue =
     clientSales?.reduce((sum, sale) => {
@@ -247,7 +256,14 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
     (parseFloat(distributionAmount) || 0) - totalDistributed;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="bg-white rounded-xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 sm:px-6 py-4 flex items-center justify-between">

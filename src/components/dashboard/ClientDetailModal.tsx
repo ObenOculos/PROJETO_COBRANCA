@@ -215,6 +215,15 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     }
   }, []);
 
+  // Desabilitar scroll do body quando o modal estiver aberto
+  React.useEffect(() => {
+    document.body.style.overflow = "hidden";
+    
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, []);
+
   // Obter vendas do cliente usando a nova estrutura
   const clientSales = React.useMemo(() => {
     const sales = getSalesByClient(clientGroup.document);
@@ -369,7 +378,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
+        }}
+      >
         <div className="bg-white rounded-xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
           {/* Header */}
           <div className="px-4 lg:px-6 py-4 border-b border-gray-200 flex items-center justify-between">

@@ -30,6 +30,16 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
   onClose,
 }) => {
   const { scheduledVisits, users } = useCollection();
+  
+  // Desabilitar scroll do body quando o modal estiver aberto
+  React.useEffect(() => {
+    document.body.style.overflow = "hidden";
+    
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, []);
+  
   const saleData = useMemo(() => {
     if (!collections.length) return null;
 
@@ -127,7 +137,14 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
   if (!saleData) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[95vh] overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-600 to-purple-600 text-white">
@@ -482,18 +499,6 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
               </div>
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex justify-end">
-            <button
-              onClick={onClose}
-              className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Fechar
-            </button>
-          </div>
         </div>
       </div>
     </div>
