@@ -6,6 +6,18 @@ import {
   Users,
   Calendar,
   BarChart3,
+  Trophy,
+  Diamond,
+  Medal,
+  Award,
+  Flame,
+  Sun,
+  CalendarDays,
+  CalendarRange,
+  TrendingUp,
+  Zap,
+  Rocket,
+  ThumbsUp,
 } from "lucide-react";
 import StatsCard from "../common/StatsCard";
 import FilterBar from "../common/FilterBar";
@@ -109,24 +121,12 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       return new Date(dateStr);
     };
 
-    // Debug visitas
-    console.log('Debug visitas:');
-    console.log('Total de visitas:', visits.length);
-    console.log('Status disponíveis:', [...new Set(visits.map(v => v.status))]);
-    
     const todayVisits = visits.filter(v => {
-      console.log('Visita:', v.id, 'Status:', v.status, 'Data agendada:', v.scheduledDate, 'Data realizada:', v.dataVisitaRealizada);
       if (v.status !== 'realizada') return false;
-      
-      // Verificar se devemos usar dataVisitaRealizada ao invés de scheduledDate
       const dateToCheck = v.dataVisitaRealizada || v.scheduledDate;
       const visitDate = processVisitDate(dateToCheck);
-      const isToday = isSameDay(visitDate, today);
-      console.log('Data para verificar:', dateToCheck, 'É hoje?', isToday);
-      return isToday;
+      return isSameDay(visitDate, today);
     });
-    
-    console.log('Visitas de hoje:', todayVisits.length);
 
     // Calcular métricas reais
     const metrics = {
@@ -161,6 +161,57 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     };
 
     return { metrics, goals };
+  };
+
+  // Funções para gamificação
+  const getPerformanceLevel = (current: number, goal: number) => {
+    const percentage = goal > 0 ? (current / goal) * 100 : 0;
+    if (percentage >= 100) return { 
+      icon: Trophy, 
+      name: "Lendário", 
+      color: "text-yellow-500", 
+      bgColor: "bg-yellow-50" 
+    };
+    if (percentage >= 90) return { 
+      icon: Diamond, 
+      name: "Diamante", 
+      color: "text-blue-500", 
+      bgColor: "bg-blue-50" 
+    };
+    if (percentage >= 70) return { 
+      icon: Award, 
+      name: "Ouro", 
+      color: "text-yellow-600", 
+      bgColor: "bg-yellow-50" 
+    };
+    if (percentage >= 50) return { 
+      icon: Medal, 
+      name: "Prata", 
+      color: "text-gray-500", 
+      bgColor: "bg-gray-50" 
+    };
+    if (percentage >= 30) return { 
+      icon: ThumbsUp, 
+      name: "Bronze", 
+      color: "text-orange-600", 
+      bgColor: "bg-orange-50" 
+    };
+    return { 
+      icon: Flame, 
+      name: "Iniciante", 
+      color: "text-red-500", 
+      bgColor: "bg-red-50" 
+    };
+  };
+
+  const getMotivationalMessage = (current: number, goal: number) => {
+    const percentage = goal > 0 ? (current / goal) * 100 : 0;
+    if (percentage >= 100) return { text: "Incrível! Meta superada!", icon: Rocket };
+    if (percentage >= 90) return { text: "Quase lá! Última tacada!", icon: Zap };
+    if (percentage >= 70) return { text: "Excelente progresso!", icon: TrendingUp };
+    if (percentage >= 50) return { text: "No caminho certo!", icon: ThumbsUp };
+    if (percentage >= 30) return { text: "Vamos acelerar!", icon: Zap };
+    return { text: "Hora de começar!", icon: Target };
   };
 
   // Salva a aba ativa no localStorage apenas quando gerenciado internamente
@@ -259,6 +310,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     switch (activeTab) {
       case "overview":
         return (
+          
           <div className="space-y-6">
             {/* Enhanced Mobile Stats Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
@@ -300,7 +352,217 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
               />
             </div>
 
-            {/* Performance Summary - Mobile Optimized */}
+
+            
+            {/* Métricas Gamificadas */}
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-200 overflow-hidden">
+              {/* Header */}
+              <div className="bg-white/80 backdrop-blur-sm p-6 border-b border-indigo-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-100 rounded-xl">
+                      <Target className="w-6 h-6 text-indigo-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-800">
+                        Metas e Conquistas
+                      </h2>
+                      <p className="text-sm text-gray-600">
+                        Acompanhe seu progresso e conquiste suas metas
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-600 bg-white px-4 py-2 rounded-xl border border-gray-200">
+                    <div className="font-medium">
+                      {new Date().toLocaleDateString('pt-BR', { 
+                        weekday: 'long', 
+                        day: 'numeric', 
+                        month: 'long' 
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                {/* Layout Desktop: Grid 3x2 */}
+                <div className="hidden lg:grid lg:grid-cols-3 lg:gap-8">
+                  {/* Coluna Hoje */}
+                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-yellow-200">
+                    <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center gap-2 justify-center">
+                      <Sun className="w-5 h-5 text-yellow-500" />
+                      Hoje
+                    </h3>
+                    <div className="space-y-6">
+                      <RadialApprovalChart
+                        current={periodMetrics.daily.visits}
+                        goal={goals.daily.visits}
+                        title="Visitas Realizadas"
+                        showValues={true}
+                        isCurrency={false}
+                        level={getPerformanceLevel(periodMetrics.daily.visits, goals.daily.visits)}
+                        motivationalMessage={getMotivationalMessage(periodMetrics.daily.visits, goals.daily.visits)}
+                      />
+                      <RadialApprovalChart
+                        current={periodMetrics.daily.payments}
+                        goal={goals.daily.payments}
+                        title="Valor Recebido"
+                        showValues={true}
+                        isCurrency={true}
+                        level={getPerformanceLevel(periodMetrics.daily.payments, goals.daily.payments)}
+                        motivationalMessage={getMotivationalMessage(periodMetrics.daily.payments, goals.daily.payments)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Coluna Esta Semana */}
+                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-blue-200">
+                    <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center gap-2 justify-center">
+                      <CalendarDays className="w-5 h-5 text-blue-500" />
+                      Esta Semana
+                    </h3>
+                    <div className="space-y-6">
+                      <RadialApprovalChart
+                        current={periodMetrics.weekly.visits}
+                        goal={goals.weekly.visits}
+                        title="Visitas Realizadas"
+                        showValues={true}
+                        isCurrency={false}
+                        level={getPerformanceLevel(periodMetrics.weekly.visits, goals.weekly.visits)}
+                        motivationalMessage={getMotivationalMessage(periodMetrics.weekly.visits, goals.weekly.visits)}
+                      />
+                      <RadialApprovalChart
+                        current={periodMetrics.weekly.payments}
+                        goal={goals.weekly.payments}
+                        title="Valor Recebido"
+                        showValues={true}
+                        isCurrency={true}
+                        level={getPerformanceLevel(periodMetrics.weekly.payments, goals.weekly.payments)}
+                        motivationalMessage={getMotivationalMessage(periodMetrics.weekly.payments, goals.weekly.payments)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Coluna Este Mês */}
+                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-purple-200">
+                    <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center gap-2 justify-center">
+                      <CalendarRange className="w-5 h-5 text-purple-500" />
+                      Este Mês
+                    </h3>
+                    <div className="space-y-6">
+                      <RadialApprovalChart
+                        current={periodMetrics.monthly.visits}
+                        goal={goals.monthly.visits}
+                        title="Visitas Realizadas"
+                        showValues={true}
+                        isCurrency={false}
+                        level={getPerformanceLevel(periodMetrics.monthly.visits, goals.monthly.visits)}
+                        motivationalMessage={getMotivationalMessage(periodMetrics.monthly.visits, goals.monthly.visits)}
+                      />
+                      <RadialApprovalChart
+                        current={periodMetrics.monthly.payments}
+                        goal={goals.monthly.payments}
+                        title="Valor Recebido"
+                        showValues={true}
+                        isCurrency={true}
+                        level={getPerformanceLevel(periodMetrics.monthly.payments, goals.monthly.payments)}
+                        motivationalMessage={getMotivationalMessage(periodMetrics.monthly.payments, goals.monthly.payments)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Layout Mobile: Stack vertical */}
+                <div className="lg:hidden space-y-8">
+                  {/* Metas Diárias */}
+                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-yellow-200">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <Sun className="w-5 h-5 text-yellow-500" />
+                      Hoje
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <RadialApprovalChart
+                        current={periodMetrics.daily.visits}
+                        goal={goals.daily.visits}
+                        title="Visitas Realizadas"
+                        showValues={true}
+                        isCurrency={false}
+                        level={getPerformanceLevel(periodMetrics.daily.visits, goals.daily.visits)}
+                        motivationalMessage={getMotivationalMessage(periodMetrics.daily.visits, goals.daily.visits)}
+                      />
+                      <RadialApprovalChart
+                        current={periodMetrics.daily.payments}
+                        goal={goals.daily.payments}
+                        title="Valor Recebido"
+                        showValues={true}
+                        isCurrency={true}
+                        level={getPerformanceLevel(periodMetrics.daily.payments, goals.daily.payments)}
+                        motivationalMessage={getMotivationalMessage(periodMetrics.daily.payments, goals.daily.payments)}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Metas Semanais */}
+                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-blue-200">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <CalendarDays className="w-5 h-5 text-blue-500" />
+                      Esta Semana
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <RadialApprovalChart
+                        current={periodMetrics.weekly.visits}
+                        goal={goals.weekly.visits}
+                        title="Visitas Realizadas"
+                        showValues={true}
+                        isCurrency={false}
+                        level={getPerformanceLevel(periodMetrics.weekly.visits, goals.weekly.visits)}
+                        motivationalMessage={getMotivationalMessage(periodMetrics.weekly.visits, goals.weekly.visits)}
+                      />
+                      <RadialApprovalChart
+                        current={periodMetrics.weekly.payments}
+                        goal={goals.weekly.payments}
+                        title="Valor Recebido"
+                        showValues={true}
+                        isCurrency={true}
+                        level={getPerformanceLevel(periodMetrics.weekly.payments, goals.weekly.payments)}
+                        motivationalMessage={getMotivationalMessage(periodMetrics.weekly.payments, goals.weekly.payments)}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Metas Mensais */}
+                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-purple-200">
+                    <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <CalendarRange className="w-5 h-5 text-purple-500" />
+                      Este Mês
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <RadialApprovalChart
+                        current={periodMetrics.monthly.visits}
+                        goal={goals.monthly.visits}
+                        title="Visitas Realizadas"
+                        showValues={true}
+                        isCurrency={false}
+                        level={getPerformanceLevel(periodMetrics.monthly.visits, goals.monthly.visits)}
+                        motivationalMessage={getMotivationalMessage(periodMetrics.monthly.visits, goals.monthly.visits)}
+                      />
+                      <RadialApprovalChart
+                        current={periodMetrics.monthly.payments}
+                        goal={goals.monthly.payments}
+                        title="Valor Recebido"
+                        showValues={true}
+                        isCurrency={true}
+                        level={getPerformanceLevel(periodMetrics.monthly.payments, goals.monthly.payments)}
+                        motivationalMessage={getMotivationalMessage(periodMetrics.monthly.payments, goals.monthly.payments)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+                        {/* Performance Summary - Mobile Optimized */}
             <div className="bg-white rounded-xl shadow-sm p-4 lg:p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Resumo Financeiro
@@ -323,76 +585,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                     {formatCurrency(stats.totalAmount - stats.receivedAmount)}
                   </div>
                   <div className="text-sm text-gray-600">Valor Pendente</div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Métricas Gamificadas */}
-            <div className="bg-white rounded-xl shadow-sm p-4 lg:p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Metas e Conquistas
-              </h2>
-              
-              {/* Metas Diárias */}
-              <div className="mb-6">
-                <h3 className="text-md font-medium text-gray-700 mb-3">Hoje</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <RadialApprovalChart
-                    current={periodMetrics.daily.visits}
-                    goal={goals.daily.visits}
-                    title="Visitas Realizadas"
-                    showValues={true}
-                    isCurrency={false}
-                  />
-                  <RadialApprovalChart
-                    current={periodMetrics.daily.payments}
-                    goal={goals.daily.payments}
-                    title="Valor Recebido"
-                    showValues={true}
-                    isCurrency={true}
-                  />
-                </div>
-              </div>
-              
-              {/* Metas Semanais */}
-              <div className="mb-6">
-                <h3 className="text-md font-medium text-gray-700 mb-3">Esta Semana</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <RadialApprovalChart
-                    current={periodMetrics.weekly.visits}
-                    goal={goals.weekly.visits}
-                    title="Visitas Realizadas"
-                    showValues={true}
-                    isCurrency={false}
-                  />
-                  <RadialApprovalChart
-                    current={periodMetrics.weekly.payments}
-                    goal={goals.weekly.payments}
-                    title="Valor Recebido"
-                    showValues={true}
-                    isCurrency={true}
-                  />
-                </div>
-              </div>
-              
-              {/* Metas Mensais */}
-              <div className="mb-6">
-                <h3 className="text-md font-medium text-gray-700 mb-3">Este Mês</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <RadialApprovalChart
-                    current={periodMetrics.monthly.visits}
-                    goal={goals.monthly.visits}
-                    title="Visitas Realizadas"
-                    showValues={true}
-                    isCurrency={false}
-                  />
-                  <RadialApprovalChart
-                    current={periodMetrics.monthly.payments}
-                    goal={goals.monthly.payments}
-                    title="Valor Recebido"
-                    showValues={true}
-                    isCurrency={true}
-                  />
                 </div>
               </div>
             </div>
