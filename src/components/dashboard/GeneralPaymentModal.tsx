@@ -1,19 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Edit, 
-  DollarSign, 
-  CheckCircle, 
+import React, { useState, useEffect } from "react";
+import {
+  X,
+  Edit,
+  DollarSign,
+  CheckCircle,
   Receipt,
   Calculator,
   TrendingDown,
   RefreshCw,
-} from 'lucide-react';
-import { ClientGroup, SaleGroup } from '../../types';
-import { useCollection } from '../../contexts/CollectionContext';
-import { useAuth } from '../../contexts/AuthContext';
-import { formatCurrency } from '../../utils/mockData';
-import { CollectionStatus } from '../../types/status';
+} from "lucide-react";
+import { ClientGroup, SaleGroup } from "../../types";
+import { useCollection } from "../../contexts/CollectionContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { formatCurrency } from "../../utils/formatters";
 
 interface GeneralPaymentModalProps {
   clientGroup: ClientGroup;
@@ -29,32 +28,41 @@ interface SaleDistributionItem {
   appliedAmount: number;
 }
 
-const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({ 
-  clientGroup, 
+const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
+  clientGroup,
   clientSales,
-  onClose, 
-  onSuccess 
+  onClose,
+  onSuccess,
 }) => {
-  const { updateCollection } = useCollection();
+  const { processGeneralPayment } = useCollection();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [distributionAmount, setDistributionAmount] = useState<string>('');
-  const [distributionMode, setDistributionMode] = useState<'auto' | 'manual'>('auto');
-  const [saleDistribution, setSaleDistribution] = useState<SaleDistributionItem[]>([]);
-  const [manualSaleEdits, setManualSaleEdits] = useState<Record<number, string>>({});
+  const [distributionAmount, setDistributionAmount] = useState<string>("");
+  const [distributionMode, setDistributionMode] = useState<"auto" | "manual">(
+    "auto",
+  );
+  const [saleDistribution, setSaleDistribution] = useState<
+    SaleDistributionItem[]
+  >([]);
+  const [manualSaleEdits, setManualSaleEdits] = useState<
+    Record<number, string>
+  >({});
 
   // Calcular totais com validações
-  const totalValue = clientSales?.reduce((sum, sale) => {
-    return sum + (sale.totalValue || 0);
-  }, 0) || 0;
-  
-  const totalReceived = clientSales?.reduce((sum, sale) => {
-    return sum + (sale.totalReceived || 0);
-  }, 0) || 0;
-  
-  const totalPending = clientSales?.reduce((sum, sale) => {
-    return sum + (sale.pendingValue || 0);
-  }, 0) || 0;
+  const totalValue =
+    clientSales?.reduce((sum, sale) => {
+      return sum + (sale.totalValue || 0);
+    }, 0) || 0;
+
+  const totalReceived =
+    clientSales?.reduce((sum, sale) => {
+      return sum + (sale.totalReceived || 0);
+    }, 0) || 0;
+
+  const totalPending =
+    clientSales?.reduce((sum, sale) => {
+      return sum + (sale.pendingValue || 0);
+    }, 0) || 0;
 
   // Calcular distribuição automática por venda
   const calculateSaleDistribution = React.useCallback(() => {
@@ -74,30 +82,30 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
 
     for (const sale of sortedSales) {
       if (remainingAmount <= 0) break;
-      
+
       const currentReceived = sale.totalReceived || 0;
       const pendingValue = sale.pendingValue || 0;
-      
+
       if (pendingValue > 0) {
         const appliedAmount = Math.min(remainingAmount, pendingValue);
         const newAmount = currentReceived + appliedAmount;
-        
+
         newDistribution.push({
           sale,
           currentReceived,
           newAmount,
-          appliedAmount
+          appliedAmount,
         });
-        
+
         remainingAmount -= appliedAmount;
       }
     }
 
     setSaleDistribution(newDistribution);
-    
+
     // Inicializar valores manuais por venda
     const initialManualValues: Record<number, string> = {};
-    newDistribution.forEach(item => {
+    newDistribution.forEach((item) => {
       initialManualValues[item.sale.saleNumber] = item.newAmount.toFixed(2);
     });
     setManualSaleEdits(initialManualValues);
@@ -105,121 +113,80 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
 
   // Recalcular distribuição quando o valor mudar
   useEffect(() => {
-    if (distributionMode === 'auto') {
+    if (distributionMode === "auto") {
       calculateSaleDistribution();
     }
   }, [distributionAmount, distributionMode, calculateSaleDistribution]);
 
   const handleManualSaleEdit = (saleNumber: number, value: string) => {
-    setManualSaleEdits(prev => ({
+    setManualSaleEdits((prev) => ({
       ...prev,
-      [saleNumber]: value
+      [saleNumber]: value,
     }));
 
     // Atualizar distribuição com valor manual
-    setSaleDistribution(prev => prev.map(item => {
-      if (item.sale.saleNumber === saleNumber) {
-        const newAmount = parseFloat(value) || 0;
-        return {
-          ...item,
-          newAmount,
-          appliedAmount: newAmount - item.currentReceived
-        };
-      }
-      return item;
-    }));
+    setSaleDistribution((prev) =>
+      prev.map((item) => {
+        if (item.sale.saleNumber === saleNumber) {
+          const newAmount = parseFloat(value) || 0;
+          return {
+            ...item,
+            newAmount,
+            appliedAmount: newAmount - item.currentReceived,
+          };
+        }
+        return item;
+      }),
+    );
   };
 
   const getTotalDistributed = () => {
     return saleDistribution.reduce((sum, item) => sum + item.appliedAmount, 0);
   };
 
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) {
-      alert('Usuário não identificado');
+      alert("Usuário não identificado");
       return;
     }
 
     if (saleDistribution.length === 0) {
-      alert('Nenhuma distribuição foi calculada');
+      alert("Nenhuma distribuição foi calculada");
       return;
     }
 
     const totalDistributed = getTotalDistributed();
     const inputAmount = parseFloat(distributionAmount) || 0;
-    
+
     if (Math.abs(totalDistributed - inputAmount) > 0.01) {
       const confirm = window.confirm(
-        `O valor distribuído (${formatCurrency(totalDistributed)}) é diferente do valor informado (${formatCurrency(inputAmount)}).\n\nDeseja continuar?`
+        `O valor distribuído (${formatCurrency(totalDistributed)}) é diferente do valor informado (${formatCurrency(inputAmount)}).\n\nDeseja continuar?`,
       );
       if (!confirm) return;
     }
 
     try {
       setLoading(true);
-      
-      // Aplicar cada mudança por venda
-      for (const item of saleDistribution) {
-        if (item.appliedAmount === 0) continue;
-        
-        const { sale, newAmount } = item;
-        
-        // Distribuir o valor entre as parcelas da venda
-        const installments = sale.installments?.sort((a, b) => (a.parcela || 0) - (b.parcela || 0)) || [];
-        let remainingAmount = newAmount;
-        
-        // Primeiro, zerar todas as parcelas
-        for (const installment of installments) {
-          if (!installment.id_parcela) continue;
-          
-          await updateCollection(installment.id_parcela, {
-            valor_recebido: 0,
-            status: CollectionStatus.PENDENTE,
-            data_de_recebimento: null
-          });
-        }
-        
-        // Depois, distribuir o valor entre as parcelas
-        for (const installment of installments) {
-          if (!installment.id_parcela || remainingAmount <= 0) continue;
-          
-          const installmentValue = installment.valor_original || 0;
-          const appliedAmount = Math.min(remainingAmount, installmentValue);
-          
-          const updates: any = {
-            valor_recebido: appliedAmount,
-          };
 
-          // Atualizar status baseado no valor
-          if (appliedAmount === 0) {
-            updates.status = CollectionStatus.PENDENTE;
-            updates.data_de_recebimento = null;
-          } else if (appliedAmount >= installmentValue) {
-            updates.status = CollectionStatus.PAGO;
-            updates.data_de_recebimento = new Date().toISOString().split('T')[0];
-          } else {
-            updates.status = CollectionStatus.PARCIAL;
-            updates.data_de_recebimento = new Date().toISOString().split('T')[0];
-          }
+      // Chamar processGeneralPayment com os parâmetros corretos
+      await processGeneralPayment(
+        clientGroup.document || "",
+        parseFloat(distributionAmount) || 0,
+        "dinheiro", // Valor padrão, pode ser adicionado ao formulário futuramente
+        `Distribuição geral de ${formatCurrency(parseFloat(distributionAmount) || 0)}`,
+        user.id,
+      );
 
-          await updateCollection(installment.id_parcela, updates);
-          
-          remainingAmount -= appliedAmount;
-        }
-      }
-      
       // Notificação de sucesso
       showSuccessNotification();
-      
+
       // Chamar callback de sucesso e fechar modal
       onSuccess();
       onClose();
-      
     } catch (error) {
-      console.error('Erro ao aplicar distribuição:', error);
+      console.error("Erro ao aplicar distribuição:", error);
       showErrorNotification(error);
     } finally {
       setLoading(false);
@@ -227,8 +194,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
   };
 
   const showSuccessNotification = () => {
-    const notification = document.createElement('div');
-    notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center';
+    const notification = document.createElement("div");
+    notification.className =
+      "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
     notification.innerHTML = `
       <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
@@ -244,10 +212,12 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
   };
 
   const showErrorNotification = (error: any) => {
-    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-    
-    const notification = document.createElement('div');
-    notification.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center max-w-md';
+    const errorMessage =
+      error instanceof Error ? error.message : "Erro desconhecido";
+
+    const notification = document.createElement("div");
+    notification.className =
+      "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center max-w-md";
     notification.innerHTML = `
       <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
@@ -265,9 +235,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
     }, 8000);
   };
 
-
   const totalDistributed = getTotalDistributed();
-  const remainingToDistribute = (parseFloat(distributionAmount) || 0) - totalDistributed;
+  const remainingToDistribute =
+    (parseFloat(distributionAmount) || 0) - totalDistributed;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -281,7 +251,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                 Distribuir Pagamento
               </h2>
               <p className="text-sm text-purple-100 truncate">
-                {clientGroup.client || 'Cliente'} - {clientGroup.document || 'Sem documento'}
+                {clientGroup.client || "Cliente"} -{" "}
+                {clientGroup.document || "Sem documento"}
               </p>
             </div>
           </div>
@@ -301,34 +272,42 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                 <Receipt className="h-5 w-5 text-purple-600 mr-2" />
                 Resumo Financeiro
               </h3>
-              
+
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
                   <div className="text-lg sm:text-xl font-bold text-gray-900">
                     {formatCurrency(totalValue)}
                   </div>
-                  <div className="text-xs sm:text-sm text-gray-600">Valor Total</div>
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Valor Total
+                  </div>
                 </div>
-                
+
                 <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
                   <div className="text-lg sm:text-xl font-bold text-green-600">
                     {formatCurrency(totalReceived)}
                   </div>
-                  <div className="text-xs sm:text-sm text-gray-600">Já Recebido</div>
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Já Recebido
+                  </div>
                 </div>
-                
+
                 <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
                   <div className="text-lg sm:text-xl font-bold text-red-600">
                     {formatCurrency(totalPending)}
                   </div>
-                  <div className="text-xs sm:text-sm text-gray-600">Saldo Devedor</div>
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Saldo Devedor
+                  </div>
                 </div>
 
                 <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
                   <div className="text-lg sm:text-xl font-bold text-purple-600">
                     {clientSales?.length || 0}
                   </div>
-                  <div className="text-xs sm:text-sm text-gray-600">Total Vendas</div>
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Total Vendas
+                  </div>
                 </div>
               </div>
             </div>
@@ -350,34 +329,36 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                   required
                 />
               </div>
-              
+
               {/* Atalhos de valor e ações */}
               <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setDistributionAmount(totalPending.toFixed(2))}
+                    onClick={() =>
+                      setDistributionAmount(totalPending.toFixed(2))
+                    }
                     className="px-4 py-2 text-sm bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 transition-colors font-medium"
                   >
                     Saldo Total ({formatCurrency(totalPending)})
                   </button>
                   <button
                     type="button"
-                    onClick={() => setDistributionAmount('100')}
+                    onClick={() => setDistributionAmount("100")}
                     className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
                   >
                     R$ 100
                   </button>
                   <button
                     type="button"
-                    onClick={() => setDistributionAmount('500')}
+                    onClick={() => setDistributionAmount("500")}
                     className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
                   >
                     R$ 500
                   </button>
                   <button
                     type="button"
-                    onClick={() => setDistributionAmount('1000')}
+                    onClick={() => setDistributionAmount("1000")}
                     className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
                   >
                     R$ 1.000
@@ -391,11 +372,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
               <div className="flex items-center gap-4">
                 <button
                   type="button"
-                  onClick={() => setDistributionMode('auto')}
+                  onClick={() => setDistributionMode("auto")}
                   className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
-                    distributionMode === 'auto' 
-                      ? 'bg-purple-600 text-white' 
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    distributionMode === "auto"
+                      ? "bg-purple-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
                   <TrendingDown className="h-4 w-4 mr-2" />
@@ -403,11 +384,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDistributionMode('manual')}
+                  onClick={() => setDistributionMode("manual")}
                   className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
-                    distributionMode === 'manual' 
-                      ? 'bg-purple-600 text-white' 
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    distributionMode === "manual"
+                      ? "bg-purple-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
                   <Edit className="h-4 w-4 mr-2" />
@@ -415,9 +396,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                 </button>
               </div>
               <p className="text-sm text-gray-600 mt-2">
-                {distributionMode === 'auto' 
-                  ? 'O valor será distribuído automaticamente entre as vendas com saldo devedor'
-                  : 'Você pode ajustar manualmente o valor recebido de cada venda'}
+                {distributionMode === "auto"
+                  ? "O valor será distribuído automaticamente entre as vendas com saldo devedor"
+                  : "Você pode ajustar manualmente o valor recebido de cada venda"}
               </p>
             </div>
 
@@ -429,7 +410,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                     Distribuição do Pagamento por Venda
                   </h3>
                   <div className="flex items-center gap-3">
-                    {distributionMode === 'auto' && (
+                    {distributionMode === "auto" && (
                       <button
                         type="button"
                         onClick={calculateSaleDistribution}
@@ -444,9 +425,14 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
 
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {saleDistribution.map((item) => (
-                    <div key={item.sale.saleNumber} className={`bg-white rounded-xl border-2 p-4 transition-all duration-200 ${
-                      item.appliedAmount > 0 ? 'border-purple-300 bg-purple-50 shadow-md' : 'border-gray-200 hover:border-gray-300'
-                    }`}>
+                    <div
+                      key={item.sale.saleNumber}
+                      className={`bg-white rounded-xl border-2 p-4 transition-all duration-200 ${
+                        item.appliedAmount > 0
+                          ? "border-purple-300 bg-purple-50 shadow-md"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
                       {/* Cabeçalho da Venda */}
                       <div className="flex items-center justify-between mb-3">
                         <div>
@@ -454,11 +440,16 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                             Venda #{item.sale.saleNumber}
                           </h4>
                           <div className="text-sm text-gray-600">
-                            {item.sale.installments?.length || 0} parcela{(item.sale.installments?.length || 0) !== 1 ? 's' : ''}
+                            {item.sale.installments?.length || 0} parcela
+                            {(item.sale.installments?.length || 0) !== 1
+                              ? "s"
+                              : ""}
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-xs text-gray-600">Valor Total</div>
+                          <div className="text-xs text-gray-600">
+                            Valor Total
+                          </div>
                           <div className="font-semibold text-gray-900">
                             {formatCurrency(item.sale.totalValue || 0)}
                           </div>
@@ -468,23 +459,34 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                       {/* Informações de Pagamento */}
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div className="bg-gray-50 rounded-lg p-3">
-                          <div className="text-xs text-gray-600 mb-1">Recebido Atualmente</div>
+                          <div className="text-xs text-gray-600 mb-1">
+                            Recebido Atualmente
+                          </div>
                           <div className="font-semibold text-gray-900">
                             {formatCurrency(item.currentReceived)}
                           </div>
                         </div>
-                        
+
                         <div className="bg-green-50 rounded-lg p-3">
-                          <div className="text-xs text-gray-600 mb-1">Novo Total Recebido</div>
-                          {distributionMode === 'manual' ? (
+                          <div className="text-xs text-gray-600 mb-1">
+                            Novo Total Recebido
+                          </div>
+                          {distributionMode === "manual" ? (
                             <div className="flex items-center">
                               <DollarSign className="h-4 w-4 text-gray-400 mr-1" />
                               <input
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                value={manualSaleEdits[item.sale.saleNumber] || ''}
-                                onChange={(e) => handleManualSaleEdit(item.sale.saleNumber, e.target.value)}
+                                value={
+                                  manualSaleEdits[item.sale.saleNumber] || ""
+                                }
+                                onChange={(e) =>
+                                  handleManualSaleEdit(
+                                    item.sale.saleNumber,
+                                    e.target.value,
+                                  )
+                                }
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-semibold"
                               />
                             </div>
@@ -494,9 +496,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                             </div>
                           )}
                         </div>
-                        
+
                         <div className="bg-purple-50 rounded-lg p-3">
-                          <div className="text-xs text-gray-600 mb-1">Valor Aplicado</div>
+                          <div className="text-xs text-gray-600 mb-1">
+                            Valor Aplicado
+                          </div>
                           <div className="font-semibold text-purple-600">
                             +{formatCurrency(item.appliedAmount)}
                           </div>
@@ -506,11 +510,17 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                       {/* Status da Venda */}
                       <div className="mt-3 flex items-center justify-between">
                         <div className="text-sm text-gray-600">
-                          Saldo devedor: <span className="font-medium text-red-600">
-                            {formatCurrency(Math.max(0, (item.sale.totalValue || 0) - item.newAmount))}
+                          Saldo devedor:{" "}
+                          <span className="font-medium text-red-600">
+                            {formatCurrency(
+                              Math.max(
+                                0,
+                                (item.sale.totalValue || 0) - item.newAmount,
+                              ),
+                            )}
                           </span>
                         </div>
-                        
+
                         {item.newAmount >= (item.sale.totalValue || 0) && (
                           <div className="flex items-center text-green-600 text-sm font-medium">
                             <CheckCircle className="h-4 w-4 mr-1" />
@@ -525,17 +535,29 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                 {/* Resumo da Distribuição */}
                 <div className="mt-4 p-4 bg-purple-100 rounded-lg">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-gray-700">Valor Informado:</span>
-                    <span className="font-bold text-gray-900">{formatCurrency(parseFloat(distributionAmount) || 0)}</span>
+                    <span className="font-medium text-gray-700">
+                      Valor Informado:
+                    </span>
+                    <span className="font-bold text-gray-900">
+                      {formatCurrency(parseFloat(distributionAmount) || 0)}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between text-sm mt-1">
-                    <span className="font-medium text-gray-700">Total Distribuído:</span>
-                    <span className="font-bold text-green-600">{formatCurrency(totalDistributed)}</span>
+                    <span className="font-medium text-gray-700">
+                      Total Distribuído:
+                    </span>
+                    <span className="font-bold text-green-600">
+                      {formatCurrency(totalDistributed)}
+                    </span>
                   </div>
                   {Math.abs(remainingToDistribute) > 0.01 && (
                     <div className="flex items-center justify-between text-sm mt-1">
-                      <span className="font-medium text-gray-700">Diferença:</span>
-                      <span className={`font-bold ${remainingToDistribute > 0 ? 'text-orange-600' : 'text-red-600'}`}>
+                      <span className="font-medium text-gray-700">
+                        Diferença:
+                      </span>
+                      <span
+                        className={`font-bold ${remainingToDistribute > 0 ? "text-orange-600" : "text-red-600"}`}
+                      >
                         {formatCurrency(Math.abs(remainingToDistribute))}
                       </span>
                     </div>
@@ -550,14 +572,18 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-full sm:w-auto px-6 py-0 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                 >
                   Cancelar
                 </button>
-                
+
                 <button
                   type="submit"
-                  disabled={loading || saleDistribution.length === 0 || !distributionAmount}
+                  disabled={
+                    loading ||
+                    saleDistribution.length === 0 ||
+                    !distributionAmount
+                  }
                   className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg"
                 >
                   {loading ? (
@@ -565,7 +591,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                   ) : (
                     <CheckCircle className="h-5 w-5 mr-2" />
                   )}
-                  {loading ? 'Processando...' : 'Confirmar Distribuição'}
+                  {loading ? "Processando..." : "Confirmar Distribuição"}
                 </button>
               </div>
             </div>

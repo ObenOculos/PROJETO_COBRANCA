@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  CollectionContextType, 
-  Collection, 
-  User, 
+import React, { createContext, useContext, useState, useEffect } from "react";
+import {
+  CollectionContextType,
+  Collection,
+  User,
   CollectorStore,
   CollectionAttempt,
   DashboardStats,
@@ -14,18 +14,20 @@ import {
   SalePaymentInput,
   SaleBalance,
   PaymentDistribution,
-  ScheduledVisit
-} from '../types';
-import { supabase } from '../lib/supabase';
-import { useAuth } from './AuthContext';
-import { useLoading } from './LoadingContext';
+  ScheduledVisit,
+} from "../types";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "./AuthContext";
+import { useLoading } from "./LoadingContext";
 
-const CollectionContext = createContext<CollectionContextType | undefined>(undefined);
+const CollectionContext = createContext<CollectionContextType | undefined>(
+  undefined,
+);
 
 export const useCollection = () => {
   const context = useContext(CollectionContext);
   if (context === undefined) {
-    throw new Error('useCollection must be used within a CollectionProvider');
+    throw new Error("useCollection must be used within a CollectionProvider");
   }
   return context;
 };
@@ -34,7 +36,9 @@ interface CollectionProviderProps {
   children: React.ReactNode;
 }
 
-export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children }) => {
+export const CollectionProvider: React.FC<CollectionProviderProps> = ({
+  children,
+}) => {
   const { user } = useAuth();
   const { setLoading: setGlobalLoading } = useLoading();
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -45,88 +49,158 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Estado para controlar se é o primeiro carregamento
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  // Função para atualizar apenas as collections sem recarregar tudo
+  const refreshCollections = async () => {
+    try {
+      console.log("Atualizando collections em tempo real...");
+      await fetchCollections();
+    } catch (error) {
+      console.error("Erro ao atualizar collections:", error);
+    }
+  };
 
   useEffect(() => {
-    // Só carregar dados se o usuário estiver logado
+    let realtimeChannel: any = null;
+
     if (user) {
-      console.log('Usuário logado, carregando dados...');
-      
-      // Só mostra loading global se não for o carregamento inicial
-      if (!isInitialLoad) {
-        setGlobalLoading(true, 'Carregando dados do sistema...');
-      }
-      
-      Promise.all([
-        fetchUsers(),
-        fetchCollectorStores(),
-        fetchCollections(),
-        fetchSalePayments(),
-        fetchScheduledVisits()
-      ]).finally(() => {
-        if (!isInitialLoad) {
-          setGlobalLoading(false);
+      console.log("Usuário logado, carregando dados...");
+      setGlobalLoading(true, "Carregando dados do sistema...");
+
+      const fetchData = async () => {
+        try {
+          await Promise.all([
+            fetchUsers(),
+            fetchCollectorStores(),
+            fetchSalePayments(),
+            fetchScheduledVisits(),
+          ]);
+
+          // Now fetch collections, which can use the updated collectorStores state
+          await fetchCollections();
+        } catch (error) {
+          console.error("Erro ao carregar dados iniciais:", error);
+          setError("Erro ao carregar dados iniciais. Tente novamente.");
         }
+      };
+
+      // Define a timeout for the data fetching
+      const timeoutId = setTimeout(() => {
+        console.warn(
+          "Tempo limite excedido ao carregar dados. Liberando o estado de carregamento.",
+        );
+        setGlobalLoading(false);
         setLoading(false);
-        setIsInitialLoad(false);
-      });
+      }, 20000); // 20 seconds timeout
+
+      fetchData()
+        .catch((error) => {
+          console.error("Erro ao carregar dados:", error);
+          setError("Erro ao carregar dados. Tente novamente.");
+        })
+        .finally(() => {
+          clearTimeout(timeoutId); // Clear the timeout
+          setGlobalLoading(false);
+          setLoading(false);
+        });
+
+      // Configurar listener em tempo real para mudanças nas tabelas
+      console.log("Configurando listeners em tempo real...");
+      realtimeChannel = supabase
+        .channel("database_changes")
+        .on(
+          "postgres_changes",
+          {
+            event: "*", // Escutar todos os eventos (INSERT, UPDATE, DELETE)
+            schema: "public",
+            table: "BANCO_DADOS",
+          },
+          (payload) => {
+            console.log("Mudança detectada na tabela BANCO_DADOS:", payload);
+            // Atualizar apenas as collections quando houver mudanças
+            refreshCollections();
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*", // Escutar todos os eventos (INSERT, UPDATE, DELETE)
+            schema: "public",
+            table: "sale_payments",
+          },
+          (payload) => {
+            console.log("Mudança detectada na tabela sale_payments:", payload);
+            // Atualizar sale payments quando houver mudanças
+            fetchSalePayments();
+          },
+        )
+        .subscribe((status) => {
+          console.log("Status da conexão em tempo real:", status);
+        });
     } else {
-      console.log('Usuário não logado, limpando dados...');
+      console.log("Usuário não logado, limpando dados...");
       setCollections([]);
       setUsers([]);
       setCollectorStores([]);
       setSalePayments([]);
       setScheduledVisits([]);
       setLoading(false);
-      if (!isInitialLoad) {
-        setGlobalLoading(false);
-      }
+      setGlobalLoading(false);
     }
+
+    // Cleanup: remover listener quando o componente for desmontado ou usuário mudar
+    return () => {
+      if (realtimeChannel) {
+        console.log("Removendo listener em tempo real...");
+        supabase.removeChannel(realtimeChannel);
+      }
+    };
   }, [user]);
 
   const fetchCollections = async () => {
     try {
-      setLoading(true);
       setError(null);
-      
-      console.log('Buscando dados da tabela BANCO_DADOS...');
-      
-      // Primeiro, verificar o total de registros no banco
-      const { count, error: countError } = await supabase
-        .from('BANCO_DADOS')
-        .select('*', { count: 'exact', head: true });
-      
-      if (countError) {
-        console.error('Erro ao contar registros:', countError);
-      } else {
-        console.log('Total de registros no banco:', count);
+
+      console.log("Buscando dados da tabela BANCO_DADOS...");
+
+      let query = supabase.from("BANCO_DADOS").select("*");
+
+      if (user?.type === "collector") {
+        const assignedStores = getCollectorStores(user.id);
+        console.log(
+          `Cobrador ${user.name} (${user.id}) tem lojas atribuídas:`,
+          assignedStores,
+        );
+
+        // Fetch collections assigned directly to the collector OR to their assigned stores
+        query = query.or(
+          `user_id.eq.${user.id},nome_da_loja.in.(${assignedStores.join(",")})`,
+        );
       }
-      
-      // Carregar TODOS os dados sem limite
+
+      // Carregar TODOS os dados sem limite (ou com limite para o cobrador)
       let allData: any[] = [];
       let from = 0;
-      const pageSize = 1000;
+      const pageSize = 1000; // Still use pagination for large datasets, even with filters
       let hasMore = true;
-      
+
       while (hasMore) {
         console.log(`Carregando registros ${from} a ${from + pageSize - 1}...`);
-        
-        const { data: pageData, error: pageError } = await supabase
-          .from('BANCO_DADOS')
-          .select('*')
+
+        const { data: pageData, error: pageError } = await query
           .range(from, from + pageSize - 1)
-          .order('id_parcela', { ascending: true });
-          
+          .order("id_parcela", { ascending: true });
+
         if (pageError) {
-          console.error('Erro ao carregar página:', pageError);
+          console.error("Erro ao carregar página:", pageError);
           throw pageError;
         }
-        
+
         if (pageData && pageData.length > 0) {
           allData = allData.concat(pageData);
-          console.log(`Carregados ${pageData.length} registros. Total acumulado: ${allData.length}`);
-          
+          console.log(
+            `Carregados ${pageData.length} registros. Total acumulado: ${allData.length}`,
+          );
+
           if (pageData.length < pageSize) {
             hasMore = false;
           } else {
@@ -136,57 +210,83 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
           hasMore = false;
         }
       }
-      
-      console.log('TOTAL FINAL de registros carregados:', allData.length);
+
+      console.log("TOTAL FINAL de registros carregados:", allData.length);
       const data = allData;
 
       if (!data || data.length === 0) {
-        console.warn('Nenhum dado retornado do Supabase');
+        console.warn("Nenhum dado retornado do Supabase");
         setCollections([]);
         return;
       }
 
-      console.log('Dados carregados:', data.length, 'registros');
-      
+      console.log("Dados carregados:", data.length, "registros");
+
       // Verificar quantos clientes únicos temos nos dados carregados
       const uniqueDocuments = new Set();
-      data.forEach(row => {
-        if (row.documento && row.documento.trim() !== '') {
+      data.forEach((row) => {
+        if (row.documento && row.documento.trim() !== "") {
           uniqueDocuments.add(row.documento.trim());
         }
       });
-      console.log('Clientes únicos nos dados carregados:', uniqueDocuments.size);
-      console.log('Primeiros 10 documentos:', Array.from(uniqueDocuments).slice(0, 10));
-      
+      console.log(
+        "Clientes únicos nos dados carregados:",
+        uniqueDocuments.size,
+      );
+      console.log(
+        "Primeiros 10 documentos:",
+        Array.from(uniqueDocuments).slice(0, 10),
+      );
+
       // Debug: verificar formato das datas
-      const sampleDates = data.slice(0, 5).map(row => ({
+      const sampleDates = data.slice(0, 5).map((row) => ({
         data_vencimento: row.data_vencimento,
         data_lancamento: row.data_lancamento,
-        data_de_recebimento: row.data_de_recebimento
+        data_de_recebimento: row.data_de_recebimento,
       }));
-      console.log('Amostras de datas:', sampleDates);
+      console.log("Amostras de datas:", sampleDates);
 
       // Transformar os dados para corresponder à interface Collection
-      
-      const transformedData: Collection[] = (data || []).map(row => ({
+
+      const transformedData: Collection[] = (data || []).map((row) => ({
         id_parcela: row.id_parcela,
         nome_da_loja: row.nome_da_loja,
         data_lancamento: row.data_lancamento,
         data_vencimento: row.data_vencimento,
-        valor_original: parseFloat(row.valor_original || '0'),
-        valor_reajustado: parseFloat(row.valor_reajustado || '0'),
-        multa: parseFloat(row.multa || '0'),
-        juros_por_dia: parseFloat(row.juros_por_dia || '0'),
-        multa_aplicada: parseFloat(row.multa_aplicada || '0'),
-        juros_aplicado: parseFloat(row.juros_aplicado || '0'),
-        valor_recebido: parseFloat(row.valor_recebido || '0'),
+        valor_original: parseFloat(
+          (row.valor_original || "0").toString().replace(",", "."),
+        ),
+        valor_reajustado: parseFloat(
+          (row.valor_reajustado || "0").toString().replace(",", "."),
+        ),
+        multa: parseFloat((row.multa || "0").toString().replace(",", ".")),
+        juros_por_dia: parseFloat(
+          (row.juros_por_dia || "0").toString().replace(",", "."),
+        ),
+        multa_aplicada: parseFloat(
+          (row.multa_aplicada || "0").toString().replace(",", "."),
+        ),
+        juros_aplicado: parseFloat(
+          (row.juros_aplicado || "0").toString().replace(",", "."),
+        ),
+        valor_recebido: parseFloat(
+          (row.valor_recebido || "0").toString().replace(",", "."),
+        ),
         data_de_recebimento: row.data_de_recebimento,
         dias_em_atraso: row.dias_em_atraso,
-        dias_carencia: parseFloat(row.dias_carencia || '0'),
-        desconto: parseFloat(row.desconto || '0'),
-        acrescimo: parseFloat(row.acrescimo || '0'),
-        multa_paga: parseFloat(row.multa_paga || '0'),
-        juros_pago: parseFloat(row.juros_pago || '0'),
+        dias_carencia: parseFloat(row.dias_carencia || "0"),
+        desconto: parseFloat(
+          (row.desconto || "0").toString().replace(",", "."),
+        ),
+        acrescimo: parseFloat(
+          (row.acrescimo || "0").toString().replace(",", "."),
+        ),
+        multa_paga: parseFloat(
+          (row.multa_paga || "0").toString().replace(",", "."),
+        ),
+        juros_pago: parseFloat(
+          (row.juros_pago || "0").toString().replace(",", "."),
+        ),
         tipo_de_cobranca: row.tipo_de_cobranca,
         numero_titulo: row.numero_titulo,
         parcela: row.parcela,
@@ -218,10 +318,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
       }));
 
       setCollections(transformedData);
-      console.log('Collections carregadas:', transformedData.length);
+      console.log("Collections carregadas:", transformedData.length);
     } catch (err) {
-      console.error('Erro ao carregar collections:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
+      console.error("Erro ao carregar collections:", err);
+      setError(err instanceof Error ? err.message : "Erro ao carregar dados");
     } finally {
       setLoading(false);
     }
@@ -229,49 +329,49 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
 
   const fetchUsers = async () => {
     try {
-      console.log('Buscando usuários...');
-      
+      console.log("Buscando usuários...");
+
       const { data, error: supabaseError } = await supabase
-        .from('users')
-        .select('*')
-        .order('name', { ascending: true });
+        .from("users")
+        .select("*")
+        .order("name", { ascending: true });
 
       if (supabaseError) {
-        console.error('Erro ao buscar usuários:', supabaseError);
+        console.error("Erro ao buscar usuários:", supabaseError);
         throw supabaseError;
       }
 
-      const transformedUsers: User[] = (data || []).map(user => ({
+      const transformedUsers: User[] = (data || []).map((user) => ({
         id: user.id,
         name: user.name,
         login: user.login,
         password: user.password,
-        type: user.type as 'manager' | 'collector',
+        type: user.type as "manager" | "collector",
         createdAt: user.created_at || new Date().toISOString(),
       }));
 
       setUsers(transformedUsers);
-      console.log('Usuários carregados:', transformedUsers.length);
+      console.log("Usuários carregados:", transformedUsers.length);
     } catch (err) {
-      console.error('Erro ao carregar usuários:', err);
+      console.error("Erro ao carregar usuários:", err);
     }
   };
 
   const fetchCollectorStores = async () => {
     try {
-      console.log('Buscando atribuições de lojas...');
-      
+      console.log("Buscando atribuições de lojas...");
+
       const { data, error: supabaseError } = await supabase
-        .from('collector_stores')
-        .select('*')
-        .order('created_at', { ascending: true });
+        .from("collector_stores")
+        .select("*")
+        .order("created_at", { ascending: true });
 
       if (supabaseError) {
-        console.error('Erro ao buscar collector_stores:', supabaseError);
+        console.error("Erro ao buscar collector_stores:", supabaseError);
         throw supabaseError;
       }
 
-      const transformedStores: CollectorStore[] = (data || []).map(store => ({
+      const transformedStores: CollectorStore[] = (data || []).map((store) => ({
         id: store.id,
         collectorId: store.collector_id,
         storeName: store.store_name,
@@ -279,9 +379,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
       }));
 
       setCollectorStores(transformedStores);
-      console.log('Atribuições de lojas carregadas:', transformedStores.length);
+      console.log("Atribuições de lojas carregadas:", transformedStores.length);
     } catch (err) {
-      console.error('Erro ao carregar collector stores:', err);
+      console.error("Erro ao carregar collector stores:", err);
     }
   };
 
@@ -289,53 +389,62 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
     try {
       // Converter updates para formato do banco
       const dbUpdates: any = {};
-      
+
       if (updates.status !== undefined) dbUpdates.status = updates.status;
-      if (updates.valor_recebido !== undefined) dbUpdates.valor_recebido = updates.valor_recebido.toString();
-      if (updates.data_de_recebimento !== undefined) dbUpdates.data_de_recebimento = updates.data_de_recebimento;
+      if (updates.valor_recebido !== undefined)
+        dbUpdates.valor_recebido = updates.valor_recebido.toString();
+      if (updates.data_de_recebimento !== undefined)
+        dbUpdates.data_de_recebimento = updates.data_de_recebimento;
       if (updates.obs !== undefined) dbUpdates.obs = updates.obs;
       if (updates.user_id !== undefined) dbUpdates.user_id = updates.user_id;
 
       const { error: supabaseError } = await supabase
-        .from('BANCO_DADOS')
+        .from("BANCO_DADOS")
         .update(dbUpdates)
-        .eq('id_parcela', id);
+        .eq("id_parcela", id);
 
       if (supabaseError) {
         throw supabaseError;
       }
 
       // Atualizar estado local
-      setCollections(prev => 
-        prev.map(collection => 
-          collection.id_parcela === id ? { ...collection, ...updates } : collection
-        )
+      setCollections((prev) =>
+        prev.map((collection) =>
+          collection.id_parcela === id
+            ? { ...collection, ...updates }
+            : collection,
+        ),
       );
 
-      console.log('Collection atualizada:', id, updates);
+      console.log("Collection atualizada:", id, updates);
     } catch (err) {
-      console.error('Erro ao atualizar collection:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao atualizar cobrança');
+      console.error("Erro ao atualizar collection:", err);
+      setError(
+        err instanceof Error ? err.message : "Erro ao atualizar cobrança",
+      );
     }
   };
 
-  const assignCollectorToStore = async (collectorId: string, storeName: string) => {
+  const assignCollectorToStore = async (
+    collectorId: string,
+    storeName: string,
+  ) => {
     try {
-      console.log('Atribuindo loja ao cobrador:', { collectorId, storeName });
-      
+      console.log("Atribuindo loja ao cobrador:", { collectorId, storeName });
+
       // Verificar se a atribuição já existe
       const existingAssignment = collectorStores.find(
-        cs => cs.collectorId === collectorId && cs.storeName === storeName
+        (cs) => cs.collectorId === collectorId && cs.storeName === storeName,
       );
 
       if (existingAssignment) {
-        console.log('Atribuição já existe');
-        setError('Esta loja já está atribuída a este cobrador');
+        console.log("Atribuição já existe");
+        setError("Esta loja já está atribuída a este cobrador");
         return;
       }
 
-      const { data, error: supabaseError } = await supabase
-        .from('collector_stores')
+      const { error: supabaseError } = await supabase
+        .from("collector_stores")
         .insert({
           collector_id: collectorId,
           store_name: storeName,
@@ -343,51 +452,62 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
         .select();
 
       if (supabaseError) {
-        console.error('Erro do Supabase ao atribuir loja:', supabaseError);
+        console.error("Erro do Supabase ao atribuir loja:", supabaseError);
         throw supabaseError;
       }
 
-      console.log('Resposta do Supabase:', data);
+      // Loja atribuída com sucesso
 
       // Recarregar as atribuições
       await fetchCollectorStores();
-      console.log('Loja atribuída com sucesso');
+      console.log("Loja atribuída com sucesso");
       setError(null);
     } catch (err) {
-      console.error('Erro ao atribuir loja ao cobrador:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao atribuir loja ao cobrador');
+      console.error("Erro ao atribuir loja ao cobrador:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erro ao atribuir loja ao cobrador",
+      );
     }
   };
 
-  const removeCollectorFromStore = async (collectorId: string, storeName: string) => {
+  const removeCollectorFromStore = async (
+    collectorId: string,
+    storeName: string,
+  ) => {
     try {
-      console.log('Removendo loja do cobrador:', { collectorId, storeName });
-      
+      console.log("Removendo loja do cobrador:", { collectorId, storeName });
+
       const { error: supabaseError } = await supabase
-        .from('collector_stores')
+        .from("collector_stores")
         .delete()
-        .eq('collector_id', collectorId)
-        .eq('store_name', storeName);
+        .eq("collector_id", collectorId)
+        .eq("store_name", storeName);
 
       if (supabaseError) {
-        console.error('Erro do Supabase ao remover loja:', supabaseError);
+        console.error("Erro do Supabase ao remover loja:", supabaseError);
         throw supabaseError;
       }
 
       await fetchCollectorStores();
-      console.log('Loja removida com sucesso');
+      console.log("Loja removida com sucesso");
       setError(null);
     } catch (err) {
-      console.error('Erro ao remover loja do cobrador:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao remover loja do cobrador');
+      console.error("Erro ao remover loja do cobrador:", err);
+      setError(
+        err instanceof Error ? err.message : "Erro ao remover loja do cobrador",
+      );
     }
   };
 
-
-  const addAttempt = async (collectionId: number, attempt: Omit<CollectionAttempt, 'id'>) => {
+  const addAttempt = async (
+    collectionId: number,
+    attempt: Omit<CollectionAttempt, "id">,
+  ) => {
     try {
       const { error: supabaseError } = await supabase
-        .from('collection_attempts')
+        .from("collection_attempts")
         .insert({
           collection_id: collectionId.toString(),
           date: attempt.date,
@@ -402,23 +522,23 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
         throw supabaseError;
       }
 
-      console.log('Tentativa adicionada para cobrança:', collectionId, attempt);
+      console.log("Tentativa adicionada para cobrança:", collectionId, attempt);
     } catch (err) {
-      console.error('Erro ao adicionar tentativa:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao adicionar tentativa');
+      console.error("Erro ao adicionar tentativa:", err);
+      setError(
+        err instanceof Error ? err.message : "Erro ao adicionar tentativa",
+      );
     }
   };
 
-  const addUser = async (user: Omit<User, 'id' | 'createdAt'>) => {
+  const addUser = async (user: Omit<User, "id" | "createdAt">) => {
     try {
-      const { error: supabaseError } = await supabase
-        .from('users')
-        .insert({
-          name: user.name,
-          login: user.login,
-          password: user.password,
-          type: user.type,
-        });
+      const { error: supabaseError } = await supabase.from("users").insert({
+        name: user.name,
+        login: user.login,
+        password: user.password,
+        type: user.type,
+      });
 
       if (supabaseError) {
         throw supabaseError;
@@ -426,8 +546,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
 
       await fetchUsers();
     } catch (err) {
-      console.error('Erro ao adicionar usuário:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao adicionar usuário');
+      console.error("Erro ao adicionar usuário:", err);
+      setError(
+        err instanceof Error ? err.message : "Erro ao adicionar usuário",
+      );
     }
   };
 
@@ -440,9 +562,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
       if (updates.type !== undefined) dbUpdates.type = updates.type;
 
       const { error: supabaseError } = await supabase
-        .from('users')
+        .from("users")
         .update(dbUpdates)
-        .eq('id', id);
+        .eq("id", id);
 
       if (supabaseError) {
         throw supabaseError;
@@ -450,17 +572,19 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
 
       await fetchUsers();
     } catch (err) {
-      console.error('Erro ao atualizar usuário:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao atualizar usuário');
+      console.error("Erro ao atualizar usuário:", err);
+      setError(
+        err instanceof Error ? err.message : "Erro ao atualizar usuário",
+      );
     }
   };
 
   const deleteUser = async (id: string) => {
     try {
       const { error: supabaseError } = await supabase
-        .from('users')
+        .from("users")
         .delete()
-        .eq('id', id);
+        .eq("id", id);
 
       if (supabaseError) {
         throw supabaseError;
@@ -468,46 +592,57 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
 
       await fetchUsers();
     } catch (err) {
-      console.error('Erro ao deletar usuário:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao deletar usuário');
+      console.error("Erro ao deletar usuário:", err);
+      setError(err instanceof Error ? err.message : "Erro ao deletar usuário");
     }
   };
 
-  const getFilteredCollections = (filters: FilterOptions, userType: 'manager' | 'collector', collectorId?: string): Collection[] => {
+  const getFilteredCollections = (
+    filters: FilterOptions,
+    userType: "manager" | "collector",
+    collectorId?: string,
+  ): Collection[] => {
     let filtered = collections;
 
     // Filtrar por cobrador se o usuário for cobrador
-    if (userType === 'collector' && collectorId) {
+    if (userType === "collector" && collectorId) {
       // Obter lojas atribuídas a este cobrador
       const assignedStores = getCollectorStores(collectorId);
-      filtered = filtered.filter(c => 
-        c.user_id === collectorId || 
-        (assignedStores.includes(c.nome_da_loja || ''))
+      filtered = filtered.filter(
+        (c) =>
+          c.user_id === collectorId ||
+          assignedStores.includes(c.nome_da_loja || ""),
       );
     }
 
     // Helper function to parse date strings (supports multiple formats)
     const parseDate = (dateStr: string): Date | null => {
       if (!dateStr) return null;
-      
+
       try {
         const cleanDateStr = dateStr.trim();
-        
+
         // Handle Brazilian format DD/MM/YYYY
-        if (cleanDateStr.includes('/')) {
-          const parts = cleanDateStr.split('/');
+        if (cleanDateStr.includes("/")) {
+          const parts = cleanDateStr.split("/");
           if (parts.length === 3) {
             const [day, month, year] = parts;
             const dayNum = parseInt(day, 10);
             const monthNum = parseInt(month, 10);
             const yearNum = parseInt(year, 10);
-            
-            if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12 && yearNum >= 1900) {
+
+            if (
+              dayNum >= 1 &&
+              dayNum <= 31 &&
+              monthNum >= 1 &&
+              monthNum <= 12 &&
+              yearNum >= 1900
+            ) {
               return new Date(yearNum, monthNum - 1, dayNum);
             }
           }
         }
-        
+
         // Handle ISO format and other standard formats
         const date = new Date(cleanDateStr);
         return isNaN(date.getTime()) ? null : date;
@@ -520,12 +655,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
     if (filters.overdueOnly) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
-      filtered = filtered.filter(c => {
-        const dueDate = parseDate(c.data_vencimento || '');
+
+      filtered = filtered.filter((c) => {
+        const dueDate = parseDate(c.data_vencimento || "");
         if (!dueDate) return false;
         dueDate.setHours(0, 0, 0, 0);
-        
+
         const isOverdue = dueDate < today;
         const isPending = (c.valor_recebido || 0) < (c.valor_original || 0);
         return isOverdue && isPending;
@@ -534,49 +669,56 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
 
     // Apply highValueOnly filter
     if (filters.highValueOnly) {
-      filtered = filtered.filter(c => (c.valor_original || 0) > 1000);
+      filtered = filtered.filter((c) => (c.valor_original || 0) > 1000);
     }
 
     // Apply amount range filters - based on total client amount, not individual installments
-    if ((filters.minAmount !== undefined && filters.minAmount > 0) || 
-        (filters.maxAmount !== undefined && filters.maxAmount > 0)) {
-      
+    if (
+      (filters.minAmount !== undefined && filters.minAmount > 0) ||
+      (filters.maxAmount !== undefined && filters.maxAmount > 0)
+    ) {
       // Group collections by client to calculate total pending amount
       const clientGroups = new Map<string, Collection[]>();
-      filtered.forEach(c => {
+      filtered.forEach((c) => {
         const key = `${c.documento}-${c.cliente}`;
         if (!clientGroups.has(key)) {
           clientGroups.set(key, []);
         }
         clientGroups.get(key)!.push(c);
       });
-      
+
       // Filter clients based on their total pending amount
       const targetClientKeys = new Set<string>();
       clientGroups.forEach((clientCollections, clientKey) => {
-        const totalValue = clientCollections.reduce((sum, c) => sum + c.valor_original, 0);
-        const totalReceived = clientCollections.reduce((sum, c) => sum + c.valor_recebido, 0);
-        const pendingValue = totalValue - totalReceived;
-        
+        const totalValue = clientCollections.reduce(
+          (sum, c) => sum + c.valor_original,
+          0,
+        );
+        const totalReceived = clientCollections.reduce(
+          (sum, c) => sum + c.valor_recebido,
+          0,
+        );
+        const pendingValue = Math.max(0, totalValue - totalReceived);
+
         let includeClient = true;
-        
+
         // Check minimum amount
         if (filters.minAmount !== undefined && filters.minAmount > 0) {
           includeClient = includeClient && pendingValue >= filters.minAmount;
         }
-        
+
         // Check maximum amount
         if (filters.maxAmount !== undefined && filters.maxAmount > 0) {
           includeClient = includeClient && pendingValue <= filters.maxAmount;
         }
-        
+
         if (includeClient) {
           targetClientKeys.add(clientKey);
         }
       });
-      
+
       // Filter collections of clients that meet the criteria
-      filtered = filtered.filter(c => {
+      filtered = filtered.filter((c) => {
         const key = `${c.documento}-${c.cliente}`;
         return targetClientKeys.has(key);
       });
@@ -585,106 +727,163 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
     // Apply existing status filter
     if (filters.status) {
       // Para filtros 'parcial' e 'pago', precisamos de lógica especial para status do cliente
-      if (filters.status?.toLowerCase() === 'parcial' || filters.status?.toLowerCase() === 'pago') {
+      if (
+        filters.status?.toLowerCase() === "parcial" ||
+        filters.status?.toLowerCase() === "pago"
+      ) {
         // Agrupar por cliente para verificar status do cliente
         const clientGroups = new Map<string, Collection[]>();
-        filtered.forEach(c => {
+        filtered.forEach((c) => {
           const key = `${c.documento}-${c.cliente}`;
           if (!clientGroups.has(key)) {
             clientGroups.set(key, []);
           }
           clientGroups.get(key)!.push(c);
         });
-        
+
         // Filtrar clientes baseado no status solicitado
         const targetClientKeys = new Set<string>();
         clientGroups.forEach((clientCollections, clientKey) => {
-          const totalValue = clientCollections.reduce((sum, c) => sum + c.valor_original, 0);
-          const totalReceived = clientCollections.reduce((sum, c) => sum + c.valor_recebido, 0);
-          const pendingValue = totalValue - totalReceived;
-          
-          if (filters.status?.toLowerCase() === 'parcial') {
+          const totalValue = clientCollections.reduce(
+            (sum, c) => sum + c.valor_original,
+            0,
+          );
+          const totalReceived = clientCollections.reduce(
+            (sum, c) => sum + c.valor_recebido,
+            0,
+          );
+          const pendingValue = Math.max(0, totalValue - totalReceived);
+
+          if (filters.status?.toLowerCase() === "parcial") {
             // Cliente é parcial se tem valor recebido E ainda tem valor pendente
             if (totalReceived > 0 && pendingValue > 0) {
               targetClientKeys.add(clientKey);
             }
-          } else if (filters.status?.toLowerCase() === 'pago') {
+          } else if (filters.status?.toLowerCase() === "pago") {
             // Cliente é pago apenas se não tem nenhum valor pendente E tem valor recebido (completamente quitado)
             if (pendingValue <= 0.01 && totalReceived > 0) {
               targetClientKeys.add(clientKey);
             }
           }
         });
-        
+
         // Filtrar collections dos clientes que atendem ao critério
-        filtered = filtered.filter(c => {
+        filtered = filtered.filter((c) => {
+          const key = `${c.documento}-${c.cliente}`;
+          return targetClientKeys.has(key);
+        });
+        // Para outros filtros, incluindo 'pendente', usar lógica de cliente
+      } else if (filters.status?.toLowerCase() === "pendente") {
+        const clientGroups = new Map<string, Collection[]>();
+        filtered.forEach((c) => {
+          const key = `${c.documento}-${c.cliente}`;
+          if (!clientGroups.has(key)) {
+            clientGroups.set(key, []);
+          }
+          clientGroups.get(key)!.push(c);
+        });
+
+        const targetClientKeys = new Set<string>();
+        clientGroups.forEach((clientCollections, clientKey) => {
+          const totalValue = clientCollections.reduce(
+            (sum, c) => sum + c.valor_original,
+            0,
+          );
+          const totalReceived = clientCollections.reduce(
+            (sum, c) => sum + c.valor_recebido,
+            0,
+          );
+          const pendingValue = Math.max(0, totalValue - totalReceived);
+
+          // Cliente é pendente se não tem valor recebido E ainda tem valor pendente
+          if (totalReceived <= 0.01 && pendingValue > 0) {
+            targetClientKeys.add(clientKey);
+          }
+        });
+
+        filtered = filtered.filter((c) => {
           const key = `${c.documento}-${c.cliente}`;
           return targetClientKeys.has(key);
         });
       } else {
-        // Para outros filtros, usar lógica de parcela individual
-        filtered = filtered.filter(c => {
-          // Determinar o status real da parcela baseado na lógica de negócio
+        // Para qualquer outro status não tratado acima, usar a lógica de parcela individual
+        filtered = filtered.filter((c) => {
           const valorRecebido = c.valor_recebido || 0;
           const valorOriginal = c.valor_original || 0;
-          
+
           let realStatus: string;
-          
+
           if (valorRecebido === 0) {
-            realStatus = 'pendente';
+            realStatus = "pendente";
           } else if (valorRecebido >= valorOriginal) {
-            realStatus = 'pago';
+            realStatus = "pago";
           } else {
-            realStatus = 'parcial';
+            realStatus = "parcial";
           }
-          
-          // Se existe um status explícito, normalizar manualmente
+
           if (c.status) {
             const status = c.status.toLowerCase();
-            if (['recebido', 'pago', 'paid', 'received', 'quitado', 'finalizado'].includes(status)) {
-              realStatus = 'pago';
-            } else if (['parcialmente_pago', 'parcialmente pago', 'pago parcial', 'partial', 'parcial'].includes(status)) {
-              realStatus = 'parcial';
+            if (
+              [
+                "recebido",
+                "pago",
+                "paid",
+                "received",
+                "quitado",
+                "finalizado",
+              ].includes(status)
+            ) {
+              realStatus = "pago";
+            } else if (
+              [
+                "parcialmente_pago",
+                "parcialmente pago",
+                "pago parcial",
+                "partial",
+                "parcial",
+              ].includes(status)
+            ) {
+              realStatus = "parcial";
             } else {
-              realStatus = 'pendente';
+              realStatus = "pendente";
             }
           }
-          
+
           return realStatus === filters.status?.toLowerCase();
         });
       }
     }
 
     if (filters.dueDate) {
-      filtered = filtered.filter(c => c.data_vencimento === filters.dueDate);
+      filtered = filtered.filter((c) => c.data_vencimento === filters.dueDate);
     }
 
     if (filters.collector) {
-      filtered = filtered.filter(c => c.user_id === filters.collector);
+      filtered = filtered.filter((c) => c.user_id === filters.collector);
     }
 
     if (filters.store) {
-      filtered = filtered.filter(c => c.nome_da_loja === filters.store);
+      filtered = filtered.filter((c) => c.nome_da_loja === filters.store);
     }
 
     if (filters.city) {
-      filtered = filtered.filter(c => c.cidade === filters.city);
+      filtered = filtered.filter((c) => c.cidade === filters.city);
     }
 
     if (filters.neighborhood) {
-      filtered = filtered.filter(c => c.bairro === filters.neighborhood);
+      filtered = filtered.filter((c) => c.bairro === filters.neighborhood);
     }
 
     // Filtro por período de data de vencimento (dateFrom/dateTo)
     if (filters.dateFrom || filters.dateTo) {
-      filtered = filtered.filter(c => {
+      filtered = filtered.filter((c) => {
         if (!c.data_vencimento) return false;
-        
+
         const dueDate = parseDate(c.data_vencimento);
         if (!dueDate) return false;
-        
+
         let matchesDateRange = true;
-        
+
         if (filters.dateFrom) {
           const fromDate = new Date(filters.dateFrom);
           if (!isNaN(fromDate.getTime())) {
@@ -693,7 +892,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
             matchesDateRange = matchesDateRange && dueDate >= fromDate;
           }
         }
-        
+
         if (filters.dateTo) {
           const toDate = new Date(filters.dateTo);
           if (!isNaN(toDate.getTime())) {
@@ -703,19 +902,20 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
             matchesDateRange = matchesDateRange && dueDate <= toDate;
           }
         }
-        
+
         return matchesDateRange;
       });
     }
 
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(c => 
-        c.cliente?.toLowerCase().includes(searchLower) ||
-        c.documento?.toLowerCase().includes(searchLower) ||
-        c.numero_titulo?.toString().includes(searchLower) ||
-        c.venda_n?.toString().includes(searchLower) ||
-        c.id_parcela?.toString().includes(searchLower)
+      filtered = filtered.filter(
+        (c) =>
+          c.cliente?.toLowerCase().includes(searchLower) ||
+          c.documento?.toLowerCase().includes(searchLower) ||
+          c.numero_titulo?.toString().includes(searchLower) ||
+          c.venda_n?.toString().includes(searchLower) ||
+          c.id_parcela?.toString().includes(searchLower),
       );
     }
 
@@ -724,34 +924,40 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
 
   const getClientGroups = (collectorId?: string): ClientGroup[] => {
     let filteredCollections = collections;
-    
+
     if (collectorId) {
       const assignedStores = getCollectorStores(collectorId);
-      filteredCollections = collections.filter(c => 
-        c.user_id === collectorId || 
-        (assignedStores.includes(c.nome_da_loja || ''))
+      filteredCollections = collections.filter(
+        (c) =>
+          c.user_id === collectorId ||
+          assignedStores.includes(c.nome_da_loja || ""),
       );
     }
 
     const clientMap = new Map<string, ClientGroup>();
+    let skippedCollectionsCount = 0;
 
-    filteredCollections.forEach(collection => {
-      if (!collection.cliente || !collection.documento) return;
-      
-      const clientId = collection.documento; // Usando documento como identificador único
-      
+    filteredCollections.forEach((collection) => {
+      // Group strictly by 'documento' (CPF) as the unique identifier.
+      const clientId = collection.documento?.trim();
+
+      if (!clientId) {
+        skippedCollectionsCount++;
+        return; // Skip collections without a document.
+      }
+
       if (!clientMap.has(clientId)) {
         clientMap.set(clientId, {
           clientId,
-          client: collection.cliente,
-          document: collection.documento,
+          client: collection.cliente || "Cliente sem nome",
+          document: clientId,
           phone: collection.telefone || undefined,
           mobile: collection.celular || undefined,
-          address: collection.endereco || '',
-          number: collection.numero || '',
-          neighborhood: collection.bairro || '',
-          city: collection.cidade || '',
-          state: collection.estado || '',
+          address: collection.endereco || "",
+          number: collection.numero || "",
+          neighborhood: collection.bairro || "",
+          city: collection.cidade || "",
+          state: collection.estado || "",
           sales: [],
           totalValue: 0,
           totalReceived: 0,
@@ -760,66 +966,110 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
       }
 
       const clientGroup = clientMap.get(clientId)!;
-      
-      // Agrupar por número da venda (venda_n)
-      let saleGroup = clientGroup.sales.find(s => s.saleNumber === collection.venda_n);
-      if (!saleGroup && collection.venda_n) {
+
+      // Group by sale number (venda_n)
+      let saleGroup = clientGroup.sales.find(
+        (s) => s.saleNumber === (collection.venda_n || 0),
+      );
+      if (!saleGroup) {
         saleGroup = {
-          saleNumber: collection.venda_n,
+          saleNumber: collection.venda_n || 0,
           titleNumber: collection.numero_titulo || 0,
-          description: collection.descricao || '',
+          description: collection.descricao || "",
           installments: [],
           totalValue: 0,
           totalReceived: 0,
           pendingValue: 0,
-          saleStatus: 'pending',
+          saleStatus: "pending",
           payments: [],
-          clientDocument: collection.documento || '',
+          clientDocument: collection.documento || "",
         };
         clientGroup.sales.push(saleGroup!);
       }
 
       if (saleGroup) {
         saleGroup.installments.push(collection);
-        
-        // Arredondar para 2 casas decimais para evitar problemas de precisão
-        const roundTo2Decimals = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
-        
-        saleGroup.totalValue = roundTo2Decimals(saleGroup.totalValue + collection.valor_original);
-        saleGroup.totalReceived = roundTo2Decimals(saleGroup.totalReceived + collection.valor_recebido);
-        
-        // Calcular valor pendente corretamente
-        const pendingForThisInstallment = roundTo2Decimals(collection.valor_original - collection.valor_recebido);
+
+        const roundTo2Decimals = (num: number) =>
+          Math.round((num + Number.EPSILON) * 100) / 100;
+
+        saleGroup.totalValue = roundTo2Decimals(
+          saleGroup.totalValue + collection.valor_original,
+        );
+        saleGroup.totalReceived = roundTo2Decimals(
+          saleGroup.totalReceived + collection.valor_recebido,
+        );
+
+        const pendingForThisInstallment = roundTo2Decimals(
+          collection.valor_original - collection.valor_recebido,
+        );
         if (pendingForThisInstallment > 0.01) {
-          saleGroup.pendingValue = roundTo2Decimals(saleGroup.pendingValue + pendingForThisInstallment);
+          saleGroup.pendingValue = roundTo2Decimals(
+            saleGroup.pendingValue + pendingForThisInstallment,
+          );
         }
       }
 
-      // Arredondar para 2 casas decimais para evitar problemas de precisão
-      const roundTo2Decimals = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
-      
-      clientGroup.totalValue = roundTo2Decimals(clientGroup.totalValue + collection.valor_original);
-      clientGroup.totalReceived = roundTo2Decimals(clientGroup.totalReceived + collection.valor_recebido);
-      
-      // Calcular valor pendente corretamente
-      const pendingForThisCollection = roundTo2Decimals(collection.valor_original - collection.valor_recebido);
-      if (pendingForThisCollection > 0.01) {
-        clientGroup.pendingValue = roundTo2Decimals(clientGroup.pendingValue + pendingForThisCollection);
-      }
+      const roundTo2Decimals = (num: number) =>
+        Math.round((num + Number.EPSILON) * 100) / 100;
+
+      clientGroup.totalValue = roundTo2Decimals(
+        clientGroup.totalValue + collection.valor_original,
+      );
+      clientGroup.totalReceived = roundTo2Decimals(
+        clientGroup.totalReceived + collection.valor_recebido,
+      );
     });
 
-    return Array.from(clientMap.values()).sort((a, b) => a.client.localeCompare(b.client));
+    // Calculate pendingValue for each clientGroup and saleGroup after all collections are processed
+    clientMap.forEach((clientGroup) => {
+      const roundTo2Decimals = (num: number) =>
+        Math.round((num + Number.EPSILON) * 100) / 100;
+
+      clientGroup.sales.forEach((saleGroup) => {
+        saleGroup.pendingValue = roundTo2Decimals(
+          saleGroup.totalValue - saleGroup.totalReceived,
+        );
+      });
+
+      clientGroup.pendingValue = roundTo2Decimals(
+        clientGroup.totalValue - clientGroup.totalReceived,
+      );
+    });
+
+    if (skippedCollectionsCount > 0) {
+      console.warn(
+        `[getClientGroups] Skipped ${skippedCollectionsCount} collection entries because they were missing a 'documento'.`,
+      );
+    }
+
+    return Array.from(clientMap.values()).sort((a, b) =>
+      a.client.localeCompare(b.client),
+    );
   };
 
   const getDashboardStats = (): DashboardStats => {
-    const totalPending = collections.filter(c => c.status?.toLowerCase() === 'pendente').length;
-    const totalOverdue = collections.filter(c => c.dias_em_atraso && c.dias_em_atraso > 0).length;
-    const totalReceived = collections.filter(c => c.status?.toLowerCase() === 'recebido' || c.valor_recebido > 0).length;
-    const totalAmount = collections.reduce((sum, c) => sum + c.valor_original, 0);
-    const receivedAmount = collections.reduce((sum, c) => sum + c.valor_recebido, 0);
+    const totalPending = collections.filter(
+      (c) => c.status?.toLowerCase() === "pendente",
+    ).length;
+    const totalOverdue = collections.filter(
+      (c) => c.dias_em_atraso && c.dias_em_atraso > 0,
+    ).length;
+    const totalReceived = collections.filter(
+      (c) => c.status?.toLowerCase() === "recebido" || c.valor_recebido > 0,
+    ).length;
+    const totalAmount = collections.reduce(
+      (sum, c) => sum + c.valor_original,
+      0,
+    );
+    const receivedAmount = collections.reduce(
+      (sum, c) => sum + c.valor_recebido,
+      0,
+    );
     const pendingAmount = totalAmount - receivedAmount;
-    const conversionRate = collections.length > 0 ? (totalReceived / collections.length) * 100 : 0;
-    const collectorsCount = users.filter(u => u.type === 'collector').length;
+    const conversionRate =
+      collections.length > 0 ? (totalReceived / collections.length) * 100 : 0;
+    const collectorsCount = users.filter((u) => u.type === "collector").length;
 
     return {
       totalPending,
@@ -834,34 +1084,47 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
   };
 
   const getCollectorPerformance = (): CollectorPerformance[] => {
-    const collectors = users.filter(u => u.type === 'collector');
-    
-    return collectors.map(collector => {
-      const assignedStores = getCollectorStores(collector.id);
-      const collectorCollections = collections.filter(c => 
-        c.user_id === collector.id || 
-        (assignedStores.includes(c.nome_da_loja || ''))
-      );
-      
-      // Agrupar por venda (venda_n + documento)
-      const salesMap = new Map<string, {
-        totalValue: number;
-        receivedValue: number;
-        status: 'pendente' | 'parcial' | 'pago';
-        installments: Collection[];
-      }>();
+    const collectors = users.filter((u) => u.type === "collector");
 
-      collectorCollections.forEach(collection => {
+    return collectors.map((collector) => {
+      const assignedStores = getCollectorStores(collector.id);
+      const collectorCollections = collections.filter(
+        (c) =>
+          c.user_id === collector.id ||
+          assignedStores.includes(c.nome_da_loja || ""),
+      );
+
+      // Contar clientes únicos usando documento (CPF) como identificador
+      const uniqueClients = new Set<string>();
+      collectorCollections.forEach((collection) => {
+        if (collection.documento && collection.documento.trim()) {
+          uniqueClients.add(collection.documento.trim());
+        }
+      });
+      const clientCount = uniqueClients.size;
+
+      // Agrupar por venda (venda_n + documento)
+      const salesMap = new Map<
+        string,
+        {
+          totalValue: number;
+          receivedValue: number;
+          status: "pendente" | "parcial" | "pago";
+          installments: Collection[];
+        }
+      >();
+
+      collectorCollections.forEach((collection) => {
         const saleKey = `${collection.venda_n}-${collection.documento}`;
         if (!salesMap.has(saleKey)) {
           salesMap.set(saleKey, {
             totalValue: 0,
             receivedValue: 0,
-            status: 'pendente',
-            installments: []
+            status: "pendente",
+            installments: [],
           });
         }
-        
+
         const sale = salesMap.get(saleKey)!;
         sale.totalValue += collection.valor_original;
         sale.receivedValue += collection.valor_recebido;
@@ -870,23 +1133,29 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
 
       // Determinar status das vendas
       salesMap.forEach((sale) => {
-        const pendingValue = sale.totalValue - sale.receivedValue;
+        const pendingValue = Math.max(0, sale.totalValue - sale.receivedValue);
         if (sale.receivedValue > 0 && pendingValue > 0) {
-          sale.status = 'parcial';
+          sale.status = "parcial";
         } else if (pendingValue <= 0.01 && sale.receivedValue > 0) {
-          sale.status = 'pago';
+          sale.status = "pago";
         } else {
-          sale.status = 'pendente';
+          sale.status = "pendente";
         }
       });
 
       const salesArray = Array.from(salesMap.values());
       const totalAssigned = salesArray.length; // Total de vendas atribuídas
-      const totalReceived = salesArray.filter(s => s.status === 'pago').length; // Vendas totalmente pagas
+      const totalReceived = salesArray.filter(
+        (s) => s.status === "pago",
+      ).length; // Vendas totalmente pagas
       const totalAmount = salesArray.reduce((sum, s) => sum + s.totalValue, 0);
-      const receivedAmount = salesArray.reduce((sum, s) => sum + s.receivedValue, 0);
-      const conversionRate = totalAssigned > 0 ? (totalReceived / totalAssigned) * 100 : 0;
-      
+      const receivedAmount = salesArray.reduce(
+        (sum, s) => sum + s.receivedValue,
+        0,
+      );
+      const conversionRate =
+        totalAssigned > 0 ? (totalReceived / totalAssigned) * 100 : 0;
+
       // Calcular tempo médio (simplificado)
       const averageTime = 15; // Valor mock
 
@@ -899,21 +1168,23 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
         receivedAmount,
         conversionRate,
         averageTime,
+        clientCount,
       };
     });
   };
 
   const getCollectorCollections = (collectorId: string): Collection[] => {
     const assignedStores = getCollectorStores(collectorId);
-    return collections.filter(c => 
-      c.user_id === collectorId || 
-      (assignedStores.includes(c.nome_da_loja || ''))
+    return collections.filter(
+      (c) =>
+        c.user_id === collectorId ||
+        assignedStores.includes(c.nome_da_loja || ""),
     );
   };
 
   const getAvailableStores = (): string[] => {
     const stores = new Set<string>();
-    collections.forEach(c => {
+    collections.forEach((c) => {
       if (c.nome_da_loja) {
         stores.add(c.nome_da_loja);
       }
@@ -923,82 +1194,131 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
 
   const getCollectorStores = (collectorId: string): string[] => {
     return collectorStores
-      .filter(cs => cs.collectorId === collectorId)
-      .map(cs => cs.storeName);
+      .filter((cs) => cs.collectorId === collectorId)
+      .map((cs) => cs.storeName);
   };
 
   const refreshData = async () => {
-    setGlobalLoading(true, 'Atualizando dados...');
+    setGlobalLoading(true, "Atualizando dados...");
     try {
       await Promise.all([
         fetchCollections(),
         fetchUsers(),
         fetchCollectorStores(),
         fetchSalePayments(),
-        fetchScheduledVisits()
+        fetchScheduledVisits(),
       ]);
     } finally {
       setGlobalLoading(false);
     }
   };
 
-  const assignCollectorToClients = async (collectorId: string, documentos: string[]) => {
+  const refreshDataExceptVisits = async () => {
+    setGlobalLoading(true, "Atualizando dados...");
     try {
-      setGlobalLoading(true, 'Atribuindo clientes ao cobrador...');
+      await Promise.all([
+        fetchCollections(),
+        fetchUsers(),
+        fetchCollectorStores(),
+        fetchSalePayments(),
+      ]);
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+
+  const assignCollectorToClients = async (
+    collectorId: string,
+    clientIdentifiers: { document?: string; clientName?: string }[],
+  ) => {
+    try {
+      // setGlobalLoading(true, 'Atribuindo clientes ao cobrador...'); // Moved to ClientAssignment.tsx
       setLoading(true);
-      
-      console.log(`Iniciando atribuição de ${documentos.length} clientes ao cobrador ${collectorId}`);
-      
-      // Processar em lotes (Limite de 200 clientes por operação para performance e estabilidade)
-      const batchSize = 200; // Tamanho do lote - máximo recomendado
-      
-      if (documentos.length > batchSize) {
-        console.log(`⚠️ Processamento em lotes: ${Math.ceil(documentos.length / batchSize)} lotes de ${batchSize} clientes`);
-      }
+
+      console.log(
+        `Iniciando atribuição de ${clientIdentifiers.length} clientes ao cobrador ${collectorId}`,
+      );
+
+      const batchSize = 200;
       let totalParcelasAtualizadas = 0;
-      
-      for (let i = 0; i < documentos.length; i += batchSize) {
-        const batch = documentos.slice(i, i + batchSize);
-        console.log(`Processando lote ${Math.floor(i / batchSize) + 1}: ${batch.length} documentos`);
-        
-        // Buscar todas as parcelas dos clientes deste lote
-        const { data: parcelas, error: fetchError } = await supabase
-          .from('BANCO_DADOS')
-          .select('id_parcela')
-          .in('documento', batch);
+
+      for (let i = 0; i < clientIdentifiers.length; i += batchSize) {
+        const batch = clientIdentifiers.slice(i, i + batchSize);
+        console.log(
+          `Processando lote ${Math.floor(i / batchSize) + 1}: ${batch.length} identificadores`,
+        );
+
+        const documentBatch = batch
+          .filter((id) => id.document)
+          .map((id) => id.document);
+        const clientNameBatch = batch
+          .filter((id) => !id.document && id.clientName)
+          .map((id) => id.clientName);
+
+        let parcelas: { id_parcela: number }[] = [];
+        let fetchError: any = null;
+
+        if (documentBatch.length > 0) {
+          const { data, error } = await supabase
+            .from("BANCO_DADOS")
+            .select("id_parcela")
+            .in("documento", documentBatch);
+          if (error) fetchError = error;
+          if (data) parcelas = parcelas.concat(data);
+        }
+
+        if (clientNameBatch.length > 0 && !fetchError) {
+          const { data, error } = await supabase
+            .from("BANCO_DADOS")
+            .select("id_parcela")
+            .in("cliente", clientNameBatch);
+          if (error) fetchError = error;
+          if (data) parcelas = parcelas.concat(data);
+        }
 
         if (fetchError) {
-          console.error('Erro ao buscar parcelas do lote:', fetchError);
+          console.error("Erro ao buscar parcelas do lote:", fetchError);
           throw fetchError;
         }
 
         if (!parcelas || parcelas.length === 0) {
-          console.warn(`Nenhuma parcela encontrada para este lote de ${batch.length} clientes`);
+          console.warn(
+            `Nenhuma parcela encontrada para este lote de ${batch.length} clientes`,
+          );
           continue;
         }
 
         console.log(`Encontradas ${parcelas.length} parcelas para este lote`);
 
-        // Atualizar todas as parcelas com o novo cobrador
         const { error: updateError } = await supabase
-          .from('BANCO_DADOS')
+          .from("BANCO_DADOS")
           .update({ user_id: collectorId })
-          .in('id_parcela', parcelas.map(p => p.id_parcela));
+          .in(
+            "id_parcela",
+            parcelas.map((p) => p.id_parcela),
+          );
 
         if (updateError) {
-          console.error('Erro ao atualizar parcelas do lote:', updateError);
+          console.error("Erro ao atualizar parcelas do lote:", updateError);
           throw updateError;
         }
 
         totalParcelasAtualizadas += parcelas.length;
-        console.log(`Lote processado com sucesso. Total de parcelas atualizadas até agora: ${totalParcelasAtualizadas}`);
+        console.log(
+          `Lote processado com sucesso. Total de parcelas atualizadas até agora: ${totalParcelasAtualizadas}`,
+        );
       }
 
-      await refreshData();
-      console.log(`✅ Atribuição concluída: ${documentos.length} clientes (${totalParcelasAtualizadas} parcelas) atribuídos ao cobrador ${collectorId}`);
+      // await refreshData(); // Moved outside the loop
+      await refreshData(); // Moved outside the loop
+      console.log(
+        `✅ Atribuição concluída: ${clientIdentifiers.length} clientes (${totalParcelasAtualizadas} parcelas) atribuídos ao cobrador ${collectorId}`,
+      );
     } catch (err) {
-      console.error('Erro ao atribuir cobrador aos clientes:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao atribuir cobrador');
+      console.error("Erro ao atribuir cobrador aos clientes:", err);
+      setError(
+        err instanceof Error ? err.message : "Erro ao atribuir cobrador",
+      );
       throw err;
     } finally {
       setLoading(false);
@@ -1006,58 +1326,92 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
     }
   };
 
-  const removeCollectorFromClients = async (documentos: string[]) => {
+  const removeCollectorFromClients = async (
+    clientIdentifiers: { document?: string; clientName?: string }[],
+  ) => {
     try {
-      setGlobalLoading(true, 'Removendo cobrador dos clientes...');
+      // setGlobalLoading(true, 'Removendo cobrador dos clientes...'); // Moved to ClientAssignment.tsx
       setLoading(true);
-      console.log(`Removendo cobrador de ${documentos.length} clientes`);
-      
-      // Processar em lotes para evitar problemas de performance
+      console.log(`Removendo cobrador de ${clientIdentifiers.length} clientes`);
+
       const batchSize = 200;
       let totalParcelasAtualizadas = 0;
 
-      for (let i = 0; i < documentos.length; i += batchSize) {
-        const batch = documentos.slice(i, i + batchSize);
-        console.log(`Processando lote ${Math.floor(i / batchSize) + 1} de ${Math.ceil(documentos.length / batchSize)} (${batch.length} clientes)`);
-        
-        // Buscar todas as parcelas dos clientes neste lote
-        const { data: parcelas, error: fetchError } = await supabase
-          .from('BANCO_DADOS')
-          .select('id_parcela')
-          .in('documento', batch);
+      for (let i = 0; i < clientIdentifiers.length; i += batchSize) {
+        const batch = clientIdentifiers.slice(i, i + batchSize);
+        console.log(
+          `Processando lote ${Math.floor(i / batchSize) + 1} de ${Math.ceil(clientIdentifiers.length / batchSize)} (${batch.length} identificadores)`,
+        );
+
+        const documentBatch = batch
+          .filter((id) => id.document)
+          .map((id) => id.document);
+        const clientNameBatch = batch
+          .filter((id) => !id.document && id.clientName)
+          .map((id) => id.clientName);
+
+        let parcelas: { id_parcela: number }[] = [];
+        let fetchError: any = null;
+
+        if (documentBatch.length > 0) {
+          const { data, error } = await supabase
+            .from("BANCO_DADOS")
+            .select("id_parcela")
+            .in("documento", documentBatch);
+          if (error) fetchError = error;
+          if (data) parcelas = parcelas.concat(data);
+        }
+
+        if (clientNameBatch.length > 0 && !fetchError) {
+          const { data, error } = await supabase
+            .from("BANCO_DADOS")
+            .select("id_parcela")
+            .in("cliente", clientNameBatch);
+          if (error) fetchError = error;
+          if (data) parcelas = parcelas.concat(data);
+        }
 
         if (fetchError) {
-          console.error('Erro ao buscar parcelas do lote:', fetchError);
+          console.error("Erro ao buscar parcelas do lote:", fetchError);
           throw fetchError;
         }
 
         if (!parcelas || parcelas.length === 0) {
-          console.warn(`Nenhuma parcela encontrada para este lote de ${batch.length} clientes`);
+          console.warn(
+            `Nenhuma parcela encontrada para este lote de ${batch.length} clientes`,
+          );
           continue;
         }
 
         console.log(`Encontradas ${parcelas.length} parcelas para este lote`);
 
-        // Atualizar todas as parcelas para remover o cobrador
         const { error: updateError } = await supabase
-          .from('BANCO_DADOS')
+          .from("BANCO_DADOS")
           .update({ user_id: null })
-          .in('id_parcela', parcelas.map(p => p.id_parcela));
+          .in(
+            "id_parcela",
+            parcelas.map((p) => p.id_parcela),
+          );
 
         if (updateError) {
-          console.error('Erro ao atualizar parcelas do lote:', updateError);
+          console.error("Erro ao atualizar parcelas do lote:", updateError);
           throw updateError;
         }
 
         totalParcelasAtualizadas += parcelas.length;
-        console.log(`Lote processado com sucesso. Total de parcelas atualizadas até agora: ${totalParcelasAtualizadas}`);
+        console.log(
+          `Lote processado com sucesso. Total de parcelas atualizadas até agora: ${totalParcelasAtualizadas}`,
+        );
       }
 
-      await refreshData();
-      console.log(`✅ Remoção concluída: ${documentos.length} clientes (${totalParcelasAtualizadas} parcelas) removidos do cobrador`);
+      // await refreshData(); // Moved outside the loop
+      await refreshData(); // Moved outside the loop
+      console.log(
+        `✅ Remoção concluída: ${clientIdentifiers.length} clientes (${totalParcelasAtualizadas} parcelas) removidos do cobrador`,
+      );
     } catch (err) {
-      console.error('Erro ao remover cobrador dos clientes:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao remover cobrador');
+      console.error("Erro ao remover cobrador dos clientes:", err);
+      setError(err instanceof Error ? err.message : "Erro ao remover cobrador");
       throw err;
     } finally {
       setLoading(false);
@@ -1066,193 +1420,275 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
   };
 
   // === SALE PAYMENT FUNCTIONS ===
-  
+
   const fetchSalePayments = async () => {
     try {
-      console.log('Buscando pagamentos de venda...');
-      
-      // Simular dados de pagamentos por enquanto (pode ser implementado com Supabase depois)
-      // Por enquanto, vamos calcular dos dados existentes
-      setSalePayments([]);
-      
+      console.log("Buscando pagamentos de venda da tabela sale_payments...");
+
+      const { data: payments, error } = await supabase
+        .from("sale_payments")
+        .select("*")
+        .order("payment_date", { ascending: false });
+
+      if (error) {
+        console.error("Erro ao buscar pagamentos:", error);
+        throw error;
+      }
+
+      // Converter para o formato esperado pela aplicação
+      const convertedPayments: SalePayment[] = (payments || []).map(
+        (payment) => ({
+          id: payment.id,
+          saleNumber: payment.sale_number,
+          clientDocument: payment.client_document,
+          paymentAmount: payment.payment_amount,
+          paymentDate: payment.payment_date,
+          paymentMethod: payment.payment_method,
+          notes: payment.notes,
+          collectorId: payment.collector_id,
+          collectorName: payment.collector_name,
+          createdAt: payment.created_at,
+          distributionDetails: payment.distribution_details || [],
+        }),
+      );
+
+      setSalePayments(convertedPayments);
+      console.log(
+        `✅ ${convertedPayments.length} pagamentos carregados da tabela sale_payments`,
+      );
     } catch (err) {
-      console.error('Erro ao carregar pagamentos de venda:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao carregar pagamentos');
+      console.error("Erro ao carregar pagamentos de venda:", err);
+      setError(
+        err instanceof Error ? err.message : "Erro ao carregar pagamentos",
+      );
+      // Em caso de erro, definir array vazio
+      setSalePayments([]);
     }
   };
 
   // Algoritmo de distribuição de pagamento
   const distributeSalePayment = (
     installments: Collection[],
-    paymentAmount: number
-  ): { updatedInstallments: Collection[]; distributionDetails: PaymentDistribution[] } => {
-    console.log('Distribuindo pagamento:', paymentAmount, 'entre', installments.length, 'parcelas');
-    
-    // 1. Filtrar apenas parcelas pendentes
-    const pendingInstallments = installments.filter(inst => 
-      inst.valor_recebido < inst.valor_original
+    paymentAmount: number,
+  ): {
+    updatedInstallments: Collection[];
+    distributionDetails: PaymentDistribution[];
+  } => {
+    console.log(
+      "Distribuindo pagamento:",
+      paymentAmount,
+      "entre",
+      installments.length,
+      "parcelas",
     );
-    
+
+    // 1. Filtrar apenas parcelas pendentes
+    const pendingInstallments = installments.filter(
+      (inst) => inst.valor_recebido < inst.valor_original,
+    );
+
     if (pendingInstallments.length === 0) {
       return { updatedInstallments: installments, distributionDetails: [] };
     }
-    
+
     // 2. Ordenar por prioridade (vencidas primeiro, depois por data)
     const sortedInstallments = [...pendingInstallments].sort((a, b) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
-      const aDate = new Date(a.data_vencimento || '');
-      const bDate = new Date(b.data_vencimento || '');
+
+      const aDate = new Date(a.data_vencimento || "");
+      const bDate = new Date(b.data_vencimento || "");
       aDate.setHours(0, 0, 0, 0);
       bDate.setHours(0, 0, 0, 0);
-      
+
       const aOverdue = aDate < today;
       const bOverdue = bDate < today;
-      
+
       // Vencidas primeiro
       if (aOverdue && !bOverdue) return -1;
       if (!aOverdue && bOverdue) return 1;
-      
+
       // Se ambas vencidas ou ambas não vencidas, ordenar por data
       return aDate.getTime() - bDate.getTime();
     });
-    
+
     // 3. Distribuir o pagamento
     let remainingPayment = paymentAmount;
     const distributionDetails: PaymentDistribution[] = [];
     const updatedInstallments = [...installments];
-    
+
     // Função helper para arredondamento
-    const roundTo2Decimals = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
+    const roundTo2Decimals = (num: number) =>
+      Math.round((num + Number.EPSILON) * 100) / 100;
 
     for (const installment of sortedInstallments) {
       if (remainingPayment <= 0.01) break; // Parar se restante for <= 1 centavo
-      
-      const pendingAmount = roundTo2Decimals(installment.valor_original - installment.valor_recebido);
-      const paymentForThisInstallment = roundTo2Decimals(Math.min(remainingPayment, pendingAmount));
-      
-      if (paymentForThisInstallment > 0.01) { // Só processar se valor for > 1 centavo
+
+      const pendingAmount = roundTo2Decimals(
+        installment.valor_original - installment.valor_recebido,
+      );
+      const paymentForThisInstallment = roundTo2Decimals(
+        Math.min(remainingPayment, pendingAmount),
+      );
+
+      if (paymentForThisInstallment > 0.01) {
+        // Só processar se valor for > 1 centavo
         // Encontrar e atualizar a parcela no array
         const installmentIndex = updatedInstallments.findIndex(
-          inst => inst.id_parcela === installment.id_parcela
+          (inst) => inst.id_parcela === installment.id_parcela,
         );
-        
+
         if (installmentIndex !== -1) {
-          const newValueReceived = roundTo2Decimals(updatedInstallments[installmentIndex].valor_recebido + paymentForThisInstallment);
-          const remainingValue = roundTo2Decimals(updatedInstallments[installmentIndex].valor_original - newValueReceived);
-          
+          const newValueReceived = roundTo2Decimals(
+            updatedInstallments[installmentIndex].valor_recebido +
+              paymentForThisInstallment,
+          );
+          const remainingValue = roundTo2Decimals(
+            updatedInstallments[installmentIndex].valor_original -
+              newValueReceived,
+          );
+
           updatedInstallments[installmentIndex] = {
             ...updatedInstallments[installmentIndex],
             valor_recebido: newValueReceived,
-            status: remainingValue <= 0.01 // Considera pago se restante for <= 1 centavo
-              ? 'recebido' 
-              : 'parcialmente_pago',
-            data_de_recebimento: new Date().toISOString().split('T')[0]
+            status:
+              remainingValue <= 0.01 // Considera pago se restante for <= 1 centavo
+                ? "recebido"
+                : "parcialmente_pago",
+            data_de_recebimento: new Date().toISOString().split("T")[0],
           };
-          
+
           distributionDetails.push({
             installmentId: installment.id_parcela,
             originalAmount: pendingAmount,
             appliedAmount: paymentForThisInstallment,
-            installmentStatus: updatedInstallments[installmentIndex].status || 'pendente'
+            installmentStatus:
+              updatedInstallments[installmentIndex].status || "pendente",
           });
-          
-          remainingPayment = roundTo2Decimals(remainingPayment - paymentForThisInstallment);
+
+          remainingPayment = roundTo2Decimals(
+            remainingPayment - paymentForThisInstallment,
+          );
         }
       }
     }
-    
-    console.log('Distribuição concluída. Valor restante:', remainingPayment);
-    console.log('Detalhes da distribuição:', distributionDetails);
-    
+
+    console.log("Distribuição concluída. Valor restante:", remainingPayment);
+    console.log("Detalhes da distribuição:", distributionDetails);
+
     return { updatedInstallments, distributionDetails };
   };
 
-  const processSalePayment = async (payment: SalePaymentInput, collectorId: string) => {
+  const processSalePayment = async (
+    payment: SalePaymentInput,
+    collectorId: string,
+  ) => {
     try {
       setLoading(true);
-      console.log('Processando pagamento de venda:', payment);
-      
+      console.log("Processando pagamento de venda:", payment);
+
       // 1. Buscar todas as parcelas da venda para o cliente
-      const saleInstallments = collections.filter(collection => 
-        collection.venda_n === payment.saleNumber && 
-        collection.documento === payment.clientDocument
+      const saleInstallments = collections.filter(
+        (collection) =>
+          collection.venda_n === payment.saleNumber &&
+          collection.documento === payment.clientDocument,
       );
-      
+
       if (saleInstallments.length === 0) {
-        throw new Error('Nenhuma parcela encontrada para esta venda e cliente');
+        throw new Error("Nenhuma parcela encontrada para esta venda e cliente");
       }
-      
-      console.log('Parcelas encontradas:', saleInstallments.length);
-      
+
+      console.log("Parcelas encontradas:", saleInstallments.length);
+
       // 2. Distribuir o pagamento
-      const { updatedInstallments, distributionDetails } = distributeSalePayment(
-        saleInstallments, 
-        payment.paymentAmount
-      );
-      
+      const { updatedInstallments, distributionDetails } =
+        distributeSalePayment(saleInstallments, payment.paymentAmount);
+
       // 3. Atualizar no banco de dados
       for (const installment of updatedInstallments) {
-        const originalInstallment = saleInstallments.find(inst => inst.id_parcela === installment.id_parcela);
-        
+        const originalInstallment = saleInstallments.find(
+          (inst) => inst.id_parcela === installment.id_parcela,
+        );
+
         // Se houve mudança, atualizar no banco
-        if (originalInstallment && (
-          originalInstallment.valor_recebido !== installment.valor_recebido ||
-          originalInstallment.status !== installment.status
-        )) {
+        if (
+          originalInstallment &&
+          (originalInstallment.valor_recebido !== installment.valor_recebido ||
+            originalInstallment.status !== installment.status)
+        ) {
           const { error } = await supabase
-            .from('BANCO_DADOS')
+            .from("BANCO_DADOS")
             .update({
               valor_recebido: installment.valor_recebido,
               status: installment.status,
-              data_de_recebimento: installment.data_de_recebimento
+              data_de_recebimento: installment.data_de_recebimento,
             })
-            .eq('id_parcela', installment.id_parcela);
-          
+            .eq("id_parcela", installment.id_parcela);
+
           if (error) {
-            console.error('Erro ao atualizar parcela:', error);
+            console.error("Erro ao atualizar parcela:", error);
             throw error;
           }
         }
       }
-      
-      // 4. Registrar o pagamento da venda (futuramente pode ir para uma tabela separada)
-      const salePayment: SalePayment = {
-        id: `${Date.now()}-${Math.random()}`, // ID temporário
-        saleNumber: payment.saleNumber,
-        clientDocument: payment.clientDocument,
-        paymentAmount: payment.paymentAmount,
-        paymentDate: new Date().toISOString().split('T')[0],
-        paymentMethod: payment.paymentMethod,
-        notes: payment.notes,
-        collectorId,
-        collectorName: users.find(u => u.id === collectorId)?.name,
-        createdAt: new Date().toISOString(),
-        distributionDetails
+
+      // 4. Registrar o pagamento na tabela sale_payments
+      const collector = users.find((u) => u.id === collectorId);
+      const client = saleInstallments[0]; // Usar primeira parcela para obter dados do cliente
+
+      const paymentRecord = {
+        sale_number: payment.saleNumber,
+        client_document: payment.clientDocument,
+        client_name: client?.cliente || "Cliente não informado",
+        payment_amount: payment.paymentAmount,
+        payment_date: new Date().toISOString().split("T")[0],
+        payment_method: payment.paymentMethod,
+        notes: payment.notes || "",
+        collector_id: collectorId,
+        collector_name: collector?.name || "Cobrador não encontrado",
+        distribution_details: distributionDetails,
+        store_name: client?.nome_da_loja || null,
       };
-      
-      // Adicionar aos pagamentos locais
-      setSalePayments(prev => [...prev, salePayment]);
-      
+
+      const { data: insertedPayment, error: paymentError } = await supabase
+        .from("sale_payments")
+        .insert(paymentRecord)
+        .select()
+        .single();
+
+      if (paymentError) {
+        console.error(
+          "Erro ao registrar pagamento na tabela sale_payments:",
+          paymentError,
+        );
+        // Não falhar se não conseguir registrar o histórico, apenas logar
+      } else {
+        console.log(
+          "✅ Pagamento registrado na tabela sale_payments:",
+          insertedPayment,
+        );
+      }
+
       // 5. Atualizar estado local das collections imediatamente
-      setCollections(prevCollections => 
-        prevCollections.map(collection => {
+      setCollections((prevCollections) =>
+        prevCollections.map((collection) => {
           const updatedInstallment = updatedInstallments.find(
-            inst => inst.id_parcela === collection.id_parcela
+            (inst) => inst.id_parcela === collection.id_parcela,
           );
           return updatedInstallment || collection;
-        })
+        }),
       );
-      
-      // 6. Atualizar dados do banco (refresh)
-      await refreshData();
-      
-      console.log('✅ Pagamento de venda processado com sucesso!');
-      
+
+      // 6. Atualizar dados do banco (refresh collections apenas)
+      await refreshDataExceptVisits();
+
+      // 7. Atualizar visitas agendadas do cliente com dados refreshed
+      await updateScheduledVisitsAfterPayment(payment.clientDocument);
     } catch (err) {
-      console.error('Erro ao processar pagamento de venda:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao processar pagamento');
+      console.error("Erro ao processar pagamento de venda:", err);
+      setError(
+        err instanceof Error ? err.message : "Erro ao processar pagamento",
+      );
       throw err;
     } finally {
       setLoading(false);
@@ -1264,301 +1700,456 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
     paymentAmount: number,
     paymentMethod: string,
     notes: string,
-    collectorId: string
+    collectorId: string,
   ) => {
     try {
       setLoading(true);
-      console.log('Processando pagamento geral do cliente:', clientDocument, 'Valor:', paymentAmount);
-      
-      // 1. Buscar todas as parcelas pendentes do cliente
-      console.log('Total de collections no contexto:', collections.length);
-      console.log('Buscando parcelas para cliente:', clientDocument);
-      
-      const clientInstallments = collections.filter(collection => 
-        collection.documento === clientDocument && 
-        collection.valor_recebido < collection.valor_original
+      console.log(
+        "Processando pagamento geral do cliente:",
+        clientDocument,
+        "Valor:",
+        paymentAmount,
       );
-      
-      console.log('Parcelas encontradas para o cliente:', clientInstallments.length);
-      
+
+      // 1. Buscar todas as parcelas pendentes do cliente
+      console.log("Total de collections no contexto:", collections.length);
+      console.log("Buscando parcelas para cliente:", clientDocument);
+
+      const clientInstallments = collections.filter(
+        (collection) =>
+          collection.documento === clientDocument &&
+          collection.valor_recebido < collection.valor_original,
+      );
+
+      console.log(
+        "Parcelas encontradas para o cliente:",
+        clientInstallments.length,
+      );
+
       if (clientInstallments.length === 0) {
-        throw new Error(`Nenhuma parcela pendente encontrada para o cliente ${clientDocument}`);
+        throw new Error(
+          `Nenhuma parcela pendente encontrada para o cliente ${clientDocument}`,
+        );
       }
-      
-      console.log('Parcelas pendentes encontradas:', clientInstallments.length);
-      
+
+      console.log("Parcelas pendentes encontradas:", clientInstallments.length);
+
       // 2. Ordenar por prioridade (vencidas primeiro, depois por data de vencimento)
       const sortedInstallments = clientInstallments.sort((a, b) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
-        const aDate = new Date(a.data_vencimento || '');
-        const bDate = new Date(b.data_vencimento || '');
+
+        const aDate = new Date(a.data_vencimento || "");
+        const bDate = new Date(b.data_vencimento || "");
         aDate.setHours(0, 0, 0, 0);
         bDate.setHours(0, 0, 0, 0);
-        
+
         const aOverdue = aDate < today;
         const bOverdue = bDate < today;
-        
+
         // Parcelas vencidas primeiro
         if (aOverdue && !bOverdue) return -1;
         if (!aOverdue && bOverdue) return 1;
-        
+
         // Depois por data de vencimento
         return aDate.getTime() - bDate.getTime();
       });
-      
+
       // 3. Distribuir o pagamento
       let remainingPayment = paymentAmount;
       const updatedInstallments: Collection[] = [];
       const distributionDetails: any[] = [];
-      
+
       for (const installment of sortedInstallments) {
         if (remainingPayment <= 0) break;
-        
-        const pendingAmount = installment.valor_original - installment.valor_recebido;
-        const paymentForThisInstallment = Math.min(remainingPayment, pendingAmount);
-        
+
+        const pendingAmount =
+          installment.valor_original - installment.valor_recebido;
+        const paymentForThisInstallment = Math.min(
+          remainingPayment,
+          pendingAmount,
+        );
+
         if (paymentForThisInstallment > 0) {
-          const newReceivedAmount = installment.valor_recebido + paymentForThisInstallment;
-          
+          const newReceivedAmount =
+            installment.valor_recebido + paymentForThisInstallment;
+
           const updatedInstallment: Collection = {
             ...installment,
             valor_recebido: newReceivedAmount,
-            status: newReceivedAmount >= installment.valor_original ? 'recebido' : 'parcialmente_pago',
-            data_de_recebimento: newReceivedAmount >= installment.valor_original 
-              ? new Date().toISOString().split('T')[0] 
-              : installment.data_de_recebimento
+            status:
+              newReceivedAmount >= installment.valor_original
+                ? "recebido"
+                : "parcialmente_pago",
+            data_de_recebimento:
+              newReceivedAmount >= installment.valor_original
+                ? new Date().toISOString().split("T")[0]
+                : installment.data_de_recebimento,
           };
-          
+
           updatedInstallments.push(updatedInstallment);
-          
+
           distributionDetails.push({
             installmentId: installment.id_parcela,
             saleNumber: installment.venda_n,
             installmentNumber: installment.parcela,
             originalAmount: pendingAmount,
             appliedAmount: paymentForThisInstallment,
-            installmentStatus: updatedInstallment.status
+            installmentStatus: updatedInstallment.status,
           });
-          
+
           remainingPayment -= paymentForThisInstallment;
         }
       }
-      
+
       // 4. Atualizar no banco de dados
-      console.log('Atualizando', updatedInstallments.length, 'parcelas no banco de dados...');
+      console.log(
+        "Atualizando",
+        updatedInstallments.length,
+        "parcelas no banco de dados...",
+      );
       for (const installment of updatedInstallments) {
-        console.log('Atualizando parcela', installment.id_parcela, 'valor recebido:', installment.valor_recebido);
-        
+        console.log(
+          "Atualizando parcela",
+          installment.id_parcela,
+          "valor recebido:",
+          installment.valor_recebido,
+        );
+
         const { error: updateError } = await supabase
-          .from('BANCO_DADOS')
+          .from("BANCO_DADOS")
           .update({
             valor_recebido: installment.valor_recebido,
             status: installment.status,
-            data_de_recebimento: installment.data_de_recebimento
+            data_de_recebimento: installment.data_de_recebimento,
           })
-          .eq('id_parcela', installment.id_parcela);
-        
+          .eq("id_parcela", installment.id_parcela);
+
         if (updateError) {
-          console.error('Erro ao atualizar parcela', installment.id_parcela, ':', updateError);
+          console.error(
+            "Erro ao atualizar parcela",
+            installment.id_parcela,
+            ":",
+            updateError,
+          );
           throw updateError;
         }
       }
-      
-      // 5. Registrar o pagamento geral (opcional - se a tabela existir)
+
+      // 5. Registrar o pagamento geral na tabela sale_payments
       try {
-        const affectedSales = [...new Set(distributionDetails.map(d => d.saleNumber))];
-        
+        const collector = users.find((u) => u.id === collectorId);
+        const client = updatedInstallments[0]; // Usar primeira parcela para obter dados do cliente
+
+        const affectedSales = [
+          ...new Set(distributionDetails.map((d) => d.saleNumber)),
+        ];
+
         for (const saleNumber of affectedSales) {
-          const saleDistribution = distributionDetails.filter(d => d.saleNumber === saleNumber);
-          const salePaymentAmount = saleDistribution.reduce((sum, d) => sum + d.appliedAmount, 0);
-          
+          const saleDistribution = distributionDetails.filter(
+            (d) => d.saleNumber === saleNumber,
+          );
+          const salePaymentAmount = saleDistribution.reduce(
+            (sum, d) => sum + d.appliedAmount,
+            0,
+          );
+
           const paymentRecord = {
-            id: crypto.randomUUID(),
             sale_number: saleNumber,
             client_document: clientDocument,
+            client_name: client?.cliente || "Cliente não informado",
             payment_amount: salePaymentAmount,
-            payment_date: new Date().toISOString().split('T')[0],
+            payment_date: new Date().toISOString().split("T")[0],
             payment_method: paymentMethod,
             notes: `Pagamento geral do cliente. ${notes}`.trim(),
             collector_id: collectorId,
-            created_at: new Date().toISOString(),
-            distribution_details: JSON.stringify(saleDistribution)
+            collector_name: collector?.name || "Cobrador não encontrado",
+            distribution_details: saleDistribution,
+            store_name: client?.nome_da_loja || null,
           };
-          
-          const { error: paymentError } = await supabase
-            .from('sale_payments')
-            .insert(paymentRecord);
-          
+
+          const { data: insertedPayment, error: paymentError } = await supabase
+            .from("sale_payments")
+            .insert(paymentRecord)
+            .select()
+            .single();
+
           if (paymentError) {
-            console.warn('Tabela sale_payments não encontrada, prosseguindo sem registro de histórico:', paymentError);
+            console.error(
+              "Erro ao registrar pagamento na tabela sale_payments:",
+              paymentError,
+            );
+            // Não falhar se não conseguir registrar o histórico, apenas logar
+          } else {
+            console.log(
+              "✅ Pagamento registrado na tabela sale_payments:",
+              insertedPayment,
+            );
           }
         }
       } catch (historyError) {
-        console.warn('Erro ao registrar histórico de pagamento (não crítico):', historyError);
+        console.warn(
+          "Erro ao registrar histórico de pagamento (não crítico):",
+          historyError,
+        );
       }
-      
+
       // 6. Atualizar estado local das collections imediatamente
-      setCollections(prevCollections => 
-        prevCollections.map(collection => {
+      setCollections((prevCollections) =>
+        prevCollections.map((collection) => {
           const updatedInstallment = updatedInstallments.find(
-            inst => inst.id_parcela === collection.id_parcela
+            (inst) => inst.id_parcela === collection.id_parcela,
           );
           return updatedInstallment || collection;
-        })
+        }),
       );
-      
-      // 7. Atualizar dados do banco (refresh)
-      await refreshData();
-      
-      console.log('✅ Pagamento geral processado com sucesso!');
-      
+
+      // 7. Atualizar dados do banco (refresh collections apenas)
+      await refreshDataExceptVisits();
+
+      // 8. Atualizar visitas agendadas do cliente com dados refreshed
+      await updateScheduledVisitsAfterPayment(clientDocument);
+
+      console.log("✅ Pagamento geral processado com sucesso!");
     } catch (err) {
-      console.error('Erro ao processar pagamento geral:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao processar pagamento geral');
+      console.error("Erro ao processar pagamento geral:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erro ao processar pagamento geral",
+      );
       throw err;
     } finally {
       setLoading(false);
     }
   };
-  
-  const getSalePayments = (saleNumber: number, clientDocument: string): SalePayment[] => {
-    return salePayments.filter(payment => 
-      payment.saleNumber === saleNumber && 
-      payment.clientDocument === clientDocument
+
+  const getSalePayments = (
+    saleNumber: number,
+    clientDocument: string,
+  ): SalePayment[] => {
+    return salePayments.filter(
+      (payment) =>
+        payment.saleNumber === saleNumber &&
+        payment.clientDocument === clientDocument,
     );
   };
-  
-  const calculateSaleBalance = (saleNumber: number, clientDocument: string): SaleBalance => {
-    const saleInstallments = collections.filter(collection => 
-      collection.venda_n === saleNumber && 
-      collection.documento === clientDocument
-    );
-    
+
+  const calculateSaleBalance = (
+    saleNumber: number,
+    clientDocument: string,
+  ): SaleBalance => {
+    const saleInstallments = collections.filter((collection) => {
+      if (saleNumber === 0) {
+        // Para vendas renegociadas (saleNumber = 0), buscar parcelas sem venda_n
+        return !collection.venda_n && collection.documento === clientDocument;
+      } else {
+        // Para vendas normais, buscar por venda_n
+        return (
+          collection.venda_n === saleNumber &&
+          collection.documento === clientDocument
+        );
+      }
+    });
+
     // Arredondar para 2 casas decimais para evitar problemas de precisão
-    const roundTo2Decimals = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
-    
-    const totalValue = roundTo2Decimals(saleInstallments.reduce((sum, inst) => sum + inst.valor_original, 0));
-    const totalPaid = roundTo2Decimals(saleInstallments.reduce((sum, inst) => sum + inst.valor_recebido, 0));
+    const roundTo2Decimals = (num: number) =>
+      Math.round((num + Number.EPSILON) * 100) / 100;
+
+    const totalValue = roundTo2Decimals(
+      saleInstallments.reduce((sum, inst) => sum + inst.valor_original, 0),
+    );
+    // Limitar o valor pago ao valor original para evitar valores negativos
+    const totalPaid = roundTo2Decimals(
+      Math.min(
+        totalValue,
+        saleInstallments.reduce((sum, inst) => sum + inst.valor_recebido, 0),
+      ),
+    );
     const remainingBalance = roundTo2Decimals(totalValue - totalPaid);
-    
-    let status: 'pending' | 'partially_paid' | 'fully_paid' = 'pending';
+
+    let status: "pending" | "partially_paid" | "fully_paid" = "pending";
     if (totalPaid === 0) {
-      status = 'pending';
-    } else if (remainingBalance <= 0.01) { // Considera pago se restante for <= 1 centavo
-      status = 'fully_paid';
+      status = "pending";
+    } else if (remainingBalance <= 0.01) {
+      // Considera pago se restante for <= 1 centavo
+      status = "fully_paid";
     } else {
-      status = 'partially_paid';
+      status = "partially_paid";
     }
-    
-    const installmentBreakdown = saleInstallments.map(inst => ({
+
+    const installmentBreakdown = saleInstallments.map((inst) => ({
       installmentId: inst.id_parcela,
       originalValue: inst.valor_original,
-      paidValue: inst.valor_recebido,
-      remainingValue: roundTo2Decimals(inst.valor_original - inst.valor_recebido),
-      status: inst.status || 'pendente'
+      paidValue: Math.min(inst.valor_original, inst.valor_recebido), // Limitar valor pago ao valor original
+      remainingValue: roundTo2Decimals(
+        Math.max(0, inst.valor_original - inst.valor_recebido),
+      ),
+      status: inst.status || "pendente",
     }));
-    
+
     return {
       totalValue,
       totalPaid,
       remainingBalance,
       status,
-      installmentBreakdown
+      installmentBreakdown,
     };
   };
-  
-  const getSalesByClient = React.useCallback((clientDocument: string): SaleGroup[] => {
-    // Agrupar collections por venda
-    const salesMap = new Map<number, Collection[]>();
-    
-    collections
-      .filter(collection => collection.documento === clientDocument)
-      .forEach(collection => {
-        if (collection.venda_n) {
-          if (!salesMap.has(collection.venda_n)) {
-            salesMap.set(collection.venda_n, []);
+
+  const getSalesByClient = React.useCallback(
+    (clientDocument: string): SaleGroup[] => {
+      // Agrupar collections por venda
+      const salesMap = new Map<number, Collection[]>();
+      const individualInstallments: Collection[] = [];
+
+      collections
+        .filter((collection) => collection.documento === clientDocument)
+        .forEach((collection) => {
+          const saleNumber = collection.venda_n;
+
+          // Se não há número de venda, trata como parcela individual
+          if (!saleNumber) {
+            individualInstallments.push(collection);
+          } else {
+            // Agrupa por número de venda
+            if (!salesMap.has(saleNumber)) {
+              salesMap.set(saleNumber, []);
+            }
+            salesMap.get(saleNumber)!.push(collection);
           }
-          salesMap.get(collection.venda_n)!.push(collection);
-        }
-      });
-    
-    // Converter para SaleGroup
-    return Array.from(salesMap.entries()).map(([saleNumber, installments]) => {
-      // Arredondar para 2 casas decimais para evitar problemas de precisão
-      const roundTo2Decimals = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
-      
-      const totalValue = roundTo2Decimals(installments.reduce((sum, inst) => sum + inst.valor_original, 0));
-      const totalReceived = roundTo2Decimals(installments.reduce((sum, inst) => sum + inst.valor_recebido, 0));
-      const pendingValue = roundTo2Decimals(totalValue - totalReceived);
-      
-      const balance = calculateSaleBalance(saleNumber, clientDocument);
-      const payments = getSalePayments(saleNumber, clientDocument);
-      
-      return {
-        saleNumber,
-        titleNumber: installments[0]?.numero_titulo || 0,
-        description: installments[0]?.descricao || `Venda ${saleNumber}`,
-        installments,
-        totalValue,
-        totalReceived,
-        pendingValue,
-        saleStatus: balance.status,
-        payments,
-        clientDocument
-      };
-    });
-  }, [collections, calculateSaleBalance, getSalePayments]);
+        });
+
+      // Converter vendas agrupadas para SaleGroup
+      const saleGroups = Array.from(salesMap.entries()).map(
+        ([saleNumber, installments]) => {
+          // Arredondar para 2 casas decimais para evitar problemas de precisão
+          const roundTo2Decimals = (num: number) =>
+            Math.round((num + Number.EPSILON) * 100) / 100;
+          const totalValue = roundTo2Decimals(
+            installments.reduce((sum, inst) => sum + inst.valor_original, 0),
+          );
+          // Limitar o valor recebido ao valor original para evitar valores negativos
+          const totalReceived = roundTo2Decimals(
+            Math.min(
+              totalValue,
+              installments.reduce((sum, inst) => sum + inst.valor_recebido, 0),
+            ),
+          );
+          const pendingValue = Math.max(
+            0,
+            roundTo2Decimals(totalValue - totalReceived),
+          );
+          const balance = calculateSaleBalance(saleNumber, clientDocument);
+          const payments = getSalePayments(saleNumber, clientDocument);
+          return {
+            saleNumber,
+            titleNumber: installments[0]?.numero_titulo || 0,
+            description: installments[0]?.descricao || `Venda ${saleNumber}`,
+            installments,
+            totalValue,
+            totalReceived,
+            pendingValue,
+            saleStatus: balance.status,
+            payments,
+            clientDocument,
+          };
+        },
+      );
+
+      // Converter parcelas individuais para uma única "Venda Renegociada"
+      const renegotiatedSaleGroups =
+        individualInstallments.length > 0
+          ? [
+              {
+                saleNumber: 0, // Usar 0 para identificar como renegociada
+                titleNumber: individualInstallments[0]?.numero_titulo || 0,
+                description: `Renegociada (${individualInstallments.length} parcela${individualInstallments.length !== 1 ? "s" : ""})`,
+                installments: individualInstallments,
+                totalValue: individualInstallments.reduce(
+                  (sum, inst) => sum + inst.valor_original,
+                  0,
+                ),
+                totalReceived: Math.min(
+                  individualInstallments.reduce(
+                    (sum, inst) => sum + inst.valor_original,
+                    0,
+                  ),
+                  individualInstallments.reduce(
+                    (sum, inst) => sum + inst.valor_recebido,
+                    0,
+                  ),
+                ),
+                pendingValue: Math.max(
+                  0,
+                  individualInstallments.reduce(
+                    (sum, inst) =>
+                      sum +
+                      Math.max(0, inst.valor_original - inst.valor_recebido),
+                    0,
+                  ),
+                ),
+                saleStatus: (() => {
+                  const totalValue = individualInstallments.reduce(
+                    (sum, inst) => sum + inst.valor_original,
+                    0,
+                  );
+                  const totalReceived = Math.min(
+                    totalValue,
+                    individualInstallments.reduce(
+                      (sum, inst) => sum + inst.valor_recebido,
+                      0,
+                    ),
+                  );
+                  const pendingValue = totalValue - totalReceived;
+
+                  if (totalReceived === 0) return "pending" as const;
+                  if (pendingValue <= 0.01) return "fully_paid" as const;
+                  return "partially_paid" as const;
+                })(),
+                payments: getSalePayments(0, clientDocument), // Usar 0 para buscar pagamentos da renegociada
+                clientDocument,
+              },
+            ]
+          : [];
+
+      // Retornar vendas agrupadas + venda renegociada
+      return [...saleGroups, ...renegotiatedSaleGroups];
+    },
+    [collections, calculateSaleBalance, getSalePayments],
+  );
 
   // Scheduled Visits Functions
   const fetchScheduledVisits = async () => {
     try {
-      console.log('Buscando visitas agendadas...');
-      
+      console.log("Buscando visitas agendadas...");
+
       const { data, error: supabaseError } = await supabase
-        .from('scheduled_visits')
-        .select('*')
-        .order('scheduled_date', { ascending: true });
+        .from("scheduled_visits")
+        .select("*")
+        .order("scheduled_date", { ascending: true });
 
       if (supabaseError) {
-        console.error('Erro ao buscar visitas agendadas:', supabaseError);
-        
+        console.error("Erro ao buscar visitas agendadas:", supabaseError);
+
         // Se a tabela não existir, mostrar instruções para criar
-        if (supabaseError.message.includes('relation "scheduled_visits" does not exist')) {
-          console.log('Tabela scheduled_visits não existe.');
-          console.log('Por favor, execute o seguinte SQL no Supabase:');
-          console.log(`
-            CREATE TABLE scheduled_visits (
-              id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-              collector_id TEXT NOT NULL,
-              client_document TEXT NOT NULL,
-              client_name TEXT NOT NULL,
-              scheduled_date DATE NOT NULL,
-              scheduled_time TIME,
-              status TEXT NOT NULL DEFAULT 'agendada',
-              notes TEXT,
-              client_address TEXT,
-              client_neighborhood TEXT,
-              client_city TEXT,
-              total_pending_value DECIMAL(10,2),
-              overdue_count INTEGER DEFAULT 0,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            );
-            
-            CREATE INDEX idx_scheduled_visits_collector ON scheduled_visits(collector_id);
-            CREATE INDEX idx_scheduled_visits_client ON scheduled_visits(client_document);
-            CREATE INDEX idx_scheduled_visits_date ON scheduled_visits(scheduled_date);
-          `);
+        if (
+          supabaseError.message.includes(
+            'relation "scheduled_visits" does not exist',
+          )
+        ) {
+          console.error(
+            "Tabela scheduled_visits não existe. Verifique a estrutura do banco de dados.",
+          );
+          // Estrutura de tabela necessária não encontrada
         }
-        
+
         // Usar sistema local como fallback
         setScheduledVisits([]);
         return;
       }
 
-      const transformedVisits: ScheduledVisit[] = (data || []).map(visit => ({
+      const transformedVisits: ScheduledVisit[] = (data || []).map((visit) => ({
         id: visit.id,
         collectorId: visit.collector_id,
         clientDocument: visit.client_document,
@@ -1569,6 +2160,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
         notes: visit.notes,
         createdAt: visit.created_at,
         updatedAt: visit.updated_at,
+        dataVisitaRealizada: visit.data_visita_realizada,
         clientAddress: visit.client_address,
         clientNeighborhood: visit.client_neighborhood,
         clientCity: visit.client_city,
@@ -1580,25 +2172,27 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
         cancellationApprovedAt: visit.cancellation_approved_at,
         cancellationRejectedBy: visit.cancellation_rejected_by,
         cancellationRejectedAt: visit.cancellation_rejected_at,
-        cancellationRejectionReason: visit.cancellation_rejection_reason
+        cancellationRejectionReason: visit.cancellation_rejection_reason,
       }));
 
       setScheduledVisits(transformedVisits);
-      console.log('Visitas agendadas carregadas:', transformedVisits.length);
+      console.log("Visitas agendadas carregadas:", transformedVisits.length);
     } catch (err) {
-      console.error('Erro ao carregar visitas agendadas:', err);
+      console.error("Erro ao carregar visitas agendadas:", err);
       // Fallback para sistema local
       setScheduledVisits([]);
     }
   };
 
-  const scheduleVisit = async (visitData: Omit<ScheduledVisit, 'id' | 'createdAt'>) => {
+  const scheduleVisit = async (
+    visitData: Omit<ScheduledVisit, "id" | "createdAt">,
+  ) => {
     try {
-      console.log('Agendando visita:', visitData);
+      console.log("Agendando visita:", visitData);
 
       // Tentar inserir no Supabase
       const { data, error } = await supabase
-        .from('scheduled_visits')
+        .from("scheduled_visits")
         .insert([
           {
             collector_id: visitData.collectorId,
@@ -1612,24 +2206,24 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
             client_neighborhood: visitData.clientNeighborhood,
             client_city: visitData.clientCity,
             total_pending_value: visitData.totalPendingValue,
-            overdue_count: visitData.overdueCount
-          }
+            overdue_count: visitData.overdueCount,
+          },
         ])
         .select()
         .single();
 
       if (error) {
-        console.error('Erro ao inserir visita no Supabase:', error);
-        
+        console.error("Erro ao inserir visita no Supabase:", error);
+
         // Fallback para sistema local
         const newVisit: ScheduledVisit = {
           ...visitData,
           id: Date.now().toString(),
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         };
 
-        setScheduledVisits(prev => [...prev, newVisit]);
-        console.log('Visita agendada localmente:', newVisit);
+        setScheduledVisits((prev) => [...prev, newVisit]);
+        console.log("Visita agendada localmente:", newVisit);
         return newVisit;
       }
 
@@ -1656,263 +2250,317 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
         cancellationApprovedAt: data.cancellation_approved_at,
         cancellationRejectedBy: data.cancellation_rejected_by,
         cancellationRejectedAt: data.cancellation_rejected_at,
-        cancellationRejectionReason: data.cancellation_rejection_reason
+        cancellationRejectionReason: data.cancellation_rejection_reason,
       };
 
       // Atualizar estado local
-      setScheduledVisits(prev => [...prev, newVisit]);
-      console.log('Visita agendada com sucesso no Supabase:', newVisit);
-      
+      setScheduledVisits((prev) => [...prev, newVisit]);
+      // Visita agendada com sucesso
+
       return newVisit;
     } catch (error) {
-      console.error('Erro ao agendar visita:', error);
+      console.error("Erro ao agendar visita:", error);
       throw error;
     }
   };
 
-  const updateVisitStatus = async (visitId: string, status: ScheduledVisit['status'], notes?: string) => {
+  const updateVisitStatus = async (
+    visitId: string,
+    status: ScheduledVisit["status"],
+    notes?: string,
+  ) => {
     try {
-      console.log('Atualizando status da visita:', visitId, status);
+      console.log("Atualizando status da visita:", visitId, status);
 
       // Tentar atualizar no Supabase
       const updateData: any = {
         status,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
-      
+
       if (notes !== undefined) {
         updateData.notes = notes;
       }
 
+      // Se o status for "realizada", sempre definir a data atual como data da visita realizada
+      if (status === "realizada") {
+        updateData.data_visita_realizada = new Date()
+          .toISOString()
+          .split("T")[0];
+      }
+
       const { error } = await supabase
-        .from('scheduled_visits')
+        .from("scheduled_visits")
         .update(updateData)
-        .eq('id', visitId);
+        .eq("id", visitId);
 
       if (error) {
-        console.error('Erro ao atualizar visita no Supabase:', error);
+        console.error("Erro ao atualizar visita no Supabase:", error);
         // Continuar com atualização local mesmo se falhar no Supabase
       }
 
       // Atualizar estado local
-      setScheduledVisits(prev => prev.map(visit => 
-        visit.id === visitId 
-          ? { 
-              ...visit, 
-              status, 
-              notes: notes || visit.notes,
-              updatedAt: new Date().toISOString()
-            }
-          : visit
-      ));
+      setScheduledVisits((prev) =>
+        prev.map((visit) =>
+          visit.id === visitId
+            ? {
+                ...visit,
+                status,
+                notes: notes || visit.notes,
+                updatedAt: new Date().toISOString(),
+                // Se o status for "realizada", definir a data atual como data da visita realizada
+                ...(status === "realizada" && {
+                  dataVisitaRealizada: new Date().toISOString().split("T")[0],
+                }),
+              }
+            : visit,
+        ),
+      );
 
-      console.log('Status da visita atualizado com sucesso');
+      console.log("Status da visita atualizado com sucesso");
     } catch (error) {
-      console.error('Erro ao atualizar status da visita:', error);
+      console.error("Erro ao atualizar status da visita:", error);
       throw error;
     }
   };
 
   const requestVisitCancellation = async (visitId: string, reason: string) => {
     try {
-      console.log('Solicitando cancelamento da visita:', visitId, reason);
+      console.log("Solicitando cancelamento da visita:", visitId, reason);
 
       // Tentar atualizar no Supabase
       const updateData = {
-        status: 'cancelamento_solicitado' as const,
+        status: "cancelamento_solicitado" as const,
         cancellation_request_date: new Date().toISOString(),
         cancellation_request_reason: reason,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
 
       const { error } = await supabase
-        .from('scheduled_visits')
+        .from("scheduled_visits")
         .update(updateData)
-        .eq('id', visitId);
+        .eq("id", visitId);
 
       if (error) {
-        console.error('Erro ao solicitar cancelamento no Supabase:', error);
+        console.error("Erro ao solicitar cancelamento no Supabase:", error);
         // Continuar com atualização local mesmo se falhar no Supabase
       }
 
       // Atualizar estado local
-      setScheduledVisits(prev => prev.map(visit => 
-        visit.id === visitId 
-          ? { 
-              ...visit, 
-              status: 'cancelamento_solicitado',
-              cancellationRequestDate: new Date().toISOString(),
-              cancellationRequestReason: reason,
-              updatedAt: new Date().toISOString()
-            }
-          : visit
-      ));
+      setScheduledVisits((prev) =>
+        prev.map((visit) =>
+          visit.id === visitId
+            ? {
+                ...visit,
+                status: "cancelamento_solicitado",
+                cancellationRequestDate: new Date().toISOString(),
+                cancellationRequestReason: reason,
+                updatedAt: new Date().toISOString(),
+              }
+            : visit,
+        ),
+      );
 
-      console.log('Solicitação de cancelamento enviada com sucesso');
+      console.log("Solicitação de cancelamento enviada com sucesso");
     } catch (error) {
-      console.error('Erro ao solicitar cancelamento:', error);
+      console.error("Erro ao solicitar cancelamento:", error);
       throw error;
     }
   };
 
-  const approveVisitCancellation = async (visitId: string, managerId: string) => {
+  const approveVisitCancellation = async (
+    visitId: string,
+    managerId: string,
+  ) => {
     try {
-      console.log('Aprovando cancelamento da visita:', visitId);
+      console.log("Aprovando cancelamento da visita:", visitId);
 
       const updateData = {
-        status: 'cancelada' as const,
+        status: "cancelada" as const,
         cancellation_approved_by: managerId,
         cancellation_approved_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
 
       const { error } = await supabase
-        .from('scheduled_visits')
+        .from("scheduled_visits")
         .update(updateData)
-        .eq('id', visitId);
+        .eq("id", visitId);
 
       if (error) {
-        console.error('Erro ao aprovar cancelamento no Supabase:', error);
+        console.error("Erro ao aprovar cancelamento no Supabase:", error);
       }
 
       // Atualizar estado local
-      setScheduledVisits(prev => prev.map(visit => 
-        visit.id === visitId 
-          ? { 
-              ...visit, 
-              status: 'cancelada',
-              cancellationApprovedBy: managerId,
-              cancellationApprovedAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            }
-          : visit
-      ));
+      setScheduledVisits((prev) =>
+        prev.map((visit) =>
+          visit.id === visitId
+            ? {
+                ...visit,
+                status: "cancelada",
+                cancellationApprovedBy: managerId,
+                cancellationApprovedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }
+            : visit,
+        ),
+      );
 
-      console.log('Cancelamento aprovado com sucesso');
+      console.log("Cancelamento aprovado com sucesso");
     } catch (error) {
-      console.error('Erro ao aprovar cancelamento:', error);
+      console.error("Erro ao aprovar cancelamento:", error);
       throw error;
     }
   };
 
-  const rejectVisitCancellation = async (visitId: string, managerId: string, rejectionReason: string) => {
+  const rejectVisitCancellation = async (
+    visitId: string,
+    managerId: string,
+    rejectionReason: string,
+  ) => {
     try {
-      console.log('Rejeitando cancelamento da visita:', visitId);
+      console.log("Rejeitando cancelamento da visita:", visitId);
 
       const updateData = {
-        status: 'agendada' as const,
+        status: "agendada" as const,
         cancellation_rejected_by: managerId,
         cancellation_rejected_at: new Date().toISOString(),
         cancellation_rejection_reason: rejectionReason,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
 
       const { error } = await supabase
-        .from('scheduled_visits')
+        .from("scheduled_visits")
         .update(updateData)
-        .eq('id', visitId);
+        .eq("id", visitId);
 
       if (error) {
-        console.error('Erro ao rejeitar cancelamento no Supabase:', error);
+        console.error("Erro ao rejeitar cancelamento no Supabase:", error);
       }
 
       // Atualizar estado local
-      setScheduledVisits(prev => prev.map(visit => 
-        visit.id === visitId 
-          ? { 
-              ...visit, 
-              status: 'agendada',
-              cancellationRejectedBy: managerId,
-              cancellationRejectedAt: new Date().toISOString(),
-              cancellationRejectionReason: rejectionReason,
-              updatedAt: new Date().toISOString()
-            }
-          : visit
-      ));
+      setScheduledVisits((prev) =>
+        prev.map((visit) =>
+          visit.id === visitId
+            ? {
+                ...visit,
+                status: "agendada",
+                cancellationRejectedBy: managerId,
+                cancellationRejectedAt: new Date().toISOString(),
+                cancellationRejectionReason: rejectionReason,
+                updatedAt: new Date().toISOString(),
+              }
+            : visit,
+        ),
+      );
 
-      console.log('Cancelamento rejeitado com sucesso');
+      console.log("Cancelamento rejeitado com sucesso");
     } catch (error) {
-      console.error('Erro ao rejeitar cancelamento:', error);
+      console.error("Erro ao rejeitar cancelamento:", error);
       throw error;
     }
   };
 
   const getPendingCancellationRequests = () => {
-    return scheduledVisits.filter(visit => visit.status === 'cancelamento_solicitado');
+    return scheduledVisits.filter(
+      (visit) => visit.status === "cancelamento_solicitado",
+    );
   };
 
   const getCancellationHistory = (days: number = 30) => {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
 
-    return scheduledVisits.filter(visit => {
-      // Incluir visitas que foram aprovadas ou rejeitadas nos últimos X dias
-      const hasApproval = visit.cancellationApprovedAt && new Date(visit.cancellationApprovedAt) >= cutoffDate;
-      const hasRejection = visit.cancellationRejectedAt && new Date(visit.cancellationRejectedAt) >= cutoffDate;
-      
-      return hasApproval || hasRejection;
-    }).sort((a, b) => {
-      // Ordenar por data mais recente primeiro
-      const dateA = new Date(a.cancellationApprovedAt || a.cancellationRejectedAt || 0);
-      const dateB = new Date(b.cancellationApprovedAt || b.cancellationRejectedAt || 0);
-      return dateB.getTime() - dateA.getTime();
-    });
+    return scheduledVisits
+      .filter((visit) => {
+        // Incluir visitas que foram aprovadas ou rejeitadas nos últimos X dias
+        const hasApproval =
+          visit.cancellationApprovedAt &&
+          new Date(visit.cancellationApprovedAt) >= cutoffDate;
+        const hasRejection =
+          visit.cancellationRejectedAt &&
+          new Date(visit.cancellationRejectedAt) >= cutoffDate;
+
+        return hasApproval || hasRejection;
+      })
+      .sort((a, b) => {
+        // Ordenar por data mais recente primeiro
+        const dateA = new Date(
+          a.cancellationApprovedAt || a.cancellationRejectedAt || 0,
+        );
+        const dateB = new Date(
+          b.cancellationApprovedAt || b.cancellationRejectedAt || 0,
+        );
+        return dateB.getTime() - dateA.getTime();
+      });
   };
 
   const getVisitsByDate = (date: string, collectorId?: string) => {
-    return scheduledVisits.filter(visit => {
+    return scheduledVisits.filter((visit) => {
       const matchesDate = visit.scheduledDate === date;
-      const matchesCollector = !collectorId || visit.collectorId === collectorId;
+      const matchesCollector =
+        !collectorId || visit.collectorId === collectorId;
       return matchesDate && matchesCollector;
     });
   };
 
   const getVisitsByCollector = (collectorId: string) => {
-    return scheduledVisits.filter(visit => visit.collectorId === collectorId);
+    return scheduledVisits.filter((visit) => visit.collectorId === collectorId);
   };
 
   const getClientDataForVisit = (clientDocument: string) => {
     const clientGroups = getClientGroups();
-    const clientGroup = clientGroups.find(group => group.document === clientDocument);
-    
+    const clientGroup = clientGroups.find(
+      (group) => group.document === clientDocument,
+    );
+
     if (!clientGroup) return null;
 
     const clientSales = getSalesByClient(clientDocument);
-    const totalPending = clientSales.reduce((sum, sale) => sum + sale.pendingValue, 0);
-    
+    const totalPending = clientSales.reduce(
+      (sum, sale) => sum + sale.pendingValue,
+      0,
+    );
+
     // Calcular dias em atraso considerando formato brasileiro DD/MM/YYYY
     const calculateOverdueDays = (dueDateStr: string): number => {
       if (!dueDateStr) return 0;
-      
+
       try {
         let dueDate: Date;
-        
+
         // Limpar a string de data
         const cleanDateStr = dueDateStr.trim();
-        
+
         // Verificar se a data está no formato DD/MM/YYYY (brasileiro)
-        if (cleanDateStr.includes('/')) {
-          const parts = cleanDateStr.split('/');
+        if (cleanDateStr.includes("/")) {
+          const parts = cleanDateStr.split("/");
           if (parts.length === 3) {
             const [day, month, year] = parts;
             // Converter para números e validar
             const dayNum = parseInt(day, 10);
             const monthNum = parseInt(month, 10);
             const yearNum = parseInt(year, 10);
-            
-            if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12 && yearNum >= 1900) {
+
+            if (
+              dayNum >= 1 &&
+              dayNum <= 31 &&
+              monthNum >= 1 &&
+              monthNum <= 12 &&
+              yearNum >= 1900
+            ) {
               dueDate = new Date(yearNum, monthNum - 1, dayNum);
             } else {
-              console.warn('Data brasileira inválida:', cleanDateStr);
+              console.warn("Data brasileira inválida:", cleanDateStr);
               return 0;
             }
           } else {
-            console.warn('Formato de data brasileiro inválido:', cleanDateStr);
+            console.warn("Formato de data brasileiro inválido:", cleanDateStr);
             return 0;
           }
-        } else if (cleanDateStr.includes('-')) {
+        } else if (cleanDateStr.includes("-")) {
           // Formato ISO (YYYY-MM-DD) ou americano (MM-DD-YYYY)
-          const parts = cleanDateStr.split('-');
+          const parts = cleanDateStr.split("-");
           if (parts.length === 3) {
             // Assumir formato ISO se o primeiro elemento tem 4 dígitos
             if (parts[0].length === 4) {
@@ -1920,7 +2568,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
             } else {
               // Formato americano MM-DD-YYYY
               const [month, day, year] = parts;
-              dueDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+              dueDate = new Date(
+                parseInt(year, 10),
+                parseInt(month, 10) - 1,
+                parseInt(day, 10),
+              );
             }
           } else {
             dueDate = new Date(cleanDateStr);
@@ -1929,41 +2581,49 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
           // Tentar parseamento direto
           dueDate = new Date(cleanDateStr);
         }
-        
+
         // Verificar se a data é válida
         if (isNaN(dueDate.getTime())) {
-          console.warn('Data inválida após parsing:', cleanDateStr);
+          console.warn("Data inválida após parsing:", cleanDateStr);
           return 0;
         }
-        
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         dueDate.setHours(0, 0, 0, 0);
-        
+
         const diffTime = today.getTime() - dueDate.getTime();
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        
+
         return Math.max(0, diffDays);
       } catch (error) {
-        console.error('Erro ao calcular dias em atraso:', error, dueDateStr);
+        console.error("Erro ao calcular dias em atraso:", error, dueDateStr);
         return 0;
       }
     };
-    
+
     const overdueCount = clientSales.reduce((sum, sale) => {
-      return sum + sale.installments.filter(inst => {
-        const pending = (inst.valor_original || 0) - (inst.valor_recebido || 0);
-        if (pending <= 0) return false;
-        
-        // Primeiro, tentar usar o campo dias_em_atraso se existir e for válido
-        if (inst.dias_em_atraso !== null && inst.dias_em_atraso !== undefined && inst.dias_em_atraso > 0) {
-          return true;
-        }
-        
-        // Caso contrário, calcular baseado na data_vencimento
-        const overdueDays = calculateOverdueDays(inst.data_vencimento || '');
-        return overdueDays > 0;
-      }).length;
+      return (
+        sum +
+        sale.installments.filter((inst) => {
+          const pending =
+            (inst.valor_original || 0) - (inst.valor_recebido || 0);
+          if (pending <= 0) return false;
+
+          // Primeiro, tentar usar o campo dias_em_atraso se existir e for válido
+          if (
+            inst.dias_em_atraso !== null &&
+            inst.dias_em_atraso !== undefined &&
+            inst.dias_em_atraso > 0
+          ) {
+            return true;
+          }
+
+          // Caso contrário, calcular baseado na data_vencimento
+          const overdueDays = calculateOverdueDays(inst.data_vencimento || "");
+          return overdueDays > 0;
+        }).length
+      );
     }, 0);
 
     return {
@@ -1975,25 +2635,122 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
       phone: clientGroup.phone,
       mobile: clientGroup.mobile,
       totalPendingValue: totalPending,
-      overdueCount: overdueCount
+      overdueCount: overdueCount,
     };
   };
 
-  const rescheduleVisit = async (visitId: string, newDate: string, newTime?: string, reason?: string) => {
+  // Função para atualizar visitas agendadas após processamento de pagamentos
+  const updateScheduledVisitsAfterPayment = async (clientDocument: string) => {
     try {
-      console.log('Reagendando visita:', visitId, newDate, newTime);
+      console.log("=== INÍCIO updateScheduledVisitsAfterPayment ===");
+      console.log("Cliente:", clientDocument);
+
+      // Buscar dados atualizados do cliente
+      const clientData = getClientDataForVisit(clientDocument);
+      console.log("Dados do cliente recalculados:", clientData);
+
+      if (!clientData) {
+        console.log("❌ Dados do cliente não encontrados:", clientDocument);
+        return;
+      }
+
+      // Buscar visitas agendadas deste cliente
+      const clientVisits = scheduledVisits.filter(
+        (visit) =>
+          visit.clientDocument === clientDocument &&
+          visit.status === "agendada",
+      );
+
+      console.log(`Visitas agendadas encontradas: ${clientVisits.length}`);
+      clientVisits.forEach((visit) => {
+        console.log(
+          `- Visita ${visit.id}: Pendente atual: R$ ${visit.totalPendingValue}, Atraso atual: ${visit.overdueCount}`,
+        );
+      });
+
+      if (clientVisits.length === 0) {
+        console.log(
+          "❌ Nenhuma visita agendada encontrada para o cliente:",
+          clientDocument,
+        );
+        return;
+      }
+
+      // Atualizar cada visita agendada no Supabase e estado local
+      for (const visit of clientVisits) {
+        const updateData = {
+          total_pending_value: clientData.totalPendingValue,
+          overdue_count: clientData.overdueCount,
+          updated_at: new Date().toISOString(),
+        };
+
+        console.log(`📝 Atualizando visita ${visit.id}:`);
+        console.log(
+          `   - Pendente: R$ ${visit.totalPendingValue} → R$ ${clientData.totalPendingValue}`,
+        );
+        console.log(
+          `   - Atraso: ${visit.overdueCount} → ${clientData.overdueCount}`,
+        );
+
+        // Atualizar no Supabase
+        const { error } = await supabase
+          .from("scheduled_visits")
+          .update(updateData)
+          .eq("id", visit.id);
+
+        if (error) {
+          console.error("❌ Erro ao atualizar visita no Supabase:", error);
+        } else {
+          console.log("✅ Visita atualizada no Supabase com sucesso");
+        }
+
+        // Atualizar estado local
+        setScheduledVisits((prev) => {
+          const updated = prev.map((v) =>
+            v.id === visit.id
+              ? {
+                  ...v,
+                  totalPendingValue: clientData.totalPendingValue,
+                  overdueCount: clientData.overdueCount,
+                  updatedAt: new Date().toISOString(),
+                }
+              : v,
+          );
+          console.log("✅ Estado local atualizado");
+          return updated;
+        });
+      }
+
+      console.log(
+        "✅ Visitas agendadas atualizadas com sucesso para cliente:",
+        clientDocument,
+      );
+      console.log("=== FIM updateScheduledVisitsAfterPayment ===");
+    } catch (error) {
+      console.error("Erro ao atualizar visitas agendadas:", error);
+    }
+  };
+
+  const rescheduleVisit = async (
+    visitId: string,
+    newDate: string,
+    newTime?: string,
+    reason?: string,
+  ) => {
+    try {
+      console.log("Reagendando visita:", visitId, newDate, newTime);
 
       // Buscar visita atual para manter histórico
-      const currentVisit = scheduledVisits.find(v => v.id === visitId);
+      const currentVisit = scheduledVisits.find((v) => v.id === visitId);
       if (!currentVisit) {
-        throw new Error('Visita não encontrada');
+        throw new Error("Visita não encontrada");
       }
 
       // Montar nota com informações do reagendamento
-      const rescheduleNote = `Reagendado de ${currentVisit.scheduledDate} ${currentVisit.scheduledTime || ''} para ${newDate} ${newTime || ''}${reason ? `. Motivo: ${reason}` : ''}`;
-      
+      const rescheduleNote = `Reagendado de ${currentVisit.scheduledDate} ${currentVisit.scheduledTime || ""} para ${newDate} ${newTime || ""}${reason ? `. Motivo: ${reason}` : ""}`;
+
       // Atualizar notas concatenando com as existentes
-      const updatedNotes = currentVisit.notes 
+      const updatedNotes = currentVisit.notes
         ? `${currentVisit.notes}\n${rescheduleNote}`
         : rescheduleNote;
 
@@ -2002,35 +2759,37 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
         scheduled_date: newDate,
         scheduled_time: newTime || null,
         notes: updatedNotes,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
 
       const { error } = await supabase
-        .from('scheduled_visits')
+        .from("scheduled_visits")
         .update(updateData)
-        .eq('id', visitId);
+        .eq("id", visitId);
 
       if (error) {
-        console.error('Erro ao reagendar visita no Supabase:', error);
+        console.error("Erro ao reagendar visita no Supabase:", error);
         // Continuar com atualização local mesmo se falhar no Supabase
       }
 
       // Atualizar estado local
-      setScheduledVisits(prev => prev.map(visit => 
-        visit.id === visitId 
-          ? { 
-              ...visit, 
-              scheduledDate: newDate,
-              scheduledTime: newTime || visit.scheduledTime,
-              notes: updatedNotes,
-              updatedAt: new Date().toISOString()
-            }
-          : visit
-      ));
+      setScheduledVisits((prev) =>
+        prev.map((visit) =>
+          visit.id === visitId
+            ? {
+                ...visit,
+                scheduledDate: newDate,
+                scheduledTime: newTime || visit.scheduledTime,
+                notes: updatedNotes,
+                updatedAt: new Date().toISOString(),
+              }
+            : visit,
+        ),
+      );
 
-      console.log('Visita reagendada com sucesso');
+      console.log("Visita reagendada com sucesso");
     } catch (error) {
-      console.error('Erro ao reagendar visita:', error);
+      console.error("Erro ao reagendar visita:", error);
       throw error;
     }
   };
@@ -2083,6 +2842,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
     getVisitsByCollector,
     getClientDataForVisit,
     rescheduleVisit,
+    updateScheduledVisitsAfterPayment,
   };
 
   return (

@@ -1,0 +1,48 @@
+{
+  "name": "Sistema de Gestão de Cobranças",
+  "short_name": "Cobranças Cobradores",
+  "description": "Sistema de cobrança para cobradores móveis",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1f2937",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-48.webp",
+      "sizes": "48x48",
+      "type": "image/webp"
+    },
+    {
+      "src": "/icons/icon-72.webp",
+      "sizes": "72x72",
+      "type": "image/webp"
+    },
+    {
+      "src": "/icons/icon-96.webp",
+      "sizes": "96x96",
+      "type": "image/webp"
+    },
+    {
+      "src": "/icons/icon-128.webp",
+      "sizes": "128x128",
+      "type": "image/webp"
+    },
+    {
+      "src": "/icons/icon-192.webp",
+      "sizes": "192x192",
+      "type": "image/webp"
+    },
+    {
+      "src": "/icons/icon-256.webp",
+      "sizes": "256x256",
+      "type": "image/webp"
+    },
+    {
+      "src": "/icons/icon-512.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    }
+  ]
+}

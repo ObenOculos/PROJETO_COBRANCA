@@ -1,44 +1,54 @@
-import React, { useMemo } from 'react';
-import { 
-  X, 
-  Phone, 
-  MessageCircle, 
-  MapPin, 
+import React, { useMemo } from "react";
+import {
+  X,
+  Phone,
+  MessageCircle,
+  MapPin,
   DollarSign,
   Calendar,
   Store,
   FileText,
   Package,
   Clock,
-  User
-} from 'lucide-react';
-import { Collection } from '../../types';
-import { formatCurrency, formatDate, getStatusLabel } from '../../utils/mockData';
-import { useCollection } from '../../contexts/CollectionContext';
+  User,
+} from "lucide-react";
+import { Collection } from "../../types";
+import {
+  formatCurrency,
+  formatDate,
+  getStatusLabel,
+} from "../../utils/formatters";
+import { useCollection } from "../../contexts/CollectionContext";
 
 interface SaleDetailsModalProps {
   collections: Collection[];
   onClose: () => void;
 }
 
-const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({ 
-  collections, 
-  onClose 
+const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
+  collections,
+  onClose,
 }) => {
   const { scheduledVisits, users } = useCollection();
   const saleData = useMemo(() => {
     if (!collections.length) return null;
 
     const firstCollection = collections[0];
-    const totalOriginal = collections.reduce((sum, c) => sum + c.valor_original, 0);
-    const totalReceived = collections.reduce((sum, c) => sum + c.valor_recebido, 0);
+    const totalOriginal = collections.reduce(
+      (sum, c) => sum + c.valor_original,
+      0,
+    );
+    const totalReceived = collections.reduce(
+      (sum, c) => sum + c.valor_recebido,
+      0,
+    );
     const totalPending = totalOriginal - totalReceived;
 
-    let saleStatus = 'pendente';
+    let saleStatus = "pendente";
     if (totalReceived > 0 && totalPending > 0) {
-      saleStatus = 'parcial';
+      saleStatus = "parcial";
     } else if (totalPending <= 0.01 && totalReceived > 0) {
-      saleStatus = 'pago';
+      saleStatus = "pago";
     }
 
     return {
@@ -48,17 +58,19 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
       totalPending,
       saleStatus,
       installmentsCount: collections.length,
-      collections: collections.sort((a, b) => (a.parcela || 0) - (b.parcela || 0))
+      collections: collections.sort(
+        (a, b) => (a.parcela || 0) - (b.parcela || 0),
+      ),
     };
   }, [collections]);
 
   // Buscar visitas relacionadas a este cliente
   const clientVisits = useMemo(() => {
     if (!saleData?.documento || !scheduledVisits) return [];
-    
+
     return scheduledVisits
-      .filter(visit => visit.clientDocument === saleData.documento)
-      .filter(visit => visit.status === 'realizada' && visit.notes) // Apenas visitas realizadas com observações
+      .filter((visit) => visit.clientDocument === saleData.documento)
+      .filter((visit) => visit.status === "realizada" && visit.notes) // Apenas visitas realizadas com observações
       .sort((a, b) => {
         const dateA = new Date(a.updatedAt || a.createdAt);
         const dateB = new Date(b.updatedAt || b.createdAt);
@@ -67,15 +79,15 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
   }, [saleData, scheduledVisits]);
 
   const getCollectorName = (collectorId: string) => {
-    const collector = users?.find(u => u.id === collectorId);
-    return collector?.name || 'Cobrador não identificado';
+    const collector = users?.find((u) => u.id === collectorId);
+    return collector?.name || "Cobrador não identificado";
   };
 
   const formatVisitDate = (dateString: string) => {
     try {
-      const [year, month, day] = dateString.split('-');
+      const [year, month, day] = dateString.split("-");
       const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      return date.toLocaleDateString('pt-BR');
+      return date.toLocaleDateString("pt-BR");
     } catch {
       return dateString;
     }
@@ -83,15 +95,30 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
 
   const getStatusVisitBadge = (status: string) => {
     const config = {
-      'realizada': { bg: 'bg-green-100', text: 'text-green-800', label: 'Realizada' },
-      'cancelada': { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Cancelada' },
-      'nao_encontrado': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Não Encontrado' }
+      realizada: {
+        bg: "bg-green-100",
+        text: "text-green-800",
+        label: "Realizada",
+      },
+      cancelada: {
+        bg: "bg-gray-100",
+        text: "text-gray-800",
+        label: "Cancelada",
+      },
+      nao_encontrado: {
+        bg: "bg-yellow-100",
+        text: "text-yellow-800",
+        label: "Não Encontrado",
+      },
     };
 
-    const statusConfig = config[status as keyof typeof config] || config['realizada'];
-    
+    const statusConfig =
+      config[status as keyof typeof config] || config["realizada"];
+
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusConfig.bg} ${statusConfig.text}`}>
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-semibold ${statusConfig.bg} ${statusConfig.text}`}
+      >
         {statusConfig.label}
       </span>
     );
@@ -106,7 +133,9 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-600 to-purple-600 text-white">
           <div>
             <h2 className="text-xl font-semibold">{saleData.cliente}</h2>
-            <p className="text-blue-100 text-sm">Venda #{saleData.venda_n} • {saleData.nome_da_loja}</p>
+            <p className="text-blue-100 text-sm">
+              Venda #{saleData.venda_n} • {saleData.nome_da_loja}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -123,8 +152,12 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-green-700">Valor Total</p>
-                  <p className="text-2xl font-bold text-green-900">{formatCurrency(saleData.totalOriginal)}</p>
+                  <p className="text-sm font-medium text-green-700">
+                    Valor Total
+                  </p>
+                  <p className="text-2xl font-bold text-green-900">
+                    {formatCurrency(saleData.totalOriginal)}
+                  </p>
                 </div>
                 <DollarSign className="h-8 w-8 text-green-600" />
               </div>
@@ -133,8 +166,12 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-blue-700">Já Recebido</p>
-                  <p className="text-2xl font-bold text-blue-900">{formatCurrency(saleData.totalReceived)}</p>
+                  <p className="text-sm font-medium text-blue-700">
+                    Já Recebido
+                  </p>
+                  <p className="text-2xl font-bold text-blue-900">
+                    {formatCurrency(saleData.totalReceived)}
+                  </p>
                 </div>
                 <Package className="h-8 w-8 text-blue-600" />
               </div>
@@ -143,8 +180,12 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
             <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-xl border border-orange-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-orange-700">Pendente</p>
-                  <p className="text-2xl font-bold text-orange-900">{formatCurrency(saleData.totalPending)}</p>
+                  <p className="text-sm font-medium text-orange-700">
+                    Pendente
+                  </p>
+                  <p className="text-2xl font-bold text-orange-900">
+                    {formatCurrency(saleData.totalPending)}
+                  </p>
                 </div>
                 <Calendar className="h-8 w-8 text-orange-600" />
               </div>
@@ -159,35 +200,57 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                 <Store className="h-5 w-5 mr-2 text-blue-600" />
                 Informações da Venda
               </h3>
-              
+
               <div className="bg-gray-50 p-4 rounded-xl space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-sm font-medium text-gray-600">Loja:</span>
-                  <span className="text-sm font-semibold text-gray-900">{saleData.nome_da_loja}</span>
+                  <span className="text-sm font-medium text-gray-600">
+                    Loja:
+                  </span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {saleData.nome_da_loja}
+                  </span>
                 </div>
-                
+
                 <div className="flex justify-between">
-                  <span className="text-sm font-medium text-gray-600">Número da Venda:</span>
-                  <span className="text-sm font-semibold text-gray-900">{saleData.venda_n}</span>
+                  <span className="text-sm font-medium text-gray-600">
+                    Número da Venda:
+                  </span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {saleData.venda_n}
+                  </span>
                 </div>
-                
+
                 <div className="flex justify-between">
-                  <span className="text-sm font-medium text-gray-600">Número de Parcelas:</span>
-                  <span className="text-sm font-semibold text-gray-900">{saleData.installmentsCount}</span>
+                  <span className="text-sm font-medium text-gray-600">
+                    Número de Parcelas:
+                  </span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {saleData.installmentsCount}
+                  </span>
                 </div>
-                
+
                 <div className="flex justify-between">
-                  <span className="text-sm font-medium text-gray-600">Tipo de Cobrança:</span>
-                  <span className="text-sm font-semibold text-gray-900">{saleData.tipo_de_cobranca}</span>
+                  <span className="text-sm font-medium text-gray-600">
+                    Tipo de Cobrança:
+                  </span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {saleData.tipo_de_cobranca}
+                  </span>
                 </div>
-                
+
                 <div className="flex justify-between">
-                  <span className="text-sm font-medium text-gray-600">Status da Venda:</span>
-                  <span className={`text-sm font-semibold px-2 py-1 rounded-full ${
-                    saleData.saleStatus === 'pago' ? 'bg-green-100 text-green-800' :
-                    saleData.saleStatus === 'parcial' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
+                  <span className="text-sm font-medium text-gray-600">
+                    Status da Venda:
+                  </span>
+                  <span
+                    className={`text-sm font-semibold px-2 py-1 rounded-full ${
+                      saleData.saleStatus === "pago"
+                        ? "bg-green-100 text-green-800"
+                        : saleData.saleStatus === "parcial"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-red-100 text-red-800"
+                    }`}
+                  >
                     {getStatusLabel(saleData.saleStatus)}
                   </span>
                 </div>
@@ -200,17 +263,23 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                 <Phone className="h-5 w-5 mr-2 text-blue-600" />
                 Contato e Endereço
               </h3>
-              
+
               <div className="bg-gray-50 p-4 rounded-xl space-y-4">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-2">Cliente:</p>
-                  <p className="font-semibold text-gray-900">{saleData.cliente}</p>
+                  <p className="text-sm font-medium text-gray-600 mb-2">
+                    Cliente:
+                  </p>
+                  <p className="font-semibold text-gray-900">
+                    {saleData.cliente}
+                  </p>
                   <p className="text-sm text-gray-600">{saleData.documento}</p>
                 </div>
 
                 {(saleData.telefone || saleData.celular) && (
                   <div>
-                    <p className="text-sm font-medium text-gray-600 mb-2">Contatos:</p>
+                    <p className="text-sm font-medium text-gray-600 mb-2">
+                      Contatos:
+                    </p>
                     <div className="space-y-2">
                       {saleData.telefone && (
                         <div className="flex items-center">
@@ -229,13 +298,19 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                 )}
 
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-2">Endereço:</p>
+                  <p className="text-sm font-medium text-gray-600 mb-2">
+                    Endereço:
+                  </p>
                   <div className="flex items-start">
                     <MapPin className="h-4 w-4 text-gray-400 mr-2 mt-1 flex-shrink-0" />
                     <div className="text-sm">
-                      <p>{saleData.endereco}, {saleData.numero}</p>
+                      <p>
+                        {saleData.endereco}, {saleData.numero}
+                      </p>
                       {saleData.complemento && <p>{saleData.complemento}</p>}
-                      <p>{saleData.bairro} - {saleData.cidade}/{saleData.estado}</p>
+                      <p>
+                        {saleData.bairro} - {saleData.cidade}/{saleData.estado}
+                      </p>
                       <p>{saleData.cep}</p>
                     </div>
                   </div>
@@ -250,37 +325,58 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
               <FileText className="h-5 w-5 mr-2 text-blue-600" />
               Detalhes das Parcelas
             </h3>
-            
+
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parcela</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimento</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Original</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Recebido</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pendente</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Parcela
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Vencimento
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Valor Original
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Valor Recebido
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Pendente
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {saleData.collections.map((collection, index) => {
-                      const pending = collection.valor_original - collection.valor_recebido;
-                      let status = 'pendente';
+                      const pending =
+                        collection.valor_original - collection.valor_recebido;
+                      let status = "pendente";
                       if (collection.valor_recebido > 0 && pending > 0) {
-                        status = 'parcial';
-                      } else if (pending <= 0.01 && collection.valor_recebido > 0) {
-                        status = 'pago';
+                        status = "parcial";
+                      } else if (
+                        pending <= 0.01 &&
+                        collection.valor_recebido > 0
+                      ) {
+                        status = "pago";
                       }
 
                       return (
-                        <tr key={collection.id_parcela} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <tr
+                          key={collection.id_parcela}
+                          className={
+                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                          }
+                        >
                           <td className="px-4 py-3 text-sm font-medium text-gray-900">
                             {collection.parcela}° Parcela
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
-                            {formatDate(collection.data_vencimento || '')}
+                            {formatDate(collection.data_vencimento || "")}
                           </td>
                           <td className="px-4 py-3 text-sm font-semibold text-gray-900">
                             {formatCurrency(collection.valor_original)}
@@ -292,11 +388,15 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                             {formatCurrency(pending)}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              status === 'pago' ? 'bg-green-100 text-green-800' :
-                              status === 'parcial' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
+                            <span
+                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                status === "pago"
+                                  ? "bg-green-100 text-green-800"
+                                  : status === "parcial"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-red-100 text-red-800"
+                              }`}
+                            >
                               {getStatusLabel(status)}
                             </span>
                           </td>
@@ -318,22 +418,28 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
               </h3>
               <div className="space-y-3">
                 {clientVisits.map((visit) => (
-                  <div key={visit.id} className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                  <div
+                    key={visit.id}
+                    className="bg-gray-50 p-4 rounded-xl border border-gray-200"
+                  >
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           {getStatusVisitBadge(visit.status)}
                           <span className="text-xs text-gray-500">
                             {formatVisitDate(visit.scheduledDate)}
-                            {visit.scheduledTime && ` às ${visit.scheduledTime}`}
+                            {visit.scheduledTime &&
+                              ` às ${visit.scheduledTime}`}
                           </span>
                         </div>
-                        
+
                         <div className="flex items-center text-sm text-gray-600 mb-2">
                           <User className="h-4 w-4 mr-1" />
-                          <span className="font-medium">{getCollectorName(visit.collectorId)}</span>
+                          <span className="font-medium">
+                            {getCollectorName(visit.collectorId)}
+                          </span>
                         </div>
-                        
+
                         {visit.notes && (
                           <div className="bg-white p-3 rounded-lg border border-gray-200">
                             <p className="text-sm text-gray-700 leading-relaxed">
@@ -342,13 +448,19 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="flex items-center text-xs text-gray-400">
                         <Clock className="h-3 w-3 mr-1" />
                         {visit.updatedAt ? (
-                          <>Finalizada em {formatVisitDate(visit.updatedAt.split('T')[0])}</>
+                          <>
+                            Finalizada em{" "}
+                            {formatVisitDate(visit.updatedAt.split("T")[0])}
+                          </>
                         ) : (
-                          <>Registrada em {formatVisitDate(visit.createdAt.split('T')[0])}</>
+                          <>
+                            Registrada em{" "}
+                            {formatVisitDate(visit.createdAt.split("T")[0])}
+                          </>
                         )}
                       </div>
                     </div>
@@ -377,7 +489,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
           <div className="flex justify-end">
             <button
               onClick={onClose}
-              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
             >
               Fechar
             </button>

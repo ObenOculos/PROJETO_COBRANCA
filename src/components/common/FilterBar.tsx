@@ -1,29 +1,36 @@
-import React from 'react';
-import { Search, Filter, X } from 'lucide-react';
-import { FilterOptions } from '../../types';
-import { useCollection } from '../../contexts/CollectionContext';
-import { useAuth } from '../../contexts/AuthContext';
-import { getAllStatuses } from '../../utils/mockData';
+import React from "react";
+import { Search, Filter, X } from "lucide-react";
+import { FilterOptions } from "../../types";
+import { useCollection } from "../../contexts/CollectionContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { getAllStatuses } from "../../utils/formatters";
 
 interface FilterBarProps {
   filters: FilterOptions;
   onFilterChange: (filters: FilterOptions) => void;
-  userType: 'manager' | 'collector';
+  userType: "manager" | "collector";
 }
 
-const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType }) => {
-  const { getAvailableStores, users, getCollectorCollections } = useCollection();
+const FilterBar: React.FC<FilterBarProps> = ({
+  filters,
+  onFilterChange,
+  userType,
+}) => {
+  const { getAvailableStores, users, getCollectorCollections } =
+    useCollection();
   const { user } = useAuth();
   const [isExpanded, setIsExpanded] = React.useState(false);
 
   const availableStores = getAvailableStores();
-  const collectors = users.filter(u => u.type === 'collector');
+  const collectors = users.filter((u) => u.type === "collector");
 
   // Para cobradores, buscar apenas as lojas dos seus clientes
   const getCollectorStores = () => {
-    if (userType !== 'collector' || !user) return availableStores;
+    if (userType !== "collector" || !user) return availableStores;
     const myCollections = getCollectorCollections(user.id);
-    const stores = Array.from(new Set(myCollections.map(c => c.nome_da_loja).filter(Boolean)));
+    const stores = Array.from(
+      new Set(myCollections.map((c) => c.nome_da_loja).filter(Boolean)),
+    );
     return stores.sort();
   };
 
@@ -31,16 +38,20 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
 
   // Para cobradores, buscar apenas as cidades e bairros dos seus clientes
   const getCollectorCities = () => {
-    if (userType !== 'collector' || !user) return [];
+    if (userType !== "collector" || !user) return [];
     const myCollections = getCollectorCollections(user.id);
-    const cities = Array.from(new Set(myCollections.map(c => c.cidade).filter(Boolean)));
+    const cities = Array.from(
+      new Set(myCollections.map((c) => c.cidade).filter(Boolean)),
+    );
     return cities.sort();
   };
 
   const getCollectorNeighborhoods = () => {
-    if (userType !== 'collector' || !user) return [];
+    if (userType !== "collector" || !user) return [];
     const myCollections = getCollectorCollections(user.id);
-    const neighborhoods = Array.from(new Set(myCollections.map(c => c.bairro).filter(Boolean)));
+    const neighborhoods = Array.from(
+      new Set(myCollections.map((c) => c.bairro).filter(Boolean)),
+    );
     return neighborhoods.sort();
   };
 
@@ -48,13 +59,19 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
   const collectorNeighborhoods = getCollectorNeighborhoods();
 
   const handleStatusChange = (status: string) => {
-    onFilterChange({ ...filters, status: status === 'all' ? undefined : status });
+    onFilterChange({
+      ...filters,
+      status: status === "all" ? undefined : status,
+    });
   };
 
-  const handleLocationChange = (field: 'city' | 'neighborhood', value: string) => {
-    onFilterChange({ 
-      ...filters, 
-      [field]: value === 'all' ? undefined : value 
+  const handleLocationChange = (
+    field: "city" | "neighborhood",
+    value: string,
+  ) => {
+    onFilterChange({
+      ...filters,
+      [field]: value === "all" ? undefined : value,
     });
   };
 
@@ -67,7 +84,21 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
     setIsExpanded(false);
   };
 
-  const hasActiveFilters = filters.status || filters.dueDate || filters.city || filters.neighborhood || filters.store || filters.collector || filters.search || filters.dateFrom || filters.dateTo || filters.minAmount || filters.maxAmount || filters.overdueOnly || filters.highValueOnly;
+  const hasActiveFilters =
+    filters.status ||
+    filters.dueDate ||
+    filters.city ||
+    filters.neighborhood ||
+    filters.store ||
+    filters.collector ||
+    filters.search ||
+    filters.dateFrom ||
+    filters.dateTo ||
+    filters.minAmount ||
+    filters.maxAmount ||
+    filters.overdueOnly ||
+    filters.highValueOnly ||
+    filters.visitsOnly;
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
@@ -78,7 +109,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
           <input
             type="text"
             placeholder="Buscar cliente, documento, título..."
-            value={filters.search || ''}
+            value={filters.search || ""}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
@@ -89,31 +120,46 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
       <div className="px-6 pb-4">
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => onFilterChange({ ...filters, status: filters.status === 'pendente' ? undefined : 'pendente' })}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-              filters.status === 'pendente'
-                ? 'bg-red-100 text-red-700 border border-red-300'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            onClick={() =>
+              onFilterChange({
+                ...filters,
+                status: filters.status === "pendente" ? undefined : "pendente",
+              })
+            }
+            className={`px-3 py-2 text-xs font-medium rounded-full transition-colors ${
+              filters.status === "pendente"
+                ? "bg-red-100 text-red-700 border border-red-300"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
             Pendente
           </button>
           <button
-            onClick={() => onFilterChange({ ...filters, status: filters.status === 'pago' ? undefined : 'pago' })}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-              filters.status === 'pago'
-                ? 'bg-green-100 text-green-700 border border-green-300'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            onClick={() =>
+              onFilterChange({
+                ...filters,
+                status: filters.status === "pago" ? undefined : "pago",
+              })
+            }
+            className={`px-3 py-2 text-xs font-medium rounded-full transition-colors ${
+              filters.status === "pago"
+                ? "bg-green-100 text-green-700 border border-green-300"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
             Pago
           </button>
           <button
-            onClick={() => onFilterChange({ ...filters, status: filters.status === 'parcial' ? undefined : 'parcial' })}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-              filters.status === 'parcial'
-                ? 'bg-orange-100 text-orange-700 border border-orange-300'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            onClick={() =>
+              onFilterChange({
+                ...filters,
+                status: filters.status === "parcial" ? undefined : "parcial",
+              })
+            }
+            className={`px-3 py-2 text-xs font-medium rounded-full transition-colors ${
+              filters.status === "parcial"
+                ? "bg-orange-100 text-orange-700 border border-orange-300"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
             Parcial
@@ -140,23 +186,36 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
           </div>
           <div className="flex items-center">
             {hasActiveFilters && (
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={(e) => {
                   e.stopPropagation();
                   clearFilters();
                 }}
-                className="mr-2 p-1 text-red-600 hover:text-red-800"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.stopPropagation();
+                    clearFilters();
+                  }
+                }}
+                className="mr-2 p-1 text-red-600 hover:text-red-800 cursor-pointer"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </div>
             )}
-            <svg 
-              className={`w-4 h-4 text-gray-500 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
-              fill="none" 
-              stroke="currentColor" 
+            <svg
+              className={`w-4 h-4 text-gray-500 transform transition-transform ${isExpanded ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
             </svg>
           </div>
         </button>
@@ -169,14 +228,16 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Status Filter */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Status
+              </label>
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                value={filters.status || 'all'}
+                value={filters.status || "all"}
                 onChange={(e) => handleStatusChange(e.target.value)}
               >
                 <option value="all">Todos</option>
-                {getAllStatuses().map(status => (
+                {getAllStatuses().map((status) => (
                   <option key={status.value} value={status.value}>
                     {status.label}
                   </option>
@@ -186,20 +247,32 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
 
             {/* Date Range Filter - Mobile Stacked, Desktop Side by Side */}
             <div className="sm:col-span-2 lg:col-span-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">Período</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Período
+              </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input
                   type="date"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  value={filters.dateFrom || ''}
-                  onChange={(e) => onFilterChange({ ...filters, dateFrom: e.target.value || undefined })}
+                  value={filters.dateFrom || ""}
+                  onChange={(e) =>
+                    onFilterChange({
+                      ...filters,
+                      dateFrom: e.target.value || undefined,
+                    })
+                  }
                   placeholder="De"
                 />
                 <input
                   type="date"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  value={filters.dateTo || ''}
-                  onChange={(e) => onFilterChange({ ...filters, dateTo: e.target.value || undefined })}
+                  value={filters.dateTo || ""}
+                  onChange={(e) =>
+                    onFilterChange({
+                      ...filters,
+                      dateTo: e.target.value || undefined,
+                    })
+                  }
                   placeholder="Até"
                 />
               </div>
@@ -207,29 +280,47 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
 
             {/* Store Filter */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Loja</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Loja
+              </label>
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                value={filters.store || 'all'}
-                onChange={(e) => onFilterChange({ ...filters, store: e.target.value === 'all' ? undefined : e.target.value })}
+                value={filters.store || "all"}
+                onChange={(e) =>
+                  onFilterChange({
+                    ...filters,
+                    store:
+                      e.target.value === "all" ? undefined : e.target.value,
+                  })
+                }
               >
                 <option value="all">Todas</option>
-                {collectorStores.filter(store => store !== null).map((store) => (
-                  <option key={store} value={store!}>
-                    {store}
-                  </option>
-                ))}
+                {collectorStores
+                  .filter((store) => store !== null)
+                  .map((store) => (
+                    <option key={store} value={store!}>
+                      {store}
+                    </option>
+                  ))}
               </select>
             </div>
 
             {/* Collector Filter for Managers */}
-            {userType === 'manager' && (
+            {userType === "manager" && (
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Cobrador</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Cobrador
+                </label>
                 <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  value={filters.collector || 'all'}
-                  onChange={(e) => onFilterChange({ ...filters, collector: e.target.value === 'all' ? undefined : e.target.value })}
+                  value={filters.collector || "all"}
+                  onChange={(e) =>
+                    onFilterChange({
+                      ...filters,
+                      collector:
+                        e.target.value === "all" ? undefined : e.target.value,
+                    })
+                  }
                 >
                   <option value="all">Todos</option>
                   {collectors.map((collector) => (
@@ -242,37 +333,49 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
             )}
 
             {/* Location Filters for Collectors */}
-            {userType === 'collector' && (
+            {userType === "collector" && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Cidade</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Cidade
+                  </label>
                   <select
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    value={filters.city || 'all'}
-                    onChange={(e) => handleLocationChange('city', e.target.value)}
+                    value={filters.city || "all"}
+                    onChange={(e) =>
+                      handleLocationChange("city", e.target.value)
+                    }
                   >
                     <option value="all">Todas</option>
-                    {collectorCities.filter(city => city !== null).map((city) => (
-                      <option key={city} value={city!}>
-                        {city}
-                      </option>
-                    ))}
+                    {collectorCities
+                      .filter((city) => city !== null)
+                      .map((city) => (
+                        <option key={city} value={city!}>
+                          {city}
+                        </option>
+                      ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Bairro</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Bairro
+                  </label>
                   <select
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    value={filters.neighborhood || 'all'}
-                    onChange={(e) => handleLocationChange('neighborhood', e.target.value)}
+                    value={filters.neighborhood || "all"}
+                    onChange={(e) =>
+                      handleLocationChange("neighborhood", e.target.value)
+                    }
                   >
                     <option value="all">Todos</option>
-                    {collectorNeighborhoods.filter(neighborhood => neighborhood !== null).map((neighborhood) => (
-                      <option key={neighborhood} value={neighborhood!}>
-                        {neighborhood}
-                      </option>
-                    ))}
+                    {collectorNeighborhoods
+                      .filter((neighborhood) => neighborhood !== null)
+                      .map((neighborhood) => (
+                        <option key={neighborhood} value={neighborhood!}>
+                          {neighborhood}
+                        </option>
+                      ))}
                   </select>
                 </div>
               </>
@@ -280,32 +383,76 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
 
             {/* Amount Range Filter */}
             <div className="sm:col-span-2 lg:col-span-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">Valor</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Valor
+              </label>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="number"
                   placeholder="Mínimo"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  value={filters.minAmount || ''}
-                  onChange={(e) => onFilterChange({ ...filters, minAmount: e.target.value ? parseFloat(e.target.value) : undefined })}
+                  value={filters.minAmount || ""}
+                  onChange={(e) =>
+                    onFilterChange({
+                      ...filters,
+                      minAmount: e.target.value
+                        ? parseFloat(e.target.value)
+                        : undefined,
+                    })
+                  }
                 />
                 <input
                   type="number"
                   placeholder="Máximo"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  value={filters.maxAmount || ''}
-                  onChange={(e) => onFilterChange({ ...filters, maxAmount: e.target.value ? parseFloat(e.target.value) : undefined })}
+                  value={filters.maxAmount || ""}
+                  onChange={(e) =>
+                    onFilterChange({
+                      ...filters,
+                      maxAmount: e.target.value
+                        ? parseFloat(e.target.value)
+                        : undefined,
+                    })
+                  }
                 />
               </div>
             </div>
-          </div>
 
+            {/* Visits Only Filter - Only show for collectors */}
+            {userType === "collector" && (
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Filtro de Visitas
+                </label>
+                <div className="flex items-center space-x-4">
+                  <button
+                    onClick={() =>
+                      onFilterChange({
+                        ...filters,
+                        visitsOnly: !filters.visitsOnly,
+                      })
+                    }
+                    className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                      filters.visitsOnly
+                        ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    {filters.visitsOnly ? "✓ " : ""}Mostrar apenas clientes com
+                    visitas agendadas
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Active Filters Summary */}
           {hasActiveFilters && (
             <div className="mt-4 p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-medium text-gray-600">Filtros ativos:</h4>
+                <h4 className="text-xs font-medium text-gray-600">
+                  Filtros ativos:
+                </h4>
                 <button
                   onClick={clearFilters}
                   className="text-xs text-red-600 hover:text-red-800 font-medium"
@@ -318,7 +465,9 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
                   <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-200 text-gray-700">
                     Status: {filters.status}
                     <button
-                      onClick={() => onFilterChange({ ...filters, status: undefined })}
+                      onClick={() =>
+                        onFilterChange({ ...filters, status: undefined })
+                      }
                       className="ml-1 text-gray-500 hover:text-gray-700"
                     >
                       ×
@@ -329,7 +478,9 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
                   <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-200 text-gray-700">
                     Loja: {filters.store}
                     <button
-                      onClick={() => onFilterChange({ ...filters, store: undefined })}
+                      onClick={() =>
+                        onFilterChange({ ...filters, store: undefined })
+                      }
                       className="ml-1 text-gray-500 hover:text-gray-700"
                     >
                       ×
@@ -338,9 +489,12 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
                 )}
                 {filters.collector && (
                   <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-200 text-gray-700">
-                    Cobrador: {collectors.find(c => c.id === filters.collector)?.name}
+                    Cobrador:{" "}
+                    {collectors.find((c) => c.id === filters.collector)?.name}
                     <button
-                      onClick={() => onFilterChange({ ...filters, collector: undefined })}
+                      onClick={() =>
+                        onFilterChange({ ...filters, collector: undefined })
+                      }
                       className="ml-1 text-gray-500 hover:text-gray-700"
                     >
                       ×
@@ -351,8 +505,23 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange, userType
                   <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-200 text-gray-700">
                     Cidade: {filters.city}
                     <button
-                      onClick={() => onFilterChange({ ...filters, city: undefined })}
+                      onClick={() =>
+                        onFilterChange({ ...filters, city: undefined })
+                      }
                       className="ml-1 text-gray-500 hover:text-gray-700"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+                {filters.visitsOnly && (
+                  <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-700">
+                    Apenas com visitas
+                    <button
+                      onClick={() =>
+                        onFilterChange({ ...filters, visitsOnly: undefined })
+                      }
+                      className="ml-1 text-blue-500 hover:text-blue-700"
                     >
                       ×
                     </button>

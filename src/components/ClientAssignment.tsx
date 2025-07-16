@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Search,
   UserPlus,
@@ -8,19 +7,20 @@ import {
   AlertCircle,
   Filter,
   MapPin,
-  X,
   ChevronLeft,
   ChevronRight,
-  ArrowUpDown,
+  Award,
+  Building,
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
 import { Collection } from "../types";
-import { formatCurrency } from "../utils/mockData";
+import { formatCurrency } from "../utils/formatters";
 import { Modal } from "./Modal";
 
 interface ClientWithCollections {
   cliente: string;
   documento: string;
+  uniqueKey: string; // Adicionado para identificar clientes de forma única (documento ou nome)
   collections: Collection[];
   collectorId?: string;
   collectorName?: string;
@@ -28,7 +28,7 @@ interface ClientWithCollections {
   bairro?: string;
 }
 
-export function ClientAssignment() {
+export const ClientAssignment = React.memo(() => {
   const {
     collections,
     users,
@@ -39,16 +39,16 @@ export function ClientAssignment() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCollector, setSelectedCollector] = useState<string>("");
   const [selectedClients, setSelectedClients] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [loading, setLoading] = useState(false);
-  const [clientsData, setClientsData] = useState<ClientWithCollections[]>([]);
 
   // Novos filtros
   const [filterCollector, setFilterCollector] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>(""); // 'with_collector', 'without_collector', ''
   const [filterCity, setFilterCity] = useState<string>("");
   const [filterNeighborhood, setFilterNeighborhood] = useState<string>("");
+  const [filterStore, setFilterStore] = useState<string>(""); // Novo filtro de loja
   const [filterDateFrom, setFilterDateFrom] = useState<string>("");
   const [filterDateTo, setFilterDateTo] = useState<string>("");
   const [includeWithoutDate, setIncludeWithoutDate] = useState(false);
@@ -57,39 +57,23 @@ export function ClientAssignment() {
   // Modal states
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
-  const [modalData, setModalData] = useState<{ clientsWithCollectors?: number; totalClients?: number }>({});
+  const [modalData, setModalData] = useState<{
+    clientsWithCollectors?: number;
+    totalClients?: number;
+  }>({});
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Limite para operações em massa
-  const MAX_BATCH_SIZE = 200;
+  const MAX_BATCH_SIZE = 100;
 
   const collectors = users.filter((user) => user.type === "collector");
 
-  // Obter opções únicas para filtros
-  const availableCities = useMemo(() => {
-    const cities = new Set<string>();
-    clientsData.forEach((client) => {
-      if (client.cidade) cities.add(client.cidade);
-    });
-    return Array.from(cities).sort();
-  }, [clientsData]);
-
-  const availableNeighborhoods = useMemo(() => {
-    const neighborhoods = new Set<string>();
-    clientsData.forEach((client) => {
-      if (client.bairro && (!filterCity || client.cidade === filterCity)) {
-        neighborhoods.add(client.bairro);
-      }
-    });
-    return Array.from(neighborhoods).sort();
-  }, [clientsData, filterCity]);
-
   // Função utilitária para parsear e normalizar datas
   const parseAndNormalizeDate = (
-    dateStr: string | null | undefined
+    dateStr: string | null | undefined,
   ): Date | null => {
     if (!dateStr || dateStr === "null" || dateStr === "") {
       return null;
@@ -107,7 +91,7 @@ export function ClientAssignment() {
       else if (dateStr.includes("/")) {
         const [day, month, year] = dateStr.split("/");
         date = new Date(
-          `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+          `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`,
         );
       }
       // Outro formato
@@ -129,12 +113,11 @@ export function ClientAssignment() {
     }
   };
 
-  useEffect(() => {
-    // Função para determinar qual cobrador está atribuído a uma collection
+  // Obter opções únicas para filtros
+  const clientsData = useMemo(() => {
     const getCollectorForCollection = (
-      collection: Collection
+      collection: Collection,
     ): { collectorId?: string; collectorName?: string } => {
-      // 1. Verificar atribuição direta (user_id)
       if (collection.user_id) {
         const collector = users.find((u) => u.id === collection.user_id);
         return {
@@ -143,14 +126,13 @@ export function ClientAssignment() {
         };
       }
 
-      // 2. Verificar atribuição por loja
       if (collection.nome_da_loja) {
         const storeAssignment = collectorStores.find(
-          (cs) => cs.storeName === collection.nome_da_loja
+          (cs) => cs.storeName === collection.nome_da_loja,
         );
         if (storeAssignment) {
           const collector = users.find(
-            (u) => u.id === storeAssignment.collectorId
+            (u) => u.id === storeAssignment.collectorId,
           );
           return {
             collectorId: storeAssignment.collectorId,
@@ -159,31 +141,27 @@ export function ClientAssignment() {
         }
       }
 
-      // 3. Sem atribuição
       return { collectorId: undefined, collectorName: undefined };
     };
 
-    // Agrupar collections por cliente
     const clientsMap = new Map<string, ClientWithCollections>();
 
     collections.forEach((collection) => {
-      // Usar documento como chave principal, ou nome do cliente como fallback
-      const key = (collection.documento || collection.cliente || '').trim();
+      const key = (collection.documento || collection.cliente || "").trim();
 
-      // Ignorar se não houver chave
       if (!key) {
         console.warn("Collection sem documento ou nome válido:", collection);
         return;
       }
 
       if (!clientsMap.has(key)) {
-        // Determinar cobrador através da nova função
         const { collectorId, collectorName } =
           getCollectorForCollection(collection);
 
         clientsMap.set(key, {
           cliente: collection.cliente || "Cliente sem nome",
-          documento: collection.documento || '',
+          documento: collection.documento || "",
+          uniqueKey: key,
           collections: [],
           collectorId: collectorId,
           collectorName: collectorName,
@@ -191,7 +169,6 @@ export function ClientAssignment() {
           bairro: collection.bairro || undefined,
         });
       } else {
-        // Se cliente já existe, verificar se há um cobrador mais específico
         const existingClient = clientsMap.get(key)!;
         if (!existingClient.collectorId) {
           const { collectorId, collectorName } =
@@ -206,15 +183,111 @@ export function ClientAssignment() {
       clientsMap.get(key)!.collections.push(collection);
     });
 
-    console.log("Total de collections:", collections.length);
-    console.log("Total de clientes únicos encontrados:", clientsMap.size);
-    console.log(
-      "Clientes com cobrador (direto + loja):",
-      Array.from(clientsMap.values()).filter((c) => c.collectorId).length
-    );
-
-    setClientsData(Array.from(clientsMap.values()));
+    return Array.from(clientsMap.values());
   }, [collections, users, collectorStores]);
+
+  const availableCities = useMemo(() => {
+    const cities = new Set<string>();
+    clientsData.forEach((client) => {
+      if (client.cidade) cities.add(client.cidade);
+    });
+    return Array.from(cities).sort();
+  }, [clientsData]);
+
+  const availableNeighborhoods = useMemo(() => {
+    const neighborhoods = new Set<string>();
+    clientsData.forEach((client) => {
+      if (client.bairro && (!filterCity || client.cidade === filterCity)) {
+        neighborhoods.add(client.bairro);
+      }
+    });
+    return Array.from(neighborhoods).sort();
+  }, [clientsData, filterCity]);
+
+  const availableStores = useMemo(() => {
+    const stores = new Set<string>();
+    clientsData.forEach((client) => {
+      client.collections.forEach((collection) => {
+        if (collection.nome_da_loja) stores.add(collection.nome_da_loja);
+      });
+    });
+    return Array.from(stores).sort();
+  }, [clientsData]);
+
+  const activeFilterChips = useMemo(() => {
+    const chips = [];
+
+    if (searchTerm) {
+      chips.push({
+        label: `Busca: "${searchTerm}"`,
+        onClear: () => setSearchTerm(""),
+      });
+    }
+    if (filterCollector) {
+      const collector = collectors.find((c) => c.id === filterCollector);
+      chips.push({
+        label: `Cobrador: ${collector?.name || "Desconhecido"}`,
+        onClear: () => setFilterCollector(""),
+      });
+    }
+    if (filterStatus) {
+      const statusLabel =
+        filterStatus === "with_collector" ? "Com Cobrador" : "Sem Cobrador";
+      chips.push({
+        label: `Status: ${statusLabel}`,
+        onClear: () => setFilterStatus(""),
+      });
+    }
+    if (filterCity) {
+      chips.push({
+        label: `Cidade: ${filterCity}`,
+        onClear: () => setFilterCity(""),
+      });
+    }
+    if (filterNeighborhood) {
+      chips.push({
+        label: `Bairro: ${filterNeighborhood}`,
+        onClear: () => setFilterNeighborhood(""),
+      });
+    }
+    if (filterStore) {
+      chips.push({
+        label: `Loja: ${filterStore}`,
+        onClear: () => setFilterStore(""),
+      });
+    }
+    if (filterDateFrom) {
+      chips.push({
+        label: `De: ${filterDateFrom}`,
+        onClear: () => setFilterDateFrom(""),
+      });
+    }
+    if (filterDateTo) {
+      chips.push({
+        label: `Até: ${filterDateTo}`,
+        onClear: () => setFilterDateTo(""),
+      });
+    }
+    if (includeWithoutDate && (filterDateFrom || filterDateTo)) {
+      chips.push({
+        label: `Incluir sem data`,
+        onClear: () => setIncludeWithoutDate(false),
+      });
+    }
+
+    return chips;
+  }, [
+    searchTerm,
+    filterCollector,
+    filterStatus,
+    filterCity,
+    filterNeighborhood,
+    filterStore,
+    filterDateFrom,
+    filterDateTo,
+    includeWithoutDate,
+    collectors,
+  ]);
 
   const filteredClients = useMemo(() => {
     const filtered = clientsData.filter((client) => {
@@ -234,6 +307,10 @@ export function ClientAssignment() {
 
       const matchesNeighborhood =
         !filterNeighborhood || client.bairro === filterNeighborhood;
+
+      const matchesStore =
+        !filterStore ||
+        client.collections.some((c) => c.nome_da_loja === filterStore);
 
       // Filtro por período de data de vencimento - VERSÃO CORRIGIDA
       const matchesDateRange = (() => {
@@ -303,12 +380,10 @@ export function ClientAssignment() {
         matchesStatus &&
         matchesCity &&
         matchesNeighborhood &&
+        matchesStore &&
         matchesDateRange
       );
     });
-
-    // Reset para primeira página quando filtros mudarem
-    setCurrentPage(1);
 
     return filtered;
   }, [
@@ -322,6 +397,10 @@ export function ClientAssignment() {
     filterDateTo,
     includeWithoutDate,
   ]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredClients]);
 
   // Clientes da página atual
   const paginatedClients = useMemo(() => {
@@ -342,20 +421,20 @@ export function ClientAssignment() {
   };
 
   const handleSelectAll = () => {
-    const currentPageDocuments = paginatedClients.map((c) => c.documento);
-    const allCurrentPageSelected = currentPageDocuments.every((doc) =>
-      selectedClients.has(doc)
+    const currentPageUniqueKeys = paginatedClients.map((c) => c.uniqueKey);
+    const allCurrentPageSelected = currentPageUniqueKeys.every((key) =>
+      selectedClients.has(key),
     );
 
     if (allCurrentPageSelected) {
       // Remover todos da página atual
       const newSelected = new Set(selectedClients);
-      currentPageDocuments.forEach((doc) => newSelected.delete(doc));
+      currentPageUniqueKeys.forEach((key) => newSelected.delete(key));
       setSelectedClients(newSelected);
     } else {
       // Adicionar todos da página atual
       const newSelected = new Set(selectedClients);
-      currentPageDocuments.forEach((doc) => newSelected.add(doc));
+      currentPageUniqueKeys.forEach((key) => newSelected.add(key));
       setSelectedClients(newSelected);
     }
   };
@@ -364,16 +443,16 @@ export function ClientAssignment() {
     if (selectedClients.size === filteredClients.length) {
       setSelectedClients(new Set());
     } else {
-      setSelectedClients(new Set(filteredClients.map((c) => c.documento)));
+      setSelectedClients(new Set(filteredClients.map((c) => c.uniqueKey)));
     }
   };
 
-  const handleSelectClient = (documento: string) => {
+  const handleSelectClient = (uniqueKey: string) => {
     const newSelected = new Set(selectedClients);
-    if (newSelected.has(documento)) {
-      newSelected.delete(documento);
+    if (newSelected.has(uniqueKey)) {
+      newSelected.delete(uniqueKey);
     } else {
-      newSelected.add(documento);
+      newSelected.add(uniqueKey);
     }
     setSelectedClients(newSelected);
   };
@@ -398,38 +477,80 @@ export function ClientAssignment() {
     setShowAssignModal(false);
 
     setLoading(true);
-    try {
-      await assignCollectorToClients(
-        selectedCollector,
-        Array.from(selectedClients)
-      );
-      // Success notification
+    const clientsToProcess = Array.from(selectedClients).map((key) => {
+      const client = clientsData.find((c) => c.uniqueKey === key);
+      return { document: client?.documento, clientName: client?.cliente };
+    });
+
+    const totalClients = clientsToProcess.length;
+    let successCount = 0;
+    let errorCount = 0;
+
+    const showNotification = (
+      message: string,
+      type: "success" | "error" | "info",
+    ) => {
       const notification = document.createElement("div");
-      notification.className =
-        "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
+      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center`;
       notification.innerHTML = `
-        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-        </svg>
-        ${selectedClients.size} cliente(s) atribuído(s) com sucesso!
-      `;
+      <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+        ${type === "success" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' : type === "error" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' : '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>'}
+      </svg>
+      ${message}
+    `;
       document.body.appendChild(notification);
       setTimeout(() => document.body.removeChild(notification), 5000);
+    };
+
+    const processBatch = async (
+      batch: { document?: string; clientName?: string }[],
+    ) => {
+      try {
+        await assignCollectorToClients(selectedCollector, batch);
+        successCount += batch.length;
+      } catch (error) {
+        console.error("Erro ao atribuir cobrador em lote:", error);
+        errorCount += batch.length;
+      }
+    };
+
+    try {
+      if (totalClients > MAX_BATCH_SIZE) {
+        // showNotification(`Iniciando atribuição em lotes. Total: ${totalClients} clientes.`, "info"); // Removed intermediate notification
+        for (let i = 0; i < totalClients; i += MAX_BATCH_SIZE) {
+          const batch = clientsToProcess.slice(i, i + MAX_BATCH_SIZE);
+          await processBatch(batch);
+          if (i + MAX_BATCH_SIZE < totalClients) {
+            await new Promise((resolve) => setTimeout(resolve, 1000)); // Delay de 1 segundo entre lotes
+          }
+        }
+        if (errorCount === 0) {
+          showNotification(
+            `${successCount} cliente(s) atribuído(s) com sucesso em lotes!`,
+            "success",
+          );
+        } else if (successCount === 0) {
+          showNotification(
+            `Erro ao atribuir cobrador a todos os ${errorCount} clientes.`,
+            "error",
+          );
+        } else {
+          showNotification(
+            `${successCount} clientes atribuídos, ${errorCount} com erro.`,
+            "error",
+          );
+        }
+      } else {
+        await assignCollectorToClients(selectedCollector, clientsToProcess);
+        showNotification(
+          `${totalClients} cliente(s) atribuído(s) com sucesso!`,
+          "success",
+        );
+      }
       setSelectedClients(new Set());
     } catch (error) {
-      console.error("Erro ao atribuir cobrador:", error);
-      // Error notification
-      const notification = document.createElement("div");
-      notification.className =
-        "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
-      notification.innerHTML = `
-        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-        </svg>
-        Erro ao atribuir cobrador. Tente novamente.
-      `;
-      document.body.appendChild(notification);
-      setTimeout(() => document.body.removeChild(notification), 5000);
+      console.error("Erro geral ao atribuir cobrador:", error);
+      showNotification("Erro ao atribuir cobrador. Tente novamente.", "error");
     } finally {
       setLoading(false);
     }
@@ -449,11 +570,11 @@ export function ClientAssignment() {
 
     // Verificar se os clientes selecionados realmente têm cobradores
     const selectedClientsData = Array.from(selectedClients)
-      .map((doc) => clientsData.find((c) => c.documento === doc))
+      .map((uniqueKey) => clientsData.find((c) => c.uniqueKey === uniqueKey))
       .filter(Boolean);
 
     const clientsWithCollectors = selectedClientsData.filter(
-      (c) => c?.collectorId
+      (c) => c?.collectorId,
     );
 
     if (clientsWithCollectors.length === 0) {
@@ -469,7 +590,7 @@ export function ClientAssignment() {
 
     setModalData({
       clientsWithCollectors: clientsWithCollectors.length,
-      totalClients: selectedClients.size
+      totalClients: selectedClients.size,
     });
     setShowRemoveModal(true);
   };
@@ -478,72 +599,86 @@ export function ClientAssignment() {
     setShowRemoveModal(false);
 
     setLoading(true);
-    try {
-      console.log(
-        "Iniciando remoção de cobradores para:",
-        Array.from(selectedClients)
-      );
+    const clientsToProcess = Array.from(selectedClients).map((key) => {
+      const client = clientsData.find((c) => c.uniqueKey === key);
+      return { document: client?.documento, clientName: client?.cliente };
+    });
 
-      await removeCollectorFromClients(Array.from(selectedClients));
+    const totalClients = clientsToProcess.length;
+    let successCount = 0;
+    let errorCount = 0;
 
-      // Success notification
+    const showNotification = (
+      message: string,
+      type: "success" | "error" | "info",
+    ) => {
       const notification = document.createElement("div");
-      notification.className =
-        "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
+      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center`;
       notification.innerHTML = `
-        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-        </svg>
-        Cobrador removido de ${modalData.clientsWithCollectors || 0} cliente(s)!
-      `;
+      <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+        ${type === "success" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' : type === "error" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' : '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>'}
+      </svg>
+      ${message}
+    `;
       document.body.appendChild(notification);
       setTimeout(() => document.body.removeChild(notification), 5000);
+    };
+
+    const processBatch = async (
+      batch: { document?: string; clientName?: string }[],
+    ) => {
+      try {
+        await removeCollectorFromClients(batch);
+        successCount += batch.length;
+      } catch (error) {
+        console.error("Erro ao remover cobrador em lote:", error);
+        errorCount += batch.length;
+      }
+    };
+
+    try {
+      if (totalClients > MAX_BATCH_SIZE) {
+        // showNotification(`Iniciando remoção em lotes. Total: ${totalClients} clientes.`, "info"); // Removed intermediate notification
+        for (let i = 0; i < totalClients; i += MAX_BATCH_SIZE) {
+          const batch = clientsToProcess.slice(i, i + MAX_BATCH_SIZE);
+          await processBatch(batch);
+          if (i + MAX_BATCH_SIZE < totalClients) {
+            await new Promise((resolve) => setTimeout(resolve, 1000)); // Delay de 1 segundo entre lotes
+          }
+        }
+        if (errorCount === 0) {
+          showNotification(
+            `Cobrador removido de ${successCount} cliente(s) com sucesso em lotes!`,
+            "success",
+          );
+        } else if (successCount === 0) {
+          showNotification(
+            `Erro ao remover cobrador de todos os ${errorCount} clientes.`,
+            "error",
+          );
+        } else {
+          showNotification(
+            `${successCount} clientes processados, ${errorCount} com erro na remoção.`,
+            "error",
+          );
+        }
+      } else {
+        await removeCollectorFromClients(clientsToProcess);
+        showNotification(
+          `Cobrador removido de ${totalClients} cliente(s)!`,
+          "success",
+        );
+      }
       setSelectedClients(new Set());
     } catch (error) {
-      console.error("Erro ao remover cobrador:", error);
-      // Error notification with more details
-      const notification = document.createElement("div");
-      notification.className =
-        "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center max-w-md";
-      notification.innerHTML = `
-        <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-        </svg>
-        <div>
-          <div>Erro ao remover cobrador</div>
-          <div class="text-xs mt-1 opacity-90">${
-            error instanceof Error ? error.message : "Erro desconhecido"
-          }</div>
-        </div>
-      `;
-      document.body.appendChild(notification);
-      setTimeout(() => document.body.removeChild(notification), 8000);
+      console.error("Erro geral ao remover cobrador:", error);
+      showNotification("Erro ao remover cobrador. Tente novamente.", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const clearFilters = () => {
-    setSearchTerm("");
-    setFilterCollector("");
-    setFilterStatus("");
-    setFilterCity("");
-    setFilterNeighborhood("");
-    setFilterDateFrom("");
-    setFilterDateTo("");
-    setIncludeWithoutDate(false);
-    setShowFilters(false);
-    setCurrentPage(1);
-  };
-
-  const hasActiveFilters =
-    searchTerm ||
-    filterCollector ||
-    filterStatus ||
-    filterCity ||
-    filterNeighborhood ||
-    filterDateFrom ||
-    filterDateTo;
+  const hasActiveFilters = activeFilterChips.length > 0;
 
   // Calculate overview statistics
   const overviewStats = useMemo(() => {
@@ -552,7 +687,7 @@ export function ClientAssignment() {
     const unassignedClients = totalClients - assignedClients;
     const totalCollections = clientsData.reduce(
       (sum, c) => sum + c.collections.length,
-      0
+      0,
     );
     const avgCollectionsPerClient =
       totalClients > 0 ? totalCollections / totalClients : 0;
@@ -573,12 +708,12 @@ export function ClientAssignment() {
   const filteredStats = useMemo(() => {
     const totalFiltered = filteredClients.length;
     const assignedFiltered = filteredClients.filter(
-      (c) => c.collectorId
+      (c) => c.collectorId,
     ).length;
     const unassignedFiltered = totalFiltered - assignedFiltered;
     const totalCollectionsFiltered = filteredClients.reduce(
       (sum, c) => sum + c.collections.length,
-      0
+      0,
     );
 
     return {
@@ -618,7 +753,7 @@ export function ClientAssignment() {
 
       console.log(
         "Amostra de datas (primeiras 10):",
-        Array.from(sampleDates).slice(0, 10)
+        Array.from(sampleDates).slice(0, 10),
       );
       console.log("Datas válidas/inválidas na amostra:", {
         validCount,
@@ -633,340 +768,284 @@ export function ClientAssignment() {
     clientsData,
   ]);
 
+  // Calcular estatísticas para o card principal
+  const mainStats = useMemo(() => {
+    const total = hasActiveFilters
+      ? filteredStats.totalFiltered
+      : overviewStats.totalClients;
+    const assigned = hasActiveFilters
+      ? filteredStats.assignedFiltered
+      : overviewStats.assignedClients;
+    const assignmentRate = total > 0 ? (assigned / total) * 100 : 0;
+
+    return {
+      total,
+      assigned,
+      assignmentRate,
+    };
+  }, [hasActiveFilters, filteredStats, overviewStats]);
+
   return (
-    <div className="space-y-6">
-      {/* Header with Controls */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-4 lg:p-6 border-b border-gray-200">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="min-w-0">
-              <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-                <Users className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
-                <span className="truncate">Atribuição de Cobradores</span>
-              </h2>
-              <p className="text-gray-600 mt-1 text-sm lg:text-base">
-                Gerencie a atribuição de clientes aos cobradores
-              </p>
-            </div>
+    <div className="space-y-4">
+      {/* Header Simplificado */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
+              <Users className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
+              Atribuição de Cobradores
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Gerencie a atribuição de {mainStats.total} clientes
+            </p>
+          </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 lg:gap-3">
-              {hasActiveFilters && (
-                <button
-                  onClick={clearFilters}
-                  className="flex items-center justify-center px-3 lg:px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Limpar Filtros</span>
-                  <span className="sm:hidden">Limpar</span>
-                </button>
-              )}
-              {selectedClients.size > 0 && (
-                <button
-                  onClick={() => setSelectedClients(new Set())}
-                  className="flex items-center justify-center px-3 lg:px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">
-                    Limpar Seleção ({selectedClients.size})
-                  </span>
-                  <span className="sm:hidden">
-                    Seleção ({selectedClients.size})
-                  </span>
-                </button>
-              )}
-            </div>
+          {/* Ações Principais */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Filtros"
+            >
+              <Filter className="h-5 w-5" />
+            </button>
           </div>
         </div>
       </div>
 
-
-
-      {/* Overview Statistics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 lg:p-6 rounded-xl border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-blue-700">
-                Total de Clientes
-              </p>
-              <p className="text-2xl lg:text-3xl font-bold text-blue-900 truncate">
-                {hasActiveFilters
-                  ? filteredStats.totalFiltered
-                  : overviewStats.totalClients}
-              </p>
-              {hasActiveFilters && (
-                <p className="text-xs text-blue-600 mt-1">
-                  De {overviewStats.totalClients} total
-                </p>
-              )}
-            </div>
-            <Users className="h-8 w-8 lg:h-10 lg:w-10 text-blue-600 flex-shrink-0 ml-2" />
+      {/* Card Principal - Taxa de Atribuição */}
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-blue-100 text-sm font-medium">
+              Taxa de Atribuição
+            </p>
+            <p className="text-4xl font-bold mt-1">
+              {mainStats.assignmentRate.toFixed(1)}%
+            </p>
+            <p className="text-blue-100 text-sm mt-2">
+              {mainStats.total} clientes cadastrados
+            </p>
           </div>
+          <Award className="h-16 w-16 text-blue-200 opacity-50" />
         </div>
 
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 lg:p-6 rounded-xl border border-green-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-green-700">Com Cobrador</p>
-              <p className="text-2xl lg:text-3xl font-bold text-green-900">
-                {hasActiveFilters
-                  ? filteredStats.assignedFiltered
-                  : overviewStats.assignedClients}
-              </p>
-              <p className="text-xs text-green-600 mt-1">
-                {hasActiveFilters
-                  ? Math.round(
-                      (filteredStats.assignedFiltered /
-                        filteredStats.totalFiltered) *
-                        100
-                    ) || 0
-                  : Math.round(overviewStats.assignmentRate)}
-                % atribuídos
-              </p>
-            </div>
-            <UserPlus className="h-8 w-8 lg:h-10 lg:w-10 text-green-600 flex-shrink-0 ml-2" />
+        {/* Métricas secundárias */}
+        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-blue-400">
+          <div>
+            <p className="text-blue-100 text-xs">Atribuídos</p>
+            <p className="text-2xl font-semibold">{mainStats.assigned}</p>
           </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 lg:p-6 rounded-xl border border-amber-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-amber-700">Sem Cobrador</p>
-              <p className="text-2xl lg:text-3xl font-bold text-amber-900">
-                {hasActiveFilters
-                  ? filteredStats.unassignedFiltered
-                  : overviewStats.unassignedClients}
-              </p>
-              <p className="text-xs text-amber-600 mt-1">
-                {hasActiveFilters
-                  ? Math.round(
-                      (filteredStats.unassignedFiltered /
-                        filteredStats.totalFiltered) *
-                        100
-                    ) || 0
-                  : Math.round(100 - overviewStats.assignmentRate)}
-                % pendentes
-              </p>
-            </div>
-            <AlertCircle className="h-8 w-8 lg:h-10 lg:w-10 text-amber-600 flex-shrink-0 ml-2" />
+          <div>
+            <p className="text-blue-100 text-xs">Pendentes</p>
+            <p className="text-2xl font-semibold">
+              {mainStats.total - mainStats.assigned}
+            </p>
           </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-violet-50 p-4 lg:p-6 rounded-xl border border-purple-200">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-purple-700">
-                Total Parcelas
-              </p>
-              <p className="text-2xl lg:text-3xl font-bold text-purple-900">
-                {hasActiveFilters
-                  ? filteredStats.totalCollectionsFiltered
-                  : overviewStats.totalCollections}
-              </p>
-              <p className="text-xs text-purple-600 mt-1">
-                Média: {overviewStats.avgCollectionsPerClient.toFixed(1)} por
-                cliente
-              </p>
-            </div>
-            <ArrowUpDown className="h-8 w-8 lg:h-10 lg:w-10 text-purple-600 flex-shrink-0 ml-2" />
+          <div>
+            <p className="text-blue-100 text-xs">Cobradores</p>
+            <p className="text-2xl font-semibold">{collectors.length}</p>
           </div>
         </div>
       </div>
 
-
-      {/* Search and Filters Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-4 lg:p-6">
-          <div className="space-y-4">
+      {/* Filtros Colapsáveis */}
+      {showFilters && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 animate-in slide-in-from-top-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <Search className="h-4 w-4 mr-1" />
                 Buscar Cliente
               </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Nome do cliente ou documento..."
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Nome ou documento..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
 
             <div>
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`w-full flex items-center justify-center px-3 py-2 border rounded-lg transition-colors ${
-                  showFilters
-                    ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-                    : "border-gray-300 hover:bg-gray-50"
-                }`}
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <Users className="h-4 w-4 mr-1" />
+                Cobrador
+              </label>
+              <select
+                value={filterCollector}
+                onChange={(e) => setFilterCollector(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <Filter className="h-4 w-4 mr-2" />
-                {showFilters ? "Ocultar" : "Mostrar"} Filtros
-                {hasActiveFilters && !showFilters && (
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {
-                      [
-                        filterCollector,
-                        filterStatus,
-                        filterCity,
-                        filterNeighborhood,
-                        filterDateFrom,
-                        filterDateTo,
-                      ].filter(Boolean).length
-                    }
-                  </span>
-                )}
+                <option value="">Todos os cobradores</option>
+                {collectors.map((collector) => (
+                  <option key={collector.id} value={collector.id}>
+                    {collector.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <AlertCircle className="h-4 w-4 mr-1" />
+                Status
+              </label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Todos os status</option>
+                <option value="with_collector">Com cobrador</option>
+                <option value="without_collector">Sem cobrador</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <MapPin className="h-4 w-4 mr-1" />
+                Cidade
+              </label>
+              <select
+                value={filterCity}
+                onChange={(e) => {
+                  setFilterCity(e.target.value);
+                  setFilterNeighborhood("");
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Todas as cidades</option>
+                {availableCities.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <MapPin className="h-4 w-4 mr-1" />
+                Bairro
+              </label>
+              <select
+                value={filterNeighborhood}
+                onChange={(e) => setFilterNeighborhood(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!filterCity}
+              >
+                <option value="">Todos os bairros</option>
+                {availableNeighborhoods.map((neighborhood) => (
+                  <option key={neighborhood} value={neighborhood}>
+                    {neighborhood}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <Building className="h-4 w-4 mr-1" />
+                Loja
+              </label>
+              <select
+                value={filterStore}
+                onChange={(e) => setFilterStore(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Todas as lojas</option>
+                {availableStores.map((store) => (
+                  <option key={store} value={store}>
+                    {store}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="col-span-full">
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setFilterCollector("");
+                  setFilterStatus("");
+                  setFilterCity("");
+                  setFilterNeighborhood("");
+                  setFilterStore("");
+                  setFilterDateFrom("");
+                  setFilterDateTo("");
+                  setIncludeWithoutDate(false);
+                  setCurrentPage(1);
+                }}
+                className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+              >
+                Limpar Filtros
               </button>
             </div>
           </div>
-
-          {/* Expanded Filters */}
-          {showFilters && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Status
-                  </label>
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Todos</option>
-                    <option value="with_collector">Com Cobrador</option>
-                    <option value="without_collector">Sem Cobrador</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Cobrador
-                  </label>
-                  <select
-                    value={filterCollector}
-                    onChange={(e) => setFilterCollector(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Todos os Cobradores</option>
-                    {collectors.map((collector) => (
-                      <option key={collector.id} value={collector.id}>
-                        {collector.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Cidade
-                  </label>
-                  <select
-                    value={filterCity}
-                    onChange={(e) => {
-                      setFilterCity(e.target.value);
-                      setFilterNeighborhood("");
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Todas as Cidades</option>
-                    {availableCities.map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Bairro
-                  </label>
-                  <select
-                    value={filterNeighborhood}
-                    onChange={(e) => setFilterNeighborhood(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-                    disabled={!filterCity}
-                  >
-                    <option value="">Todos os Bairros</option>
-                    {availableNeighborhoods.map((neighborhood) => (
-                      <option key={neighborhood} value={neighborhood}>
-                        {neighborhood}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Vencimento De
-                  </label>
-                  <input
-                    type="date"
-                    value={filterDateFrom}
-                    onChange={(e) => setFilterDateFrom(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Vencimento Até
-                  </label>
-                  <input
-                    type="date"
-                    value={filterDateTo}
-                    onChange={(e) => setFilterDateTo(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {(filterDateFrom || filterDateTo) && (
-                <div className="mt-4">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={includeWithoutDate}
-                      onChange={(e) =>
-                        setIncludeWithoutDate(e.target.checked)
-                      }
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">
-                      Incluir clientes sem data de vencimento
-                    </span>
-                  </label>
-                </div>
-              )}
-            </div>
-          )}
         </div>
-      </div>
+      )}
 
-                  {/* Assignment Actions */}
-      {selectedClients.size > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-4 lg:p-6">
-            <div className="flex flex-col gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Ações em Massa
-                </h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  {selectedClients.size} cliente
-                  {selectedClients.size !== 1 ? "s" : ""} selecionado
-                  {selectedClients.size !== 1 ? "s" : ""}
-                </p>
+      {/* Client List */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Lista de Clientes ({filteredClients.length})
+          </h3>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              onClick={handleSelectAll}
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+            >
+              <span className="hidden sm:inline">
+                {paginatedClients.every((c) => selectedClients.has(c.documento))
+                  ? "Desmarcar"
+                  : "Selecionar"}{" "}
+                página
+              </span>
+              <span className="sm:hidden">
+                {paginatedClients.every((c) => selectedClients.has(c.documento))
+                  ? "Desmarcar"
+                  : "Selecionar"}{" "}
+                página
+              </span>
+            </button>
+            {filteredClients.length > itemsPerPage && (
+              <button
+                onClick={handleSelectAllFiltered}
+                className="px-4 py-2 text-sm border border-blue-300 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+              >
+                <span className="hidden sm:inline">
+                  Selecionar todos ({filteredClients.length})
+                </span>
+                <span className="sm:hidden">
+                  Todos ({filteredClients.length})
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+        {/* Assignment Actions */}
+        {selectedClients.size > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="p-4 lg:p-6">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Ações em Massa
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {selectedClients.size} cliente
+                    {selectedClients.size !== 1 ? "s" : ""} selecionado
+                    {selectedClients.size !== 1 ? "s" : ""}
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-3">
                 <select
+                  id="selectedCollector"
+                  name="selectedCollector"
                   value={selectedCollector}
                   onChange={(e) => setSelectedCollector(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1009,93 +1088,50 @@ export function ClientAssignment() {
                   </button>
                 </div>
               </div>
-            </div>
 
-            {selectedClients.size > MAX_BATCH_SIZE && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-center text-amber-700">
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  <span className="text-sm">
-                    Operação será processada em{" "}
-                    {Math.ceil(selectedClients.size / MAX_BATCH_SIZE)} lotes de{" "}
-                    {MAX_BATCH_SIZE} clientes
-                  </span>
+              {selectedClients.size > MAX_BATCH_SIZE && (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center text-amber-700">
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    <span className="text-sm">
+                      Operação será processada em{" "}
+                      {Math.ceil(selectedClients.size / MAX_BATCH_SIZE)} lotes
+                      de {MAX_BATCH_SIZE} clientes
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      )}
-
-
-      {/* Client List */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Lista de Clientes ({filteredClients.length})
-          </h3>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <button
-              onClick={handleSelectAll}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-            >
-              <span className="hidden sm:inline">
-                {paginatedClients.every((c) => selectedClients.has(c.documento))
-                  ? "Desmarcar"
-                  : "Selecionar"}{" "}
-                página
-              </span>
-              <span className="sm:hidden">
-                {paginatedClients.every((c) => selectedClients.has(c.documento))
-                  ? "Desmarcar"
-                  : "Selecionar"}{" "}
-                página
-              </span>
-            </button>
-            {filteredClients.length > itemsPerPage && (
-              <button
-                onClick={handleSelectAllFiltered}
-                className="px-4 py-2 text-sm border border-blue-300 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors font-medium"
-              >
-                <span className="hidden sm:inline">
-                  Selecionar todos ({filteredClients.length})
-                </span>
-                <span className="sm:hidden">
-                  Todos ({filteredClients.length})
-                </span>
-              </button>
-            )}
-          </div>
-        </div>
+        )}
 
         {/* Client Cards - Mobile Optimized */}
         {paginatedClients.map((client) => {
           const isWithoutCollector = !client.collectorId;
           const totalValue = client.collections.reduce(
             (sum, c) => sum + c.valor_original,
-            0
+            0,
           );
-          const pendingValue = totalValue - client.collections.reduce(
-            (sum, c) => sum + c.valor_recebido,
-            0
-          );
+          const pendingValue =
+            totalValue -
+            client.collections.reduce((sum, c) => sum + c.valor_recebido, 0);
 
           return (
             <div
-              key={client.documento || client.cliente}
+              key={client.uniqueKey}
               className={`bg-white rounded-lg shadow-sm border transition-all duration-200 hover:shadow-md cursor-pointer ${
                 isWithoutCollector
                   ? "border-amber-300 bg-amber-50"
                   : "border-gray-200"
               } ${
-                selectedClients.has(client.documento)
+                selectedClients.has(client.uniqueKey)
                   ? "ring-2 ring-blue-500"
                   : ""
               }`}
               onClick={(e) => {
                 // Previne o clique no card quando clicar no checkbox
-                if ((e.target as HTMLElement).tagName !== 'INPUT') {
-                  handleSelectClient(client.documento);
+                if ((e.target as HTMLElement).tagName !== "INPUT") {
+                  handleSelectClient(client.uniqueKey);
                 }
               }}
             >
@@ -1103,13 +1139,15 @@ export function ClientAssignment() {
                 <div className="flex items-start gap-3">
                   {/* Larger checkbox for mobile */}
                   <input
+                    id={`select-client-${client.uniqueKey}`}
+                    name={`select-client-${client.uniqueKey}`}
                     type="checkbox"
-                    checked={selectedClients.has(client.documento)}
-                    onChange={() => handleSelectClient(client.documento)}
+                    checked={selectedClients.has(client.uniqueKey)}
+                    onChange={() => handleSelectClient(client.uniqueKey)}
                     onClick={(e) => e.stopPropagation()} // Evita duplo clique
                     className="h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500 border-gray-300 rounded mt-1 flex-shrink-0"
                   />
-                  
+
                   <div className="flex-1 min-w-0">
                     {/* Client info - more compact */}
                     <div className="flex items-start justify-between mb-2">
@@ -1121,10 +1159,11 @@ export function ClientAssignment() {
                           )}
                         </h4>
                         <p className="text-sm text-gray-600">
-                          {client.documento} • {client.collections.length} parcela{client.collections.length !== 1 ? "s" : ""}
+                          {client.documento} • {client.collections.length}{" "}
+                          parcela{client.collections.length !== 1 ? "s" : ""}
                         </p>
                       </div>
-                      
+
                       {/* Collector status - more prominent */}
                       <div className="flex-shrink-0 ml-2">
                         {client.collectorName ? (
@@ -1144,10 +1183,11 @@ export function ClientAssignment() {
                       <div className="flex items-center text-sm text-gray-600 mb-3">
                         <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
                         <span className="truncate">
-                          {client.bairro && client.cidade 
+                          {client.bairro && client.cidade
                             ? `${client.bairro}, ${client.cidade}`
-                            : client.cidade || client.bairro || "Localização não informada"
-                          }
+                            : client.cidade ||
+                              client.bairro ||
+                              "Localização não informada"}
                         </span>
                       </div>
                     )}
@@ -1216,10 +1256,15 @@ export function ClientAssignment() {
               </div>
 
               <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600 whitespace-nowrap">
+                <label
+                  htmlFor="itemsPerPage"
+                  className="text-sm text-gray-600 whitespace-nowrap"
+                >
                   Mostrar:
                 </label>
                 <select
+                  id="itemsPerPage"
+                  name="itemsPerPage"
                   value={itemsPerPage}
                   onChange={(e) =>
                     handleItemsPerPageChange(Number(e.target.value))
@@ -1260,7 +1305,7 @@ export function ClientAssignment() {
                   {
                     length: Math.min(
                       totalPages,
-                      window.innerWidth < 640 ? 3 : 5
+                      window.innerWidth < 640 ? 3 : 5,
                     ),
                   },
                   (_, i) => {
@@ -1293,7 +1338,7 @@ export function ClientAssignment() {
                         {pageNumber}
                       </button>
                     );
-                  }
+                  },
                 )}
               </div>
 
@@ -1333,13 +1378,18 @@ export function ClientAssignment() {
               <UserPlus className="h-6 w-6 text-green-600" />
             </div>
           </div>
-          
+
           <div className="text-center">
             <p className="text-gray-700">
-              Você está prestes a atribuir <span className="font-semibold">{selectedClients.size} cliente{selectedClients.size !== 1 ? 's' : ''}</span> ao cobrador:
+              Você está prestes a atribuir{" "}
+              <span className="font-semibold">
+                {selectedClients.size} cliente
+                {selectedClients.size !== 1 ? "s" : ""}
+              </span>{" "}
+              ao cobrador:
             </p>
             <p className="text-lg font-semibold text-gray-900 mt-2">
-              {collectors.find(c => c.id === selectedCollector)?.name}
+              {collectors.find((c) => c.id === selectedCollector)?.name}
             </p>
           </div>
 
@@ -1348,7 +1398,9 @@ export function ClientAssignment() {
               <div className="flex items-center text-amber-700">
                 <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
                 <span className="text-sm">
-                  A operação será processada em {Math.ceil(selectedClients.size / MAX_BATCH_SIZE)} lotes de {MAX_BATCH_SIZE} clientes
+                  A operação será processada em{" "}
+                  {Math.ceil(selectedClients.size / MAX_BATCH_SIZE)} lotes de{" "}
+                  {MAX_BATCH_SIZE} clientes
                 </span>
               </div>
             </div>
@@ -1392,20 +1444,44 @@ export function ClientAssignment() {
               <UserMinus className="h-6 w-6 text-red-600" />
             </div>
           </div>
-          
+
           <div className="text-center space-y-3">
             <p className="text-gray-700">
-              Confirma a remoção de cobradores de <span className="font-semibold">{modalData.totalClients} cliente{modalData.totalClients !== 1 ? 's' : ''}</span>?
+              Confirma a remoção de cobradores de{" "}
+              <span className="font-semibold">
+                {modalData.totalClients} cliente
+                {modalData.totalClients !== 1 ? "s" : ""}
+              </span>
+              ?
             </p>
-            
+
             <div className="space-y-1 text-sm text-gray-600">
               <p>
-                <span className="font-medium text-green-600">{modalData.clientsWithCollectors}</span> cliente{modalData.clientsWithCollectors !== 1 ? 's têm' : ' tem'} cobradores atribuídos
+                <span className="font-medium text-green-600">
+                  {modalData.clientsWithCollectors}
+                </span>{" "}
+                cliente
+                {modalData.clientsWithCollectors !== 1 ? "s têm" : " tem"}{" "}
+                cobradores atribuídos
               </p>
               <p>
                 <span className="font-medium text-gray-500">
-                  {(modalData.totalClients || 0) - (modalData.clientsWithCollectors || 0)}
-                </span> cliente{((modalData.totalClients || 0) - (modalData.clientsWithCollectors || 0)) !== 1 ? 's' : ''} já não {((modalData.totalClients || 0) - (modalData.clientsWithCollectors || 0)) !== 1 ? 'possuem' : 'possui'} cobrador
+                  {(modalData.totalClients || 0) -
+                    (modalData.clientsWithCollectors || 0)}
+                </span>{" "}
+                cliente
+                {(modalData.totalClients || 0) -
+                  (modalData.clientsWithCollectors || 0) !==
+                1
+                  ? "s"
+                  : ""}{" "}
+                já não{" "}
+                {(modalData.totalClients || 0) -
+                  (modalData.clientsWithCollectors || 0) !==
+                1
+                  ? "possuem"
+                  : "possui"}{" "}
+                cobrador
               </p>
             </div>
 
@@ -1421,7 +1497,9 @@ export function ClientAssignment() {
               <div className="flex items-center text-amber-700">
                 <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
                 <span className="text-sm">
-                  A operação será processada em {Math.ceil((modalData.totalClients || 0) / MAX_BATCH_SIZE)} lotes de {MAX_BATCH_SIZE} clientes
+                  A operação será processada em{" "}
+                  {Math.ceil((modalData.totalClients || 0) / MAX_BATCH_SIZE)}{" "}
+                  lotes de {MAX_BATCH_SIZE} clientes
                 </span>
               </div>
             </div>
@@ -1453,4 +1531,4 @@ export function ClientAssignment() {
       </Modal>
     </div>
   );
-}
+});

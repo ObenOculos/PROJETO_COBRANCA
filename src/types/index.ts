@@ -4,8 +4,27 @@ export interface User {
   name: string;
   login: string;
   password: string;
-  type: 'manager' | 'collector';
+  type: "manager" | "collector";
   createdAt: string;
+}
+
+// Authorization history types
+export interface AuthorizationHistory {
+  id: string;
+  token: string;
+  collector_id: string;
+  collector_name: string;
+  client_name: string;
+  client_document: string;
+  requested_at: string;
+  expires_at: string;
+  status: "pending" | "approved" | "rejected" | "expired";
+  processed_at?: string;
+  processed_by_id?: string;
+  processed_by_name?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Store assignment for collectors
@@ -24,10 +43,16 @@ export interface ScheduledVisit {
   clientName: string;
   scheduledDate: string; // YYYY-MM-DD
   scheduledTime?: string; // HH:MM
-  status: 'agendada' | 'realizada' | 'cancelada' | 'nao_encontrado' | 'cancelamento_solicitado';
+  status:
+    | "agendada"
+    | "realizada"
+    | "cancelada"
+    | "nao_encontrado"
+    | "cancelamento_solicitado";
   notes?: string;
   createdAt: string;
   updatedAt?: string;
+  dataVisitaRealizada?: string; // Data em que a visita foi efetivamente realizada (YYYY-MM-DD)
   // Dados do cliente para facilitar exibição
   clientAddress?: string;
   clientNeighborhood?: string;
@@ -98,8 +123,15 @@ export interface Collection {
 export interface CollectionAttempt {
   id: string;
   date: string;
-  type: 'call' | 'visit' | 'email' | 'whatsapp';
-  result: 'no_answer' | 'busy' | 'not_found' | 'promise' | 'refusal' | 'partial_payment' | 'full_payment';
+  type: "call" | "visit" | "email" | "whatsapp";
+  result:
+    | "no_answer"
+    | "busy"
+    | "not_found"
+    | "promise"
+    | "refusal"
+    | "partial_payment"
+    | "full_payment";
   notes?: string;
   nextAction?: string;
   nextActionDate?: string;
@@ -131,7 +163,7 @@ export interface SaleGroup {
   totalValue: number;
   totalReceived: number;
   pendingValue: number;
-  saleStatus: 'pending' | 'partially_paid' | 'fully_paid';
+  saleStatus: "pending" | "partially_paid" | "fully_paid";
   payments: SalePayment[];
   clientDocument: string;
 }
@@ -157,6 +189,7 @@ export interface CollectorPerformance {
   receivedAmount: number;
   conversionRate: number;
   averageTime: number;
+  clientCount: number;
 }
 
 // Auth context types
@@ -165,6 +198,8 @@ export interface AuthContextType {
   login: (login: string, password: string) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
+  error: string | null;
+  clearError: () => void;
 }
 
 // Collection context types
@@ -182,34 +217,80 @@ export interface CollectionContextType {
   fetchSalePayments: () => Promise<void>;
   refreshData: () => Promise<void>;
   updateCollection: (id: number, updates: Partial<Collection>) => Promise<void>;
-  assignCollectorToStore: (collectorId: string, storeName: string) => Promise<void>;
-  removeCollectorFromStore: (collectorId: string, storeName: string) => Promise<void>;
-  assignCollectorToClients: (collectorId: string, documentos: string[]) => Promise<void>;
-  removeCollectorFromClients: (documentos: string[]) => Promise<void>;
-  addAttempt: (collectionId: number, attempt: Omit<CollectionAttempt, 'id'>) => Promise<void>;
-  addUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<void>;
+  assignCollectorToStore: (
+    collectorId: string,
+    storeName: string,
+  ) => Promise<void>;
+  removeCollectorFromStore: (
+    collectorId: string,
+    storeName: string,
+  ) => Promise<void>;
+  assignCollectorToClients: (
+    collectorId: string,
+    clientIdentifiers: { document?: string; clientName?: string }[],
+  ) => Promise<void>;
+  removeCollectorFromClients: (
+    clientIdentifiers: { document?: string; clientName?: string }[],
+  ) => Promise<void>;
+  addAttempt: (
+    collectionId: number,
+    attempt: Omit<CollectionAttempt, "id">,
+  ) => Promise<void>;
+  addUser: (user: Omit<User, "id" | "createdAt">) => Promise<void>;
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
   getDashboardStats: () => DashboardStats;
   getCollectorPerformance: () => CollectorPerformance[];
   getCollectorCollections: (collectorId: string) => Collection[];
   getClientGroups: (collectorId?: string) => ClientGroup[];
-  getFilteredCollections: (filters: FilterOptions, userType: 'manager' | 'collector', collectorId?: string) => Collection[];
+  getFilteredCollections: (
+    filters: FilterOptions,
+    userType: "manager" | "collector",
+    collectorId?: string,
+  ) => Collection[];
   getAvailableStores: () => string[];
   getCollectorStores: (collectorId: string) => string[];
   // Sale payment methods
-  processSalePayment: (payment: SalePaymentInput, collectorId: string) => Promise<void>;
-  processGeneralPayment: (clientDocument: string, paymentAmount: number, paymentMethod: string, notes: string, collectorId: string) => Promise<void>;
-  getSalePayments: (saleNumber: number, clientDocument: string) => SalePayment[];
-  calculateSaleBalance: (saleNumber: number, clientDocument: string) => SaleBalance;
+  processSalePayment: (
+    payment: SalePaymentInput,
+    collectorId: string,
+  ) => Promise<void>;
+  processGeneralPayment: (
+    clientDocument: string,
+    paymentAmount: number,
+    paymentMethod: string,
+    notes: string,
+    collectorId: string,
+  ) => Promise<void>;
+  getSalePayments: (
+    saleNumber: number,
+    clientDocument: string,
+  ) => SalePayment[];
+  calculateSaleBalance: (
+    saleNumber: number,
+    clientDocument: string,
+  ) => SaleBalance;
   getSalesByClient: (clientDocument: string) => SaleGroup[];
   // Visit scheduling methods
   fetchScheduledVisits: () => Promise<void>;
-  scheduleVisit: (visitData: Omit<ScheduledVisit, 'id' | 'createdAt'>) => Promise<ScheduledVisit>;
-  updateVisitStatus: (visitId: string, status: ScheduledVisit['status'], notes?: string) => Promise<void>;
+  scheduleVisit: (
+    visitData: Omit<ScheduledVisit, "id" | "createdAt">,
+  ) => Promise<ScheduledVisit>;
+  updateVisitStatus: (
+    visitId: string,
+    status: ScheduledVisit["status"],
+    notes?: string,
+  ) => Promise<void>;
   requestVisitCancellation: (visitId: string, reason: string) => Promise<void>;
-  approveVisitCancellation: (visitId: string, managerId: string) => Promise<void>;
-  rejectVisitCancellation: (visitId: string, managerId: string, rejectionReason: string) => Promise<void>;
+  approveVisitCancellation: (
+    visitId: string,
+    managerId: string,
+  ) => Promise<void>;
+  rejectVisitCancellation: (
+    visitId: string,
+    managerId: string,
+    rejectionReason: string,
+  ) => Promise<void>;
   getPendingCancellationRequests: () => ScheduledVisit[];
   getCancellationHistory: (days?: number) => ScheduledVisit[];
   getVisitsByDate: (date: string, collectorId?: string) => ScheduledVisit[];
@@ -225,7 +306,13 @@ export interface CollectionContextType {
     totalPendingValue: number;
     overdueCount: number;
   } | null;
-  rescheduleVisit: (visitId: string, newDate: string, newTime?: string, reason?: string) => Promise<void>;
+  rescheduleVisit: (
+    visitId: string,
+    newDate: string,
+    newTime?: string,
+    reason?: string,
+  ) => Promise<void>;
+  updateScheduledVisitsAfterPayment: (clientDocument: string) => Promise<void>;
 }
 
 // Sale payment types
@@ -262,7 +349,7 @@ export interface SaleBalance {
   totalValue: number;
   totalPaid: number;
   remainingBalance: number;
-  status: 'pending' | 'partially_paid' | 'fully_paid';
+  status: "pending" | "partially_paid" | "fully_paid";
   installmentBreakdown: {
     installmentId: number;
     originalValue: number;
@@ -286,4 +373,5 @@ export interface FilterOptions {
   maxAmount?: number;
   overdueOnly?: boolean;
   highValueOnly?: boolean;
+  visitsOnly?: boolean;
 }

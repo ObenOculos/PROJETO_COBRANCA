@@ -1,38 +1,31 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
+import { getSupabaseConfig } from "./supabase-config";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-console.log('Configuração do Supabase:', { 
-  url: supabaseUrl, 
-  key: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'undefined' 
-});
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Variáveis de ambiente do Supabase não encontradas. Verifique seu arquivo .env');
-}
+// Configuração segura do Supabase
+const config = getSupabaseConfig();
 
 // Validar se a URL do Supabase está formatada corretamente
 try {
-  new URL(supabaseUrl);
+  new URL(config.url);
 } catch (error) {
-  throw new Error(`Formato inválido da VITE_SUPABASE_URL: "${supabaseUrl}". Certifique-se de que é uma URL válida começando com https:// (ex: https://your-project-ref.supabase.co)`);
+  throw new Error(`Formato inválido da URL do Supabase: "${config.url}"`);
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(config.url, config.anonKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
-    detectSessionInUrl: false
-  }
+    detectSessionInUrl: false,
+  },
 });
 
-// Testar a conexão
-supabase.from('users').select('count', { count: 'exact', head: true })
-  .then(({ count, error }) => {
+// Testar a conexão silenciosamente
+supabase
+  .from("users")
+  .select("count", { count: "exact", head: true })
+  .then(({ error }) => {
     if (error) {
-      console.error('Teste de conexão do Supabase falhou:', error);
-    } else {
-      console.log('Supabase conectado com sucesso. Contagem de usuários:', count);
+      console.error("Erro de conectividade com o banco de dados");
     }
+    // Conexão OK - sem logs em produção
   });
