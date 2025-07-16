@@ -1614,11 +1614,22 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // 1. Buscar todas as parcelas da venda para o cliente
       const saleInstallments = collections.filter(
         (collection) =>
-          collection.venda_n === payment.saleNumber &&
+          Number(collection.venda_n) === Number(payment.saleNumber) &&
           collection.documento === payment.clientDocument,
       );
 
       if (saleInstallments.length === 0) {
+        console.error("Debug - Erro ao buscar parcelas:", {
+          saleNumber: payment.saleNumber,
+          saleNumberType: typeof payment.saleNumber,
+          clientDocument: payment.clientDocument,
+          totalCollections: collections.length,
+          samplesOfVendaN: collections.slice(0, 5).map(c => ({ 
+            venda_n: c.venda_n, 
+            type: typeof c.venda_n,
+            documento: c.documento 
+          }))
+        });
         throw new Error("Nenhuma parcela encontrada para esta venda e cliente");
       }
 
