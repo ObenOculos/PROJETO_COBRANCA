@@ -20,7 +20,6 @@ import {
   ThumbsUp,
   AlertCircle,
   Clock,
-  CalendarCheck,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import CollectionTable from "./CollectionTable";
@@ -236,7 +235,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-1">
             <AlertCircle className="w-3 h-3 text-orange-500" />
-            <span className="text-gray-600">Com pendências</span>
+            <span className="text-gray-600">Pendentes</span>
           </div>
           <span className="font-medium text-orange-600">{stats.clientsWithPending}</span>
         </div>
