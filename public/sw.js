@@ -50,6 +50,21 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Ignora requisições de desenvolvimento do Vite
+  if (
+    request.url.includes('?t=') || // Arquivos com timestamp do Vite
+    request.url.includes('/@vite/') || // Recursos do Vite
+    request.url.includes('/src/') || // Arquivos fonte em desenvolvimento
+    request.url.includes('?import') || // Imports dinâmicos do Vite
+    request.url.includes('.tsx') || // Arquivos TypeScript/React
+    request.url.includes('.ts') || // Arquivos TypeScript
+    request.url.includes('.jsx') || // Arquivos React
+    request.url.includes('?v=') || // Versionamento do Vite
+    request.url.includes('/node_modules/') // Módulos do Node
+  ) {
+    return; // Deixa o Vite lidar com essas requisições
+  }
+
   // Estratégia para API do Supabase - Network First
   if (request.url.includes('supabase.co')) {
     event.respondWith(

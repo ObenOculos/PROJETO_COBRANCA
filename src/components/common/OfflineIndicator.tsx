@@ -9,7 +9,9 @@ const OfflineIndicator: React.FC = () => {
     return null;
   }
 
-  const paymentActions = offlineQueue.filter(action => action.type === 'DISTRIBUTE_PAYMENT');
+  const paymentActions = offlineQueue.filter(action => 
+    action.type === 'DISTRIBUTE_PAYMENT' || action.type === 'CREATE_PAYMENT'
+  );
   const otherActions = offlineQueue.length - paymentActions.length;
 
   const handleRetrySync = () => {

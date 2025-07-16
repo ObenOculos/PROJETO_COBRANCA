@@ -27,12 +27,18 @@ export interface DistributePaymentAction {
 }
 
 export const useOffline = () => {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(() => {
+    const online = navigator.onLine;
+    console.log('🔄 Estado inicial da conexão:', online ? 'ONLINE' : 'OFFLINE');
+    return online;
+  });
   const [offlineQueue, setOfflineQueue] = useState<OfflineAction[]>(() => {
     // Carregar fila do localStorage na inicialização
     try {
       const stored = localStorage.getItem('offlineQueue');
-      return stored ? JSON.parse(stored) : [];
+      const queue = stored ? JSON.parse(stored) : [];
+      console.log('📋 Fila offline carregada:', queue.length, 'itens');
+      return queue;
     } catch (error) {
       console.error('Erro ao carregar fila offline:', error);
       return [];
@@ -93,17 +99,24 @@ export const useOffline = () => {
     // Mostrar notificação de sincronização
     if (processedCount > 0) {
       showSyncNotification(processedCount, failedCount);
+      
+      // Disparar evento customizado para atualizar os dados
+      window.dispatchEvent(new CustomEvent('offlineDataSynced', {
+        detail: { processedCount, failedCount }
+      }));
     }
   }, []);
 
   useEffect(() => {
     const handleOnline = () => {
+      console.log('🌐 Conectado online');
       setIsOnline(true);
       // Processar fila de ações offline quando voltar online
       processOfflineQueue();
     };
 
     const handleOffline = () => {
+      console.log('📵 Modo offline detectado');
       setIsOnline(false);
     };
 
@@ -117,6 +130,7 @@ export const useOffline = () => {
   }, [processOfflineQueue]);
 
   const addToOfflineQueue = (action: Omit<OfflineAction, 'id' | 'timestamp' | 'retryCount' | 'maxRetries' | 'lastError'>) => {
+    console.log('📥 Adicionando à fila offline:', action);
     const queue = JSON.parse(localStorage.getItem('offlineQueue') || '[]');
     const newAction: OfflineAction = {
       ...action,
@@ -129,6 +143,7 @@ export const useOffline = () => {
     queue.push(newAction);
     localStorage.setItem('offlineQueue', JSON.stringify(queue));
     setOfflineQueue(queue);
+    console.log('✅ Ação adicionada à fila. Total de itens:', queue.length);
   };
 
   const processAction = async (action: OfflineAction) => {
@@ -198,28 +213,71 @@ export const useOffline = () => {
       }
 
       // Atualizar valores das parcelas
+      // IMPORTANTE: Como o pagamento offline é processado depois, 
+      // precisamos usar a mesma lógica do processamento online
+      console.log('🔄 Processando distribuições offline:', paymentData.distributionDetails);
+
       for (const distribution of paymentData.distributionDetails) {
-        // Primeiro, buscar o valor atual
+        console.log('📝 Processando parcela:', {
+          installmentId: distribution.installmentId,
+          appliedAmount: distribution.appliedAmount,
+          originalAmount: distribution.originalAmount
+        });
+
+        // Buscar dados atuais da parcela
         const { data: currentData, error: fetchError } = await supabase
-          .from('collections')
-          .select('valor_recebido')
-          .eq('id', distribution.installmentId)
+          .from('BANCO_DADOS')
+          .select('valor_recebido, valor_original')
+          .eq('id_parcela', distribution.installmentId)
           .single();
 
         if (fetchError) {
           throw new Error(`Erro ao buscar parcela ${distribution.installmentId}: ${fetchError.message}`);
         }
 
-        // Calcular o novo valor
-        const newValue = (currentData.valor_recebido || 0) + distribution.appliedAmount;
+        const currentReceived = currentData?.valor_recebido || 0;
+        const originalValue = currentData?.valor_original || 0;
+        const appliedAmount = distribution.appliedAmount || 0;
+        
+        // Calcular novo valor recebido
+        const newReceivedValue = currentReceived + appliedAmount;
+        
+        // Calcular novo status
+        const remainingValue = originalValue - newReceivedValue;
+        const newStatus = remainingValue <= 0.01 ? "recebido" : "parcialmente_pago";
 
-        // Atualizar com o novo valor
+        console.log('💰 Detalhes do cálculo:', {
+          installmentId: distribution.installmentId,
+          currentReceived,
+          originalValue,
+          appliedAmount,
+          newReceivedValue,
+          remainingValue,
+          newStatus
+        });
+
+        // Verificações de segurança
+        if (appliedAmount <= 0) {
+          console.warn('⚠️ Valor aplicado deve ser positivo:', appliedAmount);
+          continue;
+        }
+        
+        if (newReceivedValue > originalValue + 0.01) {
+          console.warn('⚠️ Valor recebido maior que o original:', {
+            newReceived: newReceivedValue,
+            original: originalValue
+          });
+        }
+
+        // Atualizar no banco
         const { error: updateError } = await supabase
-          .from('collections')
+          .from('BANCO_DADOS')
           .update({
-            valor_recebido: newValue
+            valor_recebido: newReceivedValue,
+            status: newStatus,
+            data_de_recebimento: new Date().toISOString().split('T')[0]
           })
-          .eq('id', distribution.installmentId);
+          .eq('id_parcela', distribution.installmentId);
 
         if (updateError) {
           throw new Error(`Erro ao atualizar parcela ${distribution.installmentId}: ${updateError.message}`);

@@ -79,6 +79,7 @@ const LoginForm: React.FC = () => {
                   }`}
                   placeholder="Digite seu login"
                   disabled={isLoading}
+                  autoComplete="username"
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-purple-500/0 to-pink-500/0 rounded-xl opacity-0 group-focus-within:opacity-10 transition-opacity duration-300 pointer-events-none"></div>
               </div>
@@ -113,6 +114,7 @@ const LoginForm: React.FC = () => {
                   }`}
                   placeholder="Digite sua senha"
                   disabled={isLoading}
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"

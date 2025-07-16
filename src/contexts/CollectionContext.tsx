@@ -158,6 +158,21 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     };
   }, [user]);
 
+  // Escutar evento de sincronização offline para recarregar dados
+  useEffect(() => {
+    const handleOfflineDataSynced = (event: CustomEvent) => {
+      console.log('📡 Dados sincronizados offline, recarregando collections...', event.detail);
+      // Recarregar apenas as collections, sem as visitas para melhor performance
+      refreshCollections();
+    };
+
+    window.addEventListener('offlineDataSynced', handleOfflineDataSynced as EventListener);
+    
+    return () => {
+      window.removeEventListener('offlineDataSynced', handleOfflineDataSynced as EventListener);
+    };
+  }, []);
+
   const fetchCollections = async () => {
     try {
       setError(null);
@@ -394,7 +409,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       if (updates.status !== undefined) dbUpdates.status = updates.status;
       if (updates.valor_recebido !== undefined)
-        dbUpdates.valor_recebido = updates.valor_recebido.toString();
+        dbUpdates.valor_recebido = updates.valor_recebido;
       if (updates.data_de_recebimento !== undefined)
         dbUpdates.data_de_recebimento = updates.data_de_recebimento;
       if (updates.obs !== undefined) dbUpdates.obs = updates.obs;
@@ -1541,10 +1556,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         );
 
         if (installmentIndex !== -1) {
-          const newValueReceived = roundTo2Decimals(
-            updatedInstallments[installmentIndex].valor_recebido +
-              paymentForThisInstallment,
-          );
+          // Garantir que os valores são números
+          const currentReceived = Number(updatedInstallments[installmentIndex].valor_recebido) || 0;
+          const paymentAmount = Number(paymentForThisInstallment) || 0;
+          
+          console.log('🔢 Verificando tipos de valores:', {
+            installmentId: installment.id_parcela,
+            currentReceived: { value: currentReceived, type: typeof currentReceived },
+            paymentAmount: { value: paymentAmount, type: typeof paymentAmount }
+          });
+          
+          const newValueReceived = roundTo2Decimals(currentReceived + paymentAmount);
           const remainingValue = roundTo2Decimals(
             updatedInstallments[installmentIndex].valor_original -
               newValueReceived,
@@ -1795,31 +1817,39 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       let remainingPayment = paymentAmount;
       const updatedInstallments: Collection[] = [];
       const distributionDetails: any[] = [];
-      let allSalePayments: any[] = [];
 
       for (const installment of sortedInstallments) {
         if (remainingPayment <= 0) break;
 
-        const pendingAmount =
-          installment.valor_original - installment.valor_recebido;
+        // Garantir que os valores são números
+        const originalAmount = Number(installment.valor_original) || 0;
+        const currentReceived = Number(installment.valor_recebido) || 0;
+        const pendingAmount = originalAmount - currentReceived;
         const paymentForThisInstallment = Math.min(
           remainingPayment,
           pendingAmount,
         );
 
+        console.log('🔢 ProcessGeneralPayment - Verificando valores:', {
+          installmentId: installment.id_parcela,
+          originalAmount: { value: originalAmount, type: typeof originalAmount },
+          currentReceived: { value: currentReceived, type: typeof currentReceived },
+          pendingAmount,
+          paymentForThisInstallment
+        });
+
         if (paymentForThisInstallment > 0) {
-          const newReceivedAmount =
-            installment.valor_recebido + paymentForThisInstallment;
+          const newReceivedAmount = currentReceived + paymentForThisInstallment;
 
           const updatedInstallment: Collection = {
             ...installment,
             valor_recebido: newReceivedAmount,
             status:
-              newReceivedAmount >= installment.valor_original
+              newReceivedAmount >= originalAmount
                 ? "recebido"
                 : "parcialmente_pago",
             data_de_recebimento:
-              newReceivedAmount >= installment.valor_original
+              newReceivedAmount >= originalAmount
                 ? new Date().toISOString().split("T")[0]
                 : installment.data_de_recebimento,
           };

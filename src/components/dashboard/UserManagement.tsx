@@ -292,6 +292,7 @@ const UserManagement: React.FC = () => {
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
+                  autoComplete="name"
                 />
               </div>
 
@@ -307,6 +308,7 @@ const UserManagement: React.FC = () => {
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
+                  autoComplete="username"
                 />
               </div>
 
@@ -324,6 +326,7 @@ const UserManagement: React.FC = () => {
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required={!editingUser}
+                  autoComplete="new-password"
                 />
               </div>
 
