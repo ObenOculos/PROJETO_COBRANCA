@@ -7,7 +7,22 @@ const LoginForm: React.FC = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const { login: authenticate, isLoading, error, clearError } = useAuth();
+
+  // Monitorar status da conexão
+  React.useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +68,21 @@ const LoginForm: React.FC = () => {
             </p>
             <div className="w-16 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 mx-auto mt-4 rounded-full"></div>
           </div>
+
+          {/* Indicador de status offline */}
+          {!isOnline && (
+            <div className="bg-orange-50/80 backdrop-blur-sm border border-orange-200/50 rounded-xl p-4 flex items-center space-x-3">
+              <AlertCircle className="h-5 w-5 text-orange-500 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-orange-800">
+                  Modo Offline
+                </p>
+                <p className="text-xs text-orange-600">
+                  Usando dados em cache para login
+                </p>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Campo login */}

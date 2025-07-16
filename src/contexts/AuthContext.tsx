@@ -162,12 +162,63 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [user]);
 
+  // Função para realizar login offline usando dados em cache
+  const performOfflineLogin = async (login: string, password: string): Promise<boolean> => {
+    try {
+      // Verificar se há dados de usuários em cache (localStorage)
+      const cachedUsers = localStorage.getItem('cached_users');
+      
+      if (!cachedUsers) {
+        setError("Sem conexão e nenhum dado de login em cache. Conecte-se à internet para fazer o primeiro login.");
+        return false;
+      }
+
+      const users = JSON.parse(cachedUsers);
+      const foundUser = users.find((user: any) => 
+        user.login === login && user.password === password
+      );
+
+      if (!foundUser) {
+        setError("Credenciais inválidas ou usuário não encontrado no cache offline.");
+        return false;
+      }
+
+      // Criar objeto do usuário
+      const userObj: User = {
+        id: foundUser.id,
+        name: foundUser.name,
+        login: foundUser.login,
+        password: foundUser.password,
+        type: foundUser.type as "manager" | "collector",
+        createdAt: foundUser.created_at || new Date().toISOString(),
+      };
+
+      // Salvar na sessão local
+      sessionStorage.setItem("sistema_user", JSON.stringify(userObj));
+      
+      console.log("Login offline realizado com sucesso:", userObj);
+      setUser(userObj);
+      return true;
+      
+    } catch (error) {
+      console.error("Erro no login offline:", error);
+      setError("Erro ao processar login offline. Tente novamente.");
+      return false;
+    }
+  };
+
   const login = async (login: string, password: string): Promise<boolean> => {
     try {
       // Limpa qualquer erro anterior ao tentar fazer login
       clearError();
 
       console.log("Tentando fazer login com:", { login });
+
+      // Verificar se está offline
+      if (!navigator.onLine) {
+        console.log("Modo offline detectado - tentando login com dados em cache");
+        return await performOfflineLogin(login, password);
+      }
 
       // Função interna para realizar o login
       const performLogin = async (): Promise<boolean> => {
@@ -190,6 +241,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log("Usuário não encontrado com essas credenciais");
           setError("Login ou senha incorretos. Verifique suas credenciais.");
           return false; // Retorna false explicitamente para credenciais inválidas
+        }
+
+        // Cache dos usuários para login offline (buscar todos os usuários)
+        try {
+          const { data: allUsers, error: cacheError } = await supabase
+            .from("users")
+            .select("*");
+          
+          if (!cacheError && allUsers) {
+            localStorage.setItem('cached_users', JSON.stringify(allUsers));
+            console.log("Usuários armazenados em cache para login offline");
+          }
+        } catch (cacheErr) {
+          console.log("Erro ao cachear usuários (não crítico):", cacheErr);
         }
 
         const foundUser = users[0];
