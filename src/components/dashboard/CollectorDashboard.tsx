@@ -12,6 +12,7 @@ import FilterBar from "../common/FilterBar";
 import CollectionTable from "./CollectionTable";
 import RouteMap from "./RouteMap";
 import VisitScheduler from "./VisitScheduler";
+import RadialApprovalChart from "./RadialApprovalChart";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { FilterOptions } from "../../types";
@@ -40,6 +41,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     getFilteredCollections,
     getClientGroups,
     getVisitsByCollector,
+    salePayments,
   } = useCollection();
 
   // Usa a aba externa se fornecida, senão gerencia internamente
@@ -61,6 +63,106 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
   const [filters, setFilters] = useState<FilterOptions>({});
 
+  // Funções para calcular métricas por período
+  const getMetricsByPeriod = (payments: any[], visits: any[]) => {
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Metas (podem ser ajustadas conforme necessário)
+    const goals = {
+      daily: { visits: 10, payments: 5000 },
+      weekly: { visits: 50, payments: 25000 },
+      monthly: { visits: 200, payments: 100000 }
+    };
+
+    // Filtrar pagamentos do cobrador atual
+    const collectorPayments = payments.filter(p => p.collectorId === user?.id);
+
+    // Função para comparar datas (apenas dia)
+    const isSameDay = (date1: Date, date2: Date) => {
+      return date1.toISOString().split('T')[0] === date2.toISOString().split('T')[0];
+    };
+
+    const today = new Date();
+    
+    const dailyPayments = collectorPayments.filter(p => {
+      // Verificar se a data é uma string no formato YYYY-MM-DD ou se já é um objeto Date
+      let paymentDate;
+      if (typeof p.paymentDate === 'string') {
+        // Se é string, pode ser no formato YYYY-MM-DD (date do SQL)
+        paymentDate = new Date(p.paymentDate + 'T00:00:00');
+      } else {
+        paymentDate = new Date(p.paymentDate);
+      }
+      
+      return isSameDay(paymentDate, today);
+    });
+
+    // Função para processar data de visita
+    const processVisitDate = (dateStr: string) => {
+      if (typeof dateStr === 'string') {
+        return new Date(dateStr + 'T00:00:00');
+      }
+      return new Date(dateStr);
+    };
+
+    // Debug visitas
+    console.log('Debug visitas:');
+    console.log('Total de visitas:', visits.length);
+    console.log('Status disponíveis:', [...new Set(visits.map(v => v.status))]);
+    
+    const todayVisits = visits.filter(v => {
+      console.log('Visita:', v.id, 'Status:', v.status, 'Data agendada:', v.scheduledDate, 'Data realizada:', v.dataVisitaRealizada);
+      if (v.status !== 'realizada') return false;
+      
+      // Verificar se devemos usar dataVisitaRealizada ao invés de scheduledDate
+      const dateToCheck = v.dataVisitaRealizada || v.scheduledDate;
+      const visitDate = processVisitDate(dateToCheck);
+      const isToday = isSameDay(visitDate, today);
+      console.log('Data para verificar:', dateToCheck, 'É hoje?', isToday);
+      return isToday;
+    });
+    
+    console.log('Visitas de hoje:', todayVisits.length);
+
+    // Calcular métricas reais
+    const metrics = {
+      daily: {
+        visits: todayVisits.length,
+        payments: dailyPayments.reduce((sum, p) => sum + p.paymentAmount, 0)
+      },
+      weekly: {
+        visits: visits.filter(v => {
+          if (v.status !== 'realizada') return false;
+          const dateToCheck = v.dataVisitaRealizada || v.scheduledDate;
+          const visitDate = processVisitDate(dateToCheck);
+          return visitDate >= startOfWeek;
+        }).length,
+        payments: collectorPayments.filter(p => {
+          const paymentDate = new Date(p.paymentDate);
+          return paymentDate >= startOfWeek;
+        }).reduce((sum, p) => sum + p.paymentAmount, 0)
+      },
+      monthly: {
+        visits: visits.filter(v => {
+          if (v.status !== 'realizada') return false;
+          const dateToCheck = v.dataVisitaRealizada || v.scheduledDate;
+          const visitDate = processVisitDate(dateToCheck);
+          return visitDate >= startOfMonth;
+        }).length,
+        payments: collectorPayments.filter(p => {
+          const paymentDate = new Date(p.paymentDate);
+          return paymentDate >= startOfMonth;
+        }).reduce((sum, p) => sum + p.paymentAmount, 0)
+      }
+    };
+
+    return { metrics, goals };
+  };
+
   // Salva a aba ativa no localStorage apenas quando gerenciado internamente
   useEffect(() => {
     if (!externalActiveTab) {
@@ -76,6 +178,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   );
   const clientGroups = getClientGroups(user?.id);
   const myVisits = getVisitsByCollector(user?.id || "");
+  
+  // Calcular métricas gamificadas
+  const { metrics: periodMetrics, goals } = getMetricsByPeriod(salePayments, myVisits);
 
   // Simplified logic - group by sale to count correctly
   const salesMap = new Map<
@@ -218,6 +323,76 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                     {formatCurrency(stats.totalAmount - stats.receivedAmount)}
                   </div>
                   <div className="text-sm text-gray-600">Valor Pendente</div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Métricas Gamificadas */}
+            <div className="bg-white rounded-xl shadow-sm p-4 lg:p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Metas e Conquistas
+              </h2>
+              
+              {/* Metas Diárias */}
+              <div className="mb-6">
+                <h3 className="text-md font-medium text-gray-700 mb-3">Hoje</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <RadialApprovalChart
+                    current={periodMetrics.daily.visits}
+                    goal={goals.daily.visits}
+                    title="Visitas Realizadas"
+                    showValues={true}
+                    isCurrency={false}
+                  />
+                  <RadialApprovalChart
+                    current={periodMetrics.daily.payments}
+                    goal={goals.daily.payments}
+                    title="Valor Recebido"
+                    showValues={true}
+                    isCurrency={true}
+                  />
+                </div>
+              </div>
+              
+              {/* Metas Semanais */}
+              <div className="mb-6">
+                <h3 className="text-md font-medium text-gray-700 mb-3">Esta Semana</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <RadialApprovalChart
+                    current={periodMetrics.weekly.visits}
+                    goal={goals.weekly.visits}
+                    title="Visitas Realizadas"
+                    showValues={true}
+                    isCurrency={false}
+                  />
+                  <RadialApprovalChart
+                    current={periodMetrics.weekly.payments}
+                    goal={goals.weekly.payments}
+                    title="Valor Recebido"
+                    showValues={true}
+                    isCurrency={true}
+                  />
+                </div>
+              </div>
+              
+              {/* Metas Mensais */}
+              <div className="mb-6">
+                <h3 className="text-md font-medium text-gray-700 mb-3">Este Mês</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <RadialApprovalChart
+                    current={periodMetrics.monthly.visits}
+                    goal={goals.monthly.visits}
+                    title="Visitas Realizadas"
+                    showValues={true}
+                    isCurrency={false}
+                  />
+                  <RadialApprovalChart
+                    current={periodMetrics.monthly.payments}
+                    goal={goals.monthly.payments}
+                    title="Valor Recebido"
+                    showValues={true}
+                    isCurrency={true}
+                  />
                 </div>
               </div>
             </div>
