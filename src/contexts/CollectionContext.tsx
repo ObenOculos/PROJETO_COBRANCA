@@ -1143,8 +1143,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }
 
         const sale = salesMap.get(saleKey)!;
-        sale.totalValue += collection.valor_original;
-        sale.receivedValue += collection.valor_recebido;
+        sale.totalValue = Number(sale.totalValue) + Number(collection.valor_original);
+        sale.receivedValue = Number(sale.receivedValue) + Number(collection.valor_recebido);
         sale.installments.push(collection);
       });
 
@@ -1901,7 +1901,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           }
           
           const sale = salesMap.get(detail.saleNumber);
-          sale.paymentAmount += detail.appliedAmount;
+          sale.paymentAmount = Number(sale.paymentAmount) + Number(detail.appliedAmount);
           sale.distributionDetails.push({
             installmentId: detail.installmentId,
             originalAmount: detail.originalAmount,

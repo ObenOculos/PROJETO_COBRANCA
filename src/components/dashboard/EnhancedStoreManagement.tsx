@@ -277,8 +277,8 @@ const EnhancedStoreManagement: React.FC = () => {
         }
 
         const sale = salesMap.get(saleKey)!;
-        sale.totalValue += collection.valor_original;
-        sale.receivedValue += collection.valor_recebido;
+        sale.totalValue = Number(sale.totalValue) + Number(collection.valor_original);
+        sale.receivedValue = Number(sale.receivedValue) + Number(collection.valor_recebido);
       });
 
       // Determine if each sale is pending
