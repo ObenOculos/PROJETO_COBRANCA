@@ -12,6 +12,7 @@ import {
 import { SaleGroup, SalePaymentInput } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
+import { useOffline } from "../../hooks/useOffline";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 
 interface SalePaymentModalProps {
@@ -27,6 +28,7 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
 }) => {
   const { processSalePayment, calculateSaleBalance } = useCollection();
   const { user } = useAuth();
+  const { isOnline } = useOffline();
   const [paymentAmount, setPaymentAmount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<string>("dinheiro");
   const [notes, setNotes] = useState<string>("");
@@ -138,11 +140,16 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
       const notification = document.createElement("div");
       notification.className =
         "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
+      
+      const successMessage = isOnline 
+        ? `Pagamento de ${formatCurrency(amount)} processado com sucesso!`
+        : `Pagamento de ${formatCurrency(amount)} adicionado à fila offline!`;
+      
       notification.innerHTML = `
         <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
         </svg>
-        Pagamento de ${formatCurrency(amount)} processado com sucesso!
+        ${successMessage}
       `;
       document.body.appendChild(notification);
       setTimeout(() => {
@@ -192,6 +199,14 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
                 Venda #{saleGroup.saleNumber} -{" "}
                 {saleGroup.installments[0]?.cliente}
               </p>
+              {!isOnline && (
+                <div className="flex items-center mt-2">
+                  <div className="w-2 h-2 bg-yellow-300 rounded-full mr-2 animate-pulse"></div>
+                  <span className="text-xs text-yellow-200">
+                    Modo offline - Pagamento será adicionado à fila
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <button

@@ -19,6 +19,7 @@ import {
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
 import { useLoading } from "./LoadingContext";
+import { useOffline } from "../hooks/useOffline";
 
 const CollectionContext = createContext<CollectionContextType | undefined>(
   undefined,
@@ -41,6 +42,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 }) => {
   const { user } = useAuth();
   const { setLoading: setGlobalLoading } = useLoading();
+  const { isOnline, addToOfflineQueue } = useOffline();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [collectorStores, setCollectorStores] = useState<CollectorStore[]>([]);
@@ -1604,7 +1606,41 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const { updatedInstallments, distributionDetails } =
         distributeSalePayment(saleInstallments, payment.paymentAmount);
 
-      // 3. Atualizar no banco de dados
+      // 3. Verificar se está offline
+      if (!isOnline) {
+        console.log("Modo offline: Adicionando pagamento à fila");
+        
+        // Adicionar à fila offline
+        addToOfflineQueue({
+          type: 'DISTRIBUTE_PAYMENT',
+          data: {
+            saleNumber: payment.saleNumber,
+            clientDocument: payment.clientDocument,
+            paymentAmount: payment.paymentAmount,
+            paymentMethod: payment.paymentMethod,
+            notes: payment.notes,
+            collectorId: collectorId,
+            distributionDetails: distributionDetails
+          }
+        });
+
+        // Atualizar estado local imediatamente para melhor UX
+        setCollections((prevCollections) =>
+          prevCollections.map((collection) => {
+            const updatedInstallment = updatedInstallments.find(
+              (inst) => inst.id_parcela === collection.id_parcela,
+            );
+            return updatedInstallment || collection;
+          }),
+        );
+
+        // Mostrar mensagem de sucesso offline
+        console.log("✅ Pagamento adicionado à fila offline");
+        setLoading(false);
+        return;
+      }
+
+      // 4. Atualizar no banco de dados (apenas quando online)
       for (const installment of updatedInstallments) {
         const originalInstallment = saleInstallments.find(
           (inst) => inst.id_parcela === installment.id_parcela,
@@ -1759,6 +1795,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       let remainingPayment = paymentAmount;
       const updatedInstallments: Collection[] = [];
       const distributionDetails: any[] = [];
+      let allSalePayments: any[] = [];
 
       for (const installment of sortedInstallments) {
         if (remainingPayment <= 0) break;
@@ -1802,7 +1839,60 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }
       }
 
-      // 4. Atualizar no banco de dados
+      // 4. Verificar se está offline
+      if (!isOnline) {
+        console.log("Modo offline: Adicionando pagamento geral à fila");
+        
+        // Agrupar por venda para criar registros de pagamento separados
+        const salesMap = new Map<number, any>();
+        
+        distributionDetails.forEach((detail) => {
+          if (!salesMap.has(detail.saleNumber)) {
+            salesMap.set(detail.saleNumber, {
+              saleNumber: detail.saleNumber,
+              clientDocument: clientDocument,
+              paymentAmount: 0,
+              paymentMethod: paymentMethod,
+              notes: notes,
+              collectorId: collectorId,
+              distributionDetails: []
+            });
+          }
+          
+          const sale = salesMap.get(detail.saleNumber);
+          sale.paymentAmount += detail.appliedAmount;
+          sale.distributionDetails.push({
+            installmentId: detail.installmentId,
+            originalAmount: detail.originalAmount,
+            appliedAmount: detail.appliedAmount,
+            installmentStatus: detail.installmentStatus
+          });
+        });
+        
+        // Adicionar cada venda à fila offline
+        for (const salePayment of salesMap.values()) {
+          addToOfflineQueue({
+            type: 'DISTRIBUTE_PAYMENT',
+            data: salePayment
+          });
+        }
+
+        // Atualizar estado local imediatamente para melhor UX
+        setCollections((prevCollections) =>
+          prevCollections.map((collection) => {
+            const updatedInstallment = updatedInstallments.find(
+              (inst) => inst.id_parcela === collection.id_parcela,
+            );
+            return updatedInstallment || collection;
+          }),
+        );
+
+        console.log("✅ Pagamento geral adicionado à fila offline");
+        setLoading(false);
+        return;
+      }
+
+      // 5. Atualizar no banco de dados (apenas quando online)
       console.log(
         "Atualizando",
         updatedInstallments.length,
@@ -1836,7 +1926,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }
       }
 
-      // 5. Registrar o pagamento geral na tabela sale_payments
+      // 6. Registrar o pagamento geral na tabela sale_payments
       try {
         const collector = users.find((u) => u.id === collectorId);
         const client = updatedInstallments[0]; // Usar primeira parcela para obter dados do cliente
