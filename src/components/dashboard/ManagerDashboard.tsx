@@ -591,8 +591,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             )}
 
             {/* Performance Overview - Enhanced Mobile Optimization */}
-            <div className="bg-white rounded-2xl sm:rounded-2xl shadow-sm border border-gray-200">
-              <div className="p-3 sm:p-4 lg:p-6">
+            <div className="bg-white rounded-2xl sm:rounded-2xl shadow-sm border border-gray-200 p-4 lg:p-6">
+              <div>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-6">
                   <div className="min-w-0">
                     <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900 truncate">
