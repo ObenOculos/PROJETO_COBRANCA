@@ -528,7 +528,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
           {/* Controles de Paginação */}
           {totalPages > 1 && (
-            <div className="bg-gray-800 px-4 sm:px-6 py-4 rounded-2xl-b-lg">
+            <div className="bg-gray-800 px-4 sm:px-6 py-4 rounded-2xl mt-4">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-sm text-white text-center sm:text-left">
                   <span className="font-semibold">

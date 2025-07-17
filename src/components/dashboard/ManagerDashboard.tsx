@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   DollarSign,
   TrendingUp,
@@ -197,45 +197,48 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     setCurrentSlide(currentSlide > 0 ? currentSlide - 1 : 2);
   };
 
-  const stats = getDashboardStats();
-  const performance = getCollectorPerformance();
-  const baseFilteredCollections = getFilteredCollections(filters, "manager");
+  const stats = useMemo(() => getDashboardStats(), [collections]);
+  const performance = useMemo(() => getCollectorPerformance(), [collections]);
+  const baseFilteredCollections = useMemo(() => getFilteredCollections(filters, "manager"), [filters, collections]);
 
   // Apply collector filter for collections view
   const filteredCollections = baseFilteredCollections;
 
   // Apply overview filter for overview calculations
-  const overviewCollections =
+  const overviewCollections = useMemo(() => 
     overviewFilter === "with-collector"
       ? collections.filter(
           (collection) =>
             collection.user_id && collection.user_id.trim() !== "",
         )
-      : collections;
+      : collections,
+  [overviewFilter, collections]);
 
   // Calculate metrics based on overview filter
-  const totalAmount = overviewCollections.reduce(
-    (sum, c) => sum + c.valor_original,
-    0,
-  );
-  const receivedAmount = overviewCollections.reduce(
-    (sum, c) => sum + c.valor_recebido,
-    0,
-  );
-  const totalReceived = overviewCollections.filter(
-    (c) => c.status?.toLowerCase() === "recebido" || c.valor_recebido > 0,
-  ).length;
-  const totalCollections = overviewCollections.length;
+  const overviewStats = useMemo(() => {
+    const totalAmount = overviewCollections.reduce(
+      (sum, c) => sum + c.valor_original,
+      0,
+    );
+    const receivedAmount = overviewCollections.reduce(
+      (sum, c) => sum + c.valor_recebido,
+      0,
+    );
+    const totalReceived = overviewCollections.filter(
+      (c) => c.status?.toLowerCase() === "recebido" || c.valor_recebido > 0,
+    ).length;
+    const totalCollections = overviewCollections.length;
 
-  const overviewStats = {
-    totalAmount,
-    receivedAmount,
-    totalReceived,
-    totalCollections,
-    pendingAmount: totalAmount - receivedAmount,
-    conversionRate:
-      totalCollections > 0 ? (totalReceived / totalCollections) * 100 : 0,
-  };
+    return {
+      totalAmount,
+      receivedAmount,
+      totalReceived,
+      totalCollections,
+      pendingAmount: totalAmount - receivedAmount,
+      conversionRate:
+        totalCollections > 0 ? (totalReceived / totalCollections) * 100 : 0,
+    };
+  }, [overviewCollections]);
 
   const pendingCancellations = getPendingCancellationRequests();
   const tabs = getManagerTabs(pendingCancellations.length);
@@ -247,59 +250,80 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       case "overview":
         // Simplified metrics - pending vs completed sales and clients
         // Group by sale to count correctly
-        const salesMap = new Map<
-          string,
-          {
-            isPending: boolean;
-            clientDocument: string;
-            totalValue: number;
-            receivedValue: number;
-          }
-        >();
-        overviewCollections.forEach((collection) => {
-          const saleKey = `${collection.venda_n}-${collection.documento}`;
-          if (!salesMap.has(saleKey)) {
-            salesMap.set(saleKey, {
-              isPending: false,
-              clientDocument: collection.documento || "",
-              totalValue: 0,
-              receivedValue: 0,
-            });
-          }
-          const sale = salesMap.get(saleKey)!;
-          sale.totalValue = Number(sale.totalValue) + Number(collection.valor_original);
-          sale.receivedValue = Number(sale.receivedValue) + Number(collection.valor_recebido);
-        });
+        const salesMap = useMemo(() => {
+          const map = new Map<
+            string,
+            {
+              isPending: boolean;
+              clientDocument: string;
+              totalValue: number;
+              receivedValue: number;
+            }
+          >();
+          
+          overviewCollections.forEach((collection) => {
+            const saleKey = `${collection.venda_n}-${collection.documento}`;
+            if (!map.has(saleKey)) {
+              map.set(saleKey, {
+                isPending: false,
+                clientDocument: collection.documento || "",
+                totalValue: 0,
+                receivedValue: 0,
+              });
+            }
+            const sale = map.get(saleKey)!;
+            sale.totalValue = Number(sale.totalValue) + Number(collection.valor_original);
+            sale.receivedValue = Number(sale.receivedValue) + Number(collection.valor_recebido);
+          });
 
-        // Determine if each sale is pending (has any amount left to receive)
-        salesMap.forEach((sale) => {
-          const pendingAmount = sale.totalValue - sale.receivedValue;
-          sale.isPending = pendingAmount > 0.01; // Consider amounts > 1 cent as pending
-        });
+          // Determine if each sale is pending (has any amount left to receive)
+          map.forEach((sale) => {
+            const pendingAmount = sale.totalValue - sale.receivedValue;
+            sale.isPending = pendingAmount > 0.01; // Consider amounts > 1 cent as pending
+          });
+          
+          return map;
+        }, [overviewCollections]);
 
-        const pendingSalesCount = Array.from(salesMap.values()).filter(
-          (s) => s.isPending,
-        ).length;
-        const completedSalesCount = Array.from(salesMap.values()).filter(
-          (s) => !s.isPending,
-        ).length;
-        const clientsWithPendingCount = new Set(
-          Array.from(salesMap.values())
-            .filter((s) => s.isPending)
-            .map((s) => s.clientDocument)
-            .filter(Boolean),
-        ).size;
-        const todayCollections = overviewCollections.filter((c) => {
-          const today = new Date().toISOString().split("T")[0];
-          return c.data_vencimento === today;
-        });
-        const todayAmount = todayCollections.reduce(
-          (sum, c) => sum + c.valor_original,
-          0,
-        );
-        const storesWithCollections = new Set(
-          overviewCollections.map((c) => c.nome_da_loja).filter(Boolean),
-        ).size;
+        const overviewMetrics = useMemo(() => {
+          const salesArray = Array.from(salesMap.values());
+          const pendingSales = salesArray.filter((s) => s.isPending);
+          const completedSales = salesArray.filter((s) => !s.isPending);
+          
+          const clientsWithPendingCount = new Set(
+            pendingSales
+              .map((s) => s.clientDocument)
+              .filter(Boolean),
+          ).size;
+          
+          const todayCollections = overviewCollections.filter((c) => {
+            const today = new Date().toISOString().split("T")[0];
+            return c.data_vencimento === today;
+          });
+          
+          const todayAmount = todayCollections.reduce(
+            (sum, c) => sum + c.valor_original,
+            0,
+          );
+          
+          const storesWithCollections = new Set(
+            overviewCollections.map((c) => c.nome_da_loja).filter(Boolean),
+          ).size;
+          
+          const averageEfficiency = performance.length > 0 
+            ? (performance.reduce((acc, p) => acc + p.conversionRate, 0) / performance.length).toFixed(1)
+            : "0.0";
+          
+          return {
+            pendingSalesCount: pendingSales.length,
+            completedSalesCount: completedSales.length,
+            clientsWithPendingCount,
+            todayCollections,
+            todayAmount,
+            storesWithCollections,
+            averageEfficiency,
+          };
+        }, [salesMap, overviewCollections, performance]);
 
         return (
           <div className="space-y-4 sm:space-y-6">
@@ -432,8 +456,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
                       <StatsCard
                         title="Vendas Finalizadas"
-                        value={completedSalesCount.toString()}
-                        change={`${((completedSalesCount / (completedSalesCount + pendingSalesCount)) * 100).toFixed(1)}% concluídas`}
+                        value={overviewMetrics.completedSalesCount.toString()}
+                        change={`${((overviewMetrics.completedSalesCount / (overviewMetrics.completedSalesCount + overviewMetrics.pendingSalesCount)) * 100).toFixed(1)}% concluídas`}
                         changeType="positive"
                         icon={CheckCircle}
                         iconColor="bg-green-500"
@@ -441,8 +465,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       />
                       <StatsCard
                         title="Clientes com Pendências"
-                        value={clientsWithPendingCount.toString()}
-                        change={`${pendingSalesCount} vendas pendentes`}
+                        value={overviewMetrics.clientsWithPendingCount.toString()}
+                        change={`${overviewMetrics.pendingSalesCount} vendas pendentes`}
                         changeType="negative"
                         icon={Users}
                         iconColor="bg-orange-600"
@@ -450,8 +474,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       />
                       <StatsCard
                         title="Vencimentos Hoje"
-                        value={formatCurrency(todayAmount)}
-                        change={`${todayCollections.length} títulos`}
+                        value={formatCurrency(overviewMetrics.todayAmount)}
+                        change={`${overviewMetrics.todayCollections.length} títulos`}
                         changeType="neutral"
                         icon={Calendar}
                         iconColor="bg-orange-500"
@@ -484,7 +508,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       />
                       <StatsCard
                         title="Cobertura da Rede"
-                        value={storesWithCollections.toString()}
+                        value={overviewMetrics.storesWithCollections.toString()}
                         change="pontos ativos"
                         changeType="neutral"
                         icon={Store}
@@ -493,7 +517,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       />
                       <StatsCard
                         title="Eficiência Média"
-                        value={`${performance.length > 0 ? (performance.reduce((acc, p) => acc + p.conversionRate, 0) / performance.length).toFixed(1) : "0.0"}%`}
+                        value={`${overviewMetrics.averageEfficiency}%`}
                         change="conversão da equipe"
                         changeType="positive"
                         icon={TrendingUp}
@@ -533,7 +557,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     Vencimentos hoje
                   </span>
                   <span className="font-semibold text-gray-900">
-                    {todayCollections.length} títulos
+                    {overviewMetrics.todayCollections.length} títulos
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -548,7 +572,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       Valor a receber hoje
                     </span>
                     <span className="text-lg font-bold text-blue-600">
-                      {formatCurrency(todayAmount)}
+                      {formatCurrency(overviewMetrics.todayAmount)}
                     </span>
                   </div>
                 </div>

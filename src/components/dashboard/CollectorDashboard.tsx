@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   MapPin,
   Target,
@@ -375,106 +375,101 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     }
   }, [internalActiveTab, externalActiveTab]);
 
-  const myCollections = getCollectorCollections(user?.id || "");
-  const filteredCollections = getFilteredCollections(
+  const myCollections = useMemo(() => getCollectorCollections(user?.id || ""), [user?.id]);
+  const filteredCollections = useMemo(() => getFilteredCollections(
     filters,
     "collector",
     user?.id,
-  );
-  const clientGroups = getClientGroups(user?.id);
-  const myVisits = getVisitsByCollector(user?.id || "");
+  ), [filters, user?.id]);
+  const clientGroups = useMemo(() => getClientGroups(user?.id), [user?.id]);
+  const myVisits = useMemo(() => getVisitsByCollector(user?.id || ""), [user?.id]);
 
   // Calcular métricas gamificadas
-  const { metrics: periodMetrics, goals } = getMetricsByPeriod(
+  const { metrics: periodMetrics, goals } = useMemo(() => getMetricsByPeriod(
     salePayments,
     myVisits,
-  );
+  ), [salePayments, myVisits]);
 
   // Simplified logic - group by sale to count correctly
-  const salesMap = new Map<
-    string,
-    {
-      totalValue: number;
-      receivedValue: number;
-      isPending: boolean;
-      clientDocument: string;
-    }
-  >();
-
-  myCollections.forEach((collection) => {
-    const saleKey = `${collection.venda_n}-${collection.documento}`;
-    if (!salesMap.has(saleKey)) {
-      salesMap.set(saleKey, {
-        totalValue: 0,
-        receivedValue: 0,
-        isPending: false,
-        clientDocument: collection.documento || "",
-      });
-    }
-
-    const sale = salesMap.get(saleKey)!;
-    sale.totalValue = Number(sale.totalValue) + Number(collection.valor_original);
-    sale.receivedValue = Number(sale.receivedValue) + Number(collection.valor_recebido);
-  });
-
-  // Determine if each sale is pending (has any amount left to receive)
-  salesMap.forEach((sale) => {
-    const pendingAmount = sale.totalValue - sale.receivedValue;
-    sale.isPending = pendingAmount > 0.01; // Consider amounts > 1 cent as pending
-  });
-
-  const totalSales = salesMap.size;
-  const pendingSales = Array.from(salesMap.values()).filter(
-    (s) => s.isPending,
-  ).length;
-  const completedSales = Array.from(salesMap.values()).filter(
-    (s) => !s.isPending,
-  ).length;
-
-  // Count unique clients with pending sales
-  const clientsWithPending = new Set(
-    Array.from(salesMap.values())
-      .filter((s) => s.isPending)
-      .map((s) => s.clientDocument)
-      .filter(Boolean),
-  ).size;
-
-  // Calcular métricas de visitas
-  const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
-
-  const visitStats = {
-    today: myVisits.filter((v) => {
-      // Para visitas agendadas, usar scheduled_date
-      // Para visitas realizadas, usar data_visita_realizada se existir
-      if (v.status === "agendada") {
-        return v.scheduledDate === todayStr;
-      } else if (v.status === "realizada" && v.dataVisitaRealizada) {
-        return v.dataVisitaRealizada === todayStr;
+  const salesMap = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        totalValue: number;
+        receivedValue: number;
+        isPending: boolean;
+        clientDocument: string;
       }
-      return false;
-    }).length,
-    scheduled: myVisits.filter((v) => v.status === "agendada").length,
-    completed: myVisits.filter((v) => v.status === "realizada").length,
-  };
+    >();
 
-  const stats = {
-    total: totalSales,
-    clients: clientGroups.length,
-    pending: pendingSales,
-    completed: completedSales,
-    clientsWithPending: clientsWithPending,
-    visits: visitStats.scheduled,
-    visitStats: visitStats,
-    totalAmount: Array.from(salesMap.values()).reduce(
-      (sum, s) => sum + s.totalValue,
-      0,
-    ),
-    receivedAmount: Array.from(salesMap.values()).reduce(
-      (sum, s) => sum + s.receivedValue,
-      0,
-    ),
-  };
+    myCollections.forEach((collection) => {
+      const saleKey = `${collection.venda_n}-${collection.documento}`;
+      if (!map.has(saleKey)) {
+        map.set(saleKey, {
+          totalValue: 0,
+          receivedValue: 0,
+          isPending: false,
+          clientDocument: collection.documento || "",
+        });
+      }
+
+      const sale = map.get(saleKey)!;
+      sale.totalValue = Number(sale.totalValue) + Number(collection.valor_original);
+      sale.receivedValue = Number(sale.receivedValue) + Number(collection.valor_recebido);
+    });
+
+    // Determine if each sale is pending (has any amount left to receive)
+    map.forEach((sale) => {
+      const pendingAmount = sale.totalValue - sale.receivedValue;
+      sale.isPending = pendingAmount > 0.01; // Consider amounts > 1 cent as pending
+    });
+
+    return map;
+  }, [myCollections]);
+
+  const stats = useMemo(() => {
+    const salesArray = Array.from(salesMap.values());
+    const pendingSales = salesArray.filter((s) => s.isPending);
+    const completedSales = salesArray.filter((s) => !s.isPending);
+    
+    // Count unique clients with pending sales
+    const clientsWithPending = new Set(
+      pendingSales
+        .map((s) => s.clientDocument)
+        .filter(Boolean),
+    ).size;
+
+    // Calcular métricas de visitas
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+
+    const visitStats = {
+      today: myVisits.filter((v) => {
+        // Para visitas agendadas, usar scheduled_date
+        // Para visitas realizadas, usar data_visita_realizada se existir
+        if (v.status === "agendada") {
+          return v.scheduledDate === todayStr;
+        } else if (v.status === "realizada" && v.dataVisitaRealizada) {
+          return v.dataVisitaRealizada === todayStr;
+        }
+        return false;
+      }).length,
+      scheduled: myVisits.filter((v) => v.status === "agendada").length,
+      completed: myVisits.filter((v) => v.status === "realizada").length,
+    };
+
+    return {
+      total: salesMap.size,
+      clients: clientGroups.length,
+      pending: pendingSales.length,
+      completed: completedSales.length,
+      clientsWithPending: clientsWithPending,
+      visits: visitStats.scheduled,
+      visitStats: visitStats,
+      totalAmount: salesArray.reduce((sum, s) => sum + s.totalValue, 0),
+      receivedAmount: salesArray.reduce((sum, s) => sum + s.receivedValue, 0),
+    };
+  }, [salesMap, clientGroups, myVisits]);
 
   const tabs = [
     { id: "overview", name: "Resumo", icon: BarChart3 },

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
 import {
   CollectionContextType,
   Collection,
@@ -20,6 +20,8 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
 import { useLoading } from "./LoadingContext";
 import { useOffline } from "../hooks/useOffline";
+import { dataCache, statsCache, userCache } from "../utils/cache";
+import { useRealtimeCacheInvalidation, useOfflineSyncCacheInvalidation } from "../hooks/useCacheInvalidation";
 
 const CollectionContext = createContext<CollectionContextType | undefined>(
   undefined,
@@ -51,11 +53,22 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Cache invalidation hooks
+  const { 
+    invalidateCollections, 
+    invalidatePayments, 
+    invalidateUsers,
+    invalidateVisits 
+  } = useRealtimeCacheInvalidation();
+  
+  useOfflineSyncCacheInvalidation();
+
   // Função para atualizar apenas as collections sem recarregar tudo
   const refreshCollections = async () => {
     try {
       console.log("Atualizando collections em tempo real...");
-      await fetchCollections();
+      invalidateCollections(); // Invalidate cache before fetching
+      await fetchCollections(false); // Force fresh fetch
     } catch (error) {
       console.error("Erro ao atualizar collections:", error);
     }
@@ -132,7 +145,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           (payload) => {
             console.log("Mudança detectada na tabela sale_payments:", payload);
             // Atualizar sale payments quando houver mudanças
-            fetchSalePayments();
+            invalidatePayments(); // Invalidate cache before fetching
+            fetchSalePayments(false); // Force fresh fetch
           },
         )
         .subscribe();
@@ -172,9 +186,21 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     };
   }, []);
 
-  const fetchCollections = async () => {
+  const fetchCollections = async (useCache = true) => {
     try {
       setError(null);
+
+      const cacheKey = `collections-${user?.id || 'all'}-${user?.type || 'manager'}`;
+      
+      // Try to get from cache first
+      if (useCache) {
+        const cachedData = dataCache.get<Collection[]>(cacheKey);
+        if (cachedData) {
+          console.log("Dados de collections carregados do cache");
+          setCollections(cachedData);
+          return;
+        }
+      }
 
       console.log("Buscando dados da tabela BANCO_DADOS...");
 
@@ -334,6 +360,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }));
 
       setCollections(transformedData);
+      
+      // Cache the data
+      dataCache.set(cacheKey, transformedData);
+      
       console.log("Collections carregadas:", transformedData.length);
     } catch (err) {
       console.error("Erro ao carregar collections:", err);
@@ -343,8 +373,20 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (useCache = true) => {
     try {
+      const cacheKey = 'users';
+      
+      // Try to get from cache first
+      if (useCache) {
+        const cachedData = userCache.get<User[]>(cacheKey);
+        if (cachedData) {
+          console.log("Dados de usuários carregados do cache");
+          setUsers(cachedData);
+          return;
+        }
+      }
+
       console.log("Buscando usuários...");
 
       const { data, error: supabaseError } = await supabase
@@ -367,14 +409,30 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }));
 
       setUsers(transformedUsers);
+      
+      // Cache the data
+      userCache.set(cacheKey, transformedUsers);
+      
       console.log("Usuários carregados:", transformedUsers.length);
     } catch (err) {
       console.error("Erro ao carregar usuários:", err);
     }
   };
 
-  const fetchCollectorStores = async () => {
+  const fetchCollectorStores = async (useCache = true) => {
     try {
+      const cacheKey = 'collector-stores';
+      
+      // Try to get from cache first
+      if (useCache) {
+        const cachedData = userCache.get<CollectorStore[]>(cacheKey);
+        if (cachedData) {
+          console.log("Dados de collector stores carregados do cache");
+          setCollectorStores(cachedData);
+          return;
+        }
+      }
+
       console.log("Buscando atribuições de lojas...");
 
       const { data, error: supabaseError } = await supabase
@@ -395,6 +453,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }));
 
       setCollectorStores(transformedStores);
+      
+      // Cache the data
+      userCache.set(cacheKey, transformedStores);
+      
       console.log("Atribuições de lojas carregadas:", transformedStores.length);
     } catch (err) {
       console.error("Erro ao carregar collector stores:", err);
@@ -560,7 +622,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         throw supabaseError;
       }
 
-      await fetchUsers();
+      invalidateUsers(); // Invalidate cache before fetching
+      await fetchUsers(false); // Force fresh fetch
     } catch (err) {
       console.error("Erro ao adicionar usuário:", err);
       setError(
@@ -586,7 +649,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         throw supabaseError;
       }
 
-      await fetchUsers();
+      invalidateUsers(); // Invalidate cache before fetching
+      await fetchUsers(false); // Force fresh fetch
     } catch (err) {
       console.error("Erro ao atualizar usuário:", err);
       setError(
@@ -606,7 +670,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         throw supabaseError;
       }
 
-      await fetchUsers();
+      invalidateUsers(); // Invalidate cache before fetching
+      await fetchUsers(false); // Force fresh fetch
     } catch (err) {
       console.error("Erro ao deletar usuário:", err);
       setError(err instanceof Error ? err.message : "Erro ao deletar usuário");
@@ -938,7 +1003,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     return filtered;
   };
 
-  const getClientGroups = (collectorId?: string): ClientGroup[] => {
+  const getClientGroups = useMemo(() => (collectorId?: string): ClientGroup[] => {
+    const cacheKey = `client-groups-${collectorId || 'all'}`;
+    
+    // Try to get from cache first
+    const cachedData = statsCache.get<ClientGroup[]>(cacheKey);
+    if (cachedData) {
+      return cachedData;
+    }
+
     let filteredCollections = collections;
 
     if (collectorId) {
@@ -1059,12 +1132,25 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
     }
 
-    return Array.from(clientMap.values()).sort((a, b) =>
+    const result = Array.from(clientMap.values()).sort((a, b) =>
       a.client.localeCompare(b.client),
     );
-  };
+    
+    // Cache the result
+    statsCache.set(cacheKey, result);
+    
+    return result;
+  }, [collections, collectorStores]);
 
-  const getDashboardStats = (): DashboardStats => {
+  const getDashboardStats = useMemo(() => (): DashboardStats => {
+    const cacheKey = 'dashboard-stats';
+    
+    // Try to get from cache first
+    const cachedData = statsCache.get<DashboardStats>(cacheKey);
+    if (cachedData) {
+      return cachedData;
+    }
+
     const totalPending = collections.filter(
       (c) => c.status?.toLowerCase() === "pendente",
     ).length;
@@ -1087,7 +1173,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       collections.length > 0 ? (totalReceived / collections.length) * 100 : 0;
     const collectorsCount = users.filter((u) => u.type === "collector").length;
 
-    return {
+    const result = {
       totalPending,
       totalOverdue,
       totalReceived,
@@ -1097,12 +1183,25 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       conversionRate,
       collectorsCount,
     };
-  };
+    
+    // Cache the result
+    statsCache.set(cacheKey, result);
+    
+    return result;
+  }, [collections, users]);
 
-  const getCollectorPerformance = (): CollectorPerformance[] => {
+  const getCollectorPerformance = useMemo(() => (): CollectorPerformance[] => {
+    const cacheKey = 'collector-performance';
+    
+    // Try to get from cache first
+    const cachedData = statsCache.get<CollectorPerformance[]>(cacheKey);
+    if (cachedData) {
+      return cachedData;
+    }
+
     const collectors = users.filter((u) => u.type === "collector");
 
-    return collectors.map((collector) => {
+    const result = collectors.map((collector) => {
       const assignedStores = getCollectorStores(collector.id);
       const collectorCollections = collections.filter(
         (c) =>
@@ -1187,7 +1286,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         clientCount,
       };
     });
-  };
+    
+    // Cache the result
+    statsCache.set(cacheKey, result);
+    
+    return result;
+  }, [collections, users, collectorStores]);
 
   const getCollectorCollections = (collectorId: string): Collection[] => {
     const assignedStores = getCollectorStores(collectorId);
@@ -1437,8 +1541,20 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   // === SALE PAYMENT FUNCTIONS ===
 
-  const fetchSalePayments = async () => {
+  const fetchSalePayments = async (useCache = true) => {
     try {
+      const cacheKey = 'sale-payments';
+      
+      // Try to get from cache first
+      if (useCache) {
+        const cachedData = dataCache.get<SalePayment[]>(cacheKey);
+        if (cachedData) {
+          console.log("Dados de sale payments carregados do cache");
+          setSalePayments(cachedData);
+          return;
+        }
+      }
+
       console.log("Buscando pagamentos de venda da tabela sale_payments...");
 
       const { data: payments, error } = await supabase
@@ -1469,6 +1585,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
 
       setSalePayments(convertedPayments);
+      
+      // Cache the data
+      dataCache.set(cacheKey, convertedPayments);
+      
       console.log(
         `✅ ${convertedPayments.length} pagamentos carregados da tabela sale_payments`,
       );
@@ -2250,8 +2370,20 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   );
 
   // Scheduled Visits Functions
-  const fetchScheduledVisits = async () => {
+  const fetchScheduledVisits = async (useCache = true) => {
     try {
+      const cacheKey = 'scheduled-visits';
+      
+      // Try to get from cache first
+      if (useCache) {
+        const cachedData = dataCache.get<ScheduledVisit[]>(cacheKey);
+        if (cachedData) {
+          console.log("Dados de scheduled visits carregados do cache");
+          setScheduledVisits(cachedData);
+          return;
+        }
+      }
+
       console.log("Buscando visitas agendadas...");
 
       const { data, error: supabaseError } = await supabase
@@ -2306,6 +2438,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }));
 
       setScheduledVisits(transformedVisits);
+      
+      // Cache the data
+      dataCache.set(cacheKey, transformedVisits);
+      
       console.log("Visitas agendadas carregadas:", transformedVisits.length);
     } catch (err) {
       console.error("Erro ao carregar visitas agendadas:", err);
@@ -2385,8 +2521,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Atualizar estado local
       setScheduledVisits((prev) => [...prev, newVisit]);
+      
+      // Invalidate cache
+      invalidateVisits();
+      
       // Visita agendada com sucesso
-
       return newVisit;
     } catch (error) {
       console.error("Erro ao agendar visita:", error);
@@ -2447,6 +2586,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         ),
       );
 
+      // Invalidate cache
+      invalidateVisits();
+
       console.log("Status da visita atualizado com sucesso");
     } catch (error) {
       console.error("Erro ao atualizar status da visita:", error);
@@ -2490,6 +2632,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             : visit,
         ),
       );
+
+      // Invalidate cache
+      invalidateVisits();
 
       console.log("Solicitação de cancelamento enviada com sucesso");
     } catch (error) {
@@ -2535,6 +2680,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             : visit,
         ),
       );
+
+      // Invalidate cache
+      invalidateVisits();
 
       console.log("Cancelamento aprovado com sucesso");
     } catch (error) {
@@ -2583,6 +2731,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             : visit,
         ),
       );
+
+      // Invalidate cache
+      invalidateVisits();
 
       console.log("Cancelamento rejeitado com sucesso");
     } catch (error) {
@@ -2849,6 +3000,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           console.log("✅ Estado local atualizado");
           return updated;
         });
+        
+        // Invalidate cache
+        invalidateVisits();
       }
 
       console.log(
@@ -2916,6 +3070,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             : visit,
         ),
       );
+
+      // Invalidate cache
+      invalidateVisits();
 
       console.log("Visita reagendada com sucesso");
     } catch (error) {
