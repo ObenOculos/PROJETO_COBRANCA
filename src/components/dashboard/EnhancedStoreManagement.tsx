@@ -489,7 +489,7 @@ const EnhancedStoreManagement: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Header Simplificado */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
@@ -512,7 +512,7 @@ const EnhancedStoreManagement: React.FC = () => {
 
             <button
               onClick={exportStoreData}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
               title="Exportar"
             >
               <Download className="h-5 w-5" />
@@ -522,7 +522,7 @@ const EnhancedStoreManagement: React.FC = () => {
       </div>
 
       {/* Card Principal - Taxa de Conversão Média */}
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-blue-100 text-sm font-medium">
@@ -560,7 +560,7 @@ const EnhancedStoreManagement: React.FC = () => {
       </div>
 
       {/* Filtros Minimalistas */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
         <div className="flex items-center gap-2">
           {/* Busca */}
           <div className="flex-1 relative">
@@ -570,7 +570,7 @@ const EnhancedStoreManagement: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar loja ou cobrador..."
-              className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors text-sm"
+              className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors text-sm"
             />
           </div>
 
@@ -579,7 +579,7 @@ const EnhancedStoreManagement: React.FC = () => {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="pl-3 pr-8 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors text-sm min-w-[120px]"
+              className="pl-3 pr-8 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors text-sm min-w-[120px]"
             >
               <option value="storeName">Nome</option>
               <option value="conversionRate">Taxa</option>
@@ -588,7 +588,7 @@ const EnhancedStoreManagement: React.FC = () => {
 
             <button
               onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-              className={`flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200 ${
+              className={`flex items-center justify-center w-10 h-10 rounded-2xl transition-all duration-200 ${
                 sortOrder === "desc"
                   ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -623,7 +623,7 @@ const EnhancedStoreManagement: React.FC = () => {
           return (
             <div
               key={store.storeName}
-              className={`bg-white rounded-xl shadow-sm border-2 transition-all duration-200 hover:shadow-lg ${
+              className={`bg-white rounded-2xl shadow-sm border-2 transition-all duration-200 hover:shadow-lg ${
                 isUnassigned
                   ? "border-amber-200 hover:border-amber-300"
                   : store.conversionRate >= 70
@@ -686,7 +686,7 @@ const EnhancedStoreManagement: React.FC = () => {
                 {/* Métricas Resumidas com Ícones */}
                 {!isUnassigned && (
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                    <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center p-3 bg-gray-50 rounded-2xl">
                       <div className="bg-gray-100 rounded-full p-2 mr-3">
                         <FileText className="h-4 w-4 text-gray-600" />
                       </div>
@@ -697,7 +697,7 @@ const EnhancedStoreManagement: React.FC = () => {
                         <div className="text-xs text-gray-600">vendas</div>
                       </div>
                     </div>
-                    <div className="flex items-center p-3 bg-green-50 rounded-lg">
+                    <div className="flex items-center p-3 bg-green-50 rounded-2xl">
                       <div className="bg-green-100 rounded-full p-2 mr-3">
                         <CheckCircle className="h-4 w-4 text-green-600" />
                       </div>
@@ -710,7 +710,7 @@ const EnhancedStoreManagement: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center p-3 bg-orange-50 rounded-lg">
+                    <div className="flex items-center p-3 bg-orange-50 rounded-2xl">
                       <div className="bg-orange-100 rounded-full p-2 mr-3">
                         <AlertCircle className="h-4 w-4 text-orange-600" />
                       </div>
@@ -721,7 +721,7 @@ const EnhancedStoreManagement: React.FC = () => {
                         <div className="text-xs text-orange-600">pendentes</div>
                       </div>
                     </div>
-                    <div className="flex items-center p-3 bg-purple-50 rounded-lg">
+                    <div className="flex items-center p-3 bg-purple-50 rounded-2xl">
                       <div className="bg-purple-100 rounded-full p-2 mr-3">
                         <Users className="h-4 w-4 text-purple-600" />
                       </div>
@@ -757,7 +757,7 @@ const EnhancedStoreManagement: React.FC = () => {
 
                 {/* Valores Financeiros com Ícones */}
                 {!isUnassigned && (
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl">
                     <div className="flex items-center">
                       <BarChart3 className="h-4 w-4 text-gray-500 mr-2 sm:block hidden" />
                       <div className="text-center">
@@ -805,7 +805,7 @@ const EnhancedStoreManagement: React.FC = () => {
                     </div>
                     <button
                       onClick={() => toggleCardExpansion(store.storeName)}
-                      className={`p-2 rounded-lg transition-colors ${
+                      className={`p-2 rounded-2xl transition-colors ${
                         isExpanded
                           ? "bg-blue-100 text-blue-600"
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -827,7 +827,7 @@ const EnhancedStoreManagement: React.FC = () => {
                 {isExpanded && !isUnassigned && (
                   <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                      <div className="flex items-center p-3 bg-amber-50 rounded-lg">
+                      <div className="flex items-center p-3 bg-amber-50 rounded-2xl">
                         <div className="bg-amber-100 rounded-full p-2 mr-3">
                           <AlertCircle className="h-4 w-4 text-amber-600" />
                         </div>
@@ -840,7 +840,7 @@ const EnhancedStoreManagement: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center p-3 bg-green-50 rounded-lg">
+                      <div className="flex items-center p-3 bg-green-50 rounded-2xl">
                         <div className="bg-green-100 rounded-full p-2 mr-3">
                           <DollarSign className="h-4 w-4 text-green-600" />
                         </div>
@@ -855,7 +855,7 @@ const EnhancedStoreManagement: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                    <div className="bg-blue-50 rounded-2xl p-3 border border-blue-200">
                       <div className="flex items-center justify-between text-sm mb-2">
                         <div className="flex items-center">
                           <Award className="h-4 w-4 text-blue-600 mr-2" />
@@ -881,7 +881,7 @@ const EnhancedStoreManagement: React.FC = () => {
 
                 {/* Estado de Loja Não Atribuída */}
                 {isUnassigned && (
-                  <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
+                  <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center text-amber-700">
                         <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
@@ -903,7 +903,7 @@ const EnhancedStoreManagement: React.FC = () => {
 
       {/* Empty State */}
       {filteredAndSortedStores.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
           <Store className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             Nenhuma loja encontrada

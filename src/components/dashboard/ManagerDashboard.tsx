@@ -14,6 +14,7 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  Filter,
 } from "lucide-react";
 import StatsCard from "../common/StatsCard";
 import FilterBar from "../common/FilterBar";
@@ -97,6 +98,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const [overviewFilter, setOverviewFilter] = useState<
     "all" | "with-collector"
   >("all");
+  
+  // Estado para controlar visibilidade dos filtros no mobile
+  const [isFilterVisible, setIsFilterVisible] = useState(false);
+  
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
@@ -299,9 +304,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         return (
           <div className="space-y-4 sm:space-y-6">
             {/* Overview Filter */}
-            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm p-3 sm:p-4 border border-gray-200">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 justify-between">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900">
+                <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
                   Visão Geral
                 </h2>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -515,7 +520,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             </div>
 
             {/* Foco do Dia */}
-            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
+            <div className="bg-white rounded-2xl sm:rounded-2xl shadow-sm border border-gray-200 p-4 lg:p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base lg:text-lg font-semibold text-gray-900">
                   Foco do Dia
@@ -553,7 +558,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     setFilters({ ...filters, dueDate: today });
                     setActiveTab("collections");
                   }}
-                  className="w-full mt-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium flex items-center justify-center"
+                  className="w-full mt-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-2xl hover:bg-blue-100 transition-colors text-sm font-medium flex items-center justify-center"
                 >
                   <Calendar className="h-4 w-4 mr-2" />
                   Ver Vencimentos de Hoje
@@ -563,7 +568,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
             {/* Pending Cancellations Alert */}
             {pendingCancellations.length > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg sm:rounded-xl p-4 lg:p-6">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl sm:rounded-2xl p-4 lg:p-6">
                 <div className="flex items-start">
                   <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" />
                   <div className="flex-1">
@@ -576,7 +581,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     </p>
                     <button
                       onClick={() => setActiveTab("visit-tracking")}
-                      className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
+                      className="px-4 py-2 bg-yellow-600 text-white rounded-2xl hover:bg-yellow-700 transition-colors text-sm font-medium"
                     >
                       Revisar Solicitações
                     </button>
@@ -586,7 +591,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             )}
 
             {/* Performance Overview - Enhanced Mobile Optimization */}
-            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200">
+            <div className="bg-white rounded-2xl sm:rounded-2xl shadow-sm border border-gray-200">
               <div className="p-3 sm:p-4 lg:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-6">
                   <div className="min-w-0">
@@ -597,7 +602,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       Acompanhamento detalhado por cobrador
                     </p>
                   </div>
-                  <button className="inline-flex items-center justify-center px-3 sm:px-3 lg:px-4 py-2 sm:py-2 bg-blue-600 text-white rounded-md sm:rounded-lg hover:bg-blue-700 transition-colors text-xs sm:text-sm font-medium whitespace-nowrap touch-manipulation">
+                  <button className="inline-flex items-center justify-center px-3 sm:px-3 lg:px-4 py-2 sm:py-2 bg-blue-600 text-white rounded-md sm:rounded-2xl hover:bg-blue-700 transition-colors text-xs sm:text-sm font-medium whitespace-nowrap touch-manipulation">
                     <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                     <span className="hidden sm:inline">Exportar Dados</span>
                     <span className="sm:hidden">Exportar</span>
@@ -609,7 +614,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   {performance.map((collector) => (
                     <div
                       key={collector.collectorId}
-                      className="bg-gray-50 rounded-lg p-3 border border-gray-200"
+                      className="bg-gray-50 rounded-2xl p-3 border border-gray-200"
                     >
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="font-medium text-sm text-gray-900 truncate flex-1 mr-2">
@@ -762,11 +767,21 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         return (
           <div className="space-y-3 sm:space-y-4">
             {/* View Toggle Buttons - Enhanced Mobile */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-                <FileText className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
-                Cobranças
-              </h2>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 lg:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center justify-between w-full sm:w-auto">
+                <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
+                  <FileText className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
+                  Cobranças
+                </h2>
+                {/* Botão de filtro para mobile */}
+                <button
+                  onClick={() => setIsFilterVisible(!isFilterVisible)}
+                  className="md:hidden p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-colors"
+                  title="Filtros"
+                >
+                  <Filter className="h-5 w-5" />
+                </button>
+              </div>
               <div className="flex bg-gray-100 rounded-md p-0.5 w-full sm:w-auto">
                 <button
                   onClick={() => setCollectionsView("table")}
@@ -798,11 +813,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             {/* Content based on selected view */}
             {collectionsView === "table" ? (
               <div>
-                <FilterBar
-                  filters={filters}
-                  onFilterChange={setFilters}
-                  userType="manager"
-                />
+                <div className={`${isFilterVisible ? 'block' : 'hidden'} md:block`}>
+                  <FilterBar
+                    filters={filters}
+                    onFilterChange={setFilters}
+                    userType="manager"
+                  />
+                </div>
                 <CollectionTable
                   collections={filteredCollections}
                   userType="manager"

@@ -278,7 +278,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
   const showSuccessNotification = (changeCount: number) => {
     const notification = document.createElement("div");
     notification.className =
-      "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
+      "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center";
     notification.innerHTML = `
       <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
@@ -299,7 +299,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
 
     const notification = document.createElement("div");
     notification.className =
-      "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center max-w-md";
+      "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center max-w-md";
     notification.innerHTML = `
       <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
@@ -326,7 +326,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
         }
       }}
     >
-      <div className="bg-white rounded-xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
+      <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center flex-1 min-w-0">
@@ -343,7 +343,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors flex-shrink-0"
+            className="p-2 hover:bg-white hover:bg-opacity-20 rounded-2xl transition-colors flex-shrink-0"
           >
             <X className="h-5 w-5 text-white" />
           </button>
@@ -352,21 +352,21 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
         <div className="overflow-y-auto max-h-[calc(95vh-180px)] sm:max-h-[calc(90vh-180px)]">
           <div className="p-4 sm:p-6">
             {/* Resumo do Cliente */}
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6 border border-purple-200">
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-4 sm:p-6 mb-6 border border-purple-200">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <Receipt className="h-5 w-5 text-purple-600 mr-2" />
                 Resumo dos Pagamentos
               </h3>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="text-center p-4 bg-white rounded-lg shadow-sm h-20 flex flex-col justify-center">
+                <div className="text-center p-4 bg-white rounded-2xl shadow-sm h-20 flex flex-col justify-center">
                   <div className="text-xl font-bold text-gray-900">
                     {formatCurrency(totalValue)}
                   </div>
                   <div className="text-sm text-gray-600">Valor Total</div>
                 </div>
 
-                <div className="text-center p-4 bg-white rounded-lg shadow-sm h-20 flex flex-col justify-center">
+                <div className="text-center p-4 bg-white rounded-2xl shadow-sm h-20 flex flex-col justify-center">
                   <div className="text-xl font-bold text-green-600">
                     {formatCurrency(newTotalReceived)}
                   </div>
@@ -381,14 +381,14 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                   )}
                 </div>
 
-                <div className="text-center p-4 bg-white rounded-lg shadow-sm h-20 flex flex-col justify-center">
+                <div className="text-center p-4 bg-white rounded-2xl shadow-sm h-20 flex flex-col justify-center">
                   <div className="text-xl font-bold text-red-600">
                     {formatCurrency(newTotalPending)}
                   </div>
                   <div className="text-sm text-gray-600">Novo Pendente</div>
                 </div>
 
-                <div className="text-center p-4 bg-white rounded-lg shadow-sm h-20 flex flex-col justify-center">
+                <div className="text-center p-4 bg-white rounded-2xl shadow-sm h-20 flex flex-col justify-center">
                   <div className="text-xl font-bold text-purple-600">
                     {changes.length}
                   </div>
@@ -442,7 +442,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                     return (
                       <div
                         key={sale.saleNumber}
-                        className={`bg-white rounded-xl border-2 transition-all duration-200 p-4 sm:p-6 ${
+                        className={`bg-white rounded-2xl border-2 transition-all duration-200 p-4 sm:p-6 ${
                           hasSaleChanged
                             ? "border-purple-300 bg-purple-50 shadow-md"
                             : "border-gray-200 hover:border-gray-300"
@@ -490,7 +490,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                                   onClick={() =>
                                     adjustSaleValue(sale.saleNumber, -50)
                                   }
-                                  className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                                  className="p-2 bg-red-100 text-red-600 rounded-2xl hover:bg-red-200 transition-colors"
                                   title="Diminuir R$ 50"
                                 >
                                   <Minus className="h-4 w-4" />
@@ -509,7 +509,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                                         e.target.value,
                                       )
                                     }
-                                    className="w-full pl-9 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-center font-semibold text-lg"
+                                    className="w-full pl-9 pr-3 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-center font-semibold text-lg"
                                   />
                                 </div>
 
@@ -518,7 +518,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                                   onClick={() =>
                                     adjustSaleValue(sale.saleNumber, 50)
                                   }
-                                  className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition-colors"
+                                  className="p-2 bg-green-100 text-green-600 rounded-2xl hover:bg-green-200 transition-colors"
                                   title="Aumentar R$ 50"
                                 >
                                   <Plus className="h-4 w-4" />
@@ -532,7 +532,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                                   onClick={() =>
                                     clearSaleValue(sale.saleNumber)
                                   }
-                                  className="flex-1 p-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                                  className="flex-1 p-2 text-sm bg-gray-100 text-gray-700 rounded-2xl hover:bg-gray-200 transition-colors font-medium"
                                 >
                                   Zerar
                                 </button>
@@ -544,7 +544,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                                       sale.totalValue,
                                     )
                                   }
-                                  className="flex-1 p-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium"
+                                  className="flex-1 p-2 text-sm bg-green-100 text-green-700 rounded-2xl hover:bg-green-200 transition-colors font-medium"
                                 >
                                   Quitar Total
                                 </button>
@@ -552,7 +552,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                             </div>
 
                             {/* Preview do Resultado */}
-                            <div className="bg-gray-50 rounded-lg p-4">
+                            <div className="bg-gray-50 rounded-2xl p-4">
                               <h5 className="text-sm font-semibold text-gray-700 mb-3">
                                 Preview da Distribuição
                               </h5>
@@ -608,7 +608,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
 
                               {/* Indicador de Mudança */}
                               {hasSaleChanged && (
-                                <div className="mt-3 p-2 bg-purple-100 rounded-lg">
+                                <div className="mt-3 p-2 bg-purple-100 rounded-2xl">
                                   <div className="flex items-center text-purple-700 text-xs">
                                     <Edit className="h-3 w-3 mr-1" />
                                     <span className="font-medium">
@@ -648,7 +648,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                     <button
                       type="button"
                       onClick={onClose}
-                      className="w-full sm:w-auto px-6 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                      className="w-full sm:w-auto px-6 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors font-medium"
                     >
                       Cancelar
                     </button>
@@ -656,7 +656,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
                     <button
                       type="submit"
                       disabled={loading || changes.length === 0}
-                      className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg"
+                      className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg"
                     >
                       {loading ? (
                         <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
@@ -680,7 +680,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
       {/* Modal de Confirmação para Zerar Tudo */}
       {showClearConfirmModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center mb-4">
               <div className="h-10 w-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
                 <AlertCircle className="h-5 w-5 text-red-600" />
@@ -698,13 +698,13 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
             <div className="flex gap-3">
               <button
                 onClick={() => setShowClearConfirmModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors font-medium"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmClearAll}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors font-medium"
               >
                 Zerar Tudo
               </button>

@@ -92,7 +92,7 @@ const UserManagement: React.FC = () => {
     <>
       <div className="space-y-4">
         {/* Header */}
-        <div className="page-header">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 flex items-center justify-between">
           <div>
             <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center-title">
               Gerenciamento de Usuários
@@ -194,7 +194,7 @@ const UserManagement: React.FC = () => {
             {users.map((user) => (
               <div
                 key={user.id}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
+                className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center">
@@ -211,14 +211,14 @@ const UserManagement: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => handleOpenModal(user)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-2xl transition-colors"
                       title="Editar"
                     >
                       <Edit className="h-5 w-5" />
                     </button>
                     <button
                       onClick={() => handleOpenDeleteModal(user)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-2xl transition-colors"
                       title="Excluir"
                     >
                       <Trash2 className="h-5 w-5" />
@@ -272,7 +272,7 @@ const UserManagement: React.FC = () => {
       {/* User Modal */}
       {isModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-container max-w-md mx-4">
+          <div className="modal-container rounded-2xl max-w-md mx-4">
             <div className="modal-header">
               <h3 className="text-lg font-semibold text-gray-900">
                 {editingUser ? "Editar Usuário" : "Novo Usuário"}
@@ -290,7 +290,7 @@ const UserManagement: React.FC = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                   autoComplete="name"
                 />
@@ -306,7 +306,7 @@ const UserManagement: React.FC = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, login: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                   autoComplete="username"
                 />
@@ -324,7 +324,7 @@ const UserManagement: React.FC = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, password: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required={!editingUser}
                   autoComplete="new-password"
                 />
@@ -342,7 +342,7 @@ const UserManagement: React.FC = () => {
                       type: e.target.value as "manager" | "collector",
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="collector">Cobrador</option>
                   <option value="manager">Gerente</option>
@@ -353,13 +353,13 @@ const UserManagement: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="w-full sm:w-auto px-4 py-3 sm:py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-center"
+                  className="w-full sm:w-auto px-4 py-3 sm:py-2 text-gray-700 border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors text-center"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="w-full sm:w-auto px-4 py-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-center"
+                  className="w-full sm:w-auto px-4 py-3 sm:py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors text-center"
                 >
                   {editingUser ? "Atualizar" : "Criar"}
                 </button>
@@ -372,7 +372,7 @@ const UserManagement: React.FC = () => {
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && userToDelete && (
         <div className="modal-overlay">
-          <div className="modal-container max-w-sm mx-4">
+          <div className="modal-container rounded-2xl max-w-sm mx-4">
             <div className="p-6">
               <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
                 <Trash2 className="w-6 h-6 text-red-600" />
@@ -392,14 +392,14 @@ const UserManagement: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleCloseDeleteModal}
-                  className="w-full px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full px-4 py-2 text-gray-700 border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="button"
                   onClick={handleConfirmDelete}
-                  className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  className="w-full px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors"
                 >
                   Excluir
                 </button>

@@ -135,9 +135,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             fetchSalePayments();
           },
         )
-        .subscribe((status) => {
-          console.log("Status da conexão em tempo real:", status);
-        });
+        .subscribe();
     } else {
       console.log("Usuário não logado, limpando dados...");
       setCollections([]);
@@ -160,10 +158,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   // Escutar evento de sincronização offline para recarregar dados
   useEffect(() => {
-    const handleOfflineDataSynced = (event: CustomEvent) => {
-      console.log('📡 Dados sincronizados offline, recarregando collections...', event.detail);
-      // Recarregar apenas as collections, sem as visitas para melhor performance
-      refreshCollections();
+    const handleOfflineDataSynced = () => {
+      // Debounce para evitar múltiplas chamadas em sequência
+      setTimeout(() => {
+        refreshCollections();
+      }, 100);
     };
 
     window.addEventListener('offlineDataSynced', handleOfflineDataSynced as EventListener);

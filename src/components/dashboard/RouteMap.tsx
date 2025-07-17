@@ -709,7 +709,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
             <div className="flex items-center justify-between gap-3">
               {/* Seleção Rápida */}
               <div className="flex items-center space-x-2">
-                <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+                <div className="flex bg-gray-100 rounded-2xl p-1 gap-1">
                   <button
                     onClick={handleSelectAll}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -746,7 +746,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`p-2 rounded-2xl transition-colors ${
                     showFilters
                       ? "bg-blue-100 text-blue-700"
                       : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
@@ -759,7 +759,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 <button
                   onClick={getUserLocation}
                   disabled={isGettingLocation}
-                  className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center px-3 py-2 rounded-2xl text-sm font-medium transition-colors ${
                     userLocation
                       ? "bg-green-600 text-white hover:bg-green-700"
                       : "bg-orange-600 text-white hover:bg-orange-700"
@@ -778,7 +778,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 <button
                   onClick={handleOptimizeRoute}
                   disabled={selectedClients.length === 0 || isOptimizing}
-                  className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`flex items-center px-3 py-2 rounded-2xl text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                     userLocation
                       ? "bg-blue-600 text-white hover:bg-blue-700"
                       : "bg-gray-600 text-white hover:bg-gray-700"
@@ -834,7 +834,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
 
             {/* Linha 5: Erro de Geolocalização */}
             {geolocationError && (
-              <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg mt-3">
+              <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-2xl mt-3">
                 <span className="text-sm text-red-700">{geolocationError}</span>
                 <button
                   onClick={handleRetryLocation}
@@ -850,7 +850,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
 
       {/* Google Maps */}
       {selectedClients.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="px-4 sm:px-6 py-3 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
@@ -870,7 +870,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 )}
                 <button
                   onClick={openGoogleMapsDirections}
-                  className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                  className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl transition-colors text-sm"
                   title="Abrir rota completa no Google Maps"
                 >
                   <Navigation className="h-4 w-4 mr-2" />
@@ -897,8 +897,8 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
       )}
 
       {/* Client List for Route */}
-      <div className="rounded-lg shadow-sm overflow-hidden">
-        <div className="bg-white mb-2 rounded-xl px-3 sm:px-4 py-3 sm:py-4 border-b border-gray-200">
+      <div className="rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white mb-2 rounded-2xl px-3 sm:px-4 py-3 sm:py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <h3 className="text-base sm:text-lg font-semibold text-gray-900">
@@ -939,7 +939,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
         <div className="space-y-4">
           {/* Clientes com visitas atrasadas - PRIORIDADE MÁXIMA */}
           {paginatedOverdueVisits.length > 0 && (
-            <div className="mt-4 bg-white rounded-lg shadow-sm border-2 border-red-500 overflow-hidden">
+            <div className="mt-4 bg-white rounded-2xl shadow-sm border-2 border-red-500 overflow-hidden">
               <div className="px-4 py-4 bg-gradient-to-r from-red-50 to-red-100 border-b border-red-200">
                 <div className="flex items-center justify-between">
                   <h4 className="text-base font-semibold text-red-900 flex items-center">
@@ -1053,7 +1053,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
 
           {/* Clientes com visitas agendadas no prazo */}
           {paginatedScheduledVisits.length > 0 && (
-            <div className="mt-4 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="mt-4 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="px-4 py-4 bg-gradient-to-r from-green-50 to-green-100 border-b border-green-200">
                 <div className="flex items-center justify-between">
                   <h4 className="text-base font-semibold text-green-900 flex items-center">
@@ -1167,7 +1167,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
 
           {/* Clientes com visitas reagendadas */}
           {paginatedRescheduledVisits.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="px-4 py-4 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-200">
                 <div className="flex items-center justify-between">
                   <h4 className="text-base font-semibold text-orange-900 flex items-center">
@@ -1288,7 +1288,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
 
           {/* Clientes sem visitas agendadas */}
           {paginatedWithoutVisits.length > 0 && !filters.visitsOnly && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="px-4 py-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <h4 className="text-base font-semibold text-gray-800 flex items-center">
@@ -1504,7 +1504,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
       {/* Modal Simples */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-auto">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-auto">
             <div className="p-6">
               <div className="flex items-center mb-4">
                 <div
@@ -1582,7 +1582,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
               <div className="flex justify-end">
                 <button
                   onClick={() => setShowModal(false)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-2xl font-medium transition-colors ${
                     modalContent.type === "success"
                       ? "bg-green-600 hover:bg-green-700 text-white"
                       : modalContent.type === "error"

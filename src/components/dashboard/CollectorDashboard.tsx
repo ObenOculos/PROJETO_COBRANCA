@@ -239,7 +239,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-purple-500 rounded-lg">
+          <div className="p-2 bg-purple-500 rounded-2xl">
             <Users className="w-4 h-4 text-white" />
           </div>
           <h3 className="font-semibold text-gray-900">Clientes</h3>
@@ -282,7 +282,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     <div className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-blue-300 transition-colors">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-blue-500 rounded-lg">
+          <div className="p-2 bg-blue-500 rounded-2xl">
             <Target className="w-4 h-4 text-white" />
           </div>
           <h3 className="font-semibold text-gray-900">Vendas</h3>
@@ -327,7 +327,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-orange-500 rounded-lg">
+          <div className="p-2 bg-orange-500 rounded-2xl">
             <Calendar className="w-4 h-4 text-white" />
           </div>
           <h3 className="font-semibold text-gray-900">Visitas</h3>
@@ -503,14 +503,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
               <div className="bg-white/80 backdrop-blur-sm p-4 border-b border-indigo-100">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-100 rounded-xl">
+                    <div className="p-2 bg-indigo-100 rounded-2xl">
                       <Target className="w-6 h-6 text-indigo-600" />
                     </div>
                     <div>
                       <h2 className="font-semibold text-gray-900">Metas</h2>
                     </div>
                   </div>
-                  <div className="text-sm text-gray-600 bg-white px-4 py-2 rounded-xl border border-gray-200">
+                  <div className="text-sm text-gray-600 bg-white px-4 py-2 rounded-2xl border border-gray-200">
                     <div className="font-medium">
                       {new Date().toLocaleDateString("pt-BR", {
                         weekday: "long",
@@ -527,7 +527,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                 {/* Layout Desktop: Grid 3x2 */}
                 <div className="hidden lg:grid lg:grid-cols-3 lg:gap-8">
                   {/* Coluna Hoje */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-indigo-200">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-indigo-200">
                     <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center gap-2 justify-center">
                       <Sun className="w-5 h-5 text-yellow-500" />
                       Hoje
@@ -567,7 +567,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                   </div>
 
                   {/* Coluna Esta Semana */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-blue-200">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-blue-200">
                     <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center gap-2 justify-center">
                       <CalendarDays className="w-5 h-5 text-blue-500" />
                       Esta Semana
@@ -607,7 +607,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                   </div>
 
                   {/* Coluna Este Mês */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-purple-200">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-purple-200">
                     <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center gap-2 justify-center">
                       <CalendarRange className="w-5 h-5 text-purple-500" />
                       Este Mês
@@ -650,7 +650,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                 {/* Layout Mobile: Stack vertical */}
                 <div className="lg:hidden space-y-8">
                   {/* Metas Diárias */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-yellow-200">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-yellow-200">
                     <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
                       <Sun className="w-5 h-5 text-yellow-500" />
                       Hoje
@@ -690,7 +690,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                   </div>
 
                   {/* Metas Semanais */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-blue-200">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-blue-200">
                     <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
                       <CalendarDays className="w-5 h-5 text-blue-500" />
                       Esta Semana
@@ -730,7 +730,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                   </div>
 
                   {/* Metas Mensais */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-purple-200">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-purple-200">
                     <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
                       <CalendarRange className="w-5 h-5 text-purple-500" />
                       Este Mês
@@ -778,7 +778,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
               <div className="bg-white/80 backdrop-blur-sm p-4 border-b border-blue-100">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-xl">
+                    <div className="p-2 bg-blue-100 rounded-2xl">
                       <BarChart3 className="w-6 h-6 text-blue-600" />
                     </div>
                     <div>
@@ -796,7 +796,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
               {/* Content */}
               <div className="p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-4">
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-blue-200 text-center">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-blue-200 text-center">
                     <div className="text-1xl lg:text-3xl font-bold text-blue-600 mb-2">
                       {formatCurrency(stats.totalAmount)}
                     </div>
@@ -804,7 +804,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                       Valor Total
                     </div>
                   </div>
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-green-200 text-center">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-green-200 text-center">
                     <div className="text-1xl lg:text-3xl font-bold text-green-600 mb-2">
                       {formatCurrency(stats.receivedAmount)}
                     </div>
@@ -812,7 +812,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                       Valor Recebido
                     </div>
                   </div>
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-orange-200 text-center">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-orange-200 text-center">
                     <div className="text-1xl lg:text-3xl font-bold text-orange-600 mb-2">
                       {formatCurrency(stats.totalAmount - stats.receivedAmount)}
                     </div>

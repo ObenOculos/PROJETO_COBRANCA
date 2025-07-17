@@ -136,7 +136,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
   const showSuccessNotification = (message: string) => {
     const notification = document.createElement("div");
     notification.className =
-      "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
+      "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center";
     notification.innerHTML = `
       <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
@@ -153,7 +153,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-lg">
+      <div className="bg-white rounded-2xl shadow-lg">
         {/* Header */}
         <div className="bg-gradient-to-r from-red-600 to-pink-600 text-white px-4 lg:px-6 py-4 rounded-t-xl">
           <div className="flex items-center justify-between">
@@ -171,7 +171,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
             {onClose && (
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
+                className="p-2 hover:bg-white hover:bg-opacity-20 rounded-2xl transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -235,7 +235,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
                   {pendingRequests.map((request) => (
                     <div
                       key={request.id}
-                      className="border border-red-200 rounded-lg p-3 lg:p-4 bg-red-50"
+                      className="border border-red-200 rounded-2xl p-3 lg:p-4 bg-red-50"
                     >
                       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                         <div className="flex-1">
@@ -289,7 +289,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
                           </div>
 
                           {request.cancellationRequestReason && (
-                            <div className="bg-white border border-gray-200 rounded-lg p-3 mb-3">
+                            <div className="bg-white border border-gray-200 rounded-2xl p-3 mb-3">
                               <div className="flex items-start">
                                 <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
                                 <div>
@@ -316,7 +316,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
                             onClick={() =>
                               handleOpenApproval(request, "approve")
                             }
-                            className="px-3 lg:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center text-sm lg:text-base"
+                            className="px-3 lg:px-4 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium flex items-center justify-center text-sm lg:text-base"
                             title="Aprovar cancelamento"
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
@@ -326,7 +326,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
                             onClick={() =>
                               handleOpenApproval(request, "reject")
                             }
-                            className="px-3 lg:px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center justify-center text-sm lg:text-base"
+                            className="px-3 lg:px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors font-medium flex items-center justify-center text-sm lg:text-base"
                             title="Rejeitar cancelamento"
                           >
                             <XCircle className="h-4 w-4 mr-1" />
@@ -383,7 +383,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
                     return (
                       <div
                         key={visit.id}
-                        className={`border rounded-lg p-3 lg:p-4 ${
+                        className={`border rounded-2xl p-3 lg:p-4 ${
                           isApproved
                             ? "border-green-200 bg-green-50"
                             : "border-red-200 bg-red-50"
@@ -452,7 +452,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
                             </div>
 
                             {visit.cancellationRequestReason && (
-                              <div className="bg-white border border-gray-200 rounded-lg p-3 mb-3">
+                              <div className="bg-white border border-gray-200 rounded-2xl p-3 mb-3">
                                 <div className="flex items-start">
                                   <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
                                   <div>
@@ -469,7 +469,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
 
                             {isRejected &&
                               visit.cancellationRejectionReason && (
-                                <div className="bg-white border border-red-200 rounded-lg p-3 mb-3">
+                                <div className="bg-white border border-red-200 rounded-2xl p-3 mb-3">
                                   <div className="flex items-start">
                                     <XCircle className="h-4 w-4 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
                                     <div>
@@ -504,7 +504,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
       {/* Modal de Confirmação */}
       {showApprovalModal && selectedRequest && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">
                 {approvalAction === "approve" ? "Aprovar" : "Rejeitar"}{" "}
@@ -531,7 +531,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
               </div>
 
               {selectedRequest.cancellationRequestReason && (
-                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <div className="mb-4 p-3 bg-gray-50 rounded-2xl">
                   <div className="text-sm font-medium text-gray-700 mb-1">
                     Motivo solicitado:
                   </div>
@@ -551,14 +551,14 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
                     onChange={(e) => setRejectionReason(e.target.value)}
                     placeholder="Explique por que está rejeitando esta solicitação..."
                     rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-red-500 focus:border-red-500"
                     required
                   />
                 </div>
               )}
 
               <div
-                className={`border rounded-lg p-3 mb-4 ${
+                className={`border rounded-2xl p-3 mb-4 ${
                   approvalAction === "approve"
                     ? "bg-green-50 border-green-200"
                     : "bg-red-50 border-red-200"
@@ -598,7 +598,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
               <button
                 onClick={handleCloseApproval}
                 disabled={loading}
-                className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -608,7 +608,7 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
                   loading ||
                   (approvalAction === "reject" && !rejectionReason.trim())
                 }
-                className={`w-full sm:w-auto px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center ${
+                className={`w-full sm:w-auto px-4 py-2 rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center ${
                   approvalAction === "approve"
                     ? "bg-green-600 text-white hover:bg-green-700"
                     : "bg-red-600 text-white hover:bg-red-700"

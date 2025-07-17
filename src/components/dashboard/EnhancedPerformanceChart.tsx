@@ -414,7 +414,7 @@ const EnhancedPerformanceChart: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Header Simplificado */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
@@ -430,7 +430,7 @@ const EnhancedPerformanceChart: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors relative"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors relative"
             >
               <Filter className="h-5 w-5" />
               {activeFiltersCount > 0 && (
@@ -442,7 +442,7 @@ const EnhancedPerformanceChart: React.FC = () => {
 
             <button
               onClick={exportPerformanceData}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
               title="Exportar"
             >
               <Download className="h-5 w-5" />
@@ -452,7 +452,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       </div>
 
       {/* Card Principal - Taxa de Conversão Média */}
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-blue-100 text-sm font-medium">
@@ -491,7 +491,7 @@ const EnhancedPerformanceChart: React.FC = () => {
 
       {/* Filtros Colapsáveis */}
       {showFilters && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 animate-in slide-in-from-top-2">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 animate-in slide-in-from-top-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -500,7 +500,7 @@ const EnhancedPerformanceChart: React.FC = () => {
               <select
                 value={selectedPeriod}
                 onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="week">Última Semana</option>
                 <option value="month">Último Mês</option>
@@ -519,7 +519,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                 value={filterMinRate}
                 onChange={(e) => setFilterMinRate(e.target.value)}
                 placeholder="Ex: 50"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 min="0"
                 max="100"
               />
@@ -532,7 +532,7 @@ const EnhancedPerformanceChart: React.FC = () => {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="conversionRate">Taxa de Conversão</option>
                 <option value="receivedAmount">Valor Recebido</option>
@@ -548,7 +548,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                   setSortBy("conversionRate");
                   setSortOrder("desc");
                 }}
-                className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                className="w-full px-4 py-2 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition-colors text-sm font-medium"
               >
                 Limpar Filtros
               </button>
@@ -584,7 +584,7 @@ const EnhancedPerformanceChart: React.FC = () => {
             return (
               <div
                 key={collector.collectorId}
-                className={`bg-white rounded-lg border p-4 hover:shadow-md transition-shadow ${
+                className={`bg-white rounded-2xl border p-4 hover:shadow-md transition-shadow ${
                   isTopPerformer
                     ? "border-blue-300 bg-blue-50"
                     : "border-gray-200"
@@ -685,7 +685,7 @@ const EnhancedPerformanceChart: React.FC = () => {
 
       {/* Empty State */}
       {filteredAndSortedPerformance.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
           <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             Nenhum cobrador encontrado

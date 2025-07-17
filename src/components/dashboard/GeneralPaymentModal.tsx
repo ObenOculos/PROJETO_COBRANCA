@@ -207,7 +207,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
   const showSuccessNotification = () => {
     const notification = document.createElement("div");
     notification.className =
-      "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
+      "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center";
     
     const successMessage = isOnline 
       ? "Pagamento distribuído com sucesso!"
@@ -233,7 +233,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
 
     const notification = document.createElement("div");
     notification.className =
-      "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center max-w-md";
+      "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center max-w-md";
     notification.innerHTML = `
       <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
@@ -264,7 +264,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
         }
       }}
     >
-      <div className="bg-white rounded-xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
+      <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center flex-1 min-w-0">
@@ -289,7 +289,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors flex-shrink-0"
+            className="p-2 hover:bg-white hover:bg-opacity-20 rounded-2xl transition-colors flex-shrink-0"
           >
             <X className="h-5 w-5 text-white" />
           </button>
@@ -298,14 +298,14 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
         <div className="overflow-y-auto max-h-[calc(95vh-180px)] sm:max-h-[calc(90vh-180px)]">
           <form onSubmit={handleSubmit} className="p-4 sm:p-6">
             {/* Resumo do Cliente */}
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6 border border-purple-200">
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-4 sm:p-6 mb-6 border border-purple-200">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <Receipt className="h-5 w-5 text-purple-600 mr-2" />
                 Resumo Financeiro
               </h3>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
+                <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
                   <div className="text-lg sm:text-xl font-bold text-gray-900">
                     {formatCurrency(totalValue)}
                   </div>
@@ -314,7 +314,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                   </div>
                 </div>
 
-                <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
+                <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
                   <div className="text-lg sm:text-xl font-bold text-green-600">
                     {formatCurrency(totalReceived)}
                   </div>
@@ -323,7 +323,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                   </div>
                 </div>
 
-                <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
+                <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
                   <div className="text-lg sm:text-xl font-bold text-red-600">
                     {formatCurrency(totalPending)}
                   </div>
@@ -332,7 +332,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                   </div>
                 </div>
 
-                <div className="text-center p-3 sm:p-4 bg-white rounded-lg shadow-sm">
+                <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
                   <div className="text-lg sm:text-xl font-bold text-purple-600">
                     {clientSales?.length || 0}
                   </div>
@@ -355,7 +355,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                   step="0.01"
                   value={distributionAmount}
                   onChange={(e) => setDistributionAmount(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-2xl font-bold"
+                  className="w-full pl-12 pr-4 py-4 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-2xl font-bold"
                   placeholder="0,00"
                   required
                 />
@@ -404,7 +404,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setDistributionMode("auto")}
-                  className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`flex items-center px-4 py-2 rounded-2xl font-medium transition-colors ${
                     distributionMode === "auto"
                       ? "bg-purple-600 text-white"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -416,7 +416,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setDistributionMode("manual")}
-                  className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`flex items-center px-4 py-2 rounded-2xl font-medium transition-colors ${
                     distributionMode === "manual"
                       ? "bg-purple-600 text-white"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -458,7 +458,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                   {saleDistribution.map((item) => (
                     <div
                       key={item.sale.saleNumber}
-                      className={`bg-white rounded-xl border-2 p-4 transition-all duration-200 ${
+                      className={`bg-white rounded-2xl border-2 p-4 transition-all duration-200 ${
                         item.appliedAmount > 0
                           ? "border-purple-300 bg-purple-50 shadow-md"
                           : "border-gray-200 hover:border-gray-300"
@@ -489,7 +489,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
 
                       {/* Informações de Pagamento */}
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        <div className="bg-gray-50 rounded-lg p-3">
+                        <div className="bg-gray-50 rounded-2xl p-3">
                           <div className="text-xs text-gray-600 mb-1">
                             Recebido Atualmente
                           </div>
@@ -498,7 +498,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                           </div>
                         </div>
 
-                        <div className="bg-green-50 rounded-lg p-3">
+                        <div className="bg-green-50 rounded-2xl p-3">
                           <div className="text-xs text-gray-600 mb-1">
                             Novo Total Recebido
                           </div>
@@ -528,7 +528,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                           )}
                         </div>
 
-                        <div className="bg-purple-50 rounded-lg p-3">
+                        <div className="bg-purple-50 rounded-2xl p-3">
                           <div className="text-xs text-gray-600 mb-1">
                             Valor Aplicado
                           </div>
@@ -564,7 +564,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                 </div>
 
                 {/* Resumo da Distribuição */}
-                <div className="mt-4 p-4 bg-purple-100 rounded-lg">
+                <div className="mt-4 p-4 bg-purple-100 rounded-2xl">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-gray-700">
                       Valor Informado:
@@ -603,7 +603,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors font-medium"
                 >
                   Cancelar
                 </button>
@@ -615,7 +615,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
                     saleDistribution.length === 0 ||
                     !distributionAmount
                   }
-                  className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg"
+                  className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg"
                 >
                   {loading ? (
                     <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>

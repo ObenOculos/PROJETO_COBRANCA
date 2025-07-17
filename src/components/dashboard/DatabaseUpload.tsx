@@ -623,7 +623,7 @@ const DatabaseUpload: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-lg sm:rounded-xl shadow-sm p-4 sm:p-6 border border-gray-200 space-y-6">
+    <div className="bg-white rounded-2xl sm:rounded-2xl shadow-sm p-4 sm:p-6 border border-gray-200 space-y-6">
       <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">
         Upload de Dados do Banco
       </h2>
@@ -633,7 +633,7 @@ const DatabaseUpload: React.FC = () => {
       </p>
 
       {/* Botão de teste de conexão */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex items-center justify-between">
         <h3 className="text-sm font-medium text-yellow-800 flex items-center">
           <Info className="h-4 w-4 mr-2" />
           🔧 Debug e Teste
@@ -650,7 +650,7 @@ const DatabaseUpload: React.FC = () => {
       {/* Status do upload */}
       {uploadStatus && (
         <div
-          className={`p-4 rounded-lg flex items-center ${
+          className={`p-4 rounded-2xl flex items-center ${
             uploadStatus.includes("❌")
               ? "bg-red-50 text-red-700"
               : uploadStatus.includes("✅")
@@ -676,7 +676,7 @@ const DatabaseUpload: React.FC = () => {
 
       {/* Debug info */}
       {debugInfo && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
           <h4 className="text-sm font-medium text-gray-800 mb-2 flex items-center">
             <FileText className="h-4 w-4 mr-2" />
             🐛 Informações de Debug:
@@ -689,7 +689,7 @@ const DatabaseUpload: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Upload para atualizar status */}
-        <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+        <div className="border border-gray-200 rounded-2xl p-4 space-y-3">
           <h3 className="text-lg font-medium text-gray-800 flex items-center">
             <UploadCloud className="h-5 w-5 mr-2" />
             Atualizar Status de Parcelas
@@ -753,7 +753,7 @@ const DatabaseUpload: React.FC = () => {
         </div>
 
         {/* Upload para adicionar novas parcelas */}
-        <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+        <div className="border border-gray-200 rounded-2xl p-4 space-y-3">
           <h3 className="text-lg font-medium text-gray-800 flex items-center">
             <UploadCloud className="h-5 w-5 mr-2" />
             Adicionar Novas Parcelas
@@ -811,7 +811,7 @@ const DatabaseUpload: React.FC = () => {
       </div>
 
       {/* Instruções de uso */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start">
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start">
         <Info className="h-5 w-5 mr-3 text-blue-700 flex-shrink-0" />
         <div>
           <h3 className="text-sm font-medium text-blue-800 mb-2">Como usar:</h3>

@@ -145,7 +145,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
         }
       }}
     >
-      <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[95vh] overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[95vh] overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-600 to-purple-600 text-white">
           <div>
@@ -166,7 +166,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
         <div className="p-6 overflow-y-auto max-h-[75vh]">
           {/* Sale Summary */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-2xl border border-green-200">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-green-700">
@@ -180,7 +180,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl border border-blue-200">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-blue-700">
@@ -194,7 +194,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-xl border border-orange-200">
+            <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-2xl border border-orange-200">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-orange-700">
@@ -218,7 +218,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                 Informações da Venda
               </h3>
 
-              <div className="bg-gray-50 p-4 rounded-xl space-y-3">
+              <div className="bg-gray-50 p-4 rounded-2xl space-y-3">
                 <div className="flex justify-between">
                   <span className="text-sm font-medium text-gray-600">
                     Loja:
@@ -281,7 +281,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                 Contato e Endereço
               </h3>
 
-              <div className="bg-gray-50 p-4 rounded-xl space-y-4">
+              <div className="bg-gray-50 p-4 rounded-2xl space-y-4">
                 <div>
                   <p className="text-sm font-medium text-gray-600 mb-2">
                     Cliente:
@@ -343,7 +343,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
               Detalhes das Parcelas
             </h3>
 
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
@@ -437,7 +437,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                 {clientVisits.map((visit) => (
                   <div
                     key={visit.id}
-                    className="bg-gray-50 p-4 rounded-xl border border-gray-200"
+                    className="bg-gray-50 p-4 rounded-2xl border border-gray-200"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="flex-1">
@@ -458,7 +458,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                         </div>
 
                         {visit.notes && (
-                          <div className="bg-white p-3 rounded-lg border border-gray-200">
+                          <div className="bg-white p-3 rounded-2xl border border-gray-200">
                             <p className="text-sm text-gray-700 leading-relaxed">
                               {visit.notes}
                             </p>
@@ -494,7 +494,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                 <FileText className="h-5 w-5 mr-2 text-blue-600" />
                 Observações da Venda
               </h3>
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+              <div className="bg-blue-50 p-4 rounded-2xl border border-blue-200">
                 <p className="text-sm text-gray-700">{saleData.obs}</p>
               </div>
             </div>

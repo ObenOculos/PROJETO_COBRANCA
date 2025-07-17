@@ -140,7 +140,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <div>
@@ -352,7 +352,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                 <textarea
                   value={observations}
                   onChange={(e) => setObservations(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows={3}
                   placeholder="Adicione observações sobre este cliente..."
                   disabled={userType === "manager"}
@@ -360,7 +360,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                 {userType === "collector" && (
                   <button
                     onClick={handleUpdateObservations}
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors"
                   >
                     <Save className="h-4 w-4 mr-2" />
                     Salvar Observações
@@ -401,7 +401,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                     <select
                       value={newStatus}
                       onChange={(e) => setNewStatus(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="pendente">Pendente</option>
                       <option value="em_negociacao">Em Negociação</option>
@@ -413,7 +413,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                   <div className="flex items-end">
                     <button
                       onClick={handleStatusUpdate}
-                      className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
+                      className="w-full bg-green-600 text-white py-2 px-4 rounded-2xl hover:bg-green-700 transition-colors"
                     >
                       Atualizar Status
                     </button>
@@ -446,7 +446,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                         min="0"
                         value={correctedValue}
                         onChange={(e) => setCorrectedValue(e.target.value)}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="0,00"
                       />
                     </div>
@@ -460,12 +460,12 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                       type="date"
                       value={correctedDate}
                       onChange={(e) => setCorrectedDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                <div className="flex justify-between items-center p-3 bg-blue-50 rounded-2xl">
                   <div className="text-sm">
                     <p className="text-gray-600">
                       Valor original:{" "}
@@ -496,7 +496,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
 
                 <button
                   onClick={handleUpdatePaymentValue}
-                  className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors"
+                  className="w-full bg-purple-600 text-white py-2 px-4 rounded-2xl hover:bg-purple-700 transition-colors"
                 >
                   Atualizar Valor Pago
                 </button>
@@ -525,7 +525,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                             | "whatsapp",
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="call">Ligação</option>
                       <option value="visit">Visita</option>
@@ -553,7 +553,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                             | "full_payment",
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="no_answer">Não atendeu</option>
                       <option value="busy">Ocupado</option>
@@ -575,7 +575,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                     onChange={(e) =>
                       setNewAttempt({ ...newAttempt, notes: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     rows={3}
                     placeholder="Descreva o resultado da tentativa..."
                   />
@@ -595,7 +595,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                           nextAction: e.target.value,
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Ex: Ligar novamente..."
                     />
                   </div>
@@ -613,7 +613,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                           nextActionDate: e.target.value,
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -621,7 +621,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                 <button
                   onClick={handleAddAttempt}
                   disabled={!newAttempt.notes.trim()}
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Registrar Tentativa

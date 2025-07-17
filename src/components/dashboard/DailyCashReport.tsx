@@ -497,7 +497,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   return (
     <div className="space-y-4">
       {/* Header Simplificado */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900">
@@ -517,7 +517,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 await refreshData();
                 setForceUpdate((prev) => prev + 1);
               }}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
               title="Atualizar"
             >
               <RefreshCw className="h-5 w-5" />
@@ -525,7 +525,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors relative"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors relative"
             >
               <Filter className="h-5 w-5" />
               {activeFiltersCount > 0 && (
@@ -537,14 +537,14 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
             <button
               onClick={handlePrintReport}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
             >
               <Printer className="h-5 w-5" />
             </button>
 
             <button
               onClick={handleExportReport}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
             >
               <Download className="h-5 w-5" />
             </button>
@@ -561,14 +561,14 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
       {/* Filtros Colapsáveis */}
       {showFilters && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 animate-in slide-in-from-top-2">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 animate-in slide-in-from-top-2">
           <div className="space-y-4">
             {/* Date Range Mode Toggle */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Período
               </label>
-              <div className="flex bg-gray-100 rounded-lg p-1 w-full sm:w-auto">
+              <div className="flex bg-gray-100 rounded-2xl p-1 w-full sm:w-auto">
                 <button
                   onClick={() => setDateRangeMode("single")}
                   className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
@@ -606,7 +606,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                         key as keyof ReturnType<typeof getQuickDateRanges>,
                       )
                     }
-                    className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-blue-100 hover:text-blue-700 transition-colors whitespace-nowrap"
+                    className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-2xl hover:bg-blue-100 hover:text-blue-700 transition-colors whitespace-nowrap"
                   >
                     {range.label}
                   </button>
@@ -626,7 +626,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -644,7 +644,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
                       min={selectedDate}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -658,7 +658,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 <select
                   value={selectedCollector}
                   onChange={(e) => setSelectedCollector(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="all">Todos os Cobradores</option>
                   {availableCollectors.map((collector) => (
@@ -677,7 +677,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 <select
                   value={selectedStore}
                   onChange={(e) => setSelectedStore(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="all">Todas as Lojas</option>
                   {availableStores.map((store) => (
@@ -702,7 +702,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     value={minAmount}
                     onChange={(e) => setMinAmount(e.target.value)}
                     placeholder="0,00"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -720,7 +720,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     value={maxAmount}
                     onChange={(e) => setMaxAmount(e.target.value)}
                     placeholder="∞"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -729,7 +729,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               <div className="flex items-end">
                 <button
                   onClick={handleClearFilters}
-                  className="w-full flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                  className="w-full flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition-colors text-sm font-medium"
                 >
                   <Filter className="h-4 w-4 mr-2" />
                   Limpar Filtros
@@ -741,7 +741,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       )}
 
       {/* Card Principal - Informação mais importante primeiro */}
-      <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-lg p-6">
+      <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl shadow-lg p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-green-100 text-sm font-medium">Total Recebido</p>
@@ -797,7 +797,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             {reportData.collectorSummary.map((collector) => (
               <div
                 key={collector.collectorId}
-                className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow"
+                className="bg-white rounded-2xl border border-gray-200 p-4 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div>
@@ -847,7 +847,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             Transações Detalhadas
           </h3>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               {/* Tabela Responsiva */}
               <table className="w-full">
@@ -915,7 +915,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
       {/* Empty State */}
       {reportData.totalTransactions === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
           <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             Nenhum recebimento encontrado

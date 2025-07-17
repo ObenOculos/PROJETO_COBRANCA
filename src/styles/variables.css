@@ -166,7 +166,3 @@
 .transition-slow {
   transition: all var(--transition-slow);
 }
-
-.space-y-4 > .p-4 {
-  margin-top: 0 !important;
-}

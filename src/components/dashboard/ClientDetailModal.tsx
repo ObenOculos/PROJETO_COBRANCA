@@ -386,7 +386,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           }
         }}
       >
-        <div className="bg-white rounded-xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
+        <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
           {/* Header */}
           <div className="px-4 lg:px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <div className="flex items-center flex-1 min-w-0">
@@ -417,7 +417,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 id="view-client-data"
                 name="viewClientData"
                 onClick={() => setShowClientData(true)}
-                className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
+                className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
                 title="Ver todos os dados de cadastro do cliente"
               >
                 <Info className="h-5 w-5 mr-2" />
@@ -427,7 +427,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 id="view-client-sales"
                 name="viewClientSales"
                 onClick={() => setShowClientData(false)}
-                className="flex items-center px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium shadow-sm"
+                className="flex items-center px-3 py-2 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-colors text-sm font-medium shadow-sm"
                 title="Ver vendas do cliente"
               >
                 <Receipt className="h-5 w-5 mr-2" />
@@ -439,7 +439,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   id="distribute-payment"
                   name="distributePayment"
                   onClick={() => setIsGeneralPaymentModalOpen(true)}
-                  className="flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium shadow-sm"
+                  className="flex items-center px-3 py-2 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-700 transition-colors text-sm font-medium shadow-sm"
                   title="Distribuir pagamento entre parcelas"
                 >
                   <CreditCard className="h-5 w-5 mr-2" />
@@ -455,7 +455,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   id="edit-payments"
                   name="editPayments"
                   onClick={handleEditPaymentClick}
-                  className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium shadow-sm"
+                  className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 transition-colors text-sm font-medium shadow-sm"
                   title={
                     (userType as "manager" | "collector") === "manager"
                       ? "Editar valores recebidos"
@@ -540,14 +540,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     return (
                       <div
                         key={sale.saleNumber}
-                        className="border border-gray-200 rounded-lg overflow-hidden"
+                        className="border border-gray-200 rounded-2xl overflow-hidden"
                       >
                         {/* Sale Header */}
                         <div className="px-4 py-3 bg-gray-50">
                           <div className="flex items-center justify-between">
                             <div
                               id={`sale-expansion-${sale.saleNumber}`}
-                              className="flex items-center flex-1 cursor-pointer hover:bg-gray-100 p-2 rounded-lg -m-2"
+                              className="flex items-center flex-1 cursor-pointer hover:bg-gray-100 p-2 rounded-2xl -m-2"
                               onClick={() =>
                                 toggleSaleExpansion(sale.saleNumber)
                               }
@@ -612,7 +612,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                       e.stopPropagation();
                                       handleOpenSalePayment(sale);
                                     }}
-                                    className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium shadow-sm"
+                                    className="flex items-center px-3 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors text-sm font-medium shadow-sm"
                                     title="Receber pagamento da venda"
                                   >
                                     <CreditCard className="h-4 w-4 mr-1" />
@@ -631,7 +631,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                             <div className="space-y-3">
                               {/* Sale Summary */}
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="text-center p-3 bg-blue-50 rounded-lg">
+                                <div className="text-center p-3 bg-blue-50 rounded-2xl">
                                   <div className="text-sm sm:text-base lg:text-lg font-bold text-blue-600">
                                     {formatCurrency(
                                       saleBalance.totalValue,
@@ -642,7 +642,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                     Valor Total
                                   </div>
                                 </div>
-                                <div className="text-center p-3 bg-green-50 rounded-lg">
+                                <div className="text-center p-3 bg-green-50 rounded-2xl">
                                   <div className="text-sm sm:text-lg font-bold text-green-600">
                                     {formatCurrency(saleBalance.totalPaid)}
                                   </div>
@@ -650,7 +650,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                     Já Pago
                                   </div>
                                 </div>
-                                <div className="text-center p-3 bg-red-50 rounded-lg">
+                                <div className="text-center p-3 bg-red-50 rounded-2xl">
                                   <div className="text-sm sm:text-lg font-bold text-red-600">
                                     {formatCurrency(
                                       saleBalance.remainingBalance,
@@ -715,7 +715,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       {/* Authorization Modal */}
       {showAuthModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-4">
               Autorização Necessária
             </h3>
@@ -732,7 +732,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
                 <div className="space-y-4">
                   {authError && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="bg-red-50 border border-red-200 rounded-2xl p-3">
                       <p className="text-xs sm:text-sm text-red-700">
                         {authError}
                       </p>
@@ -749,7 +749,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                         setAuthError("");
                         setAuthRequestSent(false);
                       }}
-                      className="flex-1 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="flex-1 px-4 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
                     >
                       Cancelar
                     </button>
@@ -758,7 +758,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       name="requestAuth"
                       onClick={requestManagerAuth}
                       disabled={isRequestingAuth}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isRequestingAuth
                         ? "Solicitando..."
@@ -770,7 +770,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             ) : (
               <>
                 {showApprovalNotification ? (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 animate-pulse">
+                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4 animate-pulse">
                     <div className="flex items-center">
                       <div className="bg-blue-500 rounded-full p-1 mr-3">
                         <svg
@@ -801,7 +801,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   </div>
                 ) : (
                   !approvedToken && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                    <div className="bg-green-50 border border-green-200 rounded-2xl p-3 mb-4">
                       <p className="text-xs sm:text-sm text-green-700">
                         ✅ Solicitação enviada para o gerente! Aguarde a
                         aprovação.
@@ -828,7 +828,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                           e.target.value.replace(/\D/g, "").slice(0, 6),
                         )
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-sm sm:text-lg font-mono"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-sm sm:text-lg font-mono"
                       placeholder="000000"
                       maxLength={6}
                       onKeyDown={(e) => e.key === "Enter" && validateToken()}
@@ -836,7 +836,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   </div>
 
                   {authError && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="bg-red-50 border border-red-200 rounded-2xl p-3">
                       <p className="text-xs sm:text-sm text-red-700">
                         {authError}
                       </p>
@@ -853,7 +853,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                         setAuthError("");
                         setAuthRequestSent(false);
                       }}
-                      className="flex-1 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="flex-1 px-4 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
                     >
                       Cancelar
                     </button>
@@ -862,7 +862,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       name="validateToken"
                       onClick={validateToken}
                       disabled={authToken.length !== 6}
-                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Validar Token
                     </button>
@@ -880,7 +880,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       setApprovedToken("");
                       setProcessedApprovalToken("");
                     }}
-                    className="w-full px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-xs sm:text-sm"
+                    className="w-full px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-2xl transition-colors text-xs sm:text-sm"
                   >
                     Solicitar Nova Autorização
                   </button>
@@ -914,7 +914,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       {/* Rejection Modal */}
       {showRejectionModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="text-center">
               <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
                 <svg
@@ -944,7 +944,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   setAuthToken("");
                   setAuthError("");
                 }}
-                className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                className="w-full px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors font-medium"
               >
                 Fechar
               </button>

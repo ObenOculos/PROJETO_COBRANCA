@@ -290,7 +290,7 @@ const AuthorizationManager: React.FC = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
             <span className="ml-2 text-gray-600">
@@ -305,7 +305,7 @@ const AuthorizationManager: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header + Navigation Combined - Padrão VisitTracking */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div className="flex items-center gap-2">
             <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
@@ -322,7 +322,7 @@ const AuthorizationManager: React.FC = () => {
         <div className="grid grid-cols-2 sm:flex gap-2">
           <button
             onClick={() => setActiveView("current")}
-            className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-2xl text-sm font-medium transition-colors ${
               activeView === "current"
                 ? "bg-blue-600 text-white"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -334,7 +334,7 @@ const AuthorizationManager: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveView("history")}
-            className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-2xl text-sm font-medium transition-colors ${
               activeView === "history"
                 ? "bg-blue-600 text-white"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -357,7 +357,7 @@ const AuthorizationManager: React.FC = () => {
             {activeView === "current" ? (
               <button
                 onClick={clearExpiredRequests}
-                className="flex items-center px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="flex items-center px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-2xl transition-colors"
                 title="Limpar Solicitações Expiradas"
               >
                 <X className="h-4 w-4 sm:mr-1" />
@@ -366,7 +366,7 @@ const AuthorizationManager: React.FC = () => {
             ) : (
               <button
                 onClick={exportHistory}
-                className="flex items-center px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                className="flex items-center px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-2xl transition-colors"
                 title="Exportar Histórico"
               >
                 <Download className="h-4 w-4 sm:mr-1" />
@@ -378,7 +378,7 @@ const AuthorizationManager: React.FC = () => {
       </div>
 
       {/* Content Area */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
         {activeView === "current" ? (
           <div>
             {/* Solicitações Pendentes - Design Melhorado */}
@@ -398,7 +398,7 @@ const AuthorizationManager: React.FC = () => {
                 {pendingRequests.map((request) => (
                   <div
                     key={request.token}
-                    className="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-400 rounded-lg p-3 hover:shadow-md transition-shadow"
+                    className="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-400 rounded-2xl p-3 hover:shadow-md transition-shadow"
                   >
                     {/* Header Mobile Compacto */}
                     <div className="flex items-center justify-between mb-3">
@@ -438,7 +438,7 @@ const AuthorizationManager: React.FC = () => {
                       <button
                         onClick={() => approveRequest(request.token)}
                         disabled={actionLoading === request.token}
-                        className="flex-1 flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 text-sm"
+                        className="flex-1 flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium disabled:opacity-50 text-sm"
                         title="Aprovar solicitação"
                       >
                         {actionLoading === request.token ? (
@@ -455,7 +455,7 @@ const AuthorizationManager: React.FC = () => {
                       <button
                         onClick={() => rejectRequest(request.token)}
                         disabled={actionLoading === request.token}
-                        className="flex-1 flex items-center justify-center px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 text-sm"
+                        className="flex-1 flex items-center justify-center px-3 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors font-medium disabled:opacity-50 text-sm"
                         title="Rejeitar solicitação"
                       >
                         {actionLoading === request.token ? (
@@ -496,7 +496,7 @@ const AuthorizationManager: React.FC = () => {
                 {processedRequests.map((request) => (
                   <div
                     key={request.token}
-                    className={`border rounded-lg p-4 ${
+                    className={`border rounded-2xl p-4 ${
                       request.status === "approved"
                         ? "bg-green-50 border-green-200"
                         : "bg-red-50 border-red-200"
@@ -560,7 +560,7 @@ const AuthorizationManager: React.FC = () => {
                   expiredRequests.map((request) => (
                     <div
                       key={request.token}
-                      className="bg-gray-50 border border-gray-200 rounded-lg p-4 opacity-60"
+                      className="bg-gray-50 border border-gray-200 rounded-2xl p-4 opacity-60"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -607,7 +607,7 @@ const AuthorizationManager: React.FC = () => {
           <div>
             {/* Estatísticas do Histórico */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-blue-800">Total</p>
@@ -618,7 +618,7 @@ const AuthorizationManager: React.FC = () => {
                   <FileText className="h-8 w-8 text-blue-600" />
                 </div>
               </div>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-green-800">
@@ -631,7 +631,7 @@ const AuthorizationManager: React.FC = () => {
                   <Check className="h-8 w-8 text-green-600" />
                 </div>
               </div>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-red-800">
@@ -644,7 +644,7 @@ const AuthorizationManager: React.FC = () => {
                   <X className="h-8 w-8 text-red-600" />
                 </div>
               </div>
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-amber-800">
@@ -660,7 +660,7 @@ const AuthorizationManager: React.FC = () => {
             </div>
 
             {/* Filtros do Histórico */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -672,7 +672,7 @@ const AuthorizationManager: React.FC = () => {
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Cobrador, cliente, documento..."
                     />
                   </div>
@@ -684,7 +684,7 @@ const AuthorizationManager: React.FC = () => {
                   <select
                     value={historyFilter}
                     onChange={(e) => setHistoryFilter(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="all">Todos</option>
                     <option value="approved">Aprovadas</option>
@@ -700,7 +700,7 @@ const AuthorizationManager: React.FC = () => {
                     type="date"
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
                 <div className="flex items-end">
@@ -711,7 +711,7 @@ const AuthorizationManager: React.FC = () => {
                       setDateFilter("");
                       setHistoryPage(1);
                     }}
-                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
                   >
                     Limpar Filtros
                   </button>
@@ -730,7 +730,7 @@ const AuthorizationManager: React.FC = () => {
                 historyData.map((request) => (
                   <div
                     key={`${request.token}-${request.requested_at}`}
-                    className={`border rounded-lg p-4 ${
+                    className={`border rounded-2xl p-4 ${
                       request.status === "approved"
                         ? "bg-green-50 border-green-200"
                         : request.status === "rejected"
@@ -812,7 +812,7 @@ const AuthorizationManager: React.FC = () => {
                   <button
                     onClick={() => setHistoryPage(Math.max(1, historyPage - 1))}
                     disabled={historyPage === 1}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Anterior
                   </button>
@@ -826,7 +826,7 @@ const AuthorizationManager: React.FC = () => {
                       )
                     }
                     disabled={historyPage === historyTotalPages}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Próxima
                   </button>

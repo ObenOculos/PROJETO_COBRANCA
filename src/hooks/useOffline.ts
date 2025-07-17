@@ -27,20 +27,12 @@ export interface DistributePaymentAction {
 }
 
 export const useOffline = () => {
-  const [isOnline, setIsOnline] = useState(() => {
-    const online = navigator.onLine;
-    console.log('🔄 Estado inicial da conexão:', online ? 'ONLINE' : 'OFFLINE');
-    return online;
-  });
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [offlineQueue, setOfflineQueue] = useState<OfflineAction[]>(() => {
-    // Carregar fila do localStorage na inicialização
     try {
       const stored = localStorage.getItem('offlineQueue');
-      const queue = stored ? JSON.parse(stored) : [];
-      console.log('📋 Fila offline carregada:', queue.length, 'itens');
-      return queue;
-    } catch (error) {
-      console.error('Erro ao carregar fila offline:', error);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
       return [];
     }
   });
@@ -49,53 +41,39 @@ export const useOffline = () => {
     const queue = JSON.parse(localStorage.getItem('offlineQueue') || '[]');
     if (queue.length === 0) return;
 
-    console.log('Processando fila offline:', queue.length, 'itens');
 
     let processedCount = 0;
     let failedCount = 0;
 
     for (const action of queue) {
       try {
-        // Aplicar delay exponencial baseado no número de tentativas
         const retryCount = action.retryCount || 0;
         if (retryCount > 0) {
-          const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000); // Max 10 segundos
-          console.log(`⏳ Aguardando ${delay}ms antes da tentativa ${retryCount + 1}`);
+          const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
 
-        // Processar cada ação da fila
         await processAction(action);
-        // Remover da fila após sucesso
         removeFromQueue(action.id);
         processedCount++;
-        console.log(`✅ Ação ${action.id} processada com sucesso`);
       } catch (error) {
         failedCount++;
         const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-        console.error(`❌ Erro ao processar ação ${action.id}:`, errorMessage);
         
-        // Atualizar ação com informações do erro e retry
         const retryCount = (action.retryCount || 0) + 1;
         const maxRetries = action.maxRetries || 3;
         
         if (retryCount <= maxRetries) {
-          // Atualizar ação na fila para próxima tentativa
           updateActionInQueue(action.id, {
             retryCount,
             lastError: errorMessage
           });
-          console.log(`🔄 Ação ${action.id} será tentada novamente (${retryCount}/${maxRetries})`);
         } else {
-          // Remover da fila após esgotar tentativas
-          console.log(`⚠️ Ação ${action.id} removida da fila após ${maxRetries} tentativas`);
           removeFromQueue(action.id);
         }
       }
     }
 
-    console.log(`Processamento da fila concluído: ${processedCount} sucessos, ${failedCount} falhas`);
-    
     // Mostrar notificação de sincronização
     if (processedCount > 0) {
       showSyncNotification(processedCount, failedCount);
@@ -109,14 +87,11 @@ export const useOffline = () => {
 
   useEffect(() => {
     const handleOnline = () => {
-      console.log('🌐 Conectado online');
       setIsOnline(true);
-      // Processar fila de ações offline quando voltar online
       processOfflineQueue();
     };
 
     const handleOffline = () => {
-      console.log('📵 Modo offline detectado');
       setIsOnline(false);
     };
 
@@ -130,7 +105,6 @@ export const useOffline = () => {
   }, [processOfflineQueue]);
 
   const addToOfflineQueue = (action: Omit<OfflineAction, 'id' | 'timestamp' | 'retryCount' | 'maxRetries' | 'lastError'>) => {
-    console.log('📥 Adicionando à fila offline:', action);
     const queue = JSON.parse(localStorage.getItem('offlineQueue') || '[]');
     const newAction: OfflineAction = {
       ...action,
@@ -143,12 +117,9 @@ export const useOffline = () => {
     queue.push(newAction);
     localStorage.setItem('offlineQueue', JSON.stringify(queue));
     setOfflineQueue(queue);
-    console.log('✅ Ação adicionada à fila. Total de itens:', queue.length);
   };
 
   const processAction = async (action: OfflineAction) => {
-    console.log('Processando ação offline:', action.type, action.id);
-    
     switch (action.type) {
       case 'CREATE_PAYMENT':
         await processCreatePayment(action.data);
@@ -163,23 +134,23 @@ export const useOffline = () => {
         await processDistributePayment(action.data);
         break;
       default:
-        console.warn('Tipo de ação desconhecida:', action.type);
+        throw new Error(`Tipo de ação desconhecida: ${action.type}`);
     }
   };
 
-  const processCreatePayment = async (data: unknown) => {
+  const processCreatePayment = async (_data: unknown) => {
     // TODO: Implementar criação de pagamento
-    console.log('Processando criação de pagamento offline:', data);
+    throw new Error('Criação de pagamento não implementada');
   };
 
-  const processUpdateVisit = async (data: unknown) => {
+  const processUpdateVisit = async (_data: unknown) => {
     // TODO: Implementar atualização de visita
-    console.log('Processando atualização de visita offline:', data);
+    throw new Error('Atualização de visita não implementada');
   };
 
-  const processCreateCollection = async (data: unknown) => {
+  const processCreateCollection = async (_data: unknown) => {
     // TODO: Implementar criação de cobrança
-    console.log('Processando criação de cobrança offline:', data);
+    throw new Error('Criação de cobrança não implementada');
   };
 
   const processDistributePayment = async (data: unknown) => {
@@ -190,7 +161,6 @@ export const useOffline = () => {
     
     const paymentData = data as DistributePaymentAction['data'];
     try {
-      console.log('Processando distribuição de pagamento offline:', paymentData);
       
       // Criar registro de pagamento no banco
       const paymentRecord = {
@@ -212,19 +182,8 @@ export const useOffline = () => {
         throw new Error(`Erro ao salvar pagamento: ${paymentError.message}`);
       }
 
-      // Atualizar valores das parcelas
-      // IMPORTANTE: Como o pagamento offline é processado depois, 
-      // precisamos usar a mesma lógica do processamento online
-      console.log('🔄 Processando distribuições offline:', paymentData.distributionDetails);
-
       for (const distribution of paymentData.distributionDetails) {
-        console.log('📝 Processando parcela:', {
-          installmentId: distribution.installmentId,
-          appliedAmount: distribution.appliedAmount,
-          originalAmount: distribution.originalAmount
-        });
 
-        // Buscar dados atuais da parcela
         const { data: currentData, error: fetchError } = await supabase
           .from('BANCO_DADOS')
           .select('valor_recebido, valor_original')
@@ -239,37 +198,15 @@ export const useOffline = () => {
         const originalValue = currentData?.valor_original || 0;
         const appliedAmount = distribution.appliedAmount || 0;
         
-        // Calcular novo valor recebido
         const newReceivedValue = currentReceived + appliedAmount;
         
-        // Calcular novo status
         const remainingValue = originalValue - newReceivedValue;
         const newStatus = remainingValue <= 0.01 ? "recebido" : "parcialmente_pago";
 
-        console.log('💰 Detalhes do cálculo:', {
-          installmentId: distribution.installmentId,
-          currentReceived,
-          originalValue,
-          appliedAmount,
-          newReceivedValue,
-          remainingValue,
-          newStatus
-        });
-
-        // Verificações de segurança
         if (appliedAmount <= 0) {
-          console.warn('⚠️ Valor aplicado deve ser positivo:', appliedAmount);
           continue;
         }
-        
-        if (newReceivedValue > originalValue + 0.01) {
-          console.warn('⚠️ Valor recebido maior que o original:', {
-            newReceived: newReceivedValue,
-            original: originalValue
-          });
-        }
 
-        // Atualizar no banco
         const { error: updateError } = await supabase
           .from('BANCO_DADOS')
           .update({
@@ -284,9 +221,7 @@ export const useOffline = () => {
         }
       }
 
-      console.log('Distribuição de pagamento processada com sucesso');
     } catch (error) {
-      console.error('Erro ao processar distribuição de pagamento:', error);
       throw error;
     }
   };
@@ -336,18 +271,15 @@ export const useOffline = () => {
 
   const retrySyncOfflineQueue = async () => {
     if (!isOnline) {
-      console.log('Não é possível sincronizar offline');
       return;
     }
     
-    console.log('Tentando sincronizar fila offline manualmente...');
     await processOfflineQueue();
   };
 
   const clearOfflineQueue = () => {
     localStorage.removeItem('offlineQueue');
     setOfflineQueue([]);
-    console.log('Fila offline limpa');
   };
 
   return {

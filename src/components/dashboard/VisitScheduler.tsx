@@ -725,7 +725,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   ) => {
     const notification = document.createElement("div");
     notification.className =
-      "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
+      "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center";
     notification.innerHTML = `
       <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
@@ -1059,7 +1059,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => setShowFilters(!showFilters)}
-                    className={`flex items-center px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                    className={`flex items-center px-3 py-1.5 text-sm rounded-2xl transition-colors ${
                       showFilters
                         ? "bg-purple-100 text-purple-700"
                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -1088,13 +1088,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Digite o nome, documento ou endereço do cliente..."
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 />
               </div>
 
               {/* Filtros Avançados */}
               {showFilters && (
-                <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-4">
+                <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Filtro por Cidade */}
                     <div>
@@ -1220,14 +1220,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               )}
 
               {selectedClients.size > 0 && (
-                <div className="mt-2 text-sm text-purple-600 bg-purple-50 rounded-lg p-2">
+                <div className="mt-2 text-sm text-purple-600 bg-purple-50 rounded-2xl p-2">
                   {selectedClients.size} cliente
                   {selectedClients.size !== 1 ? "s" : ""} selecionado
                   {selectedClients.size !== 1 ? "s" : ""}
                 </div>
               )}
               {clientsWithActiveVisits > 0 && (
-                <div className="mt-2 text-sm text-orange-600 bg-orange-50 rounded-lg p-2 flex items-center">
+                <div className="mt-2 text-sm text-orange-600 bg-orange-50 rounded-2xl p-2 flex items-center">
                   <AlertTriangle className="h-4 w-4 mr-2" />
                   {clientsWithActiveVisits} cliente
                   {clientsWithActiveVisits !== 1 ? "s" : ""} com visita
@@ -1241,7 +1241,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
             {/* Lista de Clientes */}
             {availableClients.length > 0 && (
-              <div className="border border-gray-200 rounded-lg">
+              <div className="border border-gray-200 rounded-2xl">
                 <div className="bg-gray-50 p-3 border-b border-gray-200">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div className="flex-1">
@@ -1485,7 +1485,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                               return (
                                 <div
                                   key={client.document}
-                                  className={`relative bg-white rounded-lg border-2 transition-all duration-200 cursor-pointer hover:shadow-md ${
+                                  className={`relative bg-white rounded-2xl border-2 transition-all duration-200 cursor-pointer hover:shadow-md ${
                                     isSelected
                                       ? "border-purple-500 bg-purple-50 shadow-md ring-2 ring-purple-200"
                                       : "border-gray-200 hover:border-gray-300"
@@ -1651,7 +1651,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             {availableClients.length === 0 &&
               user &&
               user.type === "collector" && (
-                <div className="p-4 text-center text-gray-500 border border-gray-200 rounded-lg">
+                <div className="p-4 text-center text-gray-500 border border-gray-200 rounded-2xl">
                   {hasActiveFilters
                     ? "Nenhum cliente encontrado com os filtros aplicados"
                     : clientsWithActiveVisits > 0
@@ -1662,7 +1662,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
             {/* Cliente(s) Selecionado(s) */}
             {selectedClients.size > 0 && (
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 lg:p-4">
+              <div className="bg-purple-50 border border-purple-200 rounded-2xl p-3 lg:p-4">
                 <h3 className="font-semibold text-gray-900 mb-2">
                   {selectedClients.size} Cliente
                   {selectedClients.size !== 1 ? "s" : ""} Selecionado
@@ -1670,7 +1670,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 </h3>
                 {selectedClients.size > 0 && (
                   <div className="space-y-3">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 mb-3">
                       <div className="flex items-center text-sm text-blue-800">
                         <CalendarDays className="h-4 w-4 mr-2" />
                         <span className="font-medium">
@@ -1689,7 +1689,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         return (
                           <div
                             key={client.document}
-                            className="bg-white rounded-lg p-3 border border-gray-200"
+                            className="bg-white rounded-2xl p-3 border border-gray-200"
                           >
                             <div className="flex items-center justify-between mb-2">
                               <div>
@@ -1806,13 +1806,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Adicione observações sobre a visita..."
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
               />
             </div>
 
             {/* Resumo de Visitas Agendadas */}
             {selectedClients.size > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
                 <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
                   <Calendar className="h-4 w-4 mr-2" />
                   Resumo dos Agendamentos
@@ -1857,14 +1857,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   setCurrentPage(1);
                   setClientsCurrentPage(1);
                 }}
-                className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
               >
                 Limpar
               </button>
               <button
                 onClick={handleScheduleVisit}
                 disabled={selectedClients.size === 0 || loading}
-                className="w-full sm:w-auto px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
+                className="w-full sm:w-auto px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
               >
                 {loading ? (
                   <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
@@ -1896,7 +1896,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         setCurrentPage(Math.max(1, currentPage - 1))
                       }
                       disabled={currentPage === 1}
-                      className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                      className="p-2 border border-gray-300 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
@@ -1908,7 +1908,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         setCurrentPage(Math.min(totalPages, currentPage + 1))
                       }
                       disabled={currentPage === totalPages}
-                      className="p-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                      className="p-2 border border-gray-300 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>
@@ -1917,7 +1917,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </div>
 
               {todayVisits.length === 0 ? (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
                   <Calendar className="h-8 w-8 text-blue-400 mx-auto mb-2" />
                   <p className="text-blue-600 font-medium">
                     Nenhuma. "" visita agendada para hoje
@@ -1931,7 +1931,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   {paginatedTodayVisits.map((visit) => (
                     <div
                       key={visit.id}
-                      className="border-2 border-blue-300 bg-blue-50 rounded-lg p-3 lg:p-4 hover:shadow-md transition-shadow"
+                      className="border-2 border-blue-300 bg-blue-50 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
                     >
                       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                         <div className="flex-1">
@@ -2015,7 +2015,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                           </div>
                         )}
                         {visit.status === "cancelamento_solicitado" && (
-                          <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-lg">
+                          <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-2xl">
                             <div className="font-medium">
                               Cancelamento Solicitado
                             </div>
@@ -2031,7 +2031,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         )}
                         {visit.cancellationRejectedBy &&
                           visit.status === "agendada" && (
-                            <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+                            <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-2xl">
                               <div className="font-medium">
                                 Cancelamento Rejeitado pelo Gerente
                               </div>
@@ -2080,7 +2080,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   {upcomingVisits.slice(0, 5).map((visit) => (
                     <div
                       key={visit.id}
-                      className="border border-gray-200 rounded-lg p-3 lg:p-4 hover:shadow-md transition-shadow"
+                      className="border border-gray-200 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
                     >
                       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                         <div className="flex-1">
@@ -2171,7 +2171,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                           </div>
                         )}
                         {visit.status === "cancelamento_solicitado" && (
-                          <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-lg">
+                          <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-2xl">
                             <div className="font-medium">
                               Cancelamento Solicitado
                             </div>
@@ -2187,7 +2187,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         )}
                         {visit.cancellationRejectedBy &&
                           visit.status === "agendada" && (
-                            <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+                            <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-2xl">
                               <div className="font-medium">
                                 Cancelamento Rejeitado pelo Gerente
                               </div>
@@ -2245,7 +2245,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   {pastVisits.slice(0, 5).map((visit) => (
                     <div
                       key={visit.id}
-                      className="border-2 border-red-300 bg-red-50 rounded-lg p-3 lg:p-4 hover:shadow-md transition-shadow"
+                      className="border-2 border-red-300 bg-red-50 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
                     >
                       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                         <div className="flex-1">
@@ -2380,7 +2380,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       {/* Modal de Solicitação de Cancelamento */}
       {showCancellationModal && selectedVisitForCancellation && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">
                 Solicitar Cancelamento de Visita
@@ -2411,12 +2411,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   onChange={(e) => setCancellationReason(e.target.value)}
                   placeholder="Descreva o motivo para solicitar o cancelamento desta visita..."
                   rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   required
                 />
               </div>
 
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 mb-4">
                 <div className="flex items-start">
                   <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-yellow-700">
@@ -2431,14 +2431,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleCloseCancellationModal}
-                className="flex-1 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleConfirmCancellation}
                 disabled={!cancellationReason.trim()}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Solicitar
               </button>
@@ -2450,7 +2450,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       {/* Modal de Reagendamento */}
       {showRescheduleModal && selectedVisitForReschedule && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                 <RefreshCw className="h-5 w-5 mr-2 text-purple-600" />
@@ -2489,7 +2489,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                       value={rescheduleDate}
                       onChange={(e) => setRescheduleDate(e.target.value)}
                       min={getLocalDate()}
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                       required
                     />
                   </div>
@@ -2505,14 +2505,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                       type="time"
                       value={rescheduleTime}
                       onChange={(e) => setRescheduleTime(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                       required
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 mt-4">
                 <div className="flex items-start">
                   <Calendar className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-blue-700">
@@ -2526,14 +2526,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleCloseRescheduleModal}
-                className="flex-1 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleConfirmReschedule}
                 disabled={!rescheduleDate || !rescheduleTime}
-                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Reagendar
@@ -2546,7 +2546,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       {/* Modal de Conflito de Horários */}
       {showConflictModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
             {/* Header */}
             <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center">
@@ -2562,7 +2562,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </div>
               <button
                 onClick={handleCloseConflictModal}
-                className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
+                className="p-2 hover:bg-white hover:bg-opacity-20 rounded-2xl transition-colors"
               >
                 <X className="h-5 w-5 text-white" />
               </button>
@@ -2581,7 +2581,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                     {conflictData.conflicts.map((conflict, index) => (
                       <div
                         key={index}
-                        className="bg-orange-50 border border-orange-200 rounded-lg p-4"
+                        className="bg-orange-50 border border-orange-200 rounded-2xl p-4"
                       >
                         <div className="flex items-start">
                           <AlertTriangle className="h-5 w-5 text-orange-600 mr-3 mt-0.5 flex-shrink-0" />
@@ -2595,7 +2595,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 </div>
 
                 {/* Opções */}
-                <div className="bg-gray-50 rounded-lg p-4">
+                <div className="bg-gray-50 rounded-2xl p-4">
                   <h4 className="font-medium text-gray-900 mb-2">
                     O que você gostaria de fazer?
                   </h4>
@@ -2617,14 +2617,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleCloseConflictModal}
-                className="flex-1 px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                className="flex-1 px-6 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors font-medium"
               >
                 Cancelar e Ajustar
               </button>
               <button
                 onClick={handleConfirmScheduleWithConflicts}
                 disabled={loading}
-                className="flex-1 px-6 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
+                className="flex-1 px-6 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
               >
                 {loading ? (
                   <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
@@ -2641,7 +2641,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       {/* Modal de Conclusão da Visita com Observações Pré-programadas */}
       {showCompletedModal && selectedVisitForCompletion && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                 <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
@@ -2667,7 +2667,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   <button
                     key={index}
                     onClick={() => handleConfirmCompletion(note)}
-                    className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-green-50 hover:border-green-200 border border-gray-200 rounded-lg transition-colors text-sm"
+                    className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-green-50 hover:border-green-200 border border-gray-200 rounded-2xl transition-colors text-sm"
                   >
                     {note}
                   </button>
@@ -2677,7 +2677,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               <div className="mt-4">
                 <button
                   onClick={() => handleConfirmCompletion("")}
-                  className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                  className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors text-sm"
                 >
                   Marcar como realizada sem observação
                 </button>
@@ -2690,7 +2690,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   setShowCompletedModal(false);
                   setSelectedVisitForCompletion(null);
                 }}
-                className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                className="w-full px-4 py-2 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition-colors"
               >
                 Cancelar
               </button>
@@ -2702,7 +2702,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       {/* Modal de Confirmação para "Não Encontrado" */}
       {showNotFoundConfirmModal && selectedVisitForNotFound && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                 <AlertTriangle className="h-5 w-5 mr-2 text-orange-600" />
@@ -2730,13 +2730,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   setShowNotFoundConfirmModal(false);
                   setSelectedVisitForNotFound(null);
                 }}
-                className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleConfirmNotFoundFirst}
-                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 transition-colors"
               >
                 Sim, Confirmar
               </button>
@@ -2748,7 +2748,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       {/* Modal de "Não Encontrado" com Observações Pré-programadas */}
       {showNotFoundObservationModal && selectedVisitForNotFound && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                 <AlertTriangle className="h-5 w-5 mr-2 text-orange-600" />
@@ -2774,7 +2774,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   <button
                     key={index}
                     onClick={() => handleConfirmNotFound(note)}
-                    className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-orange-50 hover:border-orange-200 border border-gray-200 rounded-lg transition-colors text-sm"
+                    className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-orange-50 hover:border-orange-200 border border-gray-200 rounded-2xl transition-colors text-sm"
                   >
                     {note}
                   </button>
@@ -2784,7 +2784,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               <div className="mt-4">
                 <button
                   onClick={() => handleConfirmNotFound("")}
-                  className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                  className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors text-sm"
                 >
                   Marcar como não encontrado sem observação
                 </button>
@@ -2797,7 +2797,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   setShowNotFoundObservationModal(false);
                   setSelectedVisitForNotFound(null);
                 }}
-                className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                className="w-full px-4 py-2 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition-colors"
               >
                 Cancelar
               </button>
@@ -2809,7 +2809,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       {/* Modal de Pergunta sobre Pagamento */}
       {showPaymentQuestionModal && selectedVisitForPayment && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                 <DollarSign className="h-5 w-5 mr-2 text-green-600" />
@@ -2828,14 +2828,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               <div className="flex space-x-3">
                 <button
                   onClick={handleClientMadePayment}
-                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center"
+                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium flex items-center justify-center"
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Sim, fez pagamento
                 </button>
                 <button
                   onClick={handleClientDidNotPay}
-                  className="flex-1 px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center justify-center"
+                  className="flex-1 px-4 py-3 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition-colors font-medium flex items-center justify-center"
                 >
                   <X className="h-4 w-4 mr-2" />
                   Não fez pagamento
@@ -2848,7 +2848,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
       {showTimeWarningModal && timeWarningData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -2870,7 +2870,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   </p>
                 </div>
 
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <div className="bg-gray-50 rounded-2xl p-4 mb-4">
                   <p className="text-sm text-gray-600 mb-2">
                     <strong>Horário selecionado:</strong>{" "}
                     {timeWarningData.selectedTime}
@@ -2893,7 +2893,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                     setShowTimeWarningModal(false);
                     setTimeWarningData(null);
                   }}
-                  className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors"
+                  className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-2xl hover:bg-purple-700 transition-colors"
                 >
                   Usar Horário Sugerido
                 </button>
@@ -2911,7 +2911,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                     setShowTimeWarningModal(false);
                     setTimeWarningData(null);
                   }}
-                  className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
+                  className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-2xl hover:bg-gray-300 transition-colors"
                 >
                   Cancelar
                 </button>

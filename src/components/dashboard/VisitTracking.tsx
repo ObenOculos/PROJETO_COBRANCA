@@ -390,7 +390,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const showSuccessNotification = (message: string) => {
     const notification = document.createElement("div");
     notification.className =
-      "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
+      "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center";
     notification.innerHTML = `
       <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
@@ -414,14 +414,14 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     return (
       <div className="space-y-4">
         {/* Filtros Colapsáveis */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Filtros</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors relative"
+                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors relative"
                 >
                   <Filter className="h-5 w-5" />
                   {activeFiltersCount > 0 && (
@@ -433,7 +433,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 {activeFiltersCount > 0 && (
                   <button
                     onClick={clearAllFilters}
-                    className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                    className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-2xl hover:bg-gray-200 transition-colors text-sm font-medium"
                   >
                     Limpar
                   </button>
@@ -453,14 +453,14 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   value={clientSearchFilter}
                   onChange={(e) => setClientSearchFilter(e.target.value)}
                   placeholder="Nome, documento ou endereço..."
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             </div>
 
             {/* Filtros Colapsáveis */}
             {showFilters && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 animate-in slide-in-from-top-2">
+              <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-200 animate-in slide-in-from-top-2">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -469,7 +469,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     <select
                       value={selectedCollector}
                       onChange={(e) => setSelectedCollector(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="all">Todos os cobradores</option>
                       {collectors.map((collector) => (
@@ -487,7 +487,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="all">Todos os status</option>
                       <option value="agendada">Agendada</option>
@@ -505,7 +505,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       type="date"
                       value={dateFromFilter}
                       onChange={(e) => setDateFromFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
@@ -517,7 +517,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       type="date"
                       value={dateToFilter}
                       onChange={(e) => setDateToFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
@@ -528,7 +528,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
         {/* Visit Cards */}
         {Object.keys(groupedVisits).length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
             <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               Nenhuma visita encontrada
@@ -546,7 +546,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               return (
                 <div
                   key={collectorId}
-                  className="bg-white rounded-xl shadow-sm border border-gray-200"
+                  className="bg-white rounded-2xl shadow-sm border border-gray-200"
                 >
                   {/* Header do cobrador */}
                   <div
@@ -592,7 +592,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                         return (
                           <div
                             key={visit.id}
-                            className={`p-3 lg:p-4 rounded-lg border transition-all duration-200 hover:shadow-md ${
+                            className={`p-3 lg:p-4 rounded-2xl border transition-all duration-200 hover:shadow-md ${
                               isOverdue
                                 ? "border-red-300 bg-red-50"
                                 : "border-gray-200 bg-gray-50"
@@ -664,7 +664,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                 )}
 
                                 {visit.cancellationRequestReason && (
-                                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+                                  <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 mb-3">
                                     <div className="flex items-start">
                                       <MessageSquare className="h-4 w-4 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
                                       <div>
@@ -686,7 +686,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                     onClick={() =>
                                       handleOpenApproval(visit, "approve")
                                     }
-                                    className="flex-1 sm:flex-none px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center text-sm"
+                                    className="flex-1 sm:flex-none px-3 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium flex items-center justify-center text-sm"
                                   >
                                     <CheckCircle className="h-4 w-4 mr-1" />
                                     <span className="hidden sm:inline">
@@ -698,7 +698,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                     onClick={() =>
                                       handleOpenApproval(visit, "reject")
                                     }
-                                    className="flex-1 sm:flex-none px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center justify-center text-sm"
+                                    className="flex-1 sm:flex-none px-3 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors font-medium flex items-center justify-center text-sm"
                                   >
                                     <XCircle className="h-4 w-4 mr-1" />
                                     <span className="hidden sm:inline">
@@ -726,7 +726,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const renderCancellationsTab = () => (
     <div className="space-y-4">
       {pendingRequests.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
           <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             Nenhuma solicitação pendente
@@ -746,7 +746,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           {pendingRequests.map((request) => (
             <div
               key={request.id}
-              className="bg-white rounded-xl shadow-sm border border-red-200 p-4 lg:p-6"
+              className="bg-white rounded-2xl shadow-sm border border-red-200 p-4 lg:p-6"
             >
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                 <div className="flex-1 min-w-0">
@@ -807,7 +807,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   </div>
 
                   {request.cancellationRequestReason && (
-                    <div className="bg-white border border-gray-200 rounded-lg p-3 mb-3">
+                    <div className="bg-white border border-gray-200 rounded-2xl p-3 mb-3">
                       <div className="flex items-start">
                         <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
                         <div>
@@ -832,7 +832,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 <div className="flex flex-col sm:flex-row gap-2 mt-3 lg:ml-4">
                   <button
                     onClick={() => handleOpenApproval(request, "approve")}
-                    className="flex-1 sm:flex-none px-3 lg:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center text-sm"
+                    className="flex-1 sm:flex-none px-3 lg:px-4 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium flex items-center justify-center text-sm"
                   >
                     <CheckCircle className="h-4 w-4 mr-1" />
                     <span className="hidden sm:inline">Aprovar</span>
@@ -840,7 +840,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   </button>
                   <button
                     onClick={() => handleOpenApproval(request, "reject")}
-                    className="flex-1 sm:flex-none px-3 lg:px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center justify-center text-sm"
+                    className="flex-1 sm:flex-none px-3 lg:px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors font-medium flex items-center justify-center text-sm"
                   >
                     <XCircle className="h-4 w-4 mr-1" />
                     <span className="hidden sm:inline">Rejeitar</span>
@@ -911,7 +911,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     return (
       <div className="space-y-4">
         {totalHistoryVisits === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
             <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               Nenhuma visita finalizada
@@ -939,7 +939,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               return (
                 <div
                   key={`history_${collectorId}`}
-                  className="bg-white rounded-xl shadow-sm border border-gray-200"
+                  className="bg-white rounded-2xl shadow-sm border border-gray-200"
                 >
                   {/* Header do cobrador */}
                   <div
@@ -996,7 +996,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                         return (
                           <div
                             key={visit.id}
-                            className="p-4 rounded-lg border border-gray-200 bg-gray-50 transition-all duration-200 hover:shadow-md"
+                            className="p-4 rounded-2xl border border-gray-200 bg-gray-50 transition-all duration-200 hover:shadow-md"
                           >
                             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                               <div className="flex-1">
@@ -1067,7 +1067,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                 )}
 
                                 {visit.cancellationRequestReason && (
-                                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3">
+                                  <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3 mb-3">
                                     <div className="flex items-start">
                                       <MessageSquare className="h-4 w-4 text-orange-600 mr-2 flex-shrink-0 mt-0.5" />
                                       <div>
@@ -1084,7 +1084,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
                                 {visit.cancellationRejectedBy &&
                                   visit.cancellationRejectionReason && (
-                                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                                    <div className="bg-red-50 border border-red-200 rounded-2xl p-3 mb-3">
                                       <div className="flex items-start">
                                         <XCircle className="h-4 w-4 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
                                         <div>
@@ -1154,7 +1154,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     <>
       <div className="space-y-6">
         {/* Header + Navegação Combinados */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -1170,7 +1170,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             {onClose && (
               <button
                 onClick={onClose}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
                 title="Fechar"
               >
                 <X className="h-5 w-5" />
@@ -1182,7 +1182,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           <div className="grid grid-cols-3 sm:flex gap-2">
             <button
               onClick={() => setActiveTab("visits")}
-              className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-2xl text-sm font-medium transition-colors ${
                 activeTab === "visits"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -1194,7 +1194,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             </button>
             <button
               onClick={() => setActiveTab("cancellations")}
-              className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors relative ${
+              className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-2xl text-sm font-medium transition-colors relative ${
                 activeTab === "cancellations"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -1211,7 +1211,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             </button>
             <button
               onClick={() => setActiveTab("history")}
-              className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-2xl text-sm font-medium transition-colors ${
                 activeTab === "history"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -1225,7 +1225,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
         </div>
 
         {/* Card Principal - Visitas Agendadas */}
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-blue-100 text-sm font-medium">
@@ -1269,7 +1269,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
           <div className="p-6">
             {activeTab === "visits" && renderVisitsTab()}
             {activeTab === "cancellations" && renderCancellationsTab()}
@@ -1281,7 +1281,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       {/* Modal de Confirmação para Cancelamentos */}
       {showApprovalModal && selectedRequest && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">
                 {approvalAction === "approve" ? "Aprovar" : "Rejeitar"}{" "}
@@ -1308,7 +1308,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               </div>
 
               {selectedRequest.cancellationRequestReason && (
-                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <div className="mb-4 p-3 bg-gray-50 rounded-2xl">
                   <div className="text-sm font-medium text-gray-700 mb-1">
                     Motivo solicitado:
                   </div>
@@ -1328,14 +1328,14 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     onChange={(e) => setRejectionReason(e.target.value)}
                     placeholder="Explique por que está rejeitando esta solicitação..."
                     rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-red-500 focus:border-red-500"
                     required
                   />
                 </div>
               )}
 
               <div
-                className={`border rounded-lg p-3 mb-4 ${
+                className={`border rounded-2xl p-3 mb-4 ${
                   approvalAction === "approve"
                     ? "bg-green-50 border-green-200"
                     : "bg-red-50 border-red-200"
@@ -1375,7 +1375,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               <button
                 onClick={handleCloseApproval}
                 disabled={loading}
-                className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -1385,7 +1385,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   loading ||
                   (approvalAction === "reject" && !rejectionReason.trim())
                 }
-                className={`w-full sm:w-auto px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center ${
+                className={`w-full sm:w-auto px-4 py-2 rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center ${
                   approvalAction === "approve"
                     ? "bg-green-600 text-white hover:bg-green-700"
                     : "bg-red-600 text-white hover:bg-red-700"

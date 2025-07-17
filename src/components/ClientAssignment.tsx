@@ -788,7 +788,7 @@ export const ClientAssignment = React.memo(() => {
   return (
     <div className="space-y-4">
       {/* Header Simplificado */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
@@ -814,7 +814,7 @@ export const ClientAssignment = React.memo(() => {
       </div>
 
       {/* Card Principal - Taxa de Atribuição */}
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-blue-100 text-sm font-medium">
@@ -851,7 +851,7 @@ export const ClientAssignment = React.memo(() => {
 
       {/* Filtros Colapsáveis */}
       {showFilters && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 animate-in slide-in-from-top-2">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 animate-in slide-in-from-top-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
               <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
@@ -1027,7 +1027,7 @@ export const ClientAssignment = React.memo(() => {
         </div>
         {/* Assignment Actions */}
         {selectedClients.size > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
             <div className="p-4 lg:p-6">
               <div className="flex flex-col gap-4">
                 <div>
@@ -1231,7 +1231,7 @@ export const ClientAssignment = React.memo(() => {
 
       {/* Empty State */}
       {filteredClients.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
           <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             Nenhum cliente encontrado
@@ -1246,7 +1246,7 @@ export const ClientAssignment = React.memo(() => {
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
           <div className="flex flex-col gap-4">
             {/* Mobile-first: Info and items per page on top */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
