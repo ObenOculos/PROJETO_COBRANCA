@@ -774,13 +774,15 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   Cobranças
                 </h2>
                 {/* Botão de filtro para mobile */}
-                <button
-                  onClick={() => setIsFilterVisible(!isFilterVisible)}
-                  className="md:hidden p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-colors"
-                  title="Filtros"
-                >
-                  <Filter className="h-5 w-5" />
-                </button>
+                {collectionsView !== "cash-report" && (
+                  <button
+                    onClick={() => setIsFilterVisible(!isFilterVisible)}
+                    className="md:hidden p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-colors"
+                    title="Filtros"
+                  >
+                    <Filter className="h-5 w-5" />
+                  </button>
+                )}
               </div>
               <div className="flex bg-gray-100 rounded-md p-0.5 w-full sm:w-auto">
                 <button

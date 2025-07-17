@@ -18,9 +18,9 @@ import {
   ChevronDown,
   ChevronUp,
   Hash,
-  Settings,
   Maximize2,
   Minimize2,
+  EyeIcon,
 } from "lucide-react";
 import { Collection, ClientGroup, SaleGroup } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
@@ -465,7 +465,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                     className="px-4 py-4 hover:bg-gray-50 cursor-pointer"
                     onClick={() => handleViewClient(clientGroup)}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1 justify-between">
                       <div className="flex items-center flex-1 min-w-0">
                         <div className="flex-shrink-0 mr-3">
                           <User className="h-5 w-5 text-blue-600" />
@@ -659,9 +659,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     // Fallback to simple list view
     return (
       <>
-        <div className="">
+        <div className="rounded-2xl border border-gray-200 sm:border-0">
           {/* Header Minimalista */}
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 mb-4">
+          <div className="bg-white p-4 rounded-2xl mb-4">
             <div className="space-y-3">
               {/* Linha Principal */}
               <div className="flex items-center gap-1 justify-between">
@@ -677,29 +677,30 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                     </div>
                   </div>
                 </div>
-                
-                <div className="flex items-center gap-1 text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
-                  <Settings className="h-4 w-4 text-gray-400" />
-                  <select
-                    id="items-per-page"
-                    name="itemsPerPage"
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="text-sm border-0 bg-transparent focus:ring-0 text-gray-600"
-                  >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
+                <div className="flex items-center gap-1 justify-between">
+                  <div className="flex items-center gap- text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
+                    <EyeIcon className="h-4 w-4 text-gray-400" />
+                    <select
+                      id="items-per-page"
+                      name="itemsPerPage"
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="text-sm border-0 bg-transparent focus:ring-0 text-gray-600"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
               {/* Linha de Controles */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 justify-between">
                 {/* Ordenação */}
                 <div className="flex items-center gap-1">
                   <button
@@ -830,7 +831,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           </div>
 
           {/* Lista de Clientes Agrupados */}
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y px-2 sm:px-0 divide-gray-100">
             {paginatedSalesGroups.map((clientGroup) => (
               <div
                 key={clientGroup.document}
@@ -841,7 +842,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   className="px-4 sm:px-6 py-3 rounded-2xl border-b border-gray-200 bg-white cursor-pointer"
                   onClick={() => toggleClientExpansion(clientGroup.document)}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1 justify-between">
                     <div className="flex items-center flex-1 min-w-0">
                       <div className="hidden sm:flex flex-shrink-0 mr-3">
                         <button
@@ -864,7 +865,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-bold text-gray-900 truncate">
+                        <h3 className="text-md font-semibold text-gray-900 truncate">
                           {clientGroup.client}
                         </h3>
                         <p className="text-sm text-gray-600 truncate font-mono bg-gray-100 px-2 py-1 rounded-2xl mt-1 inline-block">
@@ -945,7 +946,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                           >
                             <div className="p-4">
                               {/* Header */}
-                              <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-1 justify-between mb-3">
                                 <div className="font-medium text-gray-900">
                                   Venda #{sale.saleNumber}
                                 </div>
