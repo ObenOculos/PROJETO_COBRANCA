@@ -55,7 +55,7 @@ const StatsCard: React.FC<StatsCardProps> = ({
           )}
         </div>
         <div
-          className={`h-10 w-10 lg:h-12 lg:w-12 ${iconColor} rounded-lg flex items-center justify-center flex-shrink-0 ml-3`}
+          className={`h-10 w-10 lg:h-12 lg:w-12 ${iconColor} rounded-2xl flex items-center justify-center flex-shrink-0 ml-3`}
         >
           <Icon className="h-5 w-5 lg:h-6 lg:w-6 text-white" />
         </div>

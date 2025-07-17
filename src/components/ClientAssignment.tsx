@@ -462,7 +462,7 @@ export const ClientAssignment = React.memo(() => {
       // Toast notification seria melhor aqui
       const notification = document.createElement("div");
       notification.className =
-        "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50";
+        "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50";
       notification.textContent =
         "Selecione um cobrador e pelo menos um cliente";
       document.body.appendChild(notification);
@@ -491,7 +491,7 @@ export const ClientAssignment = React.memo(() => {
       type: "success" | "error" | "info",
     ) => {
       const notification = document.createElement("div");
-      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center`;
+      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center`;
       notification.innerHTML = `
       <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
         ${type === "success" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' : type === "error" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' : '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>'}
@@ -561,7 +561,7 @@ export const ClientAssignment = React.memo(() => {
       // Toast notification
       const notification = document.createElement("div");
       notification.className =
-        "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50";
+        "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50";
       notification.textContent = "Selecione pelo menos um cliente";
       document.body.appendChild(notification);
       setTimeout(() => document.body.removeChild(notification), 3000);
@@ -580,7 +580,7 @@ export const ClientAssignment = React.memo(() => {
     if (clientsWithCollectors.length === 0) {
       const notification = document.createElement("div");
       notification.className =
-        "fixed top-4 right-4 bg-amber-500 text-white px-4 py-2 rounded-lg shadow-lg z-50";
+        "fixed top-4 right-4 bg-amber-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50";
       notification.textContent =
         "Nenhum dos clientes selecionados possui cobrador atribuído";
       document.body.appendChild(notification);
@@ -613,7 +613,7 @@ export const ClientAssignment = React.memo(() => {
       type: "success" | "error" | "info",
     ) => {
       const notification = document.createElement("div");
-      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center`;
+      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center`;
       notification.innerHTML = `
       <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
         ${type === "success" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' : type === "error" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' : '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>'}
@@ -804,7 +804,7 @@ export const ClientAssignment = React.memo(() => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
               title="Filtros"
             >
               <Filter className="h-5 w-5" />
@@ -863,7 +863,7 @@ export const ClientAssignment = React.memo(() => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Nome ou documento..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
@@ -875,7 +875,7 @@ export const ClientAssignment = React.memo(() => {
               <select
                 value={filterCollector}
                 onChange={(e) => setFilterCollector(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Todos os cobradores</option>
                 {collectors.map((collector) => (
@@ -894,7 +894,7 @@ export const ClientAssignment = React.memo(() => {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Todos os status</option>
                 <option value="with_collector">Com cobrador</option>
@@ -913,7 +913,7 @@ export const ClientAssignment = React.memo(() => {
                   setFilterCity(e.target.value);
                   setFilterNeighborhood("");
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Todas as cidades</option>
                 {availableCities.map((city) => (
@@ -932,7 +932,7 @@ export const ClientAssignment = React.memo(() => {
               <select
                 value={filterNeighborhood}
                 onChange={(e) => setFilterNeighborhood(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={!filterCity}
               >
                 <option value="">Todos os bairros</option>
@@ -952,7 +952,7 @@ export const ClientAssignment = React.memo(() => {
               <select
                 value={filterStore}
                 onChange={(e) => setFilterStore(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Todas as lojas</option>
                 {availableStores.map((store) => (
@@ -977,7 +977,7 @@ export const ClientAssignment = React.memo(() => {
                   setIncludeWithoutDate(false);
                   setCurrentPage(1);
                 }}
-                className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                className="w-full px-4 py-2 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition-colors text-sm font-medium"
               >
                 Limpar Filtros
               </button>
@@ -995,7 +995,7 @@ export const ClientAssignment = React.memo(() => {
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               onClick={handleSelectAll}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              className="px-4 py-2 text-sm border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors font-medium"
             >
               <span className="hidden sm:inline">
                 {paginatedClients.every((c) => selectedClients.has(c.documento))
@@ -1013,7 +1013,7 @@ export const ClientAssignment = React.memo(() => {
             {filteredClients.length > itemsPerPage && (
               <button
                 onClick={handleSelectAllFiltered}
-                className="px-4 py-2 text-sm border border-blue-300 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                className="px-4 py-2 text-sm border border-blue-300 text-blue-700 bg-blue-50 rounded-2xl hover:bg-blue-100 transition-colors font-medium"
               >
                 <span className="hidden sm:inline">
                   Selecionar todos ({filteredClients.length})
@@ -1048,7 +1048,7 @@ export const ClientAssignment = React.memo(() => {
                   name="selectedCollector"
                   value={selectedCollector}
                   onChange={(e) => setSelectedCollector(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Selecione um cobrador</option>
                   {collectors.map((collector) => (
@@ -1062,7 +1062,7 @@ export const ClientAssignment = React.memo(() => {
                   <button
                     onClick={handleAssignCollectorClick}
                     disabled={loading || !selectedCollector}
-                    className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? (
                       <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
@@ -1076,7 +1076,7 @@ export const ClientAssignment = React.memo(() => {
                   <button
                     onClick={handleRemoveCollectorClick}
                     disabled={loading}
-                    className="flex-1 flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? (
                       <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
@@ -1090,7 +1090,7 @@ export const ClientAssignment = React.memo(() => {
               </div>
 
               {selectedClients.size > MAX_BATCH_SIZE && (
-                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl">
                   <div className="flex items-center text-amber-700">
                     <AlertCircle className="h-4 w-4 mr-2" />
                     <span className="text-sm">
@@ -1119,7 +1119,7 @@ export const ClientAssignment = React.memo(() => {
           return (
             <div
               key={client.uniqueKey}
-              className={`bg-white rounded-lg shadow-sm border transition-all duration-200 hover:shadow-md cursor-pointer ${
+              className={`bg-white rounded-2xl shadow-sm border transition-all duration-200 hover:shadow-md cursor-pointer ${
                 isWithoutCollector
                   ? "border-amber-300 bg-amber-50"
                   : "border-gray-200"
@@ -1269,7 +1269,7 @@ export const ClientAssignment = React.memo(() => {
                   onChange={(e) =>
                     handleItemsPerPageChange(Number(e.target.value))
                   }
-                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -1285,7 +1285,7 @@ export const ClientAssignment = React.memo(() => {
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="px-2 sm:px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                className="px-2 sm:px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               >
                 <span className="hidden sm:inline">Primeira</span>
                 <span className="sm:hidden">1</span>
@@ -1294,7 +1294,7 @@ export const ClientAssignment = React.memo(() => {
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="px-2 sm:px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-2 sm:px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -1329,7 +1329,7 @@ export const ClientAssignment = React.memo(() => {
                       <button
                         key={pageNumber}
                         onClick={() => setCurrentPage(pageNumber)}
-                        className={`px-2 sm:px-3 py-2 text-sm font-medium rounded-lg min-w-[40px] ${
+                        className={`px-2 sm:px-3 py-2 text-sm font-medium rounded-2xl min-w-[40px] ${
                           currentPage === pageNumber
                             ? "bg-blue-600 text-white"
                             : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
@@ -1347,7 +1347,7 @@ export const ClientAssignment = React.memo(() => {
                   setCurrentPage(Math.min(totalPages, currentPage + 1))
                 }
                 disabled={currentPage === totalPages}
-                className="px-2 sm:px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-2 sm:px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -1355,7 +1355,7 @@ export const ClientAssignment = React.memo(() => {
               <button
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="px-2 sm:px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                className="px-2 sm:px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               >
                 <span className="hidden sm:inline">Última</span>
                 <span className="sm:hidden">{totalPages}</span>
@@ -1394,7 +1394,7 @@ export const ClientAssignment = React.memo(() => {
           </div>
 
           {selectedClients.size > MAX_BATCH_SIZE && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl">
               <div className="flex items-center text-amber-700">
                 <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
                 <span className="text-sm">
@@ -1409,14 +1409,14 @@ export const ClientAssignment = React.memo(() => {
           <div className="flex gap-3 mt-6">
             <button
               onClick={() => setShowAssignModal(false)}
-              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium"
+              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-2xl transition-colors font-medium"
             >
               Cancelar
             </button>
             <button
               onClick={handleAssignCollector}
               disabled={loading}
-              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {loading ? (
                 <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
@@ -1485,7 +1485,7 @@ export const ClientAssignment = React.memo(() => {
               </p>
             </div>
 
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg mt-4">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-2xl mt-4">
               <p className="text-sm text-red-700 font-medium">
                 Esta ação não pode ser desfeita
               </p>
@@ -1493,7 +1493,7 @@ export const ClientAssignment = React.memo(() => {
           </div>
 
           {(modalData.totalClients || 0) > MAX_BATCH_SIZE && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl">
               <div className="flex items-center text-amber-700">
                 <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
                 <span className="text-sm">
@@ -1508,14 +1508,14 @@ export const ClientAssignment = React.memo(() => {
           <div className="flex gap-3 mt-6">
             <button
               onClick={() => setShowRemoveModal(false)}
-              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium"
+              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-2xl transition-colors font-medium"
             >
               Cancelar
             </button>
             <button
               onClick={handleRemoveCollector}
               disabled={loading}
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {loading ? (
                 <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />

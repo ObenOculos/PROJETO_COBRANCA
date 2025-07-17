@@ -102,7 +102,7 @@ const NotificationDropdown: React.FC = () => {
           />
 
           {/* Modal Content */}
-          <div className="fixed inset-x-2 top-12 bottom-12 bg-white rounded-lg shadow-xl flex flex-col max-h-[calc(100vh-6rem)]">
+          <div className="fixed inset-x-2 top-12 bottom-12 bg-white rounded-2xl shadow-xl flex flex-col max-h-[calc(100vh-6rem)]">
             {/* Header */}
             <div className="p-4 border-b border-gray-200 flex-shrink-0">
               <div className="flex items-center justify-between">
@@ -148,7 +148,7 @@ const NotificationDropdown: React.FC = () => {
                   {notifications.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`relative p-3 mb-2 rounded-lg border-l-4 transition-colors hover:bg-gray-50 ${
+                      className={`relative p-3 mb-2 rounded-2xl border-l-4 transition-colors hover:bg-gray-50 ${
                         notification.read
                           ? "bg-gray-50"
                           : getPriorityColor(notification.priority)
@@ -228,7 +228,7 @@ const NotificationDropdown: React.FC = () => {
 
       {/* Desktop Dropdown */}
       {isOpen && (
-        <div className="hidden sm:block absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 flex-col">
+        <div className="hidden sm:block absolute right-0 mt-2 w-96 bg-white rounded-2xl shadow-lg border border-gray-200 z-50 max-h-96 flex-col">
           {/* Header */}
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
@@ -274,7 +274,7 @@ const NotificationDropdown: React.FC = () => {
                 {notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`relative p-3 mb-2 rounded-lg border-l-4 transition-colors hover:bg-gray-50 ${
+                    className={`relative p-3 mb-2 rounded-2xl border-l-4 transition-colors hover:bg-gray-50 ${
                       notification.read
                         ? "bg-gray-50"
                         : getPriorityColor(notification.priority)

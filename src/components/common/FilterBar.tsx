@@ -111,7 +111,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
             placeholder="Buscar cliente, documento, título..."
             value={filters.search || ""}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
       </div>
@@ -171,7 +171,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
       <div className="px-4 pb-4">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+          className="w-full flex items-center justify-between py-2 px-3 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors"
         >
           <div className="flex items-center">
             <Filter className="h-4 w-4 text-gray-600 mr-2" />
@@ -232,7 +232,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 Status
               </label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 value={filters.status || "all"}
                 onChange={(e) => handleStatusChange(e.target.value)}
               >
@@ -253,7 +253,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input
                   type="date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   value={filters.dateFrom || ""}
                   onChange={(e) =>
                     onFilterChange({
@@ -265,7 +265,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 />
                 <input
                   type="date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   value={filters.dateTo || ""}
                   onChange={(e) =>
                     onFilterChange({
@@ -284,7 +284,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 Loja
               </label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 value={filters.store || "all"}
                 onChange={(e) =>
                   onFilterChange({
@@ -312,7 +312,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                   Cobrador
                 </label>
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   value={filters.collector || "all"}
                   onChange={(e) =>
                     onFilterChange({
@@ -340,7 +340,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                     Cidade
                   </label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     value={filters.city || "all"}
                     onChange={(e) =>
                       handleLocationChange("city", e.target.value)
@@ -362,7 +362,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                     Bairro
                   </label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     value={filters.neighborhood || "all"}
                     onChange={(e) =>
                       handleLocationChange("neighborhood", e.target.value)
@@ -390,7 +390,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 <input
                   type="number"
                   placeholder="Mínimo"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   value={filters.minAmount || ""}
                   onChange={(e) =>
                     onFilterChange({
@@ -404,7 +404,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 <input
                   type="number"
                   placeholder="Máximo"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   value={filters.maxAmount || ""}
                   onChange={(e) =>
                     onFilterChange({
@@ -432,7 +432,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                         visitsOnly: !filters.visitsOnly,
                       })
                     }
-                    className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                    className={`px-3 py-2 text-sm rounded-2xl border transition-colors ${
                       filters.visitsOnly
                         ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
                         : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
@@ -448,7 +448,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
           {/* Active Filters Summary */}
           {hasActiveFilters && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+            <div className="mt-4 p-3 bg-gray-50 rounded-2xl">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-medium text-gray-600">
                   Filtros ativos:

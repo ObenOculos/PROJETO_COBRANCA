@@ -421,7 +421,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 title="Ver todos os dados de cadastro do cliente"
               >
                 <Info className="h-5 w-5 mr-2" />
-                <span className="text-xs sm:text-sm">Ver Dados</span>
+                <span className="text-xs sm:text-sm">
+                  <span className="sm:hidden">Dados</span>
+                  <span className="hidden sm:inline">Ver Dados</span>
+                </span>
               </button>
               <button
                 id="view-client-sales"
@@ -431,7 +434,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 title="Ver vendas do cliente"
               >
                 <Receipt className="h-5 w-5 mr-2" />
-                <span className="text-xs sm:text-sm">Ver Vendas</span>
+                <span className="text-xs sm:text-sm">
+                  <span className="sm:hidden">Vendas</span>
+                  <span className="hidden sm:inline">Ver Vendas</span>
+                </span>
               </button>
               {clientSales.reduce((sum, sale) => sum + sale.pendingValue, 0) >
                 0 && (
@@ -444,7 +450,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 >
                   <CreditCard className="h-5 w-5 mr-2" />
                   <span className="text-xs sm:text-sm">
-                    Distribuir Pagamento
+                    <span className="sm:hidden">Distribuir</span>
+                    <span className="hidden sm:inline">Distribuir Pagamento</span>
                   </span>
                 </button>
               )}
@@ -463,7 +470,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   }
                 >
                   <Edit className="h-5 w-5 mr-2" />
-                  <span className="text-xs sm:text-sm">Editar Pagamentos</span>
+                  <span className="text-xs sm:text-sm">
+                    <span className="sm:hidden">Editar</span>
+                    <span className="hidden sm:inline">Editar Pagamentos</span>
+                  </span>
                 </button>
               )}
             </div>
@@ -475,7 +485,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-4">
                 Dados de Cadastro do Cliente
               </h3>
-              <div className="space-y-3 text-xs sm:text-sm text-gray-700">
+              <div className="bg-gray-200 p-4 space-y-3 rounded-lg text-xs sm:text-sm text-gray-700">
                 {Object.entries(clientGroup)
                   .filter(([key]) =>
                     [
@@ -544,7 +554,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       >
                         {/* Sale Header */}
                         <div className="px-4 py-3 bg-gray-50">
-                          <div className="flex items-center justify-between">
+                          {/* Desktop Layout */}
+                          <div className="hidden sm:flex items-center justify-between">
                             <div
                               id={`sale-expansion-${sale.saleNumber}`}
                               className="flex items-center flex-1 cursor-pointer hover:bg-gray-100 p-2 rounded-2xl -m-2"
@@ -563,7 +574,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                 <h4 className="font-medium text-gray-900">
                                   Venda {sale.saleNumber}
                                 </h4>
-                                <p className="text-xs sm:text-sm text-gray-600">
+                                <p className="text-sm text-gray-600">
                                   {sale.installments.length} parcela
                                   {sale.installments.length !== 1 ? "s" : ""}
                                 </p>
@@ -572,8 +583,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                                       saleBalance.status === "fully_paid"
                                         ? "bg-green-100 text-green-800"
-                                        : saleBalance.status ===
-                                            "partially_paid"
+                                        : saleBalance.status === "partially_paid"
                                           ? "bg-yellow-100 text-yellow-800"
                                           : "bg-red-100 text-red-800"
                                     }`}
@@ -588,40 +598,108 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-4">
                               <div className="text-right">
-                                <div className="text-xs sm:text-sm font-medium text-gray-900">
+                                <div className="text-sm font-medium text-gray-900">
                                   {formatCurrency(sale.totalValue)}
                                 </div>
                                 <div className="text-xs text-green-600 font-medium">
                                   Pago: {formatCurrency(saleBalance.totalPaid)}
                                 </div>
                                 <div className="text-xs text-red-600 font-medium">
-                                  Restante:{" "}
-                                  {formatCurrency(saleBalance.remainingBalance)}
+                                  Restante: {formatCurrency(saleBalance.remainingBalance)}
                                 </div>
                               </div>
 
-                              {/* Botão de Pagamento por Venda */}
-                              {userType === "collector" &&
-                                saleBalance.remainingBalance > 0 && (
-                                  <button
-                                    id={`receive-payment-${sale.saleNumber}`}
-                                    name={`receivePayment${sale.saleNumber}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenSalePayment(sale);
-                                    }}
-                                    className="flex items-center px-3 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors text-sm font-medium shadow-sm"
-                                    title="Receber pagamento da venda"
-                                  >
-                                    <CreditCard className="h-4 w-4 mr-1" />
-                                    <span className="text-xs sm:text-sm">
-                                      Receber
-                                    </span>
-                                  </button>
-                                )}
+                              {userType === "collector" && saleBalance.remainingBalance > 0 && (
+                                <button
+                                  id={`receive-payment-${sale.saleNumber}`}
+                                  name={`receivePayment${sale.saleNumber}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenSalePayment(sale);
+                                  }}
+                                  className="flex items-center px-3 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors text-sm font-medium shadow-sm"
+                                  title="Receber pagamento da venda"
+                                >
+                                  <CreditCard className="h-4 w-4 mr-1" />
+                                  <span>Receber</span>
+                                </button>
+                              )}
                             </div>
+                          </div>
+
+                          {/* Mobile Layout */}
+                          <div className="sm:hidden space-y-3">
+                            <div
+                              id={`sale-expansion-mobile-${sale.saleNumber}`}
+                              className="flex items-center justify-between cursor-pointer hover:bg-gray-100 p-2 rounded-2xl -m-2"
+                              onClick={() =>
+                                toggleSaleExpansion(sale.saleNumber)
+                              }
+                            >
+                              <div className="flex items-center">
+                                <div className="mr-3">
+                                  {expandedSales.has(sale.saleNumber) ? (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronRight className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </div>
+                                <div>
+                                  <h4 className="font-medium text-gray-900">
+                                    Venda {sale.saleNumber}
+                                  </h4>
+                                  <p className="text-xs text-gray-600">
+                                    {sale.installments.length} parcela
+                                    {sale.installments.length !== 1 ? "s" : ""}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <div className="text-right">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {formatCurrency(sale.totalValue)}
+                                </div>
+                                <div className="text-xs text-red-600 font-medium">
+                                  Restante: {formatCurrency(saleBalance.remainingBalance)}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-center">
+                              <span
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                  saleBalance.status === "fully_paid"
+                                    ? "bg-green-100 text-green-800"
+                                    : saleBalance.status === "partially_paid"
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {saleBalance.status === "fully_paid"
+                                  ? "Pago Integralmente"
+                                  : saleBalance.status === "partially_paid"
+                                    ? "Parcialmente Pago"
+                                    : "Pendente"}
+                              </span>
+                            </div>
+
+                            {userType === "collector" && saleBalance.remainingBalance > 0 && (
+                              <button
+                                id={`receive-payment-mobile-${sale.saleNumber}`}
+                                name={`receivePaymentMobile${sale.saleNumber}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenSalePayment(sale);
+                                }}
+                                className="flex items-center justify-center w-full px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium shadow-sm"
+                                title="Receber pagamento da venda"
+                              >
+                                <CreditCard className="h-5 w-5 mr-2" />
+                                <span>Receber Pagamento</span>
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -762,7 +840,12 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     >
                       {isRequestingAuth
                         ? "Solicitando..."
-                        : "Solicitar Autorização"}
+                        : (
+                          <>
+                            <span className="sm:hidden">Solicitar</span>
+                            <span className="hidden sm:inline">Solicitar Autorização</span>
+                          </>
+                        )}
                     </button>
                   </div>
                 </div>

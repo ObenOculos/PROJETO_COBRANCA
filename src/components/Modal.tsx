@@ -35,7 +35,7 @@ export function Modal({
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div
-          className={`relative bg-white rounded-lg shadow-xl w-full ${sizeClasses[size]} transform transition-all`}
+          className={`relative bg-white rounded-2xl shadow-xl w-full ${sizeClasses[size]} transform transition-all`}
         >
           {/* Header */}
           {title && (
@@ -43,7 +43,7 @@ export function Modal({
               <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg p-1"
+                className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-2xl p-1"
               >
                 <X className="h-5 w-5" />
               </button>

@@ -25,7 +25,7 @@ export function DateValidationModal({
 
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all">
+        <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md transform transition-all">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center space-x-3">
@@ -36,7 +36,7 @@ export function DateValidationModal({
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 rounded-lg p-1"
+              className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 rounded-2xl p-1"
             >
               <X className="h-5 w-5" />
             </button>
@@ -48,7 +48,7 @@ export function DateValidationModal({
             <div className="flex justify-end">
               <button
                 onClick={onClose}
-                className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 transition-colors"
+                className="px-4 py-2 bg-amber-500 text-white rounded-2xl hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 transition-colors"
               >
                 Entendi
               </button>

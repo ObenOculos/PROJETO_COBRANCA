@@ -1106,7 +1106,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         onChange={(e) =>
                           handleFilterChange("city", e.target.value)
                         }
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                       >
                         <option value="">Todas as cidades</option>
                         {availableCities.map((city) => (
@@ -1130,7 +1130,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                           handleFilterChange("minValue", e.target.value)
                         }
                         placeholder="R$ 0,00"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                        className="w-full px-3 py-2 text-sm border rounded-2xl border-gray-300 focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                       />
                     </div>
 
@@ -1147,7 +1147,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                           handleFilterChange("maxValue", e.target.value)
                         }
                         placeholder="R$ 999.999,99"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                       />
                     </div>
 
@@ -1161,7 +1161,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         onChange={(e) =>
                           handleFilterChange("visitStatus", e.target.value)
                         }
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                       >
                         <option value="">Todos</option>
                         <option value="critical">
@@ -1242,7 +1242,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             {/* Lista de Clientes */}
             {availableClients.length > 0 && (
               <div className="border border-gray-200 rounded-2xl">
-                <div className="bg-gray-50 p-3 border-b border-gray-200">
+                <div className="bg-gray-50 p-3 border-b border-gray-200 rounded-t-2xl">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div className="flex-1">
                       <span className="text-sm font-medium text-gray-700">
@@ -2431,7 +2431,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleCloseCancellationModal}
-                className="flex-1 px-4 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
               >
                 Cancelar
               </button>
@@ -2526,7 +2526,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleCloseRescheduleModal}
-                className="flex-1 px-4 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
               >
                 Cancelar
               </button>

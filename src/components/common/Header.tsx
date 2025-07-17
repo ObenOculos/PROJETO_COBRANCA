@@ -30,7 +30,7 @@ const Header: React.FC<HeaderProps> = ({
       <div className="mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-3 lg:py-4">
           <div className="flex items-center flex-1 min-w-0">
-            <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+            <div className="h-8 w-8 bg-blue-600 rounded-2xl flex items-center justify-center mr-3 flex-shrink-0">
               <span className="text-white font-bold text-sm">SC</span>
             </div>
             <div className="min-w-0 flex-1">
@@ -115,7 +115,7 @@ const Header: React.FC<HeaderProps> = ({
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                  <div className="h-8 w-8 bg-blue-600 rounded-2xl flex items-center justify-center">
                     <span className="text-white font-semibold text-sm">SC</span>
                   </div>
                   <h2 className="text-lg font-semibold text-gray-900">
@@ -124,7 +124,7 @@ const Header: React.FC<HeaderProps> = ({
                 </div>
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-2xl transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -164,7 +164,7 @@ const Header: React.FC<HeaderProps> = ({
                           onTabChange(tab.id);
                           setIsMobileMenuOpen(false);
                         }}
-                        className={`group w-full flex items-center px-3 py-2 rounded-lg text-left transition-colors ${
+                        className={`group w-full flex items-center px-3 py-2 rounded-2xl text-left transition-colors ${
                           activeTab === tab.id
                             ? "bg-blue-50 text-blue-700 border-l-3 border-blue-500"
                             : "text-gray-700 hover:bg-gray-50"
@@ -196,7 +196,7 @@ const Header: React.FC<HeaderProps> = ({
             <div className="mt-auto p-4 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={logout}
-                className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
+                className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-2xl transition-colors font-medium"
                 title="Sair"
               >
                 <LogOut className="h-4 w-4" />

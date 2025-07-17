@@ -17,6 +17,10 @@ import {
   ArrowDown,
   ChevronDown,
   ChevronUp,
+  Hash,
+  Settings,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { Collection, ClientGroup, SaleGroup } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
@@ -390,7 +394,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                         setItemsPerPage(Number(e.target.value));
                         setCurrentPage(1);
                       }}
-                      className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      className="text-sm border border-gray-300 rounded-2xl px-2 py-1 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     >
                       <option value={10}>10</option>
                       <option value={20}>20</option>
@@ -496,13 +500,13 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                     <div className="mt-3 flex flex-wrap gap-2">
                       {clientGroup.totalReceived > 0 && (
-                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-2xl bg-green-100 text-green-800">
                           <TrendingUp className="h-3 w-3 mr-1" />
                           {formatCurrency(clientGroup.totalReceived)} recebido
                         </span>
                       )}
                       {clientGroup.pendingValue > 0.01 && (
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-2xl bg-red-100 text-red-800">
                           {formatCurrency(clientGroup.pendingValue)} pendente
                         </span>
                       )}
@@ -524,7 +528,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
           {/* Controles de Paginação */}
           {totalPages > 1 && (
-            <div className="bg-gray-800 px-4 sm:px-6 py-4 rounded-b-lg">
+            <div className="bg-gray-800 px-4 sm:px-6 py-4 rounded-2xl-b-lg">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-sm text-white text-center sm:text-left">
                   <span className="font-semibold">
@@ -655,26 +659,27 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     // Fallback to simple list view
     return (
       <>
-        <div className="bg-white rounded-2xl border border-gray-200">
-          {/* Header Consolidado */}
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <div className="space-y-4">
-              {/* Linha 1: Título e Paginação */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
+        <div className="">
+          {/* Header Minimalista */}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 mb-4">
+            <div className="space-y-3">
+              {/* Linha Principal */}
+              <div className="flex items-center gap-1 justify-between">
+                <div className="flex items-center gap-3">
                   <DollarSign className="h-5 w-5 text-blue-600" />
                   <h2 className="text-lg font-semibold text-gray-900">
-                    {userType === "manager"
-                      ? "Todas as Cobranças"
-                      : "Minha Carteira"}
+                    {userType === "manager" ? "Todas as Cobranças" : "Minha Carteira"}
                   </h2>
-                  <span className="text-sm text-gray-500">
-                    {filteredAndGroupedSales.length} cliente
-                    {filteredAndGroupedSales.length !== 1 ? "s" : ""}
-                  </span>
+                  <div className="flex items-center gap- text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
+                    <div className="flex items-center gap-1 text-sm text-gray-500">
+                      <Hash className="h-3 w-3" />
+                      {filteredAndGroupedSales.length}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">Por página:</span>
+                
+                <div className="flex items-center gap-1 text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
+                  <Settings className="h-4 w-4 text-gray-400" />
                   <select
                     id="items-per-page"
                     name="itemsPerPage"
@@ -683,7 +688,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       setItemsPerPage(Number(e.target.value));
                       setCurrentPage(1);
                     }}
-                    className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                    className="text-sm border-0 bg-transparent focus:ring-0 text-gray-600"
                   >
                     <option value={10}>10</option>
                     <option value={20}>20</option>
@@ -693,141 +698,130 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                 </div>
               </div>
 
-              {/* Linha 2: Controles de Ação - Modificado para mobile */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0">
-                {/* Ordenação - Agora em linha própria em mobile */}
-                <div className="flex items-center justify-between sm:justify-start sm:space-x-3">
-                  <span className="text-sm text-gray-600">Ordenar:</span>
-                  <div className="flex space-x-1">
-                    <button
-                      onClick={() => handleSort("cliente")}
-                      className={`p-2 rounded-2xl transition-colors ${
-                        sortField === "cliente"
-                          ? "bg-blue-600 text-white"
-                          : "bg-white text-gray-600 hover:bg-gray-100"
-                      }`}
-                      title="Ordenar por Cliente"
-                    >
-                      <User className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleSort("valor")}
-                      className={`p-2 rounded-2xl transition-colors ${
-                        sortField === "valor"
-                          ? "bg-blue-600 text-white"
-                          : "bg-white text-gray-600 hover:bg-gray-100"
-                      }`}
-                      title="Ordenar por Valor"
-                    >
-                      <DollarSign className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleSort("cidade")}
-                      className={`p-2 rounded-2xl transition-colors ${
-                        sortField === "cidade"
-                          ? "bg-blue-600 text-white"
-                          : "bg-white text-gray-600 hover:bg-gray-100"
-                      }`}
-                      title="Ordenar por Cidade"
-                    >
-                      <MapPin className="h-4 w-4" />
-                    </button>
-                  </div>
+              {/* Linha de Controles */}
+              <div className="flex items-center justify-between">
+                {/* Ordenação */}
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleSort("cliente")}
+                    className={`p-2 rounded-2xl transition-colors ${
+                      sortField === "cliente"
+                        ? "bg-blue-600 text-white"
+                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                    }`}
+                    title="Ordenar por Cliente"
+                  >
+                    <User className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleSort("valor")}
+                    className={`p-2 rounded-2xl transition-colors ${
+                      sortField === "valor"
+                        ? "bg-blue-600 text-white"
+                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                    }`}
+                    title="Ordenar por Valor"
+                  >
+                    <DollarSign className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleSort("cidade")}
+                    className={`p-2 rounded-2xl transition-colors ${
+                      sortField === "cidade"
+                        ? "bg-blue-600 text-white"
+                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                    }`}
+                    title="Ordenar por Cidade"
+                  >
+                    <MapPin className="h-4 w-4" />
+                  </button>
                 </div>
 
-                {/* Controles - Agrupados em coluna em mobile */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:space-x-3">
+                {/* Controles Secundários */}
+                <div className="flex items-center gap-1">
                   {/* Navegação Rápida */}
                   {totalPages > 1 && (
-                    <div className="flex items-center justify-between sm:justify-start sm:space-x-2">
-                      <span className="text-sm text-gray-600">Ir para:</span>
-                      <div className="flex space-x-1">
-                        <button
-                          onClick={() => setCurrentPage(1)}
-                          disabled={currentPage === 1}
-                          className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          Início
-                        </button>
-                        <button
-                          onClick={() => setCurrentPage(totalPages)}
-                          disabled={currentPage === totalPages}
-                          className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          Fim
-                        </button>
-                      </div>
-                    </div>
+                    <>
+                      <button
+                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                        disabled={currentPage === 1}
+                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                        title="Página anterior"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                        disabled={currentPage === totalPages}
+                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                        title="Próxima página"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                      <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                    </>
                   )}
 
-                  {/* Filtros para Collector */}
+                  {/* Filtros */}
                   {userType === "collector" && (
                     <button
                       id="toggle-filters"
                       name="toggleFilters"
                       onClick={() => setShowFilters(!showFilters)}
-                      className={`flex items-center justify-center sm:justify-start px-3 py-2 rounded-2xl text-sm transition-colors ${
+                      className={`p-2 rounded-2xl transition-colors ${
                         showFilters
                           ? "bg-blue-600 text-white"
-                          : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                          : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
                       }`}
+                      title="Filtros"
                     >
-                      <Filter className="h-4 w-4 mr-2" />
-                      Filtros
+                      <Filter className="h-4 w-4" />
                     </button>
                   )}
 
                   {/* Expansão */}
-                  <div className="hidden sm:flex items-center justify-between sm:justify-start sm:space-x-2">
-                    <span className="text-sm text-gray-600 hidden sm:inline">
-                      Vendas:
-                    </span>
-                    <div className="flex space-x-1">
-                      <button
-                        onClick={expandAll}
-                        className="p-2 bg-green-100 text-green-700 rounded-2xl hover:bg-green-200 transition-colors"
-                        title="Expandir todas as vendas"
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={collapseAll}
-                        className="p-2 bg-orange-100 text-orange-700 rounded-2xl hover:bg-orange-200 transition-colors"
-                        title="Retrair todas as vendas"
-                      >
-                        <ChevronUp className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
+                  <button
+                    onClick={expandAll}
+                    className="p-2 text-green-600 hover:bg-green-50 rounded-2xl transition-colors"
+                    title="Expandir todas"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={collapseAll}
+                    className="p-2 text-orange-600 hover:bg-orange-50 rounded-2xl transition-colors"
+                    title="Retrair todas"
+                  >
+                    <Minimize2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
 
-              {/* Linha 3: Filtros Expandidos (se ativo) */}
+              {/* Filtros Expandidos */}
               {userType === "collector" && showFilters && (
-                <div className="flex items-center space-x-3 pt-2 border-t border-gray-200">
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm text-gray-600">Status:</label>
-                    <select
-                      id="status-filter"
-                      name="statusFilter"
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="text-sm border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                    >
-                      <option value="">Todos</option>
-                      <option value="pendente">Pendente</option>
-                      <option value="pago">Pago</option>
-                      <option value="parcial">Parcial</option>
-                    </select>
-                  </div>
+                <div className="flex items-center gap-3 py-2 border-t border-gray-100">
+                  <Filter className="h-4 w-4 text-blue-600" />
+                  <select
+                    id="status-filter"
+                    name="statusFilter"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="text-sm border border-gray-300 rounded-2xl px-3 py-1.5 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  >
+                    <option value="">Todos</option>
+                    <option value="pendente">Pendente</option>
+                    <option value="pago">Pago</option>
+                    <option value="parcial">Parcial</option>
+                  </select>
                   {statusFilter && (
                     <button
                       id="clear-filter"
                       name="clearFilter"
                       onClick={() => setStatusFilter("")}
-                      className="px-3 py-2 bg-red-100 text-red-700 rounded-2xl hover:bg-red-200 transition-colors text-sm"
+                      className="p-1.5 text-red-600 hover:bg-red-50 rounded-2xl transition-colors"
+                      title="Limpar filtro"
                     >
-                      Limpar
+                      <AlertCircle className="h-4 w-4" />
                     </button>
                   )}
                 </div>
@@ -840,20 +834,20 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
             {paginatedSalesGroups.map((clientGroup) => (
               <div
                 key={clientGroup.document}
-                className="bg-white hover:shadow-sm transition-all duration-200"
+                className="mt-4 rounded-2xl hover:shadow-sm transition-all duration-200"
               >
                 {/* Cabeçalho do Cliente */}
                 <div
-                  className="px-4 sm:px-6 py-4 sm:py-5 bg-gradient-to-r from-gray-50 to-blue-50 cursor-pointer hover:from-gray-100 hover:to-blue-100 transition-all duration-200 border-l-4 border-transparent hover:border-blue-400"
+                  className="px-4 sm:px-6 py-3 rounded-2xl border-b border-gray-200 bg-white cursor-pointer"
                   onClick={() => toggleClientExpansion(clientGroup.document)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center flex-1 min-w-0">
-                      <div className="flex-shrink-0 mr-3">
+                      <div className="hidden sm:flex flex-shrink-0 mr-3">
                         <button
                           id={`client-toggle-${clientGroup.document}`}
                           name={`clientToggle${clientGroup.document}`}
-                          className="p-1 rounded-full bg-white shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200"
+                          className="p-1 rounded-2xl bg-white shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200"
                         >
                           {expandedClients.has(clientGroup.document) ? (
                             <ChevronUp className="h-4 w-4 text-blue-600" />
@@ -864,7 +858,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       </div>
 
                       <div className="flex-shrink-0 mr-3">
-                        <div className="p-2 bg-blue-100 rounded-full">
+                        <div className="p-2 bg-blue-100 rounded-2xl">
                           <User className="h-5 w-5 text-blue-600" />
                         </div>
                       </div>
@@ -873,7 +867,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                         <h3 className="text-lg font-bold text-gray-900 truncate">
                           {clientGroup.client}
                         </h3>
-                        <p className="text-sm text-gray-600 truncate font-mono bg-gray-100 px-2 py-1 rounded mt-1 inline-block">
+                        <p className="text-sm text-gray-600 truncate font-mono bg-gray-100 px-2 py-1 rounded-2xl mt-1 inline-block">
                           {clientGroup.document}
                         </p>
                         <div className="flex items-center text-xs text-gray-500 mt-2">
@@ -895,13 +889,13 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       </div>
                       <div className="flex flex-col sm:flex-row justify-end gap-1 sm:gap-2 mt-3">
                         {clientGroup.totalReceived > 0 && (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 shadow-sm">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-2xl text-xs font-semibold bg-green-100 text-green-800 shadow-sm">
                             <TrendingUp className="h-3 w-3 mr-1" />
                             {formatCurrency(clientGroup.totalReceived)}
                           </span>
                         )}
                         {clientGroup.pendingValue > 0 && (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 shadow-sm">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-2xl text-xs font-semibold bg-red-100 text-red-800 shadow-sm">
                             <AlertCircle className="h-3 w-3 mr-1" />
                             {formatCurrency(clientGroup.pendingValue)}
                           </span>
@@ -909,11 +903,24 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Seta para Mobile - na parte inferior */}
+                  <div className="flex sm:hidden justify-center mt-3 pt-3 border-t border-gray-100">
+                    <button
+                      className="p-2 rounded-full bg-blue-50 hover:bg-blue-100 transition-colors"
+                    >
+                      {expandedClients.has(clientGroup.document) ? (
+                        <ChevronUp className="h-4 w-4 text-blue-600" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-blue-600" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Lista de Vendas do Cliente - Condicional */}
                 {expandedClients.has(clientGroup.document) && (
-                  <div className="px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50 animate-in slide-in-from-top-2 duration-200">
+                  <div className="px-4 sm:px-6 py-4 mt-2 rounded-2xl border border-gray-200 bg-gray-50 animate-in slide-in-from-top-2 duration-200">
                     <div className="space-y-3">
                       {clientGroup.sales.map((sale: SaleGroup) => {
                         // Determinar o status real da venda baseado nos valores
@@ -949,7 +956,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                                       : "pendente",
                                   )}
                                   <span
-                                    className={`inline-flex px-2 py-1 text-xs font-medium rounded ${statusColor}`}
+                                    className={`inline-flex px-2 py-1 text-xs font-medium rounded-2xl ${statusColor}`}
                                   >
                                     {displayStatus}
                                   </span>
@@ -1070,7 +1077,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           {filteredAndGroupedSales.length === 0 && (
             <div className="py-16 text-center">
               <div className="text-gray-500">
-                <div className="mx-auto w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                <div className="mx-auto w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mb-6">
                   <Clock className="h-8 w-8 text-gray-400" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -1098,7 +1105,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
         {/* Controles de Paginação */}
         {totalPages > 1 && (
-          <div className="bg-gray-800 border-t border-gray-200 px-4 sm:px-6 py-4 rounded-b-lg">
+          <div className="bg-gray-800 mt-4 border rounded-2xl border-gray-200 px-4 sm:px-6 py-4 rounded-2xl-b-lg">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-sm text-white text-center sm:text-left">
                 <span className="font-semibold">
