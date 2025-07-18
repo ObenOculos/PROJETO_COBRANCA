@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react';
-import { dataCache, statsCache, userCache, quickCache } from '../utils/cache';
+import { dataCache, statsCache, userCache, quickCache, collectionsCache } from '../utils/cache';
 
 interface CacheInvalidationConfig {
   patterns: string[];
@@ -33,7 +33,7 @@ export function useCacheInvalidation(config: CacheInvalidationConfig) {
 export function useRealtimeCacheInvalidation() {
   const invalidateCollections = useCallback(() => {
     console.log('Invalidating collections cache due to real-time update');
-    dataCache.invalidatePrefix('collections');
+    collectionsCache.invalidatePrefix('collections');
     dataCache.invalidatePrefix('client-groups');
     dataCache.invalidatePrefix('dashboard-stats');
     statsCache.invalidatePrefix('performance');

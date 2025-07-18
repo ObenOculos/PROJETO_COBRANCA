@@ -20,7 +20,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
 import { useLoading } from "./LoadingContext";
 import { useOffline } from "../hooks/useOffline";
-import { dataCache, statsCache, userCache } from "../utils/cache";
+import { dataCache, statsCache, userCache, collectionsCache } from "../utils/cache";
 import { useRealtimeCacheInvalidation, useOfflineSyncCacheInvalidation } from "../hooks/useCacheInvalidation";
 
 const CollectionContext = createContext<CollectionContextType | undefined>(
@@ -42,7 +42,7 @@ interface CollectionProviderProps {
 export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   children,
 }) => {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { setLoading: setGlobalLoading } = useLoading();
   const { isOnline, addToOfflineQueue } = useOffline();
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -76,6 +76,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   useEffect(() => {
     let realtimeChannel: any = null;
+
+    // Wait for AuthContext to finish loading before making any decisions
+    if (isAuthLoading) {
+      console.log("Aguardando autenticação carregar...");
+      return;
+    }
 
     if (user) {
       console.log("Usuário logado, carregando dados...");
@@ -168,7 +174,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         supabase.removeChannel(realtimeChannel);
       }
     };
-  }, [user]);
+  }, [user, isAuthLoading]);
 
   // Escutar evento de sincronização offline para recarregar dados
   useEffect(() => {
@@ -194,12 +200,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       
       // Try to get from cache first
       if (useCache) {
-        const cachedData = dataCache.get<Collection[]>(cacheKey);
+        console.log(`Tentando buscar no cache com chave: ${cacheKey}`);
+        const cachedData = collectionsCache.get<Collection[]>(cacheKey);
         if (cachedData) {
-          console.log("Dados de collections carregados do cache");
+          console.log("✅ Dados de collections carregados do cache", cachedData.length, "registros");
           setCollections(cachedData);
           return;
+        } else {
+          console.log("❌ Cache vazio ou expirado para chave:", cacheKey);
         }
+      } else {
+        console.log("🔄 Fetch forçado sem cache (useCache=false)");
       }
 
       console.log("Buscando dados da tabela BANCO_DADOS...");
@@ -362,7 +373,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       setCollections(transformedData);
       
       // Cache the data
-      dataCache.set(cacheKey, transformedData);
+      collectionsCache.set(cacheKey, transformedData);
+      console.log("💾 Dados salvos no cache com chave:", cacheKey);
       
       console.log("Collections carregadas:", transformedData.length);
     } catch (err) {
