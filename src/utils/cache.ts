@@ -68,14 +68,12 @@ class CacheManager {
 
       // First try to get regular cached item
       const cached = storage.getItem(`cache_${fullKey}`);
-      console.log(`🔍 Item regular no localStorage:`, cached ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
       
       if (cached) {
         try {
           // Check if data is compressed
           const parsed = JSON.parse(cached);
           if (parsed.compressed && parsed.data) {
-            console.log(`🗜️ Dados comprimidos encontrados, descomprimindo...`);
             // Decompress the data
             const compressedData = parsed.data;
             const binaryData = atob(compressedData);
@@ -87,42 +85,28 @@ class CacheManager {
             const decompressed = pako.inflate(bytes, { to: 'string' });
             const item: CacheItem<T> = JSON.parse(decompressed);
             
-            console.log(`⏰ Validando TTL - idade: ${Date.now() - item.timestamp}ms, TTL: ${item.ttl}ms`);
-            
             if (this.isValid(item)) {
-              console.log(`✅ Cache válido, retornando dados`);
               return item.data;
             }
-            
-            console.log(`❌ Cache expirado, removendo`);
             // Remove expired item
             storage.removeItem(`cache_${fullKey}`);
             return null;
-          } else {
-            console.log(`📄 Dados regulares (não comprimidos) encontrados`);
           }
         } catch (e) {
-          console.log(`❌ Erro ao tentar parsear como comprimido:`, e.message);
-          console.log(`🗑️ Removendo cache corrompido`);
           storage.removeItem(`cache_${fullKey}`);
           return null;
         }
         
         try {
           const item: CacheItem<T> = JSON.parse(cached);
-          console.log(`⏰ Validando TTL regular - idade: ${Date.now() - item.timestamp}ms, TTL: ${item.ttl}ms`);
           
           if (this.isValid(item)) {
-            console.log(`✅ Cache regular válido, retornando dados`);
             return item.data;
           }
-
-          console.log(`❌ Cache regular expirado, removendo`);
           // Remove expired item
           storage.removeItem(`cache_${fullKey}`);
           return null;
         } catch (parseError) {
-          console.log(`❌ Erro ao parsear cache regular:`, parseError.message);
           storage.removeItem(`cache_${fullKey}`);
           return null;
         }
@@ -130,7 +114,6 @@ class CacheManager {
 
       // Try to get chunked data
       const metaData = storage.getItem(`cache_${fullKey}_meta`);
-      console.log(`🧩 Chunks no localStorage:`, metaData ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
       
       if (metaData) {
         const meta = JSON.parse(metaData);
@@ -279,6 +262,37 @@ class CacheManager {
           for (let i = 0; i < chunks; i++) {
             storage.removeItem(`cache_${fullKey}_chunk_${i}`);
           }
+          
+          // If quota exceeded, try clearing old entries and retry once
+          if (chunkError instanceof Error && chunkError.name === 'QuotaExceededError') {
+            console.warn('Quota exceeded during chunked storage, clearing old cache and retrying...');
+            this.clearOldEntries();
+            
+            try {
+              // Try again with cleaned storage
+              storage.setItem(`cache_${fullKey}_meta`, JSON.stringify({
+                chunks,
+                timestamp: item.timestamp,
+                ttl: item.ttl,
+                key: fullKey,
+                compressed: isCompressed
+              }));
+              
+              for (let i = 0; i < chunks; i++) {
+                const start = i * chunkSize;
+                const end = Math.min(start + chunkSize, serializedItem.length);
+                const chunk = serializedItem.slice(start, end);
+                storage.setItem(`cache_${fullKey}_chunk_${i}`, chunk);
+              }
+              
+              console.log('✅ Retry successful after clearing old cache');
+              this.enforceMaxSize();
+              return;
+            } catch (retryError) {
+              console.warn('Failed to cache even after clearing old entries:', retryError);
+            }
+          }
+          
           return;
         }
       }
@@ -286,10 +300,8 @@ class CacheManager {
       // For regular items, store with compression flag
       if (isCompressed) {
         storage.setItem(`cache_${fullKey}`, JSON.stringify({ compressed: true, data: serializedItem }));
-        console.log(`✅ Salvo como item comprimido regular no localStorage`);
       } else {
         storage.setItem(`cache_${fullKey}`, serializedItem);
-        console.log(`✅ Salvo como item regular no localStorage`);
       }
       
       this.enforceMaxSize();
@@ -479,9 +491,9 @@ class CacheManager {
         }
       }
 
-      // Sort by timestamp (oldest first) and remove until we free up about 25% of entries
+      // Sort by timestamp (oldest first) and remove until we free up about 50% of entries
       cacheItems.sort((a, b) => a.timestamp - b.timestamp);
-      const toRemove = Math.floor(cacheItems.length * 0.25) || 1; // At least remove 1 item
+      const toRemove = Math.floor(cacheItems.length * 0.5) || 1; // Remove 50% of items
       
       for (let i = 0; i < toRemove && i < cacheItems.length; i++) {
         storage.removeItem(cacheItems[i].key);

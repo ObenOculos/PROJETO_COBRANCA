@@ -1019,7 +1019,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     const cacheKey = `client-groups-${collectorId || 'all'}`;
     
     // Try to get from cache first
-    const cachedData = statsCache.get<ClientGroup[]>(cacheKey);
+    const cachedData = dataCache.get<ClientGroup[]>(cacheKey);
     if (cachedData) {
       return cachedData;
     }
@@ -1149,7 +1149,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     );
     
     // Cache the result
-    statsCache.set(cacheKey, result);
+    dataCache.set(cacheKey, result);
     
     return result;
   }, [collections, collectorStores]);
