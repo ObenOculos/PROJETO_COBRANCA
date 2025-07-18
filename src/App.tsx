@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import {
   CollectionProvider,
@@ -124,6 +125,7 @@ const AppContent: React.FC = () => {
         />
       )}
       <OfflineIndicator />
+      <SpeedInsights />
     </div>
   );
 };
