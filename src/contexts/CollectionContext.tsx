@@ -42,7 +42,7 @@ interface CollectionProviderProps {
 export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   children,
 }) => {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { setLoading: setGlobalLoading } = useLoading();
   const { isOnline, addToOfflineQueue } = useOffline();
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -76,6 +76,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   useEffect(() => {
     let realtimeChannel: any = null;
+
+    // Wait for AuthContext to finish loading before making any decisions
+    if (isAuthLoading) {
+      console.log("Aguardando autenticação carregar...");
+      return;
+    }
 
     if (user) {
       console.log("Usuário logado, carregando dados...");
@@ -185,7 +191,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }
       }
     };
-  }, [user]);
+  }, [user, isAuthLoading]);
 
   // Escutar evento de sincronização offline para recarregar dados
   useEffect(() => {
@@ -213,10 +219,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       if (useCache) {
         const cachedData = collectionsCache.get<Collection[]>(cacheKey);
         if (cachedData) {
-          console.log("Dados de collections carregados do cache");
+          console.log("✅ Dados de collections carregados do cache", cachedData.length, "registros");
           setCollections(cachedData);
           return;
+        } else {
+          console.log("❌ Cache vazio ou expirado para chave:", cacheKey);
         }
+      } else {
+        console.log("🔄 Fetch forçado sem cache (useCache=false)");
       }
 
       console.log("Buscando dados da tabela BANCO_DADOS...");
@@ -1024,7 +1034,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     const cacheKey = `client-groups-${collectorId || 'all'}`;
     
     // Try to get from cache first
-    const cachedData = statsCache.get<ClientGroup[]>(cacheKey);
+    const cachedData = dataCache.get<ClientGroup[]>(cacheKey);
     if (cachedData) {
       return cachedData;
     }
@@ -1154,7 +1164,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     );
     
     // Cache the result
-    statsCache.set(cacheKey, result);
+    dataCache.set(cacheKey, result);
     
     return result;
   }, [collections, collectorStores]);

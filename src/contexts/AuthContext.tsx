@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { AuthContextType, User } from "../types";
 import { supabase } from "../lib/supabase";
 import { useLoading } from "./LoadingContext";
+import { dataCache, statsCache, userCache, collectionsCache, quickCache } from "../utils/cache";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -275,8 +276,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         (async () => {
           // Limpar sessão do sistema personalizado
           sessionStorage.removeItem("sistema_user");
+          
+          // Limpar todos os caches
+          dataCache.clear();
+          statsCache.clear();
+          userCache.clear();
+          collectionsCache.clear();
+          quickCache.clear();
+          
+          console.log("Cache limpo e logout realizado com sucesso");
+          
           setUser(null);
-          console.log("Logout realizado com sucesso");
 
           // Limpa o timer de inatividade
           if (inactivityTimer) {
