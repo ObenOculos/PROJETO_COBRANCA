@@ -20,7 +20,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
 import { useLoading } from "./LoadingContext";
 import { useOffline } from "../hooks/useOffline";
-import { dataCache, statsCache, userCache } from "../utils/cache";
+import { dataCache, statsCache, userCache, collectionsCache } from "../utils/cache";
 import { useRealtimeCacheInvalidation, useOfflineSyncCacheInvalidation } from "../hooks/useCacheInvalidation";
 
 const CollectionContext = createContext<CollectionContextType | undefined>(
@@ -149,7 +149,19 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             fetchSalePayments(false); // Force fresh fetch
           },
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log("Status da conexão realtime:", status);
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            console.warn("Erro na subscription do realtime, tentando reconectar em 5s...");
+            setTimeout(() => {
+              if (realtimeChannel) {
+                realtimeChannel.unsubscribe();
+                realtimeChannel = null;
+              }
+              // Reconectar será feito no próximo ciclo do useEffect
+            }, 5000);
+          }
+        });
     } else {
       console.log("Usuário não logado, limpando dados...");
       setCollections([]);
@@ -165,7 +177,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     return () => {
       if (realtimeChannel) {
         console.log("Removendo listener em tempo real...");
-        supabase.removeChannel(realtimeChannel);
+        try {
+          realtimeChannel.unsubscribe();
+          supabase.removeChannel(realtimeChannel);
+        } catch (error) {
+          console.warn("Erro ao remover canal realtime:", error);
+        }
       }
     };
   }, [user]);
@@ -194,7 +211,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       
       // Try to get from cache first
       if (useCache) {
-        const cachedData = dataCache.get<Collection[]>(cacheKey);
+        const cachedData = collectionsCache.get<Collection[]>(cacheKey);
         if (cachedData) {
           console.log("Dados de collections carregados do cache");
           setCollections(cachedData);
@@ -361,8 +378,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       setCollections(transformedData);
       
-      // Cache the data
-      dataCache.set(cacheKey, transformedData);
+      // Cache the data using dedicated collections cache
+      collectionsCache.set(cacheKey, transformedData);
       
       console.log("Collections carregadas:", transformedData.length);
     } catch (err) {

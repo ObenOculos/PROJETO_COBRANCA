@@ -100,10 +100,33 @@ class CacheManager {
       const storage = this.getStorage();
       if (!storage) return;
 
-      storage.setItem(`cache_${fullKey}`, JSON.stringify(item));
+      const itemString = JSON.stringify(item);
+      
+      // Check if the item is too large for storage (reduced threshold for better performance)
+      if (itemString.length > 1024 * 1024) { // 1MB limit instead of 5MB
+        // Silently fall back to memory cache for large items
+        this.memoryCache.set(fullKey, item);
+        return;
+      }
+
+      storage.setItem(`cache_${fullKey}`, itemString);
       this.enforceMaxSize();
     } catch (error) {
-      console.warn('Error writing to cache:', error);
+      if (error instanceof Error && error.name === 'QuotaExceededError') {
+        this.clearOldEntries();
+        
+        try {
+          // Try again after clearing old entries
+          const retryStorage = this.getStorage();
+          if (retryStorage) {
+            retryStorage.setItem(`cache_${fullKey}`, JSON.stringify(item));
+          }
+        } catch (retryError) {
+          this.memoryCache.set(fullKey, item);
+        }
+      } else {
+        console.warn('Error writing to cache:', error);
+      }
     }
   }
 
@@ -180,6 +203,39 @@ class CacheManager {
     return Date.now() - item.timestamp < item.ttl;
   }
 
+  private clearOldEntries(): void {
+    const storage = this.getStorage();
+    if (!storage) return;
+
+    const cacheItems: Array<{ key: string; item: CacheItem<any> }> = [];
+    
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key && key.startsWith('cache_')) {
+        try {
+          const item = JSON.parse(storage.getItem(key)!);
+          cacheItems.push({ key, item });
+        } catch (e) {
+          // Remove invalid items
+          storage.removeItem(key);
+        }
+      }
+    }
+
+    // Remove expired items
+    const now = Date.now();
+    const expiredItems = cacheItems.filter(({ item }) => now - item.timestamp >= item.ttl);
+    expiredItems.forEach(({ key }) => storage.removeItem(key));
+
+    // If still need space, remove oldest 50% of items
+    const remainingItems = cacheItems.filter(({ item }) => now - item.timestamp < item.ttl);
+    if (remainingItems.length > 0) {
+      remainingItems.sort((a, b) => a.item.timestamp - b.item.timestamp);
+      const toDelete = remainingItems.slice(0, Math.ceil(remainingItems.length / 2));
+      toDelete.forEach(({ key }) => storage.removeItem(key));
+    }
+  }
+
   private enforceMaxSize(): void {
     if (this.defaultConfig.storage === 'memory') {
       if (this.memoryCache.size <= this.defaultConfig.maxSize) return;
@@ -249,8 +305,8 @@ class CacheManager {
 // Create instances for different types of data
 export const dataCache = new CacheManager({
   ttl: 10 * 60 * 1000, // 10 minutes for main data
-  maxSize: 50,
-  storage: 'localStorage'
+  maxSize: 20, // Reduced from 50 to prevent quota issues
+  storage: 'memory' // Changed to memory to avoid quota issues with large collections
 });
 
 export const statsCache = new CacheManager({
@@ -268,5 +324,12 @@ export const userCache = new CacheManager({
 export const quickCache = new CacheManager({
   ttl: 30 * 1000, // 30 seconds for quick data
   maxSize: 100,
+  storage: 'memory'
+});
+
+// Dedicated cache for large collections data
+export const collectionsCache = new CacheManager({
+  ttl: 15 * 60 * 1000, // 15 minutes for collections
+  maxSize: 10, // Small number since collections are large
   storage: 'memory'
 });

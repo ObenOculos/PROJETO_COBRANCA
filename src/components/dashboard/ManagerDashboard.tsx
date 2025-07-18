@@ -243,87 +243,102 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const pendingCancellations = getPendingCancellationRequests();
   const tabs = getManagerTabs(pendingCancellations.length);
 
+  // Sales map for overview tab - moved from renderTabContent to fix hooks violation
+  const salesMap = useMemo(() => {
+    if (activeTab !== "overview") return new Map();
+    
+    const map = new Map<
+      string,
+      {
+        isPending: boolean;
+        clientDocument: string;
+        totalValue: number;
+        receivedValue: number;
+      }
+    >();
+    
+    overviewCollections.forEach((collection) => {
+      const saleKey = `${collection.venda_n}-${collection.documento}`;
+      if (!map.has(saleKey)) {
+        map.set(saleKey, {
+          isPending: false,
+          clientDocument: collection.documento || "",
+          totalValue: 0,
+          receivedValue: 0,
+        });
+      }
+      const sale = map.get(saleKey)!;
+      sale.totalValue = Number(sale.totalValue) + Number(collection.valor_original);
+      sale.receivedValue = Number(sale.receivedValue) + Number(collection.valor_recebido);
+    });
+
+    // Determine if each sale is pending (has any amount left to receive)
+    map.forEach((sale) => {
+      const pendingAmount = sale.totalValue - sale.receivedValue;
+      sale.isPending = pendingAmount > 0.01; // Consider amounts > 1 cent as pending
+    });
+    
+    return map;
+  }, [activeTab, overviewCollections]);
+
+  // Overview metrics - moved from renderTabContent to fix hooks violation
+  const overviewMetrics = useMemo(() => {
+    if (activeTab !== "overview") {
+      return {
+        pendingSalesCount: 0,
+        completedSalesCount: 0,
+        clientsWithPendingCount: 0,
+        todayCollections: [],
+        todayAmount: 0,
+        storesWithCollections: 0,
+        averageEfficiency: "0.0",
+      };
+    }
+    
+    const salesArray = Array.from(salesMap.values());
+    const pendingSales = salesArray.filter((s) => s.isPending);
+    const completedSales = salesArray.filter((s) => !s.isPending);
+    
+    const clientsWithPendingCount = new Set(
+      pendingSales
+        .map((s) => s.clientDocument)
+        .filter(Boolean),
+    ).size;
+    
+    const todayCollections = overviewCollections.filter((c) => {
+      const today = new Date().toISOString().split("T")[0];
+      return c.data_vencimento === today;
+    });
+    
+    const todayAmount = todayCollections.reduce(
+      (sum, c) => sum + c.valor_original,
+      0,
+    );
+    
+    const storesWithCollections = new Set(
+      overviewCollections.map((c) => c.nome_da_loja).filter(Boolean),
+    ).size;
+    
+    const averageEfficiency = performance.length > 0 
+      ? (performance.reduce((acc, p) => acc + p.conversionRate, 0) / performance.length).toFixed(1)
+      : "0.0";
+    
+    return {
+      pendingSalesCount: pendingSales.length,
+      completedSalesCount: completedSales.length,
+      clientsWithPendingCount,
+      todayCollections,
+      todayAmount,
+      storesWithCollections,
+      averageEfficiency,
+    };
+  }, [activeTab, salesMap, overviewCollections, performance]);
+
   const renderTabContent = () => {
     switch (activeTab) {
       case "database-upload":
         return <DatabaseUpload />;
       case "overview":
-        // Simplified metrics - pending vs completed sales and clients
-        // Group by sale to count correctly
-        const salesMap = useMemo(() => {
-          const map = new Map<
-            string,
-            {
-              isPending: boolean;
-              clientDocument: string;
-              totalValue: number;
-              receivedValue: number;
-            }
-          >();
-          
-          overviewCollections.forEach((collection) => {
-            const saleKey = `${collection.venda_n}-${collection.documento}`;
-            if (!map.has(saleKey)) {
-              map.set(saleKey, {
-                isPending: false,
-                clientDocument: collection.documento || "",
-                totalValue: 0,
-                receivedValue: 0,
-              });
-            }
-            const sale = map.get(saleKey)!;
-            sale.totalValue = Number(sale.totalValue) + Number(collection.valor_original);
-            sale.receivedValue = Number(sale.receivedValue) + Number(collection.valor_recebido);
-          });
-
-          // Determine if each sale is pending (has any amount left to receive)
-          map.forEach((sale) => {
-            const pendingAmount = sale.totalValue - sale.receivedValue;
-            sale.isPending = pendingAmount > 0.01; // Consider amounts > 1 cent as pending
-          });
-          
-          return map;
-        }, [overviewCollections]);
-
-        const overviewMetrics = useMemo(() => {
-          const salesArray = Array.from(salesMap.values());
-          const pendingSales = salesArray.filter((s) => s.isPending);
-          const completedSales = salesArray.filter((s) => !s.isPending);
-          
-          const clientsWithPendingCount = new Set(
-            pendingSales
-              .map((s) => s.clientDocument)
-              .filter(Boolean),
-          ).size;
-          
-          const todayCollections = overviewCollections.filter((c) => {
-            const today = new Date().toISOString().split("T")[0];
-            return c.data_vencimento === today;
-          });
-          
-          const todayAmount = todayCollections.reduce(
-            (sum, c) => sum + c.valor_original,
-            0,
-          );
-          
-          const storesWithCollections = new Set(
-            overviewCollections.map((c) => c.nome_da_loja).filter(Boolean),
-          ).size;
-          
-          const averageEfficiency = performance.length > 0 
-            ? (performance.reduce((acc, p) => acc + p.conversionRate, 0) / performance.length).toFixed(1)
-            : "0.0";
-          
-          return {
-            pendingSalesCount: pendingSales.length,
-            completedSalesCount: completedSales.length,
-            clientsWithPendingCount,
-            todayCollections,
-            todayAmount,
-            storesWithCollections,
-            averageEfficiency,
-          };
-        }, [salesMap, overviewCollections, performance]);
 
         return (
           <div className="space-y-4 sm:space-y-6">

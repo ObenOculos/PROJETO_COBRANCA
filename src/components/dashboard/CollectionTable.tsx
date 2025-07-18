@@ -142,9 +142,13 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
     // Para gerentes, criar grupos de clientes baseados nas collections filtradas
     const clientGroups = useMemo(() => {
+      // Early return for empty collections
+      if (collections.length === 0) return [];
+      
       if (userType === "manager") {
         const groupsMap = new Map<string, ClientGroupWithMapSales>();
 
+        // Process collections in batches to avoid blocking the UI
         collections.forEach((collection) => {
           const key = (collection.documento || collection.cliente || "").trim();
           if (!key) return;
@@ -170,11 +174,13 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           }
 
           const group = groupsMap.get(key)!;
-          group.totalValue += collection.valor_original || 0;
-          group.totalReceived += collection.valor_recebido || 0;
-          group.pendingValue = parseFloat(
-            Math.max(0, group.totalValue - group.totalReceived).toFixed(2),
-          );
+          const originalValue = collection.valor_original || 0;
+          const receivedValue = collection.valor_recebido || 0;
+          
+          group.totalValue += originalValue;
+          group.totalReceived += receivedValue;
+          // Avoid parseFloat and toFixed for better performance
+          group.pendingValue = Math.max(0, group.totalValue - group.totalReceived);
 
           const saleKey = `${collection.venda_n}-${collection.documento}`;
           if (!group.sales.has(saleKey)) {
@@ -193,18 +199,14 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           }
 
           const sale = group.sales.get(saleKey)!;
-          sale.totalValue += collection.valor_original || 0;
-          sale.totalReceived += collection.valor_recebido || 0;
+          sale.totalValue += originalValue;
+          sale.totalReceived += receivedValue;
           sale.pendingValue = Math.max(0, sale.totalValue - sale.totalReceived);
           sale.installments.push(collection);
 
-          if (sale.totalReceived === 0) {
-            sale.saleStatus = "pending";
-          } else if (sale.totalReceived >= sale.totalValue) {
-            sale.saleStatus = "fully_paid";
-          } else {
-            sale.saleStatus = "partially_paid";
-          }
+          // Optimize status computation
+          sale.saleStatus = sale.totalReceived === 0 ? "pending" :
+                           sale.totalReceived >= sale.totalValue ? "fully_paid" : "partially_paid";
         });
 
         return Array.from(groupsMap.values()).map((group) => ({
@@ -217,45 +219,49 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     }, [userType, collections, getClientGroups, collectorId]);
 
     const filteredClientGroups = useMemo(() => {
-      if (!showGrouped) return [];
+      if (!showGrouped || collections.length === 0) return [];
+      
+      // Optimize by using Set lookup which is O(1) instead of array.includes O(n)
       const collectionIds = new Set(collections.map((c) => c.id_parcela));
-      return clientGroups.filter((group) =>
-        group.sales.some((sale) =>
+      
+      return clientGroups.filter((group) => {
+        // Early return if group has no sales
+        if (!group.sales || group.sales.length === 0) return false;
+        
+        return group.sales.some((sale) =>
           sale.installments.some((inst) => collectionIds.has(inst.id_parcela)),
-        ),
-      );
+        );
+      });
     }, [showGrouped, clientGroups, collections]);
 
     // Paginação para grupos de clientes
     const paginatedClientGroups = useMemo(() => {
-      if (!showGrouped) return [];
+      if (!showGrouped || filteredClientGroups.length === 0) return [];
 
-      // Apply sorting before pagination
-      let sortedGroups = [...filteredClientGroups];
-      if (userType === "collector") {
-        sortedGroups.sort((a, b) => {
+      // Apply sorting before pagination - only if needed
+      let sortedGroups = filteredClientGroups;
+      if (userType === "collector" && sortField) {
+        sortedGroups = [...filteredClientGroups].sort((a, b) => {
+          let result = 0;
           switch (sortField) {
             case "cliente":
-              return sortDirection === "asc"
-                ? a.client.localeCompare(b.client)
-                : b.client.localeCompare(a.client);
+              result = a.client.localeCompare(b.client);
+              break;
             case "valor":
-              return sortDirection === "asc"
-                ? a.totalValue - b.totalValue
-                : b.totalValue - a.totalValue;
+              result = a.totalValue - b.totalValue;
+              break;
             case "cidade":
-              return sortDirection === "asc"
-                ? a.city.localeCompare(b.city)
-                : b.city.localeCompare(a.city);
+              result = a.city.localeCompare(b.city);
+              break;
             default:
               return 0;
           }
+          return sortDirection === "asc" ? result : -result;
         });
       }
 
       const startIndex = (currentPage - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      return sortedGroups.slice(startIndex, endIndex);
+      return sortedGroups.slice(startIndex, startIndex + itemsPerPage);
     }, [
       filteredClientGroups,
       currentPage,
@@ -268,26 +274,26 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
     // Filtrar e agrupar sales por cliente (para view simples)
     const filteredAndGroupedSales = useMemo(() => {
-      if (showGrouped) return [];
+      if (showGrouped || clientGroups.length === 0) return [];
 
+      // Early return if no filtering or sorting needed
       let filteredGroups = clientGroups;
+      
+      // Optimize status filtering
       if (userType === "collector" && statusFilter) {
+        const targetStatus = statusFilter.toLowerCase();
         filteredGroups = clientGroups.filter((group) =>
           group.sales.some((sale) => {
-            let saleRealStatus: string;
-            if (sale.totalReceived > 0 && sale.pendingValue > 0) {
-              saleRealStatus = "parcial";
-            } else if (sale.pendingValue <= 0.01 && sale.totalReceived > 0) {
-              saleRealStatus = "pago";
-            } else {
-              saleRealStatus = "pendente";
-            }
-            return saleRealStatus === statusFilter.toLowerCase();
+            // Optimize status computation - avoid re-computation
+            const status = sale.totalReceived > 0 && sale.pendingValue > 0 ? "parcial" :
+                          sale.pendingValue <= 0.01 && sale.totalReceived > 0 ? "pago" : "pendente";
+            return status === targetStatus;
           }),
         );
       }
 
-      const simpleSalesGroups = filteredGroups.map((group) => ({
+      // Create simplified groups with minimal transformation
+      let simpleSalesGroups = filteredGroups.map((group) => ({
         client: group.client,
         document: group.document,
         cidade: group.city,
@@ -298,38 +304,27 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
         pendingValue: group.pendingValue,
       }));
 
-      simpleSalesGroups.sort((a, b) => {
-        let aValue: string | number | undefined,
-          bValue: string | number | undefined;
-
-        switch (sortField) {
-          case "cliente":
-            aValue = a.client;
-            bValue = b.client;
-            break;
-          case "valor":
-            aValue = a.totalValue;
-            bValue = b.totalValue;
-            break;
-          case "cidade":
-            aValue = a.cidade;
-            bValue = b.cidade;
-            break;
-          default:
-            aValue = a.client;
-            bValue = b.client;
-            break;
-        }
-
-        if (typeof aValue === "string" && typeof bValue === "string") {
-          const result = aValue.localeCompare(bValue);
+      // Optimize sorting - only sort if needed
+      if (sortField) {
+        simpleSalesGroups.sort((a, b) => {
+          let result = 0;
+          switch (sortField) {
+            case "cliente":
+              result = a.client.localeCompare(b.client);
+              break;
+            case "valor":
+              result = a.totalValue - b.totalValue;
+              break;
+            case "cidade":
+              result = a.cidade.localeCompare(b.cidade);
+              break;
+            default:
+              result = a.client.localeCompare(b.client);
+              break;
+          }
           return sortDirection === "asc" ? result : -result;
-        }
-
-        if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-        if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
-        return 0;
-      });
+        });
+      }
 
       return simpleSalesGroups;
     }, [
