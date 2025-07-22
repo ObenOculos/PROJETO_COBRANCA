@@ -64,7 +64,7 @@ export const ClientAssignment = React.memo(() => {
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(10);
 
   // Limite para operações em massa
   const MAX_BATCH_SIZE = 100;
@@ -414,11 +414,6 @@ export const ClientAssignment = React.memo(() => {
   const startItem =
     filteredClients.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
   const endItem = Math.min(currentPage * itemsPerPage, filteredClients.length);
-
-  const handleItemsPerPageChange = (newItemsPerPage: number) => {
-    setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1); // Reset para primeira página
-  };
 
   const handleSelectAll = () => {
     const currentPageUniqueKeys = paginatedClients.map((c) => c.uniqueKey);
@@ -1244,121 +1239,98 @@ export const ClientAssignment = React.memo(() => {
         </div>
       )}
 
-      {/* Pagination Controls */}
+      {/* Controles de Paginação */}
       {totalPages > 1 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-          <div className="flex flex-col gap-4">
-            {/* Mobile-first: Info and items per page on top */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="text-sm text-gray-600 text-center sm:text-left">
-                Mostrando {startItem} a {endItem} de {filteredClients.length}{" "}
-                clientes
-              </div>
-
-              <div className="flex items-center gap-2">
-                <label
-                  htmlFor="itemsPerPage"
-                  className="text-sm text-gray-600 whitespace-nowrap"
-                >
-                  Mostrar:
-                </label>
-                <select
-                  id="itemsPerPage"
-                  name="itemsPerPage"
-                  value={itemsPerPage}
-                  onChange={(e) =>
-                    handleItemsPerPageChange(Number(e.target.value))
-                  }
-                  className="px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-              </div>
+        <div className="bg-gray-800 mt-4 border rounded-2xl border-gray-200 px-4 sm:px-6 py-4 rounded-2xl-b-lg">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-white text-center sm:text-left">
+              <span className="font-semibold">
+                Página {currentPage} de {totalPages}
+              </span>
+              <span className="text-gray-300 ml-2">
+                • Mostrando {startItem} a {endItem} de {filteredClients.length} clientes
+              </span>
             </div>
 
-            {/* Navigation controls */}
-            <div className="flex items-center justify-center gap-1 overflow-x-auto">
-              {/* First and Previous buttons - show text on larger screens, icons on mobile */}
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              {/* Botão Início */}
               <button
+                id="pagination-start-2"
+                name="paginationStart2"
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="px-2 sm:px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
-                <span className="hidden sm:inline">Primeira</span>
-                <span className="sm:hidden">1</span>
+                <span className="text-xs">Início</span>
               </button>
 
+              {/* Botão Anterior */}
               <button
+                id="pagination-previous-2"
+                name="paginationPrevious2"
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="px-2 sm:px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Anterior</span>
               </button>
 
-              {/* Page numbers - show fewer on mobile */}
-              <div className="flex items-center gap-1">
-                {Array.from(
-                  {
-                    length: Math.min(
-                      totalPages,
-                      window.innerWidth < 640 ? 3 : 5,
-                    ),
-                  },
-                  (_, i) => {
-                    let pageNumber;
-                    const maxButtons = window.innerWidth < 640 ? 3 : 5;
+              {/* Números das páginas */}
+              <div className="flex space-x-1">
+                {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
 
-                    if (totalPages <= maxButtons) {
-                      pageNumber = i + 1;
-                    } else if (currentPage <= Math.ceil(maxButtons / 2)) {
-                      pageNumber = i + 1;
-                    } else if (
-                      currentPage >=
-                      totalPages - Math.floor(maxButtons / 2)
-                    ) {
-                      pageNumber = totalPages - maxButtons + 1 + i;
-                    } else {
-                      pageNumber = currentPage - Math.floor(maxButtons / 2) + i;
-                    }
-
-                    return (
-                      <button
-                        key={pageNumber}
-                        onClick={() => setCurrentPage(pageNumber)}
-                        className={`px-2 sm:px-3 py-2 text-sm font-medium rounded-2xl min-w-[40px] ${
-                          currentPage === pageNumber
-                            ? "bg-blue-600 text-white"
-                            : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
-                        }`}
-                      >
-                        {pageNumber}
-                      </button>
-                    );
-                  },
-                )}
+                  return (
+                    <button
+                      key={pageNum}
+                      id={`pagination-page-${pageNum}-2`}
+                      name={`paginationPage${pageNum}2`}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-2 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 ${
+                        pageNum === currentPage
+                          ? "bg-white text-purple-600 shadow-lg transform scale-105"
+                          : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
               </div>
 
+              {/* Botão Próxima */}
               <button
+                id="pagination-next-2"
+                name="paginationNext2"
                 onClick={() =>
                   setCurrentPage(Math.min(totalPages, currentPage + 1))
                 }
                 disabled={currentPage === totalPages}
-                className="px-2 sm:px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
-                <ChevronRight className="h-4 w-4" />
+                <span className="hidden sm:inline">Próxima</span>
+                <ChevronRight className="h-4 w-4 sm:ml-1" />
               </button>
 
+              {/* Botão Fim */}
               <button
+                id="pagination-end-2"
+                name="paginationEnd2"
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="px-2 sm:px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
-                <span className="hidden sm:inline">Última</span>
-                <span className="sm:hidden">{totalPages}</span>
+                <span className="text-xs">Fim</span>
               </button>
             </div>
           </div>
