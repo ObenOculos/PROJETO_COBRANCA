@@ -670,11 +670,6 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
     setCurrentPage(1); // Resetar página ao filtrar
   };
 
-  const handleClientsPerPageChange = (newClientsPerPage: number) => {
-    setClientsPerPage(newClientsPerPage);
-    setCurrentPage(1); // Resetar página ao alterar quantidade
-  };
-
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
@@ -1401,101 +1396,103 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
           </div>
         )}
 
-        {/* Paginação */}
+        {/* Controles de Paginação */}
         {allClients.length > 0 && (
-          <div className="px-3 sm:px-4 py-3 sm:py-4 border-t border-gray-200 bg-gray-50">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3">
-              {/* Informações da página */}
-              <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
-                <span className="font-medium">
-                  {startIndex + 1}-{Math.min(endIndex, allClients.length)}
+          <div className="bg-gray-800 mt-4 border rounded-2xl border-gray-200 px-4 sm:px-6 py-4 rounded-2xl-b-lg">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-sm text-white text-center sm:text-left">
+                <span className="font-semibold">
+                  Página {currentPage} de {totalPages}
                 </span>
-                <span className="hidden sm:inline">
-                  {" "}
-                  de {allClients.length}
+                <span className="text-gray-300 ml-2">
+                  • Mostrando {startIndex + 1} a {Math.min(endIndex, allClients.length)} de {allClients.length} clientes
                 </span>
-                <span className="sm:hidden">/{allClients.length}</span>
                 {selectedClients.length > 0 && (
-                  <span className="ml-2 sm:ml-3 text-blue-600 font-medium">
-                    <span className="hidden sm:inline">
-                      {selectedClients.length} selecionados
-                    </span>
-                    <span className="sm:hidden">
-                      {selectedClients.length} ✓
-                    </span>
+                  <span className="text-blue-400 ml-2">
+                    • {selectedClients.length} selecionados
                   </span>
                 )}
               </div>
 
-              {/* Controle de itens por página */}
-              <div className="flex items-center space-x-2 text-xs sm:text-sm text-gray-600">
-                <span>Itens por página:</span>
-                <select
-                  value={clientsPerPage}
-                  onChange={(e) =>
-                    handleClientsPerPageChange(Number(e.target.value))
-                  }
-                  className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              <div className="flex items-center space-x-1 sm:space-x-2">
+                {/* Botão Início */}
+                <button
+                  id="pagination-start-3"
+                  name="paginationStart3"
+                  onClick={() => handlePageChange(1)}
+                  disabled={currentPage === 1}
+                  className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                 >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-              </div>
+                  <span className="text-xs">Início</span>
+                </button>
 
-              {/* Controles de paginação */}
-              {totalPages > 1 && (
-                <div className="flex items-center space-x-1">
-                  <button
-                    onClick={handlePreviousPage}
-                    disabled={currentPage === 1}
-                    className="p-1.5 sm:p-2 rounded text-gray-500 hover:text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-                  </button>
+                {/* Botão Anterior */}
+                <button
+                  id="pagination-previous-3"
+                  name="paginationPrevious3"
+                  onClick={handlePreviousPage}
+                  disabled={currentPage === 1}
+                  className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                >
+                  <ChevronLeft className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Anterior</span>
+                </button>
 
-                  {/* Números das páginas - mobile otimizado */}
-                  <div className="flex space-x-1">
-                    {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
-                      let pageNumber;
+                {/* Números das páginas */}
+                <div className="flex space-x-1">
+                  {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
 
-                      if (totalPages <= 3) {
-                        pageNumber = i + 1;
-                      } else if (currentPage <= 2) {
-                        pageNumber = i + 1;
-                      } else if (currentPage >= totalPages - 1) {
-                        pageNumber = totalPages - 2 + i;
-                      } else {
-                        pageNumber = currentPage - 1 + i;
-                      }
-
-                      return (
-                        <button
-                          key={pageNumber}
-                          onClick={() => handlePageChange(pageNumber)}
-                          className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors ${
-                            currentPage === pageNumber
-                              ? "bg-blue-600 text-white"
-                              : "text-gray-600 hover:text-gray-900 hover:bg-white"
-                          }`}
-                        >
-                          {pageNumber}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    onClick={handleNextPage}
-                    disabled={currentPage === totalPages}
-                    className="p-1.5 sm:p-2 rounded text-gray-500 hover:text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-                  </button>
+                    return (
+                      <button
+                        key={pageNum}
+                        id={`pagination-page-${pageNum}-3`}
+                        name={`paginationPage${pageNum}3`}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`px-2 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 ${
+                          pageNum === currentPage
+                            ? "bg-white text-purple-600 shadow-lg transform scale-105"
+                            : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
+
+                {/* Botão Próxima */}
+                <button
+                  id="pagination-next-3"
+                  name="paginationNext3"
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                >
+                  <span className="hidden sm:inline">Próxima</span>
+                  <ChevronRight className="h-4 w-4 sm:ml-1" />
+                </button>
+
+                {/* Botão Fim */}
+                <button
+                  id="pagination-end-3"
+                  name="paginationEnd3"
+                  onClick={() => handlePageChange(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                >
+                  <span className="text-xs">Fim</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

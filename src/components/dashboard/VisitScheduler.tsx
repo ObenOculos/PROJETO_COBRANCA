@@ -1920,7 +1920,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
                   <Calendar className="h-8 w-8 text-blue-400 mx-auto mb-2" />
                   <p className="text-blue-600 font-medium">
-                    Nenhuma. "" visita agendada para hoje
+                    Nenhuma visita agendada para hoje.
                   </p>
                   <p className="text-blue-500 text-sm">
                     Que tal agendar uma nova visita?
@@ -2349,21 +2349,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </div>
             )}
 
-            {/* Caso não tenha nenhuma visita */}
-            {todayVisits.length === 0 &&
-              upcomingVisits.length === 0 &&
-              pastVisits.length === 0 && (
-                <div className="text-center py-8">
-                  <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 text-lg">
-                    Nenhuma visita agendada
-                  </p>
-                  <p className="text-gray-400 text-sm mt-2">
-                    Comece agendando uma nova visita na aba "Agendar Nova
-                    Visita"
-                  </p>
-                </div>
-              )}
+
           </div>
         )}
       </div>
