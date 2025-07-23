@@ -54,5 +54,4 @@ const OfflineIndicator: React.FC = () => {
     </div>
   );
 };
-
 export default OfflineIndicator;
