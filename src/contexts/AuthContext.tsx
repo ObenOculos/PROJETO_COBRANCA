@@ -2,7 +2,13 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { AuthContextType, User } from "../types";
 import { supabase } from "../lib/supabase";
 import { useLoading } from "./LoadingContext";
-import { dataCache, statsCache, userCache, collectionsCache, quickCache } from "../utils/cache";
+import {
+  dataCache,
+  statsCache,
+  userCache,
+  collectionsCache,
+  quickCache,
+} from "../utils/cache";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -42,30 +48,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     if (user) {
       inactivityTimer = setTimeout(() => {
-        console.log("Tempo de inatividade atingido, fazendo logout automático...");
-        
+        console.log(
+          "Tempo de inatividade atingido, fazendo logout automático...",
+        );
+
         // Limpar sessão imediatamente
         sessionStorage.removeItem("sistema_user");
-        
+
         // Limpar localStorage (exceto dados essenciais)
-        const keysToKeep = ['cached_users', 'managerActiveTab', 'collectorActiveTab'];
+        const keysToKeep = [
+          "cached_users",
+          "managerActiveTab",
+          "collectorActiveTab",
+        ];
         const allKeys = Object.keys(localStorage);
-        allKeys.forEach(key => {
+        allKeys.forEach((key) => {
           if (!keysToKeep.includes(key)) {
             localStorage.removeItem(key);
           }
         });
-        
+
         // Limpar todos os caches
         dataCache.clear();
         statsCache.clear();
         userCache.clear();
         collectionsCache.clear();
         quickCache.clear();
-        
+
         // Resetar estado do usuário
         setUser(null);
-        
+
         // Mostrar modal informativo
         setShowInactivityModal(true);
       }, INACTIVITY_TIMEOUT);
@@ -138,23 +150,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [user]);
 
   // Função para realizar login offline usando dados em cache
-  const performOfflineLogin = async (login: string, password: string): Promise<boolean> => {
+  const performOfflineLogin = async (
+    login: string,
+    password: string,
+  ): Promise<boolean> => {
     try {
       // Verificar se há dados de usuários em cache (localStorage)
-      const cachedUsers = localStorage.getItem('cached_users');
-      
+      const cachedUsers = localStorage.getItem("cached_users");
+
       if (!cachedUsers) {
-        setError("Sem conexão e nenhum dado de login em cache. Conecte-se à internet para fazer o primeiro login.");
+        setError(
+          "Sem conexão e nenhum dado de login em cache. Conecte-se à internet para fazer o primeiro login.",
+        );
         return false;
       }
 
       const users = JSON.parse(cachedUsers);
-      const foundUser = users.find((user: any) => 
-        user.login === login && user.password === password
+      const foundUser = users.find(
+        (user: any) => user.login === login && user.password === password,
       );
 
       if (!foundUser) {
-        setError("Credenciais inválidas ou usuário não encontrado no cache offline.");
+        setError(
+          "Credenciais inválidas ou usuário não encontrado no cache offline.",
+        );
         return false;
       }
 
@@ -170,11 +189,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Salvar na sessão local
       sessionStorage.setItem("sistema_user", JSON.stringify(userObj));
-      
+
       console.log("Login offline realizado com sucesso:", userObj);
       setUser(userObj);
       return true;
-      
     } catch (error) {
       console.error("Erro no login offline:", error);
       setError("Erro ao processar login offline. Tente novamente.");
@@ -191,7 +209,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Verificar se está offline
       if (!navigator.onLine) {
-        console.log("Modo offline detectado - tentando login com dados em cache");
+        console.log(
+          "Modo offline detectado - tentando login com dados em cache",
+        );
         return await performOfflineLogin(login, password);
       }
 
@@ -225,7 +245,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (userError) {
           console.error("Erro ao consultar usuários:", userError);
-          setError("Erro de conexão com o banco de dados. Verifique sua conexão com a internet.");
+          setError(
+            "Erro de conexão com o banco de dados. Verifique sua conexão com a internet.",
+          );
           throw new Error("Erro ao consultar banco de dados");
         }
 
@@ -240,15 +262,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const { data: allUsers, error: cacheError } = await supabase
             .from("users")
             .select("*");
-          
+
           if (!cacheError && allUsers) {
             // Não armazenar senhas em cache por segurança
-            const usersWithoutPasswords = allUsers.map(user => ({
+            const usersWithoutPasswords = allUsers.map((user) => ({
               ...user,
-              password: '' // Limpar senha antes do cache
+              password: "", // Limpar senha antes do cache
             }));
-            localStorage.setItem('cached_users', JSON.stringify(usersWithoutPasswords));
-            console.log("Usuários armazenados em cache para login offline (sem senhas)");
+            localStorage.setItem(
+              "cached_users",
+              JSON.stringify(usersWithoutPasswords),
+            );
+            console.log(
+              "Usuários armazenados em cache para login offline (sem senhas)",
+            );
           }
         } catch (cacheErr) {
           console.log("Erro ao cachear usuários (não crítico):", cacheErr);
@@ -301,16 +328,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         (async () => {
           // Limpar sessão do sistema personalizado
           sessionStorage.removeItem("sistema_user");
-          
+
           // Limpar todos os caches
           dataCache.clear();
           statsCache.clear();
           userCache.clear();
           collectionsCache.clear();
           quickCache.clear();
-          
+
           console.log("Cache limpo e logout realizado com sucesso");
-          
+
           setUser(null);
 
           // Limpa o timer de inatividade

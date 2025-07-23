@@ -2348,8 +2348,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 </div>
               </div>
             )}
-
-
           </div>
         )}
       </div>

@@ -698,150 +698,149 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
     <div className="space-y-4 mt-0">
       {/* Header Otimizado - Mobile First */}
 
-        <div className="p-4 bg-white rounded-2xl shadow-sm border border-gray-200 mb-4">
-          <div className="space-y-3">
-            {/* Linha 2: Controles Principais */}
-            <div className="flex items-center justify-between gap-3">
-              {/* Seleção Rápida */}
-              <div className="flex items-center space-x-2">
-                <div className="flex bg-gray-100 rounded-2xl p-1 gap-1">
-                  <button
-                    onClick={handleSelectAll}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                      selectedClients.length === allClients.length
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    Todos
-                  </button>
-                  <button
-                    onClick={handleSelectVisitsOnly}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                      selectedClients.length ===
-                        clientData.overdueVisits.length +
-                          clientData.scheduledVisits.length +
-                          clientData.rescheduledVisits.length &&
-                      [
-                        ...clientData.overdueVisits,
-                        ...clientData.scheduledVisits,
-                        ...clientData.rescheduledVisits,
-                      ].every((c) => selectedClients.includes(c.document))
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    <Calendar className="h-4 w-4 inline sm:hidden" />
-                    <span className="hidden sm:inline">Visitas</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Ações Principais */}
-              <div className="flex items-center space-x-2">
+      <div className="p-4 bg-white rounded-2xl shadow-sm border border-gray-200 mb-4">
+        <div className="space-y-3">
+          {/* Linha 2: Controles Principais */}
+          <div className="flex items-center justify-between gap-3">
+            {/* Seleção Rápida */}
+            <div className="flex items-center space-x-2">
+              <div className="flex bg-gray-100 rounded-2xl p-1 gap-1">
                 <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`p-2 rounded-2xl transition-colors ${
-                    showFilters
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                  }`}
-                  title="Filtros"
-                >
-                  <Filter className="h-4 w-4" />
-                </button>
-
-                <button
-                  onClick={getUserLocation}
-                  disabled={isGettingLocation}
-                  className={`flex items-center px-3 py-2 rounded-2xl text-sm font-medium transition-colors ${
-                    userLocation
-                      ? "bg-green-600 text-white hover:bg-green-700"
-                      : "bg-orange-600 text-white hover:bg-orange-700"
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  <MapPin className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">
-                    {isGettingLocation
-                      ? "Obtendo..."
-                      : userLocation
-                        ? "GPS OK"
-                        : "GPS"}
-                  </span>
-                </button>
-
-                <button
-                  onClick={handleOptimizeRoute}
-                  disabled={selectedClients.length === 0 || isOptimizing}
-                  className={`flex items-center px-3 py-2 rounded-2xl text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                    userLocation
-                      ? "bg-blue-600 text-white hover:bg-blue-700"
-                      : "bg-gray-600 text-white hover:bg-gray-700"
+                  onClick={handleSelectAll}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    selectedClients.length === allClients.length
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900"
                   }`}
                 >
-                  {isOptimizing ? (
-                    <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
-                  ) : (
-                    <Route className="h-4 w-4 sm:mr-2" />
-                  )}
-                  <span className="hidden sm:inline">
-                    {isOptimizing
-                      ? "Otimizando..."
-                      : userLocation
-                        ? "Otimizar"
-                        : "Organizar"}
-                  </span>
+                  Todos
+                </button>
+                <button
+                  onClick={handleSelectVisitsOnly}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    selectedClients.length ===
+                      clientData.overdueVisits.length +
+                        clientData.scheduledVisits.length +
+                        clientData.rescheduledVisits.length &&
+                    [
+                      ...clientData.overdueVisits,
+                      ...clientData.scheduledVisits,
+                      ...clientData.rescheduledVisits,
+                    ].every((c) => selectedClients.includes(c.document))
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <Calendar className="h-4 w-4 inline sm:hidden" />
+                  <span className="hidden sm:inline">Visitas</span>
                 </button>
               </div>
             </div>
 
-            {/* Linha 3: Filtros Colapsáveis */}
-            {showFilters && (
-              <div className="animate-in slide-in-from-top-2 duration-200">
-                <FilterBar
-                  filters={filters}
-                  onFilterChange={handleFilterChange}
-                  userType={user?.type || "collector"}
-                />
-              </div>
-            )}
+            {/* Ações Principais */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`p-2 rounded-2xl transition-colors ${
+                  showFilters
+                    ? "bg-blue-100 text-blue-700"
+                    : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                }`}
+                title="Filtros"
+              >
+                <Filter className="h-4 w-4" />
+              </button>
 
-            {/* Linha 4: Resumo da Seleção */}
-            {selectedClients.length > 0 && (
-              <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-                <div className="flex items-center space-x-2">
-                  <Navigation className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm text-gray-700">
-                    {selectedClients.length} selecionado
-                    {selectedClients.length !== 1 ? "s" : ""}
-                  </span>
-                  {routeOptimized && (
-                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
-                      Otimizada
-                    </span>
-                  )}
-                </div>
-                <div className="text-sm font-semibold text-gray-900">
-                  {formatCurrency(totalValue)}
-                </div>
-              </div>
-            )}
+              <button
+                onClick={getUserLocation}
+                disabled={isGettingLocation}
+                className={`flex items-center px-3 py-2 rounded-2xl text-sm font-medium transition-colors ${
+                  userLocation
+                    ? "bg-green-600 text-white hover:bg-green-700"
+                    : "bg-orange-600 text-white hover:bg-orange-700"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <MapPin className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">
+                  {isGettingLocation
+                    ? "Obtendo..."
+                    : userLocation
+                      ? "GPS OK"
+                      : "GPS"}
+                </span>
+              </button>
 
-            {/* Linha 5: Erro de Geolocalização */}
-            {geolocationError && (
-              <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-2xl mt-3">
-                <span className="text-sm text-red-700">{geolocationError}</span>
-                <button
-                  onClick={handleRetryLocation}
-                  className="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors"
-                >
-                  Tentar Novamente
-                </button>
-              </div>
-            )}
+              <button
+                onClick={handleOptimizeRoute}
+                disabled={selectedClients.length === 0 || isOptimizing}
+                className={`flex items-center px-3 py-2 rounded-2xl text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  userLocation
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-gray-600 text-white hover:bg-gray-700"
+                }`}
+              >
+                {isOptimizing ? (
+                  <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
+                ) : (
+                  <Route className="h-4 w-4 sm:mr-2" />
+                )}
+                <span className="hidden sm:inline">
+                  {isOptimizing
+                    ? "Otimizando..."
+                    : userLocation
+                      ? "Otimizar"
+                      : "Organizar"}
+                </span>
+              </button>
+            </div>
           </div>
+
+          {/* Linha 3: Filtros Colapsáveis */}
+          {showFilters && (
+            <div className="animate-in slide-in-from-top-2 duration-200">
+              <FilterBar
+                filters={filters}
+                onFilterChange={handleFilterChange}
+                userType={user?.type || "collector"}
+              />
+            </div>
+          )}
+
+          {/* Linha 4: Resumo da Seleção */}
+          {selectedClients.length > 0 && (
+            <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+              <div className="flex items-center space-x-2">
+                <Navigation className="h-4 w-4 text-blue-600" />
+                <span className="text-sm text-gray-700">
+                  {selectedClients.length} selecionado
+                  {selectedClients.length !== 1 ? "s" : ""}
+                </span>
+                {routeOptimized && (
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+                    Otimizada
+                  </span>
+                )}
+              </div>
+              <div className="text-sm font-semibold text-gray-900">
+                {formatCurrency(totalValue)}
+              </div>
+            </div>
+          )}
+
+          {/* Linha 5: Erro de Geolocalização */}
+          {geolocationError && (
+            <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-2xl mt-3">
+              <span className="text-sm text-red-700">{geolocationError}</span>
+              <button
+                onClick={handleRetryLocation}
+                className="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors"
+              >
+                Tentar Novamente
+              </button>
+            </div>
+          )}
         </div>
-    
+      </div>
 
       {/* Google Maps */}
       {selectedClients.length > 0 && (
@@ -1405,7 +1404,9 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                   Página {currentPage} de {totalPages}
                 </span>
                 <span className="text-gray-300 ml-2">
-                  • Mostrando {startIndex + 1} a {Math.min(endIndex, allClients.length)} de {allClients.length} clientes
+                  • Mostrando {startIndex + 1} a{" "}
+                  {Math.min(endIndex, allClients.length)} de {allClients.length}{" "}
+                  clientes
                 </span>
                 {selectedClients.length > 0 && (
                   <span className="text-blue-400 ml-2">
@@ -1440,41 +1441,47 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
 
                 {/* Números das páginas */}
                 <div className="flex space-x-1 flex-1 justify-center sm:flex-none">
-                  {Array.from({ 
-                    length: Math.min(
-                      window.innerWidth < 640 ? 3 : 5, 
-                      totalPages
-                    ) 
-                  }, (_, i) => {
-                    const maxButtons = window.innerWidth < 640 ? 3 : 5;
-                    let pageNum;
-                    
-                    if (totalPages <= maxButtons) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= Math.ceil(maxButtons / 2)) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - Math.floor(maxButtons / 2)) {
-                      pageNum = totalPages - maxButtons + 1 + i;
-                    } else {
-                      pageNum = currentPage - Math.floor(maxButtons / 2) + i;
-                    }
+                  {Array.from(
+                    {
+                      length: Math.min(
+                        window.innerWidth < 640 ? 3 : 5,
+                        totalPages,
+                      ),
+                    },
+                    (_, i) => {
+                      const maxButtons = window.innerWidth < 640 ? 3 : 5;
+                      let pageNum;
 
-                    return (
-                      <button
-                        key={pageNum}
-                        id={`pagination-page-${pageNum}-3`}
-                        name={`paginationPage${pageNum}3`}
-                        onClick={() => handlePageChange(pageNum)}
-                        className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
-                          pageNum === currentPage
-                            ? "bg-white text-purple-600 shadow-lg transform scale-105"
-                            : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
+                      if (totalPages <= maxButtons) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= Math.ceil(maxButtons / 2)) {
+                        pageNum = i + 1;
+                      } else if (
+                        currentPage >=
+                        totalPages - Math.floor(maxButtons / 2)
+                      ) {
+                        pageNum = totalPages - maxButtons + 1 + i;
+                      } else {
+                        pageNum = currentPage - Math.floor(maxButtons / 2) + i;
+                      }
+
+                      return (
+                        <button
+                          key={pageNum}
+                          id={`pagination-page-${pageNum}-3`}
+                          name={`paginationPage${pageNum}3`}
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
+                            pageNum === currentPage
+                              ? "bg-white text-purple-600 shadow-lg transform scale-105"
+                              : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    },
+                  )}
                 </div>
 
                 {/* Botão Próxima */}

@@ -1,5 +1,11 @@
-import { useEffect, useCallback } from 'react';
-import { dataCache, statsCache, userCache, quickCache, collectionsCache } from '../utils/cache';
+import { useEffect, useCallback } from "react";
+import {
+  dataCache,
+  statsCache,
+  userCache,
+  quickCache,
+  collectionsCache,
+} from "../utils/cache";
 
 interface CacheInvalidationConfig {
   patterns: string[];
@@ -10,7 +16,7 @@ export function useCacheInvalidation(config: CacheInvalidationConfig) {
   const { patterns, dependencies = [] } = config;
 
   const invalidatePatterns = useCallback(() => {
-    patterns.forEach(pattern => {
+    patterns.forEach((pattern) => {
       // Invalidate from all cache managers
       dataCache.invalidatePrefix(pattern);
       statsCache.invalidatePrefix(pattern);
@@ -32,37 +38,37 @@ export function useCacheInvalidation(config: CacheInvalidationConfig) {
 // Hook for real-time cache invalidation
 export function useRealtimeCacheInvalidation() {
   const invalidateCollections = useCallback(() => {
-    console.log('Invalidating collections cache due to real-time update');
-    collectionsCache.invalidatePrefix('collections');
-    dataCache.invalidatePrefix('client-groups');
-    dataCache.invalidatePrefix('dashboard-stats');
-    statsCache.invalidatePrefix('performance');
-    statsCache.invalidatePrefix('filtered-collections');
+    console.log("Invalidating collections cache due to real-time update");
+    collectionsCache.invalidatePrefix("collections");
+    dataCache.invalidatePrefix("client-groups");
+    dataCache.invalidatePrefix("dashboard-stats");
+    statsCache.invalidatePrefix("performance");
+    statsCache.invalidatePrefix("filtered-collections");
   }, []);
 
   const invalidatePayments = useCallback(() => {
-    console.log('Invalidating payments cache due to real-time update');
-    dataCache.invalidatePrefix('sale-payments');
-    dataCache.invalidatePrefix('dashboard-stats');
-    statsCache.invalidatePrefix('performance');
+    console.log("Invalidating payments cache due to real-time update");
+    dataCache.invalidatePrefix("sale-payments");
+    dataCache.invalidatePrefix("dashboard-stats");
+    statsCache.invalidatePrefix("performance");
   }, []);
 
   const invalidateUsers = useCallback(() => {
-    console.log('Invalidating users cache due to real-time update');
-    userCache.invalidatePrefix('users');
-    userCache.invalidatePrefix('collector-stores');
-    statsCache.invalidatePrefix('performance');
+    console.log("Invalidating users cache due to real-time update");
+    userCache.invalidatePrefix("users");
+    userCache.invalidatePrefix("collector-stores");
+    statsCache.invalidatePrefix("performance");
   }, []);
 
   const invalidateVisits = useCallback(() => {
-    console.log('Invalidating visits cache due to real-time update');
-    dataCache.invalidatePrefix('visits');
-    dataCache.invalidatePrefix('scheduled-visits');
-    statsCache.invalidatePrefix('visit-stats');
+    console.log("Invalidating visits cache due to real-time update");
+    dataCache.invalidatePrefix("visits");
+    dataCache.invalidatePrefix("scheduled-visits");
+    statsCache.invalidatePrefix("visit-stats");
   }, []);
 
   const invalidateAll = useCallback(() => {
-    console.log('Invalidating all cache due to major update');
+    console.log("Invalidating all cache due to major update");
     dataCache.clear();
     statsCache.clear();
     // Keep user cache as it changes less frequently
@@ -73,14 +79,14 @@ export function useRealtimeCacheInvalidation() {
     invalidatePayments,
     invalidateUsers,
     invalidateVisits,
-    invalidateAll
+    invalidateAll,
   };
 }
 
 // Hook for offline sync cache invalidation
 export function useOfflineSyncCacheInvalidation() {
   const invalidateAfterSync = useCallback(() => {
-    console.log('Invalidating cache after offline sync');
+    console.log("Invalidating cache after offline sync");
     // Invalidate all data caches but keep user preferences
     dataCache.clear();
     statsCache.clear();
@@ -92,10 +98,10 @@ export function useOfflineSyncCacheInvalidation() {
       invalidateAfterSync();
     };
 
-    window.addEventListener('offlineDataSynced', handleOfflineSync);
-    
+    window.addEventListener("offlineDataSynced", handleOfflineSync);
+
     return () => {
-      window.removeEventListener('offlineDataSynced', handleOfflineSync);
+      window.removeEventListener("offlineDataSynced", handleOfflineSync);
     };
   }, [invalidateAfterSync]);
 

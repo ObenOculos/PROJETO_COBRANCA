@@ -218,7 +218,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   // Desabilitar scroll do body quando o modal estiver aberto
   React.useEffect(() => {
     document.body.style.overflow = "hidden";
-    
+
     return () => {
       document.body.style.overflow = "unset";
     };
@@ -378,7 +378,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
   return (
     <>
-      <div 
+      <div
         className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
@@ -451,7 +451,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   <CreditCard className="h-5 w-5 mr-2" />
                   <span className="text-xs sm:text-sm">
                     <span className="sm:hidden">Distribuir</span>
-                    <span className="hidden sm:inline">Distribuir Pagamento</span>
+                    <span className="hidden sm:inline">
+                      Distribuir Pagamento
+                    </span>
                   </span>
                 </button>
               )}
@@ -583,7 +585,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                                       saleBalance.status === "fully_paid"
                                         ? "bg-green-100 text-green-800"
-                                        : saleBalance.status === "partially_paid"
+                                        : saleBalance.status ===
+                                            "partially_paid"
                                           ? "bg-yellow-100 text-yellow-800"
                                           : "bg-red-100 text-red-800"
                                     }`}
@@ -607,25 +610,27 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                   Pago: {formatCurrency(saleBalance.totalPaid)}
                                 </div>
                                 <div className="text-xs text-red-600 font-medium">
-                                  Restante: {formatCurrency(saleBalance.remainingBalance)}
+                                  Restante:{" "}
+                                  {formatCurrency(saleBalance.remainingBalance)}
                                 </div>
                               </div>
 
-                              {userType === "collector" && saleBalance.remainingBalance > 0 && (
-                                <button
-                                  id={`receive-payment-${sale.saleNumber}`}
-                                  name={`receivePayment${sale.saleNumber}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenSalePayment(sale);
-                                  }}
-                                  className="flex items-center px-3 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors text-sm font-medium shadow-sm"
-                                  title="Receber pagamento da venda"
-                                >
-                                  <CreditCard className="h-4 w-4 mr-1" />
-                                  <span>Receber</span>
-                                </button>
-                              )}
+                              {userType === "collector" &&
+                                saleBalance.remainingBalance > 0 && (
+                                  <button
+                                    id={`receive-payment-${sale.saleNumber}`}
+                                    name={`receivePayment${sale.saleNumber}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenSalePayment(sale);
+                                    }}
+                                    className="flex items-center px-3 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors text-sm font-medium shadow-sm"
+                                    title="Receber pagamento da venda"
+                                  >
+                                    <CreditCard className="h-4 w-4 mr-1" />
+                                    <span>Receber</span>
+                                  </button>
+                                )}
                             </div>
                           </div>
 
@@ -656,13 +661,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                   </p>
                                 </div>
                               </div>
-                              
+
                               <div className="text-right">
                                 <div className="text-sm font-medium text-gray-900">
                                   {formatCurrency(sale.totalValue)}
                                 </div>
                                 <div className="text-xs text-red-600 font-medium">
-                                  Restante: {formatCurrency(saleBalance.remainingBalance)}
+                                  Restante:{" "}
+                                  {formatCurrency(saleBalance.remainingBalance)}
                                 </div>
                               </div>
                             </div>
@@ -685,21 +691,22 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               </span>
                             </div>
 
-                            {userType === "collector" && saleBalance.remainingBalance > 0 && (
-                              <button
-                                id={`receive-payment-mobile-${sale.saleNumber}`}
-                                name={`receivePaymentMobile${sale.saleNumber}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenSalePayment(sale);
-                                }}
-                                className="flex items-center justify-center w-full px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium shadow-sm"
-                                title="Receber pagamento da venda"
-                              >
-                                <CreditCard className="h-5 w-5 mr-2" />
-                                <span>Receber Pagamento</span>
-                              </button>
-                            )}
+                            {userType === "collector" &&
+                              saleBalance.remainingBalance > 0 && (
+                                <button
+                                  id={`receive-payment-mobile-${sale.saleNumber}`}
+                                  name={`receivePaymentMobile${sale.saleNumber}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenSalePayment(sale);
+                                  }}
+                                  className="flex items-center justify-center w-full px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium shadow-sm"
+                                  title="Receber pagamento da venda"
+                                >
+                                  <CreditCard className="h-5 w-5 mr-2" />
+                                  <span>Receber Pagamento</span>
+                                </button>
+                              )}
                           </div>
                         </div>
 
@@ -838,14 +845,16 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       disabled={isRequestingAuth}
                       className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isRequestingAuth
-                        ? "Solicitando..."
-                        : (
-                          <>
-                            <span className="sm:hidden">Solicitar</span>
-                            <span className="hidden sm:inline">Solicitar Autorização</span>
-                          </>
-                        )}
+                      {isRequestingAuth ? (
+                        "Solicitando..."
+                      ) : (
+                        <>
+                          <span className="sm:hidden">Solicitar</span>
+                          <span className="hidden sm:inline">
+                            Solicitar Autorização
+                          </span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

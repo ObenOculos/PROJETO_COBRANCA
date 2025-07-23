@@ -98,10 +98,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const [overviewFilter, setOverviewFilter] = useState<
     "all" | "with-collector"
   >("all");
-  
+
   // Estado para controlar visibilidade dos filtros no mobile
   const [isFilterVisible, setIsFilterVisible] = useState(false);
-  
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
@@ -199,20 +199,25 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   const stats = useMemo(() => getDashboardStats(), [collections]);
   const performance = useMemo(() => getCollectorPerformance(), [collections]);
-  const baseFilteredCollections = useMemo(() => getFilteredCollections(filters, "manager"), [filters, collections]);
+  const baseFilteredCollections = useMemo(
+    () => getFilteredCollections(filters, "manager"),
+    [filters, collections],
+  );
 
   // Apply collector filter for collections view
   const filteredCollections = baseFilteredCollections;
 
   // Apply overview filter for overview calculations
-  const overviewCollections = useMemo(() => 
-    overviewFilter === "with-collector"
-      ? collections.filter(
-          (collection) =>
-            collection.user_id && collection.user_id.trim() !== "",
-        )
-      : collections,
-  [overviewFilter, collections]);
+  const overviewCollections = useMemo(
+    () =>
+      overviewFilter === "with-collector"
+        ? collections.filter(
+            (collection) =>
+              collection.user_id && collection.user_id.trim() !== "",
+          )
+        : collections,
+    [overviewFilter, collections],
+  );
 
   // Calculate metrics based on overview filter
   const overviewStats = useMemo(() => {
@@ -246,7 +251,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   // Sales map for overview tab - moved from renderTabContent to fix hooks violation
   const salesMap = useMemo(() => {
     if (activeTab !== "overview") return new Map();
-    
+
     const map = new Map<
       string,
       {
@@ -256,7 +261,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         receivedValue: number;
       }
     >();
-    
+
     overviewCollections.forEach((collection) => {
       const saleKey = `${collection.venda_n}-${collection.documento}`;
       if (!map.has(saleKey)) {
@@ -268,8 +273,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         });
       }
       const sale = map.get(saleKey)!;
-      sale.totalValue = Number(sale.totalValue) + Number(collection.valor_original);
-      sale.receivedValue = Number(sale.receivedValue) + Number(collection.valor_recebido);
+      sale.totalValue =
+        Number(sale.totalValue) + Number(collection.valor_original);
+      sale.receivedValue =
+        Number(sale.receivedValue) + Number(collection.valor_recebido);
     });
 
     // Determine if each sale is pending (has any amount left to receive)
@@ -277,7 +284,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       const pendingAmount = sale.totalValue - sale.receivedValue;
       sale.isPending = pendingAmount > 0.01; // Consider amounts > 1 cent as pending
     });
-    
+
     return map;
   }, [activeTab, overviewCollections]);
 
@@ -294,35 +301,37 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         averageEfficiency: "0.0",
       };
     }
-    
+
     const salesArray = Array.from(salesMap.values());
     const pendingSales = salesArray.filter((s) => s.isPending);
     const completedSales = salesArray.filter((s) => !s.isPending);
-    
+
     const clientsWithPendingCount = new Set(
-      pendingSales
-        .map((s) => s.clientDocument)
-        .filter(Boolean),
+      pendingSales.map((s) => s.clientDocument).filter(Boolean),
     ).size;
-    
+
     const todayCollections = overviewCollections.filter((c) => {
       const today = new Date().toISOString().split("T")[0];
       return c.data_vencimento === today;
     });
-    
+
     const todayAmount = todayCollections.reduce(
       (sum, c) => sum + c.valor_original,
       0,
     );
-    
+
     const storesWithCollections = new Set(
       overviewCollections.map((c) => c.nome_da_loja).filter(Boolean),
     ).size;
-    
-    const averageEfficiency = performance.length > 0 
-      ? (performance.reduce((acc, p) => acc + p.conversionRate, 0) / performance.length).toFixed(1)
-      : "0.0";
-    
+
+    const averageEfficiency =
+      performance.length > 0
+        ? (
+            performance.reduce((acc, p) => acc + p.conversionRate, 0) /
+            performance.length
+          ).toFixed(1)
+        : "0.0";
+
     return {
       pendingSalesCount: pendingSales.length,
       completedSalesCount: completedSales.length,
@@ -339,7 +348,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       case "database-upload":
         return <DatabaseUpload />;
       case "overview":
-
         return (
           <div className="space-y-4 sm:space-y-6">
             {/* Overview Filter */}
@@ -854,7 +862,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             {/* Content based on selected view */}
             {collectionsView === "table" ? (
               <div>
-                <div className={`${isFilterVisible ? 'block' : 'hidden'} md:block`}>
+                <div
+                  className={`${isFilterVisible ? "block" : "hidden"} md:block`}
+                >
                   <FilterBar
                     filters={filters}
                     onFilterChange={setFilters}

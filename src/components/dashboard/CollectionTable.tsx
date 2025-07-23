@@ -43,7 +43,14 @@ interface CollectionTableProps {
 }
 
 const CollectionTable: React.FC<CollectionTableProps> = React.memo(
-  ({ collections, userType, showGrouped = true, collectorId, showFilterBar, onToggleFilterBar }) => {
+  ({
+    collections,
+    userType,
+    showGrouped = true,
+    collectorId,
+    showFilterBar,
+    onToggleFilterBar,
+  }) => {
     const { getClientGroups, loading } = useCollection();
     const [selectedCollection, setSelectedCollection] =
       useState<Collection | null>(null);
@@ -146,7 +153,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     const clientGroups = useMemo(() => {
       // Early return for empty collections
       if (collections.length === 0) return [];
-      
+
       if (userType === "manager") {
         const groupsMap = new Map<string, ClientGroupWithMapSales>();
 
@@ -178,11 +185,14 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           const group = groupsMap.get(key)!;
           const originalValue = collection.valor_original || 0;
           const receivedValue = collection.valor_recebido || 0;
-          
+
           group.totalValue += originalValue;
           group.totalReceived += receivedValue;
           // Avoid parseFloat and toFixed for better performance
-          group.pendingValue = Math.max(0, group.totalValue - group.totalReceived);
+          group.pendingValue = Math.max(
+            0,
+            group.totalValue - group.totalReceived,
+          );
 
           const saleKey = `${collection.venda_n}-${collection.documento}`;
           if (!group.sales.has(saleKey)) {
@@ -207,8 +217,12 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           sale.installments.push(collection);
 
           // Optimize status computation
-          sale.saleStatus = sale.totalReceived === 0 ? "pending" :
-                           sale.totalReceived >= sale.totalValue ? "fully_paid" : "partially_paid";
+          sale.saleStatus =
+            sale.totalReceived === 0
+              ? "pending"
+              : sale.totalReceived >= sale.totalValue
+                ? "fully_paid"
+                : "partially_paid";
         });
 
         return Array.from(groupsMap.values()).map((group) => ({
@@ -222,14 +236,14 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
     const filteredClientGroups = useMemo(() => {
       if (!showGrouped || collections.length === 0) return [];
-      
+
       // Optimize by using Set lookup which is O(1) instead of array.includes O(n)
       const collectionIds = new Set(collections.map((c) => c.id_parcela));
-      
+
       return clientGroups.filter((group) => {
         // Early return if group has no sales
         if (!group.sales || group.sales.length === 0) return false;
-        
+
         return group.sales.some((sale) =>
           sale.installments.some((inst) => collectionIds.has(inst.id_parcela)),
         );
@@ -280,15 +294,19 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
       // Early return if no filtering or sorting needed
       let filteredGroups = clientGroups;
-      
+
       // Optimize status filtering
       if (userType === "collector" && statusFilter) {
         const targetStatus = statusFilter.toLowerCase();
         filteredGroups = clientGroups.filter((group) =>
           group.sales.some((sale) => {
             // Optimize status computation - avoid re-computation
-            const status = sale.totalReceived > 0 && sale.pendingValue > 0 ? "parcial" :
-                          sale.pendingValue <= 0.01 && sale.totalReceived > 0 ? "pago" : "pendente";
+            const status =
+              sale.totalReceived > 0 && sale.pendingValue > 0
+                ? "parcial"
+                : sale.pendingValue <= 0.01 && sale.totalReceived > 0
+                  ? "pago"
+                  : "pendente";
             return status === targetStatus;
           }),
         );
@@ -444,7 +462,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                             ? "bg-blue-100 text-blue-700"
                             : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                         }`}
-                        title={showFilterBar ? "Ocultar Filtros" : "Mostrar Filtros"}
+                        title={
+                          showFilterBar ? "Ocultar Filtros" : "Mostrar Filtros"
+                        }
                       >
                         <Filter className="h-3.5 w-3.5" />
                       </button>
@@ -452,7 +472,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                     {/* Selector de items por página */}
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-600 whitespace-nowrap">Por página:</label>
+                      <label className="text-sm text-gray-600 whitespace-nowrap">
+                        Por página:
+                      </label>
                       <select
                         id="items-per-page"
                         name="itemsPerPage"
@@ -473,7 +495,6 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                 </div>
               </div>
             </div>
-
 
             <div className="divide-y divide-gray-200">
               {paginatedClientGroups.map((clientGroup) => (
@@ -582,41 +603,48 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                   {/* Números das páginas */}
                   <div className="flex space-x-3 flex-1 justify-center sm:flex-none">
-                    {Array.from({ 
-                      length: Math.min(
-                        window.innerWidth < 640 ? 3 : 5, 
-                        totalPages
-                      ) 
-                    }, (_, i) => {
-                      const maxButtons = window.innerWidth < 640 ? 3 : 5;
-                      let pageNum;
-                      
-                      if (totalPages <= maxButtons) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= Math.ceil(maxButtons / 2)) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - Math.floor(maxButtons / 2)) {
-                        pageNum = totalPages - maxButtons + 1 + i;
-                      } else {
-                        pageNum = currentPage - Math.floor(maxButtons / 2) + i;
-                      }
+                    {Array.from(
+                      {
+                        length: Math.min(
+                          window.innerWidth < 640 ? 3 : 5,
+                          totalPages,
+                        ),
+                      },
+                      (_, i) => {
+                        const maxButtons = window.innerWidth < 640 ? 3 : 5;
+                        let pageNum;
 
-                      return (
-                        <button
-                          key={pageNum}
-                          id={`pagination-page-${pageNum}`}
-                          name={`paginationPage${pageNum}`}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
-                            pageNum === currentPage
-                              ? "bg-white text-purple-600 shadow-lg transform scale-105"
-                              : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
+                        if (totalPages <= maxButtons) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= Math.ceil(maxButtons / 2)) {
+                          pageNum = i + 1;
+                        } else if (
+                          currentPage >=
+                          totalPages - Math.floor(maxButtons / 2)
+                        ) {
+                          pageNum = totalPages - maxButtons + 1 + i;
+                        } else {
+                          pageNum =
+                            currentPage - Math.floor(maxButtons / 2) + i;
+                        }
+
+                        return (
+                          <button
+                            key={pageNum}
+                            id={`pagination-page-${pageNum}`}
+                            name={`paginationPage${pageNum}`}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
+                              pageNum === currentPage
+                                ? "bg-white text-purple-600 shadow-lg transform scale-105"
+                                : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      },
+                    )}
                   </div>
 
                   {/* Botão Próxima */}
@@ -692,7 +720,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                 <div className="flex items-center gap-3">
                   <DollarSign className="h-5 w-5 text-blue-600" />
                   <h2 className="text-lg font-semibold text-gray-900">
-                    {userType === "manager" ? "Todas as Cobranças" : "Minha Carteira"}
+                    {userType === "manager"
+                      ? "Todas as Cobranças"
+                      : "Minha Carteira"}
                   </h2>
                   <div className="flex items-center gap- text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
                     <div className="flex items-center gap-1 text-sm text-gray-500">
@@ -768,7 +798,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   {totalPages > 1 && (
                     <>
                       <button
-                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                        onClick={() =>
+                          setCurrentPage(Math.max(1, currentPage - 1))
+                        }
                         disabled={currentPage === 1}
                         className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
                         title="Página anterior"
@@ -776,7 +808,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                         <ChevronLeft className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                        onClick={() =>
+                          setCurrentPage(Math.min(totalPages, currentPage + 1))
+                        }
                         disabled={currentPage === totalPages}
                         className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
                         title="Próxima página"
@@ -928,12 +962,10 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Seta para Mobile - na parte inferior */}
                   <div className="flex sm:hidden justify-center mt-3 pt-3 border-t border-gray-100">
-                    <button
-                      className="p-2 rounded-full bg-blue-50 hover:bg-blue-100 transition-colors"
-                    >
+                    <button className="p-2 rounded-full bg-blue-50 hover:bg-blue-100 transition-colors">
                       {expandedClients.has(clientGroup.document) ? (
                         <ChevronUp className="h-4 w-4 text-blue-600" />
                       ) : (
@@ -1167,41 +1199,47 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                 {/* Números das páginas */}
                 <div className="flex space-x-3 flex-1 justify-center sm:flex-none">
-                  {Array.from({ 
-                    length: Math.min(
-                      window.innerWidth < 640 ? 3 : 5, 
-                      totalPages
-                    ) 
-                  }, (_, i) => {
-                    const maxButtons = window.innerWidth < 640 ? 3 : 5;
-                    let pageNum;
-                    
-                    if (totalPages <= maxButtons) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= Math.ceil(maxButtons / 2)) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - Math.floor(maxButtons / 2)) {
-                      pageNum = totalPages - maxButtons + 1 + i;
-                    } else {
-                      pageNum = currentPage - Math.floor(maxButtons / 2) + i;
-                    }
+                  {Array.from(
+                    {
+                      length: Math.min(
+                        window.innerWidth < 640 ? 3 : 5,
+                        totalPages,
+                      ),
+                    },
+                    (_, i) => {
+                      const maxButtons = window.innerWidth < 640 ? 3 : 5;
+                      let pageNum;
 
-                    return (
-                      <button
-                        key={pageNum}
-                        id={`pagination-page-${pageNum}-2`}
-                        name={`paginationPage${pageNum}2`}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
-                          pageNum === currentPage
-                            ? "bg-white text-purple-600 shadow-lg transform scale-105"
-                            : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
+                      if (totalPages <= maxButtons) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= Math.ceil(maxButtons / 2)) {
+                        pageNum = i + 1;
+                      } else if (
+                        currentPage >=
+                        totalPages - Math.floor(maxButtons / 2)
+                      ) {
+                        pageNum = totalPages - maxButtons + 1 + i;
+                      } else {
+                        pageNum = currentPage - Math.floor(maxButtons / 2) + i;
+                      }
+
+                      return (
+                        <button
+                          key={pageNum}
+                          id={`pagination-page-${pageNum}-2`}
+                          name={`paginationPage${pageNum}2`}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
+                            pageNum === currentPage
+                              ? "bg-white text-purple-600 shadow-lg transform scale-105"
+                              : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    },
+                  )}
                 </div>
 
                 {/* Botão Próxima */}

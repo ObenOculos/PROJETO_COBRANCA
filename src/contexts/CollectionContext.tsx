@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+} from "react";
 import {
   CollectionContextType,
   Collection,
@@ -20,8 +26,16 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
 import { useLoading } from "./LoadingContext";
 import { useOffline } from "../hooks/useOffline";
-import { dataCache, statsCache, userCache, collectionsCache } from "../utils/cache";
-import { useRealtimeCacheInvalidation, useOfflineSyncCacheInvalidation } from "../hooks/useCacheInvalidation";
+import {
+  dataCache,
+  statsCache,
+  userCache,
+  collectionsCache,
+} from "../utils/cache";
+import {
+  useRealtimeCacheInvalidation,
+  useOfflineSyncCacheInvalidation,
+} from "../hooks/useCacheInvalidation";
 
 const CollectionContext = createContext<CollectionContextType | undefined>(
   undefined,
@@ -54,13 +68,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Cache invalidation hooks
-  const { 
-    invalidateCollections, 
-    invalidatePayments, 
+  const {
+    invalidateCollections,
+    invalidatePayments,
     invalidateUsers,
-    invalidateVisits 
+    invalidateVisits,
   } = useRealtimeCacheInvalidation();
-  
+
   useOfflineSyncCacheInvalidation();
 
   // Função para atualizar apenas as collections sem recarregar tudo
@@ -157,8 +171,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         )
         .subscribe((status) => {
           console.log("Status da conexão realtime:", status);
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-            console.warn("Erro na subscription do realtime, tentando reconectar em 5s...");
+          if (
+            status === "CHANNEL_ERROR" ||
+            status === "TIMED_OUT" ||
+            status === "CLOSED"
+          ) {
+            console.warn(
+              "Erro na subscription do realtime, tentando reconectar em 5s...",
+            );
             setTimeout(() => {
               if (realtimeChannel) {
                 realtimeChannel.unsubscribe();
@@ -202,10 +222,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }, 100);
     };
 
-    window.addEventListener('offlineDataSynced', handleOfflineDataSynced as EventListener);
-    
+    window.addEventListener(
+      "offlineDataSynced",
+      handleOfflineDataSynced as EventListener,
+    );
+
     return () => {
-      window.removeEventListener('offlineDataSynced', handleOfflineDataSynced as EventListener);
+      window.removeEventListener(
+        "offlineDataSynced",
+        handleOfflineDataSynced as EventListener,
+      );
     };
   }, []);
 
@@ -213,13 +239,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     try {
       setError(null);
 
-      const cacheKey = `collections-${user?.id || 'all'}-${user?.type || 'manager'}`;
-      
+      const cacheKey = `collections-${user?.id || "all"}-${user?.type || "manager"}`;
+
       // Try to get from cache first
       if (useCache) {
         const cachedData = collectionsCache.get<Collection[]>(cacheKey);
         if (cachedData) {
-          console.log("✅ Dados de collections carregados do cache", cachedData.length, "registros");
+          console.log(
+            "✅ Dados de collections carregados do cache",
+            cachedData.length,
+            "registros",
+          );
           setCollections(cachedData);
           return;
         } else {
@@ -387,10 +417,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }));
 
       setCollections(transformedData);
-      
+
       // Cache the data using dedicated collections cache
       collectionsCache.set(cacheKey, transformedData);
-      
+
       console.log("Collections carregadas:", transformedData.length);
     } catch (err) {
       console.error("Erro ao carregar collections:", err);
@@ -402,8 +432,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   const fetchUsers = async (useCache = true) => {
     try {
-      const cacheKey = 'users';
-      
+      const cacheKey = "users";
+
       // Try to get from cache first
       if (useCache) {
         const cachedData = userCache.get<User[]>(cacheKey);
@@ -436,10 +466,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }));
 
       setUsers(transformedUsers);
-      
+
       // Cache the data
       userCache.set(cacheKey, transformedUsers);
-      
+
       console.log("Usuários carregados:", transformedUsers.length);
     } catch (err) {
       console.error("Erro ao carregar usuários:", err);
@@ -448,8 +478,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   const fetchCollectorStores = async (useCache = true) => {
     try {
-      const cacheKey = 'collector-stores';
-      
+      const cacheKey = "collector-stores";
+
       // Try to get from cache first
       if (useCache) {
         const cachedData = userCache.get<CollectorStore[]>(cacheKey);
@@ -480,10 +510,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }));
 
       setCollectorStores(transformedStores);
-      
+
       // Cache the data
       userCache.set(cacheKey, transformedStores);
-      
+
       console.log("Atribuições de lojas carregadas:", transformedStores.length);
     } catch (err) {
       console.error("Erro ao carregar collector stores:", err);
@@ -1030,295 +1060,315 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     return filtered;
   };
 
-  const getClientGroups = useMemo(() => (collectorId?: string): ClientGroup[] => {
-    const cacheKey = `client-groups-${collectorId || 'all'}`;
-    
-    // Try to get from cache first
-    const cachedData = dataCache.get<ClientGroup[]>(cacheKey);
-    if (cachedData) {
-      return cachedData;
-    }
+  const getClientGroups = useMemo(
+    () =>
+      (collectorId?: string): ClientGroup[] => {
+        const cacheKey = `client-groups-${collectorId || "all"}`;
 
-    let filteredCollections = collections;
+        // Try to get from cache first
+        const cachedData = dataCache.get<ClientGroup[]>(cacheKey);
+        if (cachedData) {
+          return cachedData;
+        }
 
-    if (collectorId) {
-      const assignedStores = getCollectorStores(collectorId);
-      filteredCollections = collections.filter(
-        (c) =>
-          c.user_id === collectorId ||
-          assignedStores.includes(c.nome_da_loja || ""),
-      );
-    }
+        let filteredCollections = collections;
 
-    const clientMap = new Map<string, ClientGroup>();
-    let skippedCollectionsCount = 0;
-
-    filteredCollections.forEach((collection) => {
-      // Group strictly by 'documento' (CPF) as the unique identifier.
-      const clientId = collection.documento?.trim();
-
-      if (!clientId) {
-        skippedCollectionsCount++;
-        return; // Skip collections without a document.
-      }
-
-      if (!clientMap.has(clientId)) {
-        clientMap.set(clientId, {
-          clientId,
-          client: collection.cliente || "Cliente sem nome",
-          document: clientId,
-          phone: collection.telefone || undefined,
-          mobile: collection.celular || undefined,
-          address: collection.endereco || "",
-          number: collection.numero || "",
-          neighborhood: collection.bairro || "",
-          city: collection.cidade || "",
-          state: collection.estado || "",
-          sales: [],
-          totalValue: 0,
-          totalReceived: 0,
-          pendingValue: 0,
-        });
-      }
-
-      const clientGroup = clientMap.get(clientId)!;
-
-      // Group by sale number (venda_n)
-      let saleGroup = clientGroup.sales.find(
-        (s) => s.saleNumber === (collection.venda_n || 0),
-      );
-      if (!saleGroup) {
-        saleGroup = {
-          saleNumber: collection.venda_n || 0,
-          titleNumber: collection.numero_titulo || 0,
-          description: collection.descricao || "",
-          installments: [],
-          totalValue: 0,
-          totalReceived: 0,
-          pendingValue: 0,
-          saleStatus: "pending",
-          payments: [],
-          clientDocument: collection.documento || "",
-        };
-        clientGroup.sales.push(saleGroup!);
-      }
-
-      if (saleGroup) {
-        saleGroup.installments.push(collection);
-
-        const roundTo2Decimals = (num: number) =>
-          Math.round((num + Number.EPSILON) * 100) / 100;
-
-        saleGroup.totalValue = roundTo2Decimals(
-          saleGroup.totalValue + collection.valor_original,
-        );
-        saleGroup.totalReceived = roundTo2Decimals(
-          saleGroup.totalReceived + collection.valor_recebido,
-        );
-
-        const pendingForThisInstallment = roundTo2Decimals(
-          collection.valor_original - collection.valor_recebido,
-        );
-        if (pendingForThisInstallment > 0.01) {
-          saleGroup.pendingValue = roundTo2Decimals(
-            saleGroup.pendingValue + pendingForThisInstallment,
+        if (collectorId) {
+          const assignedStores = getCollectorStores(collectorId);
+          filteredCollections = collections.filter(
+            (c) =>
+              c.user_id === collectorId ||
+              assignedStores.includes(c.nome_da_loja || ""),
           );
         }
+
+        const clientMap = new Map<string, ClientGroup>();
+        let skippedCollectionsCount = 0;
+
+        filteredCollections.forEach((collection) => {
+          // Group strictly by 'documento' (CPF) as the unique identifier.
+          const clientId = collection.documento?.trim();
+
+          if (!clientId) {
+            skippedCollectionsCount++;
+            return; // Skip collections without a document.
+          }
+
+          if (!clientMap.has(clientId)) {
+            clientMap.set(clientId, {
+              clientId,
+              client: collection.cliente || "Cliente sem nome",
+              document: clientId,
+              phone: collection.telefone || undefined,
+              mobile: collection.celular || undefined,
+              address: collection.endereco || "",
+              number: collection.numero || "",
+              neighborhood: collection.bairro || "",
+              city: collection.cidade || "",
+              state: collection.estado || "",
+              sales: [],
+              totalValue: 0,
+              totalReceived: 0,
+              pendingValue: 0,
+            });
+          }
+
+          const clientGroup = clientMap.get(clientId)!;
+
+          // Group by sale number (venda_n)
+          let saleGroup = clientGroup.sales.find(
+            (s) => s.saleNumber === (collection.venda_n || 0),
+          );
+          if (!saleGroup) {
+            saleGroup = {
+              saleNumber: collection.venda_n || 0,
+              titleNumber: collection.numero_titulo || 0,
+              description: collection.descricao || "",
+              installments: [],
+              totalValue: 0,
+              totalReceived: 0,
+              pendingValue: 0,
+              saleStatus: "pending",
+              payments: [],
+              clientDocument: collection.documento || "",
+            };
+            clientGroup.sales.push(saleGroup!);
+          }
+
+          if (saleGroup) {
+            saleGroup.installments.push(collection);
+
+            const roundTo2Decimals = (num: number) =>
+              Math.round((num + Number.EPSILON) * 100) / 100;
+
+            saleGroup.totalValue = roundTo2Decimals(
+              saleGroup.totalValue + collection.valor_original,
+            );
+            saleGroup.totalReceived = roundTo2Decimals(
+              saleGroup.totalReceived + collection.valor_recebido,
+            );
+
+            const pendingForThisInstallment = roundTo2Decimals(
+              collection.valor_original - collection.valor_recebido,
+            );
+            if (pendingForThisInstallment > 0.01) {
+              saleGroup.pendingValue = roundTo2Decimals(
+                saleGroup.pendingValue + pendingForThisInstallment,
+              );
+            }
+          }
+
+          const roundTo2Decimals = (num: number) =>
+            Math.round((num + Number.EPSILON) * 100) / 100;
+
+          clientGroup.totalValue = roundTo2Decimals(
+            clientGroup.totalValue + collection.valor_original,
+          );
+          clientGroup.totalReceived = roundTo2Decimals(
+            clientGroup.totalReceived + collection.valor_recebido,
+          );
+        });
+
+        // Calculate pendingValue for each clientGroup and saleGroup after all collections are processed
+        clientMap.forEach((clientGroup) => {
+          const roundTo2Decimals = (num: number) =>
+            Math.round((num + Number.EPSILON) * 100) / 100;
+
+          clientGroup.sales.forEach((saleGroup) => {
+            saleGroup.pendingValue = roundTo2Decimals(
+              saleGroup.totalValue - saleGroup.totalReceived,
+            );
+          });
+
+          clientGroup.pendingValue = roundTo2Decimals(
+            clientGroup.totalValue - clientGroup.totalReceived,
+          );
+        });
+
+        if (skippedCollectionsCount > 0) {
+          console.warn(
+            `[getClientGroups] Skipped ${skippedCollectionsCount} collection entries because they were missing a 'documento'.`,
+          );
+        }
+
+        const result = Array.from(clientMap.values()).sort((a, b) =>
+          a.client.localeCompare(b.client),
+        );
+
+        // Cache the result
+        dataCache.set(cacheKey, result);
+
+        return result;
+      },
+    [collections, collectorStores],
+  );
+
+  const getDashboardStats = useMemo(
+    () => (): DashboardStats => {
+      const cacheKey = "dashboard-stats";
+
+      // Try to get from cache first
+      const cachedData = statsCache.get<DashboardStats>(cacheKey);
+      if (cachedData) {
+        return cachedData;
       }
 
-      const roundTo2Decimals = (num: number) =>
-        Math.round((num + Number.EPSILON) * 100) / 100;
-
-      clientGroup.totalValue = roundTo2Decimals(
-        clientGroup.totalValue + collection.valor_original,
-      );
-      clientGroup.totalReceived = roundTo2Decimals(
-        clientGroup.totalReceived + collection.valor_recebido,
-      );
-    });
-
-    // Calculate pendingValue for each clientGroup and saleGroup after all collections are processed
-    clientMap.forEach((clientGroup) => {
-      const roundTo2Decimals = (num: number) =>
-        Math.round((num + Number.EPSILON) * 100) / 100;
-
-      clientGroup.sales.forEach((saleGroup) => {
-        saleGroup.pendingValue = roundTo2Decimals(
-          saleGroup.totalValue - saleGroup.totalReceived,
-        );
-      });
-
-      clientGroup.pendingValue = roundTo2Decimals(
-        clientGroup.totalValue - clientGroup.totalReceived,
-      );
-    });
-
-    if (skippedCollectionsCount > 0) {
-      console.warn(
-        `[getClientGroups] Skipped ${skippedCollectionsCount} collection entries because they were missing a 'documento'.`,
-      );
-    }
-
-    const result = Array.from(clientMap.values()).sort((a, b) =>
-      a.client.localeCompare(b.client),
-    );
-    
-    // Cache the result
-    dataCache.set(cacheKey, result);
-    
-    return result;
-  }, [collections, collectorStores]);
-
-  const getDashboardStats = useMemo(() => (): DashboardStats => {
-    const cacheKey = 'dashboard-stats';
-    
-    // Try to get from cache first
-    const cachedData = statsCache.get<DashboardStats>(cacheKey);
-    if (cachedData) {
-      return cachedData;
-    }
-
-    const totalPending = collections.filter(
-      (c) => c.status?.toLowerCase() === "pendente",
-    ).length;
-    const totalOverdue = collections.filter(
-      (c) => c.dias_em_atraso && c.dias_em_atraso > 0,
-    ).length;
-    const totalReceived = collections.filter(
-      (c) => c.status?.toLowerCase() === "recebido" || c.valor_recebido > 0,
-    ).length;
-    const totalAmount = collections.reduce(
-      (sum, c) => sum + c.valor_original,
-      0,
-    );
-    const receivedAmount = collections.reduce(
-      (sum, c) => sum + c.valor_recebido,
-      0,
-    );
-    const pendingAmount = totalAmount - receivedAmount;
-    const conversionRate =
-      collections.length > 0 ? (totalReceived / collections.length) * 100 : 0;
-    const collectorsCount = users.filter((u) => u.type === "collector").length;
-
-    const result = {
-      totalPending,
-      totalOverdue,
-      totalReceived,
-      totalAmount,
-      receivedAmount,
-      pendingAmount,
-      conversionRate,
-      collectorsCount,
-    };
-    
-    // Cache the result
-    statsCache.set(cacheKey, result);
-    
-    return result;
-  }, [collections, users]);
-
-  const getCollectorPerformance = useMemo(() => (): CollectorPerformance[] => {
-    const cacheKey = 'collector-performance';
-    
-    // Try to get from cache first
-    const cachedData = statsCache.get<CollectorPerformance[]>(cacheKey);
-    if (cachedData) {
-      return cachedData;
-    }
-
-    const collectors = users.filter((u) => u.type === "collector");
-
-    const result = collectors.map((collector) => {
-      const assignedStores = getCollectorStores(collector.id);
-      const collectorCollections = collections.filter(
-        (c) =>
-          c.user_id === collector.id ||
-          assignedStores.includes(c.nome_da_loja || ""),
-      );
-
-      // Contar clientes únicos usando documento (CPF) como identificador
-      const uniqueClients = new Set<string>();
-      collectorCollections.forEach((collection) => {
-        if (collection.documento && collection.documento.trim()) {
-          uniqueClients.add(collection.documento.trim());
-        }
-      });
-      const clientCount = uniqueClients.size;
-
-      // Agrupar por venda (venda_n + documento)
-      const salesMap = new Map<
-        string,
-        {
-          totalValue: number;
-          receivedValue: number;
-          status: "pendente" | "parcial" | "pago";
-          installments: Collection[];
-        }
-      >();
-
-      collectorCollections.forEach((collection) => {
-        const saleKey = `${collection.venda_n}-${collection.documento}`;
-        if (!salesMap.has(saleKey)) {
-          salesMap.set(saleKey, {
-            totalValue: 0,
-            receivedValue: 0,
-            status: "pendente",
-            installments: [],
-          });
-        }
-
-        const sale = salesMap.get(saleKey)!;
-        sale.totalValue = Number(sale.totalValue) + Number(collection.valor_original);
-        sale.receivedValue = Number(sale.receivedValue) + Number(collection.valor_recebido);
-        sale.installments.push(collection);
-      });
-
-      // Determinar status das vendas
-      salesMap.forEach((sale) => {
-        const pendingValue = Math.max(0, sale.totalValue - sale.receivedValue);
-        if (sale.receivedValue > 0 && pendingValue > 0) {
-          sale.status = "parcial";
-        } else if (pendingValue <= 0.01 && sale.receivedValue > 0) {
-          sale.status = "pago";
-        } else {
-          sale.status = "pendente";
-        }
-      });
-
-      const salesArray = Array.from(salesMap.values());
-      const totalAssigned = salesArray.length; // Total de vendas atribuídas
-      const totalReceived = salesArray.filter(
-        (s) => s.status === "pago",
-      ).length; // Vendas totalmente pagas
-      const totalAmount = salesArray.reduce((sum, s) => sum + s.totalValue, 0);
-      const receivedAmount = salesArray.reduce(
-        (sum, s) => sum + s.receivedValue,
+      const totalPending = collections.filter(
+        (c) => c.status?.toLowerCase() === "pendente",
+      ).length;
+      const totalOverdue = collections.filter(
+        (c) => c.dias_em_atraso && c.dias_em_atraso > 0,
+      ).length;
+      const totalReceived = collections.filter(
+        (c) => c.status?.toLowerCase() === "recebido" || c.valor_recebido > 0,
+      ).length;
+      const totalAmount = collections.reduce(
+        (sum, c) => sum + c.valor_original,
         0,
       );
+      const receivedAmount = collections.reduce(
+        (sum, c) => sum + c.valor_recebido,
+        0,
+      );
+      const pendingAmount = totalAmount - receivedAmount;
       const conversionRate =
-        totalAssigned > 0 ? (totalReceived / totalAssigned) * 100 : 0;
+        collections.length > 0 ? (totalReceived / collections.length) * 100 : 0;
+      const collectorsCount = users.filter(
+        (u) => u.type === "collector",
+      ).length;
 
-      // Calcular tempo médio (simplificado)
-      const averageTime = 15; // Valor mock
-
-      return {
-        collectorId: collector.id,
-        collectorName: collector.name,
-        totalAssigned,
+      const result = {
+        totalPending,
+        totalOverdue,
         totalReceived,
         totalAmount,
         receivedAmount,
+        pendingAmount,
         conversionRate,
-        averageTime,
-        clientCount,
+        collectorsCount,
       };
-    });
-    
-    // Cache the result
-    statsCache.set(cacheKey, result);
-    
-    return result;
-  }, [collections, users, collectorStores]);
+
+      // Cache the result
+      statsCache.set(cacheKey, result);
+
+      return result;
+    },
+    [collections, users],
+  );
+
+  const getCollectorPerformance = useMemo(
+    () => (): CollectorPerformance[] => {
+      const cacheKey = "collector-performance";
+
+      // Try to get from cache first
+      const cachedData = statsCache.get<CollectorPerformance[]>(cacheKey);
+      if (cachedData) {
+        return cachedData;
+      }
+
+      const collectors = users.filter((u) => u.type === "collector");
+
+      const result = collectors.map((collector) => {
+        const assignedStores = getCollectorStores(collector.id);
+        const collectorCollections = collections.filter(
+          (c) =>
+            c.user_id === collector.id ||
+            assignedStores.includes(c.nome_da_loja || ""),
+        );
+
+        // Contar clientes únicos usando documento (CPF) como identificador
+        const uniqueClients = new Set<string>();
+        collectorCollections.forEach((collection) => {
+          if (collection.documento && collection.documento.trim()) {
+            uniqueClients.add(collection.documento.trim());
+          }
+        });
+        const clientCount = uniqueClients.size;
+
+        // Agrupar por venda (venda_n + documento)
+        const salesMap = new Map<
+          string,
+          {
+            totalValue: number;
+            receivedValue: number;
+            status: "pendente" | "parcial" | "pago";
+            installments: Collection[];
+          }
+        >();
+
+        collectorCollections.forEach((collection) => {
+          const saleKey = `${collection.venda_n}-${collection.documento}`;
+          if (!salesMap.has(saleKey)) {
+            salesMap.set(saleKey, {
+              totalValue: 0,
+              receivedValue: 0,
+              status: "pendente",
+              installments: [],
+            });
+          }
+
+          const sale = salesMap.get(saleKey)!;
+          sale.totalValue =
+            Number(sale.totalValue) + Number(collection.valor_original);
+          sale.receivedValue =
+            Number(sale.receivedValue) + Number(collection.valor_recebido);
+          sale.installments.push(collection);
+        });
+
+        // Determinar status das vendas
+        salesMap.forEach((sale) => {
+          const pendingValue = Math.max(
+            0,
+            sale.totalValue - sale.receivedValue,
+          );
+          if (sale.receivedValue > 0 && pendingValue > 0) {
+            sale.status = "parcial";
+          } else if (pendingValue <= 0.01 && sale.receivedValue > 0) {
+            sale.status = "pago";
+          } else {
+            sale.status = "pendente";
+          }
+        });
+
+        const salesArray = Array.from(salesMap.values());
+        const totalAssigned = salesArray.length; // Total de vendas atribuídas
+        const totalReceived = salesArray.filter(
+          (s) => s.status === "pago",
+        ).length; // Vendas totalmente pagas
+        const totalAmount = salesArray.reduce(
+          (sum, s) => sum + s.totalValue,
+          0,
+        );
+        const receivedAmount = salesArray.reduce(
+          (sum, s) => sum + s.receivedValue,
+          0,
+        );
+        const conversionRate =
+          totalAssigned > 0 ? (totalReceived / totalAssigned) * 100 : 0;
+
+        // Calcular tempo médio (simplificado)
+        const averageTime = 15; // Valor mock
+
+        return {
+          collectorId: collector.id,
+          collectorName: collector.name,
+          totalAssigned,
+          totalReceived,
+          totalAmount,
+          receivedAmount,
+          conversionRate,
+          averageTime,
+          clientCount,
+        };
+      });
+
+      // Cache the result
+      statsCache.set(cacheKey, result);
+
+      return result;
+    },
+    [collections, users, collectorStores],
+  );
 
   const getCollectorCollections = (collectorId: string): Collection[] => {
     const assignedStores = getCollectorStores(collectorId);
@@ -1570,8 +1620,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   const fetchSalePayments = async (useCache = true) => {
     try {
-      const cacheKey = 'sale-payments';
-      
+      const cacheKey = "sale-payments";
+
       // Try to get from cache first
       if (useCache) {
         const cachedData = dataCache.get<SalePayment[]>(cacheKey);
@@ -1612,10 +1662,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
 
       setSalePayments(convertedPayments);
-      
+
       // Cache the data
       dataCache.set(cacheKey, convertedPayments);
-      
+
       console.log(
         `✅ ${convertedPayments.length} pagamentos carregados da tabela sale_payments`,
       );
@@ -1703,16 +1753,22 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
         if (installmentIndex !== -1) {
           // Garantir que os valores são números
-          const currentReceived = Number(updatedInstallments[installmentIndex].valor_recebido) || 0;
+          const currentReceived =
+            Number(updatedInstallments[installmentIndex].valor_recebido) || 0;
           const paymentAmount = Number(paymentForThisInstallment) || 0;
-          
-          console.log('🔢 Verificando tipos de valores:', {
+
+          console.log("🔢 Verificando tipos de valores:", {
             installmentId: installment.id_parcela,
-            currentReceived: { value: currentReceived, type: typeof currentReceived },
-            paymentAmount: { value: paymentAmount, type: typeof paymentAmount }
+            currentReceived: {
+              value: currentReceived,
+              type: typeof currentReceived,
+            },
+            paymentAmount: { value: paymentAmount, type: typeof paymentAmount },
           });
-          
-          const newValueReceived = roundTo2Decimals(currentReceived + paymentAmount);
+
+          const newValueReceived = roundTo2Decimals(
+            currentReceived + paymentAmount,
+          );
           const remainingValue = roundTo2Decimals(
             updatedInstallments[installmentIndex].valor_original -
               newValueReceived,
@@ -1770,11 +1826,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           saleNumberType: typeof payment.saleNumber,
           clientDocument: payment.clientDocument,
           totalCollections: collections.length,
-          samplesOfVendaN: collections.slice(0, 5).map(c => ({ 
-            venda_n: c.venda_n, 
+          samplesOfVendaN: collections.slice(0, 5).map((c) => ({
+            venda_n: c.venda_n,
             type: typeof c.venda_n,
-            documento: c.documento 
-          }))
+            documento: c.documento,
+          })),
         });
         throw new Error("Nenhuma parcela encontrada para esta venda e cliente");
       }
@@ -1788,10 +1844,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // 3. Verificar se está offline
       if (!isOnline) {
         console.log("Modo offline: Adicionando pagamento à fila");
-        
+
         // Adicionar à fila offline
         addToOfflineQueue({
-          type: 'DISTRIBUTE_PAYMENT',
+          type: "DISTRIBUTE_PAYMENT",
           data: {
             saleNumber: payment.saleNumber,
             clientDocument: payment.clientDocument,
@@ -1799,8 +1855,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             paymentMethod: payment.paymentMethod,
             notes: payment.notes,
             collectorId: collectorId,
-            distributionDetails: distributionDetails
-          }
+            distributionDetails: distributionDetails,
+          },
         });
 
         // Atualizar estado local imediatamente para melhor UX
@@ -1987,12 +2043,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           pendingAmount,
         );
 
-        console.log('🔢 ProcessGeneralPayment - Verificando valores:', {
+        console.log("🔢 ProcessGeneralPayment - Verificando valores:", {
           installmentId: installment.id_parcela,
-          originalAmount: { value: originalAmount, type: typeof originalAmount },
-          currentReceived: { value: currentReceived, type: typeof currentReceived },
+          originalAmount: {
+            value: originalAmount,
+            type: typeof originalAmount,
+          },
+          currentReceived: {
+            value: currentReceived,
+            type: typeof currentReceived,
+          },
           pendingAmount,
-          paymentForThisInstallment
+          paymentForThisInstallment,
         });
 
         if (paymentForThisInstallment > 0) {
@@ -2029,10 +2091,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // 4. Verificar se está offline
       if (!isOnline) {
         console.log("Modo offline: Adicionando pagamento geral à fila");
-        
+
         // Agrupar por venda para criar registros de pagamento separados
         const salesMap = new Map<number, any>();
-        
+
         distributionDetails.forEach((detail) => {
           if (!salesMap.has(detail.saleNumber)) {
             salesMap.set(detail.saleNumber, {
@@ -2042,25 +2104,26 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               paymentMethod: paymentMethod,
               notes: notes,
               collectorId: collectorId,
-              distributionDetails: []
+              distributionDetails: [],
             });
           }
-          
+
           const sale = salesMap.get(detail.saleNumber);
-          sale.paymentAmount = Number(sale.paymentAmount) + Number(detail.appliedAmount);
+          sale.paymentAmount =
+            Number(sale.paymentAmount) + Number(detail.appliedAmount);
           sale.distributionDetails.push({
             installmentId: detail.installmentId,
             originalAmount: detail.originalAmount,
             appliedAmount: detail.appliedAmount,
-            installmentStatus: detail.installmentStatus
+            installmentStatus: detail.installmentStatus,
           });
         });
-        
+
         // Adicionar cada venda à fila offline
         for (const salePayment of salesMap.values()) {
           addToOfflineQueue({
-            type: 'DISTRIBUTE_PAYMENT',
-            data: salePayment
+            type: "DISTRIBUTE_PAYMENT",
+            data: salePayment,
           });
         }
 
@@ -2399,8 +2462,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   // Scheduled Visits Functions
   const fetchScheduledVisits = async (useCache = true) => {
     try {
-      const cacheKey = 'scheduled-visits';
-      
+      const cacheKey = "scheduled-visits";
+
       // Try to get from cache first
       if (useCache) {
         const cachedData = dataCache.get<ScheduledVisit[]>(cacheKey);
@@ -2465,10 +2528,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }));
 
       setScheduledVisits(transformedVisits);
-      
+
       // Cache the data
       dataCache.set(cacheKey, transformedVisits);
-      
+
       console.log("Visitas agendadas carregadas:", transformedVisits.length);
     } catch (err) {
       console.error("Erro ao carregar visitas agendadas:", err);
@@ -2548,10 +2611,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Atualizar estado local
       setScheduledVisits((prev) => [...prev, newVisit]);
-      
+
       // Invalidate cache
       invalidateVisits();
-      
+
       // Visita agendada com sucesso
       return newVisit;
     } catch (error) {
@@ -3027,7 +3090,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           console.log("✅ Estado local atualizado");
           return updated;
         });
-        
+
         // Invalidate cache
         invalidateVisits();
       }

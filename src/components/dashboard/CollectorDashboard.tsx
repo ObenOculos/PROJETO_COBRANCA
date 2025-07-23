@@ -376,20 +376,25 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     }
   }, [internalActiveTab, externalActiveTab]);
 
-  const myCollections = useMemo(() => getCollectorCollections(user?.id || ""), [user?.id]);
-  const filteredCollections = useMemo(() => getFilteredCollections(
-    filters,
-    "collector",
-    user?.id,
-  ), [filters, user?.id]);
+  const myCollections = useMemo(
+    () => getCollectorCollections(user?.id || ""),
+    [user?.id],
+  );
+  const filteredCollections = useMemo(
+    () => getFilteredCollections(filters, "collector", user?.id),
+    [filters, user?.id],
+  );
   const clientGroups = useMemo(() => getClientGroups(user?.id), [user?.id]);
-  const myVisits = useMemo(() => getVisitsByCollector(user?.id || ""), [user?.id]);
+  const myVisits = useMemo(
+    () => getVisitsByCollector(user?.id || ""),
+    [user?.id],
+  );
 
   // Calcular métricas gamificadas
-  const { metrics: periodMetrics, goals } = useMemo(() => getMetricsByPeriod(
-    salePayments,
-    myVisits,
-  ), [salePayments, myVisits]);
+  const { metrics: periodMetrics, goals } = useMemo(
+    () => getMetricsByPeriod(salePayments, myVisits),
+    [salePayments, myVisits],
+  );
 
   // Simplified logic - group by sale to count correctly
   const salesMap = useMemo(() => {
@@ -415,8 +420,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       }
 
       const sale = map.get(saleKey)!;
-      sale.totalValue = Number(sale.totalValue) + Number(collection.valor_original);
-      sale.receivedValue = Number(sale.receivedValue) + Number(collection.valor_recebido);
+      sale.totalValue =
+        Number(sale.totalValue) + Number(collection.valor_original);
+      sale.receivedValue =
+        Number(sale.receivedValue) + Number(collection.valor_recebido);
     });
 
     // Determine if each sale is pending (has any amount left to receive)
@@ -432,12 +439,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     const salesArray = Array.from(salesMap.values());
     const pendingSales = salesArray.filter((s) => s.isPending);
     const completedSales = salesArray.filter((s) => !s.isPending);
-    
+
     // Count unique clients with pending sales
     const clientsWithPending = new Set(
-      pendingSales
-        .map((s) => s.clientDocument)
-        .filter(Boolean),
+      pendingSales.map((s) => s.clientDocument).filter(Boolean),
     ).size;
 
     // Calcular métricas de visitas

@@ -1248,7 +1248,8 @@ export const ClientAssignment = React.memo(() => {
                 Página {currentPage} de {totalPages}
               </span>
               <span className="text-gray-300 ml-2">
-                • Mostrando {startItem} a {endItem} de {filteredClients.length} clientes
+                • Mostrando {startItem} a {endItem} de {filteredClients.length}{" "}
+                clientes
               </span>
             </div>
 
@@ -1278,41 +1279,47 @@ export const ClientAssignment = React.memo(() => {
 
               {/* Números das páginas */}
               <div className="flex space-x-1 flex-1 justify-center sm:flex-none">
-                {Array.from({ 
-                  length: Math.min(
-                    window.innerWidth < 640 ? 3 : 5, 
-                    totalPages
-                  ) 
-                }, (_, i) => {
-                  const maxButtons = window.innerWidth < 640 ? 3 : 5;
-                  let pageNum;
-                  
-                  if (totalPages <= maxButtons) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= Math.ceil(maxButtons / 2)) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - Math.floor(maxButtons / 2)) {
-                    pageNum = totalPages - maxButtons + 1 + i;
-                  } else {
-                    pageNum = currentPage - Math.floor(maxButtons / 2) + i;
-                  }
+                {Array.from(
+                  {
+                    length: Math.min(
+                      window.innerWidth < 640 ? 3 : 5,
+                      totalPages,
+                    ),
+                  },
+                  (_, i) => {
+                    const maxButtons = window.innerWidth < 640 ? 3 : 5;
+                    let pageNum;
 
-                  return (
-                    <button
-                      key={pageNum}
-                      id={`pagination-page-${pageNum}-2`}
-                      name={`paginationPage${pageNum}2`}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
-                        pageNum === currentPage
-                          ? "bg-white text-purple-600 shadow-lg transform scale-105"
-                          : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
+                    if (totalPages <= maxButtons) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= Math.ceil(maxButtons / 2)) {
+                      pageNum = i + 1;
+                    } else if (
+                      currentPage >=
+                      totalPages - Math.floor(maxButtons / 2)
+                    ) {
+                      pageNum = totalPages - maxButtons + 1 + i;
+                    } else {
+                      pageNum = currentPage - Math.floor(maxButtons / 2) + i;
+                    }
+
+                    return (
+                      <button
+                        key={pageNum}
+                        id={`pagination-page-${pageNum}-2`}
+                        name={`paginationPage${pageNum}2`}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
+                          pageNum === currentPage
+                            ? "bg-white text-purple-600 shadow-lg transform scale-105"
+                            : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  },
+                )}
               </div>
 
               {/* Botão Próxima */}

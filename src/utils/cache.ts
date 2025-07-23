@@ -8,7 +8,7 @@ export interface CacheItem<T> {
 export interface CacheConfig {
   ttl: number; // Default TTL in milliseconds
   maxSize: number; // Maximum number of items to store
-  storage: 'localStorage' | 'sessionStorage' | 'memory';
+  storage: "localStorage" | "sessionStorage" | "memory";
 }
 
 class CacheManager {
@@ -16,7 +16,7 @@ class CacheManager {
   private defaultConfig: CacheConfig = {
     ttl: 5 * 60 * 1000, // 5 minutes
     maxSize: 100,
-    storage: 'localStorage'
+    storage: "localStorage",
   };
 
   constructor(config?: Partial<CacheConfig>) {
@@ -25,11 +25,11 @@ class CacheManager {
 
   private getStorage() {
     switch (this.defaultConfig.storage) {
-      case 'sessionStorage':
+      case "sessionStorage":
         return sessionStorage;
-      case 'localStorage':
+      case "localStorage":
         return localStorage;
-      case 'memory':
+      case "memory":
         return null;
       default:
         return localStorage;
@@ -38,20 +38,20 @@ class CacheManager {
 
   private generateKey(baseKey: string, params?: Record<string, any>): string {
     if (!params) return baseKey;
-    
+
     const paramString = Object.keys(params)
       .sort()
-      .map(key => `${key}:${JSON.stringify(params[key])}`)
-      .join('|');
-    
+      .map((key) => `${key}:${JSON.stringify(params[key])}`)
+      .join("|");
+
     return `${baseKey}__${paramString}`;
   }
 
   get<T>(key: string, params?: Record<string, any>): T | null {
     const fullKey = this.generateKey(key, params);
-    
+
     try {
-      if (this.defaultConfig.storage === 'memory') {
+      if (this.defaultConfig.storage === "memory") {
         const item = this.memoryCache.get(fullKey);
         if (item && this.isValid(item)) {
           return item.data;
@@ -67,7 +67,7 @@ class CacheManager {
       if (!cached) return null;
 
       const item: CacheItem<T> = JSON.parse(cached);
-      
+
       if (this.isValid(item)) {
         return item.data;
       }
@@ -76,22 +76,27 @@ class CacheManager {
       storage.removeItem(`cache_${fullKey}`);
       return null;
     } catch (error) {
-      console.warn('Error reading from cache:', error);
+      console.warn("Error reading from cache:", error);
       return null;
     }
   }
 
-  set<T>(key: string, data: T, params?: Record<string, any>, ttl?: number): void {
+  set<T>(
+    key: string,
+    data: T,
+    params?: Record<string, any>,
+    ttl?: number,
+  ): void {
     const fullKey = this.generateKey(key, params);
     const item: CacheItem<T> = {
       data,
       timestamp: Date.now(),
       ttl: ttl || this.defaultConfig.ttl,
-      key: fullKey
+      key: fullKey,
     };
 
     try {
-      if (this.defaultConfig.storage === 'memory') {
+      if (this.defaultConfig.storage === "memory") {
         this.memoryCache.set(fullKey, item);
         this.enforceMaxSize();
         return;
@@ -101,9 +106,10 @@ class CacheManager {
       if (!storage) return;
 
       const itemString = JSON.stringify(item);
-      
+
       // Check if the item is too large for storage (reduced threshold for better performance)
-      if (itemString.length > 1024 * 1024) { // 1MB limit instead of 5MB
+      if (itemString.length > 1024 * 1024) {
+        // 1MB limit instead of 5MB
         // Silently fall back to memory cache for large items
         this.memoryCache.set(fullKey, item);
         return;
@@ -112,9 +118,9 @@ class CacheManager {
       storage.setItem(`cache_${fullKey}`, itemString);
       this.enforceMaxSize();
     } catch (error) {
-      if (error instanceof Error && error.name === 'QuotaExceededError') {
+      if (error instanceof Error && error.name === "QuotaExceededError") {
         this.clearOldEntries();
-        
+
         try {
           // Try again after clearing old entries
           const retryStorage = this.getStorage();
@@ -125,16 +131,16 @@ class CacheManager {
           this.memoryCache.set(fullKey, item);
         }
       } else {
-        console.warn('Error writing to cache:', error);
+        console.warn("Error writing to cache:", error);
       }
     }
   }
 
   invalidate(key: string, params?: Record<string, any>): void {
     const fullKey = this.generateKey(key, params);
-    
+
     try {
-      if (this.defaultConfig.storage === 'memory') {
+      if (this.defaultConfig.storage === "memory") {
         this.memoryCache.delete(fullKey);
         return;
       }
@@ -144,17 +150,17 @@ class CacheManager {
 
       storage.removeItem(`cache_${fullKey}`);
     } catch (error) {
-      console.warn('Error invalidating cache:', error);
+      console.warn("Error invalidating cache:", error);
     }
   }
 
   invalidatePrefix(prefix: string): void {
     try {
-      if (this.defaultConfig.storage === 'memory') {
-        const keysToDelete = Array.from(this.memoryCache.keys()).filter(key => 
-          key.startsWith(prefix)
+      if (this.defaultConfig.storage === "memory") {
+        const keysToDelete = Array.from(this.memoryCache.keys()).filter((key) =>
+          key.startsWith(prefix),
         );
-        keysToDelete.forEach(key => this.memoryCache.delete(key));
+        keysToDelete.forEach((key) => this.memoryCache.delete(key));
         return;
       }
 
@@ -168,16 +174,16 @@ class CacheManager {
           keysToRemove.push(key);
         }
       }
-      
-      keysToRemove.forEach(key => storage.removeItem(key));
+
+      keysToRemove.forEach((key) => storage.removeItem(key));
     } catch (error) {
-      console.warn('Error invalidating cache prefix:', error);
+      console.warn("Error invalidating cache prefix:", error);
     }
   }
 
   clear(): void {
     try {
-      if (this.defaultConfig.storage === 'memory') {
+      if (this.defaultConfig.storage === "memory") {
         this.memoryCache.clear();
         return;
       }
@@ -188,14 +194,14 @@ class CacheManager {
       const keysToRemove: string[] = [];
       for (let i = 0; i < storage.length; i++) {
         const key = storage.key(i);
-        if (key && key.startsWith('cache_')) {
+        if (key && key.startsWith("cache_")) {
           keysToRemove.push(key);
         }
       }
-      
-      keysToRemove.forEach(key => storage.removeItem(key));
+
+      keysToRemove.forEach((key) => storage.removeItem(key));
     } catch (error) {
-      console.warn('Error clearing cache:', error);
+      console.warn("Error clearing cache:", error);
     }
   }
 
@@ -208,10 +214,10 @@ class CacheManager {
     if (!storage) return;
 
     const cacheItems: Array<{ key: string; item: CacheItem<any> }> = [];
-    
+
     for (let i = 0; i < storage.length; i++) {
       const key = storage.key(i);
-      if (key && key.startsWith('cache_')) {
+      if (key && key.startsWith("cache_")) {
         try {
           const item = JSON.parse(storage.getItem(key)!);
           cacheItems.push({ key, item });
@@ -224,27 +230,37 @@ class CacheManager {
 
     // Remove expired items
     const now = Date.now();
-    const expiredItems = cacheItems.filter(({ item }) => now - item.timestamp >= item.ttl);
+    const expiredItems = cacheItems.filter(
+      ({ item }) => now - item.timestamp >= item.ttl,
+    );
     expiredItems.forEach(({ key }) => storage.removeItem(key));
 
     // If still need space, remove oldest 50% of items
-    const remainingItems = cacheItems.filter(({ item }) => now - item.timestamp < item.ttl);
+    const remainingItems = cacheItems.filter(
+      ({ item }) => now - item.timestamp < item.ttl,
+    );
     if (remainingItems.length > 0) {
       remainingItems.sort((a, b) => a.item.timestamp - b.item.timestamp);
-      const toDelete = remainingItems.slice(0, Math.ceil(remainingItems.length / 2));
+      const toDelete = remainingItems.slice(
+        0,
+        Math.ceil(remainingItems.length / 2),
+      );
       toDelete.forEach(({ key }) => storage.removeItem(key));
     }
   }
 
   private enforceMaxSize(): void {
-    if (this.defaultConfig.storage === 'memory') {
+    if (this.defaultConfig.storage === "memory") {
       if (this.memoryCache.size <= this.defaultConfig.maxSize) return;
-      
+
       // Remove oldest items
       const entries = Array.from(this.memoryCache.entries());
       entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
-      
-      const toDelete = entries.slice(0, entries.length - this.defaultConfig.maxSize);
+
+      const toDelete = entries.slice(
+        0,
+        entries.length - this.defaultConfig.maxSize,
+      );
       toDelete.forEach(([key]) => this.memoryCache.delete(key));
       return;
     }
@@ -253,10 +269,10 @@ class CacheManager {
     if (!storage) return;
 
     const cacheItems: Array<{ key: string; item: CacheItem<any> }> = [];
-    
+
     for (let i = 0; i < storage.length; i++) {
       const key = storage.key(i);
-      if (key && key.startsWith('cache_')) {
+      if (key && key.startsWith("cache_")) {
         try {
           const item = JSON.parse(storage.getItem(key)!);
           cacheItems.push({ key, item });
@@ -271,7 +287,10 @@ class CacheManager {
 
     // Sort by timestamp and remove oldest
     cacheItems.sort((a, b) => a.item.timestamp - b.item.timestamp);
-    const toDelete = cacheItems.slice(0, cacheItems.length - this.defaultConfig.maxSize);
+    const toDelete = cacheItems.slice(
+      0,
+      cacheItems.length - this.defaultConfig.maxSize,
+    );
     toDelete.forEach(({ key }) => storage.removeItem(key));
   }
 
@@ -281,13 +300,13 @@ class CacheManager {
     config: CacheConfig;
   } {
     let storageSize = 0;
-    
-    if (this.defaultConfig.storage !== 'memory') {
+
+    if (this.defaultConfig.storage !== "memory") {
       const storage = this.getStorage();
       if (storage) {
         for (let i = 0; i < storage.length; i++) {
           const key = storage.key(i);
-          if (key && key.startsWith('cache_')) {
+          if (key && key.startsWith("cache_")) {
             storageSize++;
           }
         }
@@ -297,7 +316,7 @@ class CacheManager {
     return {
       memorySize: this.memoryCache.size,
       storageSize,
-      config: this.defaultConfig
+      config: this.defaultConfig,
     };
   }
 }
@@ -306,30 +325,30 @@ class CacheManager {
 export const dataCache = new CacheManager({
   ttl: 10 * 60 * 1000, // 10 minutes for main data
   maxSize: 20, // Reduced from 50 to prevent quota issues
-  storage: 'memory' // Changed to memory to avoid quota issues with large collections
+  storage: "memory", // Changed to memory to avoid quota issues with large collections
 });
 
 export const statsCache = new CacheManager({
   ttl: 2 * 60 * 1000, // 2 minutes for stats
   maxSize: 20,
-  storage: 'sessionStorage'
+  storage: "sessionStorage",
 });
 
 export const userCache = new CacheManager({
   ttl: 30 * 60 * 1000, // 30 minutes for user data
   maxSize: 10,
-  storage: 'localStorage'
+  storage: "localStorage",
 });
 
 export const quickCache = new CacheManager({
   ttl: 30 * 1000, // 30 seconds for quick data
   maxSize: 100,
-  storage: 'memory'
+  storage: "memory",
 });
 
 // Dedicated cache for large collections data
 export const collectionsCache = new CacheManager({
   ttl: 15 * 60 * 1000, // 15 minutes for collections
   maxSize: 10, // Small number since collections are large
-  storage: 'memory'
+  storage: "memory",
 });

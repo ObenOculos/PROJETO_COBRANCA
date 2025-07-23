@@ -53,7 +53,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
   // Desabilitar scroll do body quando o modal estiver aberto
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    
+
     return () => {
       document.body.style.overflow = "unset";
     };
@@ -208,11 +208,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
     const notification = document.createElement("div");
     notification.className =
       "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center";
-    
-    const successMessage = isOnline 
+
+    const successMessage = isOnline
       ? "Pagamento distribuído com sucesso!"
       : "Pagamento adicionado à fila offline!";
-    
+
     notification.innerHTML = `
       <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
@@ -256,7 +256,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
     (parseFloat(distributionAmount) || 0) - totalDistributed;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
       onClick={(e) => {
         if (e.target === e.currentTarget) {

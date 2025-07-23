@@ -1,6 +1,6 @@
-import React from 'react';
-import { WifiOff, Wifi } from 'lucide-react';
-import { useOffline } from '../../hooks/useOffline';
+import React from "react";
+import { WifiOff, Wifi } from "lucide-react";
+import { useOffline } from "../../hooks/useOffline";
 
 const OfflineIndicator: React.FC = () => {
   const { isOnline, offlineQueue } = useOffline();
@@ -9,19 +9,16 @@ const OfflineIndicator: React.FC = () => {
     return null;
   }
 
-  const paymentActions = offlineQueue.filter(action => 
-    action.type === 'DISTRIBUTE_PAYMENT' || action.type === 'CREATE_PAYMENT'
+  const paymentActions = offlineQueue.filter(
+    (action) =>
+      action.type === "DISTRIBUTE_PAYMENT" || action.type === "CREATE_PAYMENT",
   );
   const otherActions = offlineQueue.length - paymentActions.length;
-
-
 
   return (
     <div
       className={`fixed bottom-4 right-4 px-4 py-2 rounded-2xl shadow-lg flex items-center gap-2 z-50 transition-all max-w-sm ${
-        isOnline
-          ? 'bg-yellow-500 text-white'
-          : 'bg-red-500 text-white'
+        isOnline ? "bg-yellow-500 text-white" : "bg-red-500 text-white"
       }`}
     >
       <div className="flex items-center gap-2 flex-1">
@@ -44,9 +41,7 @@ const OfflineIndicator: React.FC = () => {
           <>
             <WifiOff className="w-5 h-5 flex-shrink-0" />
             <div className="flex-1">
-              <div className="text-sm font-medium">
-                Modo Offline
-              </div>
+              <div className="text-sm font-medium">Modo Offline</div>
             </div>
           </>
         )}
