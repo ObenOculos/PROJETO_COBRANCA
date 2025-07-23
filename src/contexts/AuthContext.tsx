@@ -42,6 +42,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     if (user) {
       inactivityTimer = setTimeout(() => {
+        console.log("Tempo de inatividade atingido, fazendo logout automático...");
+        
+        // Limpar sessão imediatamente
+        sessionStorage.removeItem("sistema_user");
+        
+        // Limpar localStorage (exceto dados essenciais)
+        const keysToKeep = ['cached_users', 'managerActiveTab', 'collectorActiveTab'];
+        const allKeys = Object.keys(localStorage);
+        allKeys.forEach(key => {
+          if (!keysToKeep.includes(key)) {
+            localStorage.removeItem(key);
+          }
+        });
+        
+        // Limpar todos os caches
+        dataCache.clear();
+        statsCache.clear();
+        userCache.clear();
+        collectionsCache.clear();
+        quickCache.clear();
+        
+        // Resetar estado do usuário
+        setUser(null);
+        
+        // Mostrar modal informativo
         setShowInactivityModal(true);
       }, INACTIVITY_TIMEOUT);
     }
@@ -303,7 +328,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const handleInactivityLogout = () => {
     setShowInactivityModal(false);
-    logout();
+    // Não precisa chamar logout() pois já foi feito no timer
+    // Apenas fecha o modal
   };
 
   const value: AuthContextType = {
