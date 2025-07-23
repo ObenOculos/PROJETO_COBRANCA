@@ -1252,7 +1252,7 @@ export const ClientAssignment = React.memo(() => {
               </span>
             </div>
 
-            <div className="flex items-center space-x-1 sm:space-x-2">
+            <div className="flex items-center justify-between w-full sm:w-auto space-x-1 sm:space-x-2">
               {/* Botão Início */}
               <button
                 id="pagination-start-2"
@@ -1277,17 +1277,24 @@ export const ClientAssignment = React.memo(() => {
               </button>
 
               {/* Números das páginas */}
-              <div className="flex space-x-1">
-                {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+              <div className="flex space-x-1 flex-1 justify-center sm:flex-none">
+                {Array.from({ 
+                  length: Math.min(
+                    window.innerWidth < 640 ? 3 : 5, 
+                    totalPages
+                  ) 
+                }, (_, i) => {
+                  const maxButtons = window.innerWidth < 640 ? 3 : 5;
                   let pageNum;
-                  if (totalPages <= 5) {
+                  
+                  if (totalPages <= maxButtons) {
                     pageNum = i + 1;
-                  } else if (currentPage <= 3) {
+                  } else if (currentPage <= Math.ceil(maxButtons / 2)) {
                     pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
+                  } else if (currentPage >= totalPages - Math.floor(maxButtons / 2)) {
+                    pageNum = totalPages - maxButtons + 1 + i;
                   } else {
-                    pageNum = currentPage - 2 + i;
+                    pageNum = currentPage - Math.floor(maxButtons / 2) + i;
                   }
 
                   return (
@@ -1296,7 +1303,7 @@ export const ClientAssignment = React.memo(() => {
                       id={`pagination-page-${pageNum}-2`}
                       name={`paginationPage${pageNum}2`}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`px-2 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 ${
+                      className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
                         pageNum === currentPage
                           ? "bg-white text-purple-600 shadow-lg transform scale-105"
                           : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"

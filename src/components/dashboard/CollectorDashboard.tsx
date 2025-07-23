@@ -75,6 +75,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   };
 
   const [filters, setFilters] = useState<FilterOptions>({});
+  const [showFilterBar, setShowFilterBar] = useState(false);
 
   // Funções para calcular métricas por período
   const getMetricsByPeriod = (payments: any[], visits: any[]) => {
@@ -824,16 +825,20 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       case "collections":
         return (
           <div>
-            <FilterBar
-              filters={filters}
-              onFilterChange={setFilters}
-              userType="collector"
-            />
+            {showFilterBar && (
+              <FilterBar
+                filters={filters}
+                onFilterChange={setFilters}
+                userType="collector"
+              />
+            )}
             <CollectionTable
               collections={filteredCollections}
               userType="collector"
               showGrouped={true}
               collectorId={user?.id}
+              showFilterBar={showFilterBar}
+              onToggleFilterBar={() => setShowFilterBar(!showFilterBar)}
             />
           </div>
         );

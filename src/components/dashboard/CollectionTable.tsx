@@ -38,10 +38,12 @@ interface CollectionTableProps {
   userType: "manager" | "collector";
   showGrouped?: boolean;
   collectorId?: string;
+  showFilterBar?: boolean;
+  onToggleFilterBar?: () => void;
 }
 
 const CollectionTable: React.FC<CollectionTableProps> = React.memo(
-  ({ collections, userType, showGrouped = true, collectorId }) => {
+  ({ collections, userType, showGrouped = true, collectorId, showFilterBar, onToggleFilterBar }) => {
     const { getClientGroups, loading } = useCollection();
     const [selectedCollection, setSelectedCollection] =
       useState<Collection | null>(null);
@@ -368,90 +370,110 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
         <>
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
             <div className="px-4 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {userType === "manager"
-                  ? "Clientes e Cobranças"
-                  : "Meus Clientes"}
-              </h2>
-              <div className="flex justify-between items-center mt-1">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <p className="text-sm text-gray-600">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {userType === "manager"
+                      ? "Clientes e Cobranças"
+                      : "Meus Clientes"}
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
                     {filteredClientGroups.length} cliente
                     {filteredClientGroups.length !== 1 ? "s" : ""} com cobranças
                   </p>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  {/* Controles de Ordenação para Cobrador */}
+                  {userType === "collector" && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        id="sort-by-cliente"
+                        name="sortByCliente"
+                        onClick={() => handleSort("cliente")}
+                        className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                          sortField === "cliente"
+                            ? "bg-blue-100 text-blue-700"
+                            : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                        }`}
+                        title="Ordenar por Nome"
+                      >
+                        <User className="h-3.5 w-3.5" />
+                        {getSortIcon("cliente")}
+                      </button>
+                      <button
+                        id="sort-by-valor"
+                        name="sortByValor"
+                        onClick={() => handleSort("valor")}
+                        className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                          sortField === "valor"
+                            ? "bg-blue-100 text-blue-700"
+                            : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                        }`}
+                        title="Ordenar por Valor"
+                      >
+                        <DollarSign className="h-3.5 w-3.5" />
+                        {getSortIcon("valor")}
+                      </button>
+                      <button
+                        id="sort-by-cidade"
+                        name="sortByCidade"
+                        onClick={() => handleSort("cidade")}
+                        className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                          sortField === "cidade"
+                            ? "bg-blue-100 text-blue-700"
+                            : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                        }`}
+                        title="Ordenar por Cidade"
+                      >
+                        <MapPin className="h-3.5 w-3.5" />
+                        {getSortIcon("cidade")}
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2">
-                    <label className="text-sm text-gray-600">Por página:</label>
-                    <select
-                      id="items-per-page"
-                      name="itemsPerPage"
-                      value={itemsPerPage}
-                      onChange={(e) => {
-                        setItemsPerPage(Number(e.target.value));
-                        setCurrentPage(1);
-                      }}
-                      className="text-sm border border-gray-300 rounded-2xl px-2 py-1 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
+                    {/* Botão de Filtro para Cobrador */}
+                    {userType === "collector" && onToggleFilterBar && (
+                      <button
+                        id="toggle-filters-header"
+                        name="toggleFiltersHeader"
+                        onClick={onToggleFilterBar}
+                        className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                          showFilterBar
+                            ? "bg-blue-100 text-blue-700"
+                            : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                        }`}
+                        title={showFilterBar ? "Ocultar Filtros" : "Mostrar Filtros"}
+                      >
+                        <Filter className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+
+                    {/* Selector de items por página */}
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-600 whitespace-nowrap">Por página:</label>
+                      <select
+                        id="items-per-page"
+                        name="itemsPerPage"
+                        value={itemsPerPage}
+                        onChange={(e) => {
+                          setItemsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Controles de Ordenação para Cobrador */}
-            {userType === "collector" && (
-              <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-blue-50 border-b border-gray-200">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <span className="text-sm font-semibold text-gray-700">
-                    Ordenar por:
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      id="sort-by-cliente"
-                      name="sortByCliente"
-                      onClick={() => handleSort("cliente")}
-                      className={`flex items-center space-x-1 px-3 py-2 rounded-2xl text-sm font-medium transition-all duration-200 ${
-                        sortField === "cliente"
-                          ? "bg-blue-600 text-white shadow-md"
-                          : "bg-white text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400"
-                      }`}
-                    >
-                      <span>Nome</span>
-                      {getSortIcon("cliente")}
-                    </button>
-                    <button
-                      id="sort-by-valor"
-                      name="sortByValor"
-                      onClick={() => handleSort("valor")}
-                      className={`flex items-center space-x-1 px-3 py-2 rounded-2xl text-sm font-medium transition-all duration-200 ${
-                        sortField === "valor"
-                          ? "bg-blue-600 text-white shadow-md"
-                          : "bg-white text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400"
-                      }`}
-                    >
-                      <span>Valor</span>
-                      {getSortIcon("valor")}
-                    </button>
-                    <button
-                      id="sort-by-cidade"
-                      name="sortByCidade"
-                      onClick={() => handleSort("cidade")}
-                      className={`flex items-center space-x-1 px-3 py-2 rounded-2xl text-sm font-medium transition-all duration-200 ${
-                        sortField === "cidade"
-                          ? "bg-blue-600 text-white shadow-md"
-                          : "bg-white text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400"
-                      }`}
-                    >
-                      <span>Cidade</span>
-                      {getSortIcon("cidade")}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
 
             <div className="divide-y divide-gray-200">
               {paginatedClientGroups.map((clientGroup) => (
@@ -534,7 +556,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   </span>
                 </div>
 
-                <div className="flex items-center space-x-1 sm:space-x-2">
+                <div className="flex items-center justify-between w-full sm:w-auto space-x-1 sm:space-x-2">
                   {/* Botão Início */}
                   <button
                     id="pagination-start"
@@ -559,17 +581,24 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   </button>
 
                   {/* Números das páginas */}
-                  <div className="flex space-x-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  <div className="flex space-x-3 flex-1 justify-center sm:flex-none">
+                    {Array.from({ 
+                      length: Math.min(
+                        window.innerWidth < 640 ? 3 : 5, 
+                        totalPages
+                      ) 
+                    }, (_, i) => {
+                      const maxButtons = window.innerWidth < 640 ? 3 : 5;
                       let pageNum;
-                      if (totalPages <= 5) {
+                      
+                      if (totalPages <= maxButtons) {
                         pageNum = i + 1;
-                      } else if (currentPage <= 3) {
+                      } else if (currentPage <= Math.ceil(maxButtons / 2)) {
                         pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
+                      } else if (currentPage >= totalPages - Math.floor(maxButtons / 2)) {
+                        pageNum = totalPages - maxButtons + 1 + i;
                       } else {
-                        pageNum = currentPage - 2 + i;
+                        pageNum = currentPage - Math.floor(maxButtons / 2) + i;
                       }
 
                       return (
@@ -578,7 +607,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                           id={`pagination-page-${pageNum}`}
                           name={`paginationPage${pageNum}`}
                           onClick={() => setCurrentPage(pageNum)}
-                          className={`px-2 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 ${
+                          className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
                             pageNum === currentPage
                               ? "bg-white text-purple-600 shadow-lg transform scale-105"
                               : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
@@ -1112,7 +1141,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                 </span>
               </div>
 
-              <div className="flex items-center space-x-1 sm:space-x-2">
+              <div className="flex items-center justify-between w-full sm:w-auto space-x-1 sm:space-x-2">
                 {/* Botão Início */}
                 <button
                   id="pagination-start-2"
@@ -1137,17 +1166,24 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                 </button>
 
                 {/* Números das páginas */}
-                <div className="flex space-x-1">
-                  {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                <div className="flex space-x-3 flex-1 justify-center sm:flex-none">
+                  {Array.from({ 
+                    length: Math.min(
+                      window.innerWidth < 640 ? 3 : 5, 
+                      totalPages
+                    ) 
+                  }, (_, i) => {
+                    const maxButtons = window.innerWidth < 640 ? 3 : 5;
                     let pageNum;
-                    if (totalPages <= 5) {
+                    
+                    if (totalPages <= maxButtons) {
                       pageNum = i + 1;
-                    } else if (currentPage <= 3) {
+                    } else if (currentPage <= Math.ceil(maxButtons / 2)) {
                       pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
+                    } else if (currentPage >= totalPages - Math.floor(maxButtons / 2)) {
+                      pageNum = totalPages - maxButtons + 1 + i;
                     } else {
-                      pageNum = currentPage - 2 + i;
+                      pageNum = currentPage - Math.floor(maxButtons / 2) + i;
                     }
 
                     return (
@@ -1156,7 +1192,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                         id={`pagination-page-${pageNum}-2`}
                         name={`paginationPage${pageNum}2`}
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`px-2 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 ${
+                        className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
                           pageNum === currentPage
                             ? "bg-white text-purple-600 shadow-lg transform scale-105"
                             : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
