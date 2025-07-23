@@ -590,18 +590,6 @@ const AuthorizationManager: React.FC = () => {
                   ))}
               </div>
             )}
-
-            {/* Estado vazio */}
-            {pendingRequests.length === 0 &&
-              processedRequests.length === 0 &&
-              expiredRequests.length === 0 && (
-                <div className="text-center py-12">
-                  <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">
-                    Nenhuma solicitação de autorização
-                  </p>
-                </div>
-              )}
           </div>
         ) : (
           <div>

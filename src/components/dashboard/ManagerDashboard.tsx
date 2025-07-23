@@ -642,7 +642,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               <div>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-6">
                   <div className="min-w-0">
-                    <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900 truncate">
+                    <h2 className="text-base lg:text-lg font-semibold text-gray-900">
                       Desempenho dos Cobradores
                     </h2>
                     <p className="text-xs sm:text-sm text-gray-600 mt-1">
