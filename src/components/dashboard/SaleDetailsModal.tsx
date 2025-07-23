@@ -504,5 +504,4 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
     </div>
   );
 };
-
 export default SaleDetailsModal;
