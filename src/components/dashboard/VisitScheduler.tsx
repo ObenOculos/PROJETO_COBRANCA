@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Calendar,
   Clock,
@@ -15,6 +15,7 @@ import {
   CalendarDays,
   Filter,
   RefreshCw,
+  Users,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -70,13 +71,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   >(new Map());
   const [notes, setNotes] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"schedule" | "list">("schedule");
+  // const [activeTab, setActiveTab] = useState<"schedule" | "list">("schedule");
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentPage, setCurrentPage] = useState(1);
   const [visitsPerPage] = useState(10);
   const [clientsCurrentPage, setClientsCurrentPage] = useState(1);
   const [clientsPerPage] = useState(20);
+  const [modalCurrentPage, setModalCurrentPage] = useState(1);
+  const modalClientsPerPage = 20;
   const [showCancellationModal, setShowCancellationModal] = useState(false);
   const [selectedVisitForCancellation, setSelectedVisitForCancellation] =
     useState<ScheduledVisit | null>(null);
@@ -443,6 +447,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     filters.minValue ||
     filters.maxValue ||
     filters.visitStatus;
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setModalCurrentPage(1);
+  }, [searchTerm, filters]);
 
   // Obter lista de cidades únicas (apenas de clientes com pendências)
   const availableCities = React.useMemo(() => {
@@ -1057,38 +1066,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg">
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <div className="flex">
-          <button
-            onClick={() => setActiveTab("schedule")}
-            className={`px-6 py-3 font-medium transition-colors ${
-              activeTab === "schedule"
-                ? "border-b-2 border-purple-600 text-purple-600"
-                : "text-gray-600 hover:text-gray-800"
-            }`}
-          >
-            <Plus className="h-4 w-4 mr-2 inline" />
-            Agendar Nova Visita
-          </button>
-          <button
-            onClick={() => setActiveTab("list")}
-            className={`px-6 py-3 font-medium transition-colors ${
-              activeTab === "list"
-                ? "border-b-2 border-purple-600 text-purple-600"
-                : "text-gray-600 hover:text-gray-800"
-            }`}
-          >
-            <Eye className="h-4 w-4 mr-2 inline" />
-            Minhas Visitas ({allVisits.length})
-          </button>
-        </div>
-      </div>
+    <div className="rounded-2xl">
 
       {/* Filtro e Listagem */}
-      <div className="p-4 lg:p-6">
-        {activeTab === "schedule" ? (
+      <div className="p-0 lg:p-0">
+        {false ? (
           // Aba de Agendamento
           <div className="space-y-6">
             {/* Busca e Filtros */}
@@ -1536,7 +1518,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                               return (
                                 <div
                                   key={client.document}
-                                  className={`relative bg-white rounded-2xl border-2 transition-all duration-200 cursor-pointer hover:shadow-md ${
+                                  className={`relative bg-white rounded-2xl border transition-all duration-200 cursor-pointer hover:shadow-md ${
                                     isSelected
                                       ? "border-purple-500 bg-purple-50 shadow-md ring-2 ring-purple-200"
                                       : "border-gray-200 hover:border-gray-300"
@@ -1566,7 +1548,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                               client.document,
                                             )
                                           }
-                                          className="h-4 w-4 sm:h-6 sm:w-6 text-purple-600 focus:ring-2 focus:ring-purple-500 border-2 border-gray-300 rounded-md cursor-pointer"
+                                          className="h-4 w-4 sm:h-6 sm:w-6 text-purple-600 focus:ring-2 focus:ring-purple-500 border border-gray-300 rounded-md cursor-pointer"
                                           onClick={(e) => e.stopPropagation()}
                                         />
                                       </div>
@@ -1702,8 +1684,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             )}
 
             {availableClients.length === 0 &&
-              user &&
-              user.type === "collector" && (
+              user?.type === "collector" && (
                 <div className="p-4 text-center text-gray-500 border border-gray-200 rounded-2xl">
                   {hasActiveFilters
                     ? "Nenhum cliente encontrado com os filtros aplicados"
@@ -1926,7 +1907,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 className="w-full sm:w-auto px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
               >
                 {loading ? (
-                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                  <div className="animate-spin h-4 w-4 border border-white border-t-transparent rounded-full mr-2"></div>
                 ) : (
                   <CheckCircle className="h-4 w-4 mr-2" />
                 )}
@@ -1939,7 +1920,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             </div>
           </div>
         ) : (
-          // Aba de Lista de Visitas
+          // Lista de Visitas
           <div className="space-y-6">
             {/* Calendário de Visitas */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
@@ -1968,12 +1949,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </div>
 
               {/* Grade do Calendário */}
-              <div className="grid grid-cols-7 gap-1">
+              <div className="grid grid-cols-7 gap-3">
                 {/* Cabeçalho dos dias da semana */}
                 {weekDays.map((day) => (
                   <div
                     key={day}
-                    className="text-center text-xs font-medium text-gray-500 py-2"
+                    className="flex items-center justify-center text-xs font-medium text-gray-500 pb-2"
                   >
                     {day}
                   </div>
@@ -1989,7 +1970,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   // Dias vazios no início
                   for (let i = 0; i < startingDayOfWeek; i++) {
                     days.push(
-                      <div key={`empty-${i}`} className="aspect-square" />
+                      <div key={`empty-${i}`} className="h-10 lg:h-12" />
                     );
                   }
 
@@ -2007,7 +1988,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         key={day}
                         onClick={() => selectDate(date)}
                         className={`
-                          aspect-square rounded-lg flex flex-col items-center justify-center
+                          h-10 lg:h-16 rounded-lg flex flex-col items-center justify-center
                           relative transition-all duration-200 transform hover:scale-105
                           ${
                             isSelected
@@ -2048,7 +2029,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   <span>Selecionado</span>
                 </div>
                 <div className="flex items-center">
-                  <div className="w-4 h-4 border-2 border-purple-400 rounded mr-1.5" />
+                  <div className="w-4 h-4 border border-purple-400 rounded mr-1.5" />
                   <span>Com visitas</span>
                 </div>
               </div>
@@ -2104,7 +2085,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   {paginatedSelectedDateVisits.map((visit) => (
                     <div
                       key={visit.id}
-                      className="border-2 border-blue-300 bg-blue-50 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
+                      className="border border-blue-300 bg-blue-50 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
                     >
                       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                         <div className="flex-1">
@@ -2430,7 +2411,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   {pastVisits.slice(0, 5).map((visit) => (
                     <div
                       key={visit.id}
-                      className="border-2 border-red-300 bg-red-50 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
+                      className="border border-red-300 bg-red-50 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
                     >
                       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                         <div className="flex-1">
@@ -2802,7 +2783,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 className="flex-1 px-6 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
               >
                 {loading ? (
-                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                  <div className="animate-spin h-4 w-4 border border-white border-t-transparent rounded-full mr-2"></div>
                 ) : (
                   <CheckCircle className="h-4 w-4 mr-2" />
                 )}
@@ -3089,6 +3070,514 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-2xl hover:bg-gray-300 transition-colors"
                 >
                   Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Botão Flutuante para Agendar Nova Visita */}
+      <button
+        onClick={() => {
+          setShowScheduleModal(true);
+          setModalCurrentPage(1);
+        }}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 transition-all duration-200 flex items-center justify-center z-50 hover:scale-110"
+        title="Agendar Nova Visita"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+
+      {/* Modal de Agendamento de Nova Visita */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="px-4 lg:px-6 py-4 border-b border-gray-200 bg-white rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Agendar Nova Visita
+                </h3>
+                <button
+                  onClick={() => setShowScheduleModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  title="Fechar"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <div className="bg-gray-50 px-4 lg:px-6 py-4">
+              {/* Content from the schedule tab */}
+              <div className="space-y-6">
+                {/* Busca e Filtros */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label htmlFor="search-clients" className="flex items-center text-sm font-medium text-gray-700">
+                      <Search className="h-4 w-4 mr-2 text-purple-600" />
+                      Buscar e Filtrar Clientes
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`flex items-center px-3 py-1.5 text-sm rounded-2xl transition-colors ${
+                          showFilters
+                            ? "bg-purple-100 text-purple-700"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      >
+                        <Filter className="h-4 w-4" />
+                        <span className="ml-1 hidden sm:inline">Filtros</span>
+                      </button>
+                      <span className="text-xs text-gray-500">
+                        {availableClients.length} de {availableClients.length} clientes
+                      </span>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      id="search-clients"
+                      type="text"
+                      placeholder="Buscar por nome, documento, endereço ou cidade..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Filtros Expandidos */}
+                {showFilters && (
+                  <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div>
+                        <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          Cidade
+                        </label>
+                        <select
+                          value={filters.city}
+                          onChange={(e) =>
+                            setFilters({ ...filters, city: e.target.value })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                        >
+                          <option value="">Todas as cidades</option>
+                          {Array.from(new Set(availableClients.map((c) => c.city))).map(
+                            (city) => (
+                              <option key={city} value={city}>
+                                {city}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                          <DollarSign className="h-3 w-3 mr-1" />
+                          Valor Mínimo
+                        </label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={filters.minValue}
+                            onChange={(e) =>
+                              setFilters({ ...filters, minValue: e.target.value })
+                            }
+                            className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                          <DollarSign className="h-3 w-3 mr-1" />
+                          Valor Máximo
+                        </label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <input
+                            type="number"
+                            placeholder="∞"
+                            value={filters.maxValue}
+                            onChange={(e) =>
+                              setFilters({ ...filters, maxValue: e.target.value })
+                            }
+                            className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                          <Eye className="h-3 w-3 mr-1" />
+                          Status da Visita
+                        </label>
+                        <select
+                          value={filters.visitStatus}
+                          onChange={(e) =>
+                            setFilters({ ...filters, visitStatus: e.target.value })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                        >
+                          <option value="">Todos os status</option>
+                          <option value="never-visited">Nunca visitado</option>
+                          <option value="recent">Visitado recentemente</option>
+                          <option value="overdue">Visita em atraso</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        onClick={clearAllFilters}
+                        className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors flex items-center"
+                      >
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Limpar filtros
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lista de Clientes */}
+                <div className="space-y-6">
+                  {selectedClients.size > 0 && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4">
+                      <h4 className="font-semibold text-purple-900 mb-3 flex items-center">
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Clientes Selecionados ({selectedClients.size})
+                      </h4>
+                      <div className="grid grid-cols-1 gap-3 max-h-64 overflow-y-auto">
+                        {availableClients
+                          .filter((client) => selectedClients.has(client.document))
+                          .map((client) => {
+                            const schedule = clientSchedules.get(client.document) || {
+                              date: "",
+                              time: "",
+                            };
+                            return (
+                              <div
+                                key={client.document}
+                                className="bg-white rounded-2xl p-3 border border-gray-200"
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <div>
+                                    <span className="font-medium text-gray-900">
+                                      {client.client}
+                                    </span>
+                                    <span className="text-gray-500 ml-2">
+                                      ({client.document})
+                                    </span>
+                                  </div>
+                                  <div className="text-red-600 font-medium">
+                                    {formatCurrency(client.pendingValue)}
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                      Data da Visita
+                                    </label>
+                                    <div className="relative">
+                                      <Calendar className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                                      <input
+                                        id={`visit-date-${client.document}`}
+                                        name={`visit-date-${client.document}`}
+                                        type="date"
+                                        value={schedule.date}
+                                        onChange={(e) =>
+                                          updateClientSchedule(
+                                            client.document,
+                                            "date",
+                                            e.target.value,
+                                          )
+                                        }
+                                        min={getLocalDate()}
+                                        className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                      Horário
+                                    </label>
+                                    <div className="relative">
+                                      <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                                      <input
+                                        id={`visit-time-${client.document}`}
+                                        name={`visit-time-${client.document}`}
+                                        type="time"
+                                        value={schedule.time}
+                                        onChange={(e) => {
+                                          const selectedTime = e.target.value;
+                                          updateClientSchedule(
+                                            client.document,
+                                            "time",
+                                            selectedTime,
+                                          );
+                                          // Verificar se é um horário no passado
+                                          const selectedDate = schedule.date;
+                                          if (selectedDate && selectedTime) {
+                                            const [year, month, day] = selectedDate.split("-");
+                                            const [hours, minutes] = selectedTime.split(":");
+                                            const selectedDateTime = new Date(
+                                              parseInt(year),
+                                              parseInt(month) - 1,
+                                              parseInt(day),
+                                              parseInt(hours),
+                                              parseInt(minutes),
+                                            );
+                                            const now = new Date();
+                                            if (selectedDateTime <= now) {
+                                              // Mostrar modal de aviso
+                                              setTimeWarningData({
+                                                clientDocument: client.document,
+                                                selectedTime: selectedTime,
+                                                suggestedTime: "",
+                                                previousTime: "",
+                                              });
+                                              setShowTimeWarningModal(true);
+                                            }
+                                          }
+                                        }}
+                                        className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Resumo das Visitas Selecionadas */}
+                  {selectedClients.size > 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                      <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                        <CalendarDays className="h-4 w-4 mr-2" />
+                        Resumo do Agendamento
+                      </h4>
+                      <div className="space-y-2">
+                        {availableClients
+                          .filter((client) => selectedClients.has(client.document))
+                          .map((client) => {
+                            const schedule = clientSchedules.get(client.document) || {
+                              date: "",
+                              time: "",
+                            };
+                            if (!schedule.date || !schedule.time) return null;
+                            return (
+                              <div
+                                key={client.document}
+                                className="flex items-center justify-between text-sm bg-white rounded-2xl p-2"
+                              >
+                                <div>
+                                  <span className="font-medium">{client.client}</span>
+                                  <span className="text-gray-500 ml-2">
+                                    ({client.document})
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-medium text-blue-600">
+                                    {formatSafeDate(schedule.date)} às {schedule.time}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+
+
+                  {/* Lista de Clientes Disponíveis */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-semibold text-gray-900 flex items-center">
+                        <Users className="h-5 w-5 mr-2 text-purple-600" />
+                        Clientes para Visita
+                      </h4>
+                      {/* Indicador de Paginação */}
+                      {availableClients.length > modalClientsPerPage && (
+                        <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() => setModalCurrentPage(modalCurrentPage - 1)}
+                              disabled={modalCurrentPage === 1}
+                              className="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="Página anterior"
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            <span className="px-2 py-1 text-sm font-medium text-gray-700 min-w-[60px] text-center">
+                              {modalCurrentPage}/{Math.ceil(availableClients.length / modalClientsPerPage)}
+                            </span>
+                            <button
+                              onClick={() => setModalCurrentPage(modalCurrentPage + 1)}
+                              disabled={modalCurrentPage >= Math.ceil(availableClients.length / modalClientsPerPage)}
+                              className="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="Próxima página"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {loading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="animate-spin h-8 w-8 border-4 border-purple-600 border-t-transparent rounded-full"></div>
+                      </div>
+                    ) : availableClients.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500">
+                          {searchTerm || Object.values(filters).some(Boolean)
+                            ? "Nenhum cliente encontrado com os filtros aplicados."
+                            : "Nenhum cliente encontrado."}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {(() => {
+                          // Paginação dos clientes
+                          const startIndex = (modalCurrentPage - 1) * modalClientsPerPage;
+                          const endIndex = startIndex + modalClientsPerPage;
+                          const paginatedClients = availableClients.slice(startIndex, endIndex);
+                          
+                          // Agrupar clientes paginados por bairro
+                          const groupedClients = paginatedClients.reduce((groups, client) => {
+                            const neighborhood = client.neighborhood || "Outros";
+                            if (!groups[neighborhood]) {
+                              groups[neighborhood] = [];
+                            }
+                            groups[neighborhood].push(client);
+                            return groups;
+                          }, {} as Record<string, typeof paginatedClients>);
+                          
+                          return Object.entries(groupedClients).map(([neighborhood, clients]) => (
+                            <div key={neighborhood} className="mb-4">
+                              {/* Neighborhood Header */}
+                              <div className="flex items-center mb-3 pb-2 border-b border-gray-200">
+                                <MapPin className="h-4 w-4 text-gray-500 mr-2" />
+                                <h4 className="text-sm font-medium text-gray-700">
+                                  {neighborhood}
+                                </h4>
+                                <span className="ml-2 text-xs text-gray-500">
+                                  ({clients.length} cliente
+                                  {clients.length !== 1 ? "s" : ""})
+                                </span>
+                              </div>
+                              {/* Client Cards */}
+                              <div className="grid grid-cols-1 gap-3">
+                                {clients.map((client) => {
+                                  const isSelected = selectedClients.has(
+                                    client.document,
+                                  );
+                                  return (
+                                    <div
+                                      key={client.document}
+                                      className={`relative bg-white rounded-2xl border transition-all duration-200 cursor-pointer hover:shadow-md ${
+                                        isSelected
+                                          ? "border-purple-500 bg-purple-50 shadow-md ring-2 ring-purple-200"
+                                          : "border-gray-200 hover:border-gray-300"
+                                      }`}
+                                      onClick={() =>
+                                        handleToggleClientSelection(client.document)
+                                      }
+                                    >
+                                      <div className="p-4">
+                                        <div className="flex items-start">
+                                          <div className="flex-1 min-w-0">
+                                            {/* Client Info */}
+                                            <div className="flex items-start justify-between mb-2">
+                                              <div className="min-w-0 flex-1">
+                                                <h3 className="font-semibold text-gray-900 text-lg truncate">
+                                                  {client.client}
+                                                </h3>
+                                                <p className="text-sm text-gray-600">
+                                                  {client.document}
+                                                </p>
+                                              </div>
+                                            </div>
+                                            {/* Client Details */}
+                                            <div className="space-y-2 text-sm text-gray-600">
+                                              <div className="flex items-center">
+                                                <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                                                <span className="truncate">
+                                                  {client.address}, {client.city}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center">
+                                                <DollarSign className="h-4 w-4 mr-2 flex-shrink-0" />
+                                                <span className="font-medium text-red-600">
+                                                  {formatCurrency(client.pendingValue)} pendente
+                                                </span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              </div>
+            </div>
+            <div className="px-4 lg:px-6 py-4 border-t border-gray-200 bg-white rounded-b-2xl flex-shrink-0">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end space-y-3 sm:space-y-0 sm:space-x-4">
+                <button
+                  onClick={() => {
+                    setSelectedClients(new Set());
+                    setClientSchedules(new Map());
+                    setNotes("");
+                    clearAllFilters();
+                    setCurrentPage(1);
+                    setClientsCurrentPage(1);
+                    setModalCurrentPage(1);
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Limpar
+                </button>
+                <button
+                  onClick={() => setShowScheduleModal(false)}
+                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    handleScheduleVisit();
+                    setShowScheduleModal(false);
+                  }}
+                  disabled={selectedClients.size === 0 || loading}
+                  className="w-full sm:w-auto px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
+                >
+                  {loading ? (
+                    <div className="animate-spin h-4 w-4 border border-white border-t-transparent rounded-full mr-2"></div>
+                  ) : (
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                  )}
+                  {loading
+                    ? "Agendando..."
+                    : selectedClients.size > 0
+                    ? `Agendar ${selectedClients.size} Visita${selectedClients.size > 1 ? "s" : ""}`
+                    : "Agendar Visitas"}
                 </button>
               </div>
             </div>
