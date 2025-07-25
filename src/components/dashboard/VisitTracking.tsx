@@ -658,8 +658,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                 </div>
 
                                 {visit.notes && (
-                                  <div className="text-sm text-gray-500 italic mb-3">
-                                    Observações: "{visit.notes}"
+                                  <div className="text-sm text-gray-500 italic mb-3 whitespace-pre-line">
+                                    Observações: {visit.notes}
                                   </div>
                                 )}
 
@@ -823,8 +823,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   )}
 
                   {request.notes && (
-                    <div className="text-sm text-gray-500 italic mb-3">
-                      Observações da visita: "{request.notes}"
+                    <div className="text-sm text-gray-500 italic mb-3 whitespace-pre-line">
+                      Observações da visita: {request.notes}
                     </div>
                   )}
                 </div>
@@ -1061,8 +1061,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                 </div>
 
                                 {visit.notes && (
-                                  <div className="text-sm text-gray-500 italic mb-3">
-                                    Observações: "{visit.notes}"
+                                  <div className="text-sm text-gray-500 italic mb-3 whitespace-pre-line">
+                                    Observações: {visit.notes}
                                   </div>
                                 )}
 

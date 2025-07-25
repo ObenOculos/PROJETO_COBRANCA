@@ -305,8 +305,8 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
                           )}
 
                           {request.notes && (
-                            <div className="text-sm text-gray-500 italic mb-3">
-                              Observações da visita: "{request.notes}"
+                            <div className="text-sm text-gray-500 italic mb-3 whitespace-pre-line">
+                              Observações da visita: {request.notes}
                             </div>
                           )}
                         </div>
@@ -485,8 +485,8 @@ const VisitCancellationApproval: React.FC<VisitCancellationApprovalProps> = ({
                               )}
 
                             {visit.notes && (
-                              <div className="text-sm text-gray-500 italic">
-                                Observações da visita: "{visit.notes}"
+                              <div className="text-sm text-gray-500 italic whitespace-pre-line">
+                                Observações da visita: {visit.notes}
                               </div>
                             )}
                           </div>

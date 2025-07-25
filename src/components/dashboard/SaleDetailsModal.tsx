@@ -459,7 +459,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
 
                         {visit.notes && (
                           <div className="bg-white p-3 rounded-2xl border border-gray-200">
-                            <p className="text-sm text-gray-700 leading-relaxed">
+                            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
                               {visit.notes}
                             </p>
                           </div>
