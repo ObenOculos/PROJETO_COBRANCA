@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Calendar,
   Clock,
@@ -71,6 +71,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   const [notes, setNotes] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"schedule" | "list">("schedule");
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentPage, setCurrentPage] = useState(1);
   const [visitsPerPage] = useState(10);
   const [clientsCurrentPage, setClientsCurrentPage] = useState(1);
@@ -302,11 +304,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   }, [searchTerm, filters]);
 
   // Obter visitas organizadas por data
-  const { todayVisits, upcomingVisits, pastVisits, allVisits } =
+  const { upcomingVisits, pastVisits, allVisits } =
     React.useMemo(() => {
       if (!user)
         return {
-          todayVisits: [],
           upcomingVisits: [],
           pastVisits: [],
           allVisits: [],
@@ -319,17 +320,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       const day = String(today.getDate()).padStart(2, "0");
       const todayStr = `${year}-${month}-${day}`;
       const visits = getVisitsByCollector(user.id);
-
-      const todayVisits = visits
-        .filter((visit) => {
-          // Garantir que a comparação está correta
-          return visit.scheduledDate === todayStr;
-        })
-        .sort((a, b) => {
-          const timeA = a.scheduledTime || "00:00";
-          const timeB = b.scheduledTime || "00:00";
-          return timeA.localeCompare(timeB);
-        });
 
       const upcomingVisits = visits
         .filter((visit) => {
@@ -371,17 +361,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         return dateA.getTime() - dateB.getTime();
       });
 
-      return { todayVisits, upcomingVisits, pastVisits, allVisits };
+      return { upcomingVisits, pastVisits, allVisits };
     }, [user, getVisitsByCollector, scheduledVisits]);
 
-  // Paginação para visitas de hoje
-  const paginatedTodayVisits = React.useMemo(() => {
-    const startIndex = (currentPage - 1) * visitsPerPage;
-    const endIndex = startIndex + visitsPerPage;
-    return todayVisits.slice(startIndex, endIndex);
-  }, [todayVisits, currentPage, visitsPerPage]);
-
-  const totalPages = Math.ceil(todayVisits.length / visitsPerPage);
 
   const handleScheduleVisit = async () => {
     return handleScheduleMultipleVisits();
@@ -476,6 +458,65 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     ];
     return cities.sort();
   }, [user, getClientGroups]);
+
+  // Funções do calendário
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    return { daysInMonth, startingDayOfWeek };
+  };
+
+  const getVisitsForDate = (date: Date) => {
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    
+    return allVisits.filter(visit => {
+      const visitDate = visit.scheduledDate;
+      return visitDate === dateStr && 
+             (visit.status === 'agendada' || visit.status === 'realizada' || visit.status === 'nao_encontrado');
+    });
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    const newMonth = new Date(currentMonth);
+    if (direction === 'prev') {
+      newMonth.setMonth(newMonth.getMonth() - 1);
+    } else {
+      newMonth.setMonth(newMonth.getMonth() + 1);
+    }
+    setCurrentMonth(newMonth);
+  };
+
+  const selectDate = (date: Date) => {
+    setSelectedCalendarDate(date);
+    setCurrentPage(1); // Reset paginação ao selecionar nova data
+  };
+
+  const monthNames = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+  // Visitas do dia selecionado no calendário
+  const selectedDateVisits = useMemo(() => {
+    if (!selectedCalendarDate) return [];
+    return getVisitsForDate(selectedCalendarDate);
+  }, [selectedCalendarDate, allVisits]);
+
+  // Paginação para visitas do dia selecionado
+  const paginatedSelectedDateVisits = useMemo(() => {
+    const startIndex = (currentPage - 1) * visitsPerPage;
+    const endIndex = startIndex + visitsPerPage;
+    return selectedDateVisits.slice(startIndex, endIndex);
+  }, [selectedDateVisits, currentPage, visitsPerPage]);
+
+  const totalSelectedDatePages = Math.ceil(selectedDateVisits.length / visitsPerPage);
 
   const proceedWithScheduling = async () => {
     try {
@@ -1053,7 +1094,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             {/* Busca e Filtros */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">
+                <label htmlFor="search-clients" className="block text-sm font-medium text-gray-700">
                   Buscar e Filtrar Clientes
                 </label>
                 <div className="flex items-center space-x-2">
@@ -1084,6 +1125,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
+                  id="search-clients"
+                  name="search-clients"
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -1102,6 +1145,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         Cidade
                       </label>
                       <select
+                        id="filter-city"
+                        name="filter-city"
                         value={filters.city}
                         onChange={(e) =>
                           handleFilterChange("city", e.target.value)
@@ -1123,6 +1168,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         Valor Mínimo
                       </label>
                       <input
+                        id="filter-min-value"
+                        name="filter-min-value"
                         type="number"
                         step="0.01"
                         value={filters.minValue}
@@ -1140,6 +1187,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         Valor Máximo
                       </label>
                       <input
+                        id="filter-max-value"
+                        name="filter-max-value"
                         type="number"
                         step="0.01"
                         value={filters.maxValue}
@@ -1157,6 +1206,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         Status de Visita
                       </label>
                       <select
+                        id="filter-visit-status"
+                        name="filter-visit-status"
                         value={filters.visitStatus}
                         onChange={(e) =>
                           handleFilterChange("visitStatus", e.target.value)
@@ -1302,7 +1353,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   </div>
                 </div>
 
-                <div className="max-h-[32rem] overflow-y-auto p-3">
+                <div className="bg-gray-50 max-h-[32rem] overflow-y-auto p-3">
                   {/* Group clients by neighborhood */}
                   {(() => {
                     const groupedClients = paginatedClients.reduce(
@@ -1504,8 +1555,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                   <div className="p-4">
                                     <div className="flex items-start">
                                       {/* Large Checkbox */}
-                                      <div className="mr-4 mt-1">
+                                      <div className="mr-4 mt-1 hidden">
                                         <input
+                                          id={`client-checkbox-${client.document}`}
+                                          name={`client-checkbox-${client.document}`}
                                           type="checkbox"
                                           checked={isSelected}
                                           onChange={() =>
@@ -1712,6 +1765,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                 <div className="relative">
                                   <Calendar className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
                                   <input
+                                    id={`visit-date-${client.document}`}
+                                    name={`visit-date-${client.document}`}
                                     type="date"
                                     value={schedule.date}
                                     onChange={(e) =>
@@ -1733,6 +1788,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                 <div className="relative">
                                   <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
                                   <input
+                                    id={`visit-time-${client.document}`}
+                                    name={`visit-time-${client.document}`}
                                     type="time"
                                     value={schedule.time}
                                     onFocus={(e) => {
@@ -1798,10 +1855,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
             {/* Observações */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="visit-notes" className="block text-sm font-medium text-gray-700 mb-2">
                 Observações (opcional)
               </label>
               <textarea
+                id="visit-notes"
+                name="visit-notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Adicione observações sobre a visita..."
@@ -1882,14 +1941,128 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         ) : (
           // Aba de Lista de Visitas
           <div className="space-y-6">
-            {/* Visitas de Hoje */}
-            <div>
+            {/* Calendário de Visitas */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <Calendar className="h-5 w-5 mr-2 text-purple-600" />
+                  Calendário de Visitas
+                </h3>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => navigateMonth('prev')}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <span className="text-sm font-medium min-w-[120px] text-center">
+                    {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                  </span>
+                  <button
+                    onClick={() => navigateMonth('next')}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Grade do Calendário */}
+              <div className="grid grid-cols-7 gap-1">
+                {/* Cabeçalho dos dias da semana */}
+                {weekDays.map((day) => (
+                  <div
+                    key={day}
+                    className="text-center text-xs font-medium text-gray-500 py-2"
+                  >
+                    {day}
+                  </div>
+                ))}
+
+                {/* Dias do mês */}
+                {(() => {
+                  const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentMonth);
+                  const days = [];
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+
+                  // Dias vazios no início
+                  for (let i = 0; i < startingDayOfWeek; i++) {
+                    days.push(
+                      <div key={`empty-${i}`} className="aspect-square" />
+                    );
+                  }
+
+                  // Dias do mês
+                  for (let day = 1; day <= daysInMonth; day++) {
+                    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                    const visitsForDay = getVisitsForDate(date);
+                    const isToday = date.toDateString() === today.toDateString();
+                    const isSelected = selectedCalendarDate?.toDateString() === date.toDateString();
+                    const isPast = date < today;
+                    const hasVisits = visitsForDay.length > 0;
+
+                    days.push(
+                      <button
+                        key={day}
+                        onClick={() => selectDate(date)}
+                        className={`
+                          aspect-square rounded-lg flex flex-col items-center justify-center
+                          relative transition-all duration-200 transform hover:scale-105
+                          ${
+                            isSelected
+                              ? 'bg-purple-600 text-white shadow-lg'
+                              : isToday
+                              ? 'bg-blue-100 text-blue-800 font-bold'
+                              : isPast
+                              ? 'bg-gray-50 text-gray-400'
+                              : 'hover:bg-gray-100 text-gray-700'
+                          }
+                          ${hasVisits ? 'ring-2 ring-purple-400 ring-offset-1' : ''}
+                        `}
+                      >
+                        <span className="text-sm font-medium">{day}</span>
+                        {hasVisits && (
+                          <div className="absolute bottom-1">
+                            <div className={`w-2 h-2 rounded-full ${
+                              isSelected ? 'bg-white' : 'bg-purple-500'
+                            }`} />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  }
+
+                  return days;
+                })()}
+              </div>
+
+              {/* Legenda */}
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-600">
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-blue-100 rounded mr-1.5" />
+                  <span>Hoje</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-purple-600 rounded mr-1.5" />
+                  <span>Selecionado</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-4 h-4 border-2 border-purple-400 rounded mr-1.5" />
+                  <span>Com visitas</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Visitas do dia selecionado */}
+            {selectedCalendarDate ? (
+              <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
                 <h3 className="text-base lg:text-lg font-semibold text-gray-900 flex items-center">
                   <CalendarDays className="h-5 w-5 mr-2 text-purple-600" />
-                  Visitas de Hoje ({todayVisits.length})
+                  Visitas de {selectedCalendarDate.toLocaleDateString('pt-BR')} ({selectedDateVisits.length})
                 </h3>
-                {todayVisits.length > visitsPerPage && (
+                {selectedDateVisits.length > visitsPerPage && (
                   <div className="flex items-center justify-center sm:justify-start space-x-2">
                     <button
                       onClick={() =>
@@ -1901,13 +2074,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                       <ChevronLeft className="h-4 w-4" />
                     </button>
                     <span className="text-sm text-gray-600">
-                      Página {currentPage} de {totalPages}
+                      Página {currentPage} de {totalSelectedDatePages}
                     </span>
                     <button
                       onClick={() =>
-                        setCurrentPage(Math.min(totalPages, currentPage + 1))
+                        setCurrentPage(Math.min(totalSelectedDatePages, currentPage + 1))
                       }
-                      disabled={currentPage === totalPages}
+                      disabled={currentPage === totalSelectedDatePages}
                       className="p-2 border border-gray-300 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -1916,11 +2089,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 )}
               </div>
 
-              {todayVisits.length === 0 ? (
+              {selectedDateVisits.length === 0 ? (
                 <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
                   <Calendar className="h-8 w-8 text-blue-400 mx-auto mb-2" />
                   <p className="text-blue-600 font-medium">
-                    Nenhuma visita agendada para hoje.
+                    Nenhuma visita agendada para {selectedCalendarDate.toLocaleDateString('pt-BR')}.
                   </p>
                   <p className="text-blue-500 text-sm">
                     Que tal agendar uma nova visita?
@@ -1928,7 +2101,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {paginatedTodayVisits.map((visit) => (
+                  {paginatedSelectedDateVisits.map((visit) => (
                     <div
                       key={visit.id}
                       className="border-2 border-blue-300 bg-blue-50 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
@@ -2067,9 +2240,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 </div>
               )}
             </div>
+            ) : (
+              /* Mensagem quando nenhuma data é selecionada */
+              <div className="bg-purple-50 border border-purple-200 rounded-2xl p-6 text-center">
+                <Calendar className="h-12 w-12 text-purple-400 mx-auto mb-3" />
+                <p className="text-purple-700 font-medium text-lg mb-2">
+                  Selecione um dia no calendário
+                </p>
+                <p className="text-purple-600 text-sm">
+                  Clique em qualquer dia para visualizar as visitas agendadas
+                </p>
+              </div>
+            )}
 
             {/* Próximas Visitas */}
-            {upcomingVisits.length > 0 && (
+            {upcomingVisits.length > 0 && false && (
               <div>
                 <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
                   <Calendar className="h-5 w-5 mr-2 text-gray-600" />
@@ -2391,6 +2576,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   Motivo do cancelamento *
                 </label>
                 <textarea
+                  id="cancellation-reason"
+                  name="cancellation-reason"
                   value={cancellationReason}
                   onChange={(e) => setCancellationReason(e.target.value)}
                   placeholder="Descreva o motivo para solicitar o cancelamento desta visita..."
@@ -2469,6 +2656,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
+                      id="reschedule-date"
+                      name="reschedule-date"
                       type="date"
                       value={rescheduleDate}
                       onChange={(e) => setRescheduleDate(e.target.value)}
@@ -2486,6 +2675,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   <div className="relative">
                     <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
+                      id="reschedule-time"
+                      name="reschedule-time"
                       type="time"
                       value={rescheduleTime}
                       onChange={(e) => setRescheduleTime(e.target.value)}
