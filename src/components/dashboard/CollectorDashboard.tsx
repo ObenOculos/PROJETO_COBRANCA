@@ -29,7 +29,6 @@ import RadialApprovalChart from "./RadialApprovalChart";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { FilterOptions } from "../../types";
-import { formatCurrency } from "../../utils/formatters";
 
 // Export tabs for use in Header
 export const getCollectorTabs = () => [
@@ -526,10 +525,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
               {/* Content */}
               <div className="p-3">
                 {/* Layout Desktop: Grid 3x2 */}
-                <div className="hidden lg:grid lg:grid-cols-3 lg:gap-8">
+                <div className="hidden lg:grid lg:grid-cols-3 lg:gap-4">
                   {/* Coluna Hoje */}
                   <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-indigo-200">
-                    <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center gap-2 justify-center">
+                    <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2 justify-center">
                       <Sun className="w-5 h-5 text-yellow-500" />
                       Hoje
                     </h3>
@@ -569,7 +568,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
                   {/* Coluna Esta Semana */}
                   <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-blue-200">
-                    <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center gap-2 justify-center">
+                    <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2 justify-center">
                       <CalendarDays className="w-5 h-5 text-blue-500" />
                       Esta Semana
                     </h3>
@@ -609,7 +608,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
                   {/* Coluna Este Mês */}
                   <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-purple-200">
-                    <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center gap-2 justify-center">
+                    <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2 justify-center">
                       <CalendarRange className="w-5 h-5 text-purple-500" />
                       Este Mês
                     </h3>
@@ -767,58 +766,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                           goals.monthly.payments,
                         )}
                       />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Resumo Financeiro */}
-            <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-2xl border border-blue-200 overflow-hidden">
-              {/* Header */}
-              <div className="bg-white/80 backdrop-blur-sm p-4 border-b border-blue-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-2xl">
-                      <BarChart3 className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <h2 className="font-semibold text-gray-900">
-                        Resumo Financeiro
-                      </h2>
-                      <p className="text-sm text-gray-600">
-                        Acompanhe o desempenho financeiro da sua carteira
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-4">
-                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-blue-200 text-center">
-                    <div className="text-1xl lg:text-3xl font-bold text-blue-600 mb-2">
-                      {formatCurrency(stats.totalAmount)}
-                    </div>
-                    <div className="text-sm text-gray-600 font-medium">
-                      Valor Total
-                    </div>
-                  </div>
-                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-green-200 text-center">
-                    <div className="text-1xl lg:text-3xl font-bold text-green-600 mb-2">
-                      {formatCurrency(stats.receivedAmount)}
-                    </div>
-                    <div className="text-sm text-gray-600 font-medium">
-                      Valor Recebido
-                    </div>
-                  </div>
-                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-orange-200 text-center">
-                    <div className="text-1xl lg:text-3xl font-bold text-orange-600 mb-2">
-                      {formatCurrency(stats.totalAmount - stats.receivedAmount)}
-                    </div>
-                    <div className="text-sm text-gray-600 font-medium">
-                      Valor Pendente
                     </div>
                   </div>
                 </div>
