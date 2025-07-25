@@ -16,6 +16,9 @@ import {
   Filter,
   RefreshCw,
   Users,
+  User,
+  MapPinIcon,
+  ArrowUpDown,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -130,6 +133,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   } | null>(null);
   const [showDateValidationModal, setShowDateValidationModal] = useState(false);
   const [dateValidationMessage, setDateValidationMessage] = useState("");
+  
+  // Estados para filtro das visitas do dia selecionado
+  const [visitsSortBy, setVisitsSortBy] = useState<'name' | 'city' | 'value'>('name');
+  const [visitsSortOrder, setVisitsSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Gerenciar scroll da página quando modal abre/fecha
   useEffect(() => {
@@ -550,8 +557,33 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   // Visitas do dia selecionado no calendário
   const selectedDateVisits = useMemo(() => {
     if (!selectedCalendarDate) return [];
-    return getVisitsForDate(selectedCalendarDate);
-  }, [selectedCalendarDate, allVisits]);
+    const visits = getVisitsForDate(selectedCalendarDate);
+    
+    // Ordenar visitas
+    return [...visits].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (visitsSortBy) {
+        case 'name':
+          comparison = a.clientName.localeCompare(b.clientName);
+          break;
+        case 'city':
+          const aCity = a.clientAddress?.split(',').pop()?.trim() || '';
+          const bCity = b.clientAddress?.split(',').pop()?.trim() || '';
+          comparison = aCity.localeCompare(bCity);
+          break;
+        case 'value':
+          const aValue = a.totalPendingValue || 0;
+          const bValue = b.totalPendingValue || 0;
+          comparison = aValue - bValue;
+          break;
+        default:
+          comparison = 0;
+      }
+      
+      return visitsSortOrder === 'asc' ? comparison : -comparison;
+    });
+  }, [selectedCalendarDate, allVisits, visitsSortBy, visitsSortOrder]);
 
   // Paginação para visitas do dia selecionado
   const paginatedSelectedDateVisits = useMemo(() => {
@@ -2007,10 +2039,72 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             {selectedCalendarDate ? (
               <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
-                <h3 className="text-base lg:text-lg font-semibold text-gray-900 flex items-center">
-                  <CalendarDays className="h-5 w-5 mr-2 text-blue-600" />
-                  Visitas de {selectedCalendarDate.toLocaleDateString('pt-BR')} ({selectedDateVisits.length})
-                </h3>
+                <div className="flex items-center space-x-4">
+                  <h3 className="text-base lg:text-lg font-semibold text-gray-900 flex items-center">
+                    <CalendarDays className="h-5 w-5 mr-2 text-blue-600" />
+                    Visitas de {selectedCalendarDate.toLocaleDateString('pt-BR')} ({selectedDateVisits.length})
+                  </h3>
+                  
+                  {/* Filtro de ordenação */}
+                  {selectedDateVisits.length > 1 && (
+                    <div className="flex items-center space-x-1 bg-blue-50 rounded-full px-2 py-1 border border-blue-200">
+                      <button
+                        onClick={() => {
+                          setVisitsSortBy('name');
+                          setVisitsSortOrder(visitsSortBy === 'name' && visitsSortOrder === 'asc' ? 'desc' : 'asc');
+                        }}
+                        className={`p-1 rounded transition-colors ${
+                          visitsSortBy === 'name' 
+                            ? 'bg-blue-600 text-white' 
+                            : 'text-blue-700 hover:bg-blue-100'
+                        }`}
+                        title="Ordenar por nome"
+                      >
+                        <User className="h-3 w-3" />
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          setVisitsSortBy('city');
+                          setVisitsSortOrder(visitsSortBy === 'city' && visitsSortOrder === 'asc' ? 'desc' : 'asc');
+                        }}
+                        className={`p-1 rounded transition-colors ${
+                          visitsSortBy === 'city' 
+                            ? 'bg-blue-600 text-white' 
+                            : 'text-blue-700 hover:bg-blue-100'
+                        }`}
+                        title="Ordenar por cidade"
+                      >
+                        <MapPinIcon className="h-3 w-3" />
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          setVisitsSortBy('value');
+                          setVisitsSortOrder(visitsSortBy === 'value' && visitsSortOrder === 'asc' ? 'desc' : 'asc');
+                        }}
+                        className={`p-1 rounded transition-colors ${
+                          visitsSortBy === 'value' 
+                            ? 'bg-blue-600 text-white' 
+                            : 'text-blue-700 hover:bg-blue-100'
+                        }`}
+                        title="Ordenar por valor"
+                      >
+                        <DollarSign className="h-3 w-3" />
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          setVisitsSortOrder(visitsSortOrder === 'asc' ? 'desc' : 'asc');
+                        }}
+                        className="p-1 rounded text-blue-700 hover:bg-blue-100 transition-colors"
+                        title={`Ordem: ${visitsSortOrder === 'asc' ? 'Crescente' : 'Decrescente'}`}
+                      >
+                        <ArrowUpDown className={`h-3 w-3 ${visitsSortOrder === 'desc' ? 'rotate-180' : ''} transition-transform`} />
+                      </button>
+                    </div>
+                  )}
+                </div>
                 {selectedDateVisits.length > visitsPerPage && (
                   <div className="flex items-center justify-center sm:justify-start space-x-2">
                     <button

@@ -11,6 +11,10 @@ import {
   Loader2,
   RefreshCw,
   Filter,
+  User,
+  MapPinIcon,
+  DollarSign,
+  ArrowUpDown,
 } from "lucide-react";
 import { ClientGroup, FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
@@ -45,6 +49,8 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
   }>({ title: "", message: "", type: "info" });
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [geolocationError, setGeolocationError] = useState<string | null>(null);
+  const [scheduledVisitsSortBy, setScheduledVisitsSortBy] = useState<'name' | 'city' | 'value'>('name');
+  const [scheduledVisitsSortOrder, setScheduledVisitsSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Obter visitas do cobrador
   const collectorVisits = useMemo(() => {
@@ -254,15 +260,38 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
         hasVisit: false as const,
       }));
 
+    // Ordenar visitas agendadas
+    const sortedScheduledVisits = [...scheduledVisits].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (scheduledVisitsSortBy) {
+        case 'name':
+          comparison = a.client.localeCompare(b.client);
+          break;
+        case 'city':
+          comparison = (a.city || '').localeCompare(b.city || '');
+          break;
+        case 'value':
+          const aValue = a.totalValue || 0;
+          const bValue = b.totalValue || 0;
+          comparison = aValue - bValue;
+          break;
+        default:
+          comparison = 0;
+      }
+      
+      return scheduledVisitsSortOrder === 'asc' ? comparison : -comparison;
+    });
+
     return {
       overdueVisits,
-      scheduledVisits,
+      scheduledVisits: sortedScheduledVisits,
       rescheduledVisits,
       withoutVisits,
       // Manter compatibilidade com código existente
-      withVisits: scheduledVisits,
+      withVisits: sortedScheduledVisits,
     };
-  }, [filteredClients, collectorVisits]);
+  }, [filteredClients, collectorVisits, scheduledVisitsSortBy, scheduledVisitsSortOrder]);
 
   // Todos os clientes para paginação - ordem de prioridade: atrasadas, agendadas, reagendadas, sem agendamento
   const allClients = useMemo(() => {
@@ -1054,9 +1083,69 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                     <Calendar className="h-5 w-5 text-green-700 mr-2" />
                     Visitas Agendadas no Prazo
                   </h4>
-                  <span className="text-sm text-green-700 font-semibold bg-white/60 px-2 py-1 rounded-full">
-                    {clientData.scheduledVisits.length}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-green-700 font-semibold bg-white/60 px-2 py-1 rounded-full">
+                      {clientData.scheduledVisits.length}
+                    </span>
+                    
+                    {/* Filtro de ordenação */}
+                    <div className="flex items-center space-x-1 bg-white/60 rounded-full px-2 py-1">
+                      <button
+                        onClick={() => {
+                          setScheduledVisitsSortBy('name');
+                          setScheduledVisitsSortOrder(scheduledVisitsSortBy === 'name' && scheduledVisitsSortOrder === 'asc' ? 'desc' : 'asc');
+                        }}
+                        className={`p-1 rounded transition-colors ${
+                          scheduledVisitsSortBy === 'name' 
+                            ? 'bg-green-600 text-white' 
+                            : 'text-green-700 hover:bg-white/50'
+                        }`}
+                        title="Ordenar por nome"
+                      >
+                        <User className="h-3 w-3" />
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          setScheduledVisitsSortBy('city');
+                          setScheduledVisitsSortOrder(scheduledVisitsSortBy === 'city' && scheduledVisitsSortOrder === 'asc' ? 'desc' : 'asc');
+                        }}
+                        className={`p-1 rounded transition-colors ${
+                          scheduledVisitsSortBy === 'city' 
+                            ? 'bg-green-600 text-white' 
+                            : 'text-green-700 hover:bg-white/50'
+                        }`}
+                        title="Ordenar por cidade"
+                      >
+                        <MapPinIcon className="h-3 w-3" />
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          setScheduledVisitsSortBy('value');
+                          setScheduledVisitsSortOrder(scheduledVisitsSortBy === 'value' && scheduledVisitsSortOrder === 'asc' ? 'desc' : 'asc');
+                        }}
+                        className={`p-1 rounded transition-colors ${
+                          scheduledVisitsSortBy === 'value' 
+                            ? 'bg-green-600 text-white' 
+                            : 'text-green-700 hover:bg-white/50'
+                        }`}
+                        title="Ordenar por valor"
+                      >
+                        <DollarSign className="h-3 w-3" />
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          setScheduledVisitsSortOrder(scheduledVisitsSortOrder === 'asc' ? 'desc' : 'asc');
+                        }}
+                        className="p-1 rounded text-green-700 hover:bg-white/50 transition-colors"
+                        title={`Ordem: ${scheduledVisitsSortOrder === 'asc' ? 'Crescente' : 'Decrescente'}`}
+                      >
+                        <ArrowUpDown className={`h-3 w-3 ${scheduledVisitsSortOrder === 'desc' ? 'rotate-180' : ''} transition-transform`} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="divide-y divide-gray-100">
