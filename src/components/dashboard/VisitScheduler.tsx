@@ -137,6 +137,35 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   // Estados para filtro das visitas do dia selecionado
   const [visitsSortBy, setVisitsSortBy] = useState<'name' | 'city' | 'value'>('name');
   const [visitsSortOrder, setVisitsSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  // Estados para swipe (mobile)
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  // Swipe handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe && currentPage < totalSelectedDatePages) {
+      setCurrentPage(prev => prev + 1);
+    }
+    if (isRightSwipe && currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+    }
+  };
 
   // Gerenciar scroll da página quando modal abre/fecha
   useEffect(() => {
@@ -2038,16 +2067,31 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             {/* Visitas do dia selecionado */}
             {selectedCalendarDate ? (
               <div>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
-                <div className="flex items-center space-x-4">
-                  <h3 className="text-base lg:text-lg font-semibold text-gray-900 flex items-center">
-                    <CalendarDays className="h-5 w-5 mr-2 text-blue-600" />
-                    Visitas de {selectedCalendarDate.toLocaleDateString('pt-BR')} ({selectedDateVisits.length})
-                  </h3>
+              <div className="relative bg-gradient-to-r from-blue-50/80 via-white to-blue-50/80 rounded-xl border border-blue-100/60 p-4 mb-6 shadow-sm backdrop-blur-sm">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-transparent rounded-xl"></div>
+                <div className="relative flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center space-x-3">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-blue-500/20 rounded-lg blur-sm"></div>
+                      <div className="relative bg-gradient-to-br from-blue-500 to-blue-600 p-2 rounded-lg shadow-sm">
+                        <CalendarDays className="h-4 w-4 text-white" />
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                        {selectedCalendarDate.toLocaleDateString('pt-BR')}
+                      </h3>
+                      <p className="text-sm text-gray-600 font-medium">
+                        {selectedDateVisits.length} {selectedDateVisits.length === 1 ? 'visita agendada' : 'visitas agendadas'}
+                      </p>
+                    </div>
+                  </div>
                   
                   {/* Filtro de ordenação */}
                   {selectedDateVisits.length > 1 && (
-                    <div className="flex items-center space-x-1 bg-blue-50 rounded-full px-2 py-1 border border-blue-200">
+                    <div className="flex items-center space-x-2 bg-white/70 backdrop-blur-sm rounded-lg border border-white/50 px-3 py-2 shadow-sm">                   
+                      <div className="flex items-center space-x-1">
                       <button
                         onClick={() => {
                           setVisitsSortBy('name');
@@ -2102,34 +2146,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                       >
                         <ArrowUpDown className={`h-3 w-3 ${visitsSortOrder === 'desc' ? 'rotate-180' : ''} transition-transform`} />
                       </button>
+                      </div>
                     </div>
                   )}
                 </div>
-                {selectedDateVisits.length > visitsPerPage && (
-                  <div className="flex items-center justify-center sm:justify-start space-x-2">
-                    <button
-                      onClick={() =>
-                        setCurrentPage(Math.max(1, currentPage - 1))
-                      }
-                      disabled={currentPage === 1}
-                      className="p-2 border border-gray-300 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <span className="text-sm text-gray-600">
-                      Página {currentPage} de {totalSelectedDatePages}
-                    </span>
-                    <button
-                      onClick={() =>
-                        setCurrentPage(Math.min(totalSelectedDatePages, currentPage + 1))
-                      }
-                      disabled={currentPage === totalSelectedDatePages}
-                      className="p-2 border border-gray-300 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
+                </div>
               </div>
 
               {selectedDateVisits.length === 0 ? (
@@ -2143,7 +2164,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div 
+                  className="space-y-3"
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                >
                   {paginatedSelectedDateVisits.map((visit) => (
                     <div
                       key={visit.id}
@@ -2459,7 +2485,53 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   )}
                 </div>
               </div>
-            )}
+              )}
+              
+              {/* Paginação no final da página */}
+              {selectedDateVisits.length > visitsPerPage && (
+                <div className="relative flex items-center justify-center mt-8 pt-6 border-t border-blue-100">
+                  <div className="flex items-center space-x-4 bg-white rounded-xl border border-blue-200 shadow-sm px-6 py-3">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
+                    >
+                      <ChevronLeft className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
+                    </button>
+                    
+                    <div className="flex items-center space-x-2">
+                      {Array.from({ length: totalSelectedDatePages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-10 h-10 rounded-lg font-medium text-sm transition-colors ${
+                            currentPage === page
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </div>
+                    
+                    <button
+                      onClick={() => setCurrentPage(Math.min(totalSelectedDatePages, currentPage + 1))}
+                      disabled={currentPage === totalSelectedDatePages}
+                      className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
+                    >
+                      <ChevronRight className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
+                    </button>
+                  </div>
+                  
+                  {/* Indicador de swipe apenas no mobile */}
+                  <div className="sm:hidden absolute -bottom-4 left-1/2 transform -translate-x-1/2">
+                    <div className="flex items-center text-xs text-gray-400 bg-gray-100 rounded-full px-3 py-1">
+                      <span>👈 Deslize para navegar 👉</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
             {/* Visitas Atrasadas */}
             {pastVisits.length > 0 && (
