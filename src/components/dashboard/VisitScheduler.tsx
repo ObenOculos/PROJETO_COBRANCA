@@ -1179,27 +1179,27 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                     <div className="text-sm text-gray-600 py-4">
                       <span className="font-medium">Filtros ativos:</span>
                       {searchTerm && (
-                        <span className="ml-1 px-2 py-1 bg-white rounded border">
+                        <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
                           Busca: "{searchTerm}"
                         </span>
                       )}
                       {filters.city && (
-                        <span className="ml-1 px-2 py-1 bg-white rounded border">
+                        <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
                           Cidade: {filters.city}
                         </span>
                       )}
                       {filters.minValue && (
-                        <span className="ml-1 px-2 py-1 bg-white rounded border">
+                        <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
                           Min: R$ {filters.minValue}
                         </span>
                       )}
                       {filters.maxValue && (
-                        <span className="ml-1 px-2 py-1 bg-white rounded border">
+                        <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
                           Max: R$ {filters.maxValue}
                         </span>
                       )}
                       {filters.visitStatus && (
-                        <span className="ml-1 px-2 py-1 bg-white rounded border">
+                        <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
                           Status:{" "}
                           {filters.visitStatus === "critical"
                             ? "Nunca/120+ dias"
@@ -1278,7 +1278,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                               )
                             }
                             disabled={clientsCurrentPage === 1}
-                            className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-1.5 rounded-2xl hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <ChevronLeft className="h-4 w-4" />
                           </button>
@@ -1292,7 +1292,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                               )
                             }
                             disabled={clientsCurrentPage === totalClientsPages}
-                            className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-1.5 rounded-2xl hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <ChevronRight className="h-4 w-4" />
                           </button>
@@ -1722,7 +1722,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                       )
                                     }
                                     min={getLocalDate()}
-                                    className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                                    className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                                   />
                                 </div>
                               </div>
@@ -1782,7 +1782,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                         }
                                       }
                                     }}
-                                    className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                                    className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                                   />
                                 </div>
                               </div>
@@ -1826,7 +1826,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                     return (
                       <div
                         key={client.document}
-                        className="flex items-center justify-between text-sm bg-white rounded p-2"
+                        className="flex items-center justify-between text-sm bg-white rounded-2xl p-2"
                       >
                         <div>
                           <span className="font-medium">{client.client}</span>
@@ -1987,19 +1987,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
                             <button
                               onClick={() => handleMarkAsCompleted(visit)}
-                              className="px-3 py-2 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200 transition-colors flex items-center justify-center"
+                              className="px-3 py-2 bg-green-600 text-white rounded-2xl text-sm hover:bg-green-700 transition-colors flex items-center justify-center"
                             >
                               Realizada
                             </button>
                             <button
                               onClick={() => handleMarkAsNotFound(visit)}
-                              className="px-3 py-2 bg-orange-100 text-orange-700 rounded text-sm hover:bg-orange-200 transition-colors flex items-center justify-center"
+                              className="px-3 py-2 bg-orange-600 text-white rounded-2xl text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
                             >
                               Não Encontrado
                             </button>
                             <button
                               onClick={() => handleOpenRescheduleModal(visit)}
-                              className="px-3 py-2 bg-purple-100 text-purple-700 rounded text-sm hover:bg-purple-200 transition-colors flex items-center justify-center"
+                              className="px-3 py-2 bg-purple-600 text-white rounded-2xl text-sm hover:bg-purple-700 transition-colors flex items-center justify-center"
                             >
                               <RefreshCw className="h-4 w-4 mr-1" />
                               Reagendar
@@ -2007,9 +2007,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                             {!visit.cancellationRejectedBy && (
                               <button
                                 onClick={() => handleRequestCancellation(visit)}
-                                className="px-3 py-2 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200 transition-colors flex items-center justify-center"
+                                className="px-3 py-2 bg-red-600 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
                               >
-                                Solicitar Cancelamento
+                                Cancelar visita
                               </button>
                             )}
                           </div>
@@ -2143,19 +2143,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
                             <button
                               onClick={() => handleMarkAsCompleted(visit)}
-                              className="px-3 py-2 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200 transition-colors flex items-center justify-center"
+                              className="px-3 py-2 bg-green-100 text-green-700 rounded-2xl text-sm hover:bg-green-200 transition-colors flex items-center justify-center"
                             >
                               Realizada
                             </button>
                             <button
                               onClick={() => handleMarkAsNotFound(visit)}
-                              className="px-3 py-2 bg-orange-100 text-orange-700 rounded text-sm hover:bg-orange-200 transition-colors flex items-center justify-center"
+                              className="px-3 py-2 bg-orange-100 text-orange-700 rounded-2xl text-sm hover:bg-orange-200 transition-colors flex items-center justify-center"
                             >
                               Não Encontrado
                             </button>
                             <button
                               onClick={() => handleOpenRescheduleModal(visit)}
-                              className="px-3 py-2 bg-purple-100 text-purple-700 rounded text-sm hover:bg-purple-200 transition-colors flex items-center justify-center"
+                              className="px-3 py-2 bg-purple-100 text-purple-700 rounded-2xl text-sm hover:bg-purple-200 transition-colors flex items-center justify-center"
                             >
                               <RefreshCw className="h-4 w-4 mr-1" />
                               Reagendar
@@ -2163,7 +2163,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                             {!visit.cancellationRejectedBy && (
                               <button
                                 onClick={() => handleRequestCancellation(visit)}
-                                className="px-3 py-2 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200 transition-colors flex items-center justify-center"
+                                className="px-3 py-2 bg-red-100 text-red-700 rounded-2xl text-sm hover:bg-red-200 transition-colors flex items-center justify-center"
                               >
                                 Solicitar Cancelamento
                               </button>
@@ -2306,19 +2306,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
                           <button
                             onClick={() => handleMarkAsCompleted(visit)}
-                            className="px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors flex items-center justify-center"
+                            className="px-3 py-2 bg-green-600 text-white rounded-2xl text-sm hover:bg-green-700 transition-colors flex items-center justify-center"
                           >
-                            Marcar Realizada
+                            Realizada
                           </button>
                           <button
                             onClick={() => handleMarkAsNotFound(visit)}
-                            className="px-3 py-2 bg-orange-600 text-white rounded text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
+                            className="px-3 py-2 bg-orange-600 text-white rounded-2xl text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
                           >
                             Não Encontrado
                           </button>
                           <button
                             onClick={() => handleOpenRescheduleModal(visit)}
-                            className="px-3 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 transition-colors flex items-center justify-center"
+                            className="px-3 py-2 bg-purple-600 text-white rounded-2xl text-sm hover:bg-purple-700 transition-colors flex items-center justify-center"
                           >
                             <RefreshCw className="h-4 w-4 mr-1" />
                             Reagendar
@@ -2327,9 +2327,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                             onClick={() =>
                               handleUpdateVisitStatus(visit.id, "cancelada")
                             }
-                            className="px-3 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
+                            className="px-3 py-2 bg-red-600 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
                           >
-                            Cancelar
+                            Cancelar visita
                           </button>
                         </div>
                       </div>
