@@ -410,6 +410,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         celular2: row.celular2,
         email: row.email,
         user_id: row.user_id,
+        situacao: row.situacao,
         data_visita_agendada: row.data_visita_agendada,
         data_visita_realizada: row.data_visita_realizada,
         data_recebimento: row.data_recebimento,

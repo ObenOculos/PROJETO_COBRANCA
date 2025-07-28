@@ -11,6 +11,9 @@ import {
   ChevronRight,
   Award,
   Building,
+  HandCoins,
+  Briefcase,
+  CircleSlash,
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
 import { Collection } from "../types";
@@ -28,6 +31,42 @@ interface ClientWithCollections {
   bairro?: string;
 }
 
+// Helper function para obter indicador de situação
+const getSituacaoIndicator = (collections: Collection[]) => {
+  // Verificar se tem alguma parcela "Em mãos"
+  const hasEmMaos = collections.some(c => c.situacao === "Em mãos");
+  if (hasEmMaos) {
+    return {
+      icon: HandCoins,
+      label: "Em mãos",
+      className: "bg-blue-100 text-blue-800"
+    };
+  }
+  
+  // Verificar se tem alguma parcela "Em tratamento"
+  const hasEmTratamento = collections.some(c => c.situacao === "Em tratamento");
+  if (hasEmTratamento) {
+    return {
+      icon: Briefcase,
+      label: "Em tratamento",
+      className: "bg-yellow-100 text-yellow-800"
+    };
+  }
+  
+  // Verificar se todas as parcelas têm situação vazia
+  const allEmpty = collections.every(c => !c.situacao || c.situacao.trim() === "");
+  if (allEmpty) {
+    return {
+      icon: CircleSlash,
+      label: "Vazia",
+      className: "bg-gray-100 text-gray-600"
+    };
+  }
+  
+  // Se tem mix de situações ou outras situações
+  return null;
+};
+
 export const ClientAssignment = React.memo(() => {
   const {
     collections,
@@ -35,9 +74,11 @@ export const ClientAssignment = React.memo(() => {
     collectorStores,
     assignCollectorToClients,
     removeCollectorFromClients,
+    updateCollection,
   } = useCollection();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCollector, setSelectedCollector] = useState<string>("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [selectedClients, setSelectedClients] = useState<Set<string>>(
     new Set(),
   );
@@ -49,6 +90,7 @@ export const ClientAssignment = React.memo(() => {
   const [filterCity, setFilterCity] = useState<string>("");
   const [filterNeighborhood, setFilterNeighborhood] = useState<string>("");
   const [filterStore, setFilterStore] = useState<string>(""); // Novo filtro de loja
+  const [filterSituacao, setFilterSituacao] = useState<string>(""); // Novo filtro de situação
   const [filterDateFrom, setFilterDateFrom] = useState<string>("");
   const [filterDateTo, setFilterDateTo] = useState<string>("");
   const [includeWithoutDate, setIncludeWithoutDate] = useState(false);
@@ -57,6 +99,7 @@ export const ClientAssignment = React.memo(() => {
   // Modal states
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
   const [modalData, setModalData] = useState<{
     clientsWithCollectors?: number;
     totalClients?: number;
@@ -256,6 +299,13 @@ export const ClientAssignment = React.memo(() => {
         onClear: () => setFilterStore(""),
       });
     }
+    if (filterSituacao) {
+      const situacaoLabel = filterSituacao === "empty" ? "Vazia" : filterSituacao;
+      chips.push({
+        label: `Situação: ${situacaoLabel}`,
+        onClear: () => setFilterSituacao(""),
+      });
+    }
     if (filterDateFrom) {
       chips.push({
         label: `De: ${filterDateFrom}`,
@@ -283,6 +333,7 @@ export const ClientAssignment = React.memo(() => {
     filterCity,
     filterNeighborhood,
     filterStore,
+    filterSituacao,
     filterDateFrom,
     filterDateTo,
     includeWithoutDate,
@@ -311,6 +362,21 @@ export const ClientAssignment = React.memo(() => {
       const matchesStore =
         !filterStore ||
         client.collections.some((c) => c.nome_da_loja === filterStore);
+
+      // Filtro por situação
+      const matchesSituacao = (() => {
+        if (!filterSituacao) return true;
+        
+        // Verificar se alguma collection tem a situação desejada
+        const hasSituacao = client.collections.some((c) => {
+          if (filterSituacao === "empty") {
+            return !c.situacao || c.situacao.trim() === "";
+          }
+          return c.situacao === filterSituacao;
+        });
+        
+        return hasSituacao;
+      })();
 
       // Filtro por período de data de vencimento - VERSÃO CORRIGIDA
       const matchesDateRange = (() => {
@@ -381,6 +447,7 @@ export const ClientAssignment = React.memo(() => {
         matchesCity &&
         matchesNeighborhood &&
         matchesStore &&
+        matchesSituacao &&
         matchesDateRange
       );
     });
@@ -393,6 +460,8 @@ export const ClientAssignment = React.memo(() => {
     filterStatus,
     filterCity,
     filterNeighborhood,
+    filterStore,
+    filterSituacao,
     filterDateFrom,
     filterDateTo,
     includeWithoutDate,
@@ -668,6 +737,90 @@ export const ClientAssignment = React.memo(() => {
     } catch (error) {
       console.error("Erro geral ao remover cobrador:", error);
       showNotification("Erro ao remover cobrador. Tente novamente.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssignStatusClick = () => {
+    if (!selectedStatus || selectedClients.size === 0) {
+      const notification = document.createElement("div");
+      notification.className =
+        "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50";
+      notification.textContent =
+        "Selecione um status e pelo menos um cliente";
+      document.body.appendChild(notification);
+      setTimeout(() => document.body.removeChild(notification), 3000);
+      return;
+    }
+
+    setShowStatusModal(true);
+  };
+
+  const handleAssignStatus = async () => {
+    setShowStatusModal(false);
+    setLoading(true);
+
+    const showNotification = (
+      message: string,
+      type: "success" | "error" | "info",
+    ) => {
+      const notification = document.createElement("div");
+      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center`;
+      notification.innerHTML = `
+      <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+        ${type === "success" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' : type === "error" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' : '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>'}
+      </svg>
+      ${message}
+    `;
+      document.body.appendChild(notification);
+      setTimeout(() => document.body.removeChild(notification), 5000);
+    };
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      // Get all collections for selected clients
+      const selectedClientsData = Array.from(selectedClients)
+        .map((uniqueKey) => clientsData.find((c) => c.uniqueKey === uniqueKey))
+        .filter(Boolean);
+
+      const allCollections = selectedClientsData.flatMap((client) => client?.collections || []);
+
+      // Update status for all collections
+      for (const collection of allCollections) {
+        try {
+          const statusValue = selectedStatus === "empty" ? null : selectedStatus;
+          await updateCollection(collection.id_parcela, { situacao: statusValue });
+          successCount++;
+        } catch (error) {
+          console.error("Erro ao atualizar status da parcela:", collection.id_parcela, error);
+          errorCount++;
+        }
+      }
+
+      if (errorCount === 0) {
+        showNotification(
+          `Status atualizado em ${successCount} parcela(s) com sucesso!`,
+          "success",
+        );
+      } else if (successCount === 0) {
+        showNotification(
+          `Erro ao atualizar status em todas as ${errorCount} parcelas.`,
+          "error",
+        );
+      } else {
+        showNotification(
+          `${successCount} parcelas atualizadas, ${errorCount} com erro.`,
+          "error",
+        );
+      }
+
+      setSelectedClients(new Set());
+    } catch (error) {
+      console.error("Erro geral ao atualizar status:", error);
+      showNotification("Erro ao atualizar status. Tente novamente.", "error");
     } finally {
       setLoading(false);
     }
@@ -958,6 +1111,23 @@ export const ClientAssignment = React.memo(() => {
               </select>
             </div>
 
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                <Award className="h-4 w-4 mr-1" />
+                Situação
+              </label>
+              <select
+                value={filterSituacao}
+                onChange={(e) => setFilterSituacao(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Todas as situações</option>
+                <option value="Em mãos">Em mãos</option>
+                <option value="Em tratamento">Em tratamento</option>
+                <option value="empty">Vazia</option>
+              </select>
+            </div>
+
             <div className="col-span-full">
               <button
                 onClick={() => {
@@ -967,6 +1137,7 @@ export const ClientAssignment = React.memo(() => {
                   setFilterCity("");
                   setFilterNeighborhood("");
                   setFilterStore("");
+                  setFilterSituacao("");
                   setFilterDateFrom("");
                   setFilterDateTo("");
                   setIncludeWithoutDate(false);
@@ -1024,62 +1195,89 @@ export const ClientAssignment = React.memo(() => {
         {selectedClients.size > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
             <div className="p-4 lg:p-6">
-              <div className="flex flex-col gap-4">
-                <div>
+              <div className="flex mb-4">
+
                   <h3 className="text-lg font-semibold text-gray-900">
                     Ações em Massa
                   </h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {selectedClients.size} cliente
-                    {selectedClients.size !== 1 ? "s" : ""} selecionado
-                    {selectedClients.size !== 1 ? "s" : ""}
+                  <p className=" ml-6 text-sm text-gray-600 mt-1">
+                    {selectedClients.size} selecionados
                   </p>
-                </div>
+
               </div>
 
-              <div className="space-y-3">
-                <select
-                  id="selectedCollector"
-                  name="selectedCollector"
-                  value={selectedCollector}
-                  onChange={(e) => setSelectedCollector(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Selecione um cobrador</option>
-                  {collectors.map((collector) => (
-                    <option key={collector.id} value={collector.id}>
-                      {collector.name}
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Coluna 1: Atribuição de Cobrador */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium text-gray-700">Atribuição de Cobrador</h4>
+                  <select
+                    id="selectedCollector"
+                    name="selectedCollector"
+                    value={selectedCollector}
+                    onChange={(e) => setSelectedCollector(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Selecione um cobrador</option>
+                    {collectors.map((collector) => (
+                      <option key={collector.id} value={collector.id}>
+                        {collector.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleAssignCollectorClick}
+                      disabled={loading || !selectedCollector}
+                      className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                      ) : (
+                        <UserPlus className="h-4 w-4 mr-2" />
+                      )}
+                      Atribuir
+                    </button>
+                    <button
+                      onClick={handleRemoveCollectorClick}
+                      disabled={loading}
+                      className="flex-1 flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                      ) : (
+                        <UserMinus className="h-4 w-4 mr-2" />
+                      )}
+                      Remover
+                    </button>
+                  </div>
+                </div>
 
-                <div className="flex flex-col sm:flex-row gap-3">
+                {/* Coluna 2: Atribuição de Status */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium text-gray-700">Atribuição de Status</h4>
+                  <select
+                    id="selectedStatus"
+                    name="selectedStatus"
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Selecione um status</option>
+                    <option value="Em mãos">Em mãos</option>
+                    <option value="Em tratamento">Em tratamento</option>
+                    <option value="empty">Vazia</option>
+                  </select>
                   <button
-                    onClick={handleAssignCollectorClick}
-                    disabled={loading || !selectedCollector}
-                    className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={handleAssignStatusClick}
+                    disabled={loading || !selectedStatus}
+                    className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? (
                       <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
                     ) : (
-                      <UserPlus className="h-4 w-4 mr-2" />
+                      <Award className="h-4 w-4 mr-2" />
                     )}
-                    <span className="hidden sm:inline">Atribuir Cobrador</span>
-                    <span className="sm:hidden">Atribuir</span>
-                  </button>
-
-                  <button
-                    onClick={handleRemoveCollectorClick}
-                    disabled={loading}
-                    className="flex-1 flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-                    ) : (
-                      <UserMinus className="h-4 w-4 mr-2" />
-                    )}
-                    <span className="hidden sm:inline">Remover Cobrador</span>
-                    <span className="sm:hidden">Remover</span>
+                    Atribuir Status
                   </button>
                 </div>
               </div>
@@ -1147,8 +1345,8 @@ export const ClientAssignment = React.memo(() => {
                     {/* Client info - more compact */}
                     <div className="flex items-start justify-between mb-2">
                       <div className="min-w-0 flex-1">
-                        <h4 className="text-base font-semibold text-gray-900 truncate flex items-center gap-2">
-                          {client.cliente}
+                        <h4 className="text-base font-semibold text-gray-900 flex items-center gap-2 min-w-0">
+                          <span className="truncate">{client.cliente}</span>
                           {isWithoutCollector && (
                             <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
                           )}
@@ -1160,7 +1358,7 @@ export const ClientAssignment = React.memo(() => {
                       </div>
 
                       {/* Collector status - more prominent */}
-                      <div className="flex-shrink-0 ml-2">
+                      <div className="flex-shrink-0 ml-2 flex items-center gap-2">
                         {client.collectorName ? (
                           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                             {client.collectorName}
@@ -1170,6 +1368,22 @@ export const ClientAssignment = React.memo(() => {
                             Sem cobrador
                           </span>
                         )}
+                        
+                        {/* Indicador de situação */}
+                        {(() => {
+                          const situacao = getSituacaoIndicator(client.collections);
+                          if (!situacao) return null;
+                          const Icon = situacao.icon;
+                          return (
+                            <span 
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${situacao.className}`}
+                              title={`Situação: ${situacao.label}`}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline">{situacao.label}</span>
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -1509,6 +1723,73 @@ export const ClientAssignment = React.memo(() => {
                 <>
                   <UserMinus className="h-4 w-4 mr-2" />
                   Confirmar Remoção
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de Confirmação - Atribuir Status */}
+      <Modal
+        isOpen={showStatusModal}
+        onClose={() => setShowStatusModal(false)}
+        title="Confirmar Atribuição de Status"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-center">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+              <Award className="h-6 w-6 text-blue-600" />
+            </div>
+          </div>
+
+          <div className="text-center">
+            <p className="text-gray-700">
+              Você está prestes a atribuir o status{" "}
+              <span className="font-semibold">
+                {selectedStatus === "empty" ? "Vazia" : selectedStatus}
+              </span>{" "}
+              para todas as parcelas de{" "}
+              <span className="font-semibold">
+                {selectedClients.size} cliente
+                {selectedClients.size !== 1 ? "s" : ""}
+              </span>
+              .
+            </p>
+            <p className="text-sm text-gray-600 mt-2">
+              Esta ação afetará{" "}
+              {Array.from(selectedClients)
+                .map((key) => clientsData.find((c) => c.uniqueKey === key))
+                .reduce((total, client) => total + (client?.collections.length || 0), 0)}{" "}
+              parcela(s) no total.
+            </p>
+          </div>
+
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl">
+            <p className="text-sm text-blue-700 font-medium text-center">
+              O status será aplicado a todas as parcelas dos clientes selecionados
+            </p>
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <button
+              onClick={() => setShowStatusModal(false)}
+              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-2xl transition-colors font-medium"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleAssignStatus}
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            >
+              {loading ? (
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+              ) : (
+                <>
+                  <Award className="h-4 w-4 mr-2" />
+                  Confirmar Atribuição
                 </>
               )}
             </button>

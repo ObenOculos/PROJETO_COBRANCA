@@ -113,6 +113,7 @@ export interface Collection {
   celular2: string | null;
   email: string | null;
   user_id: string | null;
+  situacao: string | null;
   // Visit tracking properties
   data_visita_agendada: string | null;
   data_visita_realizada: string | null;
