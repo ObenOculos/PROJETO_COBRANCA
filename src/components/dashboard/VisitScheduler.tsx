@@ -104,6 +104,32 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     maxValue: "",
     visitStatus: "",
   });
+  
+  // Estados para ordenação
+  const [sortField, setSortField] = useState<"cliente" | "valor" | "cidade" | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  
+  // Função para lidar com ordenação
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  // Função para obter ícone de ordenação
+  const getSortIcon = (field: typeof sortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return sortDirection === "asc" ? (
+      <ArrowUpDown className="h-4 w-4 text-white rotate-180" />
+    ) : (
+      <ArrowUpDown className="h-4 w-4 text-white" />
+    );
+  };
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [selectedVisitForReschedule, setSelectedVisitForReschedule] =
     useState<ScheduledVisit | null>(null);
@@ -344,6 +370,29 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       });
     }
 
+    // Aplicar ordenação
+    if (sortField) {
+      filteredClients.sort((a, b) => {
+        let result = 0;
+        
+        switch (sortField) {
+          case "cliente":
+            result = a.client.localeCompare(b.client);
+            break;
+          case "valor":
+            result = a.pendingValue - b.pendingValue;
+            break;
+          case "cidade":
+            result = a.city.localeCompare(b.city);
+            break;
+          default:
+            result = 0;
+        }
+        
+        return sortDirection === "asc" ? result : -result;
+      });
+    }
+
     return filteredClients;
   }, [
     user,
@@ -352,6 +401,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     getClientGroups,
     getVisitsByCollector,
     scheduledVisits,
+    sortField,
+    sortDirection,
   ]);
 
   // Contar clientes com visitas ativas
@@ -3261,38 +3312,69 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               <div className="space-y-6">
                 {/* Busca e Filtros */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label htmlFor="search-clients" className="flex items-center text-sm font-medium text-gray-700">
-                      <Search className="h-4 w-4 mr-2 text-blue-600" />
-                      Buscar e Filtrar Clientes
-                    </label>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => setShowFilters(!showFilters)}
-                        className={`flex items-center px-3 py-1.5 text-sm rounded-2xl transition-colors ${
-                          showFilters
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }`}
-                      >
-                        <Filter className="h-4 w-4" />
-                        <span className="ml-1 hidden sm:inline">Filtros</span>
-                      </button>
-                      <span className="text-xs text-gray-500">
-                        {availableClients.length} de {availableClients.length} clientes
-                      </span>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        id="search-clients"
+                        type="text"
+                        placeholder="Buscar por nome, documento, endereço ou cidade..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
                     </div>
+                    <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      className={`flex items-center px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        showFilters
+                          ? "bg-blue-600 text-white"
+                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                      }`}
+                      title="Filtros Avançados"
+                    >
+                      <Filter className="h-4 w-4" />
+                    </button>
                   </div>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      id="search-clients"
-                      type="text"
-                      placeholder="Buscar por nome, documento, endereço ou cidade..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
+                  
+                  {/* Botões de Ordenação com Ícones */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSort("cliente")}
+                      className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        sortField === "cliente"
+                          ? "bg-blue-600 text-white"
+                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                      }`}
+                      title="Ordenar por Nome"
+                    >
+                      <User className="h-4 w-4" />
+                      {getSortIcon("cliente")}
+                    </button>
+                    <button
+                      onClick={() => handleSort("valor")}
+                      className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        sortField === "valor"
+                          ? "bg-blue-600 text-white"
+                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                      }`}
+                      title="Ordenar por Valor"
+                    >
+                      <DollarSign className="h-4 w-4" />
+                      {getSortIcon("valor")}
+                    </button>
+                    <button
+                      onClick={() => handleSort("cidade")}
+                      className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        sortField === "cidade"
+                          ? "bg-blue-600 text-white"
+                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                      }`}
+                      title="Ordenar por Cidade"
+                    >
+                      <MapPinIcon className="h-4 w-4" />
+                      {getSortIcon("cidade")}
+                    </button>
                   </div>
                 </div>
 

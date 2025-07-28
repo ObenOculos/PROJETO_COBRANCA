@@ -389,16 +389,39 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
             <div className="px-4 py-4 border-b border-gray-200">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    {userType === "manager"
-                      ? "Clientes e Cobranças"
-                      : "Meus Clientes"}
-                  </h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {filteredClientGroups.length} cliente
-                    {filteredClientGroups.length !== 1 ? "s" : ""} com cobranças
-                  </p>
+                <div id="teste_nome_mudar">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">
+                        {userType === "manager"
+                          ? "Clientes e Cobranças"
+                          : "Meus Clientes"}
+                      </h2>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {filteredClientGroups.length} cliente
+                        {filteredClientGroups.length !== 1 ? "s" : ""} com cobranças
+                      </p>
+                    </div>
+                    
+                    {/* Botão de Filtro para Cobrador */}
+                    {userType === "collector" && onToggleFilterBar && (
+                      <button
+                        id="toggle-filters-header"
+                        name="toggleFiltersHeader"
+                        onClick={onToggleFilterBar}
+                        className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                          showFilterBar
+                            ? "bg-blue-100 text-blue-700"
+                            : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                        }`}
+                        title={
+                          showFilterBar ? "Ocultar Filtros" : "Mostrar Filtros"
+                        }
+                      >
+                        <Filter className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between gap-4">
@@ -451,30 +474,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   )}
 
                   <div className="flex items-center gap-2">
-                    {/* Botão de Filtro para Cobrador */}
-                    {userType === "collector" && onToggleFilterBar && (
-                      <button
-                        id="toggle-filters-header"
-                        name="toggleFiltersHeader"
-                        onClick={onToggleFilterBar}
-                        className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                          showFilterBar
-                            ? "bg-blue-100 text-blue-700"
-                            : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                        }`}
-                        title={
-                          showFilterBar ? "Ocultar Filtros" : "Mostrar Filtros"
-                        }
-                      >
-                        <Filter className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-
                     {/* Selector de items por página */}
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-600 whitespace-nowrap">
-                        Por página:
-                      </label>
+                      <Eye className="h-4 w-4 text-gray-600" />
                       <select
                         id="items-per-page"
                         name="itemsPerPage"
