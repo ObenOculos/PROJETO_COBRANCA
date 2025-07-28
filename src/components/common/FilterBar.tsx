@@ -446,6 +446,16 @@ const FilterBar: React.FC<FilterBarProps> = ({
             )}
           </div>
 
+          {/* Botão Fechar para mobile */}
+          <div className="mt-4">
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors text-sm font-medium sm:hidden"
+            >
+              Fechar
+            </button>
+          </div>
+
           {/* Active Filters Summary */}
           {hasActiveFilters && (
             <div className="mt-4 p-3 bg-gray-50 rounded-2xl">

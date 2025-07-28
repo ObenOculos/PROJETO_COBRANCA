@@ -542,7 +542,7 @@ const EnhancedPerformanceChart: React.FC = () => {
               </select>
             </div>
 
-            <div className="flex items-end">
+            <div className="col-span-full space-y-2">
               <button
                 onClick={() => {
                   setSelectedPeriod("month");
@@ -553,6 +553,14 @@ const EnhancedPerformanceChart: React.FC = () => {
                 className="w-full px-4 py-2 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition-colors text-sm font-medium"
               >
                 Limpar Filtros
+              </button>
+              
+              {/* Botão Fechar para mobile */}
+              <button
+                onClick={() => setShowFilters(false)}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors text-sm font-medium sm:hidden"
+              >
+                Fechar
               </button>
             </div>
           </div>

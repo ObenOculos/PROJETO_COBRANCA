@@ -109,6 +109,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
   const [pendingAuthorizations, setPendingAuthorizations] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const autoPlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Salva a aba ativa no localStorage sempre que mudar
   useEffect(() => {
@@ -139,6 +141,40 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
     return () => clearInterval(interval);
   }, []);
+
+  // Auto-play slider effect - loop infinito a cada 5 segundos
+  useEffect(() => {
+    if (activeTab === "overview" && isAutoPlaying) {
+      autoPlayIntervalRef.current = setInterval(() => {
+        setCurrentSlide((prevSlide) => (prevSlide + 1) % 3);
+      }, 5000);
+
+      return () => {
+        if (autoPlayIntervalRef.current) {
+          clearInterval(autoPlayIntervalRef.current);
+        }
+      };
+    }
+
+    return () => {
+      if (autoPlayIntervalRef.current) {
+        clearInterval(autoPlayIntervalRef.current);
+      }
+    };
+  }, [activeTab, isAutoPlaying]);
+
+  // Pausar autoplay quando o usuário interage com o slider
+  const pauseAutoPlay = () => {
+    setIsAutoPlaying(false);
+    if (autoPlayIntervalRef.current) {
+      clearInterval(autoPlayIntervalRef.current);
+    }
+    
+    // Retomar autoplay após 10 segundos de inatividade
+    setTimeout(() => {
+      setIsAutoPlaying(true);
+    }, 10000);
+  };
 
   // Close mobile menu when clicking outside
   useEffect(() => {
@@ -177,11 +213,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
 
-    if (isLeftSwipe && currentSlide < 2) {
-      setCurrentSlide(currentSlide + 1);
+    if (isLeftSwipe) {
+      pauseAutoPlay();
+      setCurrentSlide((prevSlide) => (prevSlide + 1) % 3);
     }
-    if (isRightSwipe && currentSlide > 0) {
-      setCurrentSlide(currentSlide - 1);
+    if (isRightSwipe) {
+      pauseAutoPlay();
+      setCurrentSlide((prevSlide) => (prevSlide - 1 + 3) % 3);
     }
 
     // Reset touch values
@@ -190,11 +228,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   };
 
   const nextSlide = () => {
-    setCurrentSlide(currentSlide < 2 ? currentSlide + 1 : 0);
+    pauseAutoPlay();
+    setCurrentSlide((prevSlide) => (prevSlide + 1) % 3);
   };
 
   const prevSlide = () => {
-    setCurrentSlide(currentSlide > 0 ? currentSlide - 1 : 2);
+    pauseAutoPlay();
+    setCurrentSlide((prevSlide) => (prevSlide - 1 + 3) % 3);
   };
 
   const stats = useMemo(() => getDashboardStats(), [collections]);
@@ -414,6 +454,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
+                onMouseEnter={() => setIsAutoPlaying(false)}
+                onMouseLeave={() => setIsAutoPlaying(true)}
                 style={{ touchAction: "pan-y pinch-zoom" }}
               >
                 <div
@@ -557,7 +599,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 {[0, 1, 2].map((index) => (
                   <button
                     key={index}
-                    onClick={() => setCurrentSlide(index)}
+                    onClick={() => {
+                      pauseAutoPlay();
+                      setCurrentSlide(index);
+                    }}
                     className={`w-2 h-2 rounded-full transition-colors touch-manipulation ${
                       currentSlide === index ? "bg-blue-600" : "bg-gray-300"
                     }`}
