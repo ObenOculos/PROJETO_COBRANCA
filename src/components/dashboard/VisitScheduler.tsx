@@ -42,6 +42,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     requestVisitCancellation,
     rescheduleVisit,
     collections,
+    refreshData,
   } = useCollection();
   const { user } = useAuth();
 
@@ -730,6 +731,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         showSuccessNotification(
           `${successCount} visita${successCount !== 1 ? "s" : ""} agendada${successCount !== 1 ? "s" : ""} com sucesso!`,
         );
+        
+        // Refresh dos dados para atualizar outras abas
+        await refreshData();
       }
       if (errorCount > 0) {
         alert(
@@ -789,6 +793,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       showSuccessNotification(
         `Visita marcada como ${getStatusLabel(newStatus)}`,
       );
+      
+      // Refresh dos dados para atualizar outras abas
+      await refreshData();
     } catch (error) {
       console.error("Erro ao atualizar status da visita:", error);
       alert("Erro ao atualizar status da visita");
@@ -1089,6 +1096,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       );
 
       showSuccessNotification("Visita reagendada com sucesso!");
+      
+      // Refresh dos dados para atualizar outras abas
+      await refreshData();
+      
       handleCloseRescheduleModal();
     } catch (error) {
       console.error("Erro ao reagendar visita:", error);
@@ -2123,12 +2134,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 <div className="relative flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
                 <div className="flex items-center justify-between w-full">
                   <div className="flex items-center space-x-3">
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-blue-500/20 rounded-lg blur-sm"></div>
-                      <div className="relative bg-gradient-to-br from-blue-500 to-blue-600 p-2 rounded-lg shadow-sm">
-                        <CalendarDays className="h-4 w-4 text-white" />
-                      </div>
-                    </div>
                     <div>
                       <h3 className="text-lg font-bold text-gray-900 leading-tight">
                         {selectedCalendarDate.toLocaleDateString('pt-BR')}
@@ -2139,64 +2144,53 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                     </div>
                   </div>
                   
-                  {/* Filtro de ordenação */}
+                  {/* Busca e Filtros */}
                   {selectedDateVisits.length > 1 && (
-                    <div className="flex items-center space-x-2 bg-white/70 backdrop-blur-sm rounded-lg border border-white/50 px-3 py-2 shadow-sm">                   
-                      <div className="flex items-center space-x-1">
-                      <button
-                        onClick={() => {
-                          setVisitsSortBy('name');
-                          setVisitsSortOrder(visitsSortBy === 'name' && visitsSortOrder === 'asc' ? 'desc' : 'asc');
-                        }}
-                        className={`p-1 rounded transition-colors ${
-                          visitsSortBy === 'name' 
-                            ? 'bg-blue-600 text-white' 
-                            : 'text-blue-700 hover:bg-blue-100'
-                        }`}
-                        title="Ordenar por nome"
-                      >
-                        <User className="h-3 w-3" />
-                      </button>
-                      
-                      <button
-                        onClick={() => {
-                          setVisitsSortBy('city');
-                          setVisitsSortOrder(visitsSortBy === 'city' && visitsSortOrder === 'asc' ? 'desc' : 'asc');
-                        }}
-                        className={`p-1 rounded transition-colors ${
-                          visitsSortBy === 'city' 
-                            ? 'bg-blue-600 text-white' 
-                            : 'text-blue-700 hover:bg-blue-100'
-                        }`}
-                        title="Ordenar por cidade"
-                      >
-                        <MapPinIcon className="h-3 w-3" />
-                      </button>
-                      
-                      <button
-                        onClick={() => {
-                          setVisitsSortBy('value');
-                          setVisitsSortOrder(visitsSortBy === 'value' && visitsSortOrder === 'asc' ? 'desc' : 'asc');
-                        }}
-                        className={`p-1 rounded transition-colors ${
-                          visitsSortBy === 'value' 
-                            ? 'bg-blue-600 text-white' 
-                            : 'text-blue-700 hover:bg-blue-100'
-                        }`}
-                        title="Ordenar por valor"
-                      >
-                        <DollarSign className="h-3 w-3" />
-                      </button>
-                      
-                      <button
-                        onClick={() => {
-                          setVisitsSortOrder(visitsSortOrder === 'asc' ? 'desc' : 'asc');
-                        }}
-                        className="p-1 rounded text-blue-700 hover:bg-blue-100 transition-colors"
-                        title={`Ordem: ${visitsSortOrder === 'asc' ? 'Crescente' : 'Decrescente'}`}
-                      >
-                        <ArrowUpDown className={`h-3 w-3 ${visitsSortOrder === 'desc' ? 'rotate-180' : ''} transition-transform`} />
-                      </button>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-lg border border-white/50 px-3 py-2 shadow-sm">
+                      {/* Botões de Ordenação com Ícones */}
+                      <div className="flex items-center gap-2 justify-center">
+                        <button
+                          onClick={() => {
+                            setVisitsSortBy('name');
+                            setVisitsSortOrder(visitsSortBy === 'name' && visitsSortOrder === 'asc' ? 'desc' : 'asc');
+                          }}
+                          className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            visitsSortBy === 'name'
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                          }`}
+                          title="Ordenar por Nome"
+                        >
+                          <User className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setVisitsSortBy('value');
+                            setVisitsSortOrder(visitsSortBy === 'value' && visitsSortOrder === 'asc' ? 'desc' : 'asc');
+                          }}
+                          className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            visitsSortBy === 'value'
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                          }`}
+                          title="Ordenar por Valor"
+                        >
+                          <DollarSign className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setVisitsSortBy('city');
+                            setVisitsSortOrder(visitsSortBy === 'city' && visitsSortOrder === 'asc' ? 'desc' : 'asc');
+                          }}
+                          className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            visitsSortBy === 'city'
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                          }`}
+                          title="Ordenar por Cidade"
+                        >
+                          <MapPinIcon className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
                   )}
@@ -3479,7 +3473,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         <CheckCircle className="h-4 w-4 mr-2" />
                         Clientes Selecionados ({selectedClients.size})
                       </h4>
-                      <div className="grid grid-cols-1 gap-3 max-h-64 overflow-y-auto">
+                      <div className="grid grid-cols-1 gap-3 max-h-95 overflow-y-auto">
                         {availableClients
                           .filter((client) => selectedClients.has(client.document))
                           .map((client) => {
@@ -3774,7 +3768,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         <CheckCircle className="h-4 w-4 mr-2" />
                         Clientes Selecionados ({selectedClients.size})
                       </h4>
-                      <div className="grid grid-cols-1 gap-3 max-h-64 overflow-y-auto">
+                      <div className="grid grid-cols-1 gap-3 max-h-95 overflow-y-auto">
                         {availableClients
                           .filter((client) => selectedClients.has(client.document))
                           .map((client) => {
@@ -3847,21 +3841,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                     </div>
                   )}
 
-                  {/* Observações */}
-                  <div>
-                    <label htmlFor="modal-visit-notes" className="block text-sm font-medium text-gray-700 mb-2">
-                      Observações (opcional)
-                    </label>
-                    <textarea
-                      id="modal-visit-notes"
-                      name="modal-visit-notes"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Adicione observações sobre a visita..."
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
 
                   {/* Resumo dos Agendamentos - Mesmo conteúdo do componente principal */}
                   {selectedClients.size > 0 && (
