@@ -3137,7 +3137,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           // Formatar notas com formato antigo (YYYY-MM-DD HH:mm:ss)
           .replace(
             /Reagendado de (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) para (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})/g,
-            (match, fromDate, fromTime, toDate, toTime) => {
+            (_, fromDate, fromTime, toDate, toTime) => {
               const formattedFrom = formatBrazilianDate(fromDate, fromTime.substring(0, 5));
               const formattedTo = formatBrazilianDate(toDate, toTime.substring(0, 5));
               return `• Reagendado de ${formattedFrom} para ${formattedTo}`;

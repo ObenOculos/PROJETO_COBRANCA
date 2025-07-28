@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { Modal } from "../Modal"; // Importar o componente Modal
+import { useCollection } from "../../contexts/CollectionContext";
 import {
   X,
   UploadCloud,
@@ -31,6 +32,7 @@ interface InsertResult {
 }
 
 const DatabaseUpload: React.FC = () => {
+  const { refreshData } = useCollection();
   const [statusFile, setStatusFile] = useState<File | null>(null);
   const [newParcelaFile, setNewParcelaFile] = useState<File | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -533,6 +535,13 @@ const DatabaseUpload: React.FC = () => {
       } else {
         setDebugInfo("✅ Todas as atualizações foram realizadas com sucesso!");
       }
+
+      // Refresh dos dados após atualização bem-sucedida
+      if (successful > 0) {
+        setProgressMessage("🔄 Atualizando dados na interface...");
+        await refreshData();
+        setProgressMessage("✅ Dados atualizados na interface!");
+      }
     } catch (error) {
       const errorMsg = (error as Error).message;
       setUploadStatus(`❌ Erro: ${errorMsg}`);
@@ -602,6 +611,11 @@ const DatabaseUpload: React.FC = () => {
             "✅ Todas as novas parcelas foram inseridas com sucesso!",
           );
         }
+
+        // Refresh dos dados após inserção bem-sucedida
+        setProgressMessage("🔄 Atualizando dados na interface...");
+        await refreshData();
+        setProgressMessage("✅ Dados atualizados na interface!");
       } else {
         setUploadStatus(`❌ Erro: ${result.error}`);
         setDebugInfo(`❌ Erro detalhado: ${result.error}`);
@@ -624,10 +638,10 @@ const DatabaseUpload: React.FC = () => {
 
   return (
     <div className="bg-white rounded-2xl sm:rounded-2xl shadow-sm p-4 sm:p-6 border border-gray-200 space-y-6">
-      <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">
+      <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center-title">
         Upload de Dados do Banco
       </h2>
-      <p className="text-gray-600">
+      <p className="text-sm text-gray-600 mt-1 hidden sm:block">
         Utilize esta seção para atualizar informações existentes ou adicionar
         novos registros à tabela BANCO_DADOS.
       </p>
