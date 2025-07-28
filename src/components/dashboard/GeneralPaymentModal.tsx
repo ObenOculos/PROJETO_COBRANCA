@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, memo } from "react";
 import {
   X,
   Edit,
@@ -29,7 +29,7 @@ interface SaleDistributionItem {
   appliedAmount: number;
 }
 
-const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
+const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(({
   clientGroup,
   clientSales,
   onClose,
@@ -631,6 +631,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = ({
       </div>
     </div>
   );
-};
+});
 
 export default GeneralPaymentModal;

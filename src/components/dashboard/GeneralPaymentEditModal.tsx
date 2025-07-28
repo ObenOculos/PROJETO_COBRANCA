@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, memo } from "react";
 import {
   X,
   Edit,
@@ -23,7 +23,7 @@ interface GeneralPaymentEditModalProps {
   onSuccess: () => void;
 }
 
-const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
+const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(({
   clientGroup,
   clientSales,
   onClose,
@@ -714,6 +714,6 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = ({
       )}
     </div>
   );
-};
+});
 
 export default GeneralPaymentEditModal;

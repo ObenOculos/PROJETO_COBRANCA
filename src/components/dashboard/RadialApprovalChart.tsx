@@ -1,5 +1,5 @@
 // components/RadialApprovalChart.tsx
-import React from "react";
+import React, { memo } from "react";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
 
@@ -16,7 +16,7 @@ interface Props {
   motivationalMessage?: { text: string; icon: LucideIcon }; // Mensagem motivacional
 }
 
-const RadialApprovalChart: React.FC<Props> = ({
+const RadialApprovalChart: React.FC<Props> = memo(({
   value,
   current = 0,
   goal = 0,
@@ -92,6 +92,6 @@ const RadialApprovalChart: React.FC<Props> = ({
       </div>
     </div>
   );
-};
+});
 
 export default RadialApprovalChart;

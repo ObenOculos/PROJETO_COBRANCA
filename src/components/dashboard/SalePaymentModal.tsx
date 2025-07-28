@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, memo } from "react";
 import {
   X,
   CreditCard,
@@ -21,7 +21,7 @@ interface SalePaymentModalProps {
   onSuccess: () => void;
 }
 
-const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
+const SalePaymentModal: React.FC<SalePaymentModalProps> = memo(({
   saleGroup,
   onClose,
   onSuccess,
@@ -521,6 +521,6 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = ({
       </div>
     </div>
   );
-};
+});
 
 export default SalePaymentModal;
