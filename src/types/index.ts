@@ -217,6 +217,7 @@ export interface CollectionContextType {
   fetchCollectorStores: () => Promise<void>;
   fetchSalePayments: () => Promise<void>;
   refreshData: () => Promise<void>;
+  refreshCollections: () => Promise<void>;
   updateCollection: (id: number, updates: Partial<Collection>) => Promise<void>;
   assignCollectorToStore: (
     collectorId: string,

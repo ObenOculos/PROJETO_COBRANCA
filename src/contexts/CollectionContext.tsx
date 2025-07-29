@@ -3244,6 +3244,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     fetchCollectorStores,
     fetchSalePayments,
     refreshData,
+    refreshCollections,
     updateCollection,
     assignCollectorToStore,
     removeCollectorFromStore,
