@@ -1057,6 +1057,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         selectedVisitForCancellation.id,
         cancellationReason.trim(),
       );
+      
+      // Disparar evento para notificar outros componentes
+      window.dispatchEvent(new CustomEvent('visitCancellationRequested', {
+        detail: {
+          visitId: selectedVisitForCancellation.id,
+          clientName: selectedVisitForCancellation.clientName,
+          collectorId: selectedVisitForCancellation.collectorId,
+          reason: cancellationReason.trim()
+        }
+      }));
+      
       setShowCancellationModal(false);
       setSelectedVisitForCancellation(null);
       setCancellationReason("");
