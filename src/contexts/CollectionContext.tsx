@@ -1058,6 +1058,21 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
     }
 
+    // Apply visitsOnly filter - show only clients with scheduled visits
+    if (filters.visitsOnly && userType === "collector" && collectorId) {
+      const collectorVisits = getVisitsByCollector(collectorId).filter(
+        (visit) => visit.status === "agendada"
+      );
+      
+      const clientsWithVisits = new Set(
+        collectorVisits.map((visit) => visit.clientDocument)
+      );
+      
+      filtered = filtered.filter((c) =>
+        c.documento && clientsWithVisits.has(c.documento)
+      );
+    }
+
     return filtered;
   };
 

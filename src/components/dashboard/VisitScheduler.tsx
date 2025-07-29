@@ -3285,9 +3285,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-4 lg:px-6 py-4 border-b border-gray-200 bg-white rounded-t-2xl flex-shrink-0">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-500 px-4 lg:px-6 py-4 border-b border-gray-200 bg-white rounded-t-2xl flex-shrink-0">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-white">
                   {modalStep === 'selection' ? 'Selecionar Clientes para Visita' : 'Confirmar Agendamento'}
                 </h3>
                 <button
@@ -3714,7 +3714,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                         handleToggleClientSelection(client.document)
                                       }
                                     >
-                                      <div className="p-4">
+                                      <div className="p-4 bg-white border-1 rounded-2xl">
                                         <div className="flex items-start">
                                           <div className="flex-1 min-w-0">
                                             {/* Client Info */}
