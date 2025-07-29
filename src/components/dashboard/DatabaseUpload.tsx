@@ -39,14 +39,16 @@ const validateSituacao = (value: string | undefined | null): string | null => {
   if (!value || value.trim() === "") {
     return null;
   }
-  
+
   const trimmedValue = value.trim();
   if (VALID_SITUACAO_VALUES.includes(trimmedValue)) {
     return trimmedValue;
   }
-  
+
   // Se não for um valor válido, retornar null ao invés de enviar valor inválido
-  console.warn(`⚠️ Valor inválido para situacao: "${value}". Valores aceitos: ${VALID_SITUACAO_VALUES.join(", ")} ou vazio.`);
+  console.warn(
+    `⚠️ Valor inválido para situacao: "${value}". Valores aceitos: ${VALID_SITUACAO_VALUES.join(", ")} ou vazio.`,
+  );
   return null;
 };
 
@@ -288,7 +290,9 @@ const DatabaseUpload: React.FC = () => {
       const status = row.status || row["status"];
       const situacao = row.situacao || row["situacao"];
 
-      console.log(`📝 Processando: ID=${idParcela}, Status=${status}, Situação=${situacao}`);
+      console.log(
+        `📝 Processando: ID=${idParcela}, Status=${status}, Situação=${situacao}`,
+      );
 
       if (!idParcela) {
         updates.push({
@@ -320,12 +324,14 @@ const DatabaseUpload: React.FC = () => {
           continue;
         }
 
-        console.log(`🔄 Atualizando ${idParcela} com status: ${status}, situação: ${situacao}`);
+        console.log(
+          `🔄 Atualizando ${idParcela} com status: ${status}, situação: ${situacao}`,
+        );
 
         // Criar objeto de atualização dinamicamente
         const updateObj: any = {};
         if (status) updateObj.status = status;
-        
+
         // Validar situacao antes de adicionar ao objeto de atualização
         const validatedSituacao = validateSituacao(situacao);
         if (situacao && validatedSituacao !== null) {
@@ -461,7 +467,7 @@ const DatabaseUpload: React.FC = () => {
             ? Number(newRow.juros_pago.replace(",", "."))
             : null;
           if (newRow.user_id === "") newRow.user_id = null;
-          
+
           // Validar situacao antes de inserir
           if (newRow.situacao !== undefined) {
             newRow.situacao = validateSituacao(newRow.situacao);
@@ -753,7 +759,8 @@ const DatabaseUpload: React.FC = () => {
           </h3>
           <p className="text-sm text-gray-600">
             Faça upload de um arquivo CSV com as colunas:{" "}
-            <code className="bg-gray-100 px-1 rounded">id_parcela</code> e opcionalmente{" "}
+            <code className="bg-gray-100 px-1 rounded">id_parcela</code> e
+            opcionalmente{" "}
             <code className="bg-gray-100 px-1 rounded">status</code> e/ou{" "}
             <code className="bg-gray-100 px-1 rounded">situacao</code>
           </p>
@@ -762,9 +769,11 @@ const DatabaseUpload: React.FC = () => {
             <div>
               <strong>Importante:</strong> O <code>id_parcela</code> deve
               corresponder a um registro existente na tabela. Os campos{" "}
-              <code>status</code> e <code>situacao</code> serão atualizados conforme fornecidos.
+              <code>status</code> e <code>situacao</code> serão atualizados
+              conforme fornecidos.
               <br />
-              <strong>Valores de situação aceitos:</strong> "Em mãos", "Em tratamento" ou deixar vazio.
+              <strong>Valores de situação aceitos:</strong> "Em mãos", "Em
+              tratamento" ou deixar vazio.
             </div>
           </div>
 
@@ -821,8 +830,8 @@ const DatabaseUpload: React.FC = () => {
           </h3>
           <p className="text-sm text-gray-600">
             Faça upload de um arquivo CSV contendo os dados das novas parcelas a
-            serem adicionadas. O arquivo pode incluir a coluna "situacao" com valores 
-            aceitos: "Em mãos", "Em tratamento" ou deixar vazio.
+            serem adicionadas. O arquivo pode incluir a coluna "situacao" com
+            valores aceitos: "Em mãos", "Em tratamento" ou deixar vazio.
           </p>
           <div className="flex items-center space-x-2">
             <input

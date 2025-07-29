@@ -1061,15 +1061,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     // Apply visitsOnly filter - show only clients with scheduled visits
     if (filters.visitsOnly && userType === "collector" && collectorId) {
       const collectorVisits = getVisitsByCollector(collectorId).filter(
-        (visit) => visit.status === "agendada"
+        (visit) => visit.status === "agendada",
       );
-      
+
       const clientsWithVisits = new Set(
-        collectorVisits.map((visit) => visit.clientDocument)
+        collectorVisits.map((visit) => visit.clientDocument),
       );
-      
-      filtered = filtered.filter((c) =>
-        c.documento && clientsWithVisits.has(c.documento)
+
+      filtered = filtered.filter(
+        (c) => c.documento && clientsWithVisits.has(c.documento),
       );
     }
 
@@ -3138,10 +3138,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Montar nota com informações do reagendamento
       const formatBrazilianDate = (date: string, time?: string) => {
-        const [year, month, day] = date.split('-');
+        const [year, month, day] = date.split("-");
         const formattedDate = `${day}/${month}/${year}`;
         if (time) {
-          const [hours, minutes] = time.split(':');
+          const [hours, minutes] = time.split(":");
           return `${formattedDate} ${hours}:${minutes}`;
         }
         return formattedDate;
@@ -3149,25 +3149,36 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Função para formatar datas existentes em notas antigas
       const formatExistingNotes = (notes: string) => {
-        return notes
-          // Formatar notas com formato antigo (YYYY-MM-DD HH:mm:ss)
-          .replace(
-            /Reagendado de (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) para (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})/g,
-            (_, fromDate, fromTime, toDate, toTime) => {
-              const formattedFrom = formatBrazilianDate(fromDate, fromTime.substring(0, 5));
-              const formattedTo = formatBrazilianDate(toDate, toTime.substring(0, 5));
-              return `• Reagendado de ${formattedFrom} para ${formattedTo}`;
-            }
-          )
-          // Adicionar dots em notas que já estão no formato brasileiro mas sem dots
-          .replace(/^Reagendado de/gm, '• Reagendado de')
-          // Remover dots duplicados
-          .replace(/^• • Reagendado de/gm, '• Reagendado de');
+        return (
+          notes
+            // Formatar notas com formato antigo (YYYY-MM-DD HH:mm:ss)
+            .replace(
+              /Reagendado de (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) para (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})/g,
+              (_, fromDate, fromTime, toDate, toTime) => {
+                const formattedFrom = formatBrazilianDate(
+                  fromDate,
+                  fromTime.substring(0, 5),
+                );
+                const formattedTo = formatBrazilianDate(
+                  toDate,
+                  toTime.substring(0, 5),
+                );
+                return `• Reagendado de ${formattedFrom} para ${formattedTo}`;
+              },
+            )
+            // Adicionar dots em notas que já estão no formato brasileiro mas sem dots
+            .replace(/^Reagendado de/gm, "• Reagendado de")
+            // Remover dots duplicados
+            .replace(/^• • Reagendado de/gm, "• Reagendado de")
+        );
       };
 
-      const fromDateTime = formatBrazilianDate(currentVisit.scheduledDate, currentVisit.scheduledTime);
+      const fromDateTime = formatBrazilianDate(
+        currentVisit.scheduledDate,
+        currentVisit.scheduledTime,
+      );
       const toDateTime = formatBrazilianDate(newDate, newTime);
-      
+
       const rescheduleNote = `• Reagendado de ${fromDateTime} para ${toDateTime}${reason ? `. Motivo: ${reason}` : ""}`;
 
       // Atualizar notas formatando as existentes e adicionando a nova

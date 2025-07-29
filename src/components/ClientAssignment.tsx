@@ -34,35 +34,39 @@ interface ClientWithCollections {
 // Helper function para obter indicador de situação
 const getSituacaoIndicator = (collections: Collection[]) => {
   // Verificar se tem alguma parcela "Em mãos"
-  const hasEmMaos = collections.some(c => c.situacao === "Em mãos");
+  const hasEmMaos = collections.some((c) => c.situacao === "Em mãos");
   if (hasEmMaos) {
     return {
       icon: HandCoins,
       label: "Em mãos",
-      className: "bg-blue-100 text-blue-800"
+      className: "bg-blue-100 text-blue-800",
     };
   }
-  
+
   // Verificar se tem alguma parcela "Em tratamento"
-  const hasEmTratamento = collections.some(c => c.situacao === "Em tratamento");
+  const hasEmTratamento = collections.some(
+    (c) => c.situacao === "Em tratamento",
+  );
   if (hasEmTratamento) {
     return {
       icon: Briefcase,
       label: "Em tratamento",
-      className: "bg-yellow-100 text-yellow-800"
+      className: "bg-yellow-100 text-yellow-800",
     };
   }
-  
+
   // Verificar se todas as parcelas têm situação vazia
-  const allEmpty = collections.every(c => !c.situacao || c.situacao.trim() === "");
+  const allEmpty = collections.every(
+    (c) => !c.situacao || c.situacao.trim() === "",
+  );
   if (allEmpty) {
     return {
       icon: CircleSlash,
       label: "Vazia",
-      className: "bg-gray-100 text-gray-600"
+      className: "bg-gray-100 text-gray-600",
     };
   }
-  
+
   // Se tem mix de situações ou outras situações
   return null;
 };
@@ -300,7 +304,8 @@ export const ClientAssignment = React.memo(() => {
       });
     }
     if (filterSituacao) {
-      const situacaoLabel = filterSituacao === "empty" ? "Vazia" : filterSituacao;
+      const situacaoLabel =
+        filterSituacao === "empty" ? "Vazia" : filterSituacao;
       chips.push({
         label: `Situação: ${situacaoLabel}`,
         onClear: () => setFilterSituacao(""),
@@ -366,7 +371,7 @@ export const ClientAssignment = React.memo(() => {
       // Filtro por situação
       const matchesSituacao = (() => {
         if (!filterSituacao) return true;
-        
+
         // Verificar se alguma collection tem a situação desejada
         const hasSituacao = client.collections.some((c) => {
           if (filterSituacao === "empty") {
@@ -374,7 +379,7 @@ export const ClientAssignment = React.memo(() => {
           }
           return c.situacao === filterSituacao;
         });
-        
+
         return hasSituacao;
       })();
 
@@ -747,8 +752,7 @@ export const ClientAssignment = React.memo(() => {
       const notification = document.createElement("div");
       notification.className =
         "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50";
-      notification.textContent =
-        "Selecione um status e pelo menos um cliente";
+      notification.textContent = "Selecione um status e pelo menos um cliente";
       document.body.appendChild(notification);
       setTimeout(() => document.body.removeChild(notification), 3000);
       return;
@@ -786,16 +790,25 @@ export const ClientAssignment = React.memo(() => {
         .map((uniqueKey) => clientsData.find((c) => c.uniqueKey === uniqueKey))
         .filter(Boolean);
 
-      const allCollections = selectedClientsData.flatMap((client) => client?.collections || []);
+      const allCollections = selectedClientsData.flatMap(
+        (client) => client?.collections || [],
+      );
 
       // Update status for all collections
       for (const collection of allCollections) {
         try {
-          const statusValue = selectedStatus === "empty" ? null : selectedStatus;
-          await updateCollection(collection.id_parcela, { situacao: statusValue });
+          const statusValue =
+            selectedStatus === "empty" ? null : selectedStatus;
+          await updateCollection(collection.id_parcela, {
+            situacao: statusValue,
+          });
           successCount++;
         } catch (error) {
-          console.error("Erro ao atualizar status da parcela:", collection.id_parcela, error);
+          console.error(
+            "Erro ao atualizar status da parcela:",
+            collection.id_parcela,
+            error,
+          );
           errorCount++;
         }
       }
@@ -1147,7 +1160,7 @@ export const ClientAssignment = React.memo(() => {
               >
                 Limpar Filtros
               </button>
-              
+
               {/* Botão Fechar para mobile */}
               <button
                 onClick={() => setShowFilters(false)}
@@ -1204,20 +1217,20 @@ export const ClientAssignment = React.memo(() => {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
             <div className="p-4 lg:p-6">
               <div className="flex mb-4">
-
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Ações em Massa
-                  </h3>
-                  <p className=" ml-6 text-sm text-gray-600 mt-1">
-                    {selectedClients.size} selecionados
-                  </p>
-
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Ações em Massa
+                </h3>
+                <p className=" ml-6 text-sm text-gray-600 mt-1">
+                  {selectedClients.size} selecionados
+                </p>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Coluna 1: Atribuição de Cobrador */}
                 <div className="space-y-3">
-                  <h4 className="text-sm font-medium text-gray-700">Atribuição de Cobrador</h4>
+                  <h4 className="text-sm font-medium text-gray-700">
+                    Atribuição de Cobrador
+                  </h4>
                   <select
                     id="selectedCollector"
                     name="selectedCollector"
@@ -1262,7 +1275,9 @@ export const ClientAssignment = React.memo(() => {
 
                 {/* Coluna 2: Atribuição de Status */}
                 <div className="space-y-3">
-                  <h4 className="text-sm font-medium text-gray-700">Atribuição de Status</h4>
+                  <h4 className="text-sm font-medium text-gray-700">
+                    Atribuição de Status
+                  </h4>
                   <select
                     id="selectedStatus"
                     name="selectedStatus"
@@ -1376,19 +1391,23 @@ export const ClientAssignment = React.memo(() => {
                             Sem cobrador
                           </span>
                         )}
-                        
+
                         {/* Indicador de situação */}
                         {(() => {
-                          const situacao = getSituacaoIndicator(client.collections);
+                          const situacao = getSituacaoIndicator(
+                            client.collections,
+                          );
                           if (!situacao) return null;
                           const Icon = situacao.icon;
                           return (
-                            <span 
+                            <span
                               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${situacao.className}`}
                               title={`Situação: ${situacao.label}`}
                             >
                               <Icon className="h-3.5 w-3.5" />
-                              <span className="hidden sm:inline">{situacao.label}</span>
+                              <span className="hidden sm:inline">
+                                {situacao.label}
+                              </span>
                             </span>
                           );
                         })()}
@@ -1769,14 +1788,18 @@ export const ClientAssignment = React.memo(() => {
               Esta ação afetará{" "}
               {Array.from(selectedClients)
                 .map((key) => clientsData.find((c) => c.uniqueKey === key))
-                .reduce((total, client) => total + (client?.collections.length || 0), 0)}{" "}
+                .reduce(
+                  (total, client) => total + (client?.collections.length || 0),
+                  0,
+                )}{" "}
               parcela(s) no total.
             </p>
           </div>
 
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl">
             <p className="text-sm text-blue-700 font-medium text-center">
-              O status será aplicado a todas as parcelas dos clientes selecionados
+              O status será aplicado a todas as parcelas dos clientes
+              selecionados
             </p>
           </div>
 

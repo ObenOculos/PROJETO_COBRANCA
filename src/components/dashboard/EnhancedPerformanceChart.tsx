@@ -554,7 +554,7 @@ const EnhancedPerformanceChart: React.FC = () => {
               >
                 Limpar Filtros
               </button>
-              
+
               {/* Botão Fechar para mobile */}
               <button
                 onClick={() => setShowFilters(false)}

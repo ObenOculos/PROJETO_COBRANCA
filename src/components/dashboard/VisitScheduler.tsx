@@ -77,8 +77,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   const [loading, setLoading] = useState(false);
   // const [activeTab, setActiveTab] = useState<"schedule" | "list">("schedule");
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [modalStep, setModalStep] = useState<'selection' | 'confirmation'>('selection');
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
+  const [modalStep, setModalStep] = useState<"selection" | "confirmation">(
+    "selection",
+  );
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(
+    null,
+  );
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentPage, setCurrentPage] = useState(1);
   const [visitsPerPage] = useState(10);
@@ -105,11 +109,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     maxValue: "",
     visitStatus: "",
   });
-  
+
   // Estados para ordenação
-  const [sortField, setSortField] = useState<"cliente" | "valor" | "cidade" | null>(null);
+  const [sortField, setSortField] = useState<
+    "cliente" | "valor" | "cidade" | null
+  >(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  
+
   // Função para lidar com ordenação
   const handleSort = (field: typeof sortField) => {
     if (sortField === field) {
@@ -160,11 +166,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   } | null>(null);
   const [showDateValidationModal, setShowDateValidationModal] = useState(false);
   const [dateValidationMessage, setDateValidationMessage] = useState("");
-  
+
   // Estados para filtro das visitas do dia selecionado
-  const [visitsSortBy, setVisitsSortBy] = useState<'name' | 'city' | 'value'>('name');
-  const [visitsSortOrder, setVisitsSortOrder] = useState<'asc' | 'desc'>('asc');
-  
+  const [visitsSortBy, setVisitsSortBy] = useState<"name" | "city" | "value">(
+    "name",
+  );
+  const [visitsSortOrder, setVisitsSortOrder] = useState<"asc" | "desc">("asc");
+
   // Estados para swipe (mobile)
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
@@ -181,16 +189,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
-    
+
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
 
     if (isLeftSwipe && currentPage < totalSelectedDatePages) {
-      setCurrentPage(prev => prev + 1);
+      setCurrentPage((prev) => prev + 1);
     }
     if (isRightSwipe && currentPage > 1) {
-      setCurrentPage(prev => prev - 1);
+      setCurrentPage((prev) => prev - 1);
     }
   };
 
@@ -198,33 +206,33 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   useEffect(() => {
     if (showScheduleModal) {
       // Prevenir scroll da página de fundo
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
       // Restaurar scroll da página
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     }
 
     // Cleanup: sempre restaurar o scroll quando componente desmonta
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     };
   }, [showScheduleModal]);
 
   // Fechar modal com tecla ESC
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && showScheduleModal) {
+      if (event.key === "Escape" && showScheduleModal) {
         setShowScheduleModal(false);
-        setModalStep('selection');
+        setModalStep("selection");
       }
     };
 
     if (showScheduleModal) {
-      document.addEventListener('keydown', handleEscKey);
+      document.addEventListener("keydown", handleEscKey);
     }
 
     return () => {
-      document.removeEventListener('keydown', handleEscKey);
+      document.removeEventListener("keydown", handleEscKey);
     };
   }, [showScheduleModal]);
 
@@ -375,7 +383,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     if (sortField) {
       filteredClients.sort((a, b) => {
         let result = 0;
-        
+
         switch (sortField) {
           case "cliente":
             result = a.client.localeCompare(b.client);
@@ -389,7 +397,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
           default:
             result = 0;
         }
-        
+
         return sortDirection === "asc" ? result : -result;
       });
     }
@@ -411,7 +419,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     if (!user || user.type !== "collector") return 0;
 
     const activeVisits = getVisitsByCollector(user.id).filter(
-      (visit) => visit.status === "agendada" || visit.status === "cancelamento_solicitado",
+      (visit) =>
+        visit.status === "agendada" ||
+        visit.status === "cancelamento_solicitado",
     );
     return activeVisits.length;
   }, [user, getVisitsByCollector, scheduledVisits]);
@@ -431,54 +441,28 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   }, [searchTerm, filters]);
 
   // Obter visitas organizadas por data
-  const { upcomingVisits, pastVisits, allVisits } =
-    React.useMemo(() => {
-      if (!user)
-        return {
-          upcomingVisits: [],
-          pastVisits: [],
-          allVisits: [],
-        };
+  const { upcomingVisits, pastVisits, allVisits } = React.useMemo(() => {
+    if (!user)
+      return {
+        upcomingVisits: [],
+        pastVisits: [],
+        allVisits: [],
+      };
 
-      // Usar a mesma lógica de data local
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, "0");
-      const day = String(today.getDate()).padStart(2, "0");
-      const todayStr = `${year}-${month}-${day}`;
-      const visits = getVisitsByCollector(user.id);
+    // Usar a mesma lógica de data local
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    const todayStr = `${year}-${month}-${day}`;
+    const visits = getVisitsByCollector(user.id);
 
-      const upcomingVisits = visits
-        .filter((visit) => {
-          // Filtrar apenas visitas futuras (não incluir hoje)
-          return visit.scheduledDate > todayStr;
-        })
-        .sort((a, b) => {
-          const dateA = new Date(
-            `${a.scheduledDate} ${a.scheduledTime || "00:00"}`,
-          );
-          const dateB = new Date(
-            `${b.scheduledDate} ${b.scheduledTime || "00:00"}`,
-          );
-          return dateA.getTime() - dateB.getTime();
-        });
-
-      const pastVisits = visits
-        .filter((visit) => {
-          // Filtrar visitas passadas que ainda estão com status 'agendada' ou 'cancelamento_solicitado'
-          return visit.scheduledDate < todayStr && (visit.status === "agendada" || visit.status === "cancelamento_solicitado");
-        })
-        .sort((a, b) => {
-          const dateA = new Date(
-            `${a.scheduledDate} ${a.scheduledTime || "00:00"}`,
-          );
-          const dateB = new Date(
-            `${b.scheduledDate} ${b.scheduledTime || "00:00"}`,
-          );
-          return dateB.getTime() - dateA.getTime(); // Mais recentes primeiro
-        });
-
-      const allVisits = visits.sort((a, b) => {
+    const upcomingVisits = visits
+      .filter((visit) => {
+        // Filtrar apenas visitas futuras (não incluir hoje)
+        return visit.scheduledDate > todayStr;
+      })
+      .sort((a, b) => {
         const dateA = new Date(
           `${a.scheduledDate} ${a.scheduledTime || "00:00"}`,
         );
@@ -488,9 +472,37 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         return dateA.getTime() - dateB.getTime();
       });
 
-      return { upcomingVisits, pastVisits, allVisits };
-    }, [user, getVisitsByCollector, scheduledVisits]);
+    const pastVisits = visits
+      .filter((visit) => {
+        // Filtrar visitas passadas que ainda estão com status 'agendada' ou 'cancelamento_solicitado'
+        return (
+          visit.scheduledDate < todayStr &&
+          (visit.status === "agendada" ||
+            visit.status === "cancelamento_solicitado")
+        );
+      })
+      .sort((a, b) => {
+        const dateA = new Date(
+          `${a.scheduledDate} ${a.scheduledTime || "00:00"}`,
+        );
+        const dateB = new Date(
+          `${b.scheduledDate} ${b.scheduledTime || "00:00"}`,
+        );
+        return dateB.getTime() - dateA.getTime(); // Mais recentes primeiro
+      });
 
+    const allVisits = visits.sort((a, b) => {
+      const dateA = new Date(
+        `${a.scheduledDate} ${a.scheduledTime || "00:00"}`,
+      );
+      const dateB = new Date(
+        `${b.scheduledDate} ${b.scheduledTime || "00:00"}`,
+      );
+      return dateA.getTime() - dateB.getTime();
+    });
+
+    return { upcomingVisits, pastVisits, allVisits };
+  }, [user, getVisitsByCollector, scheduledVisits]);
 
   const handleScheduleVisit = async () => {
     return handleScheduleMultipleVisits();
@@ -599,23 +611,28 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
     const startingDayOfWeek = firstDay.getDay();
-    
+
     return { daysInMonth, startingDayOfWeek };
   };
 
   const getVisitsForDate = (date: Date) => {
-    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    
-    return allVisits.filter(visit => {
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+    return allVisits.filter((visit) => {
       const visitDate = visit.scheduledDate;
-      return visitDate === dateStr && 
-             (visit.status === 'agendada' || visit.status === 'realizada' || visit.status === 'nao_encontrado' || visit.status === 'cancelamento_solicitado');
+      return (
+        visitDate === dateStr &&
+        (visit.status === "agendada" ||
+          visit.status === "realizada" ||
+          visit.status === "nao_encontrado" ||
+          visit.status === "cancelamento_solicitado")
+      );
     });
   };
 
-  const navigateMonth = (direction: 'prev' | 'next') => {
+  const navigateMonth = (direction: "prev" | "next") => {
     const newMonth = new Date(currentMonth);
-    if (direction === 'prev') {
+    if (direction === "prev") {
       newMonth.setMonth(newMonth.getMonth() - 1);
     } else {
       newMonth.setMonth(newMonth.getMonth() + 1);
@@ -629,31 +646,41 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   };
 
   const monthNames = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
   ];
 
-  const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
   // Visitas do dia selecionado no calendário
   const selectedDateVisits = useMemo(() => {
     if (!selectedCalendarDate) return [];
     const visits = getVisitsForDate(selectedCalendarDate);
-    
+
     // Ordenar visitas
     return [...visits].sort((a, b) => {
       let comparison = 0;
-      
+
       switch (visitsSortBy) {
-        case 'name':
+        case "name":
           comparison = a.clientName.localeCompare(b.clientName);
           break;
-        case 'city':
-          const aCity = a.clientAddress?.split(',').pop()?.trim() || '';
-          const bCity = b.clientAddress?.split(',').pop()?.trim() || '';
+        case "city":
+          const aCity = a.clientAddress?.split(",").pop()?.trim() || "";
+          const bCity = b.clientAddress?.split(",").pop()?.trim() || "";
           comparison = aCity.localeCompare(bCity);
           break;
-        case 'value':
+        case "value":
           const aValue = a.totalPendingValue || 0;
           const bValue = b.totalPendingValue || 0;
           comparison = aValue - bValue;
@@ -661,8 +688,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         default:
           comparison = 0;
       }
-      
-      return visitsSortOrder === 'asc' ? comparison : -comparison;
+
+      return visitsSortOrder === "asc" ? comparison : -comparison;
     });
   }, [selectedCalendarDate, allVisits, visitsSortBy, visitsSortOrder]);
 
@@ -673,7 +700,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     return selectedDateVisits.slice(startIndex, endIndex);
   }, [selectedDateVisits, currentPage, visitsPerPage]);
 
-  const totalSelectedDatePages = Math.ceil(selectedDateVisits.length / visitsPerPage);
+  const totalSelectedDatePages = Math.ceil(
+    selectedDateVisits.length / visitsPerPage,
+  );
 
   const proceedWithScheduling = async () => {
     try {
@@ -731,7 +760,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         showSuccessNotification(
           `${successCount} visita${successCount !== 1 ? "s" : ""} agendada${successCount !== 1 ? "s" : ""} com sucesso!`,
         );
-        
+
         // Refresh dos dados para atualizar outras abas
         await refreshData();
       }
@@ -793,7 +822,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       showSuccessNotification(
         `Visita marcada como ${getStatusLabel(newStatus)}`,
       );
-      
+
       // Refresh dos dados para atualizar outras abas
       await refreshData();
     } catch (error) {
@@ -896,7 +925,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       const count = (notes.match(/Reagendado/g) || []).length;
       return count > 1 ? `Reagendada (${count}x)` : "Reagendada";
     }
-    
+
     switch (status) {
       case "agendada":
         return "Agendada";
@@ -918,7 +947,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     if (status === "agendada" && notes?.includes("Reagendado")) {
       return "bg-purple-100 text-purple-800";
     }
-    
+
     switch (status) {
       case "agendada":
         return "bg-blue-100 text-blue-800";
@@ -1107,10 +1136,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       );
 
       showSuccessNotification("Visita reagendada com sucesso!");
-      
+
       // Refresh dos dados para atualizar outras abas
       await refreshData();
-      
+
       handleCloseRescheduleModal();
     } catch (error) {
       console.error("Erro ao reagendar visita:", error);
@@ -1236,7 +1265,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
   return (
     <div className="rounded-2xl">
-
       {/* Filtro e Listagem */}
       <div className="p-0 lg:p-0">
         {false ? (
@@ -1245,7 +1273,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             {/* Busca e Filtros */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label htmlFor="search-clients" className="block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="search-clients"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   Buscar e Filtrar Clientes
                 </label>
                 <div className="flex items-center space-x-2">
@@ -1852,16 +1883,15 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </div>
             )}
 
-            {availableClients.length === 0 &&
-              user?.type === "collector" && (
-                <div className="p-4 text-center text-gray-500 border border-gray-200 rounded-2xl">
-                  {hasActiveFilters
-                    ? "Nenhum cliente encontrado com os filtros aplicados"
-                    : clientsWithActiveVisits > 0
-                      ? "Todos os clientes com pendências já têm visitas agendadas"
-                      : "Nenhum cliente com pendências disponível para agendamento"}
-                </div>
-              )}
+            {availableClients.length === 0 && user?.type === "collector" && (
+              <div className="p-4 text-center text-gray-500 border border-gray-200 rounded-2xl">
+                {hasActiveFilters
+                  ? "Nenhum cliente encontrado com os filtros aplicados"
+                  : clientsWithActiveVisits > 0
+                    ? "Todos os clientes com pendências já têm visitas agendadas"
+                    : "Nenhum cliente com pendências disponível para agendamento"}
+              </div>
+            )}
 
             {/* Cliente(s) Selecionado(s) */}
             {selectedClients.size > 0 && (
@@ -2005,7 +2035,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
             {/* Observações */}
             <div>
-              <label htmlFor="visit-notes" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="visit-notes"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Observações (opcional)
               </label>
               <textarea
@@ -2018,8 +2051,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-
-
           </div>
         ) : (
           // Lista de Visitas
@@ -2033,16 +2064,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 </h3>
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => navigateMonth('prev')}
+                    onClick={() => navigateMonth("prev")}
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </button>
                   <span className="text-sm font-medium min-w-[120px] text-center">
-                    {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                    {monthNames[currentMonth.getMonth()]}{" "}
+                    {currentMonth.getFullYear()}
                   </span>
                   <button
-                    onClick={() => navigateMonth('next')}
+                    onClick={() => navigateMonth("next")}
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                   >
                     <ChevronRight className="h-5 w-5" />
@@ -2064,7 +2096,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
                 {/* Dias do mês */}
                 {(() => {
-                  const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentMonth);
+                  const { daysInMonth, startingDayOfWeek } =
+                    getDaysInMonth(currentMonth);
                   const days = [];
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
@@ -2072,16 +2105,23 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   // Dias vazios no início
                   for (let i = 0; i < startingDayOfWeek; i++) {
                     days.push(
-                      <div key={`empty-${i}`} className="h-10 lg:h-12" />
+                      <div key={`empty-${i}`} className="h-10 lg:h-12" />,
                     );
                   }
 
                   // Dias do mês
                   for (let day = 1; day <= daysInMonth; day++) {
-                    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                    const date = new Date(
+                      currentMonth.getFullYear(),
+                      currentMonth.getMonth(),
+                      day,
+                    );
                     const visitsForDay = getVisitsForDate(date);
-                    const isToday = date.toDateString() === today.toDateString();
-                    const isSelected = selectedCalendarDate?.toDateString() === date.toDateString();
+                    const isToday =
+                      date.toDateString() === today.toDateString();
+                    const isSelected =
+                      selectedCalendarDate?.toDateString() ===
+                      date.toDateString();
                     const isPast = date < today;
                     const hasVisits = visitsForDay.length > 0;
 
@@ -2094,25 +2134,27 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                           relative transition-all duration-200 transform hover:scale-105
                           ${
                             isSelected
-                              ? 'bg-blue-600 text-white shadow-lg'
+                              ? "bg-blue-600 text-white shadow-lg"
                               : isToday
-                              ? 'bg-blue-100 text-blue-800 font-bold'
-                              : isPast
-                              ? 'bg-gray-50 text-gray-400'
-                              : 'hover:bg-gray-100 text-gray-700'
+                                ? "bg-blue-100 text-blue-800 font-bold"
+                                : isPast
+                                  ? "bg-gray-50 text-gray-400"
+                                  : "hover:bg-gray-100 text-gray-700"
                           }
-                          ${hasVisits ? 'ring-2 ring-blue-400 ring-offset-1' : ''}
+                          ${hasVisits ? "ring-2 ring-blue-400 ring-offset-1" : ""}
                         `}
                       >
                         <span className="text-sm font-medium">{day}</span>
                         {hasVisits && (
                           <div className="absolute bottom-1">
-                            <div className={`w-2 h-2 rounded-full ${
-                              isSelected ? 'bg-white' : 'bg-blue-500'
-                            }`} />
+                            <div
+                              className={`w-2 h-2 rounded-full ${
+                                isSelected ? "bg-white" : "bg-blue-500"
+                              }`}
+                            />
                           </div>
                         )}
-                      </button>
+                      </button>,
                     );
                   }
 
@@ -2140,231 +2182,252 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             {/* Visitas do dia selecionado */}
             {selectedCalendarDate ? (
               <div>
-              <div className="relative bg-gradient-to-r from-blue-50/80 via-white to-blue-50/80 rounded-xl border border-blue-100/60 p-4 mb-6 shadow-sm backdrop-blur-sm">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-transparent rounded-xl"></div>
-                <div className="relative flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center space-x-3">
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900 leading-tight">
-                        {selectedCalendarDate.toLocaleDateString('pt-BR')}
-                      </h3>
-                      <p className="text-sm text-gray-600 font-medium">
-                        {selectedDateVisits.length} {selectedDateVisits.length === 1 ? 'visita agendada' : 'visitas agendadas'}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Busca e Filtros */}
-                  {selectedDateVisits.length > 1 && (
-                    <div className="bg-white/70 backdrop-blur-sm rounded-lg border border-white/50 px-3 py-2 shadow-sm">
-                      {/* Botões de Ordenação com Ícones */}
-                      <div className="flex items-center gap-2 justify-center">
-                        <button
-                          onClick={() => {
-                            setVisitsSortBy('name');
-                            setVisitsSortOrder(visitsSortBy === 'name' && visitsSortOrder === 'asc' ? 'desc' : 'asc');
-                          }}
-                          className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            visitsSortBy === 'name'
-                              ? "bg-blue-600 text-white"
-                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                          }`}
-                          title="Ordenar por Nome"
-                        >
-                          <User className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setVisitsSortBy('value');
-                            setVisitsSortOrder(visitsSortBy === 'value' && visitsSortOrder === 'asc' ? 'desc' : 'asc');
-                          }}
-                          className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            visitsSortBy === 'value'
-                              ? "bg-blue-600 text-white"
-                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                          }`}
-                          title="Ordenar por Valor"
-                        >
-                          <DollarSign className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setVisitsSortBy('city');
-                            setVisitsSortOrder(visitsSortBy === 'city' && visitsSortOrder === 'asc' ? 'desc' : 'asc');
-                          }}
-                          className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            visitsSortBy === 'city'
-                              ? "bg-blue-600 text-white"
-                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                          }`}
-                          title="Ordenar por Cidade"
-                        >
-                          <MapPinIcon className="h-4 w-4" />
-                        </button>
+                <div className="relative bg-gradient-to-r from-blue-50/80 via-white to-blue-50/80 rounded-xl border border-blue-100/60 p-4 mb-6 shadow-sm backdrop-blur-sm">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-transparent rounded-xl"></div>
+                  <div className="relative flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center space-x-3">
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                            {selectedCalendarDate.toLocaleDateString("pt-BR")}
+                          </h3>
+                          <p className="text-sm text-gray-600 font-medium">
+                            {selectedDateVisits.length}{" "}
+                            {selectedDateVisits.length === 1
+                              ? "visita agendada"
+                              : "visitas agendadas"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-                </div>
-              </div>
 
-              {selectedDateVisits.length === 0 ? (
-                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
-                  <Calendar className="h-8 w-8 text-blue-400 mx-auto mb-2" />
-                  <p className="text-blue-600 font-medium">
-                    Nenhuma visita agendada para {selectedCalendarDate.toLocaleDateString('pt-BR')}.
-                  </p>
-                  <p className="text-blue-500 text-sm">
-                    Que tal agendar uma nova visita?
-                  </p>
-                </div>
-              ) : (
-                <div 
-                  className="space-y-3"
-                  onTouchStart={handleTouchStart}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleTouchEnd}
-                >
-                  {paginatedSelectedDateVisits.map((visit) => (
-                    <div
-                      key={visit.id}
-                      className="border border-blue-300 bg-blue-50 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
-                        <div className="flex-1">
-                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                      {/* Busca e Filtros */}
+                      {selectedDateVisits.length > 1 && (
+                        <div className="bg-white/70 backdrop-blur-sm rounded-lg border border-white/50 px-3 py-2 shadow-sm">
+                          {/* Botões de Ordenação com Ícones */}
+                          <div className="flex items-center gap-2 justify-center">
                             <button
-                              onClick={() => handleOpenClientModal(visit)}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              onClick={() => {
+                                setVisitsSortBy("name");
+                                setVisitsSortOrder(
+                                  visitsSortBy === "name" &&
+                                    visitsSortOrder === "asc"
+                                    ? "desc"
+                                    : "asc",
+                                );
+                              }}
+                              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                visitsSortBy === "name"
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              }`}
+                              title="Ordenar por Nome"
                             >
-                              {visit.clientName}
+                              <User className="h-4 w-4" />
                             </button>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status, visit.notes)}`}
+                            <button
+                              onClick={() => {
+                                setVisitsSortBy("value");
+                                setVisitsSortOrder(
+                                  visitsSortBy === "value" &&
+                                    visitsSortOrder === "asc"
+                                    ? "desc"
+                                    : "asc",
+                                );
+                              }}
+                              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                visitsSortBy === "value"
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              }`}
+                              title="Ordenar por Valor"
                             >
-                              {getStatusLabel(visit.status, visit.notes)}
-                            </span>
-                            <span className="text-sm text-blue-600 font-medium">
-                              {visit.scheduledTime || "00:00"}
-                            </span>
-                          </div>
-
-                          <div className="text-sm text-gray-600 space-y-1">
-                            <div className="flex items-center">
-                              <MapPin className="h-4 w-4 mr-2" />
-                              {visit.clientAddress}
-                            </div>
-                            {visit.totalPendingValue && (
-                              <div className="flex items-center">
-                                <DollarSign className="h-4 w-4 mr-2" />
-                                Pendente:{" "}
-                                {formatCurrency(visit.totalPendingValue)}
-                                {visit.overdueCount &&
-                                  visit.overdueCount > 0 && (
-                                    <span className="ml-2 text-red-600">
-                                      <AlertTriangle className="h-4 w-4 inline mr-1" />
-                                      {visit.overdueCount}{" "}
-                                      {visit.overdueCount === 1
-                                        ? "título"
-                                        : "títulos"}{" "}
-                                      em atraso
-                                    </span>
-                                  )}
-                              </div>
-                            )}
-                            {visit.notes && (
-                              <div className="text-gray-500 italic whitespace-pre-line">
-                                {visit.notes}
-                              </div>
-                            )}
+                              <DollarSign className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setVisitsSortBy("city");
+                                setVisitsSortOrder(
+                                  visitsSortBy === "city" &&
+                                    visitsSortOrder === "asc"
+                                    ? "desc"
+                                    : "asc",
+                                );
+                              }}
+                              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                visitsSortBy === "city"
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              }`}
+                              title="Ordenar por Cidade"
+                            >
+                              <MapPinIcon className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
-                        {visit.status === "agendada" && (
-                          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
-                            <button
-                              onClick={() => handleMarkAsCompleted(visit)}
-                              className="px-3 py-2 bg-green-500 text-white rounded-2xl text-sm hover:bg-green-700 transition-colors flex items-center justify-center"
-                            >
-                              Realizada
-                            </button>
-                            <button
-                              onClick={() => handleMarkAsNotFound(visit)}
-                              className="px-3 py-2 bg-orange-500 text-white rounded-2xl text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
-                            >
-                              Não Encontrado
-                            </button>
-                            <button
-                              onClick={() => handleOpenRescheduleModal(visit)}
-                              className="px-3 py-2 bg-blue-500 text-white rounded-2xl text-sm hover:bg-blue-700 transition-colors flex items-center justify-center"
-                            >
-                              <RefreshCw className="h-4 w-4 mr-1" />
-                              Reagendar
-                            </button>
-                            {!visit.cancellationRejectedBy && (
+                {selectedDateVisits.length === 0 ? (
+                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
+                    <Calendar className="h-8 w-8 text-blue-400 mx-auto mb-2" />
+                    <p className="text-blue-600 font-medium">
+                      Nenhuma visita agendada para{" "}
+                      {selectedCalendarDate.toLocaleDateString("pt-BR")}.
+                    </p>
+                    <p className="text-blue-500 text-sm">
+                      Que tal agendar uma nova visita?
+                    </p>
+                  </div>
+                ) : (
+                  <div
+                    className="space-y-3"
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                  >
+                    {paginatedSelectedDateVisits.map((visit) => (
+                      <div
+                        key={visit.id}
+                        className="border border-blue-300 bg-blue-50 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
+                          <div className="flex-1">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
                               <button
-                                onClick={() => handleRequestCancellation(visit)}
-                                className="px-3 py-2 bg-red-500 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
+                                onClick={() => handleOpenClientModal(visit)}
+                                className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
                               >
-                                Cancelar Visita
+                                {visit.clientName}
                               </button>
-                            )}
-                          </div>
-                        )}
-                        {visit.status === "cancelamento_solicitado" && (
-                          <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-2xl">
-                            <div className="font-medium">
-                              Cancelamento Solicitado
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status, visit.notes)}`}
+                              >
+                                {getStatusLabel(visit.status, visit.notes)}
+                              </span>
+                              <span className="text-sm text-blue-600 font-medium">
+                                {visit.scheduledTime || "00:00"}
+                              </span>
                             </div>
-                            <div className="text-xs mt-1">
-                              Aguardando aprovação do gerente
-                            </div>
-                            {visit.cancellationRequestReason && (
-                              <div className="text-xs mt-1 italic">
-                                Motivo: {visit.cancellationRequestReason}
+
+                            <div className="text-sm text-gray-600 space-y-1">
+                              <div className="flex items-center">
+                                <MapPin className="h-4 w-4 mr-2" />
+                                {visit.clientAddress}
                               </div>
-                            )}
-                          </div>
-                        )}
-                        {visit.cancellationRejectedBy &&
-                          visit.status === "agendada" && (
-                            <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-2xl">
-                              <div className="font-medium">
-                                Cancelamento Rejeitado pelo Gerente
-                              </div>
-                              <div className="text-xs mt-1">
-                                A visita permanece agendada
-                              </div>
-                              {visit.cancellationRejectionReason && (
-                                <div className="text-xs mt-1 italic">
-                                  Motivo da rejeição:{" "}
-                                  {visit.cancellationRejectionReason}
+                              {visit.totalPendingValue && (
+                                <div className="flex items-center">
+                                  <DollarSign className="h-4 w-4 mr-2" />
+                                  Pendente:{" "}
+                                  {formatCurrency(visit.totalPendingValue)}
+                                  {visit.overdueCount &&
+                                    visit.overdueCount > 0 && (
+                                      <span className="ml-2 text-red-600">
+                                        <AlertTriangle className="h-4 w-4 inline mr-1" />
+                                        {visit.overdueCount}{" "}
+                                        {visit.overdueCount === 1
+                                          ? "título"
+                                          : "títulos"}{" "}
+                                        em atraso
+                                      </span>
+                                    )}
                                 </div>
                               )}
-                              {visit.cancellationRejectedAt && (
-                                <div className="text-xs mt-1 text-gray-600">
-                                  Rejeitado em:{" "}
-                                  {new Date(
-                                    visit.cancellationRejectedAt,
-                                  ).toLocaleDateString("pt-BR")}{" "}
-                                  às{" "}
-                                  {new Date(
-                                    visit.cancellationRejectedAt,
-                                  ).toLocaleTimeString("pt-BR", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
+                              {visit.notes && (
+                                <div className="text-gray-500 italic whitespace-pre-line">
+                                  {visit.notes}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {visit.status === "agendada" && (
+                            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
+                              <button
+                                onClick={() => handleMarkAsCompleted(visit)}
+                                className="px-3 py-2 bg-green-500 text-white rounded-2xl text-sm hover:bg-green-700 transition-colors flex items-center justify-center"
+                              >
+                                Realizada
+                              </button>
+                              <button
+                                onClick={() => handleMarkAsNotFound(visit)}
+                                className="px-3 py-2 bg-orange-500 text-white rounded-2xl text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
+                              >
+                                Não Encontrado
+                              </button>
+                              <button
+                                onClick={() => handleOpenRescheduleModal(visit)}
+                                className="px-3 py-2 bg-blue-500 text-white rounded-2xl text-sm hover:bg-blue-700 transition-colors flex items-center justify-center"
+                              >
+                                <RefreshCw className="h-4 w-4 mr-1" />
+                                Reagendar
+                              </button>
+                              {!visit.cancellationRejectedBy && (
+                                <button
+                                  onClick={() =>
+                                    handleRequestCancellation(visit)
+                                  }
+                                  className="px-3 py-2 bg-red-500 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
+                                >
+                                  Cancelar Visita
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {visit.status === "cancelamento_solicitado" && (
+                            <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-2xl">
+                              <div className="font-medium">
+                                Cancelamento Solicitado
+                              </div>
+                              <div className="text-xs mt-1">
+                                Aguardando aprovação do gerente
+                              </div>
+                              {visit.cancellationRequestReason && (
+                                <div className="text-xs mt-1 italic">
+                                  Motivo: {visit.cancellationRequestReason}
                                 </div>
                               )}
                             </div>
                           )}
+                          {visit.cancellationRejectedBy &&
+                            visit.status === "agendada" && (
+                              <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-2xl">
+                                <div className="font-medium">
+                                  Cancelamento Rejeitado pelo Gerente
+                                </div>
+                                <div className="text-xs mt-1">
+                                  A visita permanece agendada
+                                </div>
+                                {visit.cancellationRejectionReason && (
+                                  <div className="text-xs mt-1 italic">
+                                    Motivo da rejeição:{" "}
+                                    {visit.cancellationRejectionReason}
+                                  </div>
+                                )}
+                                {visit.cancellationRejectedAt && (
+                                  <div className="text-xs mt-1 text-gray-600">
+                                    Rejeitado em:{" "}
+                                    {new Date(
+                                      visit.cancellationRejectedAt,
+                                    ).toLocaleDateString("pt-BR")}{" "}
+                                    às{" "}
+                                    {new Date(
+                                      visit.cancellationRejectedAt,
+                                    ).toLocaleTimeString("pt-BR", {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             ) : (
               /* Mensagem quando nenhuma data é selecionada */
               <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
@@ -2541,53 +2604,60 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   )}
                 </div>
               </div>
-              )}
-              
-              {/* Paginação no final da página */}
-              {selectedDateVisits.length > visitsPerPage && (
-                <div className="relative flex items-center justify-center mt-8 pt-6 border-t border-blue-100">
-                  <div className="flex items-center space-x-4 bg-white rounded-xl border border-blue-200 shadow-sm px-6 py-3">
-                    <button
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
-                      className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
-                    >
-                      <ChevronLeft className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
-                    </button>
-                    
-                    <div className="flex items-center space-x-2">
-                      {Array.from({ length: totalSelectedDatePages }, (_, i) => i + 1).map((page) => (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={`w-10 h-10 rounded-lg font-medium text-sm transition-colors ${
-                            currentPage === page
-                              ? 'bg-blue-600 text-white shadow-sm'
-                              : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                    </div>
-                    
-                    <button
-                      onClick={() => setCurrentPage(Math.min(totalSelectedDatePages, currentPage + 1))}
-                      disabled={currentPage === totalSelectedDatePages}
-                      className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
-                    >
-                      <ChevronRight className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
-                    </button>
+            )}
+
+            {/* Paginação no final da página */}
+            {selectedDateVisits.length > visitsPerPage && (
+              <div className="relative flex items-center justify-center mt-8 pt-6 border-t border-blue-100">
+                <div className="flex items-center space-x-4 bg-white rounded-xl border border-blue-200 shadow-sm px-6 py-3">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
+                  >
+                    <ChevronLeft className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
+                  </button>
+
+                  <div className="flex items-center space-x-2">
+                    {Array.from(
+                      { length: totalSelectedDatePages },
+                      (_, i) => i + 1,
+                    ).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-10 h-10 rounded-lg font-medium text-sm transition-colors ${
+                          currentPage === page
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
                   </div>
-                  
-                  {/* Indicador de swipe apenas no mobile */}
-                  <div className="sm:hidden absolute -bottom-4 left-1/2 transform -translate-x-1/2">
-                    <div className="flex items-center text-xs text-gray-400 bg-gray-100 rounded-full px-3 py-1">
-                      <span>👈 Deslize para navegar 👉</span>
-                    </div>
+
+                  <button
+                    onClick={() =>
+                      setCurrentPage(
+                        Math.min(totalSelectedDatePages, currentPage + 1),
+                      )
+                    }
+                    disabled={currentPage === totalSelectedDatePages}
+                    className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
+                  >
+                    <ChevronRight className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
+                  </button>
+                </div>
+
+                {/* Indicador de swipe apenas no mobile */}
+                <div className="sm:hidden absolute -bottom-4 left-1/2 transform -translate-x-1/2">
+                  <div className="flex items-center text-xs text-gray-400 bg-gray-100 rounded-full px-3 py-1">
+                    <span>👈 Deslize para navegar 👉</span>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
             {/* Visitas Atrasadas */}
             {pastVisits.length > 0 && (
@@ -3272,7 +3342,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         onClick={() => {
           setShowScheduleModal(true);
           setModalCurrentPage(1);
-          setModalStep('selection');
+          setModalStep("selection");
         }}
         className="shadow-xl fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all duration-200 flex items-center justify-center z-50 hover:scale-110"
         title="Agendar Nova Visita"
@@ -3282,24 +3352,26 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
       {/* Modal de Agendamento de Nova Visita */}
       {showScheduleModal && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-hidden"
           onClick={(e) => {
             // Fechar modal ao clicar fora dele
             if (e.target === e.currentTarget) {
               setShowScheduleModal(false);
-              setModalStep('selection');
+              setModalStep("selection");
             }
           }}
         >
-          <div 
+          <div
             className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-gradient-to-r from-blue-600 to-indigo-500 px-4 lg:px-6 py-4 border-b border-gray-200 bg-white rounded-t-2xl flex-shrink-0">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-white">
-                  {modalStep === 'selection' ? 'Selecionar Clientes para Visita' : 'Confirmar Agendamento'}
+                  {modalStep === "selection"
+                    ? "Selecionar Clientes para Visita"
+                    : "Confirmar Agendamento"}
                 </h3>
                 <button
                   onClick={() => setShowScheduleModal(false)}
@@ -3312,584 +3384,664 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
             </div>
             <div className="flex-1 overflow-y-auto">
               <div className="bg-gray-50 px-4 lg:px-6 py-4">
-              {/* Content from the schedule tab */}
-              {modalStep === 'selection' ? (
-              <div className="space-y-6">
-                {/* Busca e Filtros */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        id="search-clients"
-                        type="text"
-                        placeholder="Buscar por nome, documento, endereço ou cidade..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                    <button
-                      onClick={() => setShowFilters(!showFilters)}
-                      className={`flex items-center px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                        showFilters
-                          ? "bg-blue-600 text-white"
-                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                      }`}
-                      title="Filtros Avançados"
-                    >
-                      <Filter className="h-4 w-4" />
-                    </button>
-                  </div>
-                  
-                  {/* Botões de Ordenação com Ícones */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleSort("cliente")}
-                      className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                        sortField === "cliente"
-                          ? "bg-blue-600 text-white"
-                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                      }`}
-                      title="Ordenar por Nome"
-                    >
-                      <User className="h-4 w-4" />
-                      {getSortIcon("cliente")}
-                    </button>
-                    <button
-                      onClick={() => handleSort("valor")}
-                      className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                        sortField === "valor"
-                          ? "bg-blue-600 text-white"
-                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                      }`}
-                      title="Ordenar por Valor"
-                    >
-                      <DollarSign className="h-4 w-4" />
-                      {getSortIcon("valor")}
-                    </button>
-                    <button
-                      onClick={() => handleSort("cidade")}
-                      className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                        sortField === "cidade"
-                          ? "bg-blue-600 text-white"
-                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                      }`}
-                      title="Ordenar por Cidade"
-                    >
-                      <MapPinIcon className="h-4 w-4" />
-                      {getSortIcon("cidade")}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Filtros Expandidos */}
-                {showFilters && (
-                  <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div>
-                        <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                          <MapPin className="h-3 w-3 mr-1" />
-                          Cidade
-                        </label>
-                        <select
-                          value={filters.city}
-                          onChange={(e) =>
-                            setFilters({ ...filters, city: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                {/* Content from the schedule tab */}
+                {modalStep === "selection" ? (
+                  <div className="space-y-6">
+                    {/* Busca e Filtros */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <input
+                            id="search-clients"
+                            type="text"
+                            placeholder="Buscar por nome, documento, endereço ou cidade..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <button
+                          onClick={() => setShowFilters(!showFilters)}
+                          className={`flex items-center px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            showFilters
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                          }`}
+                          title="Filtros Avançados"
                         >
-                          <option value="">Todas as cidades</option>
-                          {Array.from(new Set(availableClients.map((c) => c.city))).map(
-                            (city) => (
-                              <option key={city} value={city}>
-                                {city}
+                          <Filter className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      {/* Botões de Ordenação com Ícones */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleSort("cliente")}
+                          className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            sortField === "cliente"
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                          }`}
+                          title="Ordenar por Nome"
+                        >
+                          <User className="h-4 w-4" />
+                          {getSortIcon("cliente")}
+                        </button>
+                        <button
+                          onClick={() => handleSort("valor")}
+                          className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            sortField === "valor"
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                          }`}
+                          title="Ordenar por Valor"
+                        >
+                          <DollarSign className="h-4 w-4" />
+                          {getSortIcon("valor")}
+                        </button>
+                        <button
+                          onClick={() => handleSort("cidade")}
+                          className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            sortField === "cidade"
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                          }`}
+                          title="Ordenar por Cidade"
+                        >
+                          <MapPinIcon className="h-4 w-4" />
+                          {getSortIcon("cidade")}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filtros Expandidos */}
+                    {showFilters && (
+                      <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div>
+                            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              Cidade
+                            </label>
+                            <select
+                              value={filters.city}
+                              onChange={(e) =>
+                                setFilters({ ...filters, city: e.target.value })
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                            >
+                              <option value="">Todas as cidades</option>
+                              {Array.from(
+                                new Set(availableClients.map((c) => c.city)),
+                              ).map((city) => (
+                                <option key={city} value={city}>
+                                  {city}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                              <DollarSign className="h-3 w-3 mr-1" />
+                              Valor Mínimo
+                            </label>
+                            <div className="relative">
+                              <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                              <input
+                                type="number"
+                                placeholder="0"
+                                value={filters.minValue}
+                                onChange={(e) =>
+                                  setFilters({
+                                    ...filters,
+                                    minValue: e.target.value,
+                                  })
+                                }
+                                className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                              <DollarSign className="h-3 w-3 mr-1" />
+                              Valor Máximo
+                            </label>
+                            <div className="relative">
+                              <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                              <input
+                                type="number"
+                                placeholder="∞"
+                                value={filters.maxValue}
+                                onChange={(e) =>
+                                  setFilters({
+                                    ...filters,
+                                    maxValue: e.target.value,
+                                  })
+                                }
+                                className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                              <Eye className="h-3 w-3 mr-1" />
+                              Status da Visita
+                            </label>
+                            <select
+                              value={filters.visitStatus}
+                              onChange={(e) =>
+                                setFilters({
+                                  ...filters,
+                                  visitStatus: e.target.value,
+                                })
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                            >
+                              <option value="">Todos os status</option>
+                              <option value="never-visited">
+                                Nunca visitado
                               </option>
-                            ),
-                          )}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                          <DollarSign className="h-3 w-3 mr-1" />
-                          Valor Mínimo
-                        </label>
-                        <div className="relative">
-                          <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                          <input
-                            type="number"
-                            placeholder="0"
-                            value={filters.minValue}
-                            onChange={(e) =>
-                              setFilters({ ...filters, minValue: e.target.value })
-                            }
-                            className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                          />
+                              <option value="recent">
+                                Visitado recentemente
+                              </option>
+                              <option value="overdue">Visita em atraso</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="flex justify-end">
+                          <button
+                            onClick={clearAllFilters}
+                            className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors flex items-center"
+                          >
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                            Limpar filtros
+                          </button>
                         </div>
                       </div>
-                      <div>
-                        <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                          <DollarSign className="h-3 w-3 mr-1" />
-                          Valor Máximo
-                        </label>
-                        <div className="relative">
-                          <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                          <input
-                            type="number"
-                            placeholder="∞"
-                            value={filters.maxValue}
-                            onChange={(e) =>
-                              setFilters({ ...filters, maxValue: e.target.value })
-                            }
-                            className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                          <Eye className="h-3 w-3 mr-1" />
-                          Status da Visita
-                        </label>
-                        <select
-                          value={filters.visitStatus}
-                          onChange={(e) =>
-                            setFilters({ ...filters, visitStatus: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    )}
+
+                    {/* Lista de Clientes */}
+                    <div className="space-y-6">
+                      {false && selectedClients.size > 0 && (
+                        <div
+                          id="clienteselecionadosdalistagem"
+                          className="bg-blue-50 border border-blue-200 rounded-2xl p-4"
                         >
-                          <option value="">Todos os status</option>
-                          <option value="never-visited">Nunca visitado</option>
-                          <option value="recent">Visitado recentemente</option>
-                          <option value="overdue">Visita em atraso</option>
-                        </select>
+                          <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Clientes Selecionados ({selectedClients.size})
+                          </h4>
+                          <div className="grid grid-cols-1 gap-3 max-h-95 overflow-y-auto">
+                            {availableClients
+                              .filter((client) =>
+                                selectedClients.has(client.document),
+                              )
+                              .map((client) => {
+                                const schedule = clientSchedules.get(
+                                  client.document,
+                                ) || {
+                                  date: "",
+                                  time: "",
+                                };
+                                return (
+                                  <div
+                                    key={client.document}
+                                    className="bg-white rounded-2xl p-3 border border-gray-200"
+                                  >
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div>
+                                        <span className="font-medium text-gray-900">
+                                          {client.client}
+                                        </span>
+                                        <span className="text-gray-500 ml-2">
+                                          ({client.document})
+                                        </span>
+                                      </div>
+                                      <div className="text-red-600 font-medium">
+                                        {formatCurrency(client.pendingValue)}
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                                          Data da Visita
+                                        </label>
+                                        <div className="relative">
+                                          <Calendar className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                                          <input
+                                            id={`visit-date-${client.document}`}
+                                            name={`visit-date-${client.document}`}
+                                            type="date"
+                                            value={schedule.date}
+                                            onChange={(e) =>
+                                              updateClientSchedule(
+                                                client.document,
+                                                "date",
+                                                e.target.value,
+                                              )
+                                            }
+                                            min={getLocalDate()}
+                                            className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                          />
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                                          Horário
+                                        </label>
+                                        <div className="relative">
+                                          <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                                          <input
+                                            id={`visit-time-${client.document}`}
+                                            name={`visit-time-${client.document}`}
+                                            type="time"
+                                            value={schedule.time}
+                                            onChange={(e) => {
+                                              const selectedTime =
+                                                e.target.value;
+                                              updateClientSchedule(
+                                                client.document,
+                                                "time",
+                                                selectedTime,
+                                              );
+                                              // Verificar se é um horário no passado
+                                              const selectedDate =
+                                                schedule.date;
+                                              if (
+                                                selectedDate &&
+                                                selectedTime
+                                              ) {
+                                                const [year, month, day] =
+                                                  selectedDate.split("-");
+                                                const [hours, minutes] =
+                                                  selectedTime.split(":");
+                                                const selectedDateTime =
+                                                  new Date(
+                                                    parseInt(year),
+                                                    parseInt(month) - 1,
+                                                    parseInt(day),
+                                                    parseInt(hours),
+                                                    parseInt(minutes),
+                                                  );
+                                                const now = new Date();
+                                                if (selectedDateTime <= now) {
+                                                  // Mostrar modal de aviso
+                                                  setTimeWarningData({
+                                                    clientDocument:
+                                                      client.document,
+                                                    selectedTime: selectedTime,
+                                                    suggestedTime: "",
+                                                    previousTime: "",
+                                                  });
+                                                  setShowTimeWarningModal(true);
+                                                }
+                                              }
+                                            }}
+                                            className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Resumo das Visitas Selecionadas */}
+                      {false && selectedClients.size > 0 && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                          <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                            <CalendarDays className="h-4 w-4 mr-2" />
+                            Resumo do Agendamento
+                          </h4>
+                          <div className="space-y-2">
+                            {availableClients
+                              .filter((client) =>
+                                selectedClients.has(client.document),
+                              )
+                              .map((client) => {
+                                const schedule = clientSchedules.get(
+                                  client.document,
+                                ) || {
+                                  date: "",
+                                  time: "",
+                                };
+                                if (!schedule.date || !schedule.time)
+                                  return null;
+                                return (
+                                  <div
+                                    key={client.document}
+                                    className="flex items-center justify-between text-sm bg-white rounded-2xl p-2"
+                                  >
+                                    <div>
+                                      <span className="font-medium">
+                                        {client.client}
+                                      </span>
+                                      <span className="text-gray-500 ml-2">
+                                        ({client.document})
+                                      </span>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="font-medium text-blue-600">
+                                        {formatSafeDate(schedule.date)} às{" "}
+                                        {schedule.time}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Lista de Clientes Disponíveis */}
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-semibold text-gray-900 flex items-center">
+                            <Users className="h-5 w-5 mr-2 text-blue-600" />
+                            Clientes para Visita
+                          </h4>
+                          {/* Indicador de Paginação */}
+                          {availableClients.length > modalClientsPerPage && (
+                            <div className="flex items-center space-x-3">
+                              <div className="flex items-center space-x-1">
+                                <button
+                                  onClick={() =>
+                                    setModalCurrentPage(modalCurrentPage - 1)
+                                  }
+                                  disabled={modalCurrentPage === 1}
+                                  className="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                  title="Página anterior"
+                                >
+                                  <ChevronLeft className="h-4 w-4" />
+                                </button>
+                                <span className="px-2 py-1 text-sm font-medium text-gray-700 min-w-[60px] text-center">
+                                  {modalCurrentPage}/
+                                  {Math.ceil(
+                                    availableClients.length /
+                                      modalClientsPerPage,
+                                  )}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    setModalCurrentPage(modalCurrentPage + 1)
+                                  }
+                                  disabled={
+                                    modalCurrentPage >=
+                                    Math.ceil(
+                                      availableClients.length /
+                                        modalClientsPerPage,
+                                    )
+                                  }
+                                  className="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                  title="Próxima página"
+                                >
+                                  <ChevronRight className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        {loading ? (
+                          <div className="flex items-center justify-center py-12">
+                            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+                          </div>
+                        ) : availableClients.length === 0 ? (
+                          <div className="text-center py-12">
+                            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-500">
+                              {searchTerm ||
+                              Object.values(filters).some(Boolean)
+                                ? "Nenhum cliente encontrado com os filtros aplicados."
+                                : "Nenhum cliente encontrado."}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-6">
+                            {(() => {
+                              // Paginação dos clientes
+                              const startIndex =
+                                (modalCurrentPage - 1) * modalClientsPerPage;
+                              const endIndex = startIndex + modalClientsPerPage;
+                              const paginatedClients = availableClients.slice(
+                                startIndex,
+                                endIndex,
+                              );
+
+                              // Agrupar clientes paginados por bairro
+                              const groupedClients = paginatedClients.reduce(
+                                (groups, client) => {
+                                  const neighborhood =
+                                    client.neighborhood || "Outros";
+                                  if (!groups[neighborhood]) {
+                                    groups[neighborhood] = [];
+                                  }
+                                  groups[neighborhood].push(client);
+                                  return groups;
+                                },
+                                {} as Record<string, typeof paginatedClients>,
+                              );
+
+                              return Object.entries(groupedClients).map(
+                                ([neighborhood, clients]) => (
+                                  <div key={neighborhood} className="mb-4">
+                                    {/* Neighborhood Header */}
+                                    <div className="flex items-center mb-3 pb-2 border-b border-gray-200">
+                                      <MapPin className="h-4 w-4 text-gray-500 mr-2" />
+                                      <h4 className="text-sm font-medium text-gray-700">
+                                        {neighborhood}
+                                      </h4>
+                                      <span className="ml-2 text-xs text-gray-500">
+                                        ({clients.length} cliente
+                                        {clients.length !== 1 ? "s" : ""})
+                                      </span>
+                                    </div>
+                                    {/* Client Cards */}
+                                    <div className="grid grid-cols-1 gap-3">
+                                      {clients.map((client) => {
+                                        const isSelected = selectedClients.has(
+                                          client.document,
+                                        );
+                                        return (
+                                          <div
+                                            key={client.document}
+                                            className={`relative bg-white rounded-2xl border transition-all duration-200 cursor-pointer hover:shadow-md ${
+                                              isSelected
+                                                ? "border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200"
+                                                : "border-gray-200 hover:border-gray-300"
+                                            }`}
+                                            onClick={() =>
+                                              handleToggleClientSelection(
+                                                client.document,
+                                              )
+                                            }
+                                          >
+                                            <div className="p-4 bg-white border-1 rounded-2xl">
+                                              <div className="flex items-start">
+                                                <div className="flex-1 min-w-0">
+                                                  {/* Client Info */}
+                                                  <div className="flex items-start justify-between mb-2">
+                                                    <div className="min-w-0 flex-1">
+                                                      <h3 className="font-semibold text-gray-900 text-lg truncate">
+                                                        {client.client}
+                                                      </h3>
+                                                      <p className="text-sm text-gray-600">
+                                                        {client.document}
+                                                      </p>
+                                                    </div>
+                                                  </div>
+                                                  {/* Client Details */}
+                                                  <div className="space-y-2 text-sm text-gray-600">
+                                                    <div className="flex items-center">
+                                                      <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                                                      <span className="truncate">
+                                                        {client.address},{" "}
+                                                        {client.city}
+                                                      </span>
+                                                    </div>
+                                                    <div className="flex items-center">
+                                                      <DollarSign className="h-4 w-4 mr-2 flex-shrink-0" />
+                                                      <span className="font-medium text-red-600">
+                                                        {formatCurrency(
+                                                          client.pendingValue,
+                                                        )}{" "}
+                                                        pendente
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                ),
+                              );
+                            })()}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    <div className="flex justify-end">
-                      <button
-                        onClick={clearAllFilters}
-                        className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors flex items-center"
-                      >
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                        Limpar filtros
-                      </button>
                     </div>
                   </div>
-                )}
-
-                {/* Lista de Clientes */}
-                <div className="space-y-6">
-                  {false && selectedClients.size > 0 && (
-                    <div id="clienteselecionadosdalistagem" className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                      <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Clientes Selecionados ({selectedClients.size})
-                      </h4>
-                      <div className="grid grid-cols-1 gap-3 max-h-95 overflow-y-auto">
-                        {availableClients
-                          .filter((client) => selectedClients.has(client.document))
-                          .map((client) => {
-                            const schedule = clientSchedules.get(client.document) || {
-                              date: "",
-                              time: "",
-                            };
-                            return (
-                              <div
-                                key={client.document}
-                                className="bg-white rounded-2xl p-3 border border-gray-200"
-                              >
-                                <div className="flex items-center justify-between mb-2">
-                                  <div>
-                                    <span className="font-medium text-gray-900">
-                                      {client.client}
-                                    </span>
-                                    <span className="text-gray-500 ml-2">
-                                      ({client.document})
-                                    </span>
-                                  </div>
-                                  <div className="text-red-600 font-medium">
-                                    {formatCurrency(client.pendingValue)}
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                                      Data da Visita
-                                    </label>
-                                    <div className="relative">
-                                      <Calendar className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                                      <input
-                                        id={`visit-date-${client.document}`}
-                                        name={`visit-date-${client.document}`}
-                                        type="date"
-                                        value={schedule.date}
-                                        onChange={(e) =>
-                                          updateClientSchedule(
-                                            client.document,
-                                            "date",
-                                            e.target.value,
-                                          )
-                                        }
-                                        min={getLocalDate()}
-                                        className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                      />
+                ) : (
+                  // Etapa de confirmação - Usando os componentes existentes
+                  <div className="space-y-6">
+                    {/* Lista de Clientes Selecionados - Mesmo conteúdo do componente principal */}
+                    {selectedClients.size > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                        <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Clientes Selecionados ({selectedClients.size})
+                        </h4>
+                        <div className="grid grid-cols-1 gap-3 max-h-95 overflow-y-auto">
+                          {availableClients
+                            .filter((client) =>
+                              selectedClients.has(client.document),
+                            )
+                            .map((client) => {
+                              const schedule = clientSchedules.get(
+                                client.document,
+                              ) || {
+                                date: "",
+                                time: "",
+                              };
+                              return (
+                                <div
+                                  key={client.document}
+                                  className="bg-white rounded-2xl p-3 border border-gray-200"
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div>
+                                      <span className="font-medium text-gray-900">
+                                        {client.client}
+                                      </span>
+                                      <span className="text-gray-500 ml-2 text-sm">
+                                        ({client.document})
+                                      </span>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-sm text-gray-600">
+                                        {formatSafeDate(schedule.date)} às{" "}
+                                        {schedule.time}
+                                      </div>
                                     </div>
                                   </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                                      Horário
-                                    </label>
-                                    <div className="relative">
-                                      <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                                      <input
-                                        id={`visit-time-${client.document}`}
-                                        name={`visit-time-${client.document}`}
-                                        type="time"
-                                        value={schedule.time}
-                                        onChange={(e) => {
-                                          const selectedTime = e.target.value;
-                                          updateClientSchedule(
-                                            client.document,
-                                            "time",
-                                            selectedTime,
-                                          );
-                                          // Verificar se é um horário no passado
-                                          const selectedDate = schedule.date;
-                                          if (selectedDate && selectedTime) {
-                                            const [year, month, day] = selectedDate.split("-");
-                                            const [hours, minutes] = selectedTime.split(":");
-                                            const selectedDateTime = new Date(
-                                              parseInt(year),
-                                              parseInt(month) - 1,
-                                              parseInt(day),
-                                              parseInt(hours),
-                                              parseInt(minutes),
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                      <div className="flex">
+                                        <Calendar className="h-3 w-3 text-gray-400 mr-1 mt-0.5" />
+                                        <input
+                                          type="date"
+                                          value={schedule.date}
+                                          onChange={(e) => {
+                                            const newSchedules = new Map(
+                                              clientSchedules,
                                             );
-                                            const now = new Date();
-                                            if (selectedDateTime <= now) {
-                                              // Mostrar modal de aviso
-                                              setTimeWarningData({
-                                                clientDocument: client.document,
-                                                selectedTime: selectedTime,
-                                                suggestedTime: "",
-                                                previousTime: "",
-                                              });
-                                              setShowTimeWarningModal(true);
-                                            }
-                                          }
-                                        }}
-                                        className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                      />
+                                            newSchedules.set(client.document, {
+                                              ...schedule,
+                                              date: e.target.value,
+                                            });
+                                            setClientSchedules(newSchedules);
+                                          }}
+                                          className="w-full text-sm border border-gray-300 rounded-2xl px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <div className="flex">
+                                        <Clock className="h-3 w-3 text-gray-400 mr-1 mt-0.5" />
+                                        <input
+                                          type="time"
+                                          value={schedule.time}
+                                          onChange={(e) => {
+                                            const newSchedules = new Map(
+                                              clientSchedules,
+                                            );
+                                            newSchedules.set(client.document, {
+                                              ...schedule,
+                                              time: e.target.value,
+                                            });
+                                            setClientSchedules(newSchedules);
+                                          }}
+                                          className="w-full text-sm border border-gray-300 rounded-2xl px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Resumo das Visitas Selecionadas */}
-                  {false && selectedClients.size > 0 && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                      <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
-                        <CalendarDays className="h-4 w-4 mr-2" />
-                        Resumo do Agendamento
-                      </h4>
-                      <div className="space-y-2">
-                        {availableClients
-                          .filter((client) => selectedClients.has(client.document))
-                          .map((client) => {
-                            const schedule = clientSchedules.get(client.document) || {
-                              date: "",
-                              time: "",
+                    {/* Resumo dos Agendamentos - Mesmo conteúdo do componente principal */}
+                    {selectedClients.size > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                        <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Resumo dos Agendamentos
+                        </h3>
+                        <div className="space-y-2">
+                          {getSelectedClientsData().map((client) => {
+                            const schedule = clientSchedules.get(
+                              client.document,
+                            ) || {
+                              date: selectedDate,
+                              time: selectedTime,
                             };
-                            if (!schedule.date || !schedule.time) return null;
                             return (
                               <div
                                 key={client.document}
                                 className="flex items-center justify-between text-sm bg-white rounded-2xl p-2"
                               >
                                 <div>
-                                  <span className="font-medium">{client.client}</span>
+                                  <span className="font-medium">
+                                    {client.client}
+                                  </span>
                                   <span className="text-gray-500 ml-2">
                                     ({client.document})
                                   </span>
                                 </div>
                                 <div className="text-right">
                                   <div className="font-medium text-blue-600">
-                                    {formatSafeDate(schedule.date)} às {schedule.time}
+                                    {formatSafeDate(schedule.date)} às{" "}
+                                    {schedule.time}
                                   </div>
                                 </div>
                               </div>
                             );
                           })}
-                      </div>
-                    </div>
-                  )}
-
-
-                  {/* Lista de Clientes Disponíveis */}
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="font-semibold text-gray-900 flex items-center">
-                        <Users className="h-5 w-5 mr-2 text-blue-600" />
-                        Clientes para Visita
-                      </h4>
-                      {/* Indicador de Paginação */}
-                      {availableClients.length > modalClientsPerPage && (
-                        <div className="flex items-center space-x-3">
-                          <div className="flex items-center space-x-1">
-                            <button
-                              onClick={() => setModalCurrentPage(modalCurrentPage - 1)}
-                              disabled={modalCurrentPage === 1}
-                              className="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                              title="Página anterior"
-                            >
-                              <ChevronLeft className="h-4 w-4" />
-                            </button>
-                            <span className="px-2 py-1 text-sm font-medium text-gray-700 min-w-[60px] text-center">
-                              {modalCurrentPage}/{Math.ceil(availableClients.length / modalClientsPerPage)}
-                            </span>
-                            <button
-                              onClick={() => setModalCurrentPage(modalCurrentPage + 1)}
-                              disabled={modalCurrentPage >= Math.ceil(availableClients.length / modalClientsPerPage)}
-                              className="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                              title="Próxima página"
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </button>
-                          </div>
                         </div>
-                      )}
-                    </div>
-                    {loading ? (
-                      <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-                      </div>
-                    ) : availableClients.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-500">
-                          {searchTerm || Object.values(filters).some(Boolean)
-                            ? "Nenhum cliente encontrado com os filtros aplicados."
-                            : "Nenhum cliente encontrado."}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {(() => {
-                          // Paginação dos clientes
-                          const startIndex = (modalCurrentPage - 1) * modalClientsPerPage;
-                          const endIndex = startIndex + modalClientsPerPage;
-                          const paginatedClients = availableClients.slice(startIndex, endIndex);
-                          
-                          // Agrupar clientes paginados por bairro
-                          const groupedClients = paginatedClients.reduce((groups, client) => {
-                            const neighborhood = client.neighborhood || "Outros";
-                            if (!groups[neighborhood]) {
-                              groups[neighborhood] = [];
-                            }
-                            groups[neighborhood].push(client);
-                            return groups;
-                          }, {} as Record<string, typeof paginatedClients>);
-                          
-                          return Object.entries(groupedClients).map(([neighborhood, clients]) => (
-                            <div key={neighborhood} className="mb-4">
-                              {/* Neighborhood Header */}
-                              <div className="flex items-center mb-3 pb-2 border-b border-gray-200">
-                                <MapPin className="h-4 w-4 text-gray-500 mr-2" />
-                                <h4 className="text-sm font-medium text-gray-700">
-                                  {neighborhood}
-                                </h4>
-                                <span className="ml-2 text-xs text-gray-500">
-                                  ({clients.length} cliente
-                                  {clients.length !== 1 ? "s" : ""})
-                                </span>
-                              </div>
-                              {/* Client Cards */}
-                              <div className="grid grid-cols-1 gap-3">
-                                {clients.map((client) => {
-                                  const isSelected = selectedClients.has(
-                                    client.document,
-                                  );
-                                  return (
-                                    <div
-                                      key={client.document}
-                                      className={`relative bg-white rounded-2xl border transition-all duration-200 cursor-pointer hover:shadow-md ${
-                                        isSelected
-                                          ? "border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200"
-                                          : "border-gray-200 hover:border-gray-300"
-                                      }`}
-                                      onClick={() =>
-                                        handleToggleClientSelection(client.document)
-                                      }
-                                    >
-                                      <div className="p-4 bg-white border-1 rounded-2xl">
-                                        <div className="flex items-start">
-                                          <div className="flex-1 min-w-0">
-                                            {/* Client Info */}
-                                            <div className="flex items-start justify-between mb-2">
-                                              <div className="min-w-0 flex-1">
-                                                <h3 className="font-semibold text-gray-900 text-lg truncate">
-                                                  {client.client}
-                                                </h3>
-                                                <p className="text-sm text-gray-600">
-                                                  {client.document}
-                                                </p>
-                                              </div>
-                                            </div>
-                                            {/* Client Details */}
-                                            <div className="space-y-2 text-sm text-gray-600">
-                                              <div className="flex items-center">
-                                                <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
-                                                <span className="truncate">
-                                                  {client.address}, {client.city}
-                                                </span>
-                                              </div>
-                                              <div className="flex items-center">
-                                                <DollarSign className="h-4 w-4 mr-2 flex-shrink-0" />
-                                                <span className="font-medium text-red-600">
-                                                  {formatCurrency(client.pendingValue)} pendente
-                                                </span>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ));
-                        })()}
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
-              ) : (
-                // Etapa de confirmação - Usando os componentes existentes
-                <div className="space-y-6">
-                  {/* Lista de Clientes Selecionados - Mesmo conteúdo do componente principal */}
-                  {selectedClients.size > 0 && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                      <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Clientes Selecionados ({selectedClients.size})
-                      </h4>
-                      <div className="grid grid-cols-1 gap-3 max-h-95 overflow-y-auto">
-                        {availableClients
-                          .filter((client) => selectedClients.has(client.document))
-                          .map((client) => {
-                            const schedule = clientSchedules.get(client.document) || {
-                              date: "",
-                              time: "",
-                            };
-                            return (
-                              <div
-                                key={client.document}
-                                className="bg-white rounded-2xl p-3 border border-gray-200"
-                              >
-                                <div className="flex items-center justify-between mb-2">
-                                  <div>
-                                    <span className="font-medium text-gray-900">
-                                      {client.client}
-                                    </span>
-                                    <span className="text-gray-500 ml-2 text-sm">
-                                      ({client.document})
-                                    </span>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-sm text-gray-600">
-                                      {formatSafeDate(schedule.date)} às {schedule.time}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <div className="flex">
-                                      <Calendar className="h-3 w-3 text-gray-400 mr-1 mt-0.5" />
-                                      <input
-                                        type="date"
-                                        value={schedule.date}
-                                        onChange={(e) => {
-                                          const newSchedules = new Map(clientSchedules);
-                                          newSchedules.set(client.document, {
-                                            ...schedule,
-                                            date: e.target.value,
-                                          });
-                                          setClientSchedules(newSchedules);
-                                        }}
-                                        className="w-full text-sm border border-gray-300 rounded-2xl px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                      />
-                                    </div>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <div className="flex">
-                                      <Clock className="h-3 w-3 text-gray-400 mr-1 mt-0.5" />
-                                      <input
-                                        type="time"
-                                        value={schedule.time}
-                                        onChange={(e) => {
-                                          const newSchedules = new Map(clientSchedules);
-                                          newSchedules.set(client.document, {
-                                            ...schedule,
-                                            time: e.target.value,
-                                          });
-                                          setClientSchedules(newSchedules);
-                                        }}
-                                        className="w-full text-sm border border-gray-300 rounded-2xl px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  )}
-
-
-                  {/* Resumo dos Agendamentos - Mesmo conteúdo do componente principal */}
-                  {selectedClients.size > 0 && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                      <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
-                        <Calendar className="h-4 w-4 mr-2" />
-                        Resumo dos Agendamentos
-                      </h3>
-                      <div className="space-y-2">
-                        {getSelectedClientsData().map((client) => {
-                          const schedule = clientSchedules.get(client.document) || {
-                            date: selectedDate,
-                            time: selectedTime,
-                          };
-                          return (
-                            <div
-                              key={client.document}
-                              className="flex items-center justify-between text-sm bg-white rounded-2xl p-2"
-                            >
-                              <div>
-                                <span className="font-medium">{client.client}</span>
-                                <span className="text-gray-500 ml-2">
-                                  ({client.document})
-                                </span>
-                              </div>
-                              <div className="text-right">
-                                <div className="font-medium text-blue-600">
-                                  {formatSafeDate(schedule.date)} às {schedule.time}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
               </div>
             </div>
             <div className="px-4 lg:px-6 py-4 border-t border-gray-200 bg-white rounded-b-2xl flex-shrink-0">
@@ -3906,7 +4058,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                       setCurrentPage(1);
                       setClientsCurrentPage(1);
                       setModalCurrentPage(1);
-                      setModalStep('selection');
+                      setModalStep("selection");
                     }}
                     className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
                   >
@@ -3916,7 +4068,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   <button
                     onClick={() => {
                       setShowScheduleModal(false);
-                      setModalStep('selection');
+                      setModalStep("selection");
                     }}
                     className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
                   >
@@ -3924,21 +4076,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                     Cancelar
                   </button>
                 </div>
-                
+
                 {/* Segunda linha mobile: Botões de ação */}
                 <div className="flex flex-col items-stretch justify-end space-y-2">
-                  {modalStep === 'confirmation' && (
+                  {modalStep === "confirmation" && (
                     <button
-                      onClick={() => setModalStep('selection')}
+                      onClick={() => setModalStep("selection")}
                       className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
                     >
                       <ChevronLeft className="h-4 w-4 mr-2" />
                       Voltar
                     </button>
                   )}
-                  {modalStep === 'selection' ? (
+                  {modalStep === "selection" ? (
                     <button
-                      onClick={() => setModalStep('confirmation')}
+                      onClick={() => setModalStep("confirmation")}
                       disabled={selectedClients.size === 0}
                       className="w-full sm:w-auto px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
                     >
@@ -3950,7 +4102,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                       onClick={() => {
                         handleScheduleVisit();
                         setShowScheduleModal(false);
-                        setModalStep('selection');
+                        setModalStep("selection");
                       }}
                       disabled={selectedClients.size === 0 || loading}
                       className="w-full sm:w-auto px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
@@ -3981,7 +4133,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                       setCurrentPage(1);
                       setClientsCurrentPage(1);
                       setModalCurrentPage(1);
-                      setModalStep('selection');
+                      setModalStep("selection");
                     }}
                     className="px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
                   >
@@ -3991,7 +4143,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   <button
                     onClick={() => {
                       setShowScheduleModal(false);
-                      setModalStep('selection');
+                      setModalStep("selection");
                     }}
                     className="px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
                   >
@@ -4002,18 +4154,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
                 {/* Lado direito: Botões de ação */}
                 <div className="flex items-center space-x-4">
-                  {modalStep === 'confirmation' && (
+                  {modalStep === "confirmation" && (
                     <button
-                      onClick={() => setModalStep('selection')}
+                      onClick={() => setModalStep("selection")}
                       className="px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
                     >
                       <ChevronLeft className="h-4 w-4 mr-2" />
                       Voltar
                     </button>
                   )}
-                  {modalStep === 'selection' ? (
+                  {modalStep === "selection" ? (
                     <button
-                      onClick={() => setModalStep('confirmation')}
+                      onClick={() => setModalStep("confirmation")}
                       disabled={selectedClients.size === 0}
                       className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
                     >
@@ -4025,7 +4177,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                       onClick={() => {
                         handleScheduleVisit();
                         setShowScheduleModal(false);
-                        setModalStep('selection');
+                        setModalStep("selection");
                       }}
                       disabled={selectedClients.size === 0 || loading}
                       className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"

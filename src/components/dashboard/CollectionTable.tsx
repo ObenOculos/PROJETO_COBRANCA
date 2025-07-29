@@ -399,10 +399,11 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       </h2>
                       <p className="text-sm text-gray-600 mt-1">
                         {filteredClientGroups.length} cliente
-                        {filteredClientGroups.length !== 1 ? "s" : ""} com cobranças
+                        {filteredClientGroups.length !== 1 ? "s" : ""} com
+                        cobranças
                       </p>
                     </div>
-                    
+
                     {/* Botão de Filtro para Cobrador */}
                     {userType === "collector" && onToggleFilterBar && (
                       <button

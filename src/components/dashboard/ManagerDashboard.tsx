@@ -169,7 +169,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     if (autoPlayIntervalRef.current) {
       clearInterval(autoPlayIntervalRef.current);
     }
-    
+
     // Retomar autoplay após 10 segundos de inatividade
     setTimeout(() => {
       setIsAutoPlaying(true);
