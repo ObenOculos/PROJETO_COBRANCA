@@ -411,7 +411,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     if (!user || user.type !== "collector") return 0;
 
     const activeVisits = getVisitsByCollector(user.id).filter(
-      (visit) => visit.status === "agendada",
+      (visit) => visit.status === "agendada" || visit.status === "cancelamento_solicitado",
     );
     return activeVisits.length;
   }, [user, getVisitsByCollector, scheduledVisits]);
@@ -465,8 +465,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
       const pastVisits = visits
         .filter((visit) => {
-          // Filtrar visitas passadas que ainda estão com status 'agendada'
-          return visit.scheduledDate < todayStr && visit.status === "agendada";
+          // Filtrar visitas passadas que ainda estão com status 'agendada' ou 'cancelamento_solicitado'
+          return visit.scheduledDate < todayStr && (visit.status === "agendada" || visit.status === "cancelamento_solicitado");
         })
         .sort((a, b) => {
           const dateA = new Date(
@@ -609,7 +609,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     return allVisits.filter(visit => {
       const visitDate = visit.scheduledDate;
       return visitDate === dateStr && 
-             (visit.status === 'agendada' || visit.status === 'realizada' || visit.status === 'nao_encontrado');
+             (visit.status === 'agendada' || visit.status === 'realizada' || visit.status === 'nao_encontrado' || visit.status === 'cancelamento_solicitado');
     });
   };
 
@@ -890,7 +890,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     setSelectedVisitForPayment(null);
   };
 
-  const getStatusLabel = (status: ScheduledVisit["status"]) => {
+  const getStatusLabel = (status: ScheduledVisit["status"], notes?: string) => {
+    // Verificar se é uma visita reagendada
+    if (status === "agendada" && notes?.includes("Reagendado")) {
+      const count = (notes.match(/Reagendado/g) || []).length;
+      return count > 1 ? `Reagendada (${count}x)` : "Reagendada";
+    }
+    
     switch (status) {
       case "agendada":
         return "Agendada";
@@ -907,7 +913,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     }
   };
 
-  const getStatusColor = (status: ScheduledVisit["status"]) => {
+  const getStatusColor = (status: ScheduledVisit["status"], notes?: string) => {
+    // Verificar se é uma visita reagendada
+    if (status === "agendada" && notes?.includes("Reagendado")) {
+      return "bg-purple-100 text-purple-800";
+    }
+    
     switch (status) {
       case "agendada":
         return "bg-blue-100 text-blue-800";
@@ -918,7 +929,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       case "nao_encontrado":
         return "bg-orange-100 text-orange-800";
       case "cancelamento_solicitado":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-100 text-yellow-800 border border-yellow-300";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -2230,9 +2241,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                               {visit.clientName}
                             </button>
                             <span
-                              className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status)}`}
+                              className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status, visit.notes)}`}
                             >
-                              {getStatusLabel(visit.status)}
+                              {getStatusLabel(visit.status, visit.notes)}
                             </span>
                             <span className="text-sm text-blue-600 font-medium">
                               {visit.scheduledTime || "00:00"}
@@ -2296,7 +2307,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                 onClick={() => handleRequestCancellation(visit)}
                                 className="px-3 py-2 bg-red-500 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
                               >
-                                Cancelar visita
+                                Cancelar Visita
                               </button>
                             )}
                           </div>
@@ -2391,9 +2402,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                               {visit.clientName}
                             </button>
                             <span
-                              className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status)}`}
+                              className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status, visit.notes)}`}
                             >
-                              {getStatusLabel(visit.status)}
+                              {getStatusLabel(visit.status, visit.notes)}
                             </span>
                           </div>
 
@@ -2464,7 +2475,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                 onClick={() => handleRequestCancellation(visit)}
                                 className="px-3 py-2 bg-red-100 text-red-700 rounded-2xl text-sm hover:bg-red-200 transition-colors flex items-center justify-center"
                               >
-                                Solicitar Cancelamento
+                                Cancelar Visita
                               </button>
                             )}
                           </div>
@@ -2668,14 +2679,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                             <RefreshCw className="h-4 w-4 mr-1" />
                             Reagendar
                           </button>
-                          <button
-                            onClick={() =>
-                              handleUpdateVisitStatus(visit.id, "cancelada")
-                            }
-                            className="px-3 py-2 bg-red-500 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
-                          >
-                            Cancelar visita
-                          </button>
+                          {!visit.cancellationRejectedBy && (
+                            <button
+                              onClick={() => handleRequestCancellation(visit)}
+                              className="px-3 py-2 bg-red-500 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
+                            >
+                              Cancelar Visita
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
