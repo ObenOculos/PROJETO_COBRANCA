@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Calendar,
   Clock,
@@ -1312,6 +1313,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   };
 
   return (
+    <>
     <div className="rounded-2xl">
       {/* Filtro e Listagem */}
       <div className="p-0 lg:p-0">
@@ -3399,18 +3401,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         </div>
       )}
 
-      {/* Botão Flutuante para Agendar Nova Visita */}
-      <button
-        onClick={() => {
-          setShowScheduleModal(true);
-          setModalCurrentPage(1);
-          setModalStep("selection");
-        }}
-        className="shadow-xl fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all duration-200 flex items-center justify-center z-50 hover:scale-110"
-        title="Agendar Nova Visita"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
 
       {/* Modal de Agendamento de Nova Visita */}
       {showScheduleModal && (
@@ -4268,6 +4258,23 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         message={dateValidationMessage}
       />
     </div>
+
+    {/* Botão Flutuante para Agendar Nova Visita - Renderizado via Portal */}
+    {createPortal(
+      <button
+        onClick={() => {
+          setShowScheduleModal(true);
+          setModalCurrentPage(1);
+          setModalStep("selection");
+        }}
+        className="shadow-xl fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all duration-200 flex items-center justify-center z-50 hover:scale-110"
+        title="Agendar Nova Visita"
+      >
+        <Plus className="h-6 w-6" />
+      </button>,
+      document.body
+    )}
+    </>
   );
 };
 
