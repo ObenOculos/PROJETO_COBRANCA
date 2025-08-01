@@ -26,6 +26,7 @@ import CollectionTable from "./CollectionTable";
 import RouteMap from "./RouteMap";
 import VisitScheduler from "./VisitScheduler";
 import RadialApprovalChart from "./RadialApprovalChart";
+import TabTransition from "../common/TabTransition";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { FilterOptions } from "../../types";
@@ -882,7 +883,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         </div>
 
         {/* Tab Content */}
-        {renderTabContent()}
+        <TabTransition activeKey={activeTab}>
+          {renderTabContent()}
+        </TabTransition>
       </div>
     </div>
   );

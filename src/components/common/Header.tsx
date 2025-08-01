@@ -164,10 +164,10 @@ const Header: React.FC<HeaderProps> = ({
                           onTabChange(tab.id);
                           setIsMobileMenuOpen(false);
                         }}
-                        className={`group w-full flex items-center px-3 py-2 rounded-2xl text-left transition-colors ${
+                        className={`group w-full flex items-center px-3 py-2 rounded-2xl text-left transition-all duration-200 ${
                           activeTab === tab.id
-                            ? "bg-blue-50 text-blue-700 border-l-3 border-blue-500"
-                            : "text-gray-700 hover:bg-gray-50"
+                            ? "bg-blue-50 text-blue-700 border-l-3 border-blue-500 transform scale-105"
+                            : "text-gray-700 hover:bg-gray-50 hover:scale-102"
                         }`}
                       >
                         <Icon

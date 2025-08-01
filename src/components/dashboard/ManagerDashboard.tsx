@@ -27,6 +27,7 @@ import { ClientAssignment } from "../ClientAssignment";
 import VisitTracking from "./VisitTracking";
 import DailyCashReport from "./DailyCashReport";
 import AuthorizationManager from "./AuthorizationManager";
+import TabTransition from "../common/TabTransition";
 import { useCollection } from "../../contexts/CollectionContext";
 import { FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
@@ -992,7 +993,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         </div>
 
         {/* Tab Content */}
-        <div className="animate-fadeIn">{renderTabContent()}</div>
+        <TabTransition activeKey={activeTab}>
+          {renderTabContent()}
+        </TabTransition>
       </div>
     </div>
   );
