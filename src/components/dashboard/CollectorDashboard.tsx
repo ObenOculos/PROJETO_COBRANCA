@@ -83,14 +83,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
   // Configuração dos slides para mobile
   const mobileSlides = [
-    { id: 'daily', title: 'Hoje', icon: Sun, color: 'yellow' },
-    { id: 'weekly', title: 'Esta Semana', icon: CalendarDays, color: 'blue' },
-    { id: 'monthly', title: 'Este Mês', icon: CalendarRange, color: 'purple' }
+    { id: "daily", title: "Hoje", icon: Sun, color: "yellow" },
+    { id: "weekly", title: "Esta Semana", icon: CalendarDays, color: "blue" },
+    { id: "monthly", title: "Este Mês", icon: CalendarRange, color: "purple" },
   ];
 
   // Auto-slide effect
   useEffect(() => {
-    if (!isAutoSliding || activeTab !== 'overview') return;
+    if (!isAutoSliding || activeTab !== "overview") return;
 
     const interval = setInterval(() => {
       setCurrentSlideIndex((prevIndex) => {
@@ -124,7 +124,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
-    
+
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
@@ -715,38 +715,54 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
                 {/* Layout Mobile: Slides */}
                 <div className="lg:hidden">
-                  <div 
+                  <div
                     className="relative overflow-hidden"
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
                   >
-                    <div 
+                    <div
                       className="flex transition-transform duration-300 ease-in-out"
-                      style={{ transform: `translateX(-${currentSlideIndex * 100}%)` }}
+                      style={{
+                        transform: `translateX(-${currentSlideIndex * 100}%)`,
+                      }}
                     >
                       {mobileSlides.map((slide) => {
-                        const metrics = slide.id === 'daily' ? periodMetrics.daily 
-                          : slide.id === 'weekly' ? periodMetrics.weekly 
-                          : periodMetrics.monthly;
-                        const goalsPeriod = slide.id === 'daily' ? goals.daily 
-                          : slide.id === 'weekly' ? goals.weekly 
-                          : goals.monthly;
+                        const metrics =
+                          slide.id === "daily"
+                            ? periodMetrics.daily
+                            : slide.id === "weekly"
+                              ? periodMetrics.weekly
+                              : periodMetrics.monthly;
+                        const goalsPeriod =
+                          slide.id === "daily"
+                            ? goals.daily
+                            : slide.id === "weekly"
+                              ? goals.weekly
+                              : goals.monthly;
                         const Icon = slide.icon;
-                        
+
                         return (
                           <div key={slide.id} className="w-full flex-shrink-0">
-                            <div className={`bg-white/70 backdrop-blur-sm rounded-2xl p-4 border ${
-                              slide.color === 'yellow' ? 'border-yellow-200' : 
-                              slide.color === 'blue' ? 'border-blue-200' : 
-                              'border-purple-200'
-                            }`}>
+                            <div
+                              className={`bg-white/70 backdrop-blur-sm rounded-2xl p-4 border ${
+                                slide.color === "yellow"
+                                  ? "border-yellow-200"
+                                  : slide.color === "blue"
+                                    ? "border-blue-200"
+                                    : "border-purple-200"
+                              }`}
+                            >
                               <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                                <Icon className={`w-5 h-5 ${
-                                  slide.color === 'yellow' ? 'text-yellow-500' : 
-                                  slide.color === 'blue' ? 'text-blue-500' : 
-                                  'text-purple-500'
-                                }`} />
+                                <Icon
+                                  className={`w-5 h-5 ${
+                                    slide.color === "yellow"
+                                      ? "text-yellow-500"
+                                      : slide.color === "blue"
+                                        ? "text-blue-500"
+                                        : "text-purple-500"
+                                  }`}
+                                />
                                 {slide.title}
                               </h3>
                               <div className="grid grid-cols-2 gap-4">
@@ -787,7 +803,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                       })}
                     </div>
                   </div>
-                  
+
                   {/* Indicadores de navegação */}
                   <div className="flex justify-center mt-4 space-x-2">
                     {mobileSlides.map((slide, index) => (
@@ -795,9 +811,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         key={slide.id}
                         onClick={() => goToSlide(index)}
                         className={`h-2 rounded-full transition-all duration-300 ${
-                          index === currentSlideIndex 
-                            ? 'w-8 bg-indigo-600' 
-                            : 'w-2 bg-gray-300 hover:bg-gray-400'
+                          index === currentSlideIndex
+                            ? "w-8 bg-indigo-600"
+                            : "w-2 bg-gray-300 hover:bg-gray-400"
                         }`}
                         aria-label={`Ir para ${slide.title}`}
                       />

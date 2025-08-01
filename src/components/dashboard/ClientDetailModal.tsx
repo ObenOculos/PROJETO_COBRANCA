@@ -29,7 +29,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   userType,
   onClose,
 }) => {
-  const { getSalesByClient, calculateSaleBalance, refreshCollections } = useCollection();
+  const { getSalesByClient, calculateSaleBalance, refreshCollections } =
+    useCollection();
   const { user } = useAuth();
   const [selectedSaleForPayment, setSelectedSaleForPayment] =
     useState<SaleGroup | null>(null);
@@ -251,19 +252,21 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
   const handlePaymentSuccess = async () => {
     // Pequeno delay para garantir que a operação no banco seja concluída
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
     // Forçar refresh dos dados do contexto
     await refreshCollections();
-    
+
     // Disparar evento global para atualizar outros componentes
-    window.dispatchEvent(new CustomEvent('paymentProcessed', {
-      detail: {
-        clientDocument: clientGroup.document,
-        type: 'sale'
-      }
-    }));
-    
+    window.dispatchEvent(
+      new CustomEvent("paymentProcessed", {
+        detail: {
+          clientDocument: clientGroup.document,
+          type: "sale",
+        },
+      }),
+    );
+
     // Forçar uma nova renderização local
     setRefreshKey((prev) => prev + 1);
     handleCloseSalePayment();
@@ -271,19 +274,21 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
   const handleGeneralPaymentSuccess = async () => {
     // Pequeno delay para garantir que a operação no banco seja concluída
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
     // Forçar refresh dos dados do contexto
     await refreshCollections();
-    
+
     // Disparar evento global para atualizar outros componentes
-    window.dispatchEvent(new CustomEvent('paymentProcessed', {
-      detail: {
-        clientDocument: clientGroup.document,
-        type: 'general'
-      }
-    }));
-    
+    window.dispatchEvent(
+      new CustomEvent("paymentProcessed", {
+        detail: {
+          clientDocument: clientGroup.document,
+          type: "general",
+        },
+      }),
+    );
+
     // Forçar uma nova renderização local
     setRefreshKey((prev) => prev + 1);
     setIsGeneralPaymentModalOpen(false);
@@ -291,19 +296,21 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
   const handleGeneralEditSuccess = async () => {
     // Pequeno delay para garantir que a operação no banco seja concluída
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
     // Forçar refresh dos dados do contexto
     await refreshCollections();
-    
+
     // Disparar evento global para atualizar outros componentes
-    window.dispatchEvent(new CustomEvent('paymentProcessed', {
-      detail: {
-        clientDocument: clientGroup.document,
-        type: 'edit'
-      }
-    }));
-    
+    window.dispatchEvent(
+      new CustomEvent("paymentProcessed", {
+        detail: {
+          clientDocument: clientGroup.document,
+          type: "edit",
+        },
+      }),
+    );
+
     // Forçar uma nova renderização local
     setRefreshKey((prev) => prev + 1);
     setIsGeneralEditModalOpen(false);

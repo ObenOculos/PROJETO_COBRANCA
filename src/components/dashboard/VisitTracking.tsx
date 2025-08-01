@@ -69,13 +69,13 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   // Adicionar atualização periódica para garantir que novas solicitações apareçam
   useEffect(() => {
     // Atualizar imediatamente ao montar o componente
-    if (activeTab === 'cancellations' && user?.type === 'manager') {
+    if (activeTab === "cancellations" && user?.type === "manager") {
       fetchScheduledVisits();
     }
 
     // Configurar intervalo de atualização a cada 5 segundos quando na aba de cancelamentos
     const interval = setInterval(() => {
-      if (activeTab === 'cancellations' && user?.type === 'manager') {
+      if (activeTab === "cancellations" && user?.type === "manager") {
         fetchScheduledVisits().then(() => {
           const requests = getPendingCancellationRequests();
           setPendingRequests(requests);
@@ -90,31 +90,33 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   useEffect(() => {
     const handleCancellationRequested = async (event: Event) => {
       const customEvent = event as CustomEvent;
-      console.log('Evento de cancelamento recebido:', customEvent.detail);
-      
+      console.log("Evento de cancelamento recebido:", customEvent.detail);
+
       // Aguardar um momento para garantir que o banco foi atualizado
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
       // Atualizar dados de visitas agendadas
       await fetchScheduledVisits();
-      
+
       // Atualizar lista de solicitações pendentes
       const requests = getPendingCancellationRequests();
       setPendingRequests(requests);
-      
+
       // Mostrar notificação se for gerente
-      if (user?.type === 'manager') {
-        showSuccessNotification(`Nova solicitação de cancelamento de ${customEvent.detail.clientName}`);
+      if (user?.type === "manager") {
+        showSuccessNotification(
+          `Nova solicitação de cancelamento de ${customEvent.detail.clientName}`,
+        );
       }
     };
 
     const handleCancellationApproved = async (event: Event) => {
       const customEvent = event as CustomEvent;
-      console.log('Cancelamento aprovado:', customEvent.detail);
-      
+      console.log("Cancelamento aprovado:", customEvent.detail);
+
       // Aguardar um momento para garantir que o banco foi atualizado
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
       // Atualizar dados
       await fetchScheduledVisits();
       const requests = getPendingCancellationRequests();
@@ -123,11 +125,11 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
     const handleCancellationRejected = async (event: Event) => {
       const customEvent = event as CustomEvent;
-      console.log('Cancelamento rejeitado:', customEvent.detail);
-      
+      console.log("Cancelamento rejeitado:", customEvent.detail);
+
       // Aguardar um momento para garantir que o banco foi atualizado
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
       // Atualizar dados
       await fetchScheduledVisits();
       const requests = getPendingCancellationRequests();
@@ -135,14 +137,32 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     };
 
     // Escutar eventos
-    window.addEventListener('visitCancellationRequested', handleCancellationRequested);
-    window.addEventListener('visitCancellationApproved', handleCancellationApproved);
-    window.addEventListener('visitCancellationRejected', handleCancellationRejected);
+    window.addEventListener(
+      "visitCancellationRequested",
+      handleCancellationRequested,
+    );
+    window.addEventListener(
+      "visitCancellationApproved",
+      handleCancellationApproved,
+    );
+    window.addEventListener(
+      "visitCancellationRejected",
+      handleCancellationRejected,
+    );
 
     return () => {
-      window.removeEventListener('visitCancellationRequested', handleCancellationRequested);
-      window.removeEventListener('visitCancellationApproved', handleCancellationApproved);
-      window.removeEventListener('visitCancellationRejected', handleCancellationRejected);
+      window.removeEventListener(
+        "visitCancellationRequested",
+        handleCancellationRequested,
+      );
+      window.removeEventListener(
+        "visitCancellationApproved",
+        handleCancellationApproved,
+      );
+      window.removeEventListener(
+        "visitCancellationRejected",
+        handleCancellationRejected,
+      );
     };
   }, [fetchScheduledVisits, getPendingCancellationRequests]);
 
@@ -446,17 +466,19 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
       if (approvalAction === "approve") {
         await approveVisitCancellation(selectedRequest.id, user.id);
-        
+
         // Disparar evento para notificar outros componentes
-        window.dispatchEvent(new CustomEvent('visitCancellationApproved', {
-          detail: {
-            visitId: selectedRequest.id,
-            clientName: selectedRequest.clientName,
-            collectorId: selectedRequest.collectorId,
-            managerId: user.id
-          }
-        }));
-        
+        window.dispatchEvent(
+          new CustomEvent("visitCancellationApproved", {
+            detail: {
+              visitId: selectedRequest.id,
+              clientName: selectedRequest.clientName,
+              collectorId: selectedRequest.collectorId,
+              managerId: user.id,
+            },
+          }),
+        );
+
         showSuccessNotification("Cancelamento aprovado com sucesso");
       } else {
         await rejectVisitCancellation(
@@ -464,18 +486,20 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           user.id,
           rejectionReason.trim(),
         );
-        
+
         // Disparar evento para notificar outros componentes
-        window.dispatchEvent(new CustomEvent('visitCancellationRejected', {
-          detail: {
-            visitId: selectedRequest.id,
-            clientName: selectedRequest.clientName,
-            collectorId: selectedRequest.collectorId,
-            managerId: user.id,
-            reason: rejectionReason.trim()
-          }
-        }));
-        
+        window.dispatchEvent(
+          new CustomEvent("visitCancellationRejected", {
+            detail: {
+              visitId: selectedRequest.id,
+              clientName: selectedRequest.clientName,
+              collectorId: selectedRequest.collectorId,
+              managerId: user.id,
+              reason: rejectionReason.trim(),
+            },
+          }),
+        );
+
         showSuccessNotification("Cancelamento rejeitado com sucesso");
       }
 
