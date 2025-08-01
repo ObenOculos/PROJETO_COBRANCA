@@ -2729,13 +2729,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                     <ChevronRight className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
                   </button>
                 </div>
-
-                {/* Indicador de swipe apenas no mobile */}
-                <div className="sm:hidden absolute -bottom-4 left-1/2 transform -translate-x-1/2">
-                  <div className="flex items-center text-xs text-gray-400 bg-gray-100 rounded-full px-3 py-1">
-                    <span>👈 Deslize para navegar 👉</span>
-                  </div>
-                </div>
               </div>
             )}
           </div>
