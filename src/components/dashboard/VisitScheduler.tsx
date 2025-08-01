@@ -2185,7 +2185,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                       selectedCalendarDate?.toDateString() ===
                       date.toDateString();
                     const isPast = date < today;
-                    const hasVisits = visitsForDay.length > 0;
+                    const hasVisits = visitsForDay.filter(visit => visit.status !== "nao_encontrado").length > 0;
 
                     days.push(
                       <button
