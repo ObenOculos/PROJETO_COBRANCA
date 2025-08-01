@@ -226,6 +226,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     };
   }, [showScheduleModal]);
 
+  // Gerenciar scroll da página quando modal de visitas atrasadas abre/fecha
+  useEffect(() => {
+    if (showOverdueNotificationModal) {
+      // Prevenir scroll da página de fundo
+      document.body.style.overflow = "hidden";
+    }
+
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [showOverdueNotificationModal]);
+
   // Fechar modal com tecla ESC
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
@@ -2737,11 +2749,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         )}
       </div>
 
-      {/* Modal de Notificação de Visitas Atrasadas */}
+      {/* Modal de Notificação de Visitas Atrasadas - Renderizado via Portal */}
       {showOverdueNotificationModal &&
-        Object.keys(overdueVisitsByDate).length > 0 && (
-          <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+        Object.keys(overdueVisitsByDate).length > 0 && 
+        createPortal(
+          <div 
+            className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center p-4 z-50"
+            onClick={() => setShowOverdueNotificationModal(false)}
+          >
+            <div 
+              className="bg-white rounded-2xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="px-4 lg:px-6 py-4 border-b border-gray-200 bg-red-50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -2839,7 +2858,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
       {/* Modal de Detalhes do Cliente */}
