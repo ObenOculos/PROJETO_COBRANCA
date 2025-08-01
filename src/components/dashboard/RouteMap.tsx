@@ -1643,108 +1643,109 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
       </div>
 
       {/* Modal Simples - Renderizado via Portal */}
-      {showModal && createPortal(
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowModal(false)}
-        >
-          <div 
-            className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-auto"
-            onClick={(e) => e.stopPropagation()}
+      {showModal &&
+        createPortal(
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowModal(false)}
           >
-            <div className="p-6">
-              <div className="flex items-center mb-4">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${
-                    modalContent.type === "success"
-                      ? "bg-green-100"
-                      : modalContent.type === "error"
-                        ? "bg-red-100"
-                        : "bg-blue-100"
-                  }`}
-                >
-                  {modalContent.type === "success" && (
-                    <svg
-                      className="w-6 h-6 text-green-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  )}
-                  {modalContent.type === "error" && (
-                    <svg
-                      className="w-6 h-6 text-red-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  )}
-                  {modalContent.type === "info" && (
-                    <svg
-                      className="w-6 h-6 text-blue-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  )}
+            <div
+              className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <div className="flex items-center mb-4">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${
+                      modalContent.type === "success"
+                        ? "bg-green-100"
+                        : modalContent.type === "error"
+                          ? "bg-red-100"
+                          : "bg-blue-100"
+                    }`}
+                  >
+                    {modalContent.type === "success" && (
+                      <svg
+                        className="w-6 h-6 text-green-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    )}
+                    {modalContent.type === "error" && (
+                      <svg
+                        className="w-6 h-6 text-red-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    )}
+                    {modalContent.type === "info" && (
+                      <svg
+                        className="w-6 h-6 text-blue-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                  <h3
+                    className={`text-lg font-semibold ${
+                      modalContent.type === "success"
+                        ? "text-green-900"
+                        : modalContent.type === "error"
+                          ? "text-red-900"
+                          : "text-blue-900"
+                    }`}
+                  >
+                    {modalContent.title}
+                  </h3>
                 </div>
-                <h3
-                  className={`text-lg font-semibold ${
-                    modalContent.type === "success"
-                      ? "text-green-900"
-                      : modalContent.type === "error"
-                        ? "text-red-900"
-                        : "text-blue-900"
-                  }`}
-                >
-                  {modalContent.title}
-                </h3>
-              </div>
 
-              <p className="text-gray-700 mb-6 leading-relaxed">
-                {modalContent.message}
-              </p>
+                <p className="text-gray-700 mb-6 leading-relaxed">
+                  {modalContent.message}
+                </p>
 
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className={`px-4 py-2 rounded-2xl font-medium transition-colors ${
-                    modalContent.type === "success"
-                      ? "bg-green-600 hover:bg-green-700 text-white"
-                      : modalContent.type === "error"
-                        ? "bg-red-600 hover:bg-red-700 text-white"
-                        : "bg-blue-600 hover:bg-blue-700 text-white"
-                  }`}
-                >
-                  Entendi
-                </button>
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setShowModal(false)}
+                    className={`px-4 py-2 rounded-2xl font-medium transition-colors ${
+                      modalContent.type === "success"
+                        ? "bg-green-600 hover:bg-green-700 text-white"
+                        : modalContent.type === "error"
+                          ? "bg-red-600 hover:bg-red-700 text-white"
+                          : "bg-blue-600 hover:bg-blue-700 text-white"
+                    }`}
+                  >
+                    Entendi
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 };

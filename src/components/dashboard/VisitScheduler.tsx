@@ -913,18 +913,20 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   // Função para confirmar conclusão com observação
   const handleConfirmCompletion = async (selectedNote: string) => {
     if (!selectedVisitForCompletion) return;
-    
+
     // Primeiro fechar o modal atual
     setShowCompletedModal(false);
-    
+
     // Preparar dados do cliente
-    const clientData = getClientDataForVisit(selectedVisitForCompletion.clientDocument);
+    const clientData = getClientDataForVisit(
+      selectedVisitForCompletion.clientDocument,
+    );
     if (!clientData) {
       alert("Erro: dados do cliente não encontrados");
       setSelectedVisitForCompletion(null);
       return;
     }
-    
+
     // Criar um ClientGroup mock para o modal de pagamento
     const clientGroup = {
       clientId: clientData.document,
@@ -946,19 +948,24 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     // Abrir modal do cliente imediatamente
     setSelectedClientForModal(clientGroup);
     setShowClientModal(true);
-    
+
     // Atualizar status da visita em background
     setTimeout(async () => {
       try {
-        await updateVisitStatus(selectedVisitForCompletion.id, "realizada", selectedNote);
-        showSuccessNotification(`Visita marcada como ${getStatusLabel("realizada")}`);
-        
+        await updateVisitStatus(
+          selectedVisitForCompletion.id,
+          "realizada",
+          selectedNote,
+        );
+        showSuccessNotification(
+          `Visita marcada como ${getStatusLabel("realizada")}`,
+        );
       } catch (error) {
         console.error("Erro ao atualizar status da visita:", error);
         // Não mostrar alert para não interromper o fluxo do usuário
       }
     }, 100);
-    
+
     setSelectedVisitForCompletion(null);
   };
 
@@ -1279,7 +1286,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   const handleCloseClientModal = async () => {
     setShowClientModal(false);
     setSelectedClientForModal(null);
-    
+
     // Fazer refresh dos dados apenas quando o modal for fechado
     try {
       await refreshData();
@@ -1368,872 +1375,888 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
   return (
     <>
-    <div className="rounded-2xl">
-      {/* Filtro e Listagem */}
-      <div className="p-0 lg:p-0">
-        {false ? (
-          // Aba de Agendamento
-          <div className="space-y-6">
-            {/* Busca e Filtros */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label
-                  htmlFor="search-clients"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Buscar e Filtrar Clientes
-                </label>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`flex items-center px-3 py-1.5 text-sm rounded-2xl transition-colors ${
-                      showFilters
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
+      <div className="rounded-2xl">
+        {/* Filtro e Listagem */}
+        <div className="p-0 lg:p-0">
+          {false ? (
+            // Aba de Agendamento
+            <div className="space-y-6">
+              {/* Busca e Filtros */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label
+                    htmlFor="search-clients"
+                    className="block text-sm font-medium text-gray-700"
                   >
-                    <Filter className="h-4 w-4" />
-                    {hasActiveFilters && (
-                      <span className="ml-1 px-1 py-1 bg-blue-600 text-white text-xs rounded-full"></span>
-                    )}
-                  </button>
-                  {hasActiveFilters && (
+                    Buscar e Filtrar Clientes
+                  </label>
+                  <div className="flex items-center space-x-2">
                     <button
-                      onClick={clearAllFilters}
-                      className="text-sm text-gray-600 hover:text-gray-800 underline"
+                      onClick={() => setShowFilters(!showFilters)}
+                      className={`flex items-center px-3 py-1.5 text-sm rounded-2xl transition-colors ${
+                        showFilters
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
                     >
-                      Limpar
+                      <Filter className="h-4 w-4" />
+                      {hasActiveFilters && (
+                        <span className="ml-1 px-1 py-1 bg-blue-600 text-white text-xs rounded-full"></span>
+                      )}
                     </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  id="search-clients"
-                  name="search-clients"
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Digite o nome, documento ou endereço do cliente..."
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              {/* Filtros Avançados */}
-              {showFilters && (
-                <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Filtro por Cidade */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Cidade
-                      </label>
-                      <select
-                        id="filter-city"
-                        name="filter-city"
-                        value={filters.city}
-                        onChange={(e) =>
-                          handleFilterChange("city", e.target.value)
-                        }
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="">Todas as cidades</option>
-                        {availableCities.map((city) => (
-                          <option key={city} value={city}>
-                            {city}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Filtro por Valor Mínimo */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Valor Mínimo
-                      </label>
-                      <input
-                        id="filter-min-value"
-                        name="filter-min-value"
-                        type="number"
-                        step="0.01"
-                        value={filters.minValue}
-                        onChange={(e) =>
-                          handleFilterChange("minValue", e.target.value)
-                        }
-                        placeholder="R$ 0,00"
-                        className="w-full px-3 py-2 text-sm border rounded-2xl border-gray-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-
-                    {/* Filtro por Valor Máximo */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Valor Máximo
-                      </label>
-                      <input
-                        id="filter-max-value"
-                        name="filter-max-value"
-                        type="number"
-                        step="0.01"
-                        value={filters.maxValue}
-                        onChange={(e) =>
-                          handleFilterChange("maxValue", e.target.value)
-                        }
-                        placeholder="R$ 999.999,99"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-
-                    {/* Filtro por Status de Visita */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Status de Visita
-                      </label>
-                      <select
-                        id="filter-visit-status"
-                        name="filter-visit-status"
-                        value={filters.visitStatus}
-                        onChange={(e) =>
-                          handleFilterChange("visitStatus", e.target.value)
-                        }
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="">Todos</option>
-                        <option value="critical">
-                          🔴 Nunca Visitado / Mais de 120 dias
-                        </option>
-                        <option value="high">🟠 90+ dias sem visita</option>
-                        <option value="medium">🟡 60+ dias sem visita</option>
-                        <option value="low">🔵 30+ dias sem visita</option>
-                        <option value="recent">🟢 Visitado recentemente</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {hasActiveFilters && (
-                    <div className="text-sm text-gray-600 py-4">
-                      <span className="font-medium">Filtros ativos:</span>
-                      {searchTerm && (
-                        <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
-                          Busca: "{searchTerm}"
-                        </span>
-                      )}
-                      {filters.city && (
-                        <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
-                          Cidade: {filters.city}
-                        </span>
-                      )}
-                      {filters.minValue && (
-                        <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
-                          Min: R$ {filters.minValue}
-                        </span>
-                      )}
-                      {filters.maxValue && (
-                        <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
-                          Max: R$ {filters.maxValue}
-                        </span>
-                      )}
-                      {filters.visitStatus && (
-                        <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
-                          Status:{" "}
-                          {filters.visitStatus === "critical"
-                            ? "Nunca/120+ dias"
-                            : filters.visitStatus === "high"
-                              ? "90+ dias"
-                              : filters.visitStatus === "medium"
-                                ? "60+ dias"
-                                : filters.visitStatus === "low"
-                                  ? "30+ dias"
-                                  : filters.visitStatus === "recent"
-                                    ? "Recente"
-                                    : ""}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {selectedClients.size > 0 && (
-                <div className="mt-2 text-sm text-blue-600 bg-blue-50 rounded-2xl p-2">
-                  {selectedClients.size} cliente
-                  {selectedClients.size !== 1 ? "s" : ""} selecionado
-                  {selectedClients.size !== 1 ? "s" : ""}
-                </div>
-              )}
-              {clientsWithActiveVisits > 0 && (
-                <div className="mt-2 text-sm text-orange-600 bg-orange-50 rounded-2xl p-2 flex items-center">
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  {clientsWithActiveVisits} cliente
-                  {clientsWithActiveVisits !== 1 ? "s" : ""} com visita
-                  {clientsWithActiveVisits !== 1 ? "s" : ""} já agendada
-                  {clientsWithActiveVisits !== 1 ? "s" : ""} (não{" "}
-                  {clientsWithActiveVisits !== 1 ? "aparecem" : "aparece"} na
-                  lista)
-                </div>
-              )}
-            </div>
-
-            {/* Lista de Clientes */}
-            {availableClients.length > 0 && (
-              <div className="border border-gray-200 rounded-2xl">
-                <div className="bg-gray-50 p-3 border-b border-gray-200 rounded-t-2xl">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="flex-1">
-                      <span className="text-sm font-medium text-gray-700">
-                        {availableClients.length} cliente
-                        {availableClients.length !== 1 ? "s" : ""} disponível
-                        {availableClients.length !== 1 ? "s" : ""}
-                      </span>
-                      {totalClientsPages > 1 && (
-                        <span className="ml-2 text-xs text-gray-500">
-                          (Página {clientsCurrentPage} de {totalClientsPages})
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                    {hasActiveFilters && (
                       <button
-                        onClick={handleSelectAllClients}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        onClick={clearAllFilters}
+                        className="text-sm text-gray-600 hover:text-gray-800 underline"
                       >
-                        {paginatedClients.every((client) =>
-                          selectedClients.has(client.document),
-                        ) && paginatedClients.length > 0
-                          ? "Desmarcar Página"
-                          : "Selecionar Página"}
+                        Limpar
                       </button>
-
-                      {totalClientsPages > 1 && (
-                        <div className="flex items-center space-x-1">
-                          <button
-                            onClick={() =>
-                              setClientsCurrentPage(
-                                Math.max(1, clientsCurrentPage - 1),
-                              )
-                            }
-                            disabled={clientsCurrentPage === 1}
-                            className="p-1.5 rounded-2xl hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <ChevronLeft className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              setClientsCurrentPage(
-                                Math.min(
-                                  totalClientsPages,
-                                  clientsCurrentPage + 1,
-                                ),
-                              )
-                            }
-                            disabled={clientsCurrentPage === totalClientsPages}
-                            className="p-1.5 rounded-2xl hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="bg-gray-50 max-h-[32rem] overflow-y-auto p-3">
-                  {/* Group clients by neighborhood */}
-                  {(() => {
-                    const groupedClients = paginatedClients.reduce(
-                      (groups, client) => {
-                        const neighborhood = client.neighborhood || "Outros";
-                        if (!groups[neighborhood]) {
-                          groups[neighborhood] = [];
-                        }
-                        groups[neighborhood].push(client);
-                        return groups;
-                      },
-                      {} as Record<string, typeof paginatedClients>,
-                    );
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    id="search-clients"
+                    name="search-clients"
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Digite o nome, documento ou endereço do cliente..."
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
 
-                    const getClientStatus = (client: any) => {
-                      // Check days without visit based on last visit
-                      const clientVisits = scheduledVisits
-                        .filter(
-                          (visit) =>
-                            visit.clientDocument === client.document &&
-                            visit.status === "realizada",
-                        )
-                        .sort((a, b) => {
-                          // Ordenar por created_at (mais recente primeiro)
-                          return (
-                            new Date(b.createdAt).getTime() -
-                            new Date(a.createdAt).getTime()
-                          );
-                        });
-
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-
-                      let daysSinceLastVisit: number;
-
-                      if (clientVisits.length === 0) {
-                        // Never visited - consider as more than 120 days
-                        daysSinceLastVisit = 999;
-                      } else {
-                        // Use the same safe date parsing as the formatSafeDate function
-                        try {
-                          // Usar created_at da visita mais recente
-                          const visit = clientVisits[0];
-                          const visitDateStr = visit.createdAt.split("T")[0];
-                          let lastVisitDate: Date;
-
-                          if (visitDateStr.includes("-")) {
-                            // Format YYYY-MM-DD
-                            const [year, month, day] = visitDateStr.split("-");
-                            lastVisitDate = new Date(
-                              parseInt(year),
-                              parseInt(month) - 1,
-                              parseInt(day),
-                            );
-                          } else if (visitDateStr.includes("/")) {
-                            // Format DD/MM/YYYY
-                            const [day, month, year] = visitDateStr.split("/");
-                            lastVisitDate = new Date(
-                              parseInt(year),
-                              parseInt(month) - 1,
-                              parseInt(day),
-                            );
-                          } else {
-                            lastVisitDate = new Date(visitDateStr);
+                {/* Filtros Avançados */}
+                {showFilters && (
+                  <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Filtro por Cidade */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Cidade
+                        </label>
+                        <select
+                          id="filter-city"
+                          name="filter-city"
+                          value={filters.city}
+                          onChange={(e) =>
+                            handleFilterChange("city", e.target.value)
                           }
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="">Todas as cidades</option>
+                          {availableCities.map((city) => (
+                            <option key={city} value={city}>
+                              {city}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                          lastVisitDate.setHours(0, 0, 0, 0);
-                          daysSinceLastVisit = Math.floor(
-                            (today.getTime() - lastVisitDate.getTime()) /
-                              (1000 * 60 * 60 * 24),
-                          );
+                      {/* Filtro por Valor Mínimo */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Valor Mínimo
+                        </label>
+                        <input
+                          id="filter-min-value"
+                          name="filter-min-value"
+                          type="number"
+                          step="0.01"
+                          value={filters.minValue}
+                          onChange={(e) =>
+                            handleFilterChange("minValue", e.target.value)
+                          }
+                          placeholder="R$ 0,00"
+                          className="w-full px-3 py-2 text-sm border rounded-2xl border-gray-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
 
-                          // Ensure we don't get negative days
-                          daysSinceLastVisit = Math.max(0, daysSinceLastVisit);
-                        } catch {
-                          // If date parsing fails, consider as never visited
-                          daysSinceLastVisit = 999;
-                        }
-                      }
+                      {/* Filtro por Valor Máximo */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Valor Máximo
+                        </label>
+                        <input
+                          id="filter-max-value"
+                          name="filter-max-value"
+                          type="number"
+                          step="0.01"
+                          value={filters.maxValue}
+                          onChange={(e) =>
+                            handleFilterChange("maxValue", e.target.value)
+                          }
+                          placeholder="R$ 999.999,99"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
 
-                      // Determine status based on days without visit
-                      if (daysSinceLastVisit >= 120) {
-                        return {
-                          type: "critical",
-                          label:
-                            daysSinceLastVisit === 999 ? "Nunca" : "120 dias",
-                          color: "bg-red-100 text-red-800 border-red-200",
-                          days:
-                            daysSinceLastVisit === 999
-                              ? "Nunca"
-                              : `${daysSinceLastVisit} dias`,
-                        };
-                      } else if (daysSinceLastVisit >= 90) {
-                        return {
-                          type: "high",
-                          label: "90+ dias",
-                          color:
-                            "bg-orange-100 text-orange-800 border-orange-200",
-                          days: `${daysSinceLastVisit} dias`,
-                        };
-                      } else if (daysSinceLastVisit >= 60) {
-                        return {
-                          type: "medium",
-                          label: "60+ dias",
-                          color:
-                            "bg-yellow-100 text-yellow-800 border-yellow-200",
-                          days: `${daysSinceLastVisit} dias`,
-                        };
-                      } else if (daysSinceLastVisit >= 30) {
-                        return {
-                          type: "low",
-                          label: "30+ dias",
-                          color: "bg-blue-100 text-blue-800 border-blue-200",
-                          days: `${daysSinceLastVisit} dias`,
-                        };
-                      } else {
-                        return {
-                          type: "recent",
-                          label: "Recente",
-                          color: "bg-green-100 text-green-800 border-green-200",
-                          days:
-                            daysSinceLastVisit === 0
-                              ? "Hoje"
-                              : `${daysSinceLastVisit} dias`,
-                        };
-                      }
-                    };
+                      {/* Filtro por Status de Visita */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Status de Visita
+                        </label>
+                        <select
+                          id="filter-visit-status"
+                          name="filter-visit-status"
+                          value={filters.visitStatus}
+                          onChange={(e) =>
+                            handleFilterChange("visitStatus", e.target.value)
+                          }
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="">Todos</option>
+                          <option value="critical">
+                            🔴 Nunca Visitado / Mais de 120 dias
+                          </option>
+                          <option value="high">🟠 90+ dias sem visita</option>
+                          <option value="medium">🟡 60+ dias sem visita</option>
+                          <option value="low">🔵 30+ dias sem visita</option>
+                          <option value="recent">
+                            🟢 Visitado recentemente
+                          </option>
+                        </select>
+                      </div>
+                    </div>
 
-                    const getLastVisitInfo = (client: any) => {
-                      // Get real visit history from scheduled visits
-                      const clientVisits = scheduledVisits
-                        .filter(
-                          (visit) =>
-                            visit.clientDocument === client.document &&
-                            visit.status === "realizada",
-                        )
-                        .sort((a, b) => {
-                          // Ordenar por created_at (mais recente primeiro)
-                          return (
-                            new Date(b.createdAt).getTime() -
-                            new Date(a.createdAt).getTime()
-                          );
-                        });
+                    {hasActiveFilters && (
+                      <div className="text-sm text-gray-600 py-4">
+                        <span className="font-medium">Filtros ativos:</span>
+                        {searchTerm && (
+                          <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
+                            Busca: "{searchTerm}"
+                          </span>
+                        )}
+                        {filters.city && (
+                          <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
+                            Cidade: {filters.city}
+                          </span>
+                        )}
+                        {filters.minValue && (
+                          <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
+                            Min: R$ {filters.minValue}
+                          </span>
+                        )}
+                        {filters.maxValue && (
+                          <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
+                            Max: R$ {filters.maxValue}
+                          </span>
+                        )}
+                        {filters.visitStatus && (
+                          <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
+                            Status:{" "}
+                            {filters.visitStatus === "critical"
+                              ? "Nunca/120+ dias"
+                              : filters.visitStatus === "high"
+                                ? "90+ dias"
+                                : filters.visitStatus === "medium"
+                                  ? "60+ dias"
+                                  : filters.visitStatus === "low"
+                                    ? "30+ dias"
+                                    : filters.visitStatus === "recent"
+                                      ? "Recente"
+                                      : ""}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                      const lastVisit = clientVisits[0];
-                      if (!lastVisit) return null;
+                {selectedClients.size > 0 && (
+                  <div className="mt-2 text-sm text-blue-600 bg-blue-50 rounded-2xl p-2">
+                    {selectedClients.size} cliente
+                    {selectedClients.size !== 1 ? "s" : ""} selecionado
+                    {selectedClients.size !== 1 ? "s" : ""}
+                  </div>
+                )}
+                {clientsWithActiveVisits > 0 && (
+                  <div className="mt-2 text-sm text-orange-600 bg-orange-50 rounded-2xl p-2 flex items-center">
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    {clientsWithActiveVisits} cliente
+                    {clientsWithActiveVisits !== 1 ? "s" : ""} com visita
+                    {clientsWithActiveVisits !== 1 ? "s" : ""} já agendada
+                    {clientsWithActiveVisits !== 1 ? "s" : ""} (não{" "}
+                    {clientsWithActiveVisits !== 1 ? "aparecem" : "aparece"} na
+                    lista)
+                  </div>
+                )}
+              </div>
 
-                      return {
-                        date:
-                          lastVisit.dataVisitaRealizada ||
-                          lastVisit.scheduledDate,
-                        result: lastVisit.notes || "Visita realizada",
-                      };
-                    };
+              {/* Lista de Clientes */}
+              {availableClients.length > 0 && (
+                <div className="border border-gray-200 rounded-2xl">
+                  <div className="bg-gray-50 p-3 border-b border-gray-200 rounded-t-2xl">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-gray-700">
+                          {availableClients.length} cliente
+                          {availableClients.length !== 1 ? "s" : ""} disponível
+                          {availableClients.length !== 1 ? "s" : ""}
+                        </span>
+                        {totalClientsPages > 1 && (
+                          <span className="ml-2 text-xs text-gray-500">
+                            (Página {clientsCurrentPage} de {totalClientsPages})
+                          </span>
+                        )}
+                      </div>
 
-                    return Object.entries(groupedClients).map(
-                      ([neighborhood, clients]) => (
-                        <div key={neighborhood} className="mb-4">
-                          {/* Neighborhood Header */}
-                          <div className="flex items-center mb-3 pb-2 border-b border-gray-200">
-                            <MapPin className="h-4 w-4 text-gray-500 mr-2" />
-                            <h4 className="text-sm font-medium text-gray-700">
-                              {neighborhood}
-                            </h4>
-                            <span className="ml-2 text-xs text-gray-500">
-                              ({clients.length} cliente
-                              {clients.length !== 1 ? "s" : ""})
-                            </span>
+                      <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                        <button
+                          onClick={handleSelectAllClients}
+                          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          {paginatedClients.every((client) =>
+                            selectedClients.has(client.document),
+                          ) && paginatedClients.length > 0
+                            ? "Desmarcar Página"
+                            : "Selecionar Página"}
+                        </button>
+
+                        {totalClientsPages > 1 && (
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() =>
+                                setClientsCurrentPage(
+                                  Math.max(1, clientsCurrentPage - 1),
+                                )
+                              }
+                              disabled={clientsCurrentPage === 1}
+                              className="p-1.5 rounded-2xl hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() =>
+                                setClientsCurrentPage(
+                                  Math.min(
+                                    totalClientsPages,
+                                    clientsCurrentPage + 1,
+                                  ),
+                                )
+                              }
+                              disabled={
+                                clientsCurrentPage === totalClientsPages
+                              }
+                              className="p-1.5 rounded-2xl hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
                           </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-                          {/* Client Cards */}
-                          <div className="grid grid-cols-1 gap-3">
-                            {clients.map((client) => {
-                              const status = getClientStatus(client);
-                              const lastVisit = getLastVisitInfo(client);
-                              const isSelected = selectedClients.has(
-                                client.document,
+                  <div className="bg-gray-50 max-h-[32rem] overflow-y-auto p-3">
+                    {/* Group clients by neighborhood */}
+                    {(() => {
+                      const groupedClients = paginatedClients.reduce(
+                        (groups, client) => {
+                          const neighborhood = client.neighborhood || "Outros";
+                          if (!groups[neighborhood]) {
+                            groups[neighborhood] = [];
+                          }
+                          groups[neighborhood].push(client);
+                          return groups;
+                        },
+                        {} as Record<string, typeof paginatedClients>,
+                      );
+
+                      const getClientStatus = (client: any) => {
+                        // Check days without visit based on last visit
+                        const clientVisits = scheduledVisits
+                          .filter(
+                            (visit) =>
+                              visit.clientDocument === client.document &&
+                              visit.status === "realizada",
+                          )
+                          .sort((a, b) => {
+                            // Ordenar por created_at (mais recente primeiro)
+                            return (
+                              new Date(b.createdAt).getTime() -
+                              new Date(a.createdAt).getTime()
+                            );
+                          });
+
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+
+                        let daysSinceLastVisit: number;
+
+                        if (clientVisits.length === 0) {
+                          // Never visited - consider as more than 120 days
+                          daysSinceLastVisit = 999;
+                        } else {
+                          // Use the same safe date parsing as the formatSafeDate function
+                          try {
+                            // Usar created_at da visita mais recente
+                            const visit = clientVisits[0];
+                            const visitDateStr = visit.createdAt.split("T")[0];
+                            let lastVisitDate: Date;
+
+                            if (visitDateStr.includes("-")) {
+                              // Format YYYY-MM-DD
+                              const [year, month, day] =
+                                visitDateStr.split("-");
+                              lastVisitDate = new Date(
+                                parseInt(year),
+                                parseInt(month) - 1,
+                                parseInt(day),
                               );
+                            } else if (visitDateStr.includes("/")) {
+                              // Format DD/MM/YYYY
+                              const [day, month, year] =
+                                visitDateStr.split("/");
+                              lastVisitDate = new Date(
+                                parseInt(year),
+                                parseInt(month) - 1,
+                                parseInt(day),
+                              );
+                            } else {
+                              lastVisitDate = new Date(visitDateStr);
+                            }
 
-                              return (
-                                <div
-                                  key={client.document}
-                                  className={`relative bg-white rounded-2xl border transition-all duration-200 cursor-pointer hover:shadow-md ${
-                                    isSelected
-                                      ? "border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200"
-                                      : "border-gray-200 hover:border-gray-300"
-                                  }`}
-                                  onClick={() =>
-                                    handleToggleClientSelection(client.document)
-                                  }
-                                >
-                                  {/* Status Indicator */}
+                            lastVisitDate.setHours(0, 0, 0, 0);
+                            daysSinceLastVisit = Math.floor(
+                              (today.getTime() - lastVisitDate.getTime()) /
+                                (1000 * 60 * 60 * 24),
+                            );
+
+                            // Ensure we don't get negative days
+                            daysSinceLastVisit = Math.max(
+                              0,
+                              daysSinceLastVisit,
+                            );
+                          } catch {
+                            // If date parsing fails, consider as never visited
+                            daysSinceLastVisit = 999;
+                          }
+                        }
+
+                        // Determine status based on days without visit
+                        if (daysSinceLastVisit >= 120) {
+                          return {
+                            type: "critical",
+                            label:
+                              daysSinceLastVisit === 999 ? "Nunca" : "120 dias",
+                            color: "bg-red-100 text-red-800 border-red-200",
+                            days:
+                              daysSinceLastVisit === 999
+                                ? "Nunca"
+                                : `${daysSinceLastVisit} dias`,
+                          };
+                        } else if (daysSinceLastVisit >= 90) {
+                          return {
+                            type: "high",
+                            label: "90+ dias",
+                            color:
+                              "bg-orange-100 text-orange-800 border-orange-200",
+                            days: `${daysSinceLastVisit} dias`,
+                          };
+                        } else if (daysSinceLastVisit >= 60) {
+                          return {
+                            type: "medium",
+                            label: "60+ dias",
+                            color:
+                              "bg-yellow-100 text-yellow-800 border-yellow-200",
+                            days: `${daysSinceLastVisit} dias`,
+                          };
+                        } else if (daysSinceLastVisit >= 30) {
+                          return {
+                            type: "low",
+                            label: "30+ dias",
+                            color: "bg-blue-100 text-blue-800 border-blue-200",
+                            days: `${daysSinceLastVisit} dias`,
+                          };
+                        } else {
+                          return {
+                            type: "recent",
+                            label: "Recente",
+                            color:
+                              "bg-green-100 text-green-800 border-green-200",
+                            days:
+                              daysSinceLastVisit === 0
+                                ? "Hoje"
+                                : `${daysSinceLastVisit} dias`,
+                          };
+                        }
+                      };
+
+                      const getLastVisitInfo = (client: any) => {
+                        // Get real visit history from scheduled visits
+                        const clientVisits = scheduledVisits
+                          .filter(
+                            (visit) =>
+                              visit.clientDocument === client.document &&
+                              visit.status === "realizada",
+                          )
+                          .sort((a, b) => {
+                            // Ordenar por created_at (mais recente primeiro)
+                            return (
+                              new Date(b.createdAt).getTime() -
+                              new Date(a.createdAt).getTime()
+                            );
+                          });
+
+                        const lastVisit = clientVisits[0];
+                        if (!lastVisit) return null;
+
+                        return {
+                          date:
+                            lastVisit.dataVisitaRealizada ||
+                            lastVisit.scheduledDate,
+                          result: lastVisit.notes || "Visita realizada",
+                        };
+                      };
+
+                      return Object.entries(groupedClients).map(
+                        ([neighborhood, clients]) => (
+                          <div key={neighborhood} className="mb-4">
+                            {/* Neighborhood Header */}
+                            <div className="flex items-center mb-3 pb-2 border-b border-gray-200">
+                              <MapPin className="h-4 w-4 text-gray-500 mr-2" />
+                              <h4 className="text-sm font-medium text-gray-700">
+                                {neighborhood}
+                              </h4>
+                              <span className="ml-2 text-xs text-gray-500">
+                                ({clients.length} cliente
+                                {clients.length !== 1 ? "s" : ""})
+                              </span>
+                            </div>
+
+                            {/* Client Cards */}
+                            <div className="grid grid-cols-1 gap-3">
+                              {clients.map((client) => {
+                                const status = getClientStatus(client);
+                                const lastVisit = getLastVisitInfo(client);
+                                const isSelected = selectedClients.has(
+                                  client.document,
+                                );
+
+                                return (
                                   <div
-                                    className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium border ${status.color}`}
+                                    key={client.document}
+                                    className={`relative bg-white rounded-2xl border transition-all duration-200 cursor-pointer hover:shadow-md ${
+                                      isSelected
+                                        ? "border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200"
+                                        : "border-gray-200 hover:border-gray-300"
+                                    }`}
+                                    onClick={() =>
+                                      handleToggleClientSelection(
+                                        client.document,
+                                      )
+                                    }
                                   >
-                                    {status.label}
-                                  </div>
+                                    {/* Status Indicator */}
+                                    <div
+                                      className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium border ${status.color}`}
+                                    >
+                                      {status.label}
+                                    </div>
 
-                                  <div className="p-4">
-                                    <div className="flex items-start">
-                                      {/* Large Checkbox */}
-                                      <div className="mr-4 mt-1 hidden">
-                                        <input
-                                          id={`client-checkbox-${client.document}`}
-                                          name={`client-checkbox-${client.document}`}
-                                          type="checkbox"
-                                          checked={isSelected}
-                                          onChange={() =>
-                                            handleToggleClientSelection(
-                                              client.document,
-                                            )
-                                          }
-                                          className="h-4 w-4 sm:h-6 sm:w-6 text-blue-600 focus:ring-2 focus:ring-blue-500 border border-gray-300 rounded-md cursor-pointer"
-                                          onClick={(e) => e.stopPropagation()}
-                                        />
-                                      </div>
-
-                                      <div className="flex-1 min-w-0">
-                                        {/* Client Info */}
-                                        <div className="flex items-start justify-between mb-2">
-                                          <div className="min-w-0 flex-1">
-                                            <h3 className="font-semibold text-gray-900 text-lg truncate">
-                                              {client.client}
-                                            </h3>
-                                            <p className="text-sm text-gray-600">
-                                              {client.document}
-                                            </p>
-                                          </div>
+                                    <div className="p-4">
+                                      <div className="flex items-start">
+                                        {/* Large Checkbox */}
+                                        <div className="mr-4 mt-1 hidden">
+                                          <input
+                                            id={`client-checkbox-${client.document}`}
+                                            name={`client-checkbox-${client.document}`}
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() =>
+                                              handleToggleClientSelection(
+                                                client.document,
+                                              )
+                                            }
+                                            className="h-4 w-4 sm:h-6 sm:w-6 text-blue-600 focus:ring-2 focus:ring-blue-500 border border-gray-300 rounded-md cursor-pointer"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
                                         </div>
 
-                                        {/* Address */}
-                                        <div className="text-sm text-gray-500 mb-3 flex items-center">
-                                          <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
-                                          <span className="truncate">
-                                            {client.address}, {client.number} -{" "}
-                                            {client.city}
-                                          </span>
-                                        </div>
-
-                                        {/* Financial Info */}
-                                        <div className="flex items-center justify-between mb-3">
-                                          <div className="flex items-center space-x-4">
-                                            <div>
-                                              <p className="text-xs text-gray-500">
-                                                Valor Pendente
-                                              </p>
-                                              <p className="text-lg font-bold text-red-600">
-                                                {formatCurrency(
-                                                  client.pendingValue,
-                                                )}
-                                              </p>
-                                            </div>
-                                            <div>
-                                              <p className="text-xs text-gray-500">
-                                                Total de Parcelas
-                                              </p>
-                                              <p className="text-sm font-medium text-gray-900">
-                                                {
-                                                  collections.filter(
-                                                    (c) =>
-                                                      c.documento ===
-                                                      client.document,
-                                                  ).length
-                                                }
+                                        <div className="flex-1 min-w-0">
+                                          {/* Client Info */}
+                                          <div className="flex items-start justify-between mb-2">
+                                            <div className="min-w-0 flex-1">
+                                              <h3 className="font-semibold text-gray-900 text-lg truncate">
+                                                {client.client}
+                                              </h3>
+                                              <p className="text-sm text-gray-600">
+                                                {client.document}
                                               </p>
                                             </div>
                                           </div>
-                                        </div>
 
-                                        {/* Last Visit Info */}
-                                        <div className="bg-gray-50 rounded-md p-2 mb-2">
-                                          {lastVisit ? (
-                                            <div>
+                                          {/* Address */}
+                                          <div className="text-sm text-gray-500 mb-3 flex items-center">
+                                            <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
+                                            <span className="truncate">
+                                              {client.address}, {client.number}{" "}
+                                              - {client.city}
+                                            </span>
+                                          </div>
+
+                                          {/* Financial Info */}
+                                          <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center space-x-4">
+                                              <div>
+                                                <p className="text-xs text-gray-500">
+                                                  Valor Pendente
+                                                </p>
+                                                <p className="text-lg font-bold text-red-600">
+                                                  {formatCurrency(
+                                                    client.pendingValue,
+                                                  )}
+                                                </p>
+                                              </div>
+                                              <div>
+                                                <p className="text-xs text-gray-500">
+                                                  Total de Parcelas
+                                                </p>
+                                                <p className="text-sm font-medium text-gray-900">
+                                                  {
+                                                    collections.filter(
+                                                      (c) =>
+                                                        c.documento ===
+                                                        client.document,
+                                                    ).length
+                                                  }
+                                                </p>
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          {/* Last Visit Info */}
+                                          <div className="bg-gray-50 rounded-md p-2 mb-2">
+                                            {lastVisit ? (
+                                              <div>
+                                                <div className="flex items-center text-xs text-gray-600">
+                                                  <Clock className="h-3 w-3 mr-1" />
+                                                  <span className="font-medium">
+                                                    Última visita:
+                                                  </span>
+                                                  <span className="ml-1">
+                                                    {formatSafeDate(
+                                                      lastVisit.date,
+                                                    )}
+                                                  </span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                  {lastVisit.result}
+                                                </p>
+                                              </div>
+                                            ) : (
+                                              <div className="flex items-center text-xs text-gray-500">
+                                                <Clock className="h-3 w-3 mr-1" />
+                                                <span>
+                                                  Nenhuma visita realizada
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          {/* Quick Actions */}
+                                          <div className="flex items-center justify-between">
+                                            <div className="flex items-center space-x-2">
+                                              {status.type === "critical" && (
+                                                <div className="flex items-center text-xs text-red-600">
+                                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                                  <span>Prioridade Máxima</span>
+                                                </div>
+                                              )}
+                                              {status.type === "high" && (
+                                                <div className="flex items-center text-xs text-orange-600">
+                                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                                  <span>Prioridade Alta</span>
+                                                </div>
+                                              )}
+                                              {status.type === "medium" && (
+                                                <div className="flex items-center text-xs text-yellow-600">
+                                                  <Clock className="h-3 w-3 mr-1" />
+                                                  <span>Atenção</span>
+                                                </div>
+                                              )}
                                               <div className="flex items-center text-xs text-gray-600">
                                                 <Clock className="h-3 w-3 mr-1" />
-                                                <span className="font-medium">
-                                                  Última visita:
-                                                </span>
-                                                <span className="ml-1">
-                                                  {formatSafeDate(
-                                                    lastVisit.date,
-                                                  )}
-                                                </span>
+                                                <span>{status.days}</span>
                                               </div>
-                                              <p className="text-xs text-gray-500 mt-1">
-                                                {lastVisit.result}
-                                              </p>
                                             </div>
-                                          ) : (
-                                            <div className="flex items-center text-xs text-gray-500">
-                                              <Clock className="h-3 w-3 mr-1" />
-                                              <span>
-                                                Nenhuma visita realizada
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
 
-                                        {/* Quick Actions */}
-                                        <div className="flex items-center justify-between">
-                                          <div className="flex items-center space-x-2">
-                                            {status.type === "critical" && (
-                                              <div className="flex items-center text-xs text-red-600">
-                                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                                <span>Prioridade Máxima</span>
+                                            {isSelected && (
+                                              <div className="flex items-center text-blue-600 text-xs font-medium">
+                                                <CheckCircle className="h-4 w-4 mr-1" />
+                                                Selecionado
                                               </div>
                                             )}
-                                            {status.type === "high" && (
-                                              <div className="flex items-center text-xs text-orange-600">
-                                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                                <span>Prioridade Alta</span>
-                                              </div>
-                                            )}
-                                            {status.type === "medium" && (
-                                              <div className="flex items-center text-xs text-yellow-600">
-                                                <Clock className="h-3 w-3 mr-1" />
-                                                <span>Atenção</span>
-                                              </div>
-                                            )}
-                                            <div className="flex items-center text-xs text-gray-600">
-                                              <Clock className="h-3 w-3 mr-1" />
-                                              <span>{status.days}</span>
-                                            </div>
                                           </div>
-
-                                          {isSelected && (
-                                            <div className="flex items-center text-blue-600 text-xs font-medium">
-                                              <CheckCircle className="h-4 w-4 mr-1" />
-                                              Selecionado
-                                            </div>
-                                          )}
                                         </div>
                                       </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ),
-                    );
-                  })()}
+                        ),
+                      );
+                    })()}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {availableClients.length === 0 && user?.type === "collector" && (
-              <div className="p-4 text-center text-gray-500 border border-gray-200 rounded-2xl">
-                {hasActiveFilters
-                  ? "Nenhum cliente encontrado com os filtros aplicados"
-                  : clientsWithActiveVisits > 0
-                    ? "Todos os clientes com pendências já têm visitas agendadas"
-                    : "Nenhum cliente com pendências disponível para agendamento"}
-              </div>
-            )}
+              {availableClients.length === 0 && user?.type === "collector" && (
+                <div className="p-4 text-center text-gray-500 border border-gray-200 rounded-2xl">
+                  {hasActiveFilters
+                    ? "Nenhum cliente encontrado com os filtros aplicados"
+                    : clientsWithActiveVisits > 0
+                      ? "Todos os clientes com pendências já têm visitas agendadas"
+                      : "Nenhum cliente com pendências disponível para agendamento"}
+                </div>
+              )}
 
-            {/* Cliente(s) Selecionado(s) */}
-            {selectedClients.size > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 lg:p-4">
-                <h3 className="font-semibold text-gray-900 mb-2">
-                  {selectedClients.size} Cliente
-                  {selectedClients.size !== 1 ? "s" : ""} Selecionado
-                  {selectedClients.size !== 1 ? "s" : ""}
-                </h3>
-                {selectedClients.size > 0 && (
-                  <div className="space-y-3">
-                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 mb-3">
-                      <div className="flex items-center text-sm text-blue-800">
-                        <CalendarDays className="h-4 w-4 mr-2" />
-                        <span className="font-medium">
-                          Agendamento Individual:
-                        </span>
-                        <span className="ml-1">
-                          Configure data e horário específicos para cada cliente
-                        </span>
+              {/* Cliente(s) Selecionado(s) */}
+              {selectedClients.size > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 lg:p-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    {selectedClients.size} Cliente
+                    {selectedClients.size !== 1 ? "s" : ""} Selecionado
+                    {selectedClients.size !== 1 ? "s" : ""}
+                  </h3>
+                  {selectedClients.size > 0 && (
+                    <div className="space-y-3">
+                      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 mb-3">
+                        <div className="flex items-center text-sm text-blue-800">
+                          <CalendarDays className="h-4 w-4 mr-2" />
+                          <span className="font-medium">
+                            Agendamento Individual:
+                          </span>
+                          <span className="ml-1">
+                            Configure data e horário específicos para cada
+                            cliente
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {getSelectedClientsData().map((client) => {
+                          const schedule = clientSchedules.get(
+                            client.document,
+                          ) || { date: selectedDate, time: getDefaultTime() };
+                          return (
+                            <div
+                              key={client.document}
+                              className="bg-white rounded-2xl p-3 border border-gray-200"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div>
+                                  <span className="font-medium text-gray-900">
+                                    {client.client}
+                                  </span>
+                                  <span className="text-gray-500 ml-2">
+                                    ({client.document})
+                                  </span>
+                                </div>
+                                <div className="text-red-600 font-medium">
+                                  {formatCurrency(client.pendingValue)}
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    Data da Visita
+                                  </label>
+                                  <div className="relative">
+                                    <Calendar className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                                    <input
+                                      id={`visit-date-${client.document}`}
+                                      name={`visit-date-${client.document}`}
+                                      type="date"
+                                      value={schedule.date}
+                                      onChange={(e) =>
+                                        updateClientSchedule(
+                                          client.document,
+                                          "date",
+                                          e.target.value,
+                                        )
+                                      }
+                                      min={getLocalDate()}
+                                      className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    Horário
+                                  </label>
+                                  <div className="relative">
+                                    <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                                    <input
+                                      id={`visit-time-${client.document}`}
+                                      name={`visit-time-${client.document}`}
+                                      type="time"
+                                      value={schedule.time}
+                                      onFocus={(e) => {
+                                        // Armazenar o valor atual antes de qualquer mudança
+                                        e.target.dataset.previousValue =
+                                          e.target.value;
+                                      }}
+                                      onChange={(e) => {
+                                        // Apenas atualizar o valor, sem validação
+                                        updateClientSchedule(
+                                          client.document,
+                                          "time",
+                                          e.target.value,
+                                        );
+                                      }}
+                                      onBlur={(e) => {
+                                        const selectedTime = e.target.value;
+                                        const selectedDate = schedule.date;
+                                        const previousTime =
+                                          e.target.dataset.previousValue ||
+                                          schedule.time;
+
+                                        // Verificar se é hoje e se o horário é no passado
+                                        if (selectedDate === getLocalDate()) {
+                                          const now = new Date();
+                                          const [hours, minutes] = selectedTime
+                                            .split(":")
+                                            .map(Number);
+                                          const selectedDateTime = new Date();
+                                          selectedDateTime.setHours(
+                                            hours,
+                                            minutes,
+                                            0,
+                                            0,
+                                          );
+
+                                          if (selectedDateTime <= now) {
+                                            // Mostrar modal de aviso
+                                            setTimeWarningData({
+                                              clientDocument: client.document,
+                                              selectedTime: selectedTime,
+                                              suggestedTime: getDefaultTime(),
+                                              previousTime: previousTime,
+                                            });
+                                            setShowTimeWarningModal(true);
+                                            return;
+                                          }
+                                        }
+                                      }}
+                                      className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {getSelectedClientsData().map((client) => {
-                        const schedule = clientSchedules.get(
-                          client.document,
-                        ) || { date: selectedDate, time: getDefaultTime() };
-                        return (
-                          <div
-                            key={client.document}
-                            className="bg-white rounded-2xl p-3 border border-gray-200"
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <div>
-                                <span className="font-medium text-gray-900">
-                                  {client.client}
-                                </span>
-                                <span className="text-gray-500 ml-2">
-                                  ({client.document})
-                                </span>
-                              </div>
-                              <div className="text-red-600 font-medium">
-                                {formatCurrency(client.pendingValue)}
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                  Data da Visita
-                                </label>
-                                <div className="relative">
-                                  <Calendar className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                                  <input
-                                    id={`visit-date-${client.document}`}
-                                    name={`visit-date-${client.document}`}
-                                    type="date"
-                                    value={schedule.date}
-                                    onChange={(e) =>
-                                      updateClientSchedule(
-                                        client.document,
-                                        "date",
-                                        e.target.value,
-                                      )
-                                    }
-                                    min={getLocalDate()}
-                                    className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                  />
-                                </div>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                  Horário
-                                </label>
-                                <div className="relative">
-                                  <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                                  <input
-                                    id={`visit-time-${client.document}`}
-                                    name={`visit-time-${client.document}`}
-                                    type="time"
-                                    value={schedule.time}
-                                    onFocus={(e) => {
-                                      // Armazenar o valor atual antes de qualquer mudança
-                                      e.target.dataset.previousValue =
-                                        e.target.value;
-                                    }}
-                                    onChange={(e) => {
-                                      // Apenas atualizar o valor, sem validação
-                                      updateClientSchedule(
-                                        client.document,
-                                        "time",
-                                        e.target.value,
-                                      );
-                                    }}
-                                    onBlur={(e) => {
-                                      const selectedTime = e.target.value;
-                                      const selectedDate = schedule.date;
-                                      const previousTime =
-                                        e.target.dataset.previousValue ||
-                                        schedule.time;
-
-                                      // Verificar se é hoje e se o horário é no passado
-                                      if (selectedDate === getLocalDate()) {
-                                        const now = new Date();
-                                        const [hours, minutes] = selectedTime
-                                          .split(":")
-                                          .map(Number);
-                                        const selectedDateTime = new Date();
-                                        selectedDateTime.setHours(
-                                          hours,
-                                          minutes,
-                                          0,
-                                          0,
-                                        );
-
-                                        if (selectedDateTime <= now) {
-                                          // Mostrar modal de aviso
-                                          setTimeWarningData({
-                                            clientDocument: client.document,
-                                            selectedTime: selectedTime,
-                                            suggestedTime: getDefaultTime(),
-                                            previousTime: previousTime,
-                                          });
-                                          setShowTimeWarningModal(true);
-                                          return;
-                                        }
-                                      }
-                                    }}
-                                    className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Observações */}
-            <div>
-              <label
-                htmlFor="visit-notes"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Observações (opcional)
-              </label>
-              <textarea
-                id="visit-notes"
-                name="visit-notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Adicione observações sobre a visita..."
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
-        ) : (
-          // Lista de Visitas
-          <div className="space-y-6">
-            {/* Calendário de Visitas */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Calendar className="h-5 w-5 mr-2 text-blue-600" />
-                  Calendário de Visitas
-                </h3>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => navigateMonth("prev")}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <span className="text-sm font-medium min-w-[120px] text-center">
-                    {monthNames[currentMonth.getMonth()]}{" "}
-                    {currentMonth.getFullYear()}
-                  </span>
-                  <button
-                    onClick={() => navigateMonth("next")}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
+                  )}
                 </div>
+              )}
+
+              {/* Observações */}
+              <div>
+                <label
+                  htmlFor="visit-notes"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Observações (opcional)
+                </label>
+                <textarea
+                  id="visit-notes"
+                  name="visit-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Adicione observações sobre a visita..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
-
-              {/* Grade do Calendário */}
-              <div className="grid grid-cols-7 gap-3">
-                {/* Cabeçalho dos dias da semana */}
-                {weekDays.map((day) => (
-                  <div
-                    key={day}
-                    className="flex items-center justify-center text-xs font-medium text-gray-500 pb-2"
-                  >
-                    {day}
+            </div>
+          ) : (
+            // Lista de Visitas
+            <div className="space-y-6">
+              {/* Calendário de Visitas */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <Calendar className="h-5 w-5 mr-2 text-blue-600" />
+                    Calendário de Visitas
+                  </h3>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => navigateMonth("prev")}
+                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <span className="text-sm font-medium min-w-[120px] text-center">
+                      {monthNames[currentMonth.getMonth()]}{" "}
+                      {currentMonth.getFullYear()}
+                    </span>
+                    <button
+                      onClick={() => navigateMonth("next")}
+                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
                   </div>
-                ))}
+                </div>
 
-                {/* Dias do mês */}
-                {(() => {
-                  const { daysInMonth, startingDayOfWeek } =
-                    getDaysInMonth(currentMonth);
-                  const days = [];
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
+                {/* Grade do Calendário */}
+                <div className="grid grid-cols-7 gap-3">
+                  {/* Cabeçalho dos dias da semana */}
+                  {weekDays.map((day) => (
+                    <div
+                      key={day}
+                      className="flex items-center justify-center text-xs font-medium text-gray-500 pb-2"
+                    >
+                      {day}
+                    </div>
+                  ))}
 
-                  // Dias vazios no início
-                  for (let i = 0; i < startingDayOfWeek; i++) {
-                    days.push(
-                      <div key={`empty-${i}`} className="h-10 lg:h-12" />,
-                    );
-                  }
+                  {/* Dias do mês */}
+                  {(() => {
+                    const { daysInMonth, startingDayOfWeek } =
+                      getDaysInMonth(currentMonth);
+                    const days = [];
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
 
-                  // Dias do mês
-                  for (let day = 1; day <= daysInMonth; day++) {
-                    const date = new Date(
-                      currentMonth.getFullYear(),
-                      currentMonth.getMonth(),
-                      day,
-                    );
-                    const visitsForDay = getVisitsForDate(date);
-                    const isToday =
-                      date.toDateString() === today.toDateString();
-                    const isSelected =
-                      selectedCalendarDate?.toDateString() ===
-                      date.toDateString();
-                    const isPast = date < today;
-                    const hasVisits = visitsForDay.filter(visit => visit.status !== "nao_encontrado").length > 0;
+                    // Dias vazios no início
+                    for (let i = 0; i < startingDayOfWeek; i++) {
+                      days.push(
+                        <div key={`empty-${i}`} className="h-10 lg:h-12" />,
+                      );
+                    }
 
-                    days.push(
-                      <button
-                        key={day}
-                        onClick={() => selectDate(date)}
-                        className={`
+                    // Dias do mês
+                    for (let day = 1; day <= daysInMonth; day++) {
+                      const date = new Date(
+                        currentMonth.getFullYear(),
+                        currentMonth.getMonth(),
+                        day,
+                      );
+                      const visitsForDay = getVisitsForDate(date);
+                      const isToday =
+                        date.toDateString() === today.toDateString();
+                      const isSelected =
+                        selectedCalendarDate?.toDateString() ===
+                        date.toDateString();
+                      const isPast = date < today;
+                      const hasVisits =
+                        visitsForDay.filter(
+                          (visit) => visit.status !== "nao_encontrado",
+                        ).length > 0;
+
+                      days.push(
+                        <button
+                          key={day}
+                          onClick={() => selectDate(date)}
+                          className={`
                           h-10 lg:h-16 rounded-lg flex flex-col items-center justify-center
                           relative transition-all duration-200 transform hover:scale-105
                           ${
@@ -2247,207 +2270,384 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                           }
                           ${hasVisits ? "ring-2 ring-blue-400 ring-offset-1" : ""}
                         `}
-                      >
-                        <span className="text-sm font-medium">{day}</span>
-                        {hasVisits && (
-                          <div className="absolute bottom-1">
-                            <div
-                              className={`w-2 h-2 rounded-full ${
-                                isSelected ? "bg-white" : "bg-blue-500"
-                              }`}
-                            />
+                        >
+                          <span className="text-sm font-medium">{day}</span>
+                          {hasVisits && (
+                            <div className="absolute bottom-1">
+                              <div
+                                className={`w-2 h-2 rounded-full ${
+                                  isSelected ? "bg-white" : "bg-blue-500"
+                                }`}
+                              />
+                            </div>
+                          )}
+                        </button>,
+                      );
+                    }
+
+                    return days;
+                  })()}
+                </div>
+
+                {/* Legenda */}
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-600">
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 bg-blue-100 rounded mr-1.5" />
+                    <span>Hoje</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 bg-blue-600 rounded mr-1.5" />
+                    <span>Selecionado</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 border border-blue-400 rounded mr-1.5" />
+                    <span>Com visitas</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Visitas do dia selecionado */}
+              {selectedCalendarDate ? (
+                <div>
+                  <div className="relative bg-gradient-to-r from-blue-50/80 via-white to-blue-50/80 rounded-xl border border-blue-100/60 p-4 mb-6 shadow-sm backdrop-blur-sm">
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-transparent rounded-xl"></div>
+                    <div className="relative flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center space-x-3">
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                              {selectedCalendarDate.toLocaleDateString("pt-BR")}
+                            </h3>
+                            <p className="text-sm text-gray-600 font-medium">
+                              {selectedDateVisits.length}{" "}
+                              {selectedDateVisits.length === 1
+                                ? "visita agendada"
+                                : "visitas agendadas"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Busca e Filtros */}
+                        {selectedDateVisits.length > 1 && (
+                          <div className="bg-white/70 backdrop-blur-sm rounded-lg border border-white/50 px-3 py-2 shadow-sm">
+                            {/* Botões de Ordenação com Ícones */}
+                            <div className="flex items-center gap-2 justify-center">
+                              <button
+                                onClick={() => {
+                                  setVisitsSortBy("name");
+                                  setVisitsSortOrder(
+                                    visitsSortBy === "name" &&
+                                      visitsSortOrder === "asc"
+                                      ? "desc"
+                                      : "asc",
+                                  );
+                                }}
+                                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                  visitsSortBy === "name"
+                                    ? "bg-blue-600 text-white"
+                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                                }`}
+                                title="Ordenar por Nome"
+                              >
+                                <User className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setVisitsSortBy("value");
+                                  setVisitsSortOrder(
+                                    visitsSortBy === "value" &&
+                                      visitsSortOrder === "asc"
+                                      ? "desc"
+                                      : "asc",
+                                  );
+                                }}
+                                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                  visitsSortBy === "value"
+                                    ? "bg-blue-600 text-white"
+                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                                }`}
+                                title="Ordenar por Valor"
+                              >
+                                <DollarSign className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setVisitsSortBy("city");
+                                  setVisitsSortOrder(
+                                    visitsSortBy === "city" &&
+                                      visitsSortOrder === "asc"
+                                      ? "desc"
+                                      : "asc",
+                                  );
+                                }}
+                                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                  visitsSortBy === "city"
+                                    ? "bg-blue-600 text-white"
+                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                                }`}
+                                title="Ordenar por Cidade"
+                              >
+                                <MapPinIcon className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
                         )}
-                      </button>,
-                    );
-                  }
-
-                  return days;
-                })()}
-              </div>
-
-              {/* Legenda */}
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-600">
-                <div className="flex items-center">
-                  <div className="w-4 h-4 bg-blue-100 rounded mr-1.5" />
-                  <span>Hoje</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-4 h-4 bg-blue-600 rounded mr-1.5" />
-                  <span>Selecionado</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-4 h-4 border border-blue-400 rounded mr-1.5" />
-                  <span>Com visitas</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Visitas do dia selecionado */}
-            {selectedCalendarDate ? (
-              <div>
-                <div className="relative bg-gradient-to-r from-blue-50/80 via-white to-blue-50/80 rounded-xl border border-blue-100/60 p-4 mb-6 shadow-sm backdrop-blur-sm">
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-transparent rounded-xl"></div>
-                  <div className="relative flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center space-x-3">
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-900 leading-tight">
-                            {selectedCalendarDate.toLocaleDateString("pt-BR")}
-                          </h3>
-                          <p className="text-sm text-gray-600 font-medium">
-                            {selectedDateVisits.length}{" "}
-                            {selectedDateVisits.length === 1
-                              ? "visita agendada"
-                              : "visitas agendadas"}
-                          </p>
-                        </div>
                       </div>
-
-                      {/* Busca e Filtros */}
-                      {selectedDateVisits.length > 1 && (
-                        <div className="bg-white/70 backdrop-blur-sm rounded-lg border border-white/50 px-3 py-2 shadow-sm">
-                          {/* Botões de Ordenação com Ícones */}
-                          <div className="flex items-center gap-2 justify-center">
-                            <button
-                              onClick={() => {
-                                setVisitsSortBy("name");
-                                setVisitsSortOrder(
-                                  visitsSortBy === "name" &&
-                                    visitsSortOrder === "asc"
-                                    ? "desc"
-                                    : "asc",
-                                );
-                              }}
-                              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                visitsSortBy === "name"
-                                  ? "bg-blue-600 text-white"
-                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                              }`}
-                              title="Ordenar por Nome"
-                            >
-                              <User className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setVisitsSortBy("value");
-                                setVisitsSortOrder(
-                                  visitsSortBy === "value" &&
-                                    visitsSortOrder === "asc"
-                                    ? "desc"
-                                    : "asc",
-                                );
-                              }}
-                              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                visitsSortBy === "value"
-                                  ? "bg-blue-600 text-white"
-                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                              }`}
-                              title="Ordenar por Valor"
-                            >
-                              <DollarSign className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setVisitsSortBy("city");
-                                setVisitsSortOrder(
-                                  visitsSortBy === "city" &&
-                                    visitsSortOrder === "asc"
-                                    ? "desc"
-                                    : "asc",
-                                );
-                              }}
-                              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                visitsSortBy === "city"
-                                  ? "bg-blue-600 text-white"
-                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                              }`}
-                              title="Ordenar por Cidade"
-                            >
-                              <MapPinIcon className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
-                </div>
 
-                {selectedDateVisits.length === 0 ? (
-                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
-                    <Calendar className="h-8 w-8 text-blue-400 mx-auto mb-2" />
-                    <p className="text-blue-600 font-medium">
-                      Nenhuma visita agendada para{" "}
-                      {selectedCalendarDate.toLocaleDateString("pt-BR")}.
-                    </p>
-                    <p className="text-blue-500 text-sm">
-                      Que tal agendar uma nova visita?
-                    </p>
-                  </div>
-                ) : (
-                  <div
-                    className="space-y-3"
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                  >
-                    {paginatedSelectedDateVisits.map((visit) => (
+                  {selectedDateVisits.length === 0 ? (
+                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
+                      <Calendar className="h-8 w-8 text-blue-400 mx-auto mb-2" />
+                      <p className="text-blue-600 font-medium">
+                        Nenhuma visita agendada para{" "}
+                        {selectedCalendarDate.toLocaleDateString("pt-BR")}.
+                      </p>
+                      <p className="text-blue-500 text-sm">
+                        Que tal agendar uma nova visita?
+                      </p>
+                    </div>
+                  ) : (
+                    <div
+                      className="space-y-3"
+                      onTouchStart={handleTouchStart}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
+                    >
+                      {paginatedSelectedDateVisits.map((visit) => (
+                        <div
+                          key={visit.id}
+                          className={`border rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow ${
+                            visit.isOverdue
+                              ? "border-red-300 bg-red-50"
+                              : "border-blue-300 bg-blue-50"
+                          }`}
+                        >
+                          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
+                            <div className="flex-1">
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <button
+                                  onClick={() => handleOpenClientModal(visit)}
+                                  className={`font-semibold hover:underline ${
+                                    visit.isOverdue
+                                      ? "text-red-600 hover:text-red-800"
+                                      : "text-blue-600 hover:text-blue-800"
+                                  }`}
+                                >
+                                  {visit.clientName}
+                                </button>
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs ${
+                                    visit.isOverdue
+                                      ? "bg-red-100 text-red-800"
+                                      : getStatusColor(
+                                          visit.status,
+                                          visit.notes,
+                                        )
+                                  }`}
+                                >
+                                  {visit.isOverdue
+                                    ? "Atrasada"
+                                    : getStatusLabel(visit.status, visit.notes)}
+                                </span>
+                                <span
+                                  className={`text-sm font-medium ${
+                                    visit.isOverdue
+                                      ? "text-red-600"
+                                      : "text-blue-600"
+                                  }`}
+                                >
+                                  {visit.scheduledTime || "00:00"}
+                                </span>
+                                {visit.isOverdue && (
+                                  <>
+                                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                                    {visit.overdueDays > 0 && (
+                                      <span className="text-xs text-red-600 font-medium">
+                                        ({visit.overdueDays}{" "}
+                                        {visit.overdueDays === 1
+                                          ? "dia"
+                                          : "dias"}{" "}
+                                        de atraso)
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+
+                              <div className="text-sm text-gray-600 space-y-1">
+                                <div className="flex items-center">
+                                  <MapPin className="h-4 w-4 mr-2" />
+                                  {visit.clientAddress}
+                                </div>
+                                {visit.totalPendingValue && (
+                                  <div className="flex items-center">
+                                    <DollarSign className="h-4 w-4 mr-2" />
+                                    Pendente:{" "}
+                                    {formatCurrency(visit.totalPendingValue)}
+                                    {visit.overdueCount &&
+                                      visit.overdueCount > 0 && (
+                                        <span className="ml-2 text-red-600">
+                                          <AlertTriangle className="h-4 w-4 inline mr-1" />
+                                          {visit.overdueCount}{" "}
+                                          {visit.overdueCount === 1
+                                            ? "título"
+                                            : "títulos"}{" "}
+                                          em atraso
+                                        </span>
+                                      )}
+                                  </div>
+                                )}
+                                {visit.notes && (
+                                  <div className="text-gray-500 italic whitespace-pre-line">
+                                    {visit.notes}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {visit.status === "agendada" && (
+                              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
+                                <button
+                                  onClick={() => handleMarkAsCompleted(visit)}
+                                  className="px-3 py-2 bg-green-500 text-white rounded-2xl text-sm hover:bg-green-700 transition-colors flex items-center justify-center"
+                                >
+                                  Realizada
+                                </button>
+                                <button
+                                  onClick={() => handleMarkAsNotFound(visit)}
+                                  className="px-3 py-2 bg-orange-500 text-white rounded-2xl text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
+                                >
+                                  Não Encontrado
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleOpenRescheduleModal(visit)
+                                  }
+                                  className="px-3 py-2 bg-blue-500 text-white rounded-2xl text-sm hover:bg-blue-700 transition-colors flex items-center justify-center"
+                                >
+                                  <RefreshCw className="h-4 w-4 mr-1" />
+                                  Reagendar
+                                </button>
+                                {!visit.cancellationRejectedBy && (
+                                  <button
+                                    onClick={() =>
+                                      handleRequestCancellation(visit)
+                                    }
+                                    className="px-3 py-2 bg-red-500 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
+                                  >
+                                    Cancelar Visita
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            {visit.status === "cancelamento_solicitado" && (
+                              <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-2xl">
+                                <div className="font-medium">
+                                  Cancelamento Solicitado
+                                </div>
+                                <div className="text-xs mt-1">
+                                  Aguardando aprovação do gerente
+                                </div>
+                                {visit.cancellationRequestReason && (
+                                  <div className="text-xs mt-1 italic">
+                                    Motivo: {visit.cancellationRequestReason}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {visit.cancellationRejectedBy &&
+                              visit.status === "agendada" && (
+                                <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-2xl">
+                                  <div className="font-medium">
+                                    Cancelamento Rejeitado pelo Gerente
+                                  </div>
+                                  <div className="text-xs mt-1">
+                                    A visita permanece agendada
+                                  </div>
+                                  {visit.cancellationRejectionReason && (
+                                    <div className="text-xs mt-1 italic">
+                                      Motivo da rejeição:{" "}
+                                      {visit.cancellationRejectionReason}
+                                    </div>
+                                  )}
+                                  {visit.cancellationRejectedAt && (
+                                    <div className="text-xs mt-1 text-gray-600">
+                                      Rejeitado em:{" "}
+                                      {new Date(
+                                        visit.cancellationRejectedAt,
+                                      ).toLocaleDateString("pt-BR")}{" "}
+                                      às{" "}
+                                      {new Date(
+                                        visit.cancellationRejectedAt,
+                                      ).toLocaleTimeString("pt-BR", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Mensagem quando nenhuma data é selecionada */
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
+                  <Calendar className="h-12 w-12 text-blue-400 mx-auto mb-3" />
+                  <p className="text-blue-700 font-medium text-lg mb-2">
+                    Selecione um dia no calendário
+                  </p>
+                  <p className="text-blue-600 text-sm">
+                    Clique em qualquer dia para visualizar as visitas agendadas
+                  </p>
+                </div>
+              )}
+
+              {/* Próximas Visitas */}
+              {upcomingVisits.length > 0 && false && (
+                <div>
+                  <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <Calendar className="h-5 w-5 mr-2 text-gray-600" />
+                    Próximas Visitas ({upcomingVisits.length})
+                  </h3>
+
+                  <div className="space-y-3">
+                    {upcomingVisits.slice(0, 5).map((visit) => (
                       <div
                         key={visit.id}
-                        className={`border rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow ${
-                          visit.isOverdue
-                            ? "border-red-300 bg-red-50"
-                            : "border-blue-300 bg-blue-50"
-                        }`}
+                        className="border border-gray-200 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
                       >
                         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                           <div className="flex-1">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <button
                                 onClick={() => handleOpenClientModal(visit)}
-                                className={`font-semibold hover:underline ${
-                                  visit.isOverdue
-                                    ? "text-red-600 hover:text-red-800"
-                                    : "text-blue-600 hover:text-blue-800"
-                                }`}
+                                className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
                               >
                                 {visit.clientName}
                               </button>
                               <span
-                                className={`px-2 py-1 rounded-full text-xs ${
-                                  visit.isOverdue
-                                    ? "bg-red-100 text-red-800"
-                                    : getStatusColor(visit.status, visit.notes)
-                                }`}
+                                className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status, visit.notes)}`}
                               >
-                                {visit.isOverdue
-                                  ? "Atrasada"
-                                  : getStatusLabel(visit.status, visit.notes)}
+                                {getStatusLabel(visit.status, visit.notes)}
                               </span>
-                              <span
-                                className={`text-sm font-medium ${
-                                  visit.isOverdue
-                                    ? "text-red-600"
-                                    : "text-blue-600"
-                                }`}
-                              >
-                                {visit.scheduledTime || "00:00"}
-                              </span>
-                              {visit.isOverdue && (
-                                <>
-                                  <AlertTriangle className="h-4 w-4 text-red-600" />
-                                  {visit.overdueDays > 0 && (
-                                    <span className="text-xs text-red-600 font-medium">
-                                      ({visit.overdueDays}{" "}
-                                      {visit.overdueDays === 1 ? "dia" : "dias"}{" "}
-                                      de atraso)
-                                    </span>
-                                  )}
-                                </>
-                              )}
                             </div>
 
                             <div className="text-sm text-gray-600 space-y-1">
+                              <div className="flex items-center">
+                                <Calendar className="h-4 w-4 mr-2" />
+                                {visit.status === "realizada" &&
+                                visit.dataVisitaRealizada
+                                  ? `${formatSafeDateTime(visit.dataVisitaRealizada)} (Realizada)`
+                                  : formatSafeDateTime(
+                                      visit.scheduledDate,
+                                      visit.scheduledTime,
+                                    )}
+                              </div>
                               <div className="flex items-center">
                                 <MapPin className="h-4 w-4 mr-2" />
                                 {visit.clientAddress}
@@ -2482,19 +2682,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
                               <button
                                 onClick={() => handleMarkAsCompleted(visit)}
-                                className="px-3 py-2 bg-green-500 text-white rounded-2xl text-sm hover:bg-green-700 transition-colors flex items-center justify-center"
+                                className="px-3 py-2 bg-green-100 text-green-700 rounded-2xl text-sm hover:bg-green-200 transition-colors flex items-center justify-center"
                               >
                                 Realizada
                               </button>
                               <button
                                 onClick={() => handleMarkAsNotFound(visit)}
-                                className="px-3 py-2 bg-orange-500 text-white rounded-2xl text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
+                                className="px-3 py-2 bg-orange-100 text-orange-700 rounded-2xl text-sm hover:bg-orange-200 transition-colors flex items-center justify-center"
                               >
                                 Não Encontrado
                               </button>
                               <button
                                 onClick={() => handleOpenRescheduleModal(visit)}
-                                className="px-3 py-2 bg-blue-500 text-white rounded-2xl text-sm hover:bg-blue-700 transition-colors flex items-center justify-center"
+                                className="px-3 py-2 bg-blue-100 text-blue-700 rounded-2xl text-sm hover:bg-blue-200 transition-colors flex items-center justify-center"
                               >
                                 <RefreshCw className="h-4 w-4 mr-1" />
                                 Reagendar
@@ -2504,7 +2704,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                   onClick={() =>
                                     handleRequestCancellation(visit)
                                   }
-                                  className="px-3 py-2 bg-red-500 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
+                                  className="px-3 py-2 bg-red-100 text-red-700 rounded-2xl text-sm hover:bg-red-200 transition-colors flex items-center justify-center"
                                 >
                                   Cancelar Visita
                                 </button>
@@ -2561,1289 +2761,1485 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         </div>
                       </div>
                     ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Mensagem quando nenhuma data é selecionada */
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
-                <Calendar className="h-12 w-12 text-blue-400 mx-auto mb-3" />
-                <p className="text-blue-700 font-medium text-lg mb-2">
-                  Selecione um dia no calendário
-                </p>
-                <p className="text-blue-600 text-sm">
-                  Clique em qualquer dia para visualizar as visitas agendadas
-                </p>
-              </div>
-            )}
 
-            {/* Próximas Visitas */}
-            {upcomingVisits.length > 0 && false && (
-              <div>
-                <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <Calendar className="h-5 w-5 mr-2 text-gray-600" />
-                  Próximas Visitas ({upcomingVisits.length})
-                </h3>
-
-                <div className="space-y-3">
-                  {upcomingVisits.slice(0, 5).map((visit) => (
-                    <div
-                      key={visit.id}
-                      className="border border-gray-200 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
-                        <div className="flex-1">
-                          <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <button
-                              onClick={() => handleOpenClientModal(visit)}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {visit.clientName}
-                            </button>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status, visit.notes)}`}
-                            >
-                              {getStatusLabel(visit.status, visit.notes)}
-                            </span>
-                          </div>
-
-                          <div className="text-sm text-gray-600 space-y-1">
-                            <div className="flex items-center">
-                              <Calendar className="h-4 w-4 mr-2" />
-                              {visit.status === "realizada" &&
-                              visit.dataVisitaRealizada
-                                ? `${formatSafeDateTime(visit.dataVisitaRealizada)} (Realizada)`
-                                : formatSafeDateTime(
-                                    visit.scheduledDate,
-                                    visit.scheduledTime,
-                                  )}
-                            </div>
-                            <div className="flex items-center">
-                              <MapPin className="h-4 w-4 mr-2" />
-                              {visit.clientAddress}
-                            </div>
-                            {visit.totalPendingValue && (
-                              <div className="flex items-center">
-                                <DollarSign className="h-4 w-4 mr-2" />
-                                Pendente:{" "}
-                                {formatCurrency(visit.totalPendingValue)}
-                                {visit.overdueCount &&
-                                  visit.overdueCount > 0 && (
-                                    <span className="ml-2 text-red-600">
-                                      <AlertTriangle className="h-4 w-4 inline mr-1" />
-                                      {visit.overdueCount}{" "}
-                                      {visit.overdueCount === 1
-                                        ? "título"
-                                        : "títulos"}{" "}
-                                      em atraso
-                                    </span>
-                                  )}
-                              </div>
-                            )}
-                            {visit.notes && (
-                              <div className="text-gray-500 italic whitespace-pre-line">
-                                {visit.notes}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {visit.status === "agendada" && (
-                          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
-                            <button
-                              onClick={() => handleMarkAsCompleted(visit)}
-                              className="px-3 py-2 bg-green-100 text-green-700 rounded-2xl text-sm hover:bg-green-200 transition-colors flex items-center justify-center"
-                            >
-                              Realizada
-                            </button>
-                            <button
-                              onClick={() => handleMarkAsNotFound(visit)}
-                              className="px-3 py-2 bg-orange-100 text-orange-700 rounded-2xl text-sm hover:bg-orange-200 transition-colors flex items-center justify-center"
-                            >
-                              Não Encontrado
-                            </button>
-                            <button
-                              onClick={() => handleOpenRescheduleModal(visit)}
-                              className="px-3 py-2 bg-blue-100 text-blue-700 rounded-2xl text-sm hover:bg-blue-200 transition-colors flex items-center justify-center"
-                            >
-                              <RefreshCw className="h-4 w-4 mr-1" />
-                              Reagendar
-                            </button>
-                            {!visit.cancellationRejectedBy && (
-                              <button
-                                onClick={() => handleRequestCancellation(visit)}
-                                className="px-3 py-2 bg-red-100 text-red-700 rounded-2xl text-sm hover:bg-red-200 transition-colors flex items-center justify-center"
-                              >
-                                Cancelar Visita
-                              </button>
-                            )}
-                          </div>
-                        )}
-                        {visit.status === "cancelamento_solicitado" && (
-                          <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-2xl">
-                            <div className="font-medium">
-                              Cancelamento Solicitado
-                            </div>
-                            <div className="text-xs mt-1">
-                              Aguardando aprovação do gerente
-                            </div>
-                            {visit.cancellationRequestReason && (
-                              <div className="text-xs mt-1 italic">
-                                Motivo: {visit.cancellationRequestReason}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {visit.cancellationRejectedBy &&
-                          visit.status === "agendada" && (
-                            <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-2xl">
-                              <div className="font-medium">
-                                Cancelamento Rejeitado pelo Gerente
-                              </div>
-                              <div className="text-xs mt-1">
-                                A visita permanece agendada
-                              </div>
-                              {visit.cancellationRejectionReason && (
-                                <div className="text-xs mt-1 italic">
-                                  Motivo da rejeição:{" "}
-                                  {visit.cancellationRejectionReason}
-                                </div>
-                              )}
-                              {visit.cancellationRejectedAt && (
-                                <div className="text-xs mt-1 text-gray-600">
-                                  Rejeitado em:{" "}
-                                  {new Date(
-                                    visit.cancellationRejectedAt,
-                                  ).toLocaleDateString("pt-BR")}{" "}
-                                  às{" "}
-                                  {new Date(
-                                    visit.cancellationRejectedAt,
-                                  ).toLocaleTimeString("pt-BR", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                    {upcomingVisits.length > 5 && (
+                      <div className="text-center py-2">
+                        <span className="text-sm text-gray-500">
+                          ... e mais {upcomingVisits.length - 5} visita
+                          {upcomingVisits.length - 5 !== 1 ? "s" : ""}
+                        </span>
                       </div>
-                    </div>
-                  ))}
+                    )}
+                  </div>
+                </div>
+              )}
 
-                  {upcomingVisits.length > 5 && (
-                    <div className="text-center py-2">
-                      <span className="text-sm text-gray-500">
-                        ... e mais {upcomingVisits.length - 5} visita
-                        {upcomingVisits.length - 5 !== 1 ? "s" : ""}
-                      </span>
+              {/* Paginação no final da página */}
+              {selectedDateVisits.length > visitsPerPage && (
+                <div className="relative flex items-center justify-center mt-8 pt-6 border-t border-blue-100">
+                  <div className="flex items-center space-x-4 bg-white rounded-xl border border-blue-200 shadow-sm px-6 py-3">
+                    <button
+                      onClick={() =>
+                        setCurrentPage(Math.max(1, currentPage - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
+                    >
+                      <ChevronLeft className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
+                    </button>
+
+                    <div className="flex items-center space-x-2">
+                      {Array.from(
+                        { length: totalSelectedDatePages },
+                        (_, i) => i + 1,
+                      ).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-10 h-10 rounded-lg font-medium text-sm transition-colors ${
+                            currentPage === page
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
                     </div>
-                  )}
+
+                    <button
+                      onClick={() =>
+                        setCurrentPage(
+                          Math.min(totalSelectedDatePages, currentPage + 1),
+                        )
+                      }
+                      disabled={currentPage === totalSelectedDatePages}
+                      className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
+                    >
+                      <ChevronRight className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Modal de Notificação de Visitas Atrasadas - Renderizado via Portal */}
+        {showOverdueNotificationModal &&
+          Object.keys(overdueVisitsByDate).length > 0 &&
+          createPortal(
+            <div
+              className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center p-4 z-50"
+              onClick={() => setShowOverdueNotificationModal(false)}
+            >
+              <div
+                className="bg-white rounded-2xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-4 lg:px-6 py-4 border-b border-gray-200 bg-red-50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <AlertTriangle className="h-6 w-6 text-red-600 mr-2" />
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Visitas Atrasadas
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => setShowOverdueNotificationModal(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="px-4 lg:px-6 py-4 overflow-y-auto max-h-[calc(90vh-120px)]">
+                  <p className="text-sm text-gray-600 mb-4">
+                    Você possui{" "}
+                    {Object.values(overdueVisitsByDate).flat().length} visita
+                    {Object.values(overdueVisitsByDate).flat().length > 1
+                      ? "s"
+                      : ""}{" "}
+                    atrasada
+                    {Object.values(overdueVisitsByDate).flat().length > 1
+                      ? "s"
+                      : ""}
+                    .
+                  </p>
+
+                  <div className="space-y-3">
+                    {Object.entries(overdueVisitsByDate)
+                      .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
+                      .map(([date, visits]) => {
+                        const formattedDate = new Date(
+                          date + "T00:00:00",
+                        ).toLocaleDateString("pt-BR");
+                        const daysDiff = Math.floor(
+                          (new Date().getTime() -
+                            new Date(date + "T00:00:00").getTime()) /
+                            (1000 * 60 * 60 * 24),
+                        );
+
+                        return (
+                          <div
+                            key={date}
+                            className="border border-red-200 rounded-lg p-3 bg-red-50"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <p className="font-semibold text-gray-900">
+                                  {formattedDate}
+                                </p>
+                                <p className="text-xs text-red-600">
+                                  {daysDiff} {daysDiff === 1 ? "dia" : "dias"}{" "}
+                                  de atraso - {visits.length} visita
+                                  {visits.length > 1 ? "s" : ""}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => navigateToOverdueDate(date)}
+                                className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
+                              >
+                                Ver Visitas
+                              </button>
+                            </div>
+
+                            <div className="text-xs text-gray-600 space-y-1">
+                              {visits.slice(0, 3).map((visit) => (
+                                <div
+                                  key={visit.id}
+                                  className="flex items-center"
+                                >
+                                  <User className="h-3 w-3 mr-1" />
+                                  {visit.clientName}
+                                </div>
+                              ))}
+                              {visits.length > 3 && (
+                                <div className="text-gray-500 italic">
+                                  ... e mais {visits.length - 3} cliente
+                                  {visits.length - 3 > 1 ? "s" : ""}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                <div className="px-4 lg:px-6 py-4 border-t border-gray-200">
+                  <button
+                    onClick={() => setShowOverdueNotificationModal(false)}
+                    className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-2xl hover:bg-gray-300 transition-colors font-medium"
+                  >
+                    Fechar
+                  </button>
                 </div>
               </div>
-            )}
+            </div>,
+            document.body,
+          )}
 
-            {/* Paginação no final da página */}
-            {selectedDateVisits.length > visitsPerPage && (
-              <div className="relative flex items-center justify-center mt-8 pt-6 border-t border-blue-100">
-                <div className="flex items-center space-x-4 bg-white rounded-xl border border-blue-200 shadow-sm px-6 py-3">
+        {/* Modal de Detalhes do Cliente - Renderizado via Portal */}
+        {showClientModal &&
+          selectedClientForModal &&
+          createPortal(
+            <ClientDetailModal
+              clientGroup={selectedClientForModal}
+              userType="collector"
+              onClose={handleCloseClientModal}
+            />,
+            document.body,
+          )}
+
+        {/* Modal de Solicitação de Cancelamento - Renderizado via Portal */}
+        {showCancellationModal &&
+          selectedVisitForCancellation &&
+          createPortal(
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
+                <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Solicitar Cancelamento de Visita
+                  </h3>
+                </div>
+
+                <div className="px-4 lg:px-6 py-4">
+                  <div className="mb-4">
+                    <div className="text-sm text-gray-600 mb-2">
+                      <strong>Cliente:</strong>{" "}
+                      {selectedVisitForCancellation.clientName}
+                    </div>
+                    <div className="text-sm text-gray-600 mb-2">
+                      <strong>Data:</strong>{" "}
+                      {formatSafeDateTime(
+                        selectedVisitForCancellation.scheduledDate,
+                        selectedVisitForCancellation.scheduledTime,
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Motivo do cancelamento *
+                    </label>
+                    <textarea
+                      id="cancellation-reason"
+                      name="cancellation-reason"
+                      value={cancellationReason}
+                      onChange={(e) => setCancellationReason(e.target.value)}
+                      placeholder="Descreva o motivo para solicitar o cancelamento desta visita..."
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
+                  </div>
+
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 mb-4">
+                    <div className="flex items-start">
+                      <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-yellow-700">
+                        <strong>Atenção:</strong> Esta solicitação será enviada
+                        para aprovação do gerente. A visita permanecerá agendada
+                        até que seja aprovada ou rejeitada.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
                   <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
+                    onClick={handleCloseCancellationModal}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
                   >
-                    <ChevronLeft className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
+                    Cancelar
                   </button>
+                  <button
+                    onClick={handleConfirmCancellation}
+                    disabled={!cancellationReason.trim()}
+                    className="flex-1 px-4 py-2 bg-red-500 text-white rounded-2xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Solicitar
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
 
-                  <div className="flex items-center space-x-2">
-                    {Array.from(
-                      { length: totalSelectedDatePages },
-                      (_, i) => i + 1,
-                    ).map((page) => (
+        {/* Modal de Reagendamento - Renderizado via Portal */}
+        {showRescheduleModal &&
+          selectedVisitForReschedule &&
+          createPortal(
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
+                <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <RefreshCw className="h-5 w-5 mr-2 text-blue-600" />
+                    Reagendar Visita
+                  </h3>
+                </div>
+
+                <div className="px-4 lg:px-6 py-4">
+                  <div className="mb-4">
+                    <div className="text-sm text-gray-600 mb-2">
+                      <strong>Cliente:</strong>{" "}
+                      {selectedVisitForReschedule.clientName}
+                    </div>
+                    <div className="text-sm text-gray-600 mb-2">
+                      <strong>Agendamento atual:</strong>{" "}
+                      {formatSafeDateTime(
+                        selectedVisitForReschedule.scheduledDate,
+                        selectedVisitForReschedule.scheduledTime,
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-600 mb-4">
+                      <strong>Endereço:</strong>{" "}
+                      {selectedVisitForReschedule.clientAddress}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Nova Data *
+                      </label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                          id="reschedule-date"
+                          name="reschedule-date"
+                          type="date"
+                          value={rescheduleDate}
+                          onChange={(e) => setRescheduleDate(e.target.value)}
+                          min={getLocalDate()}
+                          className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Novo Horário *
+                      </label>
+                      <div className="relative">
+                        <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                          id="reschedule-time"
+                          name="reschedule-time"
+                          type="time"
+                          value={rescheduleTime}
+                          onChange={(e) => setRescheduleTime(e.target.value)}
+                          className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 mt-4">
+                    <div className="flex items-start">
+                      <Calendar className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-blue-700">
+                        <strong>Dica:</strong> Certifique-se de escolher um
+                        horário que permita o deslocamento entre visitas.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={handleCloseRescheduleModal}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleConfirmReschedule}
+                    disabled={!rescheduleDate || !rescheduleTime}
+                    className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Reagendar
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
+
+        {/* Modal de Conflito de Horários - Renderizado via Portal */}
+        {showConflictModal &&
+          createPortal(
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-4 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <AlertTriangle className="h-6 w-6 text-white mr-3" />
+                    <div>
+                      <h2 className="text-xl font-bold text-white">
+                        Conflitos de Horário Detectados
+                      </h2>
+                      <p className="text-orange-100 text-sm">
+                        Alguns clientes têm o mesmo horário agendado
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleCloseConflictModal}
+                    className="p-2 hover:bg-white hover:bg-opacity-20 rounded-2xl transition-colors"
+                  >
+                    <X className="h-5 w-5 text-white" />
+                  </button>
+                </div>
+
+                <div className="overflow-y-auto max-h-[calc(90vh-140px)]">
+                  <div className="p-6">
+                    {/* Lista de Conflitos */}
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <Clock className="h-5 w-5 text-orange-600 mr-2" />
+                        Conflitos Encontrados
+                      </h3>
+
+                      <div className="space-y-3">
+                        {conflictData.conflicts.map((conflict, index) => (
+                          <div
+                            key={index}
+                            className="bg-orange-50 border border-orange-200 rounded-2xl p-4"
+                          >
+                            <div className="flex items-start">
+                              <AlertTriangle className="h-5 w-5 text-orange-600 mr-3 mt-0.5 flex-shrink-0" />
+                              <div className="text-sm text-orange-800">
+                                <div className="font-medium">{conflict}</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Opções */}
+                    <div className="bg-gray-50 rounded-2xl p-4">
+                      <h4 className="font-medium text-gray-900 mb-2">
+                        O que você gostaria de fazer?
+                      </h4>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>
+                          • <strong>Cancelar:</strong> Volte e ajuste os
+                          horários manualmente
+                        </li>
+                        <li>
+                          • <strong>Continuar:</strong> Agende mesmo com
+                          conflitos (não recomendado)
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={handleCloseConflictModal}
+                    className="flex-1 px-6 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    Cancelar e Ajustar
+                  </button>
+                  <button
+                    onClick={handleConfirmScheduleWithConflicts}
+                    disabled={loading}
+                    className="flex-1 px-6 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
+                  >
+                    {loading ? (
+                      <div className="animate-spin h-4 w-4 border border-white border-t-transparent rounded-full mr-2"></div>
+                    ) : (
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                    )}
+                    {loading ? "Agendando..." : "Continuar Mesmo Assim"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
+
+        {/* Modal de Conclusão da Visita com Observações Pré-programadas - Renderizado via Portal */}
+        {showCompletedModal &&
+          selectedVisitForCompletion &&
+          createPortal(
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
+                <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
+                    Marcar Visita como Realizada
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Cliente: {selectedVisitForCompletion.clientName}
+                  </p>
+                </div>
+
+                <div className="px-4 lg:px-6 py-4">
+                  <p className="text-sm text-gray-700 mb-4">
+                    Selecione uma observação sobre como foi a visita:
+                  </p>
+
+                  <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2">
+                    {[
+                      "Visitado e o cliente pagou tudo.",
+                      "Visitado, mas cliente pagou parcialmente",
+                      "Visitado, mas cliente mudou de endereço",
+                      "Visitado, mas cliente contestou a dívida",
+                    ].map((note, index) => (
                       <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-10 h-10 rounded-lg font-medium text-sm transition-colors ${
-                          currentPage === page
-                            ? "bg-blue-600 text-white shadow-sm"
-                            : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
-                        }`}
+                        key={index}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleConfirmCompletion(note);
+                        }}
+                        className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-green-50 hover:border-green-200 border border-gray-200 rounded-2xl transition-colors text-sm"
                       >
-                        {page}
+                        {note}
                       </button>
                     ))}
                   </div>
 
-                  <button
-                    onClick={() =>
-                      setCurrentPage(
-                        Math.min(totalSelectedDatePages, currentPage + 1),
-                      )
-                    }
-                    disabled={currentPage === totalSelectedDatePages}
-                    className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
-                  >
-                    <ChevronRight className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Modal de Notificação de Visitas Atrasadas - Renderizado via Portal */}
-      {showOverdueNotificationModal &&
-        Object.keys(overdueVisitsByDate).length > 0 && 
-        createPortal(
-          <div 
-            className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center p-4 z-50"
-            onClick={() => setShowOverdueNotificationModal(false)}
-          >
-            <div 
-              className="bg-white rounded-2xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="px-4 lg:px-6 py-4 border-b border-gray-200 bg-red-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <AlertTriangle className="h-6 w-6 text-red-600 mr-2" />
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Visitas Atrasadas
-                    </h3>
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleConfirmCompletion("");
+                      }}
+                      className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors text-sm"
+                    >
+                      Marcar como realizada sem observação
+                    </button>
                   </div>
+                </div>
+
+                <div className="px-4 lg:px-6 py-4 border-t border-gray-200">
                   <button
-                    onClick={() => setShowOverdueNotificationModal(false)}
-                    className="text-gray-400 hover:text-gray-600"
+                    onClick={() => {
+                      setShowCompletedModal(false);
+                      setSelectedVisitForCompletion(null);
+                    }}
+                    className="w-full px-4 py-2 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors"
                   >
-                    <X className="h-5 w-5" />
+                    Cancelar
                   </button>
                 </div>
               </div>
+            </div>,
+            document.body,
+          )}
 
-              <div className="px-4 lg:px-6 py-4 overflow-y-auto max-h-[calc(90vh-120px)]">
-                <p className="text-sm text-gray-600 mb-4">
-                  Você possui {Object.values(overdueVisitsByDate).flat().length}{" "}
-                  visita
-                  {Object.values(overdueVisitsByDate).flat().length > 1
-                    ? "s"
-                    : ""}{" "}
-                  atrasada
-                  {Object.values(overdueVisitsByDate).flat().length > 1
-                    ? "s"
-                    : ""}
-                  .
-                </p>
+        {/* Modal de Confirmação para "Não Encontrado" - Renderizado via Portal */}
+        {showNotFoundConfirmModal &&
+          selectedVisitForNotFound &&
+          createPortal(
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
+                <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <AlertTriangle className="h-5 w-5 mr-2 text-orange-600" />
+                    Confirmar "Não Encontrado"
+                  </h3>
+                </div>
 
-                <div className="space-y-3">
-                  {Object.entries(overdueVisitsByDate)
-                    .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
-                    .map(([date, visits]) => {
-                      const formattedDate = new Date(
-                        date + "T00:00:00",
-                      ).toLocaleDateString("pt-BR");
-                      const daysDiff = Math.floor(
-                        (new Date().getTime() -
-                          new Date(date + "T00:00:00").getTime()) /
-                          (1000 * 60 * 60 * 24),
-                      );
+                <div className="px-4 lg:px-6 py-4">
+                  <p className="text-gray-700 mb-2">
+                    <strong>Cliente:</strong>{" "}
+                    {selectedVisitForNotFound.clientName}
+                  </p>
+                  <p className="text-gray-700 mb-4">
+                    <strong>Endereço:</strong>{" "}
+                    {selectedVisitForNotFound.clientAddress}
+                  </p>
+                  <p className="text-gray-700">
+                    Tem certeza de que deseja marcar esta visita como{" "}
+                    <strong>"Não Encontrado"</strong>?
+                  </p>
+                </div>
 
-                      return (
-                        <div
-                          key={date}
-                          className="border border-red-200 rounded-lg p-3 bg-red-50"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <p className="font-semibold text-gray-900">
-                                {formattedDate}
-                              </p>
-                              <p className="text-xs text-red-600">
-                                {daysDiff} {daysDiff === 1 ? "dia" : "dias"} de
-                                atraso - {visits.length} visita
-                                {visits.length > 1 ? "s" : ""}
-                              </p>
+                <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowNotFoundConfirmModal(false);
+                      setSelectedVisitForNotFound(null);
+                    }}
+                    className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleConfirmNotFoundFirst}
+                    className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-2xl hover:bg-orange-700 transition-colors"
+                  >
+                    Sim, Confirmar
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
+
+        {/* Modal de "Não Encontrado" com Observações Pré-programadas - Renderizado via Portal */}
+        {showNotFoundObservationModal &&
+          selectedVisitForNotFound &&
+          createPortal(
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
+                <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <AlertTriangle className="h-5 w-5 mr-2 text-orange-600" />
+                    Marcar como "Não Encontrado"
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Cliente: {selectedVisitForNotFound.clientName}
+                  </p>
+                </div>
+
+                <div className="px-4 lg:px-6 py-4">
+                  <p className="text-sm text-gray-700 mb-4">
+                    Selecione o motivo de não ter encontrado o cliente:
+                  </p>
+
+                  <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2">
+                    {[
+                      "Cliente não estava em casa",
+                      "Cliente mudou de endereço",
+                      "Cliente evitou o atendimento",
+                      "Não foi possível localizar o endereço",
+                    ].map((note, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleConfirmNotFound(note)}
+                        className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-orange-50 hover:border-orange-200 border border-gray-200 rounded-2xl transition-colors text-sm"
+                      >
+                        {note}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-4">
+                    <button
+                      onClick={() => handleConfirmNotFound("")}
+                      className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors text-sm"
+                    >
+                      Marcar como não encontrado sem observação
+                    </button>
+                  </div>
+                </div>
+
+                <div className="px-4 lg:px-6 py-4 border-t border-gray-200">
+                  <button
+                    onClick={() => {
+                      setShowNotFoundObservationModal(false);
+                      setSelectedVisitForNotFound(null);
+                    }}
+                    className="w-full px-4 py-2 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
+
+        {/* Modal de Pergunta sobre Pagamento - Renderizado via Portal */}
+        {showPaymentQuestionModal &&
+          selectedVisitForPayment &&
+          createPortal(
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
+                <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <DollarSign className="h-5 w-5 mr-2 text-green-600" />
+                    Pagamento Realizado?
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Cliente: {selectedVisitForPayment.clientName}
+                  </p>
+                </div>
+
+                <div className="px-4 lg:px-6 py-6">
+                  <p className="text-gray-700 text-center mb-6">
+                    O cliente fez algum pagamento durante esta visita?
+                  </p>
+
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={handleClientMadePayment}
+                      className="flex-1 px-4 py-3 bg-green-500 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium flex items-center justify-center"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Sim, fez pagamento
+                    </button>
+                    <button
+                      onClick={handleClientDidNotPay}
+                      className="flex-1 px-4 py-3 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors font-medium flex items-center justify-center"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Não fez pagamento
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
+
+        {showTimeWarningModal &&
+          timeWarningData &&
+          createPortal(
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Horário Inválido
+                    </h3>
+                    <button
+                      onClick={() => setShowTimeWarningModal(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <X size={24} />
+                    </button>
+                  </div>
+
+                  <div className="mb-6">
+                    <div className="flex items-center mb-3">
+                      <AlertTriangle className="w-5 h-5 text-amber-500 mr-2" />
+                      <p className="text-gray-700">
+                        Não é possível agendar para um horário no passado.
+                      </p>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-2xl p-4 mb-4">
+                      <p className="text-sm text-gray-600 mb-2">
+                        <strong>Horário selecionado:</strong>{" "}
+                        {timeWarningData.selectedTime}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        <strong>Horário sugerido:</strong>{" "}
+                        {timeWarningData.suggestedTime}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        updateClientSchedule(
+                          timeWarningData.clientDocument,
+                          "time",
+                          timeWarningData.suggestedTime,
+                        );
+                        setShowTimeWarningModal(false);
+                        setTimeWarningData(null);
+                      }}
+                      className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-2xl hover:bg-blue-700 transition-colors"
+                    >
+                      Usar Horário Sugerido
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        // Reverter para o horário anterior
+                        if (timeWarningData.previousTime) {
+                          updateClientSchedule(
+                            timeWarningData.clientDocument,
+                            "time",
+                            timeWarningData.previousTime,
+                          );
+                        }
+                        setShowTimeWarningModal(false);
+                        setTimeWarningData(null);
+                      }}
+                      className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-2xl hover:bg-gray-300 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
+
+        {/* Modal de Agendamento de Nova Visita - Renderizado via Portal */}
+        {showScheduleModal &&
+          createPortal(
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-hidden"
+              onClick={(e) => {
+                // Fechar modal ao clicar fora dele
+                if (e.target === e.currentTarget) {
+                  setShowScheduleModal(false);
+                  setModalStep("selection");
+                }
+              }}
+            >
+              <div
+                className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-500 px-4 lg:px-6 py-4 border-b border-gray-200 bg-white rounded-t-2xl flex-shrink-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-white">
+                      {modalStep === "selection"
+                        ? "Selecionar Clientes para Visita"
+                        : "Confirmar Agendamento"}
+                    </h3>
+                    <button
+                      onClick={() => setShowScheduleModal(false)}
+                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                      title="Fechar"
+                    >
+                      <X className="h-5 w-5 text-gray-500" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  <div className="bg-gray-50 px-4 lg:px-6 py-4">
+                    {/* Content from the schedule tab */}
+                    {modalStep === "selection" ? (
+                      <div className="space-y-6">
+                        {/* Busca e Filtros */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="relative flex-1">
+                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                              <input
+                                id="search-clients"
+                                type="text"
+                                placeholder="Buscar por nome, documento, endereço ou cidade..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              />
                             </div>
                             <button
-                              onClick={() => navigateToOverdueDate(date)}
-                              className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
+                              onClick={() => setShowFilters(!showFilters)}
+                              className={`flex items-center px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                showFilters
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              }`}
+                              title="Filtros Avançados"
                             >
-                              Ver Visitas
+                              <Filter className="h-4 w-4" />
                             </button>
                           </div>
 
-                          <div className="text-xs text-gray-600 space-y-1">
-                            {visits.slice(0, 3).map((visit) => (
-                              <div key={visit.id} className="flex items-center">
-                                <User className="h-3 w-3 mr-1" />
-                                {visit.clientName}
+                          {/* Botões de Ordenação com Ícones */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleSort("cliente")}
+                              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                sortField === "cliente"
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              }`}
+                              title="Ordenar por Nome"
+                            >
+                              <User className="h-4 w-4" />
+                              {getSortIcon("cliente")}
+                            </button>
+                            <button
+                              onClick={() => handleSort("valor")}
+                              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                sortField === "valor"
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              }`}
+                              title="Ordenar por Valor"
+                            >
+                              <DollarSign className="h-4 w-4" />
+                              {getSortIcon("valor")}
+                            </button>
+                            <button
+                              onClick={() => handleSort("cidade")}
+                              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                sortField === "cidade"
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              }`}
+                              title="Ordenar por Cidade"
+                            >
+                              <MapPinIcon className="h-4 w-4" />
+                              {getSortIcon("cidade")}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Filtros Expandidos */}
+                        {showFilters && (
+                          <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div>
+                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                  <MapPin className="h-3 w-3 mr-1" />
+                                  Cidade
+                                </label>
+                                <select
+                                  value={filters.city}
+                                  onChange={(e) =>
+                                    setFilters({
+                                      ...filters,
+                                      city: e.target.value,
+                                    })
+                                  }
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                >
+                                  <option value="">Todas as cidades</option>
+                                  {Array.from(
+                                    new Set(
+                                      availableClients.map((c) => c.city),
+                                    ),
+                                  ).map((city) => (
+                                    <option key={city} value={city}>
+                                      {city}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
-                            ))}
-                            {visits.length > 3 && (
-                              <div className="text-gray-500 italic">
-                                ... e mais {visits.length - 3} cliente
-                                {visits.length - 3 > 1 ? "s" : ""}
+                              <div>
+                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                  <DollarSign className="h-3 w-3 mr-1" />
+                                  Valor Mínimo
+                                </label>
+                                <div className="relative">
+                                  <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                  <input
+                                    type="number"
+                                    placeholder="0"
+                                    value={filters.minValue}
+                                    onChange={(e) =>
+                                      setFilters({
+                                        ...filters,
+                                        minValue: e.target.value,
+                                      })
+                                    }
+                                    className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                  <DollarSign className="h-3 w-3 mr-1" />
+                                  Valor Máximo
+                                </label>
+                                <div className="relative">
+                                  <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                  <input
+                                    type="number"
+                                    placeholder="∞"
+                                    value={filters.maxValue}
+                                    onChange={(e) =>
+                                      setFilters({
+                                        ...filters,
+                                        maxValue: e.target.value,
+                                      })
+                                    }
+                                    className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  Status da Visita
+                                </label>
+                                <select
+                                  value={filters.visitStatus}
+                                  onChange={(e) =>
+                                    setFilters({
+                                      ...filters,
+                                      visitStatus: e.target.value,
+                                    })
+                                  }
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                >
+                                  <option value="">Todos os status</option>
+                                  <option value="never-visited">
+                                    Nunca visitado
+                                  </option>
+                                  <option value="recent">
+                                    Visitado recentemente
+                                  </option>
+                                  <option value="overdue">
+                                    Visita em atraso
+                                  </option>
+                                </select>
+                              </div>
+                            </div>
+                            <div className="flex justify-end">
+                              <button
+                                onClick={clearAllFilters}
+                                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors flex items-center"
+                              >
+                                <RefreshCw className="h-3 w-3 mr-1" />
+                                Limpar filtros
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Lista de Clientes */}
+                        <div className="space-y-6">
+                          {false && selectedClients.size > 0 && (
+                            <div
+                              id="clienteselecionadosdalistagem"
+                              className="bg-blue-50 border border-blue-200 rounded-2xl p-4"
+                            >
+                              <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Clientes Selecionados ({selectedClients.size})
+                              </h4>
+                              <div className="grid grid-cols-1 gap-3 max-h-95 overflow-y-auto">
+                                {availableClients
+                                  .filter((client) =>
+                                    selectedClients.has(client.document),
+                                  )
+                                  .map((client) => {
+                                    const schedule = clientSchedules.get(
+                                      client.document,
+                                    ) || {
+                                      date: "",
+                                      time: "",
+                                    };
+                                    return (
+                                      <div
+                                        key={client.document}
+                                        className="bg-white rounded-2xl p-3 border border-gray-200"
+                                      >
+                                        <div className="flex items-center justify-between mb-2">
+                                          <div>
+                                            <span className="font-medium text-gray-900">
+                                              {client.client}
+                                            </span>
+                                            <span className="text-gray-500 ml-2">
+                                              ({client.document})
+                                            </span>
+                                          </div>
+                                          <div className="text-red-600 font-medium">
+                                            {formatCurrency(
+                                              client.pendingValue,
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Data da Visita
+                                            </label>
+                                            <div className="relative">
+                                              <Calendar className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                                              <input
+                                                id={`visit-date-${client.document}`}
+                                                name={`visit-date-${client.document}`}
+                                                type="date"
+                                                value={schedule.date}
+                                                onChange={(e) =>
+                                                  updateClientSchedule(
+                                                    client.document,
+                                                    "date",
+                                                    e.target.value,
+                                                  )
+                                                }
+                                                min={getLocalDate()}
+                                                className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                              />
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Horário
+                                            </label>
+                                            <div className="relative">
+                                              <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                                              <input
+                                                id={`visit-time-${client.document}`}
+                                                name={`visit-time-${client.document}`}
+                                                type="time"
+                                                value={schedule.time}
+                                                onChange={(e) => {
+                                                  const selectedTime =
+                                                    e.target.value;
+                                                  updateClientSchedule(
+                                                    client.document,
+                                                    "time",
+                                                    selectedTime,
+                                                  );
+                                                  // Verificar se é um horário no passado
+                                                  const selectedDate =
+                                                    schedule.date;
+                                                  if (
+                                                    selectedDate &&
+                                                    selectedTime
+                                                  ) {
+                                                    const [year, month, day] =
+                                                      selectedDate.split("-");
+                                                    const [hours, minutes] =
+                                                      selectedTime.split(":");
+                                                    const selectedDateTime =
+                                                      new Date(
+                                                        parseInt(year),
+                                                        parseInt(month) - 1,
+                                                        parseInt(day),
+                                                        parseInt(hours),
+                                                        parseInt(minutes),
+                                                      );
+                                                    const now = new Date();
+                                                    if (
+                                                      selectedDateTime <= now
+                                                    ) {
+                                                      // Mostrar modal de aviso
+                                                      setTimeWarningData({
+                                                        clientDocument:
+                                                          client.document,
+                                                        selectedTime:
+                                                          selectedTime,
+                                                        suggestedTime: "",
+                                                        previousTime: "",
+                                                      });
+                                                      setShowTimeWarningModal(
+                                                        true,
+                                                      );
+                                                    }
+                                                  }
+                                                }}
+                                                className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                              />
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Resumo das Visitas Selecionadas */}
+                          {false && selectedClients.size > 0 && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                              <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                                <CalendarDays className="h-4 w-4 mr-2" />
+                                Resumo do Agendamento
+                              </h4>
+                              <div className="space-y-2">
+                                {availableClients
+                                  .filter((client) =>
+                                    selectedClients.has(client.document),
+                                  )
+                                  .map((client) => {
+                                    const schedule = clientSchedules.get(
+                                      client.document,
+                                    ) || {
+                                      date: "",
+                                      time: "",
+                                    };
+                                    if (!schedule.date || !schedule.time)
+                                      return null;
+                                    return (
+                                      <div
+                                        key={client.document}
+                                        className="flex items-center justify-between text-sm bg-white rounded-2xl p-2"
+                                      >
+                                        <div>
+                                          <span className="font-medium">
+                                            {client.client}
+                                          </span>
+                                          <span className="text-gray-500 ml-2">
+                                            ({client.document})
+                                          </span>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="font-medium text-blue-600">
+                                            {formatSafeDate(schedule.date)} às{" "}
+                                            {schedule.time}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Lista de Clientes Disponíveis */}
+                          <div>
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="font-semibold text-gray-900 flex items-center">
+                                <Users className="h-5 w-5 mr-2 text-blue-600" />
+                                Clientes para Visita
+                              </h4>
+                              {/* Indicador de Paginação */}
+                              {availableClients.length >
+                                modalClientsPerPage && (
+                                <div className="flex items-center space-x-3">
+                                  <div className="flex items-center space-x-1">
+                                    <button
+                                      onClick={() =>
+                                        setModalCurrentPage(
+                                          modalCurrentPage - 1,
+                                        )
+                                      }
+                                      disabled={modalCurrentPage === 1}
+                                      className="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                      title="Página anterior"
+                                    >
+                                      <ChevronLeft className="h-4 w-4" />
+                                    </button>
+                                    <span className="px-2 py-1 text-sm font-medium text-gray-700 min-w-[60px] text-center">
+                                      {modalCurrentPage}/
+                                      {Math.ceil(
+                                        availableClients.length /
+                                          modalClientsPerPage,
+                                      )}
+                                    </span>
+                                    <button
+                                      onClick={() =>
+                                        setModalCurrentPage(
+                                          modalCurrentPage + 1,
+                                        )
+                                      }
+                                      disabled={
+                                        modalCurrentPage >=
+                                        Math.ceil(
+                                          availableClients.length /
+                                            modalClientsPerPage,
+                                        )
+                                      }
+                                      className="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                      title="Próxima página"
+                                    >
+                                      <ChevronRight className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            {loading ? (
+                              <div className="flex items-center justify-center py-12">
+                                <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+                              </div>
+                            ) : availableClients.length === 0 ? (
+                              <div className="text-center py-12">
+                                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                <p className="text-gray-500">
+                                  {searchTerm ||
+                                  Object.values(filters).some(Boolean)
+                                    ? "Nenhum cliente encontrado com os filtros aplicados."
+                                    : "Nenhum cliente encontrado."}
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="space-y-6">
+                                {(() => {
+                                  // Paginação dos clientes
+                                  const startIndex =
+                                    (modalCurrentPage - 1) *
+                                    modalClientsPerPage;
+                                  const endIndex =
+                                    startIndex + modalClientsPerPage;
+                                  const paginatedClients =
+                                    availableClients.slice(
+                                      startIndex,
+                                      endIndex,
+                                    );
+
+                                  // Agrupar clientes paginados por bairro
+                                  const groupedClients =
+                                    paginatedClients.reduce(
+                                      (groups, client) => {
+                                        const neighborhood =
+                                          client.neighborhood || "Outros";
+                                        if (!groups[neighborhood]) {
+                                          groups[neighborhood] = [];
+                                        }
+                                        groups[neighborhood].push(client);
+                                        return groups;
+                                      },
+                                      {} as Record<
+                                        string,
+                                        typeof paginatedClients
+                                      >,
+                                    );
+
+                                  return Object.entries(groupedClients).map(
+                                    ([neighborhood, clients]) => (
+                                      <div key={neighborhood} className="mb-4">
+                                        {/* Neighborhood Header */}
+                                        <div className="flex items-center mb-3 pb-2 border-b border-gray-200">
+                                          <MapPin className="h-4 w-4 text-gray-500 mr-2" />
+                                          <h4 className="text-sm font-medium text-gray-700">
+                                            {neighborhood}
+                                          </h4>
+                                          <span className="ml-2 text-xs text-gray-500">
+                                            ({clients.length} cliente
+                                            {clients.length !== 1 ? "s" : ""})
+                                          </span>
+                                        </div>
+                                        {/* Client Cards */}
+                                        <div className="grid grid-cols-1 gap-3">
+                                          {clients.map((client) => {
+                                            const isSelected =
+                                              selectedClients.has(
+                                                client.document,
+                                              );
+                                            return (
+                                              <div
+                                                key={client.document}
+                                                className={`relative bg-white rounded-2xl border transition-all duration-200 cursor-pointer hover:shadow-md ${
+                                                  isSelected
+                                                    ? "border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200"
+                                                    : "border-gray-200 hover:border-gray-300"
+                                                }`}
+                                                onClick={() =>
+                                                  handleToggleClientSelection(
+                                                    client.document,
+                                                  )
+                                                }
+                                              >
+                                                <div className="p-4 bg-white border-1 rounded-2xl">
+                                                  <div className="flex items-start">
+                                                    <div className="flex-1 min-w-0">
+                                                      {/* Client Info */}
+                                                      <div className="flex items-start justify-between mb-2">
+                                                        <div className="min-w-0 flex-1">
+                                                          <h3 className="font-semibold text-gray-900 text-lg truncate">
+                                                            {client.client}
+                                                          </h3>
+                                                          <p className="text-sm text-gray-600">
+                                                            {client.document}
+                                                          </p>
+                                                        </div>
+                                                      </div>
+                                                      {/* Client Details */}
+                                                      <div className="space-y-2 text-sm text-gray-600">
+                                                        <div className="flex items-center">
+                                                          <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                                                          <span className="truncate">
+                                                            {client.address},{" "}
+                                                            {client.city}
+                                                          </span>
+                                                        </div>
+                                                        <div className="flex items-center">
+                                                          <DollarSign className="h-4 w-4 mr-2 flex-shrink-0" />
+                                                          <span className="font-medium text-red-600">
+                                                            {formatCurrency(
+                                                              client.pendingValue,
+                                                            )}{" "}
+                                                            pendente
+                                                          </span>
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    ),
+                                  );
+                                })()}
                               </div>
                             )}
                           </div>
                         </div>
-                      );
-                    })}
-                </div>
-              </div>
-
-              <div className="px-4 lg:px-6 py-4 border-t border-gray-200">
-                <button
-                  onClick={() => setShowOverdueNotificationModal(false)}
-                  className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-2xl hover:bg-gray-300 transition-colors font-medium"
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
-
-      {/* Modal de Detalhes do Cliente - Renderizado via Portal */}
-      {showClientModal && selectedClientForModal && createPortal(
-        <ClientDetailModal
-          clientGroup={selectedClientForModal}
-          userType="collector"
-          onClose={handleCloseClientModal}
-        />,
-        document.body
-      )}
-
-      {/* Modal de Solicitação de Cancelamento - Renderizado via Portal */}
-      {showCancellationModal && selectedVisitForCancellation && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
-            <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Solicitar Cancelamento de Visita
-              </h3>
-            </div>
-
-            <div className="px-4 lg:px-6 py-4">
-              <div className="mb-4">
-                <div className="text-sm text-gray-600 mb-2">
-                  <strong>Cliente:</strong>{" "}
-                  {selectedVisitForCancellation.clientName}
-                </div>
-                <div className="text-sm text-gray-600 mb-2">
-                  <strong>Data:</strong>{" "}
-                  {formatSafeDateTime(
-                    selectedVisitForCancellation.scheduledDate,
-                    selectedVisitForCancellation.scheduledTime,
-                  )}
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Motivo do cancelamento *
-                </label>
-                <textarea
-                  id="cancellation-reason"
-                  name="cancellation-reason"
-                  value={cancellationReason}
-                  onChange={(e) => setCancellationReason(e.target.value)}
-                  placeholder="Descreva o motivo para solicitar o cancelamento desta visita..."
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
-              </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 mb-4">
-                <div className="flex items-start">
-                  <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-yellow-700">
-                    <strong>Atenção:</strong> Esta solicitação será enviada para
-                    aprovação do gerente. A visita permanecerá agendada até que
-                    seja aprovada ou rejeitada.
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={handleCloseCancellationModal}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmCancellation}
-                disabled={!cancellationReason.trim()}
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-2xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Solicitar
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Modal de Reagendamento - Renderizado via Portal */}
-      {showRescheduleModal && selectedVisitForReschedule && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
-            <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <RefreshCw className="h-5 w-5 mr-2 text-blue-600" />
-                Reagendar Visita
-              </h3>
-            </div>
-
-            <div className="px-4 lg:px-6 py-4">
-              <div className="mb-4">
-                <div className="text-sm text-gray-600 mb-2">
-                  <strong>Cliente:</strong>{" "}
-                  {selectedVisitForReschedule.clientName}
-                </div>
-                <div className="text-sm text-gray-600 mb-2">
-                  <strong>Agendamento atual:</strong>{" "}
-                  {formatSafeDateTime(
-                    selectedVisitForReschedule.scheduledDate,
-                    selectedVisitForReschedule.scheduledTime,
-                  )}
-                </div>
-                <div className="text-sm text-gray-600 mb-4">
-                  <strong>Endereço:</strong>{" "}
-                  {selectedVisitForReschedule.clientAddress}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nova Data *
-                  </label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      id="reschedule-date"
-                      name="reschedule-date"
-                      type="date"
-                      value={rescheduleDate}
-                      onChange={(e) => setRescheduleDate(e.target.value)}
-                      min={getLocalDate()}
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Novo Horário *
-                  </label>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      id="reschedule-time"
-                      name="reschedule-time"
-                      type="time"
-                      value={rescheduleTime}
-                      onChange={(e) => setRescheduleTime(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 mt-4">
-                <div className="flex items-start">
-                  <Calendar className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-blue-700">
-                    <strong>Dica:</strong> Certifique-se de escolher um horário
-                    que permita o deslocamento entre visitas.
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={handleCloseRescheduleModal}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmReschedule}
-                disabled={!rescheduleDate || !rescheduleTime}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
-              >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Reagendar
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Modal de Conflito de Horários - Renderizado via Portal */}
-      {showConflictModal && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center">
-                <AlertTriangle className="h-6 w-6 text-white mr-3" />
-                <div>
-                  <h2 className="text-xl font-bold text-white">
-                    Conflitos de Horário Detectados
-                  </h2>
-                  <p className="text-orange-100 text-sm">
-                    Alguns clientes têm o mesmo horário agendado
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleCloseConflictModal}
-                className="p-2 hover:bg-white hover:bg-opacity-20 rounded-2xl transition-colors"
-              >
-                <X className="h-5 w-5 text-white" />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto max-h-[calc(90vh-140px)]">
-              <div className="p-6">
-                {/* Lista de Conflitos */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                    <Clock className="h-5 w-5 text-orange-600 mr-2" />
-                    Conflitos Encontrados
-                  </h3>
-
-                  <div className="space-y-3">
-                    {conflictData.conflicts.map((conflict, index) => (
-                      <div
-                        key={index}
-                        className="bg-orange-50 border border-orange-200 rounded-2xl p-4"
-                      >
-                        <div className="flex items-start">
-                          <AlertTriangle className="h-5 w-5 text-orange-600 mr-3 mt-0.5 flex-shrink-0" />
-                          <div className="text-sm text-orange-800">
-                            <div className="font-medium">{conflict}</div>
-                          </div>
-                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Opções */}
-                <div className="bg-gray-50 rounded-2xl p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">
-                    O que você gostaria de fazer?
-                  </h4>
-                  <ul className="text-sm text-gray-600 space-y-1">
-                    <li>
-                      • <strong>Cancelar:</strong> Volte e ajuste os horários
-                      manualmente
-                    </li>
-                    <li>
-                      • <strong>Continuar:</strong> Agende mesmo com conflitos
-                      (não recomendado)
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={handleCloseConflictModal}
-                className="flex-1 px-6 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors font-medium"
-              >
-                Cancelar e Ajustar
-              </button>
-              <button
-                onClick={handleConfirmScheduleWithConflicts}
-                disabled={loading}
-                className="flex-1 px-6 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
-              >
-                {loading ? (
-                  <div className="animate-spin h-4 w-4 border border-white border-t-transparent rounded-full mr-2"></div>
-                ) : (
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                )}
-                {loading ? "Agendando..." : "Continuar Mesmo Assim"}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Modal de Conclusão da Visita com Observações Pré-programadas - Renderizado via Portal */}
-      {showCompletedModal && selectedVisitForCompletion && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
-            <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
-                Marcar Visita como Realizada
-              </h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Cliente: {selectedVisitForCompletion.clientName}
-              </p>
-            </div>
-
-            <div className="px-4 lg:px-6 py-4">
-              <p className="text-sm text-gray-700 mb-4">
-                Selecione uma observação sobre como foi a visita:
-              </p>
-
-              <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2">
-                {[
-                  "Visitado e o cliente pagou tudo.",
-                  "Visitado, mas cliente pagou parcialmente",
-                  "Visitado, mas cliente mudou de endereço",
-                  "Visitado, mas cliente contestou a dívida",
-                ].map((note, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleConfirmCompletion(note);
-                    }}
-                    className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-green-50 hover:border-green-200 border border-gray-200 rounded-2xl transition-colors text-sm"
-                  >
-                    {note}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleConfirmCompletion("");
-                  }}
-                  className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors text-sm"
-                >
-                  Marcar como realizada sem observação
-                </button>
-              </div>
-            </div>
-
-            <div className="px-4 lg:px-6 py-4 border-t border-gray-200">
-              <button
-                onClick={() => {
-                  setShowCompletedModal(false);
-                  setSelectedVisitForCompletion(null);
-                }}
-                className="w-full px-4 py-2 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Modal de Confirmação para "Não Encontrado" - Renderizado via Portal */}
-      {showNotFoundConfirmModal && selectedVisitForNotFound && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
-            <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <AlertTriangle className="h-5 w-5 mr-2 text-orange-600" />
-                Confirmar "Não Encontrado"
-              </h3>
-            </div>
-
-            <div className="px-4 lg:px-6 py-4">
-              <p className="text-gray-700 mb-2">
-                <strong>Cliente:</strong> {selectedVisitForNotFound.clientName}
-              </p>
-              <p className="text-gray-700 mb-4">
-                <strong>Endereço:</strong>{" "}
-                {selectedVisitForNotFound.clientAddress}
-              </p>
-              <p className="text-gray-700">
-                Tem certeza de que deseja marcar esta visita como{" "}
-                <strong>"Não Encontrado"</strong>?
-              </p>
-            </div>
-
-            <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowNotFoundConfirmModal(false);
-                  setSelectedVisitForNotFound(null);
-                }}
-                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmNotFoundFirst}
-                className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-2xl hover:bg-orange-700 transition-colors"
-              >
-                Sim, Confirmar
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Modal de "Não Encontrado" com Observações Pré-programadas - Renderizado via Portal */}
-      {showNotFoundObservationModal && selectedVisitForNotFound && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
-            <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <AlertTriangle className="h-5 w-5 mr-2 text-orange-600" />
-                Marcar como "Não Encontrado"
-              </h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Cliente: {selectedVisitForNotFound.clientName}
-              </p>
-            </div>
-
-            <div className="px-4 lg:px-6 py-4">
-              <p className="text-sm text-gray-700 mb-4">
-                Selecione o motivo de não ter encontrado o cliente:
-              </p>
-
-              <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2">
-                {[
-                  "Cliente não estava em casa",
-                  "Cliente mudou de endereço",
-                  "Cliente evitou o atendimento",
-                  "Não foi possível localizar o endereço",
-                ].map((note, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleConfirmNotFound(note)}
-                    className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-orange-50 hover:border-orange-200 border border-gray-200 rounded-2xl transition-colors text-sm"
-                  >
-                    {note}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-4">
-                <button
-                  onClick={() => handleConfirmNotFound("")}
-                  className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors text-sm"
-                >
-                  Marcar como não encontrado sem observação
-                </button>
-              </div>
-            </div>
-
-            <div className="px-4 lg:px-6 py-4 border-t border-gray-200">
-              <button
-                onClick={() => {
-                  setShowNotFoundObservationModal(false);
-                  setSelectedVisitForNotFound(null);
-                }}
-                className="w-full px-4 py-2 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Modal de Pergunta sobre Pagamento - Renderizado via Portal */}
-      {showPaymentQuestionModal && selectedVisitForPayment && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
-            <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <DollarSign className="h-5 w-5 mr-2 text-green-600" />
-                Pagamento Realizado?
-              </h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Cliente: {selectedVisitForPayment.clientName}
-              </p>
-            </div>
-
-            <div className="px-4 lg:px-6 py-6">
-              <p className="text-gray-700 text-center mb-6">
-                O cliente fez algum pagamento durante esta visita?
-              </p>
-
-              <div className="flex space-x-3">
-                <button
-                  onClick={handleClientMadePayment}
-                  className="flex-1 px-4 py-3 bg-green-500 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium flex items-center justify-center"
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Sim, fez pagamento
-                </button>
-                <button
-                  onClick={handleClientDidNotPay}
-                  className="flex-1 px-4 py-3 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors font-medium flex items-center justify-center"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Não fez pagamento
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {showTimeWarningModal && timeWarningData && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Horário Inválido
-                </h3>
-                <button
-                  onClick={() => setShowTimeWarningModal(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X size={24} />
-                </button>
-              </div>
-
-              <div className="mb-6">
-                <div className="flex items-center mb-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-500 mr-2" />
-                  <p className="text-gray-700">
-                    Não é possível agendar para um horário no passado.
-                  </p>
-                </div>
-
-                <div className="bg-gray-50 rounded-2xl p-4 mb-4">
-                  <p className="text-sm text-gray-600 mb-2">
-                    <strong>Horário selecionado:</strong>{" "}
-                    {timeWarningData.selectedTime}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    <strong>Horário sugerido:</strong>{" "}
-                    {timeWarningData.suggestedTime}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    updateClientSchedule(
-                      timeWarningData.clientDocument,
-                      "time",
-                      timeWarningData.suggestedTime,
-                    );
-                    setShowTimeWarningModal(false);
-                    setTimeWarningData(null);
-                  }}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-2xl hover:bg-blue-700 transition-colors"
-                >
-                  Usar Horário Sugerido
-                </button>
-
-                <button
-                  onClick={() => {
-                    // Reverter para o horário anterior
-                    if (timeWarningData.previousTime) {
-                      updateClientSchedule(
-                        timeWarningData.clientDocument,
-                        "time",
-                        timeWarningData.previousTime,
-                      );
-                    }
-                    setShowTimeWarningModal(false);
-                    setTimeWarningData(null);
-                  }}
-                  className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-2xl hover:bg-gray-300 transition-colors"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-
-      {/* Modal de Agendamento de Nova Visita - Renderizado via Portal */}
-      {showScheduleModal && createPortal(
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-hidden"
-          onClick={(e) => {
-            // Fechar modal ao clicar fora dele
-            if (e.target === e.currentTarget) {
-              setShowScheduleModal(false);
-              setModalStep("selection");
-            }
-          }}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-500 px-4 lg:px-6 py-4 border-b border-gray-200 bg-white rounded-t-2xl flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">
-                  {modalStep === "selection"
-                    ? "Selecionar Clientes para Visita"
-                    : "Confirmar Agendamento"}
-                </h3>
-                <button
-                  onClick={() => setShowScheduleModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                  title="Fechar"
-                >
-                  <X className="h-5 w-5 text-gray-500" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <div className="bg-gray-50 px-4 lg:px-6 py-4">
-                {/* Content from the schedule tab */}
-                {modalStep === "selection" ? (
-                  <div className="space-y-6">
-                    {/* Busca e Filtros */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="relative flex-1">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                          <input
-                            id="search-clients"
-                            type="text"
-                            placeholder="Buscar por nome, documento, endereço ou cidade..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          />
-                        </div>
-                        <button
-                          onClick={() => setShowFilters(!showFilters)}
-                          className={`flex items-center px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            showFilters
-                              ? "bg-blue-600 text-white"
-                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                          }`}
-                          title="Filtros Avançados"
-                        >
-                          <Filter className="h-4 w-4" />
-                        </button>
-                      </div>
-
-                      {/* Botões de Ordenação com Ícones */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleSort("cliente")}
-                          className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            sortField === "cliente"
-                              ? "bg-blue-600 text-white"
-                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                          }`}
-                          title="Ordenar por Nome"
-                        >
-                          <User className="h-4 w-4" />
-                          {getSortIcon("cliente")}
-                        </button>
-                        <button
-                          onClick={() => handleSort("valor")}
-                          className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            sortField === "valor"
-                              ? "bg-blue-600 text-white"
-                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                          }`}
-                          title="Ordenar por Valor"
-                        >
-                          <DollarSign className="h-4 w-4" />
-                          {getSortIcon("valor")}
-                        </button>
-                        <button
-                          onClick={() => handleSort("cidade")}
-                          className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            sortField === "cidade"
-                              ? "bg-blue-600 text-white"
-                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                          }`}
-                          title="Ordenar por Cidade"
-                        >
-                          <MapPinIcon className="h-4 w-4" />
-                          {getSortIcon("cidade")}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Filtros Expandidos */}
-                    {showFilters && (
-                      <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                          <div>
-                            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                              <MapPin className="h-3 w-3 mr-1" />
-                              Cidade
-                            </label>
-                            <select
-                              value={filters.city}
-                              onChange={(e) =>
-                                setFilters({ ...filters, city: e.target.value })
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                            >
-                              <option value="">Todas as cidades</option>
-                              {Array.from(
-                                new Set(availableClients.map((c) => c.city)),
-                              ).map((city) => (
-                                <option key={city} value={city}>
-                                  {city}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                              <DollarSign className="h-3 w-3 mr-1" />
-                              Valor Mínimo
-                            </label>
-                            <div className="relative">
-                              <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                              <input
-                                type="number"
-                                placeholder="0"
-                                value={filters.minValue}
-                                onChange={(e) =>
-                                  setFilters({
-                                    ...filters,
-                                    minValue: e.target.value,
-                                  })
-                                }
-                                className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                              <DollarSign className="h-3 w-3 mr-1" />
-                              Valor Máximo
-                            </label>
-                            <div className="relative">
-                              <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                              <input
-                                type="number"
-                                placeholder="∞"
-                                value={filters.maxValue}
-                                onChange={(e) =>
-                                  setFilters({
-                                    ...filters,
-                                    maxValue: e.target.value,
-                                  })
-                                }
-                                className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                              <Eye className="h-3 w-3 mr-1" />
-                              Status da Visita
-                            </label>
-                            <select
-                              value={filters.visitStatus}
-                              onChange={(e) =>
-                                setFilters({
-                                  ...filters,
-                                  visitStatus: e.target.value,
-                                })
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                            >
-                              <option value="">Todos os status</option>
-                              <option value="never-visited">
-                                Nunca visitado
-                              </option>
-                              <option value="recent">
-                                Visitado recentemente
-                              </option>
-                              <option value="overdue">Visita em atraso</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="flex justify-end">
-                          <button
-                            onClick={clearAllFilters}
-                            className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors flex items-center"
-                          >
-                            <RefreshCw className="h-3 w-3 mr-1" />
-                            Limpar filtros
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Lista de Clientes */}
-                    <div className="space-y-6">
-                      {false && selectedClients.size > 0 && (
-                        <div
-                          id="clienteselecionadosdalistagem"
-                          className="bg-blue-50 border border-blue-200 rounded-2xl p-4"
-                        >
-                          <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Clientes Selecionados ({selectedClients.size})
-                          </h4>
-                          <div className="grid grid-cols-1 gap-3 max-h-95 overflow-y-auto">
-                            {availableClients
-                              .filter((client) =>
-                                selectedClients.has(client.document),
-                              )
-                              .map((client) => {
-                                const schedule = clientSchedules.get(
-                                  client.document,
-                                ) || {
-                                  date: "",
-                                  time: "",
-                                };
-                                return (
-                                  <div
-                                    key={client.document}
-                                    className="bg-white rounded-2xl p-3 border border-gray-200"
-                                  >
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div>
-                                        <span className="font-medium text-gray-900">
-                                          {client.client}
-                                        </span>
-                                        <span className="text-gray-500 ml-2">
-                                          ({client.document})
-                                        </span>
-                                      </div>
-                                      <div className="text-red-600 font-medium">
-                                        {formatCurrency(client.pendingValue)}
-                                      </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                      <div>
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                                          Data da Visita
-                                        </label>
-                                        <div className="relative">
-                                          <Calendar className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                                          <input
-                                            id={`visit-date-${client.document}`}
-                                            name={`visit-date-${client.document}`}
-                                            type="date"
-                                            value={schedule.date}
-                                            onChange={(e) =>
-                                              updateClientSchedule(
-                                                client.document,
-                                                "date",
-                                                e.target.value,
-                                              )
-                                            }
-                                            min={getLocalDate()}
-                                            className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                          />
+                    ) : (
+                      // Etapa de confirmação - Usando os componentes existentes
+                      <div className="space-y-6">
+                        {/* Lista de Clientes Selecionados - Mesmo conteúdo do componente principal */}
+                        {selectedClients.size > 0 && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                            <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Clientes Selecionados ({selectedClients.size})
+                            </h4>
+                            <div className="grid grid-cols-1 gap-3 max-h-95 overflow-y-auto">
+                              {availableClients
+                                .filter((client) =>
+                                  selectedClients.has(client.document),
+                                )
+                                .map((client) => {
+                                  const schedule = clientSchedules.get(
+                                    client.document,
+                                  ) || {
+                                    date: "",
+                                    time: "",
+                                  };
+                                  return (
+                                    <div
+                                      key={client.document}
+                                      className="bg-white rounded-2xl p-3 border border-gray-200"
+                                    >
+                                      <div className="flex items-center justify-between mb-2">
+                                        <div>
+                                          <span className="font-medium text-gray-900">
+                                            {client.client}
+                                          </span>
+                                          <span className="text-gray-500 ml-2 text-sm">
+                                            ({client.document})
+                                          </span>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-sm text-gray-600">
+                                            {formatSafeDate(schedule.date)} às{" "}
+                                            {schedule.time}
+                                          </div>
                                         </div>
                                       </div>
-                                      <div>
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                                          Horário
-                                        </label>
-                                        <div className="relative">
-                                          <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                                          <input
-                                            id={`visit-time-${client.document}`}
-                                            name={`visit-time-${client.document}`}
-                                            type="time"
-                                            value={schedule.time}
-                                            onChange={(e) => {
-                                              const selectedTime =
-                                                e.target.value;
-                                              updateClientSchedule(
-                                                client.document,
-                                                "time",
-                                                selectedTime,
-                                              );
-                                              // Verificar se é um horário no passado
-                                              const selectedDate =
-                                                schedule.date;
-                                              if (
-                                                selectedDate &&
-                                                selectedTime
-                                              ) {
-                                                const [year, month, day] =
-                                                  selectedDate.split("-");
-                                                const [hours, minutes] =
-                                                  selectedTime.split(":");
-                                                const selectedDateTime =
-                                                  new Date(
-                                                    parseInt(year),
-                                                    parseInt(month) - 1,
-                                                    parseInt(day),
-                                                    parseInt(hours),
-                                                    parseInt(minutes),
-                                                  );
-                                                const now = new Date();
-                                                if (selectedDateTime <= now) {
-                                                  // Mostrar modal de aviso
-                                                  setTimeWarningData({
-                                                    clientDocument:
-                                                      client.document,
-                                                    selectedTime: selectedTime,
-                                                    suggestedTime: "",
-                                                    previousTime: "",
-                                                  });
-                                                  setShowTimeWarningModal(true);
-                                                }
-                                              }
-                                            }}
-                                            className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                          />
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                          <div className="flex">
+                                            <Calendar className="h-3 w-3 text-gray-400 mr-1 mt-0.5" />
+                                            <input
+                                              type="date"
+                                              value={schedule.date}
+                                              onChange={(e) => {
+                                                const newSchedules = new Map(
+                                                  clientSchedules,
+                                                );
+                                                newSchedules.set(
+                                                  client.document,
+                                                  {
+                                                    ...schedule,
+                                                    date: e.target.value,
+                                                  },
+                                                );
+                                                setClientSchedules(
+                                                  newSchedules,
+                                                );
+                                              }}
+                                              className="w-full text-sm border border-gray-300 rounded-2xl px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                          </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                          <div className="flex">
+                                            <Clock className="h-3 w-3 text-gray-400 mr-1 mt-0.5" />
+                                            <input
+                                              type="time"
+                                              value={schedule.time}
+                                              onChange={(e) => {
+                                                const newSchedules = new Map(
+                                                  clientSchedules,
+                                                );
+                                                newSchedules.set(
+                                                  client.document,
+                                                  {
+                                                    ...schedule,
+                                                    time: e.target.value,
+                                                  },
+                                                );
+                                                setClientSchedules(
+                                                  newSchedules,
+                                                );
+                                              }}
+                                              className="w-full text-sm border border-gray-300 rounded-2xl px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
-                                  </div>
-                                );
-                              })}
+                                  );
+                                })}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Resumo das Visitas Selecionadas */}
-                      {false && selectedClients.size > 0 && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                          <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
-                            <CalendarDays className="h-4 w-4 mr-2" />
-                            Resumo do Agendamento
-                          </h4>
-                          <div className="space-y-2">
-                            {availableClients
-                              .filter((client) =>
-                                selectedClients.has(client.document),
-                              )
-                              .map((client) => {
+                        {/* Resumo dos Agendamentos - Mesmo conteúdo do componente principal */}
+                        {selectedClients.size > 0 && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                            <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
+                              <Calendar className="h-4 w-4 mr-2" />
+                              Resumo dos Agendamentos
+                            </h3>
+                            <div className="space-y-2">
+                              {getSelectedClientsData().map((client) => {
                                 const schedule = clientSchedules.get(
                                   client.document,
                                 ) || {
-                                  date: "",
-                                  time: "",
+                                  date: selectedDate,
+                                  time: selectedTime,
                                 };
-                                if (!schedule.date || !schedule.time)
-                                  return null;
                                 return (
                                   <div
                                     key={client.document}
@@ -3866,496 +4262,192 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                   </div>
                                 );
                               })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Lista de Clientes Disponíveis */}
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="font-semibold text-gray-900 flex items-center">
-                            <Users className="h-5 w-5 mr-2 text-blue-600" />
-                            Clientes para Visita
-                          </h4>
-                          {/* Indicador de Paginação */}
-                          {availableClients.length > modalClientsPerPage && (
-                            <div className="flex items-center space-x-3">
-                              <div className="flex items-center space-x-1">
-                                <button
-                                  onClick={() =>
-                                    setModalCurrentPage(modalCurrentPage - 1)
-                                  }
-                                  disabled={modalCurrentPage === 1}
-                                  className="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                  title="Página anterior"
-                                >
-                                  <ChevronLeft className="h-4 w-4" />
-                                </button>
-                                <span className="px-2 py-1 text-sm font-medium text-gray-700 min-w-[60px] text-center">
-                                  {modalCurrentPage}/
-                                  {Math.ceil(
-                                    availableClients.length /
-                                      modalClientsPerPage,
-                                  )}
-                                </span>
-                                <button
-                                  onClick={() =>
-                                    setModalCurrentPage(modalCurrentPage + 1)
-                                  }
-                                  disabled={
-                                    modalCurrentPage >=
-                                    Math.ceil(
-                                      availableClients.length /
-                                        modalClientsPerPage,
-                                    )
-                                  }
-                                  className="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                  title="Próxima página"
-                                >
-                                  <ChevronRight className="h-4 w-4" />
-                                </button>
-                              </div>
                             </div>
-                          )}
-                        </div>
-                        {loading ? (
-                          <div className="flex items-center justify-center py-12">
-                            <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-                          </div>
-                        ) : availableClients.length === 0 ? (
-                          <div className="text-center py-12">
-                            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                            <p className="text-gray-500">
-                              {searchTerm ||
-                              Object.values(filters).some(Boolean)
-                                ? "Nenhum cliente encontrado com os filtros aplicados."
-                                : "Nenhum cliente encontrado."}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-6">
-                            {(() => {
-                              // Paginação dos clientes
-                              const startIndex =
-                                (modalCurrentPage - 1) * modalClientsPerPage;
-                              const endIndex = startIndex + modalClientsPerPage;
-                              const paginatedClients = availableClients.slice(
-                                startIndex,
-                                endIndex,
-                              );
-
-                              // Agrupar clientes paginados por bairro
-                              const groupedClients = paginatedClients.reduce(
-                                (groups, client) => {
-                                  const neighborhood =
-                                    client.neighborhood || "Outros";
-                                  if (!groups[neighborhood]) {
-                                    groups[neighborhood] = [];
-                                  }
-                                  groups[neighborhood].push(client);
-                                  return groups;
-                                },
-                                {} as Record<string, typeof paginatedClients>,
-                              );
-
-                              return Object.entries(groupedClients).map(
-                                ([neighborhood, clients]) => (
-                                  <div key={neighborhood} className="mb-4">
-                                    {/* Neighborhood Header */}
-                                    <div className="flex items-center mb-3 pb-2 border-b border-gray-200">
-                                      <MapPin className="h-4 w-4 text-gray-500 mr-2" />
-                                      <h4 className="text-sm font-medium text-gray-700">
-                                        {neighborhood}
-                                      </h4>
-                                      <span className="ml-2 text-xs text-gray-500">
-                                        ({clients.length} cliente
-                                        {clients.length !== 1 ? "s" : ""})
-                                      </span>
-                                    </div>
-                                    {/* Client Cards */}
-                                    <div className="grid grid-cols-1 gap-3">
-                                      {clients.map((client) => {
-                                        const isSelected = selectedClients.has(
-                                          client.document,
-                                        );
-                                        return (
-                                          <div
-                                            key={client.document}
-                                            className={`relative bg-white rounded-2xl border transition-all duration-200 cursor-pointer hover:shadow-md ${
-                                              isSelected
-                                                ? "border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200"
-                                                : "border-gray-200 hover:border-gray-300"
-                                            }`}
-                                            onClick={() =>
-                                              handleToggleClientSelection(
-                                                client.document,
-                                              )
-                                            }
-                                          >
-                                            <div className="p-4 bg-white border-1 rounded-2xl">
-                                              <div className="flex items-start">
-                                                <div className="flex-1 min-w-0">
-                                                  {/* Client Info */}
-                                                  <div className="flex items-start justify-between mb-2">
-                                                    <div className="min-w-0 flex-1">
-                                                      <h3 className="font-semibold text-gray-900 text-lg truncate">
-                                                        {client.client}
-                                                      </h3>
-                                                      <p className="text-sm text-gray-600">
-                                                        {client.document}
-                                                      </p>
-                                                    </div>
-                                                  </div>
-                                                  {/* Client Details */}
-                                                  <div className="space-y-2 text-sm text-gray-600">
-                                                    <div className="flex items-center">
-                                                      <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
-                                                      <span className="truncate">
-                                                        {client.address},{" "}
-                                                        {client.city}
-                                                      </span>
-                                                    </div>
-                                                    <div className="flex items-center">
-                                                      <DollarSign className="h-4 w-4 mr-2 flex-shrink-0" />
-                                                      <span className="font-medium text-red-600">
-                                                        {formatCurrency(
-                                                          client.pendingValue,
-                                                        )}{" "}
-                                                        pendente
-                                                      </span>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                ),
-                              );
-                            })()}
                           </div>
                         )}
                       </div>
+                    )}
+                  </div>
+                </div>
+                <div className="px-4 lg:px-6 py-4 border-t border-gray-200 bg-white rounded-b-2xl flex-shrink-0">
+                  {/* Mobile: Layout em duas linhas */}
+                  <div className="sm:hidden space-y-3">
+                    {/* Primeira linha mobile: Limpar e Cancelar */}
+                    <div className="flex flex-row items-center justify-start space-x-4">
+                      <button
+                        onClick={() => {
+                          setSelectedClients(new Set());
+                          setClientSchedules(new Map());
+                          setNotes("");
+                          clearAllFilters();
+                          setCurrentPage(1);
+                          setClientsCurrentPage(1);
+                          setModalCurrentPage(1);
+                          setModalStep("selection");
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Limpar
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowScheduleModal(false);
+                          setModalStep("selection");
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Cancelar
+                      </button>
+                    </div>
+
+                    {/* Segunda linha mobile: Botões de ação */}
+                    <div className="flex flex-col items-stretch justify-end space-y-2">
+                      {modalStep === "confirmation" && (
+                        <button
+                          onClick={() => setModalStep("selection")}
+                          className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
+                        >
+                          <ChevronLeft className="h-4 w-4 mr-2" />
+                          Voltar
+                        </button>
+                      )}
+                      {modalStep === "selection" ? (
+                        <button
+                          onClick={() => setModalStep("confirmation")}
+                          disabled={selectedClients.size === 0}
+                          className="w-full sm:w-auto px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
+                        >
+                          <ChevronRight className="h-4 w-4 mr-2" />
+                          Avançar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            handleScheduleVisit();
+                            setShowScheduleModal(false);
+                            setModalStep("selection");
+                          }}
+                          disabled={selectedClients.size === 0 || loading}
+                          className="w-full sm:w-auto px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
+                        >
+                          {loading ? (
+                            <div className="animate-spin h-4 w-4 border border-white border-t-transparent rounded-full mr-2"></div>
+                          ) : (
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                          )}
+                          {loading
+                            ? "Agendando..."
+                            : `Confirmar ${selectedClients.size} Visita${selectedClients.size > 1 ? "s" : ""}`}
+                        </button>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  // Etapa de confirmação - Usando os componentes existentes
-                  <div className="space-y-6">
-                    {/* Lista de Clientes Selecionados - Mesmo conteúdo do componente principal */}
-                    {selectedClients.size > 0 && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                        <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Clientes Selecionados ({selectedClients.size})
-                        </h4>
-                        <div className="grid grid-cols-1 gap-3 max-h-95 overflow-y-auto">
-                          {availableClients
-                            .filter((client) =>
-                              selectedClients.has(client.document),
-                            )
-                            .map((client) => {
-                              const schedule = clientSchedules.get(
-                                client.document,
-                              ) || {
-                                date: "",
-                                time: "",
-                              };
-                              return (
-                                <div
-                                  key={client.document}
-                                  className="bg-white rounded-2xl p-3 border border-gray-200"
-                                >
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div>
-                                      <span className="font-medium text-gray-900">
-                                        {client.client}
-                                      </span>
-                                      <span className="text-gray-500 ml-2 text-sm">
-                                        ({client.document})
-                                      </span>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="text-sm text-gray-600">
-                                        {formatSafeDate(schedule.date)} às{" "}
-                                        {schedule.time}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                      <div className="flex">
-                                        <Calendar className="h-3 w-3 text-gray-400 mr-1 mt-0.5" />
-                                        <input
-                                          type="date"
-                                          value={schedule.date}
-                                          onChange={(e) => {
-                                            const newSchedules = new Map(
-                                              clientSchedules,
-                                            );
-                                            newSchedules.set(client.document, {
-                                              ...schedule,
-                                              date: e.target.value,
-                                            });
-                                            setClientSchedules(newSchedules);
-                                          }}
-                                          className="w-full text-sm border border-gray-300 rounded-2xl px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                        />
-                                      </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                      <div className="flex">
-                                        <Clock className="h-3 w-3 text-gray-400 mr-1 mt-0.5" />
-                                        <input
-                                          type="time"
-                                          value={schedule.time}
-                                          onChange={(e) => {
-                                            const newSchedules = new Map(
-                                              clientSchedules,
-                                            );
-                                            newSchedules.set(client.document, {
-                                              ...schedule,
-                                              time: e.target.value,
-                                            });
-                                            setClientSchedules(newSchedules);
-                                          }}
-                                          className="w-full text-sm border border-gray-300 rounded-2xl px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      </div>
-                    )}
 
-                    {/* Resumo dos Agendamentos - Mesmo conteúdo do componente principal */}
-                    {selectedClients.size > 0 && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                        <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          Resumo dos Agendamentos
-                        </h3>
-                        <div className="space-y-2">
-                          {getSelectedClientsData().map((client) => {
-                            const schedule = clientSchedules.get(
-                              client.document,
-                            ) || {
-                              date: selectedDate,
-                              time: selectedTime,
-                            };
-                            return (
-                              <div
-                                key={client.document}
-                                className="flex items-center justify-between text-sm bg-white rounded-2xl p-2"
-                              >
-                                <div>
-                                  <span className="font-medium">
-                                    {client.client}
-                                  </span>
-                                  <span className="text-gray-500 ml-2">
-                                    ({client.document})
-                                  </span>
-                                </div>
-                                <div className="text-right">
-                                  <div className="font-medium text-blue-600">
-                                    {formatSafeDate(schedule.date)} às{" "}
-                                    {schedule.time}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
+                  {/* Desktop: Layout em uma linha */}
+                  <div className="hidden sm:flex items-center justify-between">
+                    {/* Lado esquerdo: Limpar e Cancelar */}
+                    <div className="flex items-center space-x-4">
+                      <button
+                        onClick={() => {
+                          setSelectedClients(new Set());
+                          setClientSchedules(new Map());
+                          setNotes("");
+                          clearAllFilters();
+                          setCurrentPage(1);
+                          setClientsCurrentPage(1);
+                          setModalCurrentPage(1);
+                          setModalStep("selection");
+                        }}
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Limpar
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowScheduleModal(false);
+                          setModalStep("selection");
+                        }}
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Cancelar
+                      </button>
+                    </div>
+
+                    {/* Lado direito: Botões de ação */}
+                    <div className="flex items-center space-x-4">
+                      {modalStep === "confirmation" && (
+                        <button
+                          onClick={() => setModalStep("selection")}
+                          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
+                        >
+                          <ChevronLeft className="h-4 w-4 mr-2" />
+                          Voltar
+                        </button>
+                      )}
+                      {modalStep === "selection" ? (
+                        <button
+                          onClick={() => setModalStep("confirmation")}
+                          disabled={selectedClients.size === 0}
+                          className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
+                        >
+                          <ChevronRight className="h-4 w-4 mr-2" />
+                          Avançar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            handleScheduleVisit();
+                            setShowScheduleModal(false);
+                            setModalStep("selection");
+                          }}
+                          disabled={selectedClients.size === 0 || loading}
+                          className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
+                        >
+                          {loading ? (
+                            <div className="animate-spin h-4 w-4 border border-white border-t-transparent rounded-full mr-2"></div>
+                          ) : (
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                          )}
+                          {loading
+                            ? "Agendando..."
+                            : `Confirmar ${selectedClients.size} Visita${selectedClients.size > 1 ? "s" : ""}`}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-            <div className="px-4 lg:px-6 py-4 border-t border-gray-200 bg-white rounded-b-2xl flex-shrink-0">
-              {/* Mobile: Layout em duas linhas */}
-              <div className="sm:hidden space-y-3">
-                {/* Primeira linha mobile: Limpar e Cancelar */}
-                <div className="flex flex-row items-center justify-start space-x-4">
-                  <button
-                    onClick={() => {
-                      setSelectedClients(new Set());
-                      setClientSchedules(new Map());
-                      setNotes("");
-                      clearAllFilters();
-                      setCurrentPage(1);
-                      setClientsCurrentPage(1);
-                      setModalCurrentPage(1);
-                      setModalStep("selection");
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Limpar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowScheduleModal(false);
-                      setModalStep("selection");
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancelar
-                  </button>
-                </div>
-
-                {/* Segunda linha mobile: Botões de ação */}
-                <div className="flex flex-col items-stretch justify-end space-y-2">
-                  {modalStep === "confirmation" && (
-                    <button
-                      onClick={() => setModalStep("selection")}
-                      className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
-                    >
-                      <ChevronLeft className="h-4 w-4 mr-2" />
-                      Voltar
-                    </button>
-                  )}
-                  {modalStep === "selection" ? (
-                    <button
-                      onClick={() => setModalStep("confirmation")}
-                      disabled={selectedClients.size === 0}
-                      className="w-full sm:w-auto px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
-                    >
-                      <ChevronRight className="h-4 w-4 mr-2" />
-                      Avançar
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        handleScheduleVisit();
-                        setShowScheduleModal(false);
-                        setModalStep("selection");
-                      }}
-                      disabled={selectedClients.size === 0 || loading}
-                      className="w-full sm:w-auto px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
-                    >
-                      {loading ? (
-                        <div className="animate-spin h-4 w-4 border border-white border-t-transparent rounded-full mr-2"></div>
-                      ) : (
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                      )}
-                      {loading
-                        ? "Agendando..."
-                        : `Confirmar ${selectedClients.size} Visita${selectedClients.size > 1 ? "s" : ""}`}
-                    </button>
-                  )}
                 </div>
               </div>
+            </div>,
+            document.body,
+          )}
 
-              {/* Desktop: Layout em uma linha */}
-              <div className="hidden sm:flex items-center justify-between">
-                {/* Lado esquerdo: Limpar e Cancelar */}
-                <div className="flex items-center space-x-4">
-                  <button
-                    onClick={() => {
-                      setSelectedClients(new Set());
-                      setClientSchedules(new Map());
-                      setNotes("");
-                      clearAllFilters();
-                      setCurrentPage(1);
-                      setClientsCurrentPage(1);
-                      setModalCurrentPage(1);
-                      setModalStep("selection");
-                    }}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Limpar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowScheduleModal(false);
-                      setModalStep("selection");
-                    }}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancelar
-                  </button>
-                </div>
+        {/* DateValidationModal */}
+        <DateValidationModal
+          isOpen={showDateValidationModal}
+          onClose={() => setShowDateValidationModal(false)}
+          message={dateValidationMessage}
+        />
+      </div>
 
-                {/* Lado direito: Botões de ação */}
-                <div className="flex items-center space-x-4">
-                  {modalStep === "confirmation" && (
-                    <button
-                      onClick={() => setModalStep("selection")}
-                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors flex items-center justify-center"
-                    >
-                      <ChevronLeft className="h-4 w-4 mr-2" />
-                      Voltar
-                    </button>
-                  )}
-                  {modalStep === "selection" ? (
-                    <button
-                      onClick={() => setModalStep("confirmation")}
-                      disabled={selectedClients.size === 0}
-                      className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
-                    >
-                      <ChevronRight className="h-4 w-4 mr-2" />
-                      Avançar
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        handleScheduleVisit();
-                        setShowScheduleModal(false);
-                        setModalStep("selection");
-                      }}
-                      disabled={selectedClients.size === 0 || loading}
-                      className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
-                    >
-                      {loading ? (
-                        <div className="animate-spin h-4 w-4 border border-white border-t-transparent rounded-full mr-2"></div>
-                      ) : (
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                      )}
-                      {loading
-                        ? "Agendando..."
-                        : `Confirmar ${selectedClients.size} Visita${selectedClients.size > 1 ? "s" : ""}`}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
+      {/* Botão Flutuante para Agendar Nova Visita - Renderizado via Portal */}
+      {createPortal(
+        <button
+          onClick={() => {
+            setShowScheduleModal(true);
+            setModalCurrentPage(1);
+            setModalStep("selection");
+          }}
+          className="shadow-xl fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all duration-200 flex items-center justify-center z-50 hover:scale-110"
+          title="Agendar Nova Visita"
+        >
+          <Plus className="h-6 w-6" />
+        </button>,
+        document.body,
       )}
-
-      {/* DateValidationModal */}
-      <DateValidationModal
-        isOpen={showDateValidationModal}
-        onClose={() => setShowDateValidationModal(false)}
-        message={dateValidationMessage}
-      />
-    </div>
-
-    {/* Botão Flutuante para Agendar Nova Visita - Renderizado via Portal */}
-    {createPortal(
-      <button
-        onClick={() => {
-          setShowScheduleModal(true);
-          setModalCurrentPage(1);
-          setModalStep("selection");
-        }}
-        className="shadow-xl fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all duration-200 flex items-center justify-center z-50 hover:scale-110"
-        title="Agendar Nova Visita"
-      >
-        <Plus className="h-6 w-6" />
-      </button>,
-      document.body
-    )}
     </>
   );
 };

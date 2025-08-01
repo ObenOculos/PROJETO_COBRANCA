@@ -681,36 +681,42 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           )}
 
           {/* Collection Modal - Renderizado via Portal */}
-          {isModalOpen && selectedCollection && createPortal(
-            <CollectionModal
-              collection={selectedCollection}
-              userType={userType}
-              onClose={handleCloseModal}
-            />,
-            document.body
-          )}
+          {isModalOpen &&
+            selectedCollection &&
+            createPortal(
+              <CollectionModal
+                collection={selectedCollection}
+                userType={userType}
+                onClose={handleCloseModal}
+              />,
+              document.body,
+            )}
 
           {/* Client Detail Modal - Renderizado via Portal */}
-          {isClientModalOpen && selectedClientGroup && createPortal(
-            <ClientDetailModal
-              clientGroup={selectedClientGroup}
-              userType={userType}
-              onClose={handleCloseClientModal}
-            />,
-            document.body
-          )}
+          {isClientModalOpen &&
+            selectedClientGroup &&
+            createPortal(
+              <ClientDetailModal
+                clientGroup={selectedClientGroup}
+                userType={userType}
+                onClose={handleCloseClientModal}
+              />,
+              document.body,
+            )}
 
           {/* Sale Details Modal - Renderizado via Portal */}
-          {isSaleModalOpen && selectedSale.length > 0 && createPortal(
-            <SaleDetailsModal
-              collections={selectedSale}
-              onClose={() => {
-                setSelectedSale([]);
-                setIsSaleModalOpen(false);
-              }}
-            />,
-            document.body
-          )}
+          {isSaleModalOpen &&
+            selectedSale.length > 0 &&
+            createPortal(
+              <SaleDetailsModal
+                collections={selectedSale}
+                onClose={() => {
+                  setSelectedSale([]);
+                  setIsSaleModalOpen(false);
+                }}
+              />,
+              document.body,
+            )}
         </>
       );
     }
@@ -1279,26 +1285,30 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
         )}
 
         {/* Collection Modal - Renderizado via Portal */}
-        {isModalOpen && selectedCollection && createPortal(
-          <CollectionModal
-            collection={selectedCollection}
-            userType={userType}
-            onClose={handleCloseModal}
-          />,
-          document.body
-        )}
+        {isModalOpen &&
+          selectedCollection &&
+          createPortal(
+            <CollectionModal
+              collection={selectedCollection}
+              userType={userType}
+              onClose={handleCloseModal}
+            />,
+            document.body,
+          )}
 
         {/* Sale Details Modal - Renderizado via Portal */}
-        {isSaleModalOpen && selectedSale.length > 0 && createPortal(
-          <SaleDetailsModal
-            collections={selectedSale}
-            onClose={() => {
-              setSelectedSale([]);
-              setIsSaleModalOpen(false);
-            }}
-          />,
-          document.body
-        )}
+        {isSaleModalOpen &&
+          selectedSale.length > 0 &&
+          createPortal(
+            <SaleDetailsModal
+              collections={selectedSale}
+              onClose={() => {
+                setSelectedSale([]);
+                setIsSaleModalOpen(false);
+              }}
+            />,
+            document.body,
+          )}
       </>
     );
   },
