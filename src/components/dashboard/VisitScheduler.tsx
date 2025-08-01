@@ -166,6 +166,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   } | null>(null);
   const [showDateValidationModal, setShowDateValidationModal] = useState(false);
   const [dateValidationMessage, setDateValidationMessage] = useState("");
+  
+  // Estado para o modal de notificação de visitas atrasadas
+  const [showOverdueNotificationModal, setShowOverdueNotificationModal] = useState(false);
+  const [overdueVisitsByDate, setOverdueVisitsByDate] = useState<Record<string, ScheduledVisit[]>>({});
 
   // Estados para filtro das visitas do dia selecionado
   const [visitsSortBy, setVisitsSortBy] = useState<"name" | "city" | "value">(
@@ -484,6 +488,39 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     return { upcomingVisits, allVisits };
   }, [user, getVisitsByCollector, scheduledVisits]);
 
+  // Detectar e agrupar visitas atrasadas
+  React.useEffect(() => {
+    if (!user || !allVisits) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+
+    // Filtrar visitas atrasadas
+    const overdueVisits = allVisits.filter(visit => {
+      return (
+        visit.scheduledDate < todayStr &&
+        (visit.status === "agendada" || visit.status === "cancelamento_solicitado")
+      );
+    });
+
+    // Agrupar por data
+    const groupedByDate: Record<string, ScheduledVisit[]> = {};
+    overdueVisits.forEach(visit => {
+      if (!groupedByDate[visit.scheduledDate]) {
+        groupedByDate[visit.scheduledDate] = [];
+      }
+      groupedByDate[visit.scheduledDate].push(visit);
+    });
+
+    setOverdueVisitsByDate(groupedByDate);
+    
+    // Mostrar modal se houver visitas atrasadas
+    if (Object.keys(groupedByDate).length > 0) {
+      setShowOverdueNotificationModal(true);
+    }
+  }, [user, allVisits]);
+
   const handleScheduleVisit = async () => {
     return handleScheduleMultipleVisits();
   };
@@ -623,6 +660,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   const selectDate = (date: Date) => {
     setSelectedCalendarDate(date);
     setCurrentPage(1); // Reset paginação ao selecionar nova data
+  };
+
+  // Função para navegar para o dia de uma visita atrasada
+  const navigateToOverdueDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    
+    // Atualizar o mês do calendário se necessário
+    setCurrentMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+    
+    // Selecionar a data
+    selectDate(date);
+    
+    // Fechar o modal
+    setShowOverdueNotificationModal(false);
   };
 
   const monthNames = [
@@ -2672,6 +2724,89 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
           </div>
         )}
       </div>
+
+      {/* Modal de Notificação de Visitas Atrasadas */}
+      {showOverdueNotificationModal && Object.keys(overdueVisitsByDate).length > 0 && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-hidden">
+            <div className="px-4 lg:px-6 py-4 border-b border-gray-200 bg-red-50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <AlertTriangle className="h-6 w-6 text-red-600 mr-2" />
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Visitas Atrasadas
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowOverdueNotificationModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-4 lg:px-6 py-4 overflow-y-auto max-h-[calc(80vh-200px)]">
+              <p className="text-sm text-gray-600 mb-4">
+                Você possui {Object.values(overdueVisitsByDate).flat().length} visita{Object.values(overdueVisitsByDate).flat().length > 1 ? 's' : ''} atrasada{Object.values(overdueVisitsByDate).flat().length > 1 ? 's' : ''}.
+              </p>
+
+              <div className="space-y-3">
+                {Object.entries(overdueVisitsByDate)
+                  .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
+                  .map(([date, visits]) => {
+                    const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR');
+                    const daysDiff = Math.floor((new Date().getTime() - new Date(date + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    return (
+                      <div key={date} className="border border-red-200 rounded-lg p-3 bg-red-50">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {formattedDate}
+                            </p>
+                            <p className="text-xs text-red-600">
+                              {daysDiff} {daysDiff === 1 ? 'dia' : 'dias'} de atraso - {visits.length} visita{visits.length > 1 ? 's' : ''}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => navigateToOverdueDate(date)}
+                            className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
+                          >
+                            Ver Visitas
+                          </button>
+                        </div>
+                        
+                        <div className="text-xs text-gray-600 space-y-1">
+                          {visits.slice(0, 3).map((visit) => (
+                            <div key={visit.id} className="flex items-center">
+                              <User className="h-3 w-3 mr-1" />
+                              {visit.clientName}
+                            </div>
+                          ))}
+                          {visits.length > 3 && (
+                            <div className="text-gray-500 italic">
+                              ... e mais {visits.length - 3} cliente{visits.length - 3 > 1 ? 's' : ''}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            <div className="px-4 lg:px-6 py-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowOverdueNotificationModal(false)}
+                className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-2xl hover:bg-gray-300 transition-colors font-medium"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Detalhes do Cliente */}
       {showClientModal && selectedClientForModal && (

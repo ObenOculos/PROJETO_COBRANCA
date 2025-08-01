@@ -74,7 +74,46 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   };
 
   const [filters, setFilters] = useState<FilterOptions>({});
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [showFilterBar, setShowFilterBar] = useState(false);
+
+  // Configuração dos slides para mobile
+  const mobileSlides = [
+    { id: 'daily', title: 'Hoje', icon: Sun, color: 'yellow' },
+    { id: 'weekly', title: 'Esta Semana', icon: CalendarDays, color: 'blue' },
+    { id: 'monthly', title: 'Este Mês', icon: CalendarRange, color: 'purple' }
+  ];
+
+  // Funções de controle do slide
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe && currentSlideIndex < mobileSlides.length - 1) {
+      setCurrentSlideIndex(currentSlideIndex + 1);
+    }
+    if (isRightSwipe && currentSlideIndex > 0) {
+      setCurrentSlideIndex(currentSlideIndex - 1);
+    }
+  };
+
+  const goToSlide = (index: number) => {
+    setCurrentSlideIndex(index);
+  };
 
   // Funções para calcular métricas por período
   const getMetricsByPeriod = (payments: any[], visits: any[]) => {
@@ -647,126 +686,95 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                   </div>
                 </div>
 
-                {/* Layout Mobile: Stack vertical */}
-                <div className="lg:hidden space-y-8">
-                  {/* Metas Diárias */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-yellow-200">
-                    <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <Sun className="w-5 h-5 text-yellow-500" />
-                      Hoje
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <RadialApprovalChart
-                        current={periodMetrics.daily.visits}
-                        goal={goals.daily.visits}
-                        title="Visitas Realizadas"
-                        showValues={true}
-                        isCurrency={false}
-                        level={getPerformanceLevel(
-                          periodMetrics.daily.visits,
-                          goals.daily.visits,
-                        )}
-                        motivationalMessage={getMotivationalMessage(
-                          periodMetrics.daily.visits,
-                          goals.daily.visits,
-                        )}
-                      />
-                      <RadialApprovalChart
-                        current={periodMetrics.daily.payments}
-                        goal={goals.daily.payments}
-                        title="Valor Recebido"
-                        showValues={true}
-                        isCurrency={true}
-                        level={getPerformanceLevel(
-                          periodMetrics.daily.payments,
-                          goals.daily.payments,
-                        )}
-                        motivationalMessage={getMotivationalMessage(
-                          periodMetrics.daily.payments,
-                          goals.daily.payments,
-                        )}
-                      />
+                {/* Layout Mobile: Slides */}
+                <div className="lg:hidden">
+                  <div 
+                    className="relative overflow-hidden"
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                  >
+                    <div 
+                      className="flex transition-transform duration-300 ease-in-out"
+                      style={{ transform: `translateX(-${currentSlideIndex * 100}%)` }}
+                    >
+                      {mobileSlides.map((slide) => {
+                        const metrics = slide.id === 'daily' ? periodMetrics.daily 
+                          : slide.id === 'weekly' ? periodMetrics.weekly 
+                          : periodMetrics.monthly;
+                        const goalsPeriod = slide.id === 'daily' ? goals.daily 
+                          : slide.id === 'weekly' ? goals.weekly 
+                          : goals.monthly;
+                        const Icon = slide.icon;
+                        
+                        return (
+                          <div key={slide.id} className="w-full flex-shrink-0">
+                            <div className={`bg-white/70 backdrop-blur-sm rounded-2xl p-4 border ${
+                              slide.color === 'yellow' ? 'border-yellow-200' : 
+                              slide.color === 'blue' ? 'border-blue-200' : 
+                              'border-purple-200'
+                            }`}>
+                              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                                <Icon className={`w-5 h-5 ${
+                                  slide.color === 'yellow' ? 'text-yellow-500' : 
+                                  slide.color === 'blue' ? 'text-blue-500' : 
+                                  'text-purple-500'
+                                }`} />
+                                {slide.title}
+                              </h3>
+                              <div className="grid grid-cols-2 gap-4">
+                                <RadialApprovalChart
+                                  current={metrics.visits}
+                                  goal={goalsPeriod.visits}
+                                  title="Visitas Realizadas"
+                                  showValues={true}
+                                  isCurrency={false}
+                                  level={getPerformanceLevel(
+                                    metrics.visits,
+                                    goalsPeriod.visits,
+                                  )}
+                                  motivationalMessage={getMotivationalMessage(
+                                    metrics.visits,
+                                    goalsPeriod.visits,
+                                  )}
+                                />
+                                <RadialApprovalChart
+                                  current={metrics.payments}
+                                  goal={goalsPeriod.payments}
+                                  title="Valor Recebido"
+                                  showValues={true}
+                                  isCurrency={true}
+                                  level={getPerformanceLevel(
+                                    metrics.payments,
+                                    goalsPeriod.payments,
+                                  )}
+                                  motivationalMessage={getMotivationalMessage(
+                                    metrics.payments,
+                                    goalsPeriod.payments,
+                                  )}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-
-                  {/* Metas Semanais */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-blue-200">
-                    <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <CalendarDays className="w-5 h-5 text-blue-500" />
-                      Esta Semana
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <RadialApprovalChart
-                        current={periodMetrics.weekly.visits}
-                        goal={goals.weekly.visits}
-                        title="Visitas Realizadas"
-                        showValues={true}
-                        isCurrency={false}
-                        level={getPerformanceLevel(
-                          periodMetrics.weekly.visits,
-                          goals.weekly.visits,
-                        )}
-                        motivationalMessage={getMotivationalMessage(
-                          periodMetrics.weekly.visits,
-                          goals.weekly.visits,
-                        )}
+                  
+                  {/* Indicadores de navegação */}
+                  <div className="flex justify-center mt-4 space-x-2">
+                    {mobileSlides.map((slide, index) => (
+                      <button
+                        key={slide.id}
+                        onClick={() => goToSlide(index)}
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          index === currentSlideIndex 
+                            ? 'w-8 bg-indigo-600' 
+                            : 'w-2 bg-gray-300 hover:bg-gray-400'
+                        }`}
+                        aria-label={`Ir para ${slide.title}`}
                       />
-                      <RadialApprovalChart
-                        current={periodMetrics.weekly.payments}
-                        goal={goals.weekly.payments}
-                        title="Valor Recebido"
-                        showValues={true}
-                        isCurrency={true}
-                        level={getPerformanceLevel(
-                          periodMetrics.weekly.payments,
-                          goals.weekly.payments,
-                        )}
-                        motivationalMessage={getMotivationalMessage(
-                          periodMetrics.weekly.payments,
-                          goals.weekly.payments,
-                        )}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Metas Mensais */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-purple-200">
-                    <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <CalendarRange className="w-5 h-5 text-purple-500" />
-                      Este Mês
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <RadialApprovalChart
-                        current={periodMetrics.monthly.visits}
-                        goal={goals.monthly.visits}
-                        title="Visitas Realizadas"
-                        showValues={true}
-                        isCurrency={false}
-                        level={getPerformanceLevel(
-                          periodMetrics.monthly.visits,
-                          goals.monthly.visits,
-                        )}
-                        motivationalMessage={getMotivationalMessage(
-                          periodMetrics.monthly.visits,
-                          goals.monthly.visits,
-                        )}
-                      />
-                      <RadialApprovalChart
-                        current={periodMetrics.monthly.payments}
-                        goal={goals.monthly.payments}
-                        title="Valor Recebido"
-                        showValues={true}
-                        isCurrency={true}
-                        level={getPerformanceLevel(
-                          periodMetrics.monthly.payments,
-                          goals.monthly.payments,
-                        )}
-                        motivationalMessage={getMotivationalMessage(
-                          periodMetrics.monthly.payments,
-                          goals.monthly.payments,
-                        )}
-                      />
-                    </div>
+                    ))}
                   </div>
                 </div>
               </div>
