@@ -912,19 +912,54 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
   // Função para confirmar conclusão com observação
   const handleConfirmCompletion = async (selectedNote: string) => {
-    if (selectedVisitForCompletion) {
-      await handleUpdateVisitStatus(
-        selectedVisitForCompletion.id,
-        "realizada",
-        selectedNote,
-      );
-      setShowCompletedModal(false);
-
-      // Abrir modal perguntando sobre pagamento
-      setSelectedVisitForPayment(selectedVisitForCompletion);
+    if (!selectedVisitForCompletion) return;
+    
+    // Primeiro fechar o modal atual
+    setShowCompletedModal(false);
+    
+    // Preparar dados do cliente
+    const clientData = getClientDataForVisit(selectedVisitForCompletion.clientDocument);
+    if (!clientData) {
+      alert("Erro: dados do cliente não encontrados");
       setSelectedVisitForCompletion(null);
-      setShowPaymentQuestionModal(true);
+      return;
     }
+    
+    // Criar um ClientGroup mock para o modal de pagamento
+    const clientGroup = {
+      clientId: clientData.document,
+      client: clientData.name,
+      document: clientData.document,
+      phone: clientData.phone,
+      mobile: clientData.mobile,
+      address: clientData.address,
+      number: "",
+      neighborhood: clientData.neighborhood,
+      city: clientData.city,
+      state: "",
+      sales: [],
+      totalValue: clientData.totalPendingValue,
+      totalReceived: 0,
+      pendingValue: clientData.totalPendingValue,
+    };
+
+    // Abrir modal do cliente imediatamente
+    setSelectedClientForModal(clientGroup);
+    setShowClientModal(true);
+    
+    // Atualizar status da visita em background
+    setTimeout(async () => {
+      try {
+        await updateVisitStatus(selectedVisitForCompletion.id, "realizada", selectedNote);
+        showSuccessNotification(`Visita marcada como ${getStatusLabel("realizada")}`);
+        
+      } catch (error) {
+        console.error("Erro ao atualizar status da visita:", error);
+        // Não mostrar alert para não interromper o fluxo do usuário
+      }
+    }, 100);
+    
+    setSelectedVisitForCompletion(null);
   };
 
   // Função para abrir modal de confirmação "Não Encontrado"
@@ -1241,9 +1276,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     }
   };
 
-  const handleCloseClientModal = () => {
+  const handleCloseClientModal = async () => {
     setShowClientModal(false);
     setSelectedClientForModal(null);
+    
+    // Fazer refresh dos dados apenas quando o modal for fechado
+    try {
+      await refreshData();
+    } catch (error) {
+      console.error("Erro ao atualizar dados:", error);
+    }
   };
 
   const handleToggleClientSelection = (clientDocument: string) => {
@@ -2862,17 +2904,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
           document.body
         )}
 
-      {/* Modal de Detalhes do Cliente */}
-      {showClientModal && selectedClientForModal && (
+      {/* Modal de Detalhes do Cliente - Renderizado via Portal */}
+      {showClientModal && selectedClientForModal && createPortal(
         <ClientDetailModal
           clientGroup={selectedClientForModal}
           userType="collector"
           onClose={handleCloseClientModal}
-        />
+        />,
+        document.body
       )}
 
-      {/* Modal de Solicitação de Cancelamento */}
-      {showCancellationModal && selectedVisitForCancellation && (
+      {/* Modal de Solicitação de Cancelamento - Renderizado via Portal */}
+      {showCancellationModal && selectedVisitForCancellation && createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
@@ -2940,11 +2983,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Modal de Reagendamento */}
-      {showRescheduleModal && selectedVisitForReschedule && (
+      {/* Modal de Reagendamento - Renderizado via Portal */}
+      {showRescheduleModal && selectedVisitForReschedule && createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
@@ -3040,11 +3084,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Modal de Conflito de Horários */}
-      {showConflictModal && (
+      {/* Modal de Conflito de Horários - Renderizado via Portal */}
+      {showConflictModal && createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
             {/* Header */}
@@ -3135,11 +3180,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Modal de Conclusão da Visita com Observações Pré-programadas */}
-      {showCompletedModal && selectedVisitForCompletion && (
+      {/* Modal de Conclusão da Visita com Observações Pré-programadas - Renderizado via Portal */}
+      {showCompletedModal && selectedVisitForCompletion && createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
@@ -3166,7 +3212,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 ].map((note, index) => (
                   <button
                     key={index}
-                    onClick={() => handleConfirmCompletion(note)}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleConfirmCompletion(note);
+                    }}
                     className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-green-50 hover:border-green-200 border border-gray-200 rounded-2xl transition-colors text-sm"
                   >
                     {note}
@@ -3176,7 +3227,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
               <div className="mt-4">
                 <button
-                  onClick={() => handleConfirmCompletion("")}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleConfirmCompletion("");
+                  }}
                   className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors text-sm"
                 >
                   Marcar como realizada sem observação
@@ -3196,11 +3252,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Modal de Confirmação para "Não Encontrado" */}
-      {showNotFoundConfirmModal && selectedVisitForNotFound && (
+      {/* Modal de Confirmação para "Não Encontrado" - Renderizado via Portal */}
+      {showNotFoundConfirmModal && selectedVisitForNotFound && createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
@@ -3242,11 +3299,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Modal de "Não Encontrado" com Observações Pré-programadas */}
-      {showNotFoundObservationModal && selectedVisitForNotFound && (
+      {/* Modal de "Não Encontrado" com Observações Pré-programadas - Renderizado via Portal */}
+      {showNotFoundObservationModal && selectedVisitForNotFound && createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
@@ -3303,11 +3361,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Modal de Pergunta sobre Pagamento */}
-      {showPaymentQuestionModal && selectedVisitForPayment && (
+      {/* Modal de Pergunta sobre Pagamento - Renderizado via Portal */}
+      {showPaymentQuestionModal && selectedVisitForPayment && createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
@@ -3343,10 +3402,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {showTimeWarningModal && timeWarningData && (
+      {showTimeWarningModal && timeWarningData && createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
             <div className="p-6">
@@ -3418,12 +3478,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
 
-      {/* Modal de Agendamento de Nova Visita */}
-      {showScheduleModal && (
+      {/* Modal de Agendamento de Nova Visita - Renderizado via Portal */}
+      {showScheduleModal && createPortal(
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-hidden"
           onClick={(e) => {
@@ -4268,7 +4329,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* DateValidationModal */}

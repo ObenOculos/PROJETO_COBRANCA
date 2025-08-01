@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   MapPin,
   Navigation,
@@ -55,6 +56,18 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
   const [scheduledVisitsSortOrder, setScheduledVisitsSortOrder] = useState<
     "asc" | "desc"
   >("asc");
+
+  // Gerenciar scroll da página quando modal abre/fecha
+  useEffect(() => {
+    if (showModal) {
+      // Prevenir scroll da página de fundo
+      document.body.style.overflow = "hidden";
+    }
+
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [showModal]);
 
   // Obter visitas do cobrador
   const collectorVisits = useMemo(() => {
@@ -1629,10 +1642,16 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
         )}
       </div>
 
-      {/* Modal Simples */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-auto">
+      {/* Modal Simples - Renderizado via Portal */}
+      {showModal && createPortal(
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-6">
               <div className="flex items-center mb-4">
                 <div
@@ -1723,7 +1742,8 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

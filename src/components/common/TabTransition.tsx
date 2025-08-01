@@ -4,17 +4,27 @@ interface TabTransitionProps {
   children: React.ReactNode;
   activeKey: string;
   direction?: "fade" | "slide";
+  avoidTransformConflicts?: boolean;
+  disabled?: boolean;
 }
 
 const TabTransition: React.FC<TabTransitionProps> = ({
   children,
   activeKey,
   direction = "slide",
+  avoidTransformConflicts = false,
+  disabled = false,
 }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [displayChildren, setDisplayChildren] = useState(children);
 
   useEffect(() => {
+    if (disabled) {
+      setDisplayChildren(children);
+      setIsVisible(true);
+      return;
+    }
+
     // Fade out current content
     setIsVisible(false);
 
@@ -25,10 +35,14 @@ const TabTransition: React.FC<TabTransitionProps> = ({
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [activeKey, children]);
+  }, [activeKey, children, disabled]);
 
   const getTransitionClasses = () => {
-    if (direction === "fade") {
+    if (disabled) {
+      return "";
+    }
+
+    if (direction === "fade" || avoidTransformConflicts) {
       return `transition-opacity duration-300 ease-in-out ${
         isVisible ? "opacity-100" : "opacity-0"
       }`;
