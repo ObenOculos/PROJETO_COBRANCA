@@ -78,6 +78,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [showFilterBar, setShowFilterBar] = useState(false);
+  const [isAutoSliding, setIsAutoSliding] = useState(true);
 
   // Configuração dos slides para mobile
   const mobileSlides = [
@@ -86,8 +87,32 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     { id: 'monthly', title: 'Este Mês', icon: CalendarRange, color: 'purple' }
   ];
 
+  // Auto-slide effect
+  useEffect(() => {
+    if (!isAutoSliding || activeTab !== 'overview') return;
+
+    const interval = setInterval(() => {
+      setCurrentSlideIndex((prevIndex) => {
+        // Volta para o primeiro slide após o último
+        return prevIndex === mobileSlides.length - 1 ? 0 : prevIndex + 1;
+      });
+    }, 5000); // 5 segundos
+
+    return () => clearInterval(interval);
+  }, [isAutoSliding, activeTab, mobileSlides.length]);
+
+  // Função para pausar e reiniciar auto-slide
+  const pauseAutoSlide = () => {
+    setIsAutoSliding(false);
+    // Reinicia após 10 segundos de inatividade
+    setTimeout(() => {
+      setIsAutoSliding(true);
+    }, 10000);
+  };
+
   // Funções de controle do slide
   const handleTouchStart = (e: React.TouchEvent) => {
+    pauseAutoSlide();
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
@@ -112,6 +137,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   };
 
   const goToSlide = (index: number) => {
+    pauseAutoSlide();
     setCurrentSlideIndex(index);
   };
 
