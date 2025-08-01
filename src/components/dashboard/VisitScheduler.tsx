@@ -441,11 +441,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   }, [searchTerm, filters]);
 
   // Obter visitas organizadas por data
-  const { upcomingVisits, pastVisits, allVisits } = React.useMemo(() => {
+  const { upcomingVisits, allVisits } = React.useMemo(() => {
     if (!user)
       return {
         upcomingVisits: [],
-        pastVisits: [],
         allVisits: [],
       };
 
@@ -472,25 +471,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         return dateA.getTime() - dateB.getTime();
       });
 
-    const pastVisits = visits
-      .filter((visit) => {
-        // Filtrar visitas passadas que ainda estão com status 'agendada' ou 'cancelamento_solicitado'
-        return (
-          visit.scheduledDate < todayStr &&
-          (visit.status === "agendada" ||
-            visit.status === "cancelamento_solicitado")
-        );
-      })
-      .sort((a, b) => {
-        const dateA = new Date(
-          `${a.scheduledDate} ${a.scheduledTime || "00:00"}`,
-        );
-        const dateB = new Date(
-          `${b.scheduledDate} ${b.scheduledTime || "00:00"}`,
-        );
-        return dateB.getTime() - dateA.getTime(); // Mais recentes primeiro
-      });
-
     const allVisits = visits.sort((a, b) => {
       const dateA = new Date(
         `${a.scheduledDate} ${a.scheduledTime || "00:00"}`,
@@ -501,7 +481,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       return dateA.getTime() - dateB.getTime();
     });
 
-    return { upcomingVisits, pastVisits, allVisits };
+    return { upcomingVisits, allVisits };
   }, [user, getVisitsByCollector, scheduledVisits]);
 
   const handleScheduleVisit = async () => {
@@ -667,8 +647,25 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     if (!selectedCalendarDate) return [];
     const visits = getVisitsForDate(selectedCalendarDate);
 
+    // Verificar se a data selecionada é passada para marcar como atrasada
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(selectedCalendarDate);
+    selectedDate.setHours(0, 0, 0, 0);
+    const isOverdue = selectedDate < today;
+
+    // Calcular dias de atraso
+    const daysDiff = isOverdue ? Math.floor((today.getTime() - selectedDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+
+    // Adicionar flag de atrasada nas visitas
+    const visitsWithOverdueFlag = visits.map(visit => ({
+      ...visit,
+      isOverdue: isOverdue && (visit.status === "agendada" || visit.status === "cancelamento_solicitado"),
+      overdueDays: daysDiff
+    }));
+
     // Ordenar visitas
-    return [...visits].sort((a, b) => {
+    return [...visitsWithOverdueFlag].sort((a, b) => {
       let comparison = 0;
 
       switch (visitsSortBy) {
@@ -1249,30 +1246,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     setClientSchedules(newSchedules);
   };
 
-  // Calcular dias de atraso da visita
-  const getVisitOverdueDays = (visitDate: string): number => {
-    try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // Criar data da visita garantindo que não há problemas de fuso horário
-      const [year, month, day] = visitDate.split("-");
-      const visitDateObj = new Date(
-        parseInt(year),
-        parseInt(month) - 1,
-        parseInt(day),
-      );
-      visitDateObj.setHours(0, 0, 0, 0);
-
-      const diffTime = today.getTime() - visitDateObj.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-      return Math.max(0, diffDays);
-    } catch (error) {
-      console.error("Erro ao calcular dias de atraso da visita:", error);
-      return 0;
-    }
-  };
 
   return (
     <div className="rounded-2xl">
@@ -2301,25 +2274,51 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                     {paginatedSelectedDateVisits.map((visit) => (
                       <div
                         key={visit.id}
-                        className="border border-blue-300 bg-blue-50 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
+                        className={`border rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow ${
+                          visit.isOverdue 
+                            ? "border-red-300 bg-red-50" 
+                            : "border-blue-300 bg-blue-50"
+                        }`}
                       >
                         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                           <div className="flex-1">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <button
                                 onClick={() => handleOpenClientModal(visit)}
-                                className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                                className={`font-semibold hover:underline ${
+                                  visit.isOverdue 
+                                    ? "text-red-600 hover:text-red-800" 
+                                    : "text-blue-600 hover:text-blue-800"
+                                }`}
                               >
                                 {visit.clientName}
                               </button>
                               <span
-                                className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status, visit.notes)}`}
+                                className={`px-2 py-1 rounded-full text-xs ${
+                                  visit.isOverdue 
+                                    ? "bg-red-100 text-red-800" 
+                                    : getStatusColor(visit.status, visit.notes)
+                                }`}
                               >
-                                {getStatusLabel(visit.status, visit.notes)}
+                                {visit.isOverdue 
+                                  ? "Atrasada" 
+                                  : getStatusLabel(visit.status, visit.notes)}
                               </span>
-                              <span className="text-sm text-blue-600 font-medium">
+                              <span className={`text-sm font-medium ${
+                                visit.isOverdue ? "text-red-600" : "text-blue-600"
+                              }`}>
                                 {visit.scheduledTime || "00:00"}
                               </span>
+                              {visit.isOverdue && (
+                                <>
+                                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                                  {visit.overdueDays > 0 && (
+                                    <span className="text-xs text-red-600 font-medium">
+                                      ({visit.overdueDays} {visit.overdueDays === 1 ? "dia" : "dias"} de atraso)
+                                    </span>
+                                  )}
+                                </>
+                              )}
                             </div>
 
                             <div className="text-sm text-gray-600 space-y-1">
@@ -2670,121 +2669,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </div>
             )}
 
-            {/* Visitas Atrasadas */}
-            {pastVisits.length > 0 && (
-              <div>
-                <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <AlertTriangle className="h-5 w-5 mr-2 text-red-600" />
-                  Visitas Atrasadas ({pastVisits.length})
-                </h3>
-
-                <div className="space-y-3">
-                  {pastVisits.slice(0, 5).map((visit) => (
-                    <div
-                      key={visit.id}
-                      className="border border-red-300 bg-red-50 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
-                        <div className="flex-1">
-                          <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <button
-                              onClick={() => handleOpenClientModal(visit)}
-                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {visit.clientName}
-                            </button>
-                            <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
-                              Atrasada
-                            </span>
-                          </div>
-
-                          <div className="text-sm text-gray-600 space-y-1">
-                            <div className="flex items-center text-red-600 font-medium">
-                              <Calendar className="h-4 w-4 mr-2" />
-                              {formatSafeDateTime(
-                                visit.scheduledDate,
-                                visit.scheduledTime,
-                              )}
-                              {(() => {
-                                const daysLate = getVisitOverdueDays(
-                                  visit.scheduledDate,
-                                );
-                                if (daysLate > 0) {
-                                  return (
-                                    <span className="ml-2">
-                                      ({daysLate}{" "}
-                                      {daysLate === 1 ? "dia" : "dias"} de
-                                      atraso)
-                                    </span>
-                                  );
-                                }
-                                return null;
-                              })()}
-                            </div>
-                            <div className="flex items-center">
-                              <MapPin className="h-4 w-4 mr-2" />
-                              {visit.clientAddress}
-                            </div>
-                            {visit.totalPendingValue && (
-                              <div className="flex items-center">
-                                <DollarSign className="h-4 w-4 mr-2" />
-                                Pendente:{" "}
-                                {formatCurrency(visit.totalPendingValue)}
-                              </div>
-                            )}
-                            {visit.notes && (
-                              <div className="text-gray-500 italic whitespace-pre-line">
-                                {visit.notes}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
-                          <button
-                            onClick={() => handleMarkAsCompleted(visit)}
-                            className="px-3 py-2 bg-green-500 text-white rounded-2xl text-sm hover:bg-green-700 transition-colors flex items-center justify-center"
-                          >
-                            Realizada
-                          </button>
-                          <button
-                            onClick={() => handleMarkAsNotFound(visit)}
-                            className="px-3 py-2 bg-orange-500 text-white rounded-2xl text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
-                          >
-                            Não Encontrado
-                          </button>
-                          <button
-                            onClick={() => handleOpenRescheduleModal(visit)}
-                            className="px-3 py-2 bg-blue-500 text-white rounded-2xl text-sm hover:bg-blue-700 transition-colors flex items-center justify-center"
-                          >
-                            <RefreshCw className="h-4 w-4 mr-1" />
-                            Reagendar
-                          </button>
-                          {!visit.cancellationRejectedBy && (
-                            <button
-                              onClick={() => handleRequestCancellation(visit)}
-                              className="px-3 py-2 bg-red-500 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
-                            >
-                              Cancelar Visita
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {pastVisits.length > 5 && (
-                    <div className="text-center py-2">
-                      <span className="text-sm text-red-600 font-medium">
-                        ... e mais {pastVisits.length - 5} visita
-                        {pastVisits.length - 5 !== 1 ? "s" : ""} atrasada
-                        {pastVisits.length - 5 !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
