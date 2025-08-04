@@ -75,7 +75,6 @@ export const ClientAssignment = React.memo(() => {
   const {
     collections,
     users,
-    collectorStores,
     assignCollectorToClients,
     removeCollectorFromClients,
     updateCollection,
@@ -173,20 +172,6 @@ export const ClientAssignment = React.memo(() => {
         };
       }
 
-      if (collection.nome_da_loja) {
-        const storeAssignment = collectorStores.find(
-          (cs) => cs.storeName === collection.nome_da_loja,
-        );
-        if (storeAssignment) {
-          const collector = users.find(
-            (u) => u.id === storeAssignment.collectorId,
-          );
-          return {
-            collectorId: storeAssignment.collectorId,
-            collectorName: collector?.name,
-          };
-        }
-      }
 
       return { collectorId: undefined, collectorName: undefined };
     };
@@ -231,7 +216,7 @@ export const ClientAssignment = React.memo(() => {
     });
 
     return Array.from(clientsMap.values());
-  }, [collections, users, collectorStores]);
+  }, [collections, users]);
 
   const availableCities = useMemo(() => {
     const cities = new Set<string>();

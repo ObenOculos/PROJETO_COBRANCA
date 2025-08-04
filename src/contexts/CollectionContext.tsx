@@ -9,7 +9,6 @@ import {
   CollectionContextType,
   Collection,
   User,
-  CollectorStore,
   CollectionAttempt,
   DashboardStats,
   CollectorPerformance,
@@ -61,7 +60,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const { isOnline, addToOfflineQueue } = useOffline();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [collectorStores, setCollectorStores] = useState<CollectorStore[]>([]);
   const [salePayments, setSalePayments] = useState<SalePayment[]>([]);
   const [scheduledVisits, setScheduledVisits] = useState<ScheduledVisit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,12 +103,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         try {
           await Promise.all([
             fetchUsers(),
-            fetchCollectorStores(),
             fetchSalePayments(),
             fetchScheduledVisits(),
           ]);
 
-          // Now fetch collections, which can use the updated collectorStores state
+          // Now fetch collections
           await fetchCollections();
         } catch (error) {
           console.error("Erro ao carregar dados iniciais:", error);
@@ -192,7 +189,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       console.log("Usuário não logado, limpando dados...");
       setCollections([]);
       setUsers([]);
-      setCollectorStores([]);
       setSalePayments([]);
       setScheduledVisits([]);
       setLoading(false);
@@ -264,7 +260,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       let query = supabase.from("BANCO_DADOS").select("*");
 
       if (user?.type === "collector") {
-        const assignedStores = getCollectorStores(user.id);
+        const assignedStores: string[] = [];
         console.log(
           `Cobrador ${user.name} (${user.id}) tem lojas atribuídas:`,
           assignedStores,
@@ -477,49 +473,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
-  const fetchCollectorStores = async (useCache = true) => {
-    try {
-      const cacheKey = "collector-stores";
-
-      // Try to get from cache first
-      if (useCache) {
-        const cachedData = userCache.get<CollectorStore[]>(cacheKey);
-        if (cachedData) {
-          console.log("Dados de collector stores carregados do cache");
-          setCollectorStores(cachedData);
-          return;
-        }
-      }
-
-      console.log("Buscando atribuições de lojas...");
-
-      const { data, error: supabaseError } = await supabase
-        .from("collector_stores")
-        .select("*")
-        .order("created_at", { ascending: true });
-
-      if (supabaseError) {
-        console.error("Erro ao buscar collector_stores:", supabaseError);
-        throw supabaseError;
-      }
-
-      const transformedStores: CollectorStore[] = (data || []).map((store) => ({
-        id: store.id,
-        collectorId: store.collector_id,
-        storeName: store.store_name,
-        createdAt: store.created_at || new Date().toISOString(),
-      }));
-
-      setCollectorStores(transformedStores);
-
-      // Cache the data
-      userCache.set(cacheKey, transformedStores);
-
-      console.log("Atribuições de lojas carregadas:", transformedStores.length);
-    } catch (err) {
-      console.error("Erro ao carregar collector stores:", err);
-    }
-  };
 
   const updateCollection = async (id: number, updates: Partial<Collection>) => {
     try {
@@ -561,81 +514,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
-  const assignCollectorToStore = async (
-    collectorId: string,
-    storeName: string,
-  ) => {
-    try {
-      console.log("Atribuindo loja ao cobrador:", { collectorId, storeName });
-
-      // Verificar se a atribuição já existe
-      const existingAssignment = collectorStores.find(
-        (cs) => cs.collectorId === collectorId && cs.storeName === storeName,
-      );
-
-      if (existingAssignment) {
-        console.log("Atribuição já existe");
-        setError("Esta loja já está atribuída a este cobrador");
-        return;
-      }
-
-      const { error: supabaseError } = await supabase
-        .from("collector_stores")
-        .insert({
-          collector_id: collectorId,
-          store_name: storeName,
-        })
-        .select();
-
-      if (supabaseError) {
-        console.error("Erro do Supabase ao atribuir loja:", supabaseError);
-        throw supabaseError;
-      }
-
-      // Loja atribuída com sucesso
-
-      // Recarregar as atribuições
-      await fetchCollectorStores();
-      console.log("Loja atribuída com sucesso");
-      setError(null);
-    } catch (err) {
-      console.error("Erro ao atribuir loja ao cobrador:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Erro ao atribuir loja ao cobrador",
-      );
-    }
-  };
-
-  const removeCollectorFromStore = async (
-    collectorId: string,
-    storeName: string,
-  ) => {
-    try {
-      console.log("Removendo loja do cobrador:", { collectorId, storeName });
-
-      const { error: supabaseError } = await supabase
-        .from("collector_stores")
-        .delete()
-        .eq("collector_id", collectorId)
-        .eq("store_name", storeName);
-
-      if (supabaseError) {
-        console.error("Erro do Supabase ao remover loja:", supabaseError);
-        throw supabaseError;
-      }
-
-      await fetchCollectorStores();
-      console.log("Loja removida com sucesso");
-      setError(null);
-    } catch (err) {
-      console.error("Erro ao remover loja do cobrador:", err);
-      setError(
-        err instanceof Error ? err.message : "Erro ao remover loja do cobrador",
-      );
-    }
-  };
 
   const addAttempt = async (
     collectionId: number,
@@ -746,7 +624,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     // Filtrar por cobrador se o usuário for cobrador
     if (userType === "collector" && collectorId) {
       // Obter lojas atribuídas a este cobrador
-      const assignedStores = getCollectorStores(collectorId);
+      const assignedStores: string[] = [];
       filtered = filtered.filter(
         (c) =>
           c.user_id === collectorId ||
@@ -1090,7 +968,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         let filteredCollections = collections;
 
         if (collectorId) {
-          const assignedStores = getCollectorStores(collectorId);
+          const assignedStores: string[] = [];
           filteredCollections = collections.filter(
             (c) =>
               c.user_id === collectorId ||
@@ -1216,7 +1094,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
         return result;
       },
-    [collections, collectorStores],
+    [collections],
   );
 
   const getDashboardStats = useMemo(
@@ -1285,7 +1163,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const collectors = users.filter((u) => u.type === "collector");
 
       const result = collectors.map((collector) => {
-        const assignedStores = getCollectorStores(collector.id);
+        const assignedStores: string[] = [];
         const collectorCollections = collections.filter(
           (c) =>
             c.user_id === collector.id ||
@@ -1383,11 +1261,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       return result;
     },
-    [collections, users, collectorStores],
+    [collections, users],
   );
 
   const getCollectorCollections = (collectorId: string): Collection[] => {
-    const assignedStores = getCollectorStores(collectorId);
+    const assignedStores: string[] = [];
     return collections.filter(
       (c) =>
         c.user_id === collectorId ||
@@ -1405,11 +1283,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     return Array.from(stores).sort();
   };
 
-  const getCollectorStores = (collectorId: string): string[] => {
-    return collectorStores
-      .filter((cs) => cs.collectorId === collectorId)
-      .map((cs) => cs.storeName);
-  };
 
   const refreshData = async () => {
     setGlobalLoading(true, "Atualizando dados...");
@@ -1417,7 +1290,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       await Promise.all([
         fetchCollections(),
         fetchUsers(),
-        fetchCollectorStores(),
         fetchSalePayments(),
         fetchScheduledVisits(),
       ]);
@@ -1432,7 +1304,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       await Promise.all([
         fetchCollections(),
         fetchUsers(),
-        fetchCollectorStores(),
         fetchSalePayments(),
       ]);
     } finally {
@@ -3234,20 +3105,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const value: CollectionContextType = {
     collections,
     users,
-    collectorStores,
     salePayments,
     scheduledVisits,
     loading,
     error,
     fetchCollections,
     fetchUsers,
-    fetchCollectorStores,
     fetchSalePayments,
     refreshData,
     refreshCollections,
     updateCollection,
-    assignCollectorToStore,
-    removeCollectorFromStore,
     assignCollectorToClients,
     removeCollectorFromClients,
     addAttempt,
@@ -3260,7 +3127,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     getClientGroups,
     getFilteredCollections,
     getAvailableStores,
-    getCollectorStores,
     // Sale payment methods
     processSalePayment,
     processGeneralPayment,

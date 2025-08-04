@@ -191,7 +191,7 @@ interface StoreStats {
 }
 
 const EnhancedStoreManagement: React.FC = () => {
-  const { users, collections, collectorStores, getAvailableStores, loading } =
+  const { users, collections, getAvailableStores, loading } =
     useCollection();
 
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -219,14 +219,9 @@ const EnhancedStoreManagement: React.FC = () => {
         storeCollections.map((c) => c.user_id).filter(Boolean),
       );
 
-      // Find formal assignment (from collectorStores)
-      const assignment = collectorStores.find(
-        (cs) => cs.storeName === storeName,
-      );
-
-      // Determine the assigned collector (prefer formal assignment, fallback to actual worker)
-      let assignedCollector = assignment?.collectorId || "";
-      if (!assignedCollector && workingCollectors.size === 1) {
+      // Determine the assigned collector from actual worker
+      let assignedCollector = "";
+      if (workingCollectors.size === 1) {
         assignedCollector = Array.from(workingCollectors)[0] || "";
       } else if (!assignedCollector && workingCollectors.size > 1) {
         // Multiple collectors working, show the one with most collections
@@ -250,7 +245,7 @@ const EnhancedStoreManagement: React.FC = () => {
       const collectorName =
         collectors.find((c) => c.id === assignedCollector)?.name ||
         "Não atribuído";
-      const isFormalAssignment = !!assignment;
+      const isFormalAssignment = false;
 
       // Simplified - Group by sale
       const salesMap = new Map<
@@ -337,7 +332,7 @@ const EnhancedStoreManagement: React.FC = () => {
     });
 
     return stats;
-  }, [availableStores, collectorStores, collectors, collections]);
+  }, [availableStores, collectors, collections]);
 
   // Filter and sort stores
   const filteredAndSortedStores = useMemo(() => {

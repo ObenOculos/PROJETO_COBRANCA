@@ -27,14 +27,6 @@ export interface AuthorizationHistory {
   updated_at: string;
 }
 
-// Store assignment for collectors
-export interface CollectorStore {
-  id: string;
-  collectorId: string;
-  storeName: string;
-  createdAt: string;
-}
-
 // Scheduled visits for collectors
 export interface ScheduledVisit {
   id: string;
@@ -207,26 +199,16 @@ export interface AuthContextType {
 export interface CollectionContextType {
   collections: Collection[];
   users: User[];
-  collectorStores: CollectorStore[];
   salePayments: SalePayment[];
   scheduledVisits: ScheduledVisit[];
   loading: boolean;
   error: string | null;
   fetchCollections: () => Promise<void>;
   fetchUsers: () => Promise<void>;
-  fetchCollectorStores: () => Promise<void>;
   fetchSalePayments: () => Promise<void>;
   refreshData: () => Promise<void>;
   refreshCollections: () => Promise<void>;
   updateCollection: (id: number, updates: Partial<Collection>) => Promise<void>;
-  assignCollectorToStore: (
-    collectorId: string,
-    storeName: string,
-  ) => Promise<void>;
-  removeCollectorFromStore: (
-    collectorId: string,
-    storeName: string,
-  ) => Promise<void>;
   assignCollectorToClients: (
     collectorId: string,
     clientIdentifiers: { document?: string; clientName?: string }[],
@@ -251,7 +233,6 @@ export interface CollectionContextType {
     collectorId?: string,
   ) => Collection[];
   getAvailableStores: () => string[];
-  getCollectorStores: (collectorId: string) => string[];
   // Sale payment methods
   processSalePayment: (
     payment: SalePaymentInput,
