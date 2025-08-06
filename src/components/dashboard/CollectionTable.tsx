@@ -853,18 +853,32 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                   {/* Expansão */}
                   <button
-                    onClick={expandAll}
-                    className="p-2 text-green-600 hover:bg-green-50 rounded-2xl transition-colors"
-                    title="Expandir todas"
+                    onClick={() => {
+                      const allExpanded = paginatedSalesGroups.every(group => 
+                        expandedClients.has(group.document)
+                      );
+                      if (allExpanded) {
+                        collapseAll();
+                      } else {
+                        expandAll();
+                      }
+                    }}
+                    className={`p-2 rounded-2xl transition-colors ${
+                      paginatedSalesGroups.every(group => expandedClients.has(group.document))
+                        ? "text-orange-600 hover:bg-orange-50"
+                        : "text-green-600 hover:bg-green-50"
+                    }`}
+                    title={
+                      paginatedSalesGroups.every(group => expandedClients.has(group.document))
+                        ? "Retrair todas"
+                        : "Expandir todas"
+                    }
                   >
-                    <Maximize2 className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={collapseAll}
-                    className="p-2 text-orange-600 hover:bg-orange-50 rounded-2xl transition-colors"
-                    title="Retrair todas"
-                  >
-                    <Minimize2 className="h-4 w-4" />
+                    {paginatedSalesGroups.every(group => expandedClients.has(group.document)) ? (
+                      <Minimize2 className="h-4 w-4" />
+                    ) : (
+                      <Maximize2 className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
               </div>

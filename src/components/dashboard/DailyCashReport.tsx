@@ -7,6 +7,7 @@ import {
   Printer,
   Filter,
   RefreshCw,
+  X,
 } from "lucide-react";
 import { Collection } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/formatters";
@@ -726,13 +727,18 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               </div>
 
               {/* Clear Filters Button */}
-              <div className="flex items-end">
+              <div className="flex flex-col gap-2">
                 <button
                   onClick={handleClearFilters}
                   className="w-full flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition-colors text-sm font-medium"
                 >
-                  <Filter className="h-4 w-4 mr-2" />
                   Limpar Filtros
+                </button>
+                <button
+                  onClick={() => setShowFilters(false)}
+                  className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  Fechar
                 </button>
               </div>
             </div>

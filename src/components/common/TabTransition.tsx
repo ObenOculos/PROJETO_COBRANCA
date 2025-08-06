@@ -6,6 +6,7 @@ interface TabTransitionProps {
   direction?: "fade" | "slide";
   avoidTransformConflicts?: boolean;
   disabled?: boolean;
+  debounceMs?: number;
 }
 
 const TabTransition: React.FC<TabTransitionProps> = ({
@@ -14,9 +15,11 @@ const TabTransition: React.FC<TabTransitionProps> = ({
   direction = "slide",
   avoidTransformConflicts = false,
   disabled = false,
+  debounceMs = 0,
 }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [displayChildren, setDisplayChildren] = useState(children);
+  const [lastActiveKey, setLastActiveKey] = useState(activeKey);
 
   useEffect(() => {
     if (disabled) {
@@ -24,6 +27,15 @@ const TabTransition: React.FC<TabTransitionProps> = ({
       setIsVisible(true);
       return;
     }
+
+    // If debouncing is enabled and activeKey hasn't changed, just update children without animation
+    if (debounceMs > 0 && activeKey === lastActiveKey) {
+      setDisplayChildren(children);
+      return;
+    }
+
+    // Update the last active key
+    setLastActiveKey(activeKey);
 
     // Fade out current content
     setIsVisible(false);
@@ -35,7 +47,7 @@ const TabTransition: React.FC<TabTransitionProps> = ({
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [activeKey, children, disabled]);
+  }, [activeKey, children, disabled, debounceMs, lastActiveKey]);
 
   const getTransitionClasses = () => {
     if (disabled) {
