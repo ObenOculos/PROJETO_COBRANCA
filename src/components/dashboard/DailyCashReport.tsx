@@ -7,7 +7,6 @@ import {
   Printer,
   Filter,
   RefreshCw,
-  X,
 } from "lucide-react";
 import { Collection } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/formatters";
