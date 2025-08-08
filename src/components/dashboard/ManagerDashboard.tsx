@@ -96,7 +96,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     const saved = localStorage.getItem("managerCollectionsView");
     return (saved as "table" | "cash-report") || "table";
   });
-  const [overviewFilter, setOverviewFilter] = useState<
+  const [overviewFilter] = useState<
     "all" | "with-collector"
   >("all");
 
@@ -391,42 +391,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       case "overview":
         return (
           <div className="space-y-4 sm:space-y-6">
-            {/* Overview Filter */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 justify-between">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-                  Visão Geral
-                </h2>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <label className="text-sm font-medium text-gray-700">
-                    Filtrar por cobrador:
-                  </label>
-                  <div className="flex bg-gray-100 rounded-md p-0.5">
-                    <button
-                      onClick={() => setOverviewFilter("all")}
-                      className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                        overviewFilter === "all"
-                          ? "bg-white text-blue-600 shadow-sm"
-                          : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      Tudo
-                    </button>
-                    <button
-                      onClick={() => setOverviewFilter("with-collector")}
-                      className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                        overviewFilter === "with-collector"
-                          ? "bg-white text-blue-600 shadow-sm"
-                          : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      Apenas com cobrador
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Métricas Slider */}
             <div className="space-y-4">
               {/* Header with responsive controls */}
@@ -695,11 +659,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       Acompanhamento detalhado por cobrador
                     </p>
                   </div>
-                  <button className="inline-flex items-center justify-center px-3 sm:px-3 lg:px-4 py-2 sm:py-2 bg-blue-600 text-white rounded-md sm:rounded-2xl hover:bg-blue-700 transition-colors text-xs sm:text-sm font-medium whitespace-nowrap touch-manipulation">
-                    <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-                    <span className="hidden sm:inline">Exportar Dados</span>
-                    <span className="sm:hidden">Exportar</span>
-                  </button>
                 </div>
 
                 {/* Mobile-friendly performance cards */}
