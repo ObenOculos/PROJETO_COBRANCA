@@ -15,7 +15,6 @@ const TabTransition: React.FC<TabTransitionProps> = ({
   direction = "slide",
   avoidTransformConflicts = false,
   disabled = false,
-  debounceMs = 0,
 }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [displayChildren, setDisplayChildren] = useState(children);
