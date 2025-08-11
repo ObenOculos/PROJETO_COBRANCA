@@ -950,7 +950,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         </div>
 
         {/* Tab Content */}
-        <TabTransition activeKey={activeTab}>
+        <TabTransition activeKey={activeTab} avoidTransformConflicts={true}>
           {renderTabContent()}
         </TabTransition>
       </div>

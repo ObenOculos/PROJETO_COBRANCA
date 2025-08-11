@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Plus, Edit, Trash2, User, Shield } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { User as UserType } from "../../types";
@@ -9,12 +9,27 @@ const UserManagement: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserType | null>(null);
+  const userModalRef = useRef<HTMLDivElement>(null);
+  const deleteModalRef = useRef<HTMLDivElement>(null);
+
   const [formData, setFormData] = useState({
     name: "",
     login: "",
     password: "",
     type: "collector" as "manager" | "collector",
   });
+
+  useEffect(() => {
+    if (isModalOpen || isDeleteModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isModalOpen, isDeleteModalOpen]);
 
   const handleOpenModal = (user?: UserType) => {
     if (user) {
@@ -271,8 +286,12 @@ const UserManagement: React.FC = () => {
 
       {/* User Modal */}
       {isModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-container rounded-2xl max-w-md mx-4">
+        <div className="modal-overlay" onClick={(e) => {
+          if (userModalRef.current && !userModalRef.current.contains(e.target as Node)) {
+            handleCloseModal();
+          }
+        }}>
+          <div className="modal-container rounded-2xl" ref={userModalRef}>
             <div className="modal-header">
               <h3 className="text-lg font-semibold text-gray-900">
                 {editingUser ? "Editar Usuário" : "Novo Usuário"}
@@ -371,8 +390,12 @@ const UserManagement: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && userToDelete && (
-        <div className="modal-overlay">
-          <div className="modal-container rounded-2xl max-w-sm mx-4">
+        <div className="modal-overlay" onClick={(e) => {
+          if (deleteModalRef.current && !deleteModalRef.current.contains(e.target as Node)) {
+            handleCloseDeleteModal();
+          }
+        }}>
+          <div className="modal-container rounded-2xl max-w-sm mx-4" ref={deleteModalRef}>
             <div className="p-6">
               <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
                 <Trash2 className="w-6 h-6 text-red-600" />
