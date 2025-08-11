@@ -639,30 +639,35 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       try {
         const cleanDateStr = dateStr.trim();
 
-        // Handle Brazilian format DD/MM/YYYY
-        if (cleanDateStr.includes("/")) {
-          const parts = cleanDateStr.split("/");
-          if (parts.length === 3) {
-            const [day, month, year] = parts;
-            const dayNum = parseInt(day, 10);
-            const monthNum = parseInt(month, 10);
-            const yearNum = parseInt(year, 10);
-
-            if (
-              dayNum >= 1 &&
-              dayNum <= 31 &&
-              monthNum >= 1 &&
-              monthNum <= 12 &&
-              yearNum >= 1900
-            ) {
-              return new Date(yearNum, monthNum - 1, dayNum);
-            }
-          }
+        // Match DD/MM/YYYY or DD-MM-YYYY
+        const brazilMatch = cleanDateStr.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+        if (brazilMatch) {
+          const day = parseInt(brazilMatch[1], 10);
+          const month = parseInt(brazilMatch[2], 10);
+          const year = parseInt(brazilMatch[3], 10);
+          // Create date in UTC to avoid timezone shifts
+          return new Date(Date.UTC(year, month - 1, day));
         }
 
-        // Handle ISO format and other standard formats
+        // Match YYYY-MM-DD (from filter input)
+        const isoMatch = cleanDateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (isoMatch) {
+          const year = parseInt(isoMatch[1], 10);
+          const month = parseInt(isoMatch[2], 10);
+          const day = parseInt(isoMatch[3], 10);
+          // Create date in UTC
+          return new Date(Date.UTC(year, month - 1, day));
+        }
+
+        // Fallback for other standard formats
         const date = new Date(cleanDateStr);
-        return isNaN(date.getTime()) ? null : date;
+        if (!isNaN(date.getTime())) {
+          return new Date(
+            Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+          );
+        }
+
+        return null;
       } catch {
         return null;
       }
@@ -893,34 +898,49 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
     // Filtro por período de data de vencimento (dateFrom/dateTo)
     if (filters.dateFrom || filters.dateTo) {
+      const toYYYYMMDD = (dateStr: string): string | null => {
+        if (!dateStr || typeof dateStr !== "string") return null;
+
+        // Case 1: Already in YYYY-MM-DD format (from filter input or data)
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr.substring(0, 10))) {
+          return dateStr.substring(0, 10);
+        }
+
+        // Case 2: In DD/MM/YYYY or DD-MM-YYYY format (from data)
+        const parts = dateStr.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+        if (parts) {
+          const [, day, month, year] = parts;
+          return `${year}-${month}-${day}`;
+        }
+
+        // Fallback for full Date objects that might have been created
+        try {
+          const d = new Date(dateStr);
+          if (!isNaN(d.getTime())) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            return `${year}-${month}-${day}`;
+          }
+        } catch (e) {
+          // Ignore errors from invalid date strings
+        }
+
+        return null; // Unknown/invalid format
+      };
+
       filtered = filtered.filter((c) => {
-        if (!c.data_vencimento) return false;
+        const comparableDueDate = toYYYYMMDD(c.data_vencimento);
+        if (!comparableDueDate) return false;
 
-        const dueDate = parseDate(c.data_vencimento);
-        if (!dueDate) return false;
-
-        let matchesDateRange = true;
-
+        let matches = true;
         if (filters.dateFrom) {
-          const fromDate = new Date(filters.dateFrom);
-          if (!isNaN(fromDate.getTime())) {
-            fromDate.setHours(0, 0, 0, 0);
-            dueDate.setHours(0, 0, 0, 0);
-            matchesDateRange = matchesDateRange && dueDate >= fromDate;
-          }
+          matches = matches && comparableDueDate >= filters.dateFrom;
         }
-
         if (filters.dateTo) {
-          const toDate = new Date(filters.dateTo);
-          if (!isNaN(toDate.getTime())) {
-            // Adicionar 23:59:59 para incluir todo o dia final
-            toDate.setHours(23, 59, 59, 999);
-            dueDate.setHours(0, 0, 0, 0);
-            matchesDateRange = matchesDateRange && dueDate <= toDate;
-          }
+          matches = matches && comparableDueDate <= filters.dateTo;
         }
-
-        return matchesDateRange;
+        return matches;
       });
     }
 

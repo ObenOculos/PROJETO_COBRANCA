@@ -248,14 +248,14 @@ const FilterBar: React.FC<FilterBarProps> = ({
             {/* Date Range Filter - Mobile Stacked, Desktop Side by Side */}
             <div className="sm:col-span-2 lg:col-span-1">
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Período
+                Período de Vencimento
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input
                   type="date"
                   className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  value={filters.dateFrom || ""}
-                  onChange={(e) =>
+                  defaultValue={filters.dateFrom || ""}
+                  onBlur={(e) =>
                     onFilterChange({
                       ...filters,
                       dateFrom: e.target.value || undefined,
@@ -266,8 +266,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 <input
                   type="date"
                   className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  value={filters.dateTo || ""}
-                  onChange={(e) =>
+                  defaultValue={filters.dateTo || ""}
+                  onBlur={(e) =>
                     onFilterChange({
                       ...filters,
                       dateTo: e.target.value || undefined,

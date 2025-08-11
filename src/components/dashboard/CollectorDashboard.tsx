@@ -899,11 +899,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         </div>
 
         {/* Tab Content */}
-        <TabTransition
-          activeKey={activeTab}
-          avoidTransformConflicts={true}
-          disabled={activeTab === "overview"}
-        >
+        <TabTransition activeKey={activeTab}>
           {renderTabContent()}
         </TabTransition>
       </div>

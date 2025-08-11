@@ -28,26 +28,24 @@ const TabTransition: React.FC<TabTransitionProps> = ({
       return;
     }
 
-    // If debouncing is enabled and activeKey hasn't changed, just update children without animation
-    if (debounceMs > 0 && activeKey === lastActiveKey) {
-      setDisplayChildren(children);
-      return;
-    }
+    // Animate only when the activeKey changes
+    if (activeKey !== lastActiveKey) {
+      setIsVisible(false);
 
-    // Update the last active key
-    setLastActiveKey(activeKey);
+      const timer = setTimeout(() => {
+        setLastActiveKey(activeKey);
+        setDisplayChildren(children);
+        setIsVisible(true);
+      }, 150); // Should match the fade-out duration
 
-    // Fade out current content
-    setIsVisible(false);
-
-    // Wait for fade out to complete, then update content and fade in
-    const timer = setTimeout(() => {
+      return () => clearTimeout(timer);
+    } else {
+      // If the key is the same, but children changed (e.g., filter update),
+      // just update the content without animating and ensure it's visible.
       setDisplayChildren(children);
       setIsVisible(true);
-    }, 150);
-
-    return () => clearTimeout(timer);
-  }, [activeKey, children, disabled, debounceMs, lastActiveKey]);
+    }
+  }, [activeKey, children, disabled, lastActiveKey]);
 
   const getTransitionClasses = () => {
     if (disabled) {
