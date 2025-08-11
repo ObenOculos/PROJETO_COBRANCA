@@ -651,12 +651,14 @@ const AuthorizationManager: React.FC = () => {
             <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="history-search-input" className="block text-sm font-medium text-gray-700 mb-2">
                     Buscar
                   </label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
+                      id="history-search-input"
+                      name="historySearch"
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
@@ -666,10 +668,12 @@ const AuthorizationManager: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="history-status-filter" className="block text-sm font-medium text-gray-700 mb-2">
                     Status
                   </label>
                   <select
+                    id="history-status-filter"
+                    name="historyStatusFilter"
                     value={historyFilter}
                     onChange={(e) => setHistoryFilter(e.target.value as any)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -681,10 +685,12 @@ const AuthorizationManager: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="history-date-filter" className="block text-sm font-medium text-gray-700 mb-2">
                     Data
                   </label>
                   <input
+                    id="history-date-filter"
+                    name="historyDateFilter"
                     type="date"
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value)}
