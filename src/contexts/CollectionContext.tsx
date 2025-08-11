@@ -473,7 +473,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
-
   const updateCollection = async (id: number, updates: Partial<Collection>) => {
     try {
       // Converter updates para formato do banco
@@ -513,7 +512,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
     }
   };
-
 
   const addAttempt = async (
     collectionId: number,
@@ -640,7 +638,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         const cleanDateStr = dateStr.trim();
 
         // Match DD/MM/YYYY or DD-MM-YYYY
-        const brazilMatch = cleanDateStr.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+        const brazilMatch = cleanDateStr.match(
+          /^(\d{2})[\/-](\d{2})[\/-](\d{4})$/,
+        );
         if (brazilMatch) {
           const day = parseInt(brazilMatch[1], 10);
           const month = parseInt(brazilMatch[2], 10);
@@ -663,7 +663,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         const date = new Date(cleanDateStr);
         if (!isNaN(date.getTime())) {
           return new Date(
-            Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+            Date.UTC(
+              date.getUTCFullYear(),
+              date.getUTCMonth(),
+              date.getUTCDate(),
+            ),
           );
         }
 
@@ -932,7 +936,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       filtered = filtered.filter((c) => {
         // Skip items where data_vencimento is null
         if (!c.data_vencimento) return false;
-        
+
         const comparableDueDate = toYYYYMMDD(c.data_vencimento);
         if (!comparableDueDate) return false;
 
@@ -1305,7 +1309,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     });
     return Array.from(stores).sort();
   };
-
 
   const refreshData = async () => {
     setGlobalLoading(true, "Atualizando dados...");

@@ -96,9 +96,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     const saved = localStorage.getItem("managerCollectionsView");
     return (saved as "table" | "cash-report") || "table";
   });
-  const [overviewFilter] = useState<
-    "all" | "with-collector"
-  >("all");
+  const [overviewFilter] = useState<"all" | "with-collector">("all");
 
   // Estado para controlar visibilidade dos filtros no mobile
   const [isFilterVisible, setIsFilterVisible] = useState(false);

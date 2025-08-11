@@ -191,8 +191,7 @@ interface StoreStats {
 }
 
 const EnhancedStoreManagement: React.FC = () => {
-  const { users, collections, getAvailableStores, loading } =
-    useCollection();
+  const { users, collections, getAvailableStores, loading } = useCollection();
 
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());

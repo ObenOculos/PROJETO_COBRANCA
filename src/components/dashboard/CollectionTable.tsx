@@ -854,8 +854,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   {/* Expansão */}
                   <button
                     onClick={() => {
-                      const allExpanded = paginatedSalesGroups.every(group => 
-                        expandedClients.has(group.document)
+                      const allExpanded = paginatedSalesGroups.every((group) =>
+                        expandedClients.has(group.document),
                       );
                       if (allExpanded) {
                         collapseAll();
@@ -864,17 +864,23 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       }
                     }}
                     className={`p-2 rounded-2xl transition-colors ${
-                      paginatedSalesGroups.every(group => expandedClients.has(group.document))
+                      paginatedSalesGroups.every((group) =>
+                        expandedClients.has(group.document),
+                      )
                         ? "text-orange-600 hover:bg-orange-50"
                         : "text-green-600 hover:bg-green-50"
                     }`}
                     title={
-                      paginatedSalesGroups.every(group => expandedClients.has(group.document))
+                      paginatedSalesGroups.every((group) =>
+                        expandedClients.has(group.document),
+                      )
                         ? "Retrair todas"
                         : "Expandir todas"
                     }
                   >
-                    {paginatedSalesGroups.every(group => expandedClients.has(group.document)) ? (
+                    {paginatedSalesGroups.every((group) =>
+                      expandedClients.has(group.document),
+                    ) ? (
                       <Minimize2 className="h-4 w-4" />
                     ) : (
                       <Maximize2 className="h-4 w-4" />

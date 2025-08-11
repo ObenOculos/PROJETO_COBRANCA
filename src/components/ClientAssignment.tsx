@@ -172,7 +172,6 @@ export const ClientAssignment = React.memo(() => {
         };
       }
 
-
       return { collectorId: undefined, collectorName: undefined };
     };
 
