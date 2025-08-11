@@ -930,6 +930,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       };
 
       filtered = filtered.filter((c) => {
+        // Skip items where data_vencimento is null
+        if (!c.data_vencimento) return false;
+        
         const comparableDueDate = toYYYYMMDD(c.data_vencimento);
         if (!comparableDueDate) return false;
 
