@@ -286,11 +286,7 @@ const UserManagement: React.FC = () => {
 
       {/* User Modal */}
       {isModalOpen && (
-        <div className="modal-overlay" onClick={(e) => {
-          if (userModalRef.current && !userModalRef.current.contains(e.target as Node)) {
-            handleCloseModal();
-          }
-        }}>
+        <div className="modal-overlay" onClick={(e) => { if (userModalRef.current && !userModalRef.current.contains(e.target as Node)) { handleCloseModal(); } }}>
           <div className="modal-container rounded-2xl" ref={userModalRef}>
             <div className="modal-header">
               <h3 className="text-lg font-semibold text-gray-900">
