@@ -790,17 +790,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
 
             {/* Ações Principais */}
             <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`p-2 rounded-2xl transition-colors ${
-                  showFilters
-                    ? "bg-blue-100 text-blue-700"
-                    : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                }`}
-                title="Filtros"
-              >
-                <Filter className="h-4 w-4" />
-              </button>
+
 
               <button
                 onClick={getUserLocation}
@@ -843,6 +833,19 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                       : "Organizar"}
                 </span>
               </button>
+
+                            <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`p-2 rounded-2xl transition-colors ${
+                  showFilters
+                    ? "bg-blue-100 text-blue-700"
+                    : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                }`}
+                title="Filtros"
+              >
+                <Filter className="h-4 w-4" />
+              </button>
+              
             </div>
           </div>
 
@@ -1006,7 +1009,10 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                     <div className="flex gap-2 sm:gap-3">
                       <div className="flex-shrink-0 pt-1">
                         <input
+                          id={`${client.document}-checkbox`}
+                          name={`${client.document}-checkbox`}
                           type="checkbox"
+                          aria-label={`Selecionar cliente ${client.client}`}
                           checked={selectedClients.includes(client.document)}
                           onChange={() => handleToggleClient(client.document)}
                           onClick={(e) => e.stopPropagation()}
@@ -1199,7 +1205,10 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                     <div className="flex gap-2 sm:gap-3">
                       <div className="flex-shrink-0 pt-1">
                         <input
+                          id={`${client.document}-checkbox`}
+                          name={`${client.document}-checkbox`}
                           type="checkbox"
+                          aria-label={`Selecionar cliente ${client.client}`}
                           checked={selectedClients.includes(client.document)}
                           onChange={() => handleToggleClient(client.document)}
                           onClick={(e) => e.stopPropagation()}
@@ -1313,7 +1322,10 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                     <div className="flex gap-2 sm:gap-3">
                       <div className="flex-shrink-0 pt-1">
                         <input
+                          id={`${client.document}-checkbox`}
+                          name={`${client.document}-checkbox`}
                           type="checkbox"
+                          aria-label={`Selecionar cliente ${client.client}`}
                           checked={selectedClients.includes(client.document)}
                           onChange={() => handleToggleClient(client.document)}
                           onClick={(e) => e.stopPropagation()}
@@ -1434,7 +1446,10 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                     <div className="flex gap-2 sm:gap-3">
                       <div className="flex-shrink-0 pt-1">
                         <input
+                          id={`${client.document}-checkbox`}
+                          name={`${client.document}-checkbox`}
                           type="checkbox"
+                          aria-label={`Selecionar cliente ${client.client}`}
                           checked={selectedClients.includes(client.document)}
                           onChange={() => handleToggleClient(client.document)}
                           onClick={(e) => e.stopPropagation()}

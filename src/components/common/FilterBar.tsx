@@ -34,29 +34,29 @@ const FilterBar: React.FC<FilterBarProps> = ({
     return stores.sort();
   };
 
-  const collectorStores = getCollectorStores();
+  const collectorStores = React.useMemo(() => getCollectorStores(), [getCollectorStores]);
 
   // Para cobradores, buscar apenas as cidades e bairros dos seus clientes
-  const getCollectorCities = () => {
+  const getCollectorCities = React.useCallback(() => {
     if (userType !== "collector" || !user) return [];
     const myCollections = getCollectorCollections(user.id);
     const cities = Array.from(
       new Set(myCollections.map((c) => c.cidade).filter(Boolean)),
     );
     return cities.sort();
-  };
+  }, [userType, user, getCollectorCollections]);
 
-  const getCollectorNeighborhoods = () => {
+  const getCollectorNeighborhoods = React.useCallback(() => {
     if (userType !== "collector" || !user) return [];
     const myCollections = getCollectorCollections(user.id);
     const neighborhoods = Array.from(
       new Set(myCollections.map((c) => c.bairro).filter(Boolean)),
     );
     return neighborhoods.sort();
-  };
+  }, [userType, user, getCollectorCollections]);
 
-  const collectorCities = getCollectorCities();
-  const collectorNeighborhoods = getCollectorNeighborhoods();
+  const collectorCities = React.useMemo(() => getCollectorCities(), [getCollectorCities]);
+  const collectorNeighborhoods = React.useMemo(() => getCollectorNeighborhoods(), [getCollectorNeighborhoods]);
 
   const handleStatusChange = (status: string) => {
     onFilterChange({
@@ -84,7 +84,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
     setIsExpanded(false);
   };
 
-  const hasActiveFilters =
+  const hasActiveFilters = React.useMemo(() =>
     filters.status ||
     filters.dueDate ||
     filters.city ||
@@ -98,15 +98,20 @@ const FilterBar: React.FC<FilterBarProps> = ({
     filters.maxAmount ||
     filters.overdueOnly ||
     filters.highValueOnly ||
-    filters.visitsOnly;
+    filters.visitsOnly,
+    [filters]
+  );
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 mb-4">
+    <div className="bg-gray-50 rounded-2xl shadow-sm border border-gray-200 mb-4">
       {/* Search Bar */}
       <div className="p-4">
         <div className="relative">
+          <label htmlFor="search-input" className="sr-only">Buscar</label>
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
+            id="search-input"
+            name="search"
             type="text"
             placeholder="Buscar cliente, documento, título..."
             value={filters.search || ""}
@@ -171,14 +176,14 @@ const FilterBar: React.FC<FilterBarProps> = ({
       <div className="px-4 pb-4">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-between py-2 px-3 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors"
+          className="w-full flex items-center justify-between py-2 px-3 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors border border-gray-200"
         >
           <div className="flex items-center">
             <Filter className="h-4 w-4 text-gray-600 mr-2" />
             <span className="text-sm font-medium text-gray-700">
               Filtros avançados
               {hasActiveFilters && (
-                <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
+                <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
                   {Object.values(filters).filter(Boolean).length} ativos
                 </span>
               )}
@@ -226,12 +231,15 @@ const FilterBar: React.FC<FilterBarProps> = ({
         <div className="px-4 sm:px-4 pb-6 space-y-4 border-t border-gray-200 pt-4">
           {/* Grid de filtros responsivo */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <h3 className="col-span-full text-sm font-semibold text-gray-800 mb-2 mt-4">Filtros de Cobrança</h3>
             {/* Status Filter */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+              <label htmlFor="status-select" className="block text-xs font-medium text-gray-700 mb-1">
                 Status
               </label>
               <select
+                id="status-select"
+                name="status"
                 className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 value={filters.status || "all"}
                 onChange={(e) => handleStatusChange(e.target.value)}
@@ -246,13 +254,16 @@ const FilterBar: React.FC<FilterBarProps> = ({
             </div>
 
             {/* Date Range Filter - Mobile Stacked, Desktop Side by Side */}
-            <div className="sm:col-span-2 lg:col-span-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+            <div className="sm:col-span-2 lg:col-span-1" role="group" aria-labelledby="date-range-label">
+              <label id="date-range-label" htmlFor="date-from-input" className="block text-xs font-medium text-gray-700 mb-1">
                 Período de Vencimento
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <input
+                  id="date-from-input"
+                  name="dateFrom"
                   type="date"
+                  aria-label="Data de início"
                   className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   defaultValue={filters.dateFrom || ""}
                   onBlur={(e) =>
@@ -264,7 +275,10 @@ const FilterBar: React.FC<FilterBarProps> = ({
                   placeholder="De"
                 />
                 <input
+                  id="date-to-input"
+                  name="dateTo"
                   type="date"
+                  aria-label="Data de término"
                   className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   defaultValue={filters.dateTo || ""}
                   onBlur={(e) =>
@@ -278,12 +292,58 @@ const FilterBar: React.FC<FilterBarProps> = ({
               </div>
             </div>
 
+            {/* Amount Range Filter */}
+            <div className="sm:col-span-2 lg:col-span-1" role="group" aria-labelledby="amount-range-label">
+              <label id="amount-range-label" htmlFor="min-amount-input" className="block text-xs font-medium text-gray-700 mb-1">
+                Valor
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  id="min-amount-input"
+                  name="minAmount"
+                  type="number"
+                  aria-label="Valor mínimo"
+                  placeholder="Mínimo"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  value={filters.minAmount || ""}
+                  onChange={(e) =>
+                    onFilterChange({
+                      ...filters,
+                      minAmount: e.target.value
+                        ? parseFloat(e.target.value)
+                        : undefined,
+                    })
+                  }
+                />
+                <input
+                  id="max-amount-input"
+                  name="maxAmount"
+                  type="number"
+                  aria-label="Valor máximo"
+                  placeholder="Máximo"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  value={filters.maxAmount || ""}
+                  onChange={(e) =>
+                    onFilterChange({
+                      ...filters,
+                      maxAmount: e.target.value
+                        ? parseFloat(e.target.value)
+                        : undefined,
+                    })
+                  }
+                />
+              </div>
+            </div>
+
+            <h3 className="col-span-full text-sm font-semibold text-gray-800 mb-2 mt-4">Filtros de Atribuição</h3>
             {/* Store Filter */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+              <label htmlFor="store-select" className="block text-xs font-medium text-gray-700 mb-1">
                 Loja
               </label>
               <select
+                id="store-select"
+                name="store"
                 className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 value={filters.store || "all"}
                 onChange={(e) =>
@@ -308,10 +368,12 @@ const FilterBar: React.FC<FilterBarProps> = ({
             {/* Collector Filter for Managers */}
             {userType === "manager" && (
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label htmlFor="collector-select" className="block text-xs font-medium text-gray-700 mb-1">
                   Cobrador
                 </label>
                 <select
+                  id="collector-select"
+                  name="collector"
                   className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   value={filters.collector || "all"}
                   onChange={(e) =>
@@ -335,95 +397,61 @@ const FilterBar: React.FC<FilterBarProps> = ({
             {/* Location Filters for Collectors */}
             {userType === "collector" && (
               <>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Cidade
+                <div className="sm:col-span-2 lg:col-span-1" role="group" aria-labelledby="location-label">
+                  <label id="location-label" htmlFor="city-select" className="block text-xs font-medium text-gray-700 mb-1">
+                    Localização
                   </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    value={filters.city || "all"}
-                    onChange={(e) =>
-                      handleLocationChange("city", e.target.value)
-                    }
-                  >
-                    <option value="all">Todas</option>
-                    {collectorCities
-                      .filter((city) => city !== null)
-                      .map((city) => (
-                        <option key={city} value={city!}>
-                          {city}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Bairro
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    value={filters.neighborhood || "all"}
-                    onChange={(e) =>
-                      handleLocationChange("neighborhood", e.target.value)
-                    }
-                  >
-                    <option value="all">Todos</option>
-                    {collectorNeighborhoods
-                      .filter((neighborhood) => neighborhood !== null)
-                      .map((neighborhood) => (
-                        <option key={neighborhood} value={neighborhood!}>
-                          {neighborhood}
-                        </option>
-                      ))}
-                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      id="city-select"
+                      name="city"
+                      aria-label="Cidade"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      value={filters.city || "all"}
+                      onChange={(e) =>
+                        handleLocationChange("city", e.target.value)
+                      }
+                    >
+                      <option value="all">Cidade</option>
+                      {collectorCities
+                        .filter((city) => city !== null)
+                        .map((city) => (
+                          <option key={city} value={city!}>
+                            {city}
+                          </option>
+                        ))}
+                    </select>
+                    <select
+                      id="neighborhood-select"
+                      name="neighborhood"
+                      aria-label="Bairro"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      value={filters.neighborhood || "all"}
+                      onChange={(e) =>
+                        handleLocationChange("neighborhood", e.target.value)
+                      }
+                    >
+                      <option value="all">Bairro</option>
+                      {collectorNeighborhoods
+                        .filter((neighborhood) => neighborhood !== null)
+                        .map((neighborhood) => (
+                          <option key={neighborhood} value={neighborhood!}>
+                            {neighborhood}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
                 </div>
               </>
             )}
 
-            {/* Amount Range Filter */}
-            <div className="sm:col-span-2 lg:col-span-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Valor
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  placeholder="Mínimo"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  value={filters.minAmount || ""}
-                  onChange={(e) =>
-                    onFilterChange({
-                      ...filters,
-                      minAmount: e.target.value
-                        ? parseFloat(e.target.value)
-                        : undefined,
-                    })
-                  }
-                />
-                <input
-                  type="number"
-                  placeholder="Máximo"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  value={filters.maxAmount || ""}
-                  onChange={(e) =>
-                    onFilterChange({
-                      ...filters,
-                      maxAmount: e.target.value
-                        ? parseFloat(e.target.value)
-                        : undefined,
-                    })
-                  }
-                />
-              </div>
-            </div>
-
+            <h3 className="col-span-full text-sm font-semibold text-gray-800 mb-2 mt-4">Filtros Específicos</h3>
             {/* Visits Only Filter - Only show for collectors */}
             {userType === "collector" && (
-              <div className="sm:col-span-2 lg:col-span-3">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+              <div className="sm:col-span-2 lg:col-span-3" role="group" aria-labelledby="visits-filter-label">
+                <span id="visits-filter-label" className="block text-xs font-medium text-gray-700 mb-1">
                   Filtro de Visitas
-                </label>
+                </span>
                 <div className="flex items-center space-x-4">
                   <button
                     onClick={() =>
@@ -432,7 +460,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                         visitsOnly: !filters.visitsOnly,
                       })
                     }
-                    className={`px-3 py-2 text-sm rounded-2xl border transition-colors ${
+                    className={`px-3 py-2 text-sm font-medium rounded-2xl border transition-colors ${
                       filters.visitsOnly
                         ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
                         : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
@@ -458,7 +486,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
           {/* Active Filters Summary */}
           {hasActiveFilters && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-2xl">
+            <div className="mt-4 p-3 bg-gray-50 rounded-2xl border border-gray-200">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-medium text-gray-600">
                   Filtros ativos:
@@ -472,7 +500,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
               </div>
               <div className="flex flex-wrap gap-1">
                 {filters.status && (
-                  <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-200 text-gray-700">
+                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-200 text-gray-700">
                     Status: {filters.status}
                     <button
                       onClick={() =>
@@ -485,7 +513,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                   </span>
                 )}
                 {filters.store && (
-                  <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-200 text-gray-700">
+                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-200 text-gray-700">
                     Loja: {filters.store}
                     <button
                       onClick={() =>
@@ -498,7 +526,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                   </span>
                 )}
                 {filters.collector && (
-                  <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-200 text-gray-700">
+                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-200 text-gray-700">
                     Cobrador:{" "}
                     {collectors.find((c) => c.id === filters.collector)?.name}
                     <button
@@ -512,7 +540,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                   </span>
                 )}
                 {filters.city && (
-                  <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-200 text-gray-700">
+                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-200 text-gray-700">
                     Cidade: {filters.city}
                     <button
                       onClick={() =>
@@ -525,7 +553,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                   </span>
                 )}
                 {filters.visitsOnly && (
-                  <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-700">
+                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
                     Apenas com visitas
                     <button
                       onClick={() =>
