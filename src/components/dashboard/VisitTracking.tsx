@@ -571,12 +571,14 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
             {/* Busca sempre visível */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="client-search-input" className="block text-sm font-medium text-gray-700 mb-2">
                 Buscar Cliente
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
+                  id="client-search-input"
+                  name="clientSearch"
                   type="text"
                   value={clientSearchFilter}
                   onChange={(e) => setClientSearchFilter(e.target.value)}
@@ -591,10 +593,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-200 animate-in slide-in-from-top-2">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="collector-select" className="block text-sm font-medium text-gray-700 mb-2">
                       Cobrador
                     </label>
                     <select
+                      id="collector-select"
+                      name="collector"
                       value={selectedCollector}
                       onChange={(e) => setSelectedCollector(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -609,10 +613,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="status-select" className="block text-sm font-medium text-gray-700 mb-2">
                       Status
                     </label>
                     <select
+                      id="status-select"
+                      name="status"
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -626,10 +632,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="date-from-filter" className="block text-sm font-medium text-gray-700 mb-2">
                       Data Inicial
                     </label>
                     <input
+                      id="date-from-filter"
+                      name="dateFrom"
                       type="date"
                       value={dateFromFilter}
                       onChange={(e) => setDateFromFilter(e.target.value)}
@@ -638,10 +646,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="date-to-filter" className="block text-sm font-medium text-gray-700 mb-2">
                       Data Final
                     </label>
                     <input
+                      id="date-to-filter"
+                      name="dateTo"
                       type="date"
                       value={dateToFilter}
                       onChange={(e) => setDateToFilter(e.target.value)}
