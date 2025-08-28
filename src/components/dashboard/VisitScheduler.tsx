@@ -105,11 +105,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   }>({ errors: [], conflicts: [] });
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
-    city: "",
+    city: [] as string[],
     minValue: "",
     maxValue: "",
     visitStatus: "",
   });
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
 
   // Estados para ordenação
   const [sortField, setSortField] = useState<
@@ -256,7 +257,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     };
   }, [showScheduleModal]);
 
-  // Obter clientes do cobrador logado
   const availableClients = React.useMemo(() => {
     if (!user || user.type !== "collector") return [];
 
@@ -293,9 +293,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     }
 
     // Filtro por cidade
-    if (filters.city) {
+    if (filters.city.length > 0) {
       filteredClients = filteredClients.filter((client) =>
-        client.city.toLowerCase().includes(filters.city.toLowerCase()),
+        filters.city.includes(client.city),
       );
     }
 
@@ -383,16 +383,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
         // Match filter with status type
         switch (filters.visitStatus) {
-          case "critical":
-            return daysSinceLastVisit >= 120;
-          case "high":
-            return daysSinceLastVisit >= 90 && daysSinceLastVisit < 120;
-          case "medium":
-            return daysSinceLastVisit >= 60 && daysSinceLastVisit < 90;
-          case "low":
-            return daysSinceLastVisit >= 30 && daysSinceLastVisit < 60;
           case "recent":
             return daysSinceLastVisit < 30;
+          case "low":
+            return daysSinceLastVisit >= 30 && daysSinceLastVisit < 60;
+          case "medium":
+            return daysSinceLastVisit >= 60 && daysSinceLastVisit < 90;
+          case "high":
+            return daysSinceLastVisit >= 90 && daysSinceLastVisit < 120;
+          case "critical":
+            return daysSinceLastVisit >= 120 && daysSinceLastVisit !== 999;
+          case "never-visited":
+            return daysSinceLastVisit === 999;
           default:
             return true;
         }
@@ -600,9 +602,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     }));
   };
 
+  const handleCityFilterChange = (city: string) => {
+    setFilters((prev) => {
+      const newCities = prev.city.includes(city)
+        ? prev.city.filter((c) => c !== city)
+        : [...prev.city, city];
+      return { ...prev, city: newCities };
+    });
+  };
+
   const clearAllFilters = () => {
     setFilters({
-      city: "",
+      city: [],
       minValue: "",
       maxValue: "",
       visitStatus: "",
@@ -612,7 +623,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
   const hasActiveFilters =
     searchTerm ||
-    filters.city ||
+    filters.city.length > 0 ||
     filters.minValue ||
     filters.maxValue ||
     filters.visitStatus;
@@ -1437,22 +1448,36 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         <label className="block text-xs font-medium text-gray-600 mb-1">
                           Cidade
                         </label>
-                        <select
-                          id="filter-city"
-                          name="filter-city"
-                          value={filters.city}
-                          onChange={(e) =>
-                            handleFilterChange("city", e.target.value)
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                          <option value="">Todas as cidades</option>
-                          {availableCities.map((city) => (
-                            <option key={city} value={city}>
-                              {city}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="relative">
+                          <button
+                            onClick={() =>
+                              setShowCityDropdown(!showCityDropdown)
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white text-left"
+                          >
+                            {filters.city.length === 0
+                              ? "Todas as cidades"
+                              : `${filters.city.length} cidades selecionadas`}
+                          </button>
+                          {showCityDropdown && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
+                              {availableCities.map((city) => (
+                                <label
+                                  key={city}
+                                  className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={filters.city.includes(city)}
+                                    onChange={() => handleCityFilterChange(city)}
+                                    className="mr-2"
+                                  />
+                                  {city}
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {/* Filtro por Valor Mínimo */}
@@ -1508,15 +1533,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-2xl focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                         >
                           <option value="">Todos</option>
-                          <option value="critical">
-                            🔴 Nunca Visitado / Mais de 120 dias
-                          </option>
-                          <option value="high">🟠 90+ dias sem visita</option>
-                          <option value="medium">🟡 60+ dias sem visita</option>
-                          <option value="low">🔵 30+ dias sem visita</option>
-                          <option value="recent">
-                            🟢 Visitado recentemente
-                          </option>
+                          <option value="recent">Recente (&lt; 30 dias)</option>
+                          <option value="low">30-59 dias</option>
+                          <option value="medium">60-89 dias</option>
+                          <option value="high">90-119 dias</option>
+                          <option value="critical">120+ dias</option>
+                          <option value="never-visited">Nunca visitado</option>
                         </select>
                       </div>
                     </div>
@@ -1547,17 +1569,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         {filters.visitStatus && (
                           <span className="ml-1 px-2 py-1 bg-white rounded-2xl border">
                             Status:{" "}
-                            {filters.visitStatus === "critical"
-                              ? "Nunca/120+ dias"
-                              : filters.visitStatus === "high"
-                                ? "90+ dias"
-                                : filters.visitStatus === "medium"
-                                  ? "60+ dias"
-                                  : filters.visitStatus === "low"
-                                    ? "30+ dias"
-                                    : filters.visitStatus === "recent"
-                                      ? "Recente"
-                                      : ""}
+                            {
+                              {
+                                recent: "Recente (< 30 dias)",
+                                low: "30-59 dias",
+                                medium: "60-89 dias",
+                                high: "90-119 dias",
+                                critical: "120+ dias",
+                                "never-visited": "Nunca visitado",
+                              }[filters.visitStatus]
+                            }
                           </span>
                         )}
                       </div>
@@ -1687,7 +1708,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         let daysSinceLastVisit: number;
 
                         if (clientVisits.length === 0) {
-                          // Never visited - consider as more than 120 days
+                          // Never visited
                           daysSinceLastVisit = 999;
                         } else {
                           // Use the same safe date parsing as the formatSafeDate function
@@ -1737,18 +1758,23 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         }
 
                         // Determine status based on days without visit
+                        if (daysSinceLastVisit === 999) {
+                          return {
+                            type: "never-visited",
+                            label: "Nunca",
+                            color: "bg-red-100 text-red-800 border-red-200",
+                            days: "Nunca",
+                          };
+                        }
                         if (daysSinceLastVisit >= 120) {
                           return {
                             type: "critical",
-                            label:
-                              daysSinceLastVisit === 999 ? "Nunca" : "120 dias",
+                            label: "120+ dias",
                             color: "bg-red-100 text-red-800 border-red-200",
-                            days:
-                              daysSinceLastVisit === 999
-                                ? "Nunca"
-                                : `${daysSinceLastVisit} dias`,
+                            days: `${daysSinceLastVisit} dias`,
                           };
-                        } else if (daysSinceLastVisit >= 90) {
+                        }
+                        if (daysSinceLastVisit >= 90) {
                           return {
                             type: "high",
                             label: "90+ dias",
@@ -1756,7 +1782,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                               "bg-orange-100 text-orange-800 border-orange-200",
                             days: `${daysSinceLastVisit} dias`,
                           };
-                        } else if (daysSinceLastVisit >= 60) {
+                        }
+                        if (daysSinceLastVisit >= 60) {
                           return {
                             type: "medium",
                             label: "60+ dias",
@@ -1764,25 +1791,25 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                               "bg-yellow-100 text-yellow-800 border-yellow-200",
                             days: `${daysSinceLastVisit} dias`,
                           };
-                        } else if (daysSinceLastVisit >= 30) {
+                        }
+                        if (daysSinceLastVisit >= 30) {
                           return {
                             type: "low",
                             label: "30+ dias",
                             color: "bg-blue-100 text-blue-800 border-blue-200",
                             days: `${daysSinceLastVisit} dias`,
                           };
-                        } else {
-                          return {
-                            type: "recent",
-                            label: "Recente",
-                            color:
-                              "bg-green-100 text-green-800 border-green-200",
-                            days:
-                              daysSinceLastVisit === 0
-                                ? "Hoje"
-                                : `${daysSinceLastVisit} dias`,
-                          };
                         }
+                        return {
+                          type: "recent",
+                          label: "Recente",
+                          color:
+                            "bg-green-100 text-green-800 border-green-200",
+                          days:
+                            daysSinceLastVisit === 0
+                              ? "Hoje"
+                              : `${daysSinceLastVisit} dias`,
+                        };
                       };
 
                       const getLastVisitInfo = (client: any) => {
@@ -1960,7 +1987,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                           {/* Quick Actions */}
                                           <div className="flex items-center justify-between">
                                             <div className="flex items-center space-x-2">
-                                              {status.type === "critical" && (
+                                              {(status.type === "critical" ||
+                                                status.type ===
+                                                  "never-visited") && (
                                                 <div className="flex items-center text-xs text-red-600">
                                                   <AlertTriangle className="h-3 w-3 mr-1" />
                                                   <span>Prioridade Máxima</span>
@@ -3652,27 +3681,40 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                   <MapPin className="h-3 w-3 mr-1" />
                                   Cidade
                                 </label>
-                                <select
-                                  value={filters.city}
-                                  onChange={(e) =>
-                                    setFilters({
-                                      ...filters,
-                                      city: e.target.value,
-                                    })
-                                  }
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                >
-                                  <option value="">Todas as cidades</option>
-                                  {Array.from(
-                                    new Set(
-                                      availableClients.map((c) => c.city),
-                                    ),
-                                  ).map((city) => (
-                                    <option key={city} value={city}>
-                                      {city}
-                                    </option>
-                                  ))}
-                                </select>
+                                <div className="relative">
+                                  <button
+                                    onClick={() =>
+                                      setShowCityDropdown(!showCityDropdown)
+                                    }
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-left bg-white"
+                                  >
+                                    {filters.city.length === 0
+                                      ? "Todas as cidades"
+                                      : `${filters.city.length} cidades selecionadas`}
+                                  </button>
+                                  {showCityDropdown && (
+                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
+                                      {availableCities.map((city) => (
+                                        <label
+                                          key={city}
+                                          className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={filters.city.includes(
+                                              city,
+                                            )}
+                                            onChange={() =>
+                                              handleCityFilterChange(city)
+                                            }
+                                            className="mr-2"
+                                          />
+                                          {city}
+                                        </label>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                               <div>
                                 <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
@@ -3724,23 +3766,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                 <select
                                   value={filters.visitStatus}
                                   onChange={(e) =>
-                                    setFilters({
-                                      ...filters,
-                                      visitStatus: e.target.value,
-                                    })
+                                    handleFilterChange("visitStatus", e.target.value)
                                   }
                                   className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                                 >
                                   <option value="">Todos os status</option>
-                                  <option value="never-visited">
-                                    Nunca visitado
-                                  </option>
-                                  <option value="recent">
-                                    Visitado recentemente
-                                  </option>
-                                  <option value="overdue">
-                                    Visita em atraso
-                                  </option>
+                                  <option value="recent">Recente (&lt; 30 dias)</option>
+                                  <option value="low">30-59 dias</option>
+                                  <option value="medium">60-89 dias</option>
+                                  <option value="high">90-119 dias</option>
+                                  <option value="critical">120+ dias</option>
+                                  <option value="never-visited">Nunca visitado</option>
                                 </select>
                               </div>
                             </div>
