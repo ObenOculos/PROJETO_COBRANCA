@@ -1384,6 +1384,132 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     setClientSchedules(newSchedules);
   };
 
+  const getClientStatus = (client: any) => {
+    // Check days without visit based on last visit
+    const clientVisits = scheduledVisits
+      .filter(
+        (visit) =>
+          visit.clientDocument === client.document &&
+          visit.status === "realizada",
+      )
+      .sort((a, b) => {
+        // Ordenar por created_at (mais recente primeiro)
+        return (
+          new Date(b.createdAt).getTime() -
+          new Date(a.createdAt).getTime()
+        );
+      });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let daysSinceLastVisit: number;
+
+    if (clientVisits.length === 0) {
+      // Never visited
+      daysSinceLastVisit = 999;
+    } else {
+      // Use the same safe date parsing as the formatSafeDate function
+      try {
+        // Usar created_at da visita mais recente
+        const visit = clientVisits[0];
+        const visitDateStr = visit.createdAt.split("T")[0];
+        let lastVisitDate: Date;
+
+        if (visitDateStr.includes("-")) {
+          // Format YYYY-MM-DD
+          const [year, month, day] =
+            visitDateStr.split("-");
+          lastVisitDate = new Date(
+            parseInt(year),
+            parseInt(month) - 1,
+            parseInt(day),
+          );
+        } else if (visitDateStr.includes("/")) {
+          // Format DD/MM/YYYY
+          const [day, month, year] =
+            visitDateStr.split("/");
+          lastVisitDate = new Date(
+            parseInt(year),
+            parseInt(month) - 1,
+            parseInt(day),
+          );
+        } else {
+          lastVisitDate = new Date(visitDateStr);
+        }
+
+        lastVisitDate.setHours(0, 0, 0, 0);
+        daysSinceLastVisit = Math.floor(
+          (today.getTime() - lastVisitDate.getTime()) /
+            (1000 * 60 * 60 * 24),
+        );
+
+        // Ensure we don't get negative days
+        daysSinceLastVisit = Math.max(
+          0,
+          daysSinceLastVisit,
+        );
+      } catch {
+        // If date parsing fails, consider as never visited
+        daysSinceLastVisit = 999;
+      }
+    }
+
+    // Determine status based on days without visit
+    if (daysSinceLastVisit === 999) {
+      return {
+        type: "never-visited",
+        label: "Nunca",
+        color: "bg-red-100 text-red-800 border-red-200",
+        days: "Nunca",
+      };
+    }
+    if (daysSinceLastVisit >= 120) {
+      return {
+        type: "critical",
+        label: "120+ dias",
+        color: "bg-red-100 text-red-800 border-red-200",
+        days: `${daysSinceLastVisit} dias`,
+      };
+    }
+    if (daysSinceLastVisit >= 90) {
+      return {
+        type: "high",
+        label: "90+ dias",
+        color:
+          "bg-orange-100 text-orange-800 border-orange-200",
+        days: `${daysSinceLastVisit} dias`,
+      };
+    }
+    if (daysSinceLastVisit >= 60) {
+      return {
+        type: "medium",
+        label: "60+ dias",
+        color:
+          "bg-yellow-100 text-yellow-800 border-yellow-200",
+        days: `${daysSinceLastVisit} dias`,
+      };
+    }
+    if (daysSinceLastVisit >= 30) {
+      return {
+        type: "low",
+        label: "30+ dias",
+        color: "bg-blue-100 text-blue-800 border-blue-200",
+        days: `${daysSinceLastVisit} dias`,
+      };
+    }
+    return {
+      type: "recent",
+      label: "Recente",
+      color:
+        "bg-green-100 text-green-800 border-green-200",
+      days:
+        daysSinceLastVisit === 0
+          ? "Hoje"
+          : `${daysSinceLastVisit} dias`,
+    };
+  };
+
   return (
     <>
       <div className="rounded-2xl">
@@ -4096,6 +4222,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                               selectedClients.has(
                                                 client.document,
                                               );
+                                            const status = getClientStatus(client);
                                             return (
                                               <div
                                                 key={client.document}
@@ -4110,6 +4237,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                                   )
                                                 }
                                               >
+                                                <div
+                                                  className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium border ${status.color}`}
+                                                >
+                                                  {status.days}
+                                                </div>
                                                 <div className="p-4 bg-white border-1 rounded-2xl">
                                                   <div className="flex items-start">
                                                     <div className="flex-1 min-w-0">
