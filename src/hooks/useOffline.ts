@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import { PaymentDistribution } from "../types";
+import { PaymentDistribution, ScheduledVisit } from "../types";
 
 // Tipos para ações offline
 export interface OfflineAction {
@@ -10,7 +10,8 @@ export interface OfflineAction {
     | "CREATE_PAYMENT"
     | "UPDATE_VISIT"
     | "CREATE_COLLECTION"
-    | "DISTRIBUTE_PAYMENT";
+    | "DISTRIBUTE_PAYMENT"
+    | "SCHEDULE_VISIT";
   data: unknown;
   retryCount?: number;
   maxRetries?: number;
@@ -28,6 +29,11 @@ export interface DistributePaymentAction {
     collectorId: string;
     distributionDetails: PaymentDistribution[];
   };
+}
+
+export interface ScheduleVisitAction {
+  type: "SCHEDULE_VISIT";
+  data: Omit<ScheduledVisit, "id" | "createdAt" | "updatedAt">;
 }
 
 export const useOffline = () => {
@@ -144,6 +150,9 @@ export const useOffline = () => {
       case "DISTRIBUTE_PAYMENT":
         await processDistributePayment(action.data);
         break;
+      case "SCHEDULE_VISIT":
+        await processScheduleVisit(action.data);
+        break;
       default:
         throw new Error(`Tipo de ação desconhecida: ${action.type}`);
     }
@@ -162,6 +171,35 @@ export const useOffline = () => {
   const processCreateCollection = async (_data: unknown) => {
     // TODO: Implementar criação de cobrança
     throw new Error("Criação de cobrança não implementada");
+  };
+
+  const processScheduleVisit = async (data: unknown) => {
+    if (!data || typeof data !== "object") {
+      throw new Error("Dados inválidos para agendamento de visita");
+    }
+
+    const visitData = data as ScheduleVisitAction["data"];
+
+    const { error } = await supabase.from("scheduled_visits").insert([
+      {
+        collector_id: visitData.collectorId,
+        client_document: visitData.clientDocument,
+        client_name: visitData.clientName,
+        scheduled_date: visitData.scheduledDate,
+        scheduled_time: visitData.scheduledTime,
+        status: visitData.status,
+        notes: visitData.notes,
+        client_address: visitData.clientAddress,
+        client_neighborhood: visitData.clientNeighborhood,
+        client_city: visitData.clientCity,
+        total_pending_value: visitData.totalPendingValue,
+        overdue_count: visitData.overdueCount,
+      },
+    ]);
+
+    if (error) {
+      throw new Error(`Erro ao sincronizar agendamento: ${error.message}`);
+    }
   };
 
   const processDistributePayment = async (data: unknown) => {

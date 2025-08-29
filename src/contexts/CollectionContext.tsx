@@ -214,7 +214,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     const handleOfflineDataSynced = () => {
       // Debounce para evitar múltiplas chamadas em sequência
       setTimeout(() => {
-        refreshCollections();
+        console.log("Sincronização offline concluída. Atualizando todos os dados...");
+        refreshData();
       }, 100);
     };
 
@@ -2374,19 +2375,27 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   // Scheduled Visits Functions
   const fetchScheduledVisits = async (useCache = true) => {
-    try {
-      const cacheKey = "scheduled-visits";
+    const cacheKey = "scheduled-visits";
 
-      // Try to get from cache first
-      if (useCache) {
-        const cachedData = dataCache.get<ScheduledVisit[]>(cacheKey);
-        if (cachedData) {
-          console.log("Dados de scheduled visits carregados do cache");
-          setScheduledVisits(cachedData);
-          return;
-        }
+    // 1. Load from cache if available
+    if (useCache) {
+      const cachedData = dataCache.get<ScheduledVisit[]>(cacheKey);
+      if (cachedData) {
+        console.log("✅ Dados de scheduled visits carregados do cache");
+        setScheduledVisits(cachedData);
       }
+    }
 
+    // 2. If offline, do not proceed to fetch from network
+    if (!isOnline) {
+      console.log("🚫 Offline, não buscando visitas agendadas do servidor.");
+      // If there was no cache, the state will be an empty array, which is correct.
+      // If there was cache, it's already set.
+      return;
+    }
+
+    // 3. If online, fetch fresh data
+    try {
       console.log("Buscando visitas agendadas...");
 
       const { data, error: supabaseError } = await supabase
@@ -2395,23 +2404,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         .order("scheduled_date", { ascending: true });
 
       if (supabaseError) {
+        // If fetch fails, we just log it but DON'T clear the state.
+        // The user will see stale data from cache, which is the desired offline behavior.
         console.error("Erro ao buscar visitas agendadas:", supabaseError);
-
-        // Se a tabela não existir, mostrar instruções para criar
-        if (
-          supabaseError.message.includes(
-            'relation "scheduled_visits" does not exist',
-          )
-        ) {
-          console.error(
-            "Tabela scheduled_visits não existe. Verifique a estrutura do banco de dados.",
-          );
-          // Estrutura de tabela necessária não encontrada
-        }
-
-        // Usar sistema local como fallback
-        setScheduledVisits([]);
-        return;
+        return; // Exit without clearing state
       }
 
       const transformedVisits: ScheduledVisit[] = (data || []).map((visit) => ({
@@ -2442,24 +2438,48 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       setScheduledVisits(transformedVisits);
 
-      // Cache the data
+      // Cache the fresh data
       dataCache.set(cacheKey, transformedVisits);
 
       console.log("Visitas agendadas carregadas:", transformedVisits.length);
     } catch (err) {
+      // Also log error here and do not clear state
       console.error("Erro ao carregar visitas agendadas:", err);
-      // Fallback para sistema local
-      setScheduledVisits([]);
     }
   };
 
   const scheduleVisit = async (
-    visitData: Omit<ScheduledVisit, "id" | "createdAt">,
-  ) => {
-    try {
-      console.log("Agendando visita:", visitData);
+    visitData: Omit<ScheduledVisit, "id" | "createdAt" | "updatedAt">,
+  ): Promise<ScheduledVisit> => {
+    // If offline, add to queue and update UI locally
+    if (!isOnline) {
+      console.log("Offline: agendando visita na fila.");
 
-      // Tentar inserir no Supabase
+      const tempId = `offline_${crypto.randomUUID()}`;
+      const newVisit: ScheduledVisit = {
+        ...visitData,
+        id: tempId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Add to local state immediately for UI responsiveness
+      setScheduledVisits((prev) => [...prev, newVisit]);
+
+      // Add to offline queue for later sync
+      addToOfflineQueue({
+        type: "SCHEDULE_VISIT",
+        data: visitData,
+      });
+
+      console.log("Visita agendada localmente com ID temporário:", tempId);
+      return newVisit;
+    }
+
+    // If online, proceed with Supabase insert
+    try {
+      console.log("Online: Agendando visita no Supabase:", visitData);
+
       const { data, error } = await supabase
         .from("scheduled_visits")
         .insert([
@@ -2483,20 +2503,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       if (error) {
         console.error("Erro ao inserir visita no Supabase:", error);
-
-        // Fallback para sistema local
-        const newVisit: ScheduledVisit = {
-          ...visitData,
-          id: Date.now().toString(),
-          createdAt: new Date().toISOString(),
-        };
-
-        setScheduledVisits((prev) => [...prev, newVisit]);
-        console.log("Visita agendada localmente:", newVisit);
-        return newVisit;
+        throw error;
       }
 
-      // Transformar dados do Supabase para o formato esperado
       const newVisit: ScheduledVisit = {
         id: data.id,
         collectorId: data.collector_id,
@@ -2508,6 +2517,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         notes: data.notes,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
+        dataVisitaRealizada: data.data_visita_realizada,
         clientAddress: data.client_address,
         clientNeighborhood: data.client_neighborhood,
         clientCity: data.client_city,
@@ -2522,13 +2532,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         cancellationRejectionReason: data.cancellation_rejection_reason,
       };
 
-      // Atualizar estado local
+      // Update local state
       setScheduledVisits((prev) => [...prev, newVisit]);
 
       // Invalidate cache
       invalidateVisits();
 
-      // Visita agendada com sucesso
+      console.log("Visita agendada com sucesso no Supabase:", newVisit.id);
       return newVisit;
     } catch (error) {
       console.error("Erro ao agendar visita:", error);
