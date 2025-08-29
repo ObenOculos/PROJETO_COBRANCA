@@ -258,6 +258,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         console.log("🔄 Fetch forçado sem cache (useCache=false)");
       }
 
+      // Se estiver offline e não houver cache, não prosseguir com a busca de rede
+      if (!isOnline) {
+        console.log(
+          "🚫 Offline e sem cache de collections. A busca de dados foi ignorada.",
+        );
+        // Manter os dados existentes ou um array vazio se não houver nada
+        setCollections((prev) => (prev.length > 0 ? prev : []));
+        return;
+      }
+
       console.log("Buscando dados da tabela BANCO_DADOS...");
 
       let query = supabase.from("BANCO_DADOS").select("*");
@@ -2571,14 +2581,32 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           .split("T")[0];
       }
 
-      const { error } = await supabase
-        .from("scheduled_visits")
-        .update(updateData)
-        .eq("id", visitId);
+      // Se estiver offline, adicionar à fila e retornar
+      if (!isOnline) {
+        console.log("Offline: Adicionando atualização de status de visita à fila");
+        addToOfflineQueue({
+          type: "UPDATE_VISIT_STATUS",
+          data: { visitId, status, notes },
+        });
+        // A atualização local do estado já acontece abaixo, fora deste bloco
+      } else {
+        // Se estiver online, tentar atualizar no Supabase
+        const { error } = await supabase
+          .from("scheduled_visits")
+          .update(updateData)
+          .eq("id", visitId);
 
-      if (error) {
-        console.error("Erro ao atualizar visita no Supabase:", error);
-        // Continuar com atualização local mesmo se falhar no Supabase
+        if (error) {
+          console.error(
+            "Erro ao atualizar visita no Supabase. Adicionando à fila offline.",
+            error,
+          );
+          // Se a atualização online falhar, adicionar à fila para tentar mais tarde
+          addToOfflineQueue({
+            type: "UPDATE_VISIT_STATUS",
+            data: { visitId, status, notes },
+          });
+        }
       }
 
       // Atualizar estado local
@@ -3145,6 +3173,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     scheduledVisits,
     loading,
     error,
+    isOnline,
     fetchCollections,
     fetchUsers,
     fetchSalePayments,

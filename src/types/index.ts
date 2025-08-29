@@ -204,6 +204,7 @@ export interface CollectionContextType {
   scheduledVisits: ScheduledVisit[];
   loading: boolean;
   error: string | null;
+  isOnline: boolean;
   fetchCollections: () => Promise<void>;
   fetchUsers: () => Promise<void>;
   fetchSalePayments: () => Promise<void>;

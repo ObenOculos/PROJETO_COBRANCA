@@ -43,6 +43,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     requestVisitCancellation,
     rescheduleVisit,
     refreshData,
+    isOnline,
   } = useCollection();
   const { user } = useAuth();
 
@@ -822,7 +823,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         );
 
         // Refresh dos dados para atualizar outras abas
-        await refreshData();
+        if (isOnline) {
+          await refreshData();
+        }
       }
       if (errorCount > 0) {
         alert(
@@ -884,7 +887,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       );
 
       // Refresh dos dados para atualizar outras abas
-      await refreshData();
+      if (isOnline) {
+        await refreshData();
+      }
     } catch (error) {
       console.error("Erro ao atualizar status da visita:", error);
       alert("Erro ao atualizar status da visita");

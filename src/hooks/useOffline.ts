@@ -11,7 +11,7 @@ export interface OfflineAction {
   timestamp: string;
   type:
     | "CREATE_PAYMENT"
-    | "UPDATE_VISIT"
+    | "UPDATE_VISIT_STATUS"
     | "CREATE_COLLECTION"
     | "DISTRIBUTE_PAYMENT"
     | "SCHEDULE_VISIT";
@@ -37,6 +37,15 @@ export interface DistributePaymentAction {
 export interface ScheduleVisitAction {
   type: "SCHEDULE_VISIT";
   data: Omit<ScheduledVisit, "id" | "createdAt" | "updatedAt">;
+}
+
+export interface UpdateVisitStatusAction {
+  type: "UPDATE_VISIT_STATUS";
+  data: {
+    visitId: string;
+    status: ScheduledVisit["status"];
+    notes?: string;
+  };
 }
 
 export const useOffline = () => {
@@ -155,8 +164,8 @@ export const useOffline = () => {
       case "CREATE_PAYMENT":
         await processCreatePayment(action.data);
         break;
-      case "UPDATE_VISIT":
-        await processUpdateVisit(action.data);
+      case "UPDATE_VISIT_STATUS":
+        await processUpdateVisitStatus(action.data);
         break;
       case "CREATE_COLLECTION":
         await processCreateCollection(action.data);
@@ -177,9 +186,44 @@ export const useOffline = () => {
     throw new Error("Criação de pagamento não implementada");
   };
 
-  const processUpdateVisit = async (_data: unknown) => {
-    // TODO: Implementar atualização de visita
-    throw new Error("Atualização de visita não implementada");
+  const processUpdateVisitStatus = async (data: unknown) => {
+    if (!data || typeof data !== "object") {
+      throw new Error("Dados inválidos para atualização de status de visita");
+    }
+
+    const visitData = data as UpdateVisitStatusAction["data"];
+
+    const updateData: any = {
+      status: visitData.status,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (visitData.notes !== undefined) {
+      updateData.notes = visitData.notes;
+    }
+
+    if (visitData.status === "realizada") {
+      updateData.data_visita_realizada = new Date()
+        .toISOString()
+        .split("T")[0];
+    }
+
+    const { error } = await supabase
+      .from("scheduled_visits")
+      .update(updateData)
+      .eq("id", visitData.visitId);
+
+    if (error) {
+      if (error.code === "23505") {
+        console.warn(
+          `Visita ${visitData.visitId} já existe. Ignorando erro de duplicata.`,
+        );
+        return;
+      }
+      throw new Error(
+        `Erro ao sincronizar atualização de status de visita: ${error.message}`,
+      );
+    }
   };
 
   const processCreateCollection = async (_data: unknown) => {
@@ -299,9 +343,9 @@ export const useOffline = () => {
     notification.className =
       "fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center";
 
-    let message = `${processedCount} pagamento(s) sincronizado(s)`;
+    let message = `${processedCount} sincronizando`;
     if (failedCount > 0) {
-      message += ` (${failedCount} falha(s))`;
+      message += ` (${failedCount} erro)`;
     }
 
     notification.innerHTML = `
