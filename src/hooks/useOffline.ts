@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { PaymentDistribution, ScheduledVisit } from "../types";
 
+// Variável de controle de sincronização no escopo do módulo
+let isSyncing = false;
+
 // Tipos para ações offline
 export interface OfflineAction {
   id: string;
@@ -48,52 +51,63 @@ export const useOffline = () => {
   });
 
   const processOfflineQueue = useCallback(async () => {
-    const queue = JSON.parse(localStorage.getItem("offlineQueue") || "[]");
-    if (queue.length === 0) return;
+    if (isSyncing) {
+      return;
+    }
+    isSyncing = true;
 
-    let processedCount = 0;
-    let failedCount = 0;
+    try {
+      const queue = JSON.parse(localStorage.getItem("offlineQueue") || "[]");
+      if (queue.length === 0) {
+        return;
+      }
 
-    for (const action of queue) {
-      try {
-        const retryCount = action.retryCount || 0;
-        if (retryCount > 0) {
-          const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
-          await new Promise((resolve) => setTimeout(resolve, delay));
-        }
+      let processedCount = 0;
+      let failedCount = 0;
 
-        await processAction(action);
-        removeFromQueue(action.id);
-        processedCount++;
-      } catch (error) {
-        failedCount++;
-        const errorMessage =
-          error instanceof Error ? error.message : "Erro desconhecido";
+      for (const action of queue) {
+        try {
+          const retryCount = action.retryCount || 0;
+          if (retryCount > 0) {
+            const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
 
-        const retryCount = (action.retryCount || 0) + 1;
-        const maxRetries = action.maxRetries || 3;
-
-        if (retryCount <= maxRetries) {
-          updateActionInQueue(action.id, {
-            retryCount,
-            lastError: errorMessage,
-          });
-        } else {
+          await processAction(action);
           removeFromQueue(action.id);
+          processedCount++;
+        } catch (error) {
+          failedCount++;
+          const errorMessage =
+            error instanceof Error ? error.message : "Erro desconhecido";
+
+          const retryCount = (action.retryCount || 0) + 1;
+          const maxRetries = action.maxRetries || 3;
+
+          if (retryCount <= maxRetries) {
+            updateActionInQueue(action.id, {
+              retryCount,
+              lastError: errorMessage,
+            });
+          } else {
+            removeFromQueue(action.id);
+          }
         }
       }
-    }
 
-    // Mostrar notificação de sincronização
-    if (processedCount > 0) {
-      showSyncNotification(processedCount, failedCount);
+      // Mostrar notificação de sincronização
+      if (processedCount > 0) {
+        showSyncNotification(processedCount, failedCount);
 
-      // Disparar evento customizado para atualizar os dados
-      window.dispatchEvent(
-        new CustomEvent("offlineDataSynced", {
-          detail: { processedCount, failedCount },
-        }),
-      );
+        // Disparar evento customizado para atualizar os dados
+        window.dispatchEvent(
+          new CustomEvent("offlineDataSynced", {
+            detail: { processedCount, failedCount },
+          }),
+        );
+      }
+    } finally {
+      isSyncing = false;
     }
   }, []);
 
