@@ -206,9 +206,7 @@ export const useOffline = () => {
     }
 
     if (visitData.status === "realizada") {
-      updateData.data_visita_realizada = new Date()
-        .toISOString()
-        .split("T")[0];
+      updateData.data_visita_realizada = new Date().toISOString().split("T")[0];
     }
 
     const { error } = await supabase

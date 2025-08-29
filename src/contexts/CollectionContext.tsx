@@ -2595,7 +2595,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Se estiver offline, adicionar à fila e retornar
       if (!isOnline) {
-        console.log("Offline: Adicionando atualização de status de visita à fila");
+        console.log(
+          "Offline: Adicionando atualização de status de visita à fila",
+        );
         addToOfflineQueue({
           type: "UPDATE_VISIT_STATUS",
           data: { visitId, status, notes },
