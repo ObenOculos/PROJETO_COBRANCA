@@ -30,6 +30,9 @@ export interface DistributePaymentAction {
     paymentMethod?: string;
     notes?: string;
     collectorId: string;
+    client_name?: string;
+    collector_name?: string;
+    store_name?: string;
     distributionDetails: PaymentDistribution[];
   };
 }
@@ -272,10 +275,13 @@ export const useOffline = () => {
       const paymentRecord = {
         sale_number: paymentData.saleNumber,
         client_document: paymentData.clientDocument,
+        client_name: paymentData.client_name,
         payment_amount: paymentData.paymentAmount,
         payment_method: paymentData.paymentMethod || "dinheiro",
         notes: paymentData.notes || "",
         collector_id: paymentData.collectorId,
+        collector_name: paymentData.collector_name,
+        store_name: paymentData.store_name,
         payment_date: new Date().toISOString().split("T")[0],
         distribution_details: paymentData.distributionDetails,
       };

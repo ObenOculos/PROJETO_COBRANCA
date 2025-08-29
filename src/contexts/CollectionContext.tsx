@@ -1772,6 +1772,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         console.log("Modo offline: Adicionando pagamento à fila");
 
         // Adicionar à fila offline
+        const collector = users.find((u) => u.id === collectorId);
+        const client = saleInstallments[0];
+
         addToOfflineQueue({
           type: "DISTRIBUTE_PAYMENT",
           data: {
@@ -1782,6 +1785,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             notes: payment.notes,
             collectorId: collectorId,
             distributionDetails: distributionDetails,
+            client_name: client?.cliente || "Cliente não informado",
+            collector_name: collector?.name || "Cobrador não encontrado",
+            store_name: client?.nome_da_loja || null,
           },
         });
 
@@ -2021,6 +2027,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         // Agrupar por venda para criar registros de pagamento separados
         const salesMap = new Map<number, any>();
 
+        const collector = users.find((u) => u.id === collectorId);
+        const client = clientInstallments[0];
+
         distributionDetails.forEach((detail) => {
           if (!salesMap.has(detail.saleNumber)) {
             salesMap.set(detail.saleNumber, {
@@ -2031,6 +2040,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               notes: notes,
               collectorId: collectorId,
               distributionDetails: [],
+              client_name: client?.cliente || "Cliente não informado",
+              collector_name: collector?.name || "Cobrador não encontrado",
+              store_name: client?.nome_da_loja || null,
             });
           }
 
