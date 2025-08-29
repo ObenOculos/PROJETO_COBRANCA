@@ -21,13 +21,13 @@ const UserManagement: React.FC = () => {
 
   useEffect(() => {
     if (isModalOpen || isDeleteModalOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     }
 
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     };
   }, [isModalOpen, isDeleteModalOpen]);
 
@@ -286,7 +286,17 @@ const UserManagement: React.FC = () => {
 
       {/* User Modal */}
       {isModalOpen && (
-        <div className="modal-overlay" onClick={(e) => { if (userModalRef.current && !userModalRef.current.contains(e.target as Node)) { handleCloseModal(); } }}>
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (
+              userModalRef.current &&
+              !userModalRef.current.contains(e.target as Node)
+            ) {
+              handleCloseModal();
+            }
+          }}
+        >
           <div className="modal-container rounded-2xl" ref={userModalRef}>
             <div className="modal-header">
               <h3 className="text-lg font-semibold text-gray-900">
@@ -386,12 +396,21 @@ const UserManagement: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && userToDelete && (
-        <div className="modal-overlay" onClick={(e) => {
-          if (deleteModalRef.current && !deleteModalRef.current.contains(e.target as Node)) {
-            handleCloseDeleteModal();
-          }
-        }}>
-          <div className="modal-container rounded-2xl max-w-sm mx-4" ref={deleteModalRef}>
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (
+              deleteModalRef.current &&
+              !deleteModalRef.current.contains(e.target as Node)
+            ) {
+              handleCloseDeleteModal();
+            }
+          }}
+        >
+          <div
+            className="modal-container rounded-2xl max-w-sm mx-4"
+            ref={deleteModalRef}
+          >
             <div className="p-6">
               <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
                 <Trash2 className="w-6 h-6 text-red-600" />

@@ -214,7 +214,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     const handleOfflineDataSynced = () => {
       // Debounce para evitar múltiplas chamadas em sequência
       setTimeout(() => {
-        console.log("Sincronização offline concluída. Atualizando todos os dados...");
+        console.log(
+          "Sincronização offline concluída. Atualizando todos os dados...",
+        );
         refreshData();
       }, 100);
     };

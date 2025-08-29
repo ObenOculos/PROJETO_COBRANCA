@@ -439,7 +439,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
   // Paginação para clientes
 
-
   // Resetar página dos clientes quando a busca ou filtros mudarem
   React.useEffect(() => {
     setClientsCurrentPage(1);
@@ -603,7 +602,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     });
     setSearchTerm("");
   };
-
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -1303,7 +1301,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     setClientSchedules(newSchedules);
   };
 
-
   const getSelectedClientsData = () => {
     if (!user || user.type !== "collector") return [];
 
@@ -1341,8 +1338,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       .sort((a, b) => {
         // Ordenar por created_at (mais recente primeiro)
         return (
-          new Date(b.createdAt).getTime() -
-          new Date(a.createdAt).getTime()
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
       });
 
@@ -1364,8 +1360,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
         if (visitDateStr.includes("-")) {
           // Format YYYY-MM-DD
-          const [year, month, day] =
-            visitDateStr.split("-");
+          const [year, month, day] = visitDateStr.split("-");
           lastVisitDate = new Date(
             parseInt(year),
             parseInt(month) - 1,
@@ -1373,8 +1368,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
           );
         } else if (visitDateStr.includes("/")) {
           // Format DD/MM/YYYY
-          const [day, month, year] =
-            visitDateStr.split("/");
+          const [day, month, year] = visitDateStr.split("/");
           lastVisitDate = new Date(
             parseInt(year),
             parseInt(month) - 1,
@@ -1386,15 +1380,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
         lastVisitDate.setHours(0, 0, 0, 0);
         daysSinceLastVisit = Math.floor(
-          (today.getTime() - lastVisitDate.getTime()) /
-            (1000 * 60 * 60 * 24),
+          (today.getTime() - lastVisitDate.getTime()) / (1000 * 60 * 60 * 24),
         );
 
         // Ensure we don't get negative days
-        daysSinceLastVisit = Math.max(
-          0,
-          daysSinceLastVisit,
-        );
+        daysSinceLastVisit = Math.max(0, daysSinceLastVisit);
       } catch {
         // If date parsing fails, consider as never visited
         daysSinceLastVisit = 999;
@@ -1422,8 +1412,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       return {
         type: "high",
         label: "90+ dias",
-        color:
-          "bg-orange-100 text-orange-800 border-orange-200",
+        color: "bg-orange-100 text-orange-800 border-orange-200",
         days: `${daysSinceLastVisit} dias`,
       };
     }
@@ -1431,8 +1420,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       return {
         type: "medium",
         label: "60+ dias",
-        color:
-          "bg-yellow-100 text-yellow-800 border-yellow-200",
+        color: "bg-yellow-100 text-yellow-800 border-yellow-200",
         days: `${daysSinceLastVisit} dias`,
       };
     }
@@ -1447,12 +1435,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     return {
       type: "recent",
       label: "Recente",
-      color:
-        "bg-green-100 text-green-800 border-green-200",
-      days:
-        daysSinceLastVisit === 0
-          ? "Hoje"
-          : `${daysSinceLastVisit} dias`,
+      color: "bg-green-100 text-green-800 border-green-200",
+      days: daysSinceLastVisit === 0 ? "Hoje" : `${daysSinceLastVisit} dias`,
     };
   };
 
@@ -1462,84 +1446,84 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         {/* Filtro e Listagem */}
         <div className="p-0 lg:p-0">
           <div className="space-y-6">
-              {/* Calendário de Visitas */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                    <Calendar className="h-5 w-5 mr-2 text-blue-600" />
-                    Calendário de Visitas
-                  </h3>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => navigateMonth("prev")}
-                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </button>
-                    <span className="text-sm font-medium min-w-[120px] text-center">
-                      {monthNames[currentMonth.getMonth()]}{" "}
-                      {currentMonth.getFullYear()}
-                    </span>
-                    <button
-                      onClick={() => navigateMonth("next")}
-                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </button>
-                  </div>
+            {/* Calendário de Visitas */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <Calendar className="h-5 w-5 mr-2 text-blue-600" />
+                  Calendário de Visitas
+                </h3>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => navigateMonth("prev")}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <span className="text-sm font-medium min-w-[120px] text-center">
+                    {monthNames[currentMonth.getMonth()]}{" "}
+                    {currentMonth.getFullYear()}
+                  </span>
+                  <button
+                    onClick={() => navigateMonth("next")}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
                 </div>
+              </div>
 
-                {/* Grade do Calendário */}
-                <div className="grid grid-cols-7 gap-3">
-                  {/* Cabeçalho dos dias da semana */}
-                  {weekDays.map((day) => (
-                    <div
-                      key={day}
-                      className="flex items-center justify-center text-xs font-medium text-gray-500 pb-2"
-                    >
-                      {day}
-                    </div>
-                  ))}
+              {/* Grade do Calendário */}
+              <div className="grid grid-cols-7 gap-3">
+                {/* Cabeçalho dos dias da semana */}
+                {weekDays.map((day) => (
+                  <div
+                    key={day}
+                    className="flex items-center justify-center text-xs font-medium text-gray-500 pb-2"
+                  >
+                    {day}
+                  </div>
+                ))}
 
-                  {/* Dias do mês */}
-                  {(() => {
-                    const { daysInMonth, startingDayOfWeek } =
-                      getDaysInMonth(currentMonth);
-                    const days = [];
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
+                {/* Dias do mês */}
+                {(() => {
+                  const { daysInMonth, startingDayOfWeek } =
+                    getDaysInMonth(currentMonth);
+                  const days = [];
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
 
-                    // Dias vazios no início
-                    for (let i = 0; i < startingDayOfWeek; i++) {
-                      days.push(
-                        <div key={`empty-${i}`} className="h-10 lg:h-12" />,
-                      );
-                    }
+                  // Dias vazios no início
+                  for (let i = 0; i < startingDayOfWeek; i++) {
+                    days.push(
+                      <div key={`empty-${i}`} className="h-10 lg:h-12" />,
+                    );
+                  }
 
-                    // Dias do mês
-                    for (let day = 1; day <= daysInMonth; day++) {
-                      const date = new Date(
-                        currentMonth.getFullYear(),
-                        currentMonth.getMonth(),
-                        day,
-                      );
-                      const visitsForDay = getVisitsForDate(date);
-                      const isToday =
-                        date.toDateString() === today.toDateString();
-                      const isSelected =
-                        selectedCalendarDate?.toDateString() ===
-                        date.toDateString();
-                      const isPast = date < today;
-                      const hasVisits =
-                        visitsForDay.filter(
-                          (visit) => visit.status !== "nao_encontrado",
-                        ).length > 0;
+                  // Dias do mês
+                  for (let day = 1; day <= daysInMonth; day++) {
+                    const date = new Date(
+                      currentMonth.getFullYear(),
+                      currentMonth.getMonth(),
+                      day,
+                    );
+                    const visitsForDay = getVisitsForDate(date);
+                    const isToday =
+                      date.toDateString() === today.toDateString();
+                    const isSelected =
+                      selectedCalendarDate?.toDateString() ===
+                      date.toDateString();
+                    const isPast = date < today;
+                    const hasVisits =
+                      visitsForDay.filter(
+                        (visit) => visit.status !== "nao_encontrado",
+                      ).length > 0;
 
-                      days.push(
-                        <button
-                          key={day}
-                          onClick={() => selectDate(date)}
-                          className={`
+                    days.push(
+                      <button
+                        key={day}
+                        onClick={() => selectDate(date)}
+                        className={`
                           h-10 lg:h-16 rounded-lg flex flex-col items-center justify-center
                           relative transition-all duration-200 transform hover:scale-105
                           ${
@@ -1553,384 +1537,207 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                           }
                           ${hasVisits ? "ring-2 ring-blue-400 ring-offset-1" : ""}
                         `}
-                        >
-                          <span className="text-sm font-medium">{day}</span>
-                          {hasVisits && (
-                            <div className="absolute bottom-1">
-                              <div
-                                className={`w-2 h-2 rounded-full ${
-                                  isSelected ? "bg-white" : "bg-blue-500"
-                                }`}
-                              />
-                            </div>
-                          )}
-                        </button>,
-                      );
-                    }
-
-                    return days;
-                  })()}
-                </div>
-
-                {/* Legenda */}
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-600">
-                  <div className="flex items-center">
-                    <div className="w-4 h-4 bg-blue-100 rounded mr-1.5" />
-                    <span>Hoje</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-4 h-4 bg-blue-600 rounded mr-1.5" />
-                    <span>Selecionado</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-4 h-4 border border-blue-400 rounded mr-1.5" />
-                    <span>Com visitas</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Visitas do dia selecionado */}
-              {selectedCalendarDate ? (
-                <div>
-                  <div className="relative bg-gradient-to-r from-blue-50/80 via-white to-blue-50/80 rounded-xl border border-blue-100/60 p-4 mb-6 shadow-sm backdrop-blur-sm">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-transparent rounded-xl"></div>
-                    <div className="relative flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center space-x-3">
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-900 leading-tight">
-                              {selectedCalendarDate.toLocaleDateString("pt-BR")}
-                            </h3>
-                            <p className="text-sm text-gray-600 font-medium">
-                              {selectedDateVisits.length}{" "}
-                              {selectedDateVisits.length === 1
-                                ? "visita agendada"
-                                : "visitas agendadas"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Busca e Filtros */}
-                        {selectedDateVisits.length > 1 && (
-                          <div className="bg-white/70 backdrop-blur-sm rounded-lg border border-white/50 px-3 py-2 shadow-sm">
-                            {/* Botões de Ordenação com Ícones */}
-                            <div className="flex items-center gap-2 justify-center">
-                              <button
-                                onClick={() => {
-                                  setVisitsSortBy("name");
-                                  setVisitsSortOrder(
-                                    visitsSortBy === "name" &&
-                                      visitsSortOrder === "asc"
-                                      ? "desc"
-                                      : "asc",
-                                  );
-                                }}
-                                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                  visitsSortBy === "name"
-                                    ? "bg-blue-600 text-white"
-                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                }`}
-                                title="Ordenar por Nome"
-                              >
-                                <User className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setVisitsSortBy("value");
-                                  setVisitsSortOrder(
-                                    visitsSortBy === "value" &&
-                                      visitsSortOrder === "asc"
-                                      ? "desc"
-                                      : "asc",
-                                  );
-                                }}
-                                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                  visitsSortBy === "value"
-                                    ? "bg-blue-600 text-white"
-                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                }`}
-                                title="Ordenar por Valor"
-                              >
-                                <DollarSign className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setVisitsSortBy("city");
-                                  setVisitsSortOrder(
-                                    visitsSortBy === "city" &&
-                                      visitsSortOrder === "asc"
-                                      ? "desc"
-                                      : "asc",
-                                  );
-                                }}
-                                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                  visitsSortBy === "city"
-                                    ? "bg-blue-600 text-white"
-                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                }`}
-                                title="Ordenar por Cidade"
-                              >
-                                <MapPinIcon className="h-4 w-4" />
-                              </button>
-                            </div>
+                      >
+                        <span className="text-sm font-medium">{day}</span>
+                        {hasVisits && (
+                          <div className="absolute bottom-1">
+                            <div
+                              className={`w-2 h-2 rounded-full ${
+                                isSelected ? "bg-white" : "bg-blue-500"
+                              }`}
+                            />
                           </div>
                         )}
+                      </button>,
+                    );
+                  }
+
+                  return days;
+                })()}
+              </div>
+
+              {/* Legenda */}
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-600">
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-blue-100 rounded mr-1.5" />
+                  <span>Hoje</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-blue-600 rounded mr-1.5" />
+                  <span>Selecionado</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-4 h-4 border border-blue-400 rounded mr-1.5" />
+                  <span>Com visitas</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Visitas do dia selecionado */}
+            {selectedCalendarDate ? (
+              <div>
+                <div className="relative bg-gradient-to-r from-blue-50/80 via-white to-blue-50/80 rounded-xl border border-blue-100/60 p-4 mb-6 shadow-sm backdrop-blur-sm">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-transparent rounded-xl"></div>
+                  <div className="relative flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center space-x-3">
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                            {selectedCalendarDate.toLocaleDateString("pt-BR")}
+                          </h3>
+                          <p className="text-sm text-gray-600 font-medium">
+                            {selectedDateVisits.length}{" "}
+                            {selectedDateVisits.length === 1
+                              ? "visita agendada"
+                              : "visitas agendadas"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  {selectedDateVisits.length === 0 ? (
-                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
-                      <Calendar className="h-8 w-8 text-blue-400 mx-auto mb-2" />
-                      <p className="text-blue-600 font-medium">
-                        Nenhuma visita agendada para{" "}
-                        {selectedCalendarDate.toLocaleDateString("pt-BR")}.
-                      </p>
-                      <p className="text-blue-500 text-sm">
-                        Que tal agendar uma nova visita?
-                      </p>
-                    </div>
-                  ) : (
-                    <div
-                      className="space-y-3"
-                      onTouchStart={handleTouchStart}
-                      onTouchMove={handleTouchMove}
-                      onTouchEnd={handleTouchEnd}
-                    >
-                      {paginatedSelectedDateVisits.map((visit) => (
-                        <div
-                          key={visit.id}
-                          className={`border rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow ${
-                            visit.isOverdue
-                              ? "border-red-300 bg-red-50"
-                              : "border-blue-300 bg-blue-50"
-                          }`}
-                        >
-                          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
-                            <div className="flex-1">
-                              <div className="flex flex-wrap items-center gap-2 mb-2">
-                                <button
-                                  onClick={() => handleOpenClientModal(visit)}
-                                  className={`font-semibold hover:underline ${
-                                    visit.isOverdue
-                                      ? "text-red-600 hover:text-red-800"
-                                      : "text-blue-600 hover:text-blue-800"
-                                  }`}
-                                >
-                                  {visit.clientName}
-                                </button>
-                                <span
-                                  className={`px-2 py-1 rounded-full text-xs ${
-                                    visit.isOverdue
-                                      ? "bg-red-100 text-red-800"
-                                      : getStatusColor(
-                                          visit.status,
-                                          visit.notes,
-                                        )
-                                  }`}
-                                >
-                                  {visit.isOverdue
-                                    ? "Atrasada"
-                                    : getStatusLabel(visit.status, visit.notes)}
-                                </span>
-                                <span
-                                  className={`text-sm font-medium ${
-                                    visit.isOverdue
-                                      ? "text-red-600"
-                                      : "text-blue-600"
-                                  }`}
-                                >
-                                  {visit.scheduledTime || "00:00"}
-                                </span>
-                                {visit.isOverdue && (
-                                  <>
-                                    <AlertTriangle className="h-4 w-4 text-red-600" />
-                                    {visit.overdueDays > 0 && (
-                                      <span className="text-xs text-red-600 font-medium">
-                                        ({visit.overdueDays}{" "}
-                                        {visit.overdueDays === 1
-                                          ? "dia"
-                                          : "dias"}{" "}
-                                        de atraso)
-                                      </span>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-
-                              <div className="text-sm text-gray-600 space-y-1">
-                                <div className="flex items-center">
-                                  <MapPin className="h-4 w-4 mr-2" />
-                                  {visit.clientAddress}
-                                </div>
-                                {visit.totalPendingValue && (
-                                  <div className="flex items-center">
-                                    <DollarSign className="h-4 w-4 mr-2" />
-                                    Pendente:{" "}
-                                    {formatCurrency(visit.totalPendingValue)}
-                                    {visit.overdueCount &&
-                                      visit.overdueCount > 0 && (
-                                        <span className="ml-2 text-red-600">
-                                          <AlertTriangle className="h-4 w-4 inline mr-1" />
-                                          {visit.overdueCount}{" "}
-                                          {visit.overdueCount === 1
-                                            ? "título"
-                                            : "títulos"}{" "}
-                                          em atraso
-                                        </span>
-                                      )}
-                                  </div>
-                                )}
-                                {visit.notes && (
-                                  <div className="text-gray-500 italic whitespace-pre-line">
-                                    {visit.notes}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {visit.status === "agendada" && (
-                              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
-                                <button
-                                  onClick={() => handleMarkAsCompleted(visit)}
-                                  className="px-3 py-2 bg-green-500 text-white rounded-2xl text-sm hover:bg-green-700 transition-colors flex items-center justify-center"
-                                >
-                                  Realizada
-                                </button>
-                                <button
-                                  onClick={() => handleMarkAsNotFound(visit)}
-                                  className="px-3 py-2 bg-orange-500 text-white rounded-2xl text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
-                                >
-                                  Não Encontrado
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleOpenRescheduleModal(visit)
-                                  }
-                                  className="px-3 py-2 bg-blue-500 text-white rounded-2xl text-sm hover:bg-blue-700 transition-colors flex items-center justify-center"
-                                >
-                                  <RefreshCw className="h-4 w-4 mr-1" />
-                                  Reagendar
-                                </button>
-                                {!visit.cancellationRejectedBy && (
-                                  <button
-                                    onClick={() =>
-                                      handleRequestCancellation(visit)
-                                    }
-                                    className="px-3 py-2 bg-red-500 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
-                                  >
-                                    Cancelar Visita
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                            {visit.status === "cancelamento_solicitado" && (
-                              <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-2xl">
-                                <div className="font-medium">
-                                  Cancelamento Solicitado
-                                </div>
-                                <div className="text-xs mt-1">
-                                  Aguardando aprovação do gerente
-                                </div>
-                                {visit.cancellationRequestReason && (
-                                  <div className="text-xs mt-1 italic">
-                                    Motivo: {visit.cancellationRequestReason}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            {visit.cancellationRejectedBy &&
-                              visit.status === "agendada" && (
-                                <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-2xl">
-                                  <div className="font-medium">
-                                    Cancelamento Rejeitado pelo Gerente
-                                  </div>
-                                  <div className="text-xs mt-1">
-                                    A visita permanece agendada
-                                  </div>
-                                  {visit.cancellationRejectionReason && (
-                                    <div className="text-xs mt-1 italic">
-                                      Motivo da rejeição:{" "}
-                                      {visit.cancellationRejectionReason}
-                                    </div>
-                                  )}
-                                  {visit.cancellationRejectedAt && (
-                                    <div className="text-xs mt-1 text-gray-600">
-                                      Rejeitado em:{" "}
-                                      {new Date(
-                                        visit.cancellationRejectedAt,
-                                      ).toLocaleDateString("pt-BR")}{" "}
-                                      às{" "}
-                                      {new Date(
-                                        visit.cancellationRejectedAt,
-                                      ).toLocaleTimeString("pt-BR", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                      {/* Busca e Filtros */}
+                      {selectedDateVisits.length > 1 && (
+                        <div className="bg-white/70 backdrop-blur-sm rounded-lg border border-white/50 px-3 py-2 shadow-sm">
+                          {/* Botões de Ordenação com Ícones */}
+                          <div className="flex items-center gap-2 justify-center">
+                            <button
+                              onClick={() => {
+                                setVisitsSortBy("name");
+                                setVisitsSortOrder(
+                                  visitsSortBy === "name" &&
+                                    visitsSortOrder === "asc"
+                                    ? "desc"
+                                    : "asc",
+                                );
+                              }}
+                              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                visitsSortBy === "name"
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              }`}
+                              title="Ordenar por Nome"
+                            >
+                              <User className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setVisitsSortBy("value");
+                                setVisitsSortOrder(
+                                  visitsSortBy === "value" &&
+                                    visitsSortOrder === "asc"
+                                    ? "desc"
+                                    : "asc",
+                                );
+                              }}
+                              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                visitsSortBy === "value"
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              }`}
+                              title="Ordenar por Valor"
+                            >
+                              <DollarSign className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setVisitsSortBy("city");
+                                setVisitsSortOrder(
+                                  visitsSortBy === "city" &&
+                                    visitsSortOrder === "asc"
+                                    ? "desc"
+                                    : "asc",
+                                );
+                              }}
+                              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                visitsSortBy === "city"
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              }`}
+                              title="Ordenar por Cidade"
+                            >
+                              <MapPinIcon className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
-                      ))}
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
-              ) : (
-                /* Mensagem quando nenhuma data é selecionada */
-                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
-                  <Calendar className="h-12 w-12 text-blue-400 mx-auto mb-3" />
-                  <p className="text-blue-700 font-medium text-lg mb-2">
-                    Selecione um dia no calendário
-                  </p>
-                  <p className="text-blue-600 text-sm">
-                    Clique em qualquer dia para visualizar as visitas agendadas
-                  </p>
-                </div>
-              )}
 
-              {/* Próximas Visitas */}
-              {upcomingVisits.length > 0 && false && (
-                <div>
-                  <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                    <Calendar className="h-5 w-5 mr-2 text-gray-600" />
-                    Próximas Visitas ({upcomingVisits.length})
-                  </h3>
-
-                  <div className="space-y-3">
-                    {upcomingVisits.slice(0, 5).map((visit) => (
+                {selectedDateVisits.length === 0 ? (
+                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
+                    <Calendar className="h-8 w-8 text-blue-400 mx-auto mb-2" />
+                    <p className="text-blue-600 font-medium">
+                      Nenhuma visita agendada para{" "}
+                      {selectedCalendarDate.toLocaleDateString("pt-BR")}.
+                    </p>
+                    <p className="text-blue-500 text-sm">
+                      Que tal agendar uma nova visita?
+                    </p>
+                  </div>
+                ) : (
+                  <div
+                    className="space-y-3"
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                  >
+                    {paginatedSelectedDateVisits.map((visit) => (
                       <div
                         key={visit.id}
-                        className="border border-gray-200 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
+                        className={`border rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow ${
+                          visit.isOverdue
+                            ? "border-red-300 bg-red-50"
+                            : "border-blue-300 bg-blue-50"
+                        }`}
                       >
                         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
                           <div className="flex-1">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <button
                                 onClick={() => handleOpenClientModal(visit)}
-                                className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                                className={`font-semibold hover:underline ${
+                                  visit.isOverdue
+                                    ? "text-red-600 hover:text-red-800"
+                                    : "text-blue-600 hover:text-blue-800"
+                                }`}
                               >
                                 {visit.clientName}
                               </button>
                               <span
-                                className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status, visit.notes)}`}
+                                className={`px-2 py-1 rounded-full text-xs ${
+                                  visit.isOverdue
+                                    ? "bg-red-100 text-red-800"
+                                    : getStatusColor(visit.status, visit.notes)
+                                }`}
                               >
-                                {getStatusLabel(visit.status, visit.notes)}
+                                {visit.isOverdue
+                                  ? "Atrasada"
+                                  : getStatusLabel(visit.status, visit.notes)}
                               </span>
+                              <span
+                                className={`text-sm font-medium ${
+                                  visit.isOverdue
+                                    ? "text-red-600"
+                                    : "text-blue-600"
+                                }`}
+                              >
+                                {visit.scheduledTime || "00:00"}
+                              </span>
+                              {visit.isOverdue && (
+                                <>
+                                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                                  {visit.overdueDays > 0 && (
+                                    <span className="text-xs text-red-600 font-medium">
+                                      ({visit.overdueDays}{" "}
+                                      {visit.overdueDays === 1 ? "dia" : "dias"}{" "}
+                                      de atraso)
+                                    </span>
+                                  )}
+                                </>
+                              )}
                             </div>
 
                             <div className="text-sm text-gray-600 space-y-1">
-                              <div className="flex items-center">
-                                <Calendar className="h-4 w-4 mr-2" />
-                                {visit.status === "realizada" &&
-                                visit.dataVisitaRealizada
-                                  ? `${formatSafeDateTime(visit.dataVisitaRealizada)} (Realizada)`
-                                  : formatSafeDateTime(
-                                      visit.scheduledDate,
-                                      visit.scheduledTime,
-                                    )}
-                              </div>
                               <div className="flex items-center">
                                 <MapPin className="h-4 w-4 mr-2" />
                                 {visit.clientAddress}
@@ -1965,19 +1772,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
                               <button
                                 onClick={() => handleMarkAsCompleted(visit)}
-                                className="px-3 py-2 bg-green-100 text-green-700 rounded-2xl text-sm hover:bg-green-200 transition-colors flex items-center justify-center"
+                                className="px-3 py-2 bg-green-500 text-white rounded-2xl text-sm hover:bg-green-700 transition-colors flex items-center justify-center"
                               >
                                 Realizada
                               </button>
                               <button
                                 onClick={() => handleMarkAsNotFound(visit)}
-                                className="px-3 py-2 bg-orange-100 text-orange-700 rounded-2xl text-sm hover:bg-orange-200 transition-colors flex items-center justify-center"
+                                className="px-3 py-2 bg-orange-500 text-white rounded-2xl text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
                               >
                                 Não Encontrado
                               </button>
                               <button
                                 onClick={() => handleOpenRescheduleModal(visit)}
-                                className="px-3 py-2 bg-blue-100 text-blue-700 rounded-2xl text-sm hover:bg-blue-200 transition-colors flex items-center justify-center"
+                                className="px-3 py-2 bg-blue-500 text-white rounded-2xl text-sm hover:bg-blue-700 transition-colors flex items-center justify-center"
                               >
                                 <RefreshCw className="h-4 w-4 mr-1" />
                                 Reagendar
@@ -1987,7 +1794,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                   onClick={() =>
                                     handleRequestCancellation(visit)
                                   }
-                                  className="px-3 py-2 bg-red-100 text-red-700 rounded-2xl text-sm hover:bg-red-200 transition-colors flex items-center justify-center"
+                                  className="px-3 py-2 bg-red-500 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
                                 >
                                   Cancelar Visita
                                 </button>
@@ -2044,67 +1851,233 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Mensagem quando nenhuma data é selecionada */
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
+                <Calendar className="h-12 w-12 text-blue-400 mx-auto mb-3" />
+                <p className="text-blue-700 font-medium text-lg mb-2">
+                  Selecione um dia no calendário
+                </p>
+                <p className="text-blue-600 text-sm">
+                  Clique em qualquer dia para visualizar as visitas agendadas
+                </p>
+              </div>
+            )}
 
-                    {upcomingVisits.length > 5 && (
-                      <div className="text-center py-2">
-                        <span className="text-sm text-gray-500">
-                          ... e mais {upcomingVisits.length - 5} visita
-                          {upcomingVisits.length - 5 !== 1 ? "s" : ""}
-                        </span>
+            {/* Próximas Visitas */}
+            {upcomingVisits.length > 0 && false && (
+              <div>
+                <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <Calendar className="h-5 w-5 mr-2 text-gray-600" />
+                  Próximas Visitas ({upcomingVisits.length})
+                </h3>
+
+                <div className="space-y-3">
+                  {upcomingVisits.slice(0, 5).map((visit) => (
+                    <div
+                      key={visit.id}
+                      className="border border-gray-200 rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <button
+                              onClick={() => handleOpenClientModal(visit)}
+                              className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {visit.clientName}
+                            </button>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status, visit.notes)}`}
+                            >
+                              {getStatusLabel(visit.status, visit.notes)}
+                            </span>
+                          </div>
+
+                          <div className="text-sm text-gray-600 space-y-1">
+                            <div className="flex items-center">
+                              <Calendar className="h-4 w-4 mr-2" />
+                              {visit.status === "realizada" &&
+                              visit.dataVisitaRealizada
+                                ? `${formatSafeDateTime(visit.dataVisitaRealizada)} (Realizada)`
+                                : formatSafeDateTime(
+                                    visit.scheduledDate,
+                                    visit.scheduledTime,
+                                  )}
+                            </div>
+                            <div className="flex items-center">
+                              <MapPin className="h-4 w-4 mr-2" />
+                              {visit.clientAddress}
+                            </div>
+                            {visit.totalPendingValue && (
+                              <div className="flex items-center">
+                                <DollarSign className="h-4 w-4 mr-2" />
+                                Pendente:{" "}
+                                {formatCurrency(visit.totalPendingValue)}
+                                {visit.overdueCount &&
+                                  visit.overdueCount > 0 && (
+                                    <span className="ml-2 text-red-600">
+                                      <AlertTriangle className="h-4 w-4 inline mr-1" />
+                                      {visit.overdueCount}{" "}
+                                      {visit.overdueCount === 1
+                                        ? "título"
+                                        : "títulos"}{" "}
+                                      em atraso
+                                    </span>
+                                  )}
+                              </div>
+                            )}
+                            {visit.notes && (
+                              <div className="text-gray-500 italic whitespace-pre-line">
+                                {visit.notes}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {visit.status === "agendada" && (
+                          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
+                            <button
+                              onClick={() => handleMarkAsCompleted(visit)}
+                              className="px-3 py-2 bg-green-100 text-green-700 rounded-2xl text-sm hover:bg-green-200 transition-colors flex items-center justify-center"
+                            >
+                              Realizada
+                            </button>
+                            <button
+                              onClick={() => handleMarkAsNotFound(visit)}
+                              className="px-3 py-2 bg-orange-100 text-orange-700 rounded-2xl text-sm hover:bg-orange-200 transition-colors flex items-center justify-center"
+                            >
+                              Não Encontrado
+                            </button>
+                            <button
+                              onClick={() => handleOpenRescheduleModal(visit)}
+                              className="px-3 py-2 bg-blue-100 text-blue-700 rounded-2xl text-sm hover:bg-blue-200 transition-colors flex items-center justify-center"
+                            >
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                              Reagendar
+                            </button>
+                            {!visit.cancellationRejectedBy && (
+                              <button
+                                onClick={() => handleRequestCancellation(visit)}
+                                className="px-3 py-2 bg-red-100 text-red-700 rounded-2xl text-sm hover:bg-red-200 transition-colors flex items-center justify-center"
+                              >
+                                Cancelar Visita
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {visit.status === "cancelamento_solicitado" && (
+                          <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-2xl">
+                            <div className="font-medium">
+                              Cancelamento Solicitado
+                            </div>
+                            <div className="text-xs mt-1">
+                              Aguardando aprovação do gerente
+                            </div>
+                            {visit.cancellationRequestReason && (
+                              <div className="text-xs mt-1 italic">
+                                Motivo: {visit.cancellationRequestReason}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {visit.cancellationRejectedBy &&
+                          visit.status === "agendada" && (
+                            <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-2xl">
+                              <div className="font-medium">
+                                Cancelamento Rejeitado pelo Gerente
+                              </div>
+                              <div className="text-xs mt-1">
+                                A visita permanece agendada
+                              </div>
+                              {visit.cancellationRejectionReason && (
+                                <div className="text-xs mt-1 italic">
+                                  Motivo da rejeição:{" "}
+                                  {visit.cancellationRejectionReason}
+                                </div>
+                              )}
+                              {visit.cancellationRejectedAt && (
+                                <div className="text-xs mt-1 text-gray-600">
+                                  Rejeitado em:{" "}
+                                  {new Date(
+                                    visit.cancellationRejectedAt,
+                                  ).toLocaleDateString("pt-BR")}{" "}
+                                  às{" "}
+                                  {new Date(
+                                    visit.cancellationRejectedAt,
+                                  ).toLocaleTimeString("pt-BR", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Paginação no final da página */}
-              {selectedDateVisits.length > visitsPerPage && (
-                <div className="relative flex items-center justify-center mt-8 pt-6 border-t border-blue-100">
-                  <div className="flex items-center space-x-4 bg-white rounded-xl border border-blue-200 shadow-sm px-6 py-3">
-                    <button
-                      onClick={() =>
-                        setCurrentPage(Math.max(1, currentPage - 1))
-                      }
-                      disabled={currentPage === 1}
-                      className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
-                    >
-                      <ChevronLeft className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
-                    </button>
-
-                    <div className="flex items-center space-x-2">
-                      {Array.from(
-                        { length: totalSelectedDatePages },
-                        (_, i) => i + 1,
-                      ).map((page) => (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={`w-10 h-10 rounded-lg font-medium text-sm transition-colors ${
-                            currentPage === page
-                              ? "bg-blue-600 text-white shadow-sm"
-                              : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
                     </div>
+                  ))}
 
-                    <button
-                      onClick={() =>
-                        setCurrentPage(
-                          Math.min(totalSelectedDatePages, currentPage + 1),
-                        )
-                      }
-                      disabled={currentPage === totalSelectedDatePages}
-                      className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
-                    >
-                      <ChevronRight className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
-                    </button>
-                  </div>
+                  {upcomingVisits.length > 5 && (
+                    <div className="text-center py-2">
+                      <span className="text-sm text-gray-500">
+                        ... e mais {upcomingVisits.length - 5} visita
+                        {upcomingVisits.length - 5 !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* Paginação no final da página */}
+            {selectedDateVisits.length > visitsPerPage && (
+              <div className="relative flex items-center justify-center mt-8 pt-6 border-t border-blue-100">
+                <div className="flex items-center space-x-4 bg-white rounded-xl border border-blue-200 shadow-sm px-6 py-3">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
+                  >
+                    <ChevronLeft className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
+                  </button>
+
+                  <div className="flex items-center space-x-2">
+                    {Array.from(
+                      { length: totalSelectedDatePages },
+                      (_, i) => i + 1,
+                    ).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-10 h-10 rounded-lg font-medium text-sm transition-colors ${
+                          currentPage === page
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      setCurrentPage(
+                        Math.min(totalSelectedDatePages, currentPage + 1),
+                      )
+                    }
+                    disabled={currentPage === totalSelectedDatePages}
+                    className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
+                  >
+                    <ChevronRight className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Modal de Notificação de Visitas Atrasadas - Renderizado via Portal */}
@@ -2996,17 +2969,24 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                 <select
                                   value={filters.visitStatus}
                                   onChange={(e) =>
-                                    handleFilterChange("visitStatus", e.target.value)
+                                    handleFilterChange(
+                                      "visitStatus",
+                                      e.target.value,
+                                    )
                                   }
                                   className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                                 >
                                   <option value="">Todos os status</option>
-                                  <option value="recent">Recente (&lt; 30 dias)</option>
+                                  <option value="recent">
+                                    Recente (&lt; 30 dias)
+                                  </option>
                                   <option value="low">30-59 dias</option>
                                   <option value="medium">60-89 dias</option>
                                   <option value="high">90-119 dias</option>
                                   <option value="critical">120+ dias</option>
-                                  <option value="never-visited">Nunca visitado</option>
+                                  <option value="never-visited">
+                                    Nunca visitado
+                                  </option>
                                 </select>
                               </div>
                             </div>
@@ -3046,9 +3026,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                       time: "",
                                     };
                                     return (
-                                      <div
-                                        key={client.document}
-                                      >
+                                      <div key={client.document}>
                                         <div className="flex items-center justify-between mb-2">
                                           <div>
                                             <span className="font-medium text-gray-900">
@@ -3325,7 +3303,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                               selectedClients.has(
                                                 client.document,
                                               );
-                                            const status = getClientStatus(client);
+                                            const status =
+                                              getClientStatus(client);
                                             return (
                                               <div
                                                 key={client.document}

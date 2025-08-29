@@ -790,8 +790,6 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
 
             {/* Ações Principais */}
             <div className="flex items-center space-x-2">
-
-
               <button
                 onClick={getUserLocation}
                 disabled={isGettingLocation}
@@ -834,7 +832,7 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                 </span>
               </button>
 
-                            <button
+              <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={`p-2 rounded-2xl transition-colors ${
                   showFilters
@@ -845,7 +843,6 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
               >
                 <Filter className="h-4 w-4" />
               </button>
-              
             </div>
           </div>
 

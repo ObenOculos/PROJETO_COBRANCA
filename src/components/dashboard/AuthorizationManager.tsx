@@ -651,7 +651,10 @@ const AuthorizationManager: React.FC = () => {
             <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <label htmlFor="history-search-input" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="history-search-input"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
                     Buscar
                   </label>
                   <div className="relative">
@@ -668,7 +671,10 @@ const AuthorizationManager: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="history-status-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="history-status-filter"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
                     Status
                   </label>
                   <select
@@ -685,7 +691,10 @@ const AuthorizationManager: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="history-date-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="history-date-filter"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
                     Data
                   </label>
                   <input

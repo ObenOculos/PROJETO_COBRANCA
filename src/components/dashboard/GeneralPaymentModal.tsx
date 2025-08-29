@@ -284,7 +284,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           clientAddress: clientGroup.address,
           clientNeighborhood: clientGroup.neighborhood,
           clientCity: clientGroup.city,
-          totalPendingValue: totalPending - (parseFloat(distributionAmount) || 0),
+          totalPendingValue:
+            totalPending - (parseFloat(distributionAmount) || 0),
           overdueCount: 0, // This might need adjustment based on real data
         };
 
@@ -710,7 +711,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
               <div className="px-4 lg:px-6 py-4">
                 <p className="text-sm text-gray-600 mb-4">
-                  O cliente ainda possui saldo devedor. Por favor, agende uma nova visita.
+                  O cliente ainda possui saldo devedor. Por favor, agende uma
+                  nova visita.
                 </p>
                 <div className="space-y-4">
                   <div>

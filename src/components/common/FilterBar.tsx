@@ -34,7 +34,10 @@ const FilterBar: React.FC<FilterBarProps> = ({
     return stores.sort();
   };
 
-  const collectorStores = React.useMemo(() => getCollectorStores(), [getCollectorStores]);
+  const collectorStores = React.useMemo(
+    () => getCollectorStores(),
+    [getCollectorStores],
+  );
 
   // Para cobradores, buscar apenas as cidades e bairros dos seus clientes
   const getCollectorCities = React.useCallback(() => {
@@ -55,8 +58,14 @@ const FilterBar: React.FC<FilterBarProps> = ({
     return neighborhoods.sort();
   }, [userType, user, getCollectorCollections]);
 
-  const collectorCities = React.useMemo(() => getCollectorCities(), [getCollectorCities]);
-  const collectorNeighborhoods = React.useMemo(() => getCollectorNeighborhoods(), [getCollectorNeighborhoods]);
+  const collectorCities = React.useMemo(
+    () => getCollectorCities(),
+    [getCollectorCities],
+  );
+  const collectorNeighborhoods = React.useMemo(
+    () => getCollectorNeighborhoods(),
+    [getCollectorNeighborhoods],
+  );
 
   const handleStatusChange = (status: string) => {
     onFilterChange({
@@ -84,22 +93,23 @@ const FilterBar: React.FC<FilterBarProps> = ({
     setIsExpanded(false);
   };
 
-  const hasActiveFilters = React.useMemo(() =>
-    filters.status ||
-    filters.dueDate ||
-    filters.city ||
-    filters.neighborhood ||
-    filters.store ||
-    filters.collector ||
-    filters.search ||
-    filters.dateFrom ||
-    filters.dateTo ||
-    filters.minAmount ||
-    filters.maxAmount ||
-    filters.overdueOnly ||
-    filters.highValueOnly ||
-    filters.visitsOnly,
-    [filters]
+  const hasActiveFilters = React.useMemo(
+    () =>
+      filters.status ||
+      filters.dueDate ||
+      filters.city ||
+      filters.neighborhood ||
+      filters.store ||
+      filters.collector ||
+      filters.search ||
+      filters.dateFrom ||
+      filters.dateTo ||
+      filters.minAmount ||
+      filters.maxAmount ||
+      filters.overdueOnly ||
+      filters.highValueOnly ||
+      filters.visitsOnly,
+    [filters],
   );
 
   return (
@@ -107,7 +117,9 @@ const FilterBar: React.FC<FilterBarProps> = ({
       {/* Search Bar */}
       <div className="p-4">
         <div className="relative">
-          <label htmlFor="search-input" className="sr-only">Buscar</label>
+          <label htmlFor="search-input" className="sr-only">
+            Buscar
+          </label>
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             id="search-input"
@@ -231,10 +243,15 @@ const FilterBar: React.FC<FilterBarProps> = ({
         <div className="px-4 sm:px-4 pb-6 space-y-4 border-t border-gray-200 pt-4">
           {/* Grid de filtros responsivo */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <h3 className="col-span-full text-sm font-semibold text-gray-800 mb-2 mt-4">Filtros de Cobrança</h3>
+            <h3 className="col-span-full text-sm font-semibold text-gray-800 mb-2 mt-4">
+              Filtros de Cobrança
+            </h3>
             {/* Status Filter */}
             <div>
-              <label htmlFor="status-select" className="block text-xs font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="status-select"
+                className="block text-xs font-medium text-gray-700 mb-1"
+              >
                 Status
               </label>
               <select
@@ -254,8 +271,16 @@ const FilterBar: React.FC<FilterBarProps> = ({
             </div>
 
             {/* Date Range Filter - Mobile Stacked, Desktop Side by Side */}
-            <div className="sm:col-span-2 lg:col-span-1" role="group" aria-labelledby="date-range-label">
-              <label id="date-range-label" htmlFor="date-from-input" className="block text-xs font-medium text-gray-700 mb-1">
+            <div
+              className="sm:col-span-2 lg:col-span-1"
+              role="group"
+              aria-labelledby="date-range-label"
+            >
+              <label
+                id="date-range-label"
+                htmlFor="date-from-input"
+                className="block text-xs font-medium text-gray-700 mb-1"
+              >
                 Período de Vencimento
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -293,8 +318,16 @@ const FilterBar: React.FC<FilterBarProps> = ({
             </div>
 
             {/* Amount Range Filter */}
-            <div className="sm:col-span-2 lg:col-span-1" role="group" aria-labelledby="amount-range-label">
-              <label id="amount-range-label" htmlFor="min-amount-input" className="block text-xs font-medium text-gray-700 mb-1">
+            <div
+              className="sm:col-span-2 lg:col-span-1"
+              role="group"
+              aria-labelledby="amount-range-label"
+            >
+              <label
+                id="amount-range-label"
+                htmlFor="min-amount-input"
+                className="block text-xs font-medium text-gray-700 mb-1"
+              >
                 Valor
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -335,10 +368,15 @@ const FilterBar: React.FC<FilterBarProps> = ({
               </div>
             </div>
 
-            <h3 className="col-span-full text-sm font-semibold text-gray-800 mb-2 mt-4">Filtros de Atribuição</h3>
+            <h3 className="col-span-full text-sm font-semibold text-gray-800 mb-2 mt-4">
+              Filtros de Atribuição
+            </h3>
             {/* Store Filter */}
             <div>
-              <label htmlFor="store-select" className="block text-xs font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="store-select"
+                className="block text-xs font-medium text-gray-700 mb-1"
+              >
                 Loja
               </label>
               <select
@@ -368,7 +406,10 @@ const FilterBar: React.FC<FilterBarProps> = ({
             {/* Collector Filter for Managers */}
             {userType === "manager" && (
               <div>
-                <label htmlFor="collector-select" className="block text-xs font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="collector-select"
+                  className="block text-xs font-medium text-gray-700 mb-1"
+                >
                   Cobrador
                 </label>
                 <select
@@ -397,8 +438,16 @@ const FilterBar: React.FC<FilterBarProps> = ({
             {/* Location Filters for Collectors */}
             {userType === "collector" && (
               <>
-                <div className="sm:col-span-2 lg:col-span-1" role="group" aria-labelledby="location-label">
-                  <label id="location-label" htmlFor="city-select" className="block text-xs font-medium text-gray-700 mb-1">
+                <div
+                  className="sm:col-span-2 lg:col-span-1"
+                  role="group"
+                  aria-labelledby="location-label"
+                >
+                  <label
+                    id="location-label"
+                    htmlFor="city-select"
+                    className="block text-xs font-medium text-gray-700 mb-1"
+                  >
                     Localização
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -445,11 +494,20 @@ const FilterBar: React.FC<FilterBarProps> = ({
               </>
             )}
 
-            <h3 className="col-span-full text-sm font-semibold text-gray-800 mb-2 mt-4">Filtros Específicos</h3>
+            <h3 className="col-span-full text-sm font-semibold text-gray-800 mb-2 mt-4">
+              Filtros Específicos
+            </h3>
             {/* Visits Only Filter - Only show for collectors */}
             {userType === "collector" && (
-              <div className="sm:col-span-2 lg:col-span-3" role="group" aria-labelledby="visits-filter-label">
-                <span id="visits-filter-label" className="block text-xs font-medium text-gray-700 mb-1">
+              <div
+                className="sm:col-span-2 lg:col-span-3"
+                role="group"
+                aria-labelledby="visits-filter-label"
+              >
+                <span
+                  id="visits-filter-label"
+                  className="block text-xs font-medium text-gray-700 mb-1"
+                >
                   Filtro de Visitas
                 </span>
                 <div className="flex items-center space-x-4">
