@@ -38,6 +38,7 @@ interface DailyReportData {
     totalPendingValue: number;
     receivedDate: string;
     collector: string;
+    paymentMethod: string;
     installments: {
       collectionId: number | string;
       originalValue: number;
@@ -351,6 +352,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         totalReceivedValue: number;
         receivedDate: string;
         collector: string;
+        paymentMethod: string;
         installments: {
           collectionId: string;
           originalValue: number;
@@ -386,6 +388,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             payment.collectorName ||
             users.find((u) => u.id === payment.collectorId)?.name ||
             "Não atribuído",
+          paymentMethod: payment.paymentMethod || "Não informado",
           installments: [],
         });
       }
@@ -867,6 +870,9 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider hidden md:table-cell">
                       Cobrador
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider hidden lg:table-cell">
+                      Forma Pag.
+                    </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">
                       Valor
                     </th>
@@ -896,6 +902,11 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                       <td className="px-4 py-3 hidden md:table-cell">
                         <p className="text-sm text-gray-600">
                           {payment.collector}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-left hidden lg:table-cell">
+                        <p className="text-sm text-gray-600">
+                          {payment.paymentMethod}
                         </p>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -973,6 +984,7 @@ const generateReportContent = (
       lines.push(
         `Cliente: ${payment.client}`,
         `${payment.saleNumber ? `Venda: #${payment.saleNumber}` : "Venda sem número"} | Loja: ${payment.store}`,
+        `Forma de Pagamento: ${payment.paymentMethod}`,
         `Parcelas: ${payment.installments.length}`,
         `Valor Devido: ${formatCurrency(payment.totalOriginalValue)} | Valor Recebido: ${formatCurrency(payment.totalReceivedValue)}`,
         `Valor Pendente: ${payment.totalPendingValue > 0 ? formatCurrency(payment.totalPendingValue) : "Quitado"}`,
@@ -1269,6 +1281,7 @@ const generatePrintableReport = (
           <th>Venda</th>
           <th>Parcelas</th>
           <th>Loja</th>
+          <th>Forma Pag.</th>
           <th>Valor Devido</th>
           <th>Valor Recebido</th>
           <th>Valor Pendente</th>
@@ -1282,6 +1295,7 @@ const generatePrintableReport = (
             <td>${p.saleNumber ? `#${p.saleNumber}` : "Sem número"}</td>
             <td>${p.installments.length}</td>
             <td>${p.store}</td>
+            <td>${p.paymentMethod}</td>
             <td style="text-align: right;">${formatCurrency(p.totalOriginalValue)}</td>
             <td style="font-weight: bold; text-align: right;">${formatCurrency(p.totalReceivedValue)}</td>
             <td style="text-align: right;">${p.totalPendingValue > 0 ? formatCurrency(p.totalPendingValue) : "-"}</td>

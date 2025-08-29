@@ -1326,11 +1326,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const refreshData = async () => {
     setGlobalLoading(true, "Atualizando dados...");
     try {
+      invalidateCollections(); // Ensure collections are fresh
+      invalidatePayments(); // Ensure sale payments are fresh
+      invalidateUsers(); // Ensure users are fresh
+      invalidateVisits(); // Ensure visits are fresh
       await Promise.all([
-        fetchCollections(),
-        fetchUsers(),
-        fetchSalePayments(),
-        fetchScheduledVisits(),
+        fetchCollections(false), // Force fetch
+        fetchUsers(false), // Force fetch
+        fetchSalePayments(false), // Force fetch
+        fetchScheduledVisits(false), // Force fetch
       ]);
     } finally {
       setGlobalLoading(false);
