@@ -2552,20 +2552,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                       </button>
                     ))}
                   </div>
-
-                  <div className="mt-4">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleConfirmCompletion("");
-                      }}
-                      className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors text-sm"
-                    >
-                      Marcar como realizada sem observação
-                    </button>
-                  </div>
                 </div>
 
                 <div className="px-4 lg:px-6 py-4 border-t border-gray-200">
@@ -2670,15 +2656,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         {note}
                       </button>
                     ))}
-                  </div>
-
-                  <div className="mt-4">
-                    <button
-                      onClick={() => handleConfirmNotFound("")}
-                      className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors text-sm"
-                    >
-                      Marcar como não encontrado sem observação
-                    </button>
                   </div>
                 </div>
 
@@ -3071,7 +3048,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                     return (
                                       <div
                                         key={client.document}
-                                        className="bg-white rounded-2xl p-3 border border-gray-200"
                                       >
                                         <div className="flex items-center justify-between mb-2">
                                           <div>
@@ -3463,8 +3439,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                       </div>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                          <div className="flex">
-                                            <Calendar className="h-3 w-3 text-gray-400 mr-1 mt-0.5" />
+                                          <div className="flex items-center">
+                                            <Calendar className="h-3 w-3 text-gray-400 mr-1" />
                                             <input
                                               type="date"
                                               value={schedule.date}
@@ -3488,8 +3464,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                           </div>
                                         </div>
                                         <div className="space-y-2">
-                                          <div className="flex">
-                                            <Clock className="h-3 w-3 text-gray-400 mr-1 mt-0.5" />
+                                          <div className="flex items-center">
+                                            <Clock className="h-3 w-3 text-gray-400 mr-1" />
                                             <input
                                               type="time"
                                               value={schedule.time}

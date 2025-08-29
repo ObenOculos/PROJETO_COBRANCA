@@ -8,8 +8,10 @@ import {
   Calculator,
   TrendingDown,
   RefreshCw,
+  Calendar,
+  Clock,
 } from "lucide-react";
-import { ClientGroup, SaleGroup } from "../../types";
+import { ClientGroup, SaleGroup, ScheduledVisit } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useOffline } from "../../hooks/useOffline";
@@ -31,7 +33,7 @@ interface SaleDistributionItem {
 
 const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
   ({ clientGroup, clientSales, onClose, onSuccess }) => {
-    const { processGeneralPayment } = useCollection();
+    const { processGeneralPayment, scheduleVisit } = useCollection();
     const { user } = useAuth();
     const { isOnline } = useOffline();
     const [loading, setLoading] = useState(false);
@@ -45,6 +47,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const [manualSaleEdits, setManualSaleEdits] = useState<
       Record<number, string>
     >({});
+    const [paymentMethod, setPaymentMethod] = useState("dinheiro");
+    const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+    const [rescheduleDate, setRescheduleDate] = useState("");
+    const [rescheduleTime, setRescheduleTime] = useState("");
 
     // Desabilitar scroll do body quando o modal estiver aberto
     useEffect(() => {
@@ -177,40 +183,44 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         if (!confirm) return;
       }
 
-      try {
-        setLoading(true);
+      const newPendingValue = totalPending - inputAmount;
 
-        // Chamar processGeneralPayment com os parâmetros corretos
-        await processGeneralPayment(
-          clientGroup.document || "",
-          parseFloat(distributionAmount) || 0,
-          "dinheiro", // Valor padrão, pode ser adicionado ao formulário futuramente
-          `Distribuição geral de ${formatCurrency(parseFloat(distributionAmount) || 0)}`,
-          user.id,
-        );
-
-        // Notificação de sucesso
-        showSuccessNotification();
-
-        // Chamar callback de sucesso e fechar modal
-        onSuccess();
-        onClose();
-      } catch (error) {
-        console.error("Erro ao aplicar distribuição:", error);
-        showErrorNotification(error);
-      } finally {
-        setLoading(false);
+      if (newPendingValue > 0.01) {
+        // Pagamento parcial, mostrar modal de reagendamento primeiro
+        setShowRescheduleModal(true);
+      } else {
+        // Pagamento integral, processar diretamente
+        try {
+          setLoading(true);
+          await processGeneralPayment(
+            clientGroup.document || "",
+            inputAmount,
+            paymentMethod,
+            `Distribuição geral de ${formatCurrency(inputAmount)}`,
+            user.id,
+          );
+          showSuccessNotification("Pagamento distribuído com sucesso!");
+          onSuccess();
+          onClose();
+        } catch (error) {
+          console.error("Erro ao aplicar distribuição:", error);
+          showErrorNotification(error);
+        } finally {
+          setLoading(false);
+        }
       }
     };
 
-    const showSuccessNotification = () => {
+    const showSuccessNotification = (message?: string) => {
       const notification = document.createElement("div");
       notification.className =
         "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center";
 
-      const successMessage = isOnline
-        ? "Pagamento distribuído com sucesso!"
-        : "Pagamento adicionado à fila offline!";
+      const successMessage =
+        message ||
+        (isOnline
+          ? "Pagamento distribuído com sucesso!"
+          : "Pagamento adicionado à fila offline!");
 
       notification.innerHTML = `
       <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -248,6 +258,49 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           document.body.removeChild(notification);
         }
       }, 8000);
+    };
+
+    const handleConfirmReschedule = async () => {
+      if (!rescheduleDate || !rescheduleTime) {
+        alert("Por favor, informe a data e a hora para o reagendamento.");
+        return;
+      }
+
+      if (!user) {
+        alert("Usuário não identificado");
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const visitData: Omit<ScheduledVisit, "id" | "createdAt"> = {
+          collectorId: user.id,
+          clientDocument: clientGroup.document,
+          clientName: clientGroup.client,
+          scheduledDate: rescheduleDate,
+          scheduledTime: rescheduleTime,
+          status: "agendada",
+          notes: "Visita reagendada após pagamento parcial.",
+          clientAddress: clientGroup.address,
+          clientNeighborhood: clientGroup.neighborhood,
+          clientCity: clientGroup.city,
+          totalPendingValue: totalPending - (parseFloat(distributionAmount) || 0),
+          overdueCount: 0, // This might need adjustment based on real data
+        };
+
+        await scheduleVisit(visitData);
+
+        showSuccessNotification(
+          "Pagamento realizado e visita reagendada com sucesso!",
+        );
+        onSuccess();
+        onClose();
+      } catch (error) {
+        console.error("Erro ao reagendar visita:", error);
+        showErrorNotification(error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     const totalDistributed = getTotalDistributed();
@@ -395,6 +448,23 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     </button>
                   </div>
                 </div>
+              </div>
+
+              {/* Forma de Pagamento */}
+              <div className="mb-6">
+                <label className="block text-lg font-semibold text-gray-900 mb-3">
+                  Forma de Pagamento
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                >
+                  <option value="dinheiro">Dinheiro</option>
+                  <option value="pix">PIX</option>
+                  <option value="cartao_credito">Cartão de Crédito</option>
+                  <option value="cartao_debito">Cartão de Débito</option>
+                </select>
               </div>
 
               {/* Modo de Distribuição */}
@@ -628,6 +698,72 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             </form>
           </div>
         </div>
+        {showRescheduleModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
+              <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <RefreshCw className="h-5 w-5 mr-2 text-blue-600" />
+                  Reagendar Visita
+                </h3>
+              </div>
+
+              <div className="px-4 lg:px-6 py-4">
+                <p className="text-sm text-gray-600 mb-4">
+                  O cliente ainda possui saldo devedor. Por favor, agende uma nova visita.
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Nova Data *
+                    </label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        id="reschedule-date"
+                        name="reschedule-date"
+                        type="date"
+                        value={rescheduleDate}
+                        onChange={(e) => setRescheduleDate(e.target.value)}
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Novo Horário *
+                    </label>
+                    <div className="relative">
+                      <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        id="reschedule-time"
+                        name="reschedule-time"
+                        type="time"
+                        value={rescheduleTime}
+                        onChange={(e) => setRescheduleTime(e.target.value)}
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={handleConfirmReschedule}
+                  disabled={loading || !rescheduleDate || !rescheduleTime}
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  {loading ? "Agendando..." : "Confirmar Agendamento"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   },
