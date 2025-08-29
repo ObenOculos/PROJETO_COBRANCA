@@ -422,6 +422,11 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
         text: "text-red-800",
         label: "Cancelamento Solicitado",
       },
+      pending_sync: {
+        bg: "bg-gray-100",
+        text: "text-gray-800",
+        label: "Pendente",
+      },
     };
 
     const config = statusConfig[status] || statusConfig["agendada"];

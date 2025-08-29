@@ -40,7 +40,8 @@ export interface ScheduledVisit {
     | "realizada"
     | "cancelada"
     | "nao_encontrado"
-    | "cancelamento_solicitado";
+    | "cancelamento_solicitado"
+    | "pending_sync";
   notes?: string;
   createdAt: string;
   updatedAt?: string;

@@ -645,7 +645,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         (visit.status === "agendada" ||
           visit.status === "realizada" ||
           visit.status === "nao_encontrado" ||
-          visit.status === "cancelamento_solicitado")
+          visit.status === "cancelamento_solicitado" ||
+          visit.status === "pending_sync")
       );
     });
   };
@@ -1038,6 +1039,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         return "Não Encontrado";
       case "cancelamento_solicitado":
         return "Cancelamento Solicitado";
+      case "pending_sync":
+        return "Pendente";
       default:
         return status;
     }
@@ -1060,6 +1063,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         return "bg-orange-100 text-orange-800";
       case "cancelamento_solicitado":
         return "bg-yellow-100 text-yellow-800 border border-yellow-300";
+      case "pending_sync":
+        return "bg-gray-100 text-gray-800 border border-gray-300";
       default:
         return "bg-gray-100 text-gray-800";
     }

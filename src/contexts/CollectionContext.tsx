@@ -2455,12 +2455,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   ): Promise<ScheduledVisit> => {
     // If offline, add to queue and update UI locally
     if (!isOnline) {
-      console.log("Offline: agendando visita na fila.");
-
       const tempId = `offline_${crypto.randomUUID()}`;
       const newVisit: ScheduledVisit = {
         ...visitData,
         id: tempId,
+        status: "pending_sync", // Marcar como pendente de sincronização
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -2474,7 +2473,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         data: visitData,
       });
 
-      console.log("Visita agendada localmente com ID temporário:", tempId);
       return newVisit;
     }
 
