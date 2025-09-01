@@ -254,7 +254,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           );
           setCollections(cachedData);
           return;
-        } else {
+        }
       } else {
         console.log("🔄 Fetch forçado sem cache (useCache=false)");
       }
