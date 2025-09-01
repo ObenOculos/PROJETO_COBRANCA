@@ -288,9 +288,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       const currentMonthGoals = monthlyGoals.filter(
         (g) => {
           const goalDate = new Date(g.month);
-          const monthMatches = selectedMonths.length === 0 || selectedMonths.includes(goalDate.getMonth());
-          const yearMatches = selectedYears.length === 0 || selectedYears.includes(goalDate.getFullYear());
-          return monthMatches && yearMatches && g.user_id === collector.id;
+          return selectedMonths.includes(goalDate.getMonth()) && selectedYears.includes(goalDate.getFullYear()) && g.user_id === collector.id;
         }
       );
 
