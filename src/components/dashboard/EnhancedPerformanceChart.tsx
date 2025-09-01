@@ -35,6 +35,9 @@ interface EnhancedCollectorPerformance {
   currentMonthVisitsGoal: number;
   currentMonthPaymentsActual: number;
   currentMonthPaymentsGoal: number;
+  totalAssignedClients: number; // New
+  visitedClientsInSelectedMonths: number; // New
+  clientVisitEfficiency: number; // New
 }
 
 const EnhancedPerformanceChart: React.FC = () => {
@@ -367,6 +370,31 @@ const EnhancedPerformanceChart: React.FC = () => {
           ? (currentMonthPaymentsActual / currentMonthPaymentsGoal) * 100
           : 0;
 
+      // New: Calculate client visit efficiency
+      const allAssignedClients = new Set(
+        collections
+          .filter((c) => c.user_id === collector.id)
+          .map((c) => c.documento)
+          .filter(Boolean),
+      ).size;
+
+      const visitedClients = new Set(
+        scheduledVisits
+          .filter(
+            (v) =>
+              v.collectorId === collector.id &&
+              v.status === "realizada" &&
+              isDateInSelectedMonths(new Date(v.dataVisitaRealizada + "T00:00:00")),
+          )
+          .map((v) => v.clientDocument)
+          .filter(Boolean),
+      ).size;
+
+      const clientVisitEfficiency =
+        allAssignedClients > 0
+          ? (visitedClients / allAssignedClients) * 100
+          : 0;
+
       return {
         collectorId: collector.id,
         collectorName: collector.name,
@@ -386,6 +414,9 @@ const EnhancedPerformanceChart: React.FC = () => {
         currentMonthVisitsGoal,
         currentMonthPaymentsActual,
         currentMonthPaymentsGoal,
+        totalAssignedClients: allAssignedClients, // New
+        visitedClientsInSelectedMonths: visitedClients, // New
+        clientVisitEfficiency, // New
       };
     });
   }, [
@@ -931,6 +962,13 @@ const EnhancedPerformanceChart: React.FC = () => {
                       <p className="text-xs text-gray-500">Ticket Médio</p>
                       <p className="text-sm font-semibold text-gray-700">
                         {formatCurrency(collector.averageTicket)}
+                      </p>
+                    </div>
+                    {/* New: Aproveitamento de Visitas */}
+                    <div className="text-center col-span-2">
+                      <p className="text-xs text-gray-500">Aproveitamento de Visitas</p>
+                      <p className="text-sm font-semibold text-gray-700">
+                        {collector.clientVisitEfficiency.toFixed(1)}% ({collector.visitedClientsInSelectedMonths}/{collector.totalAssignedClients})
                       </p>
                     </div>
                   </div>

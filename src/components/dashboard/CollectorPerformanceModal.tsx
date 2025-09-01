@@ -78,44 +78,50 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
 
   const pendingAmount = collector.totalAmount - collector.receivedAmount;
 
-  const stats = [
-    {
-      icon: BarChart2,
-      label: "Vendas Finalizadas",
-      value: `${collector.completedSales}/${collector.totalSales}`,
-      color: "text-green-600",
-    },
-    {
-      icon: TrendingDown,
-      label: "Vendas Pendentes",
-      value: collector.pendingSales,
-      color: "text-red-600",
-    },
-    {
-      icon: Users,
-      label: "Clientes com Pendências",
-      value: collector.clientsWithPending,
-      color: "text-yellow-600",
-    },
-    {
-      icon: DollarSign,
-      label: "Valor Pendente",
-      value: formatCurrency(pendingAmount),
-      color: "text-red-700",
-    },
-    {
-      icon: PieChart,
-      label: "Eficiência",
-      value: `${collector.efficiency.toFixed(1)}%`,
-      color: "text-blue-600",
-    },
-    {
-      icon: Hash,
-      label: "Total de Clientes",
-      value: collector.clientsCount,
-      color: "text-indigo-600",
-    },
-  ];
+        const stats = [
+        {
+          icon: BarChart2,
+          label: "Vendas Finalizadas",
+          value: `${collector.completedSales}/${collector.totalSales}`,
+          color: "text-green-600",
+        },
+        {
+          icon: TrendingDown,
+          label: "Vendas Pendentes",
+          value: collector.pendingSales,
+          color: "text-red-600",
+        },
+        {
+          icon: Users,
+          label: "Clientes com Pendências",
+          value: collector.clientsWithPending,
+          color: "text-yellow-600",
+        },
+        {
+          icon: DollarSign,
+          label: "Valor Pendente",
+          value: formatCurrency(pendingAmount),
+          color: "text-red-700",
+        },
+        {
+          icon: PieChart,
+          label: "Eficiência",
+          value: `${collector.efficiency.toFixed(1)}%`,
+          color: "text-blue-600",
+        },
+        {
+          icon: Hash,
+          label: "Total de Clientes",
+          value: collector.clientsCount,
+          color: "text-indigo-600",
+        },
+        { // New stat
+          icon: Users,
+          label: "Aproveitamento de Visitas",
+          value: `${collector.clientVisitEfficiency.toFixed(1)}% (${collector.visitedClientsInSelectedMonths}/${collector.totalAssignedClients})`,
+          color: "text-purple-600", // Using purple for a new distinct color
+        },
+      ];
 
   return (
     <div
@@ -124,7 +130,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-auto transform transition-all duration-300 ease-in-out max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-3xl shadow-2xl w-full lg:max-w-[80%] mx-auto transform transition-all duration-300 ease-in-out max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 relative">
