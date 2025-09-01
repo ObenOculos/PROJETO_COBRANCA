@@ -9,6 +9,7 @@ import {
   CollectionContextType,
   Collection,
   User,
+  MonthlyGoal,
   CollectionAttempt,
   DashboardStats,
   CollectorPerformance,
@@ -62,6 +63,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [users, setUsers] = useState<User[]>([]);
   const [salePayments, setSalePayments] = useState<SalePayment[]>([]);
   const [scheduledVisits, setScheduledVisits] = useState<ScheduledVisit[]>([]);
+  const [monthlyGoals, setMonthlyGoals] = useState<MonthlyGoal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,6 +107,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             fetchUsers(),
             fetchSalePayments(),
             fetchScheduledVisits(),
+            fetchMonthlyGoals(),
           ]);
 
           // Now fetch collections
@@ -622,6 +625,61 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     } catch (err) {
       console.error("Erro ao deletar usuário:", err);
       setError(err instanceof Error ? err.message : "Erro ao deletar usuário");
+    }
+  };
+
+  const fetchMonthlyGoals = async (useCache = true) => {
+    try {
+      const cacheKey = "monthly_goals";
+      if (useCache) {
+        const cachedData = dataCache.get<MonthlyGoal[]>(cacheKey);
+        if (cachedData) {
+          setMonthlyGoals(cachedData);
+          return;
+        }
+      }
+
+      const { data, error } = await supabase.from("monthly_goals").select("*");
+
+      if (error) {
+        throw error;
+      }
+
+      setMonthlyGoals(data || []);
+      dataCache.set(cacheKey, data || []);
+    } catch (err) {
+      console.error("Erro ao carregar metas mensais:", err);
+      setError(err instanceof Error ? err.message : "Erro ao carregar metas mensais");
+    }
+  };
+
+  const setMonthlyGoal = async (goal: Omit<MonthlyGoal, "id" | "created_at" | "updated_at">) => {
+    try {
+      const { data, error } = await supabase
+        .from("monthly_goals")
+        .upsert(
+          {
+            user_id: goal.user_id,
+            month: goal.month,
+            visits_goal: goal.visits_goal,
+            payments_goal: goal.payments_goal,
+          },
+          { onConflict: "user_id,month" }
+        )
+        .select();
+
+      if (error) {
+        throw error;
+      }
+
+      // Refresh local state
+      await fetchMonthlyGoals(false);
+
+      return data;
+    } catch (err) {
+      console.error("Erro ao salvar meta mensal:", err);
+      setError(err instanceof Error ? err.message : "Erro ao salvar meta mensal");
+      throw err;
     }
   };
 
@@ -1335,6 +1393,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         fetchUsers(false), // Force fetch
         fetchSalePayments(false), // Force fetch
         fetchScheduledVisits(false), // Force fetch
+        fetchMonthlyGoals(false), // Force fetch monthly goals
       ]);
     } finally {
       setGlobalLoading(false);
@@ -3208,6 +3267,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     users,
     salePayments,
     scheduledVisits,
+    monthlyGoals,
     loading,
     error,
     isOnline,
@@ -3223,6 +3283,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     addUser,
     updateUser,
     deleteUser,
+    setMonthlyGoal,
     getDashboardStats,
     getCollectorPerformance,
     getCollectorCollections,

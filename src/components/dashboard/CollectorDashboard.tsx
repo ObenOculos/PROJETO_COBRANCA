@@ -55,6 +55,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     getClientGroups,
     getVisitsByCollector,
     salePayments,
+    monthlyGoals,
   } = useCollection();
 
   // Usa a aba externa se fornecida, senão gerencia internamente
@@ -149,12 +150,36 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthStr = now.toISOString().slice(0, 7); // "YYYY-MM"
 
-    // Metas (podem ser ajustadas conforme necessário)
+    // Find the goal for the current month
+    const currentMonthGoal = monthlyGoals.find(
+      (g) => g.user_id === user?.id && g.month.startsWith(currentMonthStr),
+    );
+
+    // Define default goals
+    const defaultGoals = {
+      visits: 200,
+      payments: 100000,
+    };
+
+    const monthlyVisitsGoal = currentMonthGoal?.visits_goal ?? defaultGoals.visits;
+    const monthlyPaymentsGoal = currentMonthGoal?.payments_goal ?? defaultGoals.payments;
+
+    // Derive daily and weekly goals from monthly
     const goals = {
-      daily: { visits: 10, payments: 5000 },
-      weekly: { visits: 50, payments: 25000 },
-      monthly: { visits: 200, payments: 100000 },
+      daily: {
+        visits: Math.ceil(monthlyVisitsGoal / 22), // Assuming 22 working days
+        payments: Math.ceil(monthlyPaymentsGoal / 22),
+      },
+      weekly: {
+        visits: Math.ceil(monthlyVisitsGoal / 4),
+        payments: Math.ceil(monthlyPaymentsGoal / 4),
+      },
+      monthly: {
+        visits: monthlyVisitsGoal,
+        payments: monthlyPaymentsGoal,
+      },
     };
 
     // Filtrar pagamentos do cobrador atual
@@ -228,7 +253,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         }).length,
         payments: collectorPayments
           .filter((p) => {
-            const paymentDate = new Date(p.paymentDate);
+            const paymentDate = processVisitDate(p.paymentDate);
             return paymentDate >= startOfMonth;
           })
           .reduce((sum, p) => sum + p.paymentAmount, 0),
@@ -458,7 +483,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   // Calcular métricas gamificadas
   const { metrics: periodMetrics, goals } = useMemo(
     () => getMetricsByPeriod(salePayments, myVisits),
-    [salePayments, myVisits],
+    [salePayments, myVisits, monthlyGoals, user],
   );
 
   // Simplified logic - group by sale to count correctly

@@ -8,6 +8,17 @@ export interface User {
   createdAt: string;
 }
 
+// Monthly Goal types
+export interface MonthlyGoal {
+  id: string;
+  user_id: string;
+  month: string; // YYYY-MM-DD
+  visits_goal: number;
+  payments_goal: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // Authorization history types
 export interface AuthorizationHistory {
   id: string;
@@ -203,6 +214,7 @@ export interface CollectionContextType {
   users: User[];
   salePayments: SalePayment[];
   scheduledVisits: ScheduledVisit[];
+  monthlyGoals: MonthlyGoal[]; // Added
   loading: boolean;
   error: string | null;
   isOnline: boolean;
@@ -226,6 +238,7 @@ export interface CollectionContextType {
   addUser: (user: Omit<User, "id" | "createdAt">) => Promise<void>;
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
+  setMonthlyGoal: (goal: Omit<MonthlyGoal, "id" | "created_at" | "updated_at">) => Promise<any>; // Added
   getDashboardStats: () => DashboardStats;
   getCollectorPerformance: () => CollectorPerformance[];
   getCollectorCollections: (collectorId: string) => Collection[];
