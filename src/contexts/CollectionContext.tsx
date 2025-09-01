@@ -255,8 +255,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           setCollections(cachedData);
           return;
         } else {
-          console.log("❌ Cache vazio ou expirado para chave:", cacheKey);
-        }
       } else {
         console.log("🔄 Fetch forçado sem cache (useCache=false)");
       }
