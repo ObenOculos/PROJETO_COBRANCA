@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   X,
   TrendingDown,
@@ -71,6 +71,19 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
       };
     });
   }, [collector, monthlyGoals, salePayments, scheduledVisits]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add("overflow-hidden");
+    } else {
+      document.body.classList.remove("overflow-hidden");
+    }
+
+    // Cleanup function to ensure the class is removed when the component unmounts
+    return () => {
+      document.body.classList.remove("overflow-hidden");
+    };
+  }, [isOpen]); // Re-run effect when isOpen changes
 
   if (!isOpen || !collector) {
     return null;
