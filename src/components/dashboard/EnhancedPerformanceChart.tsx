@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from "react";
-import { Users, Award, Filter, Download, FileText } from "lucide-react";
+import { Users, Award, Filter, Download, FileText, Eye } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
+import CollectorPerformanceModal from "./CollectorPerformanceModal";
 
 interface EnhancedCollectorPerformance {
   collectorId: string;
@@ -25,8 +26,10 @@ const EnhancedPerformanceChart: React.FC = () => {
     "conversionRate" | "receivedAmount" | "totalSales"
   >("conversionRate");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [] = useState<Set<string>>(new Set());
   const [filterMinRate, setFilterMinRate] = useState<string>("");
+  const [selectedCollector, setSelectedCollector] =
+    useState<EnhancedCollectorPerformance | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Função auxiliar para converter números em extenso
   const numeroParaExtenso = (num: number): string => {
@@ -686,6 +689,20 @@ const EnhancedPerformanceChart: React.FC = () => {
                       </p>
                     </div>
                   </div>
+
+                  {/* Botão Ver Detalhes */}
+                  <div className="mt-4">
+                    <button
+                      onClick={() => {
+                        setSelectedCollector(collector);
+                        setIsModalOpen(true);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-colors text-sm font-medium"
+                    >
+                      <Eye size={16} />
+                      Ver Detalhes
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -705,6 +722,12 @@ const EnhancedPerformanceChart: React.FC = () => {
           </p>
         </div>
       )}
+
+      <CollectorPerformanceModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        collector={selectedCollector}
+      />
     </div>
   );
 };
