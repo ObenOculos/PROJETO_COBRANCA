@@ -29,9 +29,11 @@ interface EnhancedCollectorPerformance {
 
 const EnhancedPerformanceChart: React.FC = () => {
   const { collections, users, monthlyGoals, salePayments, scheduledVisits, refreshData } = useCollection();
-    const [showFilters, setShowFilters] = useState(true);
-  const [selectedMonths, setSelectedMonths] = useState<number[]>([]); // Initialized as empty
-  const [selectedYears, setSelectedYears] = useState<number[]>([]); // Initialized as empty
+  const currentMonth = new Date().getMonth(); // 0-indexed
+  const currentYear = new Date().getFullYear();
+  const [showFilters, setShowFilters] = useState(true);
+  const [selectedMonths, setSelectedMonths] = useState<number[]>([currentMonth]);
+  const [selectedYears, setSelectedYears] = useState<number[]>([currentYear]);
   const [sortBy, setSortBy] = useState<
     "conversionRate" | "receivedAmount" | "totalSales"
   >("conversionRate");
@@ -48,7 +50,7 @@ const EnhancedPerformanceChart: React.FC = () => {
     'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
   ];
 
-  const currentYear = new Date().getFullYear();
+  
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
   // Função auxiliar para converter números em extenso
