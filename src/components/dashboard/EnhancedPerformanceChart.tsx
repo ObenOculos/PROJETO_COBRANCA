@@ -775,7 +775,7 @@ const EnhancedPerformanceChart: React.FC = () => {
         </div>
       )}
 
-      {/* Resumo dos Filtros Ativos (quando colapsado) */}
+      {/* o nome exato */}
       {!showFilters && hasActiveFilters && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
           <div className="flex items-center justify-between">
@@ -785,14 +785,12 @@ const EnhancedPerformanceChart: React.FC = () => {
               <div className="flex gap-1">
                 {selectedMonths.length > 0 && (
                   <span className="bg-blue-200 px-2 py-1 rounded-lg text-xs">
-                    {selectedMonths.length} mês
-                    {selectedMonths.length !== 1 ? "es" : ""}
+                    {selectedMonths.map((m) => monthsDisplay[m]).join(", ")}
                   </span>
                 )}
                 {selectedYears.length > 0 && (
                   <span className="bg-green-200 px-2 py-1 rounded-lg text-xs">
-                    {selectedYears.length} ano
-                    {selectedYears.length !== 1 ? "s" : ""}
+                    {selectedYears.join(", ")}
                   </span>
                 )}
                 {filterMinRate && (
