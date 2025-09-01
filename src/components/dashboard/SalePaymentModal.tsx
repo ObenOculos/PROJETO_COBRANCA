@@ -25,8 +25,13 @@ interface SalePaymentModalProps {
 
 const SalePaymentModal: React.FC<SalePaymentModalProps> = memo(
   ({ saleGroup, onClose, onSuccess }) => {
-    const { processSalePayment, calculateSaleBalance, scheduleVisit, scheduledVisits, rescheduleVisit } =
-      useCollection();
+    const {
+      processSalePayment,
+      calculateSaleBalance,
+      scheduleVisit,
+      scheduledVisits,
+      rescheduleVisit,
+    } = useCollection();
     const { user } = useAuth();
     const { isOnline } = useOffline();
     const [paymentAmount, setPaymentAmount] = useState<string>("");
@@ -245,7 +250,8 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = memo(
               scheduledDate: rescheduleDate,
               scheduledTime: rescheduleTime,
               status: "agendada",
-              notes: notes.trim() || "Nova visita agendada após pagamento parcial.",
+              notes:
+                notes.trim() || "Nova visita agendada após pagamento parcial.",
               clientAddress: saleGroup.installments[0]?.endereco || "",
               clientNeighborhood: saleGroup.installments[0]?.bairro || "",
               clientCity: saleGroup.installments[0]?.cidade || "",

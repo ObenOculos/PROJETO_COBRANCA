@@ -25,7 +25,10 @@ import {
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { ScheduledVisit } from "../../types";
-import { formatCurrency, calculateDaysSinceLastVisit } from "../../utils/formatters";
+import {
+  formatCurrency,
+  calculateDaysSinceLastVisit,
+} from "../../utils/formatters";
 import ClientDetailModal from "./ClientDetailModal";
 import { DateValidationModal } from "../common/DateValidationModal";
 
@@ -89,12 +92,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [visitsPerPage] = useState(10);
   const [, setClientsCurrentPage] = useState(1);
-  
+
   const [modalCurrentPage, setModalCurrentPage] = useState(1);
   const modalClientsPerPage = 20;
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
-  const [notificationType, setNotificationType] = useState<'success' | 'error' | 'info'>('success');
+  const [notificationType, setNotificationType] = useState<
+    "success" | "error" | "info"
+  >("success");
   const [showCancellationModal, setShowCancellationModal] = useState(false);
   const [selectedVisitForCancellation, setSelectedVisitForCancellation] =
     useState<ScheduledVisit | null>(null);
@@ -785,7 +790,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       if (successCount > 0) {
         triggerNotification(
           `${successCount} visita${successCount !== 1 ? "s" : ""} agendada${successCount !== 1 ? "s" : ""} com sucesso!`,
-          'success'
+          "success",
         );
 
         // Refresh dos dados para atualizar outras abas
@@ -849,16 +854,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     try {
       await updateVisitStatus(visitId, newStatus, visitNotes);
       // Find the updated visit from the scheduledVisits state
-      const updatedVisit = scheduledVisits.find(v => v.id === visitId);
+      const updatedVisit = scheduledVisits.find((v) => v.id === visitId);
       if (updatedVisit) {
         triggerNotification(
           `Visita marcada como ${getStatusLabel(updatedVisit)}`,
-          'success'
+          "success",
         );
       } else {
         triggerNotification(
           `Visita marcada como ${newStatus}`, // Fallback if visit not found
-          'success'
+          "success",
         );
       }
 
@@ -927,7 +932,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         );
         triggerNotification(
           `Visita marcada como ${getStatusLabel(selectedVisitForCompletion)}`,
-          'success'
+          "success",
         );
       } catch (error) {
         console.error("Erro ao atualizar status da visita:", error);
@@ -1054,7 +1059,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
   const triggerNotification = (
     message: string,
-    type: 'success' | 'error' | 'info' = 'success',
+    type: "success" | "error" | "info" = "success",
   ) => {
     setNotificationMessage(message);
     setNotificationType(type);
@@ -1158,7 +1163,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       setCancellationReason("");
       triggerNotification(
         "Solicitação de cancelamento enviada para aprovação",
-        'info' // Changed to 'info' as it's a request, not a final success
+        "info", // Changed to 'info' as it's a request, not a final success
       );
     } catch (error) {
       console.error("Erro ao solicitar cancelamento:", error);
@@ -1232,7 +1237,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         rescheduleTime,
       );
 
-      triggerNotification("Visita reagendada com sucesso!", 'success');
+      triggerNotification("Visita reagendada com sucesso!", "success");
 
       // Refresh dos dados para atualizar outras abas
       await refreshData();
@@ -1382,15 +1387,15 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
   const Notification: React.FC<{
     message: string;
-    type: 'success' | 'error' | 'info';
+    type: "success" | "error" | "info";
     show: boolean;
   }> = ({ message, type, show }) => {
     if (!show) return null;
 
     const bgColor = {
-      success: 'bg-green-500',
-      error: 'bg-red-500',
-      info: 'bg-blue-500',
+      success: "bg-green-500",
+      error: "bg-red-500",
+      info: "bg-blue-500",
     }[type];
 
     const Icon = {
@@ -1402,13 +1407,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     return createPortal(
       <div
         className={`fixed top-4 right-4 ${bgColor} text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center transition-all duration-300 transform ${
-          show ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+          show ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
         }`}
       >
         {Icon && <Icon className="h-5 w-5 mr-2" />}
         {message}
       </div>,
-      document.body
+      document.body,
     );
   };
 

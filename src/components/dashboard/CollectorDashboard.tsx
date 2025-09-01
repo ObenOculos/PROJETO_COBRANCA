@@ -163,8 +163,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       payments: 100000,
     };
 
-    const monthlyVisitsGoal = currentMonthGoal?.visits_goal ?? defaultGoals.visits;
-    const monthlyPaymentsGoal = currentMonthGoal?.payments_goal ?? defaultGoals.payments;
+    const monthlyVisitsGoal =
+      currentMonthGoal?.visits_goal ?? defaultGoals.visits;
+    const monthlyPaymentsGoal =
+      currentMonthGoal?.payments_goal ?? defaultGoals.payments;
 
     // Derive daily and weekly goals from monthly
     const goals = {

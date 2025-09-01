@@ -1,9 +1,19 @@
 import React, { useState, useMemo } from "react";
-import { Users, Award, Filter, Download, FileText, Eye, Target, Calendar, X } from "lucide-react";
+import {
+  Users,
+  Award,
+  Filter,
+  Download,
+  FileText,
+  Eye,
+  Target,
+  Calendar,
+  X,
+} from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
-import MonthlyGoalEditModal from './MonthlyGoalEditModal';
+import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
 import { User } from "../../types";
 
 interface EnhancedCollectorPerformance {
@@ -28,11 +38,20 @@ interface EnhancedCollectorPerformance {
 }
 
 const EnhancedPerformanceChart: React.FC = () => {
-  const { collections, users, monthlyGoals, salePayments, scheduledVisits, refreshData } = useCollection();
+  const {
+    collections,
+    users,
+    monthlyGoals,
+    salePayments,
+    scheduledVisits,
+    refreshData,
+  } = useCollection();
   const currentMonth = new Date().getMonth(); // 0-indexed
   const currentYear = new Date().getFullYear();
   const [showFilters, setShowFilters] = useState(true);
-  const [selectedMonths, setSelectedMonths] = useState<number[]>([currentMonth]);
+  const [selectedMonths, setSelectedMonths] = useState<number[]>([
+    currentMonth,
+  ]);
   const [selectedYears, setSelectedYears] = useState<number[]>([currentYear]);
   const [sortBy, setSortBy] = useState<
     "conversionRate" | "receivedAmount" | "totalSales"
@@ -43,14 +62,24 @@ const EnhancedPerformanceChart: React.FC = () => {
     useState<EnhancedCollectorPerformance | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
-  const [selectedCollectorForGoals, setSelectedCollectorForGoals] = useState<User | null>(null);
+  const [selectedCollectorForGoals, setSelectedCollectorForGoals] =
+    useState<User | null>(null);
 
   const monthsDisplay = [
-    'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-    'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
+    "Jan",
+    "Fev",
+    "Mar",
+    "Abr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Set",
+    "Out",
+    "Nov",
+    "Dez",
   ];
 
-  
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
   // Função auxiliar para converter números em extenso
@@ -217,8 +246,10 @@ const EnhancedPerformanceChart: React.FC = () => {
       const dateMonth = date.getUTCMonth(); // 0-indexed
       const dateYear = date.getUTCFullYear();
 
-      const monthMatches = selectedMonths.length === 0 || selectedMonths.includes(dateMonth);
-      const yearMatches = selectedYears.length === 0 || selectedYears.includes(dateYear);
+      const monthMatches =
+        selectedMonths.length === 0 || selectedMonths.includes(dateMonth);
+      const yearMatches =
+        selectedYears.length === 0 || selectedYears.includes(dateYear);
 
       return monthMatches && yearMatches;
     };
@@ -287,15 +318,23 @@ const EnhancedPerformanceChart: React.FC = () => {
         .size;
 
       // Goal performance calculation
-      const currentMonthGoals = monthlyGoals.filter(
-        (g) => {
-          const goalDate = new Date(g.month);
-          return selectedMonths.includes(goalDate.getMonth()) && selectedYears.includes(goalDate.getFullYear()) && g.user_id === collector.id;
-        }
-      );
+      const currentMonthGoals = monthlyGoals.filter((g) => {
+        const goalDate = new Date(g.month);
+        return (
+          selectedMonths.includes(goalDate.getMonth()) &&
+          selectedYears.includes(goalDate.getFullYear()) &&
+          g.user_id === collector.id
+        );
+      });
 
-      const currentMonthVisitsGoal = currentMonthGoals.reduce((sum, goal) => sum + (goal.visits_goal ?? 0), 0);
-      const currentMonthPaymentsGoal = currentMonthGoals.reduce((sum, goal) => sum + (goal.payments_goal ?? 0), 0);
+      const currentMonthVisitsGoal = currentMonthGoals.reduce(
+        (sum, goal) => sum + (goal.visits_goal ?? 0),
+        0,
+      );
+      const currentMonthPaymentsGoal = currentMonthGoals.reduce(
+        (sum, goal) => sum + (goal.payments_goal ?? 0),
+        0,
+      );
 
       const currentMonthVisitsActual = scheduledVisits.filter((v) => {
         if (v.collectorId !== collector.id || v.status !== "realizada") {
@@ -305,7 +344,7 @@ const EnhancedPerformanceChart: React.FC = () => {
         if (!dateStr) return false;
 
         // Fix: Use UTC parsing to avoid timezone issues
-        const visitDate = new Date(dateStr + 'T00:00:00');
+        const visitDate = new Date(dateStr + "T00:00:00");
         return isDateInSelectedMonths(visitDate);
       }).length; // Closing for scheduledVisits.filter
 
@@ -314,13 +353,19 @@ const EnhancedPerformanceChart: React.FC = () => {
           if (p.collectorId !== collector.id || !p.paymentDate) {
             return false;
           }
-          const paymentDate = new Date(p.paymentDate + 'T00:00:00');
+          const paymentDate = new Date(p.paymentDate + "T00:00:00");
           return isDateInSelectedMonths(paymentDate);
         }) // Closing for salePayments.filter
         .reduce((sum, p) => sum + p.paymentAmount, 0); // Closing for reduce
 
-      const visitsPerformance = currentMonthVisitsGoal > 0 ? (currentMonthVisitsActual / currentMonthVisitsGoal) * 100 : 0;
-      const paymentsPerformance = currentMonthPaymentsGoal > 0 ? (currentMonthPaymentsActual / currentMonthPaymentsGoal) * 100 : 0;
+      const visitsPerformance =
+        currentMonthVisitsGoal > 0
+          ? (currentMonthVisitsActual / currentMonthVisitsGoal) * 100
+          : 0;
+      const paymentsPerformance =
+        currentMonthPaymentsGoal > 0
+          ? (currentMonthPaymentsActual / currentMonthPaymentsGoal) * 100
+          : 0;
 
       return {
         collectorId: collector.id,
@@ -343,7 +388,15 @@ const EnhancedPerformanceChart: React.FC = () => {
         currentMonthPaymentsGoal,
       };
     });
-  }, [collections, users, monthlyGoals, salePayments, scheduledVisits, selectedMonths, selectedYears]);
+  }, [
+    collections,
+    users,
+    monthlyGoals,
+    salePayments,
+    scheduledVisits,
+    selectedMonths,
+    selectedYears,
+  ]);
 
   // Filter and sort performance data
   const filteredAndSortedPerformance = useMemo(() => {
@@ -479,12 +532,9 @@ const EnhancedPerformanceChart: React.FC = () => {
     URL.revokeObjectURL(link.href);
   };
 
-  
-
-  const activeFilterCount = selectedMonths.length + selectedYears.length + (filterMinRate ? 1 : 0);
+  const activeFilterCount =
+    selectedMonths.length + selectedYears.length + (filterMinRate ? 1 : 0);
   const hasActiveFilters = activeFilterCount > 0;
-
-  
 
   return (
     <div className="space-y-4">
@@ -568,13 +618,13 @@ const EnhancedPerformanceChart: React.FC = () => {
       {showFilters && (
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-in slide-in-from-top-2">
           <div className="space-y-6">
-            
             {/* Filtro de Meses */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <Calendar className="w-4 h-4 text-gray-500" />
                 <label className="text-sm font-semibold text-gray-700">
-                  Meses ({selectedMonths.length} selecionado{selectedMonths.length !== 1 ? 's' : ''})
+                  Meses ({selectedMonths.length} selecionado
+                  {selectedMonths.length !== 1 ? "s" : ""})
                 </label>
               </div>
               <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
@@ -583,16 +633,19 @@ const EnhancedPerformanceChart: React.FC = () => {
                     key={index}
                     onClick={() => {
                       if (selectedMonths.includes(index)) {
-                        setSelectedMonths(selectedMonths.filter(m => m !== index));
+                        setSelectedMonths(
+                          selectedMonths.filter((m) => m !== index),
+                        );
                       } else {
                         setSelectedMonths([...selectedMonths, index]);
                       }
                     }}
                     className={`
                       px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-2
-                      ${selectedMonths.includes(index)
-                        ? 'bg-blue-500 text-white border-blue-500 shadow-md'
-                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
+                      ${
+                        selectedMonths.includes(index)
+                          ? "bg-blue-500 text-white border-blue-500 shadow-md"
+                          : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
                       }
                     `}
                   >
@@ -614,7 +667,8 @@ const EnhancedPerformanceChart: React.FC = () => {
             {/* Filtro de Anos */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-3">
-                Anos ({selectedYears.length} selecionado{selectedYears.length !== 1 ? 's' : ''})
+                Anos ({selectedYears.length} selecionado
+                {selectedYears.length !== 1 ? "s" : ""})
               </label>
               <div className="flex flex-wrap gap-2">
                 {years.map((year) => (
@@ -622,16 +676,19 @@ const EnhancedPerformanceChart: React.FC = () => {
                     key={year}
                     onClick={() => {
                       if (selectedYears.includes(year)) {
-                        setSelectedYears(selectedYears.filter(y => y !== year));
+                        setSelectedYears(
+                          selectedYears.filter((y) => y !== year),
+                        );
                       } else {
                         setSelectedYears([...selectedYears, year]);
                       }
                     }}
                     className={`
                       px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-2
-                      ${selectedYears.includes(year)
-                        ? 'bg-green-500 text-white border-green-500 shadow-md transform scale-102'
-                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
+                      ${
+                        selectedYears.includes(year)
+                          ? "bg-green-500 text-white border-green-500 shadow-md transform scale-102"
+                          : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
                       }
                     `}
                   >
@@ -697,9 +754,10 @@ const EnhancedPerformanceChart: React.FC = () => {
                 disabled={!hasActiveFilters}
                 className={`
                   flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-200 border-2
-                  ${hasActiveFilters
-                    ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
-                    : 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+                  ${
+                    hasActiveFilters
+                      ? "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
+                      : "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
                   }
                 `}
               >
@@ -727,12 +785,14 @@ const EnhancedPerformanceChart: React.FC = () => {
               <div className="flex gap-1">
                 {selectedMonths.length > 0 && (
                   <span className="bg-blue-200 px-2 py-1 rounded-lg text-xs">
-                    {selectedMonths.length} mês{selectedMonths.length !== 1 ? 'es' : ''}
+                    {selectedMonths.length} mês
+                    {selectedMonths.length !== 1 ? "es" : ""}
                   </span>
                 )}
                 {selectedYears.length > 0 && (
                   <span className="bg-green-200 px-2 py-1 rounded-lg text-xs">
-                    {selectedYears.length} ano{selectedYears.length !== 1 ? 's' : ''}
+                    {selectedYears.length} ano
+                    {selectedYears.length !== 1 ? "s" : ""}
                   </span>
                 )}
                 {filterMinRate && (
@@ -822,15 +882,20 @@ const EnhancedPerformanceChart: React.FC = () => {
                   {/* Meta de Visitas */}
                   <div>
                     <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm text-gray-600">Meta de Visitas (Mês)</span>
+                      <span className="text-sm text-gray-600">
+                        Meta de Visitas (Mês)
+                      </span>
                       <span className="text-sm font-bold text-gray-800">
-                        {collector.currentMonthVisitsActual} / {collector.currentMonthVisitsGoal}
+                        {collector.currentMonthVisitsActual} /{" "}
+                        {collector.currentMonthVisitsGoal}
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
                         className="bg-blue-500 h-2 rounded-full"
-                        style={{ width: `${Math.min(100, collector.visitsPerformance)}%` }}
+                        style={{
+                          width: `${Math.min(100, collector.visitsPerformance)}%`,
+                        }}
                       />
                     </div>
                   </div>
@@ -838,15 +903,20 @@ const EnhancedPerformanceChart: React.FC = () => {
                   {/* Meta de Pagamentos */}
                   <div>
                     <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm text-gray-600">Meta de Pagamentos (Mês)</span>
+                      <span className="text-sm text-gray-600">
+                        Meta de Pagamentos (Mês)
+                      </span>
                       <span className="text-sm font-bold text-gray-800">
-                        {formatCurrency(collector.currentMonthPaymentsActual)} / {formatCurrency(collector.currentMonthPaymentsGoal)}
+                        {formatCurrency(collector.currentMonthPaymentsActual)} /{" "}
+                        {formatCurrency(collector.currentMonthPaymentsGoal)}
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
                         className="bg-green-500 h-2 rounded-full"
-                        style={{ width: `${Math.min(100, collector.paymentsPerformance)}%` }}
+                        style={{
+                          width: `${Math.min(100, collector.paymentsPerformance)}%`,
+                        }}
                       />
                     </div>
                   </div>
@@ -868,7 +938,6 @@ const EnhancedPerformanceChart: React.FC = () => {
                   </div>
                 </div>
 
-
                 {/* Botões de Ação */}
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <button
@@ -883,7 +952,9 @@ const EnhancedPerformanceChart: React.FC = () => {
                   </button>
                   <button
                     onClick={() => {
-                      const user = users.find(u => u.id === collector.collectorId);
+                      const user = users.find(
+                        (u) => u.id === collector.collectorId,
+                      );
                       if (user) {
                         setSelectedCollectorForGoals(user);
                         setIsGoalModalOpen(true);

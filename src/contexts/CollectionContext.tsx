@@ -649,11 +649,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       dataCache.set(cacheKey, data || []);
     } catch (err) {
       console.error("Erro ao carregar metas mensais:", err);
-      setError(err instanceof Error ? err.message : "Erro ao carregar metas mensais");
+      setError(
+        err instanceof Error ? err.message : "Erro ao carregar metas mensais",
+      );
     }
   };
 
-  const setMonthlyGoal = async (goal: Omit<MonthlyGoal, "id" | "created_at" | "updated_at">) => {
+  const setMonthlyGoal = async (
+    goal: Omit<MonthlyGoal, "id" | "created_at" | "updated_at">,
+  ) => {
     try {
       const { data, error } = await supabase
         .from("monthly_goals")
@@ -664,7 +668,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             visits_goal: goal.visits_goal,
             payments_goal: goal.payments_goal,
           },
-          { onConflict: "user_id,month" }
+          { onConflict: "user_id,month" },
         )
         .select();
 
@@ -678,7 +682,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       return data;
     } catch (err) {
       console.error("Erro ao salvar meta mensal:", err);
-      setError(err instanceof Error ? err.message : "Erro ao salvar meta mensal");
+      setError(
+        err instanceof Error ? err.message : "Erro ao salvar meta mensal",
+      );
       throw err;
     }
   };
@@ -3152,7 +3158,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         .single();
 
       if (fetchError) {
-        console.error("Erro ao buscar dados da visita para reagendamento:", fetchError);
+        console.error(
+          "Erro ao buscar dados da visita para reagendamento:",
+          fetchError,
+        );
         throw fetchError;
       }
 

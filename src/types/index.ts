@@ -238,7 +238,9 @@ export interface CollectionContextType {
   addUser: (user: Omit<User, "id" | "createdAt">) => Promise<void>;
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
-  setMonthlyGoal: (goal: Omit<MonthlyGoal, "id" | "created_at" | "updated_at">) => Promise<any>; // Added
+  setMonthlyGoal: (
+    goal: Omit<MonthlyGoal, "id" | "created_at" | "updated_at">,
+  ) => Promise<any>; // Added
   getDashboardStats: () => DashboardStats;
   getCollectorPerformance: () => CollectorPerformance[];
   getCollectorCollections: (collectorId: string) => Collection[];

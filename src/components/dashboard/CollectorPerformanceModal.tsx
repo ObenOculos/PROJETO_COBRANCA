@@ -1,5 +1,13 @@
 import React, { useMemo, useState } from "react";
-import { X, TrendingDown, DollarSign, Hash, BarChart2, Users, PieChart } from "lucide-react";
+import {
+  X,
+  TrendingDown,
+  DollarSign,
+  Hash,
+  BarChart2,
+  Users,
+  PieChart,
+} from "lucide-react";
 import { formatCurrency } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
 
@@ -22,7 +30,9 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
 
     const collectorGoals = monthlyGoals
       .filter((g) => g.user_id === collector.collectorId)
-      .sort((a, b) => new Date(b.month).getTime() - new Date(a.month).getTime());
+      .sort(
+        (a, b) => new Date(b.month).getTime() - new Date(a.month).getTime(),
+      );
 
     return collectorGoals.map((goal) => {
       const goalMonth = new Date(goal.month).getMonth();
@@ -108,7 +118,8 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
   ];
 
   return (
-    <div id="teste_teste"
+    <div
+      id="teste_teste"
       className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
       onClick={onClose}
     >
@@ -125,20 +136,28 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
           </button>
 
           <div className="text-center mb-6">
-            <h3 className="text-2xl font-bold text-gray-900">Desempenho do Cobrador</h3>
-            <p className="text-lg text-gray-600 mt-1">{collector.collectorName}</p>
+            <h3 className="text-2xl font-bold text-gray-900">
+              Desempenho do Cobrador
+            </h3>
+            <p className="text-lg text-gray-600 mt-1">
+              {collector.collectorName}
+            </p>
           </div>
 
           {/* Métricas Principais */}
           <div className="grid grid-cols-1 gap-4 mb-6">
             <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
-              <p className="text-sm text-green-700 font-medium">Valor Recebido</p>
+              <p className="text-sm text-green-700 font-medium">
+                Valor Recebido
+              </p>
               <p className="text-3xl font-bold text-green-600">
                 {formatCurrency(collector.receivedAmount)}
               </p>
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
-              <p className="text-sm text-blue-700 font-medium">Taxa de Conversão</p>
+              <p className="text-sm text-blue-700 font-medium">
+                Taxa de Conversão
+              </p>
               <p className="text-3xl font-bold text-blue-600">
                 {collector.conversionRate.toFixed(1)}%
               </p>
@@ -147,13 +166,20 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
 
           {/* Detalhes Adicionais */}
           <div className="space-y-4">
-            <h4 className="text-lg font-semibold text-gray-800 mb-2">Estatísticas Gerais</h4>
+            <h4 className="text-lg font-semibold text-gray-800 mb-2">
+              Estatísticas Gerais
+            </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {stats.map((stat, index) => (
-                <div key={index} className="bg-gray-50 rounded-xl p-3 flex flex-col items-center justify-center text-center">
+                <div
+                  key={index}
+                  className="bg-gray-50 rounded-xl p-3 flex flex-col items-center justify-center text-center"
+                >
                   <stat.icon className={`h-6 w-6 mb-2 ${stat.color}`} />
                   <p className="text-xs text-gray-500">{stat.label}</p>
-                  <p className="text-lg font-semibold text-gray-800">{stat.value}</p>
+                  <p className="text-lg font-semibold text-gray-800">
+                    {stat.value}
+                  </p>
                 </div>
               ))}
             </div>
@@ -163,7 +189,9 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
           {performanceHistory.length > 0 && (
             <div className="mt-6">
               <div className="flex justify-between items-center mb-2">
-                <h4 className="text-lg font-semibold text-gray-800">Histórico de Metas</h4>
+                <h4 className="text-lg font-semibold text-gray-800">
+                  Histórico de Metas
+                </h4>
                 <button
                   onClick={() => setShowHistory(!showHistory)}
                   className="text-sm text-blue-600 hover:text-blue-700 font-medium"
@@ -173,41 +201,52 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
               </div>
               {showHistory && (
                 <div className="space-y-3">
-                {performanceHistory.map((history, index) => (
-                  <div key={index} className="bg-gray-50 rounded-xl p-3">
-                    <p className="font-semibold text-gray-700 capitalize">{history.month}</p>
-                    <div className="mt-2 space-y-2">
-                      {/* Visits */}
-                      <div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Visitas</span>
-                          <span>{history.visitsActual} / {history.visitsGoal}</span>
+                  {performanceHistory.map((history, index) => (
+                    <div key={index} className="bg-gray-50 rounded-xl p-3">
+                      <p className="font-semibold text-gray-700 capitalize">
+                        {history.month}
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        {/* Visits */}
+                        <div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Visitas</span>
+                            <span>
+                              {history.visitsActual} / {history.visitsGoal}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                            <div
+                              className="bg-blue-500 h-1.5 rounded-full"
+                              style={{
+                                width: `${Math.min(100, (history.visitsActual / history.visitsGoal) * 100)}%`,
+                              }}
+                            ></div>
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
-                          <div
-                            className="bg-blue-500 h-1.5 rounded-full"
-                            style={{ width: `${Math.min(100, (history.visitsActual / history.visitsGoal) * 100)}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                      {/* Payments */}
-                      <div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Pagamentos</span>
-                          <span>{formatCurrency(history.paymentsActual)} / {formatCurrency(history.paymentsGoal)}</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
-                          <div
-                            className="bg-green-500 h-1.5 rounded-full"
-                            style={{ width: `${Math.min(100, (history.paymentsActual / history.paymentsGoal) * 100)}%` }}
-                          ></div>
+                        {/* Payments */}
+                        <div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Pagamentos</span>
+                            <span>
+                              {formatCurrency(history.paymentsActual)} /{" "}
+                              {formatCurrency(history.paymentsGoal)}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                            <div
+                              className="bg-green-500 h-1.5 rounded-full"
+                              style={{
+                                width: `${Math.min(100, (history.paymentsActual / history.paymentsGoal) * 100)}%`,
+                              }}
+                            ></div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

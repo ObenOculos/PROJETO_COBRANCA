@@ -17,7 +17,11 @@ interface MonthlyGoal {
   payments_goal: number;
 }
 
-const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({ isOpen, onClose, collector }) => {
+const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
+  isOpen,
+  onClose,
+  collector,
+}) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [visitsGoal, setVisitsGoal] = useState(200);
@@ -29,18 +33,19 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({ isOpen, onC
     const fetchGoal = async () => {
       if (!collector) return;
 
-      const monthPadded = (selectedMonth + 1).toString().padStart(2, '0');
+      const monthPadded = (selectedMonth + 1).toString().padStart(2, "0");
       const dateString = `${selectedYear}-${monthPadded}-01`;
 
       const { data, error } = await supabase
-        .from('monthly_goals')
-        .select('*')
-        .eq('user_id', collector.id)
-        .eq('month', dateString)
+        .from("monthly_goals")
+        .select("*")
+        .eq("user_id", collector.id)
+        .eq("month", dateString)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
-        console.error('Error fetching monthly goal:', error);
+      if (error && error.code !== "PGRST116") {
+        // PGRST116 means no rows found
+        console.error("Error fetching monthly goal:", error);
         setCurrentGoal(null);
         setVisitsGoal(0); // Default if error
         setPaymentsGoal(0); // Default if error
@@ -67,7 +72,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({ isOpen, onC
 
     if (!collector) return;
 
-    const monthPadded = (selectedMonth + 1).toString().padStart(2, '0');
+    const monthPadded = (selectedMonth + 1).toString().padStart(2, "0");
     const dateString = `${selectedYear}-${monthPadded}-01`;
 
     const goalData = {
@@ -82,20 +87,20 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({ isOpen, onC
     if (currentGoal) {
       // Update existing goal
       const { error: updateError } = await supabase
-        .from('monthly_goals')
+        .from("monthly_goals")
         .update(goalData)
-        .eq('id', currentGoal.id);
+        .eq("id", currentGoal.id);
       error = updateError;
     } else {
       // Insert new goal
       const { error: insertError } = await supabase
-        .from('monthly_goals')
+        .from("monthly_goals")
         .insert(goalData);
       error = insertError;
     }
 
     if (error) {
-      console.error('Error saving monthly goal:', error);
+      console.error("Error saving monthly goal:", error);
       // Optionally, show an error message to the user
     } else {
       // Optionally, show a success message to the user
@@ -106,17 +111,30 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({ isOpen, onC
   };
 
   const months = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
   ];
 
-  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
+  const years = Array.from(
+    { length: 5 },
+    (_, i) => new Date().getFullYear() - 2 + i,
+  );
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      minimumFractionDigits: 0,
     }).format(value);
   };
 
@@ -125,7 +143,8 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({ isOpen, onC
   }
 
   return (
-    <div id="teste_teste"
+    <div
+      id="teste_teste"
       className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
@@ -135,11 +154,14 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({ isOpen, onC
     >
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-auto transform transition-all duration-300 ease-in-out animate-in slide-in-from-bottom-4 max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
-          
           <div className="flex justify-between items-center p-6 border-b border-gray-200">
             <div>
-              <h3 className="text-2xl font-bold text-gray-800">Editar Metas Mensais</h3>
-              <p className="text-lg text-gray-600 mt-1">para {collector.name}</p>
+              <h3 className="text-2xl font-bold text-gray-800">
+                Editar Metas Mensais
+              </h3>
+              <p className="text-lg text-gray-600 mt-1">
+                para {collector.name}
+              </p>
             </div>
             <button
               type="button"
@@ -150,10 +172,9 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({ isOpen, onC
               <X className="w-6 h-6" />
             </button>
           </div>
-          
+
           {/* Content */}
           <div className="p-6 space-y-6">
-            
             {/* Período */}
             <div>
               <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -162,7 +183,10 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({ isOpen, onC
               </h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="month" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="month"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
                     Mês
                   </label>
                   <select
@@ -172,12 +196,17 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({ isOpen, onC
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50 font-medium shadow-sm"
                   >
                     {months.map((month, index) => (
-                      <option key={index} value={index}>{month}</option>
+                      <option key={index} value={index}>
+                        {month}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="year"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
                     Ano
                   </label>
                   <select
@@ -187,7 +216,9 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({ isOpen, onC
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50 font-medium shadow-sm"
                   >
                     {years.map((year) => (
-                      <option key={year} value={year}>{year}</option>
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -202,7 +233,10 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({ isOpen, onC
               </h4>
               <div className="space-y-4">
                 <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 transition-all hover:shadow-md">
-                  <label htmlFor="visits_goal" className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                  <label
+                    htmlFor="visits_goal"
+                    className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2"
+                  >
                     <Calendar size={16} className="text-blue-600" />
                     Meta de Visitas
                   </label>
@@ -221,7 +255,10 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({ isOpen, onC
                 </div>
 
                 <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-4 transition-all hover:shadow-md">
-                  <label htmlFor="payments_goal" className="text-sm font-semibold text-green-800 mb-3 flex items-center gap-2">
+                  <label
+                    htmlFor="payments_goal"
+                    className="text-sm font-semibold text-green-800 mb-3 flex items-center gap-2"
+                  >
                     <DollarSign size={16} className="text-green-600" />
                     Meta de Pagamentos
                   </label>
