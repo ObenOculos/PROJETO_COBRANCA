@@ -25,7 +25,7 @@ interface SalePaymentModalProps {
 
 const SalePaymentModal: React.FC<SalePaymentModalProps> = memo(
   ({ saleGroup, onClose, onSuccess }) => {
-    const { processSalePayment, calculateSaleBalance, scheduleVisit } =
+    const { processSalePayment, calculateSaleBalance, scheduleVisit, scheduledVisits, rescheduleVisit } =
       useCollection();
     const { user } = useAuth();
     const { isOnline } = useOffline();
@@ -221,25 +221,43 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = memo(
 
       if (paymentSuccess) {
         try {
-          const visitData: Omit<ScheduledVisit, "id" | "createdAt"> = {
-            collectorId: user.id,
-            clientDocument: saleGroup.clientDocument,
-            clientName: saleGroup.installments[0]?.cliente || "",
-            scheduledDate: rescheduleDate,
-            scheduledTime: rescheduleTime,
-            status: "agendada",
-            notes: "Visita reagendada após pagamento parcial.",
-            clientAddress: saleGroup.installments[0]?.endereco || "",
-            clientNeighborhood: saleGroup.installments[0]?.bairro || "",
-            clientCity: saleGroup.installments[0]?.cidade || "",
-            totalPendingValue:
-              saleBalance.remainingBalance - (parseFloat(paymentAmount) || 0),
-            overdueCount: 0, // This might need adjustment
-          };
+          // Find the most recent 'agendada' visit for this client
+          const existingScheduledVisit = scheduledVisits.find(
+            (visit) =>
+              visit.clientDocument === saleGroup.clientDocument &&
+              visit.status === "agendada",
+          );
 
-          await scheduleVisit(visitData);
+          if (existingScheduledVisit) {
+            // If an existing scheduled visit is found, reschedule it
+            await rescheduleVisit(
+              existingScheduledVisit.id,
+              rescheduleDate,
+              rescheduleTime,
+              notes.trim() || "Visita reagendada após pagamento parcial.",
+            );
+          } else {
+            // If no existing scheduled visit, create a new one
+            const visitData: Omit<ScheduledVisit, "id" | "createdAt"> = {
+              collectorId: user.id,
+              clientDocument: saleGroup.clientDocument,
+              clientName: saleGroup.installments[0]?.cliente || "",
+              scheduledDate: rescheduleDate,
+              scheduledTime: rescheduleTime,
+              status: "agendada",
+              notes: notes.trim() || "Nova visita agendada após pagamento parcial.",
+              clientAddress: saleGroup.installments[0]?.endereco || "",
+              clientNeighborhood: saleGroup.installments[0]?.bairro || "",
+              clientCity: saleGroup.installments[0]?.cidade || "",
+              totalPendingValue:
+                saleBalance.remainingBalance - (parseFloat(paymentAmount) || 0),
+              overdueCount: 0,
+            };
+            await scheduleVisit(visitData);
+          }
+
           showSuccessNotification(
-            "Pagamento realizado e visita reagendada com sucesso!",
+            "Pagamento realizado e visita agendada com sucesso!",
           );
           onSuccess();
           onClose();

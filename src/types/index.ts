@@ -60,6 +60,7 @@ export interface ScheduledVisit {
   cancellationRejectedBy?: string;
   cancellationRejectedAt?: string;
   cancellationRejectionReason?: string;
+  rescheduleCount?: number;
 }
 
 // Collection types based on BANCO_DADOS table

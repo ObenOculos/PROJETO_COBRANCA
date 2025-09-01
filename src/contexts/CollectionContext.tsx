@@ -2522,6 +2522,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             client_city: visitData.clientCity,
             total_pending_value: visitData.totalPendingValue,
             overdue_count: visitData.overdueCount,
+            reschedule_count: 0, // Initialize rescheduleCount to 0
           },
         ])
         .select()
@@ -2556,6 +2557,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         cancellationRejectedBy: data.cancellation_rejected_by,
         cancellationRejectedAt: data.cancellation_rejected_at,
         cancellationRejectionReason: data.cancellation_rejection_reason,
+        rescheduleCount: data.reschedule_count, // Include rescheduleCount
       };
 
       // Update local state
@@ -3083,10 +3085,25 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     try {
       console.log("Reagendando visita:", visitId, newDate, newTime);
 
-      // Buscar visita atual para manter histórico
+      // Fetch the latest visit data from the database
+      const { data: latestVisitData, error: fetchError } = await supabase
+        .from("scheduled_visits")
+        .select("reschedule_count")
+        .eq("id", visitId)
+        .single();
+
+      if (fetchError) {
+        console.error("Erro ao buscar dados da visita para reagendamento:", fetchError);
+        throw fetchError;
+      }
+
+      const currentRescheduleCount = latestVisitData?.reschedule_count || 0;
+      const newRescheduleCount = currentRescheduleCount + 1;
+
+      // Buscar visita atual para manter histórico (from local state for other fields)
       const currentVisit = scheduledVisits.find((v) => v.id === visitId);
       if (!currentVisit) {
-        throw new Error("Visita não encontrada");
+        throw new Error("Visita não encontrada no estado local");
       }
 
       // Montar nota com informações do reagendamento
@@ -3147,6 +3164,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         scheduled_time: newTime || null,
         notes: updatedNotes,
         updated_at: new Date().toISOString(),
+        reschedule_count: newRescheduleCount, // Use the freshly incremented count
       };
 
       const { error } = await supabase
@@ -3169,6 +3187,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
                 scheduledTime: newTime || visit.scheduledTime,
                 notes: updatedNotes,
                 updatedAt: new Date().toISOString(),
+                rescheduleCount: newRescheduleCount, // Use the freshly incremented count
               }
             : visit,
         ),

@@ -20,11 +20,12 @@ import {
   User,
   MapPinIcon,
   ArrowUpDown,
+  Info,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { ScheduledVisit } from "../../types";
-import { formatCurrency } from "../../utils/formatters";
+import { formatCurrency, calculateDaysSinceLastVisit } from "../../utils/formatters";
 import ClientDetailModal from "./ClientDetailModal";
 import { DateValidationModal } from "../common/DateValidationModal";
 
@@ -88,9 +89,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [visitsPerPage] = useState(10);
   const [, setClientsCurrentPage] = useState(1);
-  const [] = useState(20);
+  
   const [modalCurrentPage, setModalCurrentPage] = useState(1);
   const modalClientsPerPage = 20;
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [notificationType, setNotificationType] = useState<'success' | 'error' | 'info'>('success');
   const [showCancellationModal, setShowCancellationModal] = useState(false);
   const [selectedVisitForCancellation, setSelectedVisitForCancellation] =
     useState<ScheduledVisit | null>(null);
@@ -337,49 +341,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
           });
 
         const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        let daysSinceLastVisit: number;
-
-        if (clientVisits.length === 0) {
-          daysSinceLastVisit = 999; // Never visited
-        } else {
-          try {
-            // Usar created_at da visita mais recente
-            const visit = clientVisits[0];
-            const visitDateStr = visit.createdAt.split("T")[0];
-            let lastVisitDate: Date;
-
-            if (visitDateStr.includes("-")) {
-              // Format YYYY-MM-DD
-              const [year, month, day] = visitDateStr.split("-");
-              lastVisitDate = new Date(
-                parseInt(year),
-                parseInt(month) - 1,
-                parseInt(day),
-              );
-            } else if (visitDateStr.includes("/")) {
-              // Format DD/MM/YYYY
-              const [day, month, year] = visitDateStr.split("/");
-              lastVisitDate = new Date(
-                parseInt(year),
-                parseInt(month) - 1,
-                parseInt(day),
-              );
-            } else {
-              lastVisitDate = new Date(visitDateStr);
-            }
-
-            lastVisitDate.setHours(0, 0, 0, 0);
-            daysSinceLastVisit = Math.floor(
-              (today.getTime() - lastVisitDate.getTime()) /
-                (1000 * 60 * 60 * 24),
-            );
-            daysSinceLastVisit = Math.max(0, daysSinceLastVisit);
-          } catch {
-            daysSinceLastVisit = 999;
-          }
-        }
+        const daysSinceLastVisit = calculateDaysSinceLastVisit(
+          clientVisits.length > 0 ? clientVisits[0].createdAt : "",
+          today,
+        );
 
         // Match filter with status type
         switch (filters.visitStatus) {
@@ -818,8 +783,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
       // Mostrar resultado
       if (successCount > 0) {
-        showSuccessNotification(
+        triggerNotification(
           `${successCount} visita${successCount !== 1 ? "s" : ""} agendada${successCount !== 1 ? "s" : ""} com sucesso!`,
+          'success'
         );
 
         // Refresh dos dados para atualizar outras abas
@@ -882,9 +848,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   ) => {
     try {
       await updateVisitStatus(visitId, newStatus, visitNotes);
-      showSuccessNotification(
-        `Visita marcada como ${getStatusLabel(newStatus)}`,
-      );
+      // Find the updated visit from the scheduledVisits state
+      const updatedVisit = scheduledVisits.find(v => v.id === visitId);
+      if (updatedVisit) {
+        triggerNotification(
+          `Visita marcada como ${getStatusLabel(updatedVisit)}`,
+          'success'
+        );
+      } else {
+        triggerNotification(
+          `Visita marcada como ${newStatus}`, // Fallback if visit not found
+          'success'
+        );
+      }
 
       // Refresh dos dados para atualizar outras abas
       if (isOnline) {
@@ -949,8 +925,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
           "realizada",
           selectedNote,
         );
-        showSuccessNotification(
-          `Visita marcada como ${getStatusLabel("realizada")}`,
+        triggerNotification(
+          `Visita marcada como ${getStatusLabel(selectedVisitForCompletion)}`,
+          'success'
         );
       } catch (error) {
         console.error("Erro ao atualizar status da visita:", error);
@@ -1026,14 +1003,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     setSelectedVisitForPayment(null);
   };
 
-  const getStatusLabel = (status: ScheduledVisit["status"], notes?: string) => {
+  const getStatusLabel = (visit: ScheduledVisit) => {
     // Verificar se é uma visita reagendada
-    if (status === "agendada" && notes?.includes("Reagendado")) {
-      const count = (notes.match(/Reagendado/g) || []).length;
+    if (visit.status === "agendada" && (visit.rescheduleCount || 0) > 0) {
+      const count = visit.rescheduleCount || 0;
       return count > 1 ? `Reagendada (${count}x)` : "Reagendada";
     }
 
-    switch (status) {
+    switch (visit.status) {
       case "agendada":
         return "Agendada";
       case "realizada":
@@ -1047,17 +1024,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       case "pending_sync":
         return "Pendente";
       default:
-        return status;
+        return visit.status;
     }
   };
 
-  const getStatusColor = (status: ScheduledVisit["status"], notes?: string) => {
+  const getStatusColor = (visit: ScheduledVisit) => {
     // Verificar se é uma visita reagendada
-    if (status === "agendada" && notes?.includes("Reagendado")) {
+    if (visit.status === "agendada" && (visit.rescheduleCount || 0) > 0) {
       return "bg-purple-100 text-purple-800";
     }
 
-    switch (status) {
+    switch (visit.status) {
       case "agendada":
         return "bg-blue-100 text-blue-800";
       case "realizada":
@@ -1075,23 +1052,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     }
   };
 
-  const showSuccessNotification = (
-    message: string = "Visita agendada com sucesso!",
+  const triggerNotification = (
+    message: string,
+    type: 'success' | 'error' | 'info' = 'success',
   ) => {
-    const notification = document.createElement("div");
-    notification.className =
-      "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center";
-    notification.innerHTML = `
-      <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-      </svg>
-      ${message}
-    `;
-    document.body.appendChild(notification);
+    setNotificationMessage(message);
+    setNotificationType(type);
+    setShowNotification(true);
+
+    // Automatically hide after 5 seconds
     setTimeout(() => {
-      if (document.body.contains(notification)) {
-        document.body.removeChild(notification);
-      }
+      setShowNotification(false);
+      setNotificationMessage("");
     }, 5000);
   };
 
@@ -1184,8 +1156,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       setShowCancellationModal(false);
       setSelectedVisitForCancellation(null);
       setCancellationReason("");
-      showSuccessNotification(
+      triggerNotification(
         "Solicitação de cancelamento enviada para aprovação",
+        'info' // Changed to 'info' as it's a request, not a final success
       );
     } catch (error) {
       console.error("Erro ao solicitar cancelamento:", error);
@@ -1259,7 +1232,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         rescheduleTime,
       );
 
-      showSuccessNotification("Visita reagendada com sucesso!");
+      triggerNotification("Visita reagendada com sucesso!", 'success');
 
       // Refresh dos dados para atualizar outras abas
       await refreshData();
@@ -1353,53 +1326,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       });
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    let daysSinceLastVisit: number;
-
-    if (clientVisits.length === 0) {
-      // Never visited
-      daysSinceLastVisit = 999;
-    } else {
-      // Use the same safe date parsing as the formatSafeDate function
-      try {
-        // Usar created_at da visita mais recente
-        const visit = clientVisits[0];
-        const visitDateStr = visit.createdAt.split("T")[0];
-        let lastVisitDate: Date;
-
-        if (visitDateStr.includes("-")) {
-          // Format YYYY-MM-DD
-          const [year, month, day] = visitDateStr.split("-");
-          lastVisitDate = new Date(
-            parseInt(year),
-            parseInt(month) - 1,
-            parseInt(day),
-          );
-        } else if (visitDateStr.includes("/")) {
-          // Format DD/MM/YYYY
-          const [day, month, year] = visitDateStr.split("/");
-          lastVisitDate = new Date(
-            parseInt(year),
-            parseInt(month) - 1,
-            parseInt(day),
-          );
-        } else {
-          lastVisitDate = new Date(visitDateStr);
-        }
-
-        lastVisitDate.setHours(0, 0, 0, 0);
-        daysSinceLastVisit = Math.floor(
-          (today.getTime() - lastVisitDate.getTime()) / (1000 * 60 * 60 * 24),
-        );
-
-        // Ensure we don't get negative days
-        daysSinceLastVisit = Math.max(0, daysSinceLastVisit);
-      } catch {
-        // If date parsing fails, consider as never visited
-        daysSinceLastVisit = 999;
-      }
-    }
+    const daysSinceLastVisit = calculateDaysSinceLastVisit(
+      clientVisits.length > 0 ? clientVisits[0].createdAt : "",
+      today,
+    );
 
     // Determine status based on days without visit
     if (daysSinceLastVisit === 999) {
@@ -1448,6 +1378,38 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       color: "bg-green-100 text-green-800 border-green-200",
       days: daysSinceLastVisit === 0 ? "Hoje" : `${daysSinceLastVisit} dias`,
     };
+  };
+
+  const Notification: React.FC<{
+    message: string;
+    type: 'success' | 'error' | 'info';
+    show: boolean;
+  }> = ({ message, type, show }) => {
+    if (!show) return null;
+
+    const bgColor = {
+      success: 'bg-green-500',
+      error: 'bg-red-500',
+      info: 'bg-blue-500',
+    }[type];
+
+    const Icon = {
+      success: CheckCircle,
+      error: AlertTriangle,
+      info: Info,
+    }[type];
+
+    return createPortal(
+      <div
+        className={`fixed top-4 right-4 ${bgColor} text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center transition-all duration-300 transform ${
+          show ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+        }`}
+      >
+        {Icon && <Icon className="h-5 w-5 mr-2" />}
+        {message}
+      </div>,
+      document.body
+    );
   };
 
   return (
@@ -1717,12 +1679,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                 className={`px-2 py-1 rounded-full text-xs ${
                                   visit.isOverdue
                                     ? "bg-red-100 text-red-800"
-                                    : getStatusColor(visit.status, visit.notes)
+                                    : getStatusColor(visit)
                                 }`}
                               >
                                 {visit.isOverdue
                                   ? "Atrasada"
-                                  : getStatusLabel(visit.status, visit.notes)}
+                                  : getStatusLabel(visit)}
                               </span>
                               <span
                                 className={`text-sm font-medium ${
@@ -1901,9 +1863,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                               {visit.clientName}
                             </button>
                             <span
-                              className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit.status, visit.notes)}`}
+                              className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit)}`}
                             >
-                              {getStatusLabel(visit.status, visit.notes)}
+                              {getStatusLabel(visit)}
                             </span>
                           </div>
 
@@ -3708,6 +3670,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
         </button>,
         document.body,
       )}
+
+      <Notification
+        message={notificationMessage}
+        type={notificationType}
+        show={showNotification}
+      />
     </>
   );
 };

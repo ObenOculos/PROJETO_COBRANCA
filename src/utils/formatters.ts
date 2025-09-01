@@ -205,3 +205,42 @@ export const formatDate = (date: string | null | undefined): string => {
     return "-";
   }
 };
+
+export const calculateDaysSinceLastVisit = (
+  lastVisitCreatedAt: string,
+  today: Date,
+): number => {
+  if (!lastVisitCreatedAt) {
+    return 999; // Never visited
+  }
+
+  try {
+    let lastVisitDate: Date;
+    const visitDateStr = lastVisitCreatedAt.split("T")[0];
+
+    if (visitDateStr.includes("-")) {
+      // Format YYYY-MM-DD
+      const [year, month, day] = visitDateStr.split("-").map(Number);
+      lastVisitDate = new Date(year, month - 1, day);
+    } else if (visitDateStr.includes("/")) {
+      // Format DD/MM/YYYY
+      const [day, month, year] = visitDateStr.split("/").map(Number);
+      lastVisitDate = new Date(year, month - 1, day);
+    } else {
+      // Try to parse as is
+      lastVisitDate = new Date(visitDateStr);
+    }
+
+    lastVisitDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0); // Ensure today is also at start of day for accurate diff
+
+    const daysSinceLastVisit = Math.floor(
+      (today.getTime() - lastVisitDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    return Math.max(0, daysSinceLastVisit); // Ensure no negative days
+  } catch (error) {
+    console.error("Error calculating days since last visit:", error);
+    return 999; // Fallback to never visited on error
+  }
+};
