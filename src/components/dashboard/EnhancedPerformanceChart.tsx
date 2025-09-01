@@ -48,7 +48,7 @@ const EnhancedPerformanceChart: React.FC = () => {
   } = useCollection();
   const currentMonth = new Date().getMonth(); // 0-indexed
   const currentYear = new Date().getFullYear();
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState<number[]>([
     currentMonth,
   ]);
