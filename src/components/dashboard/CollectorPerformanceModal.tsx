@@ -143,7 +143,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl shadow-2xl w-full lg:max-w-[80%] mx-auto transform transition-all duration-300 ease-in-out max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-3xl shadow-2xl w-full lg:max-w-[80%] mx-auto transform transition-all duration-300 ease-in-out max-h-[90vh] overflow-y-auto custom-scrollbar"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 relative">
