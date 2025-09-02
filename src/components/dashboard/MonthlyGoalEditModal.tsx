@@ -24,8 +24,8 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
 }) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [visitsGoal, setVisitsGoal] = useState(200);
-  const [paymentsGoal, setPaymentsGoal] = useState(100000);
+  const [visitsGoal, setVisitsGoal] = useState(0);
+  const [paymentsGoal, setPaymentsGoal] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [currentGoal, setCurrentGoal] = useState<MonthlyGoal | null>(null);
 
@@ -65,6 +65,18 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
 
     fetchGoal();
   }, [selectedMonth, selectedYear, collector]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add("overflow-hidden");
+    } else {
+      document.body.classList.remove("overflow-hidden");
+    }
+
+    return () => {
+      document.body.classList.remove("overflow-hidden");
+    };
+  }, [isOpen]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
