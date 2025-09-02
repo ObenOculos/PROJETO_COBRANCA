@@ -2465,79 +2465,84 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   );
 
   // Scheduled Visits Functions
-  const fetchScheduledVisits = React.useCallback(async (useCache = true) => {
-    const cacheKey = "scheduled-visits";
+  const fetchScheduledVisits = React.useCallback(
+    async (useCache = true) => {
+      const cacheKey = "scheduled-visits";
 
-    // 1. Load from cache if available
-    if (useCache) {
-      const cachedData = dataCache.get<ScheduledVisit[]>(cacheKey);
-      if (cachedData) {
-        console.log("✅ Dados de scheduled visits carregados do cache");
-        setScheduledVisits(cachedData);
-      }
-    }
-
-    // 2. If offline, do not proceed to fetch from network
-    if (!isOnline) {
-      console.log("🚫 Offline, não buscando visitas agendadas do servidor.");
-      // If there was no cache, the state will be an empty array, which is correct.
-      // If there was cache, it's already set.
-      return;
-    }
-
-    // 3. If online, fetch fresh data
-    try {
-      console.log("Buscando visitas agendadas...");
-
-      const { data, error: supabaseError } = await supabase
-        .from("scheduled_visits")
-        .select("*")
-        .order("scheduled_date", { ascending: true });
-
-      if (supabaseError) {
-        // If fetch fails, we just log it but DON'T clear the state.
-        // The user will see stale data from cache, which is the desired offline behavior.
-        console.error("Erro ao buscar visitas agendadas:", supabaseError);
-        return; // Exit without clearing state
+      // 1. Load from cache if available
+      if (useCache) {
+        const cachedData = dataCache.get<ScheduledVisit[]>(cacheKey);
+        if (cachedData) {
+          console.log("✅ Dados de scheduled visits carregados do cache");
+          setScheduledVisits(cachedData);
+        }
       }
 
-      const transformedVisits: ScheduledVisit[] = (data || []).map((visit) => ({
-        id: visit.id,
-        collectorId: visit.collector_id,
-        clientDocument: visit.client_document,
-        clientName: visit.client_name,
-        scheduledDate: visit.scheduled_date,
-        scheduledTime: visit.scheduled_time,
-        status: visit.status,
-        notes: visit.notes,
-        createdAt: visit.created_at,
-        updatedAt: visit.updated_at,
-        dataVisitaRealizada: visit.data_visita_realizada,
-        clientAddress: visit.client_address,
-        clientNeighborhood: visit.client_neighborhood,
-        clientCity: visit.client_city,
-        totalPendingValue: visit.total_pending_value,
-        overdueCount: visit.overdue_count,
-        cancellationRequestDate: visit.cancellation_request_date,
-        cancellationRequestReason: visit.cancellation_request_reason,
-        cancellationApprovedBy: visit.cancellation_approved_by,
-        cancellationApprovedAt: visit.cancellation_approved_at,
-        cancellationRejectedBy: visit.cancellation_rejected_by,
-        cancellationRejectedAt: visit.cancellation_rejected_at,
-        cancellationRejectionReason: visit.cancellation_rejection_reason,
-      }));
+      // 2. If offline, do not proceed to fetch from network
+      if (!isOnline) {
+        console.log("🚫 Offline, não buscando visitas agendadas do servidor.");
+        // If there was no cache, the state will be an empty array, which is correct.
+        // If there was cache, it's already set.
+        return;
+      }
 
-      setScheduledVisits(transformedVisits);
+      // 3. If online, fetch fresh data
+      try {
+        console.log("Buscando visitas agendadas...");
 
-      // Cache the fresh data
-      dataCache.set(cacheKey, transformedVisits);
+        const { data, error: supabaseError } = await supabase
+          .from("scheduled_visits")
+          .select("*")
+          .order("scheduled_date", { ascending: true });
 
-      console.log("Visitas agendadas carregadas:", transformedVisits.length);
-    } catch (err) {
-      // Also log error here and do not clear state
-      console.error("Erro ao carregar visitas agendadas:", err);
-    }
-  }, [isOnline, setScheduledVisits, dataCache, supabase]);
+        if (supabaseError) {
+          // If fetch fails, we just log it but DON'T clear the state.
+          // The user will see stale data from cache, which is the desired offline behavior.
+          console.error("Erro ao buscar visitas agendadas:", supabaseError);
+          return; // Exit without clearing state
+        }
+
+        const transformedVisits: ScheduledVisit[] = (data || []).map(
+          (visit) => ({
+            id: visit.id,
+            collectorId: visit.collector_id,
+            clientDocument: visit.client_document,
+            clientName: visit.client_name,
+            scheduledDate: visit.scheduled_date,
+            scheduledTime: visit.scheduled_time,
+            status: visit.status,
+            notes: visit.notes,
+            createdAt: visit.created_at,
+            updatedAt: visit.updated_at,
+            dataVisitaRealizada: visit.data_visita_realizada,
+            clientAddress: visit.client_address,
+            clientNeighborhood: visit.client_neighborhood,
+            clientCity: visit.client_city,
+            totalPendingValue: visit.total_pending_value,
+            overdueCount: visit.overdue_count,
+            cancellationRequestDate: visit.cancellation_request_date,
+            cancellationRequestReason: visit.cancellation_request_reason,
+            cancellationApprovedBy: visit.cancellation_approved_by,
+            cancellationApprovedAt: visit.cancellation_approved_at,
+            cancellationRejectedBy: visit.cancellation_rejected_by,
+            cancellationRejectedAt: visit.cancellation_rejected_at,
+            cancellationRejectionReason: visit.cancellation_rejection_reason,
+          }),
+        );
+
+        setScheduledVisits(transformedVisits);
+
+        // Cache the fresh data
+        dataCache.set(cacheKey, transformedVisits);
+
+        console.log("Visitas agendadas carregadas:", transformedVisits.length);
+      } catch (err) {
+        // Also log error here and do not clear state
+        console.error("Erro ao carregar visitas agendadas:", err);
+      }
+    },
+    [isOnline, setScheduledVisits, dataCache, supabase],
+  );
 
   const scheduleVisit = async (
     visitData: Omit<ScheduledVisit, "id" | "createdAt" | "updatedAt">,

@@ -1041,7 +1041,12 @@ const EnhancedPerformanceChart: React.FC = () => {
                     <div className="col-span-2 sm:col-span-1 text-center bg-gray-50 rounded-lg p-2 sm:p-3 flex flex-col justify-center">
                       <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
                         <span className="hidden sm:inline">Aproveitamento</span>
-                        <span className="inline sm:hidden" title="Aproveitamento">Aprov.</span>
+                        <span
+                          className="inline sm:hidden"
+                          title="Aproveitamento"
+                        >
+                          Aprov.
+                        </span>
                       </p>
                       <p className="text-sm sm:text-lg font-bold text-gray-800 mt-1">
                         {collector.clientVisitEfficiency.toFixed(1)}%

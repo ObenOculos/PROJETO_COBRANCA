@@ -655,7 +655,9 @@ const EnhancedStoreManagement: React.FC = () => {
                     <p className="text-sm text-gray-600 mt-1">
                       {store.collectorName}
                       {store.isFormalAssignment && !isUnassigned && (
-                        <span className="text-xs text-green-600 ml-1">(Formal)</span>
+                        <span className="text-xs text-green-600 ml-1">
+                          (Formal)
+                        </span>
                       )}
                     </p>
                   </div>
@@ -683,7 +685,10 @@ const EnhancedStoreManagement: React.FC = () => {
                     <div className="flex items-center">
                       <FileText className="h-4 w-4 text-gray-500 mr-2" />
                       <span>
-                        <span className="font-semibold">{store.totalSales}</span> vendas
+                        <span className="font-semibold">
+                          {store.totalSales}
+                        </span>{" "}
+                        vendas
                       </span>
                     </div>
                     <div className="flex items-center">
@@ -764,7 +769,9 @@ const EnhancedStoreManagement: React.FC = () => {
                           ? "bg-blue-100 text-blue-600"
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       }`}
-                      title={isExpanded ? "Ocultar detalhes" : "Ver mais detalhes"}
+                      title={
+                        isExpanded ? "Ocultar detalhes" : "Ver mais detalhes"
+                      }
                     >
                       {isExpanded ? (
                         <ChevronUp className="h-4 w-4" />
