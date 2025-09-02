@@ -18,5 +18,11 @@ export default defineConfig({
       },
     },
     chunkSizeWarningLimit: 1000,
+    minify: "terser", // Garante que o terser seja usado para minificação
+    terserOptions: {
+      compress: {
+        drop_console: true, // Isso removerá as declarações console.log
+      },
+    },
   },
 });
