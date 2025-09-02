@@ -40,11 +40,9 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
         .from("monthly_goals")
         .select("*")
         .eq("user_id", collector.id)
-        .eq("month", dateString)
-        .single();
+        .eq("month", dateString);
 
-      if (error && error.code !== "PGRST116") {
-        // PGRST116 means no rows found
+      if (error) {
         console.error("Error fetching monthly goal:", error);
         setCurrentGoal(null);
         setVisitsGoal(0); // Default if error
@@ -52,10 +50,11 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
         return;
       }
 
-      if (data) {
-        setCurrentGoal(data);
-        setVisitsGoal(data.visits_goal);
-        setPaymentsGoal(data.payments_goal);
+      if (data && data.length > 0) {
+        const goal = data[0];
+        setCurrentGoal(goal);
+        setVisitsGoal(goal.visits_goal);
+        setPaymentsGoal(goal.payments_goal);
       } else {
         setCurrentGoal(null);
         setVisitsGoal(0); // Default if no goal found
