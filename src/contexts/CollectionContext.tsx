@@ -2465,7 +2465,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   );
 
   // Scheduled Visits Functions
-  const fetchScheduledVisits = async (useCache = true) => {
+  const fetchScheduledVisits = React.useCallback(async (useCache = true) => {
     const cacheKey = "scheduled-visits";
 
     // 1. Load from cache if available
@@ -2537,7 +2537,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // Also log error here and do not clear state
       console.error("Erro ao carregar visitas agendadas:", err);
     }
-  };
+  }, [isOnline, setScheduledVisits, dataCache, supabase]);
 
   const scheduleVisit = async (
     visitData: Omit<ScheduledVisit, "id" | "createdAt" | "updatedAt">,
@@ -2760,6 +2760,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // Invalidate cache
       invalidateVisits();
 
+      // Disparar evento para notificar outros componentes (e.g., VisitTracking)
+      window.dispatchEvent(
+        new CustomEvent("visitCancellationRequested", {
+          detail: { visitId, reason },
+        }),
+      );
+
       console.log("Solicitação de cancelamento enviada com sucesso");
     } catch (error) {
       console.error("Erro ao solicitar cancelamento:", error);
@@ -2866,11 +2873,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
-  const getPendingCancellationRequests = () => {
+  const getPendingCancellationRequests = React.useCallback(() => {
     return scheduledVisits.filter(
       (visit) => visit.status === "cancelamento_solicitado",
     );
-  };
+  }, [scheduledVisits]);
 
   const getCancellationHistory = (days: number = 30) => {
     const cutoffDate = new Date();

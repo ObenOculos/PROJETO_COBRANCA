@@ -68,23 +68,13 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
   // Adicionar atualização periódica para garantir que novas solicitações apareçam
   useEffect(() => {
-    // Atualizar imediatamente ao montar o componente
+    // Fetch scheduled visits when the component mounts or when the activeTab changes to "cancellations"
+    // or when the user changes (e.g., manager logs in)
     if (activeTab === "cancellations" && user?.type === "manager") {
       fetchScheduledVisits();
     }
-
-    // Configurar intervalo de atualização a cada 5 segundos quando na aba de cancelamentos
-    const interval = setInterval(() => {
-      if (activeTab === "cancellations" && user?.type === "manager") {
-        fetchScheduledVisits().then(() => {
-          const requests = getPendingCancellationRequests();
-          setPendingRequests(requests);
-        });
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [activeTab, user, fetchScheduledVisits, getPendingCancellationRequests]);
+    // No polling needed, updates will be event-driven
+  }, [activeTab, user, fetchScheduledVisits]);
 
   // Adicionar listeners para eventos de cancelamento
   useEffect(() => {
