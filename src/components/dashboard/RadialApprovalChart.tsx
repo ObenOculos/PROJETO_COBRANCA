@@ -33,6 +33,8 @@ const RadialApprovalChart: React.FC<Props> = memo(
     const formatValue = (val: number) => {
       if (isCurrency) {
         return val.toLocaleString("pt-BR", {
+          style: "currency",
+          currency: "BRL",
           minimumFractionDigits: 0,
           maximumFractionDigits: 0,
         });
