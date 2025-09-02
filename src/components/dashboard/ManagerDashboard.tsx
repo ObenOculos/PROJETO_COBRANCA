@@ -34,7 +34,6 @@ import { navigationItems } from "../../config/navigation";
 
 // Export tabs for use in Header
 
-
 interface ManagerDashboardProps {
   activeTab?: string;
   onTabChange?: (tabId: string) => void;

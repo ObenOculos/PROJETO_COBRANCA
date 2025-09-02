@@ -33,7 +33,6 @@ import { FilterOptions } from "../../types";
 
 // Export tabs for use in Header
 
-
 interface CollectorDashboardProps {
   activeTab?: string;
   onTabChange?: (tabId: string) => void;
