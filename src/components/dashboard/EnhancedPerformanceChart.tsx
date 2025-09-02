@@ -9,6 +9,10 @@ import {
   Target,
   Calendar,
   X,
+  ChevronUp,
+  ChevronDown,
+  Trophy,
+  BarChart3,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
@@ -848,165 +852,243 @@ const EnhancedPerformanceChart: React.FC = () => {
         </div>
       )}
 
-      {/* Ranking de Cobradores - Design Simplificado */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Ranking de Cobradores
-          </h3>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() =>
-                setSortOrder(sortOrder === "desc" ? "asc" : "desc")
-              }
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              {sortOrder === "desc" ? "↓ Maior primeiro" : "↑ Menor primeiro"}
-            </button>
-          </div>
+
+{/* Ranking de Cobradores - Design Responsivo com Melhor Affordance */}
+<div className="space-y-4 sm:space-y-6">
+  {/* Header responsivo */}
+  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-gray-200">
+    <div>
+      <h3 className="text-lg sm:text-xl font-bold text-gray-900">
+        Ranking de Cobradores
+      </h3>
+      <p className="text-xs sm:text-sm text-gray-600 mt-1">
+        Performance dos cobradores no período selecionado
+      </p>
+    </div>
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+      <span className="text-xs text-gray-500 font-medium hidden sm:inline">ORDENAR POR:</span>
+      <button
+        onClick={() =>
+          setSortOrder(sortOrder === "desc" ? "asc" : "desc")
+        }
+        className="flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 sm:py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 shadow-sm hover:shadow-md w-full sm:w-auto"
+      >
+        <span className="text-sm font-medium text-gray-700">
+          {sortOrder === "desc" ? "Maior Performance" : "Menor Performance"}
+        </span>
+        <div className="flex flex-col">
+          <ChevronUp className={`h-3 w-3 ${sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
+          <ChevronDown className={`h-3 w-3 ${sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
         </div>
+      </button>
+    </div>
+  </div>
 
-        {/* Cards Simplificados */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredAndSortedPerformance.map((collector, index) => {
-            const isTopPerformer = index === 0 && sortOrder === "desc";
-            const rankingPosition = index + 1;
+  {/* Grid responsivo - Mobile first */}
+  <div className="space-y-4 sm:space-y-0 sm:grid sm:gap-4 md:gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+    {filteredAndSortedPerformance.map((collector, index) => {
+      const isTopPerformer = index === 0 && sortOrder === "desc";
+      const rankingPosition = index + 1;
 
-            return (
+      return (
+        <div
+          key={collector.collectorId}
+          className={`group relative bg-white rounded-xl sm:rounded-2xl border-2 p-4 sm:p-6 transition-all duration-300 hover:shadow-lg sm:hover:-translate-y-1 cursor-pointer ${
+            isTopPerformer
+              ? "border-blue-400 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-md"
+              : "border-gray-200 hover:border-gray-300"
+          }`}
+        >
+          {/* Badge de Posição adaptado para mobile */}
+          <div className="flex items-start justify-between mb-3 sm:mb-4">
+            <div className="flex items-center gap-3 sm:gap-4">
               <div
-                key={collector.collectorId}
-                className={`bg-white rounded-2xl border p-4 hover:shadow-md transition-shadow ${
-                  isTopPerformer
-                    ? "border-blue-300 bg-blue-50"
-                    : "border-gray-200"
+                className={`relative w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-base sm:text-lg font-bold shadow-sm ${
+                  rankingPosition === 1
+                    ? "bg-gradient-to-r from-yellow-400 to-orange-400 text-white"
+                    : rankingPosition === 2
+                    ? "bg-gradient-to-r from-gray-400 to-gray-500 text-white"
+                    : rankingPosition === 3
+                    ? "bg-gradient-to-r from-orange-400 to-red-400 text-white"
+                    : "bg-gray-100 text-gray-600 border-2 border-gray-300"
                 }`}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                        rankingPosition <= 3
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {rankingPosition}
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900">
-                        {collector.collectorName}
-                      </h4>
-                      <p className="text-sm text-gray-500">
-                        {collector.totalSales} vendas
-                      </p>
-                    </div>
+                {rankingPosition <= 3 && (
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center">
+                    <Trophy className="h-2.5 w-2.5 text-yellow-600" />
                   </div>
-                  {isTopPerformer && (
-                    <Award className="h-5 w-5 text-blue-600" />
-                  )}
-                </div>
-
-                {/* Métricas de Metas Mensais */}
-                <div className="space-y-3">
-                  {/* Meta de Visitas */}
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm text-gray-600">
-                        Meta de Visitas (Mês)
-                      </span>
-                      <span className="text-sm font-bold text-gray-800">
-                        {collector.currentMonthVisitsActual} /{" "}
-                        {collector.currentMonthVisitsGoal}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-500 h-2 rounded-full"
-                        style={{
-                          width: `${Math.min(100, collector.visitsPerformance)}%`,
-                        }}
-                      />
-                    </div>
+                )}
+                {rankingPosition}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-gray-900 text-base sm:text-lg truncate">
+                  {collector.collectorName}
+                </h4>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-1">
+                    <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm text-gray-600 font-medium">
+                      {collector.totalSales} vendas
+                    </span>
                   </div>
-
-                  {/* Meta de Pagamentos */}
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm text-gray-600">
-                        Meta de Pagamentos (Mês)
-                      </span>
-                      <span className="text-sm font-bold text-gray-800">
-                        {formatCurrency(collector.currentMonthPaymentsActual)} /{" "}
-                        {formatCurrency(collector.currentMonthPaymentsGoal)}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-green-500 h-2 rounded-full"
-                        style={{
-                          width: `${Math.min(100, collector.paymentsPerformance)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Estatísticas Resumidas */}
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100 mt-3">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-500">Finalizadas</p>
-                      <p className="text-sm font-semibold text-gray-700">
-                        {collector.completedSales}/{collector.totalSales}
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-500">Ticket Médio</p>
-                      <p className="text-sm font-semibold text-gray-700">
-                        {formatCurrency(collector.averageTicket)}
-                      </p>
-                    </div>
-                    {/* New: Aproveitamento de Visitas */}
-                    <div className="text-center col-span-2">
-                      <p className="text-xs text-gray-500">Aproveitamento de Visitas</p>
-                      <p className="text-sm font-semibold text-gray-700">
-                        {collector.clientVisitEfficiency.toFixed(1)}% ({collector.visitedClientsInSelectedMonths}/{collector.totalAssignedClients})
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Botões de Ação */}
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedCollector(collector);
-                      setIsModalOpen(true);
-                    }}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-colors text-sm font-medium"
-                  >
-                    <Eye size={16} />
-                    Detalhes
-                  </button>
-                  <button
-                    onClick={() => {
-                      const user = users.find(
-                        (u) => u.id === collector.collectorId,
-                      );
-                      if (user) {
-                        setSelectedCollectorForGoals(user);
-                        setIsGoalModalOpen(true);
-                      }
-                    }}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-xl hover:bg-indigo-200 transition-colors text-sm font-medium"
-                  >
-                    <Target size={16} />
-                    Metas
-                  </button>
                 </div>
               </div>
-            );
-          })}
+            </div>
+            {isTopPerformer && (
+              <div className="absolute -top-2 -right-2 w-6 h-6 sm:w-8 sm:h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-lg">
+                <Award className="h-3 w-3 sm:h-5 sm:w-5 text-white" />
+              </div>
+            )}
+          </div>
+
+          {/* Métricas adaptadas para mobile */}
+          <div className="space-y-3 sm:space-y-4">
+            {/* Meta de Visitas - Layout mobile otimizado */}
+            <div className="bg-white/80 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-gray-100">
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-xs sm:text-sm font-semibold text-gray-700 truncate">
+                    Visitas do Mês
+                  </span>
+                </div>
+                <span className="text-xs sm:text-sm font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded-md sm:rounded-lg whitespace-nowrap ml-2">
+                  {collector.currentMonthVisitsActual} / {collector.currentMonthVisitsGoal}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 shadow-inner">
+                <div
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 sm:h-3 rounded-full shadow-sm transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, collector.visitsPerformance)}%`,
+                  }}
+                />
+              </div>
+              <div className="text-right mt-1">
+                <span className="text-xs font-medium text-gray-600">
+                  {collector.visitsPerformance.toFixed(1)}% concluído
+                </span>
+              </div>
+            </div>
+
+            {/* Meta de Pagamentos - Layout mobile otimizado */}
+            <div className="bg-white/80 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-gray-100">
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-xs sm:text-sm font-semibold text-gray-700 truncate">
+                    Pagamentos do Mês
+                  </span>
+                </div>
+              </div>
+              {/* Valores em linha separada no mobile */}
+              <div className="mb-2">
+                <span className="text-xs sm:text-sm font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded-md sm:rounded-lg block sm:inline w-fit">
+                  {formatCurrency(collector.currentMonthPaymentsActual)} / {formatCurrency(collector.currentMonthPaymentsGoal)}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 shadow-inner">
+                <div
+                  className="bg-gradient-to-r from-green-500 to-green-600 h-2 sm:h-3 rounded-full shadow-sm transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, collector.paymentsPerformance)}%`,
+                  }}
+                />
+              </div>
+              <div className="text-right mt-1">
+                <span className="text-xs font-medium text-gray-600">
+                  {collector.paymentsPerformance.toFixed(1)}% da meta
+                </span>
+              </div>
+            </div>
+
+            {/* Estatísticas em grid responsivo */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-gray-100">
+              <div className="text-center bg-gray-50 rounded-lg p-2 sm:p-3 flex flex-col justify-center">
+                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+                  Finalizadas
+                </p>
+                <p className="text-sm sm:text-lg font-bold text-gray-800 mt-1">
+                  {collector.completedSales}
+                  <span className="text-xs sm:text-sm text-gray-500 font-normal">
+                    /{collector.totalSales}
+                  </span>
+                </p>
+              </div>
+              <div className="text-center bg-gray-50 rounded-lg p-2 sm:p-3 flex flex-col justify-center">
+                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+                  Ticket Médio
+                </p>
+                <p className="text-sm sm:text-lg font-bold text-gray-800 mt-1 truncate" title={formatCurrency(collector.averageTicket)}>
+                  {formatCurrency(collector.averageTicket)}
+                </p>
+              </div>
+              {/* Aproveitamento simplificado */}
+              <div className="col-span-2 sm:col-span-1 text-center bg-gray-50 rounded-lg p-2 sm:p-3 flex flex-col justify-center">
+                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+                  Aproveitamento
+                </p>
+                <p className="text-sm sm:text-lg font-bold text-gray-800 mt-1">
+                  {collector.clientVisitEfficiency.toFixed(1)}%
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {collector.visitedClientsInSelectedMonths} de {collector.totalAssignedClients} clientes
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Botões de Ação otimizados para mobile */}
+          <div className="mt-4 sm:mt-6 flex flex-col sm:grid sm:grid-cols-2 gap-2 sm:gap-3">
+            <button
+              onClick={() => {
+                setSelectedCollector(collector);
+                setIsModalOpen(true);
+              }}
+              className="group flex items-center justify-center gap-2 px-4 py-3 sm:py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg font-medium text-sm transform active:scale-95 sm:hover:scale-105 w-full order-1"
+            >
+              <Eye size={18} className="group-hover:scale-110 transition-transform flex-shrink-0" />
+              <span>Ver Detalhes</span>
+            </button>
+            <button
+              onClick={() => {
+                const user = users.find(
+                  (u) => u.id === collector.collectorId,
+                );
+                if (user) {
+                  setSelectedCollectorForGoals(user);
+                  setIsGoalModalOpen(true);
+                }
+              }}
+              className="group flex items-center justify-center gap-2 px-4 py-3 sm:py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg font-medium text-sm transform active:scale-95 sm:hover:scale-105 w-full order-2"
+            >
+              <Target size={18} className="group-hover:scale-110 transition-transform flex-shrink-0" />
+              <span>Definir Metas</span>
+            </button>
+          </div>
+
+          {/* Indicador de hover adaptado */}
+          <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
         </div>
+      );
+    })}
+  </div>
+
+  {/* Estado vazio responsivo */}
+  {filteredAndSortedPerformance.length === 0 && (
+    <div className="text-center py-8 sm:py-12 px-4">
+      <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <BarChart3 className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" />
       </div>
+      <h4 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">
+        Nenhum cobrador encontrado
+      </h4>
+      <p className="text-sm sm:text-base text-gray-500">
+        Ajuste os filtros para visualizar os cobradores
+      </p>
+    </div>
+  )}
+</div>
 
       {/* Empty State */}
       {filteredAndSortedPerformance.length === 0 && (
