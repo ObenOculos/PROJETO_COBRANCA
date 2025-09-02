@@ -630,7 +630,7 @@ const EnhancedStoreManagement: React.FC = () => {
               }`}
             >
               <div className="p-5">
-                {/* Header com Métrica Principal */}
+                {/* Header with Main Metric */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -647,7 +647,7 @@ const EnhancedStoreManagement: React.FC = () => {
                       />
                       {store.storeName}
                       {isUnassigned && (
-                        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full font-medium">
+                        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md font-medium">
                           Sem atribuição
                         </span>
                       )}
@@ -655,14 +655,12 @@ const EnhancedStoreManagement: React.FC = () => {
                     <p className="text-sm text-gray-600 mt-1">
                       {store.collectorName}
                       {store.isFormalAssignment && !isUnassigned && (
-                        <span className="text-xs text-green-600 ml-1">
-                          (Formal)
-                        </span>
+                        <span className="text-xs text-green-600 ml-1">(Formal)</span>
                       )}
                     </p>
                   </div>
 
-                  {/* Métrica Principal Destacada */}
+                  {/* Main Metric Highlight */}
                   <div className="text-right">
                     <div
                       className={`text-3xl font-bold ${
@@ -679,59 +677,46 @@ const EnhancedStoreManagement: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Métricas Resumidas com Ícones */}
+                {/* Simplified Metrics (Sales, Clients) */}
                 {!isUnassigned && (
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                    <div className="flex items-center p-3 bg-gray-50 rounded-2xl">
-                      <div className="bg-gray-100 rounded-full p-2 mr-3">
-                        <FileText className="h-4 w-4 text-gray-600" />
-                      </div>
-                      <div>
-                        <div className="text-lg font-bold text-gray-900">
-                          {store.totalSales}
-                        </div>
-                        <div className="text-xs text-gray-600">vendas</div>
-                      </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-4 text-sm text-gray-700">
+                    <div className="flex items-center">
+                      <FileText className="h-4 w-4 text-gray-500 mr-2" />
+                      <span>
+                        <span className="font-semibold">{store.totalSales}</span> vendas
+                      </span>
                     </div>
-                    <div className="flex items-center p-3 bg-green-50 rounded-2xl">
-                      <div className="bg-green-100 rounded-full p-2 mr-3">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                      </div>
-                      <div>
-                        <div className="text-lg font-bold text-green-700">
+                    <div className="flex items-center">
+                      <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                      <span>
+                        <span className="font-semibold text-green-700">
                           {store.completedSales}
-                        </div>
-                        <div className="text-xs text-green-600">
-                          finalizadas
-                        </div>
-                      </div>
+                        </span>{" "}
+                        finalizadas
+                      </span>
                     </div>
-                    <div className="flex items-center p-3 bg-orange-50 rounded-2xl">
-                      <div className="bg-orange-100 rounded-full p-2 mr-3">
-                        <AlertCircle className="h-4 w-4 text-orange-600" />
-                      </div>
-                      <div>
-                        <div className="text-lg font-bold text-orange-700">
+                    <div className="flex items-center">
+                      <AlertCircle className="h-4 w-4 text-orange-600 mr-2" />
+                      <span>
+                        <span className="font-semibold text-orange-700">
                           {store.pendingSales}
-                        </div>
-                        <div className="text-xs text-orange-600">pendentes</div>
-                      </div>
+                        </span>{" "}
+                        pendentes
+                      </span>
                     </div>
-                    <div className="flex items-center p-3 bg-purple-50 rounded-2xl">
-                      <div className="bg-purple-100 rounded-full p-2 mr-3">
-                        <Users className="h-4 w-4 text-purple-600" />
-                      </div>
-                      <div>
-                        <div className="text-lg font-bold text-purple-700">
+                    <div className="flex items-center">
+                      <Users className="h-4 w-4 text-purple-600 mr-2" />
+                      <span>
+                        <span className="font-semibold text-purple-700">
                           {store.clientsCount}
-                        </div>
-                        <div className="text-xs text-purple-600">clientes</div>
-                      </div>
+                        </span>{" "}
+                        clientes
+                      </span>
                     </div>
                   </div>
                 )}
 
-                {/* Barra de Progresso Visual */}
+                {/* Progress Bar */}
                 {!isUnassigned && (
                   <div className="mb-4">
                     <div className="w-full bg-gray-200 rounded-full h-2">
@@ -751,64 +736,35 @@ const EnhancedStoreManagement: React.FC = () => {
                   </div>
                 )}
 
-                {/* Valores Financeiros com Ícones */}
+                {/* Financial Values */}
                 {!isUnassigned && (
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl">
-                    <div className="flex items-center">
-                      <BarChart3 className="h-4 w-4 text-gray-500 mr-2 sm:block hidden" />
-                      <div className="text-center">
-                        <div className="text-xs text-gray-600">Total</div>
-                        <div className="text-sm font-bold text-gray-900 sm:block hidden">
-                          {formatCurrency(store.totalAmount)}
-                        </div>
-                        <div className="text-sm font-bold text-gray-900 sm:hidden">
-                          {formatCurrency(store.totalAmount, false).replace(
-                            /,\d{2}$/,
-                            "",
-                          )}
-                        </div>
+                  <div className="flex items-center justify-between py-2 border-t border-b border-gray-100 my-4">
+                    <div className="text-center flex-1">
+                      <div className="text-xs text-gray-600">Total</div>
+                      <div className="text-sm font-bold text-gray-900">
+                        {formatCurrency(store.totalAmount)}
                       </div>
                     </div>
-                    <div className="flex items-center">
-                      <CheckCircle className="h-4 w-4 text-green-500 mr-2 sm:block hidden" />
-                      <div className="text-center">
-                        <div className="text-xs text-green-600">Recebido</div>
-                        <div className="text-sm font-bold text-green-700 sm:block hidden">
-                          {formatCurrency(store.receivedAmount)}
-                        </div>
-                        <div className="text-sm font-bold text-green-700 sm:hidden">
-                          {formatCurrency(store.receivedAmount, false).replace(
-                            /,\d{2}$/,
-                            "",
-                          )}
-                        </div>
+                    <div className="text-center flex-1">
+                      <div className="text-xs text-green-600">Recebido</div>
+                      <div className="text-sm font-bold text-green-700">
+                        {formatCurrency(store.receivedAmount)}
                       </div>
                     </div>
-                    <div className="flex items-center">
-                      <AlertCircle className="h-4 w-4 text-red-500 mr-2 sm:block hidden" />
-                      <div className="text-center">
-                        <div className="text-xs text-red-600">Pendente</div>
-                        <div className="text-sm font-bold text-red-700 sm:block hidden">
-                          {formatCurrency(store.pendingAmount)}
-                        </div>
-                        <div className="text-sm font-bold text-red-700 sm:hidden">
-                          {formatCurrency(store.pendingAmount, false).replace(
-                            /,\d{2}$/,
-                            "",
-                          )}
-                        </div>
+                    <div className="text-center flex-1">
+                      <div className="text-xs text-red-600">Pendente</div>
+                      <div className="text-sm font-bold text-red-700">
+                        {formatCurrency(store.pendingAmount)}
                       </div>
                     </div>
                     <button
                       onClick={() => toggleCardExpansion(store.storeName)}
-                      className={`p-2 rounded-2xl transition-colors ${
+                      className={`p-2 rounded-full transition-colors ml-2 ${
                         isExpanded
                           ? "bg-blue-100 text-blue-600"
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       }`}
-                      title={
-                        isExpanded ? "Ocultar detalhes" : "Ver mais detalhes"
-                      }
+                      title={isExpanded ? "Ocultar detalhes" : "Ver mais detalhes"}
                     >
                       {isExpanded ? (
                         <ChevronUp className="h-4 w-4" />
@@ -819,39 +775,31 @@ const EnhancedStoreManagement: React.FC = () => {
                   </div>
                 )}
 
-                {/* Detalhes Expandidos com Ícones */}
+                {/* Expanded Details */}
                 {isExpanded && !isUnassigned && (
                   <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                      <div className="flex items-center p-3 bg-amber-50 rounded-2xl">
-                        <div className="bg-amber-100 rounded-full p-2 mr-3">
-                          <AlertCircle className="h-4 w-4 text-amber-600" />
-                        </div>
-                        <div>
-                          <div className="text-lg font-bold text-amber-700">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-sm text-gray-700">
+                      <div className="flex items-center">
+                        <AlertCircle className="h-4 w-4 text-amber-600 mr-2" />
+                        <span>
+                          <span className="font-semibold text-amber-700">
                             {store.clientsWithPending}
-                          </div>
-                          <div className="text-xs text-amber-600">
-                            clientes inadimplentes
-                          </div>
-                        </div>
+                          </span>{" "}
+                          clientes inadimplentes
+                        </span>
                       </div>
-                      <div className="flex items-center p-3 bg-green-50 rounded-2xl">
-                        <div className="bg-green-100 rounded-full p-2 mr-3">
-                          <DollarSign className="h-4 w-4 text-green-600" />
-                        </div>
-                        <div>
-                          <div className="text-lg font-bold text-green-700">
+                      <div className="flex items-center">
+                        <DollarSign className="h-4 w-4 text-green-600 mr-2" />
+                        <span>
+                          <span className="font-semibold text-green-700">
                             {formatCurrency(store.averageTicket)}
-                          </div>
-                          <div className="text-xs text-green-600">
-                            ticket médio
-                          </div>
-                        </div>
+                          </span>{" "}
+                          ticket médio
+                        </span>
                       </div>
                     </div>
 
-                    <div className="bg-blue-50 rounded-2xl p-3 border border-blue-200">
+                    <div className="bg-blue-50 rounded-md p-3 border border-blue-200">
                       <div className="flex items-center justify-between text-sm mb-2">
                         <div className="flex items-center">
                           <Award className="h-4 w-4 text-blue-600 mr-2" />
@@ -875,17 +823,15 @@ const EnhancedStoreManagement: React.FC = () => {
                   </div>
                 )}
 
-                {/* Estado de Loja Não Atribuída */}
+                {/* Unassigned Store State */}
                 {isUnassigned && (
-                  <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center text-amber-700">
-                        <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-                        <div>
-                          <div className="font-medium">Loja sem atribuição</div>
-                          <div className="text-sm">
-                            Necessário atribuir um cobrador responsável
-                          </div>
+                  <div className="bg-amber-50 rounded-md p-4 border border-amber-200 text-amber-700">
+                    <div className="flex items-center">
+                      <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                      <div>
+                        <div className="font-medium">Loja sem atribuição</div>
+                        <div className="text-sm">
+                          Necessário atribuir um cobrador responsável
                         </div>
                       </div>
                     </div>
