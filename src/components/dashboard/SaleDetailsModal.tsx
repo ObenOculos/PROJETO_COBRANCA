@@ -145,7 +145,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
         }
       }}
     >
-      <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[95vh] overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-xl w-[90%] max-h-[95vh] overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-600 to-purple-600 text-white">
           <div>
