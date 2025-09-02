@@ -145,9 +145,9 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
         }
       }}
     >
-            <div className="bg-white rounded-2xl shadow-xl w-[90%] max-h-[95vh] overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-xl w-[90%] max-h-[95vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-600 to-purple-600 text-white flex-shrink-0">
           <div>
             <h2 className="text-xl font-semibold">{saleData.cliente}</h2>
             <p className="text-blue-100 text-sm">
@@ -163,7 +163,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[75vh]">
+        <div className="p-6 overflow-y-auto min-h-0">
           {/* Sale Summary */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-2xl border border-green-200">
