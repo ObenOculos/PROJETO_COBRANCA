@@ -67,13 +67,13 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      document.body.classList.add("overflow-hidden");
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.classList.remove("overflow-hidden");
+      document.body.style.overflow = "auto";
     }
 
     return () => {
-      document.body.classList.remove("overflow-hidden");
+      document.body.style.overflow = "auto"; // Ensure it's reset when component unmounts
     };
   }, [isOpen]);
 
