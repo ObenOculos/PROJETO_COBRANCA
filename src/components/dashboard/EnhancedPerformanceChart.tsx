@@ -322,10 +322,10 @@ const EnhancedPerformanceChart: React.FC = () => {
 
       // Goal performance calculation
       const currentMonthGoals = monthlyGoals.filter((g) => {
-        const goalDate = new Date(g.month);
+        const goalDate = new Date(g.month + "T00:00:00");
         return (
-          selectedMonths.includes(goalDate.getMonth()) &&
-          selectedYears.includes(goalDate.getFullYear()) &&
+          selectedMonths.includes(goalDate.getUTCMonth()) &&
+          selectedYears.includes(goalDate.getUTCFullYear()) &&
           g.user_id === collector.id
         );
       });
