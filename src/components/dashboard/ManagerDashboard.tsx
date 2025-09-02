@@ -5,9 +5,7 @@ import {
   Users,
   FileText,
   BarChart3,
-  Download,
   Store,
-  UserCheck,
   AlertTriangle,
   Calendar,
   Target,
@@ -32,19 +30,10 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
+import { navigationItems } from "../../config/navigation";
 
 // Export tabs for use in Header
-export const getManagerTabs = (_pendingCancellations: number = 0) => [
-  { id: "overview", name: "Visão Geral", icon: BarChart3 },
-  { id: "collections", name: "Cobranças", icon: FileText },
-  { id: "performance", name: "Desempenho", icon: TrendingUp },
-  { id: "stores", name: "Lojas", icon: Store },
-  { id: "clients", name: "Clientes", icon: UserCheck },
-  { id: "visit-tracking", name: "Acompanhamento", icon: AlertTriangle },
-  { id: "authorization", name: "Autorizações", icon: UserCheck },
-  { id: "users", name: "Usuários", icon: Users },
-  { id: "database-upload", name: "Upload de Dados", icon: Download },
-];
+
 
 interface ManagerDashboardProps {
   activeTab?: string;
@@ -285,7 +274,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   }, [overviewCollections]);
 
   const pendingCancellations = getPendingCancellationRequests();
-  const tabs = getManagerTabs(pendingCancellations.length);
+  const tabs = useMemo(() => {
+    return navigationItems
+      .filter((item) => item.roles.includes("manager"))
+      .map((item) => {
+        return { id: item.id, name: item.managerName, icon: item.managerIcon };
+      });
+  }, []);
 
   // Sales map for overview tab - moved from renderTabContent to fix hooks violation
   const salesMap = useMemo(() => {

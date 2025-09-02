@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { LogOut, User, Menu, X } from "lucide-react";
+import { LogOut, User, Menu, X, LucideIcon } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import NotificationDropdown from "./NotificationDropdown";
 
 interface Tab {
   id: string;
   name: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
 }
 
 interface HeaderProps {

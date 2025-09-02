@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import {
@@ -9,14 +9,11 @@ import { LoadingProvider, useLoading } from "./contexts/LoadingContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import LoginForm from "./components/auth/LoginForm";
 import Header from "./components/common/Header";
-import ManagerDashboard, {
-  getManagerTabs,
-} from "./components/dashboard/ManagerDashboard";
-import CollectorDashboard, {
-  getCollectorTabs,
-} from "./components/dashboard/CollectorDashboard";
+import ManagerDashboard from "./components/dashboard/ManagerDashboard";
+import CollectorDashboard from "./components/dashboard/CollectorDashboard";
 import GlobalLoading from "./components/common/GlobalLoading";
 import OfflineIndicator from "./components/common/OfflineIndicator";
+import { navigationItems } from "./config/navigation";
 
 const AppContent: React.FC = () => {
   const { user, isLoading: authLoading } = useAuth();
@@ -72,6 +69,23 @@ const AppContent: React.FC = () => {
     }
   }, [authLoading, user, collectionLoading, globalLoading, loadingMessage]);
 
+  const tabs = useMemo(() => {
+    if (!user) return [];
+    return navigationItems
+      .filter((item) => item.roles.includes(user.type))
+      .map((item) => {
+        const name =
+          user.type === "manager"
+            ? item.managerName
+            : item.collectorName || item.managerName;
+        const icon =
+          user.type === "manager"
+            ? item.managerIcon
+            : item.collectorIcon || item.managerIcon;
+        return { id: item.id, name, icon };
+      });
+  }, [user]);
+
   // Mostra loading baseado no estado controlado
   if (loadingState.show) {
     return <GlobalLoading message={loadingState.message} />;
@@ -95,14 +109,11 @@ const AppContent: React.FC = () => {
 
   const pendingCancellations =
     user?.type === "manager" ? getPendingCancellationRequests() : [];
-  const managerTabs =
-    user?.type === "manager" ? getManagerTabs(pendingCancellations.length) : [];
-  const collectorTabs = user?.type === "collector" ? getCollectorTabs() : [];
 
   return (
     <div className="min-h-screen bg-slate-100">
       <Header
-        tabs={user?.type === "manager" ? managerTabs : collectorTabs}
+        tabs={tabs}
         activeTab={
           user?.type === "manager" ? managerActiveTab : collectorActiveTab
         }

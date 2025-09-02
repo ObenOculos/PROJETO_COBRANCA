@@ -32,12 +32,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { FilterOptions } from "../../types";
 
 // Export tabs for use in Header
-export const getCollectorTabs = () => [
-  { id: "overview", name: "Resumo", icon: BarChart3 },
-  { id: "collections", name: "Minha Carteira", icon: Target },
-  { id: "route", name: "Rota de Cobrança", icon: MapPin },
-  { id: "visits", name: "Visitas Agendadas", icon: Calendar },
-];
+
 
 interface CollectorDashboardProps {
   activeTab?: string;
