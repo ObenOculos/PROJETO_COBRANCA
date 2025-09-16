@@ -667,6 +667,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     "Dezembro",
   ];
 
+  const monthNamesAbbr = [
+    "Jan",
+    "Fev",
+    "Mar",
+    "Abr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Set",
+    "Out",
+    "Nov",
+    "Dez",
+  ];
+
   const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
   // Visitas do dia selecionado no calendário
@@ -1430,15 +1445,20 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                   <Calendar className="h-5 w-5 mr-2 text-blue-600" />
                   Calendário de Visitas
                 </h3>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center">
                   <button
                     onClick={() => navigateMonth("prev")}
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </button>
-                  <span className="text-sm font-medium min-w-[120px] text-center">
-                    {monthNames[currentMonth.getMonth()]}{" "}
+                  <span className="text-sm font-medium min-w-[110px] text-center">
+                    <span className="hidden sm:inline">
+                      {monthNames[currentMonth.getMonth()]}
+                    </span>
+                    <span className="sm:hidden">
+                      {monthNamesAbbr[currentMonth.getMonth()]}
+                    </span>{" "}
                     {currentMonth.getFullYear()}
                   </span>
                   <button
@@ -2812,7 +2832,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                           </div>
 
                           {/* Botões de Ordenação com Ícones */}
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-between gap-2">
                             <button
                               onClick={() => handleSort("cliente")}
                               className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
@@ -3164,7 +3184,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                             <div className="flex items-center justify-between mb-4">
                               <h4 className="font-semibold text-gray-900 flex items-center">
                                 <Users className="h-5 w-5 mr-2 text-blue-600" />
-                                Clientes para Visita
+                                {availableClients.length === 0
+                                  ? "Nenhum cliente para visita"
+                                  : `${availableClients.length} ${
+                                      availableClients.length === 1
+                                        ? "cliente para visita"
+                                        : "clientes para visita"
+                                    }`}
                               </h4>
                               {/* Indicador de Paginação */}
                               {availableClients.length >
@@ -3178,12 +3204,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                         )
                                       }
                                       disabled={modalCurrentPage === 1}
-                                      className="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                      className="p-1 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                       title="Página anterior"
                                     >
                                       <ChevronLeft className="h-4 w-4" />
                                     </button>
-                                    <span className="px-2 py-1 text-sm font-medium text-gray-700 min-w-[60px] text-center">
+                                    <span className="px-2 py-1 text-sm font-medium text-gray-700 min-w-[40px] text-center">
                                       {modalCurrentPage}/
                                       {Math.ceil(
                                         availableClients.length /
@@ -3203,7 +3229,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                             modalClientsPerPage,
                                         )
                                       }
-                                      className="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                      className="p-1 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                       title="Próxima página"
                                     >
                                       <ChevronRight className="h-4 w-4" />
