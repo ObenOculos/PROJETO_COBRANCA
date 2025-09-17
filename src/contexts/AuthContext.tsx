@@ -90,9 +90,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         setIsLoading(true);
 
-        // Adiciona um pequeno delay para mostrar o loading no refresh
-        await new Promise((resolve) => setTimeout(resolve, 800));
-
         // Verificar sessionStorage para usuário logado
         const savedUser = sessionStorage.getItem("sistema_user");
         if (savedUser) {

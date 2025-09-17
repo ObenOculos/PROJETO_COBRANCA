@@ -22,7 +22,7 @@ const Header: React.FC<HeaderProps> = ({
   onTabChange = () => {},
   pendingCancellations = 0,
 }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
@@ -37,11 +37,15 @@ const Header: React.FC<HeaderProps> = ({
               <h1 className="text-lg lg:text-xl font-bold text-gray-900 truncate">
                 Sistema de Cobrança
               </h1>
-              <p className="text-xs lg:text-sm text-gray-500 truncate">
-                {user?.type === "manager"
-                  ? "Painel Gerencial"
-                  : "Carteira de Cobrança"}
-              </p>
+              {isLoading ? (
+                <div className="h-4 bg-gray-200 rounded w-32 mt-1 animate-pulse"></div>
+              ) : (
+                <p className="text-xs lg:text-sm text-gray-500 truncate">
+                  {user?.type === "manager"
+                    ? "Painel Gerencial"
+                    : "Carteira de Cobrança"}
+                </p>
+              )}
             </div>
           </div>
 
@@ -50,24 +54,35 @@ const Header: React.FC<HeaderProps> = ({
             <NotificationDropdown />
 
             <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-2">
-                <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
-                  <User className="h-4 w-4 text-gray-600" />
+              {isLoading ? (
+                <div className="flex items-center space-x-2 animate-pulse">
+                  <div className="h-8 w-8 bg-gray-200 rounded-full"></div>
+                  <div className="space-y-1">
+                    <div className="h-4 bg-gray-200 rounded w-24"></div>
+                    <div className="h-3 bg-gray-200 rounded w-16"></div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    {user?.name}
-                  </p>
-                  <p className="text-xs text-gray-500 capitalize">
-                    {user?.type === "manager" ? "Gerente" : "Cobrador"}
-                  </p>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
+                    <User className="h-4 w-4 text-gray-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {user?.name}
+                    </p>
+                    <p className="text-xs text-gray-500 capitalize">
+                      {user?.type === "manager" ? "Gerente" : "Cobrador"}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <button
                 onClick={logout}
                 className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                 title="Sair"
+                disabled={isLoading}
               >
                 <LogOut className="h-5 w-5" />
               </button>
@@ -133,22 +148,35 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* User Info */}
             <div className="p-4 border-b border-gray-100">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
-                    <User className="h-5 w-5 text-gray-600" />
+              {isLoading ? (
+                <div className="flex items-center justify-between animate-pulse">
+                  <div className="flex items-center space-x-3">
+                    <div className="h-10 w-10 bg-gray-200 rounded-full"></div>
+                    <div className="flex-1 space-y-1">
+                      <div className="h-4 bg-gray-200 rounded w-28"></div>
+                      <div className="h-3 bg-gray-200 rounded w-20"></div>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">
-                      {user?.name}
-                    </p>
-                    <p className="text-xs text-gray-500 capitalize">
-                      {user?.type === "manager" ? "Gerente" : "Cobrador"}
-                    </p>
-                  </div>
+                  <div className="h-8 w-8 bg-gray-200 rounded-full"></div>
                 </div>
-                <NotificationDropdown />
-              </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
+                      <User className="h-5 w-5 text-gray-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">
+                        {user?.name}
+                      </p>
+                      <p className="text-xs text-gray-500 capitalize">
+                        {user?.type === "manager" ? "Gerente" : "Cobrador"}
+                      </p>
+                    </div>
+                  </div>
+                  <NotificationDropdown />
+                </div>
+              )}
             </div>
 
             {/* Navigation */}

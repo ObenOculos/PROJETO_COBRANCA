@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useTransition } from "react";
 import {
   Users,
   Award,
@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Trophy,
   BarChart3,
+  Loader,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
@@ -56,6 +57,7 @@ const EnhancedPerformanceChart: React.FC = () => {
   const currentMonth = new Date().getMonth(); // 0-indexed
   const currentYear = new Date().getFullYear();
   const [showFilters, setShowFilters] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [selectedMonths, setSelectedMonths] = useState<number[]>([
     currentMonth,
   ]);
@@ -653,8 +655,16 @@ const EnhancedPerformanceChart: React.FC = () => {
 
       {/* Filtros Colapsáveis */}
       {showFilters && (
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-in slide-in-from-top-2">
-          <div className="space-y-6">
+        <div className="relative bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-in slide-in-from-top-2">
+          {isPending && (
+            <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-10 rounded-2xl">
+              <div className="flex items-center gap-2 text-gray-600">
+                <Loader className="animate-spin h-6 w-6 text-blue-600" />
+                <span className="font-medium">Calculando...</span>
+              </div>
+            </div>
+          )}
+          <div className={`space-y-6 ${isPending ? 'opacity-50' : ''}`}>
             {/* Filtro de Meses */}
             <div>
               <div className="flex items-center gap-2 mb-3">
@@ -669,13 +679,15 @@ const EnhancedPerformanceChart: React.FC = () => {
                   <button
                     key={index}
                     onClick={() => {
-                      if (selectedMonths.includes(index)) {
-                        setSelectedMonths(
-                          selectedMonths.filter((m) => m !== index),
-                        );
-                      } else {
-                        setSelectedMonths([...selectedMonths, index]);
-                      }
+                      startTransition(() => {
+                        if (selectedMonths.includes(index)) {
+                          setSelectedMonths(
+                            selectedMonths.filter((m) => m !== index),
+                          );
+                        } else {
+                          setSelectedMonths([...selectedMonths, index]);
+                        }
+                      });
                     }}
                     className={`
                       px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-2
@@ -692,7 +704,7 @@ const EnhancedPerformanceChart: React.FC = () => {
               </div>
               {selectedMonths.length > 0 && (
                 <button
-                  onClick={() => setSelectedMonths([])}
+                  onClick={() => startTransition(() => setSelectedMonths([]))}
                   className="mt-2 text-xs text-gray-500 hover:text-gray-700 flex items-center gap-2"
                 >
                   <X className="w-3 h-3" />
@@ -712,13 +724,15 @@ const EnhancedPerformanceChart: React.FC = () => {
                   <button
                     key={year}
                     onClick={() => {
-                      if (selectedYears.includes(year)) {
-                        setSelectedYears(
-                          selectedYears.filter((y) => y !== year),
-                        );
-                      } else {
-                        setSelectedYears([...selectedYears, year]);
-                      }
+                      startTransition(() => {
+                        if (selectedYears.includes(year)) {
+                          setSelectedYears(
+                            selectedYears.filter((y) => y !== year),
+                          );
+                        } else {
+                          setSelectedYears([...selectedYears, year]);
+                        }
+                      });
                     }}
                     className={`
                       px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-2
@@ -735,7 +749,7 @@ const EnhancedPerformanceChart: React.FC = () => {
               </div>
               {selectedYears.length > 0 && (
                 <button
-                  onClick={() => setSelectedYears([])}
+                  onClick={() => startTransition(() => setSelectedYears([]))}
                   className="mt-2 text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
                 >
                   <X className="w-3 h-3" />
@@ -771,7 +785,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                 <input
                   type="number"
                   value={filterMinRate}
-                  onChange={(e) => setFilterMinRate(e.target.value)}
+                  onChange={(e) => startTransition(() => setFilterMinRate(e.target.value))}
                   placeholder="Ex: 5.5"
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
                 />
@@ -782,11 +796,13 @@ const EnhancedPerformanceChart: React.FC = () => {
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
                 onClick={() => {
-                  setSelectedMonths([]);
-                  setSelectedYears([]);
-                  setFilterMinRate("");
-                  setSortBy("conversionRate");
-                  setSortOrder("desc");
+                  startTransition(() => {
+                    setSelectedMonths([]);
+                    setSelectedYears([]);
+                    setFilterMinRate("");
+                    setSortBy("conversionRate");
+                    setSortOrder("desc");
+                  });
                 }}
                 disabled={!hasActiveFilters}
                 className={`

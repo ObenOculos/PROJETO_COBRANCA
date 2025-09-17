@@ -20,6 +20,25 @@ const FilterBar: React.FC<FilterBarProps> = ({
     useCollection();
   const { user } = useAuth();
   const [isExpanded, setIsExpanded] = React.useState(false);
+  const [searchTerm, setSearchTerm] = React.useState(filters.search || "");
+
+  // Debounce for search term
+  React.useEffect(() => {
+    const handler = setTimeout(() => {
+      onFilterChange({ ...filters, search: searchTerm || undefined });
+    }, 300); // 300ms delay
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]);
+
+  // Sync local search term if filters are cleared externally
+  React.useEffect(() => {
+    if (filters.search !== searchTerm) {
+      setSearchTerm(filters.search || "");
+    }
+  }, [filters.search]);
 
   const availableStores = getAvailableStores();
   const collectors = users.filter((u) => u.type === "collector");
@@ -36,7 +55,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
   const collectorStores = React.useMemo(
     () => getCollectorStores(),
-    [getCollectorStores],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [userType, user, getCollectorCollections, availableStores],
   );
 
   // Para cobradores, buscar apenas as cidades e bairros dos seus clientes
@@ -67,25 +87,22 @@ const FilterBar: React.FC<FilterBarProps> = ({
     [getCollectorNeighborhoods],
   );
 
+  const handleFilterChange = <K extends keyof FilterOptions>(
+    field: K,
+    value: FilterOptions[K],
+  ) => {
+    onFilterChange({ ...filters, [field]: value });
+  };
+
   const handleStatusChange = (status: string) => {
-    onFilterChange({
-      ...filters,
-      status: status === "all" ? undefined : status,
-    });
+    handleFilterChange("status", status === "all" ? undefined : status);
   };
 
   const handleLocationChange = (
     field: "city" | "neighborhood",
     value: string,
   ) => {
-    onFilterChange({
-      ...filters,
-      [field]: value === "all" ? undefined : value,
-    });
-  };
-
-  const handleSearchChange = (search: string) => {
-    onFilterChange({ ...filters, search: search || undefined });
+    handleFilterChange(field, value === "all" ? undefined : value);
   };
 
   const clearFilters = () => {
@@ -94,21 +111,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   };
 
   const hasActiveFilters = React.useMemo(
-    () =>
-      filters.status ||
-      filters.dueDate ||
-      filters.city ||
-      filters.neighborhood ||
-      filters.store ||
-      filters.collector ||
-      filters.search ||
-      filters.dateFrom ||
-      filters.dateTo ||
-      filters.minAmount ||
-      filters.maxAmount ||
-      filters.overdueOnly ||
-      filters.highValueOnly ||
-      filters.visitsOnly,
+    () => Object.values(filters).some(Boolean),
     [filters],
   );
 
@@ -126,8 +129,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
             name="search"
             type="text"
             placeholder="Buscar cliente, documento, título..."
-            value={filters.search || ""}
-            onChange={(e) => handleSearchChange(e.target.value)}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
