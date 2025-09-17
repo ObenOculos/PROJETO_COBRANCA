@@ -664,7 +664,7 @@ const EnhancedPerformanceChart: React.FC = () => {
               </div>
             </div>
           )}
-          <div className={`space-y-6 ${isPending ? 'opacity-50' : ''}`}>
+          <div className={`space-y-6 ${isPending ? "opacity-50" : ""}`}>
             {/* Filtro de Meses */}
             <div>
               <div className="flex items-center gap-2 mb-3">
@@ -785,7 +785,9 @@ const EnhancedPerformanceChart: React.FC = () => {
                 <input
                   type="number"
                   value={filterMinRate}
-                  onChange={(e) => startTransition(() => setFilterMinRate(e.target.value))}
+                  onChange={(e) =>
+                    startTransition(() => setFilterMinRate(e.target.value))
+                  }
                   placeholder="Ex: 5.5"
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
                 />
