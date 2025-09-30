@@ -73,7 +73,7 @@ const LoginForm: React.FC = () => {
           {!isOnline && (
             <div className="bg-orange-50/80 backdrop-blur-sm border border-orange-200/50 rounded-xl p-4 flex items-center space-x-3">
               <AlertCircle className="h-5 w-5 text-orange-500 flex-shrink-0" />
-              <div className="flex-1">
+              <div className="flex-1"> 
                 <p className="text-sm font-medium text-orange-800">
                   Modo Offline
                 </p>
