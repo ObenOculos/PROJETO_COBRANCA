@@ -270,6 +270,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     if (!user || user.type !== "collector") return [];
 
     const clientGroups = getClientGroups(user.id);
+    
+    // Debug: Log clientes com apelido no VisitScheduler
+    const clientsWithApelido = clientGroups.filter(client => client.apelido);
+    if (clientsWithApelido.length > 0) {
+      console.log(`[VisitScheduler] Clientes com apelido encontrados:`, 
+        clientsWithApelido.map(c => ({ nome: c.client, apelido: c.apelido, documento: c.document }))
+      );
+    }
 
     // Obter visitas ativas (agendadas) do cobrador
     const activeVisits = getVisitsByCollector(user.id).filter(
@@ -296,7 +304,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
           client.client.toLowerCase().includes(searchLower) ||
           client.document.toLowerCase().includes(searchLower) ||
           client.address.toLowerCase().includes(searchLower) ||
-          client.city.toLowerCase().includes(searchLower)
+          client.city.toLowerCase().includes(searchLower) ||
+          (client.apelido && client.apelido.toLowerCase().includes(searchLower))
         );
       });
     }
@@ -2812,7 +2821,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                               <input
                                 id="search-clients"
                                 type="text"
-                                placeholder="Buscar por nome, documento, endereço ou cidade..."
+                                placeholder="Buscar por nome, documento, apelido, endereço ou cidade..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -3028,6 +3037,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                           <div>
                                             <span className="font-medium text-gray-900">
                                               {client.client}
+                                              {client.apelido && (
+                                                <span className="text-sm text-blue-600 ml-1">
+                                                  ({client.apelido})
+                                                </span>
+                                              )}
                                             </span>
                                             <span className="text-gray-500 ml-2">
                                               ({client.document})
@@ -3161,6 +3175,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                         <div>
                                           <span className="font-medium">
                                             {client.client}
+                                            {client.apelido && (
+                                              <span className="text-sm text-blue-600 ml-1">
+                                                ({client.apelido})
+                                              </span>
+                                            )}
                                           </span>
                                           <span className="text-gray-500 ml-2">
                                             ({client.document})
@@ -3336,7 +3355,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                                           <h3 className="font-semibold text-gray-900 text-lg truncate">
                                                             {client.client}
                                                           </h3>
-                                                          <p className="text-sm text-gray-600">
+                                                          {client.apelido && (
+                                                            <p className="text-sm text-blue-600 mt-1">
+                                                              {client.apelido}
+                                                            </p>
+                                                          )}
+                                                          <p className="text-sm text-gray-600 mt-1">
                                                             {client.document}
                                                           </p>
                                                         </div>
@@ -3407,6 +3431,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                         <div>
                                           <span className="font-medium text-gray-900">
                                             {client.client}
+                                            {client.apelido && (
+                                              <span className="text-sm text-blue-600 ml-1">
+                                                ({client.apelido})
+                                              </span>
+                                            )}
                                           </span>
                                           <span className="text-gray-500 ml-2 text-sm">
                                             ({client.document})
@@ -3501,6 +3530,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                     <div>
                                       <span className="font-medium">
                                         {client.client}
+                                        {client.apelido && (
+                                          <span className="text-sm text-blue-600 ml-1">
+                                            ({client.apelido})
+                                          </span>
+                                        )}
                                       </span>
                                       <span className="text-gray-500 ml-2">
                                         ({client.document})

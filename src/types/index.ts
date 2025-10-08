@@ -149,6 +149,7 @@ export interface ClientGroup {
   clientId: string;
   client: string;
   document: string;
+  apelido?: string;
   phone?: string;
   mobile?: string;
   address: string;

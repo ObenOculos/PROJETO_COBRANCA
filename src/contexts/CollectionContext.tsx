@@ -1097,6 +1097,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               clientId,
               client: collection.cliente || "Cliente sem nome",
               document: clientId,
+              apelido: collection.apelido || undefined,
               phone: collection.telefone || undefined,
               mobile: collection.celular || undefined,
               address: collection.endereco || "",
@@ -1109,6 +1110,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               totalReceived: 0,
               pendingValue: 0,
             });
+          } else {
+            // Se o cliente já existe, atualize o apelido se a parcela atual tiver um apelido e o cliente não tiver ainda
+            const existingClient = clientMap.get(clientId)!;
+            if (!existingClient.apelido && collection.apelido) {
+              existingClient.apelido = collection.apelido;
+            }
           }
 
           const clientGroup = clientMap.get(clientId)!;
@@ -1186,6 +1193,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         if (skippedCollectionsCount > 0) {
           console.warn(
             `[getClientGroups] Skipped ${skippedCollectionsCount} collection entries because they were missing a 'documento'.`,
+          );
+        }
+
+        // Debug: Log clientes com apelido
+        const clientsWithApelido = Array.from(clientMap.values()).filter(client => client.apelido);
+        if (clientsWithApelido.length > 0) {
+          console.log(`[getClientGroups] Encontrados ${clientsWithApelido.length} clientes com apelido:`, 
+            clientsWithApelido.map(c => ({ nome: c.client, apelido: c.apelido, documento: c.document }))
           );
         }
 
