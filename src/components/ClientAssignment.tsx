@@ -23,6 +23,7 @@ import { Modal } from "./Modal";
 interface ClientWithCollections {
   cliente: string;
   documento: string;
+  apelido?: string;
   uniqueKey: string; // Adicionado para identificar clientes de forma única (documento ou nome)
   collections: Collection[];
   collectorId?: string;
@@ -192,6 +193,7 @@ export const ClientAssignment = React.memo(() => {
         clientsMap.set(key, {
           cliente: collection.cliente || "Cliente sem nome",
           documento: collection.documento || "",
+          apelido: collection.apelido || undefined,
           uniqueKey: key,
           collections: [],
           collectorId: collectorId,
@@ -208,6 +210,9 @@ export const ClientAssignment = React.memo(() => {
             existingClient.collectorId = collectorId;
             existingClient.collectorName = collectorName;
           }
+        }
+        if (!existingClient.apelido && collection.apelido) {
+          existingClient.apelido = collection.apelido;
         }
       }
 
@@ -333,7 +338,8 @@ export const ClientAssignment = React.memo(() => {
     const filtered = clientsData.filter((client) => {
       const matchesSearch =
         client.cliente?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.documento?.includes(searchTerm);
+        client.documento?.includes(searchTerm) ||
+        client.apelido?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesCollector =
         !filterCollector || client.collectorId === filterCollector;

@@ -100,6 +100,7 @@ export interface Collection {
   status: string | null;
   cliente: string | null;
   documento: string | null;
+  apelido: string | null;
   endereco: string | null;
   numero: string | null;
   bairro: string | null;

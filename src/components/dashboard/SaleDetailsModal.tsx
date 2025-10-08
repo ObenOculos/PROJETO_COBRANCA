@@ -292,6 +292,15 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                   <p className="text-sm text-gray-600">{saleData.documento}</p>
                 </div>
 
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-2">
+                    Apelido:
+                  </p>
+                  <p className="font-semibold text-gray-900">
+                    {saleData.apelido}
+                  </p>  
+                </div>
+
                 {(saleData.telefone || saleData.celular) && (
                   <div>
                     <p className="text-sm font-medium text-gray-600 mb-2">
