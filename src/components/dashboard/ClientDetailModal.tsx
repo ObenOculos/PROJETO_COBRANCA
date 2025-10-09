@@ -541,6 +541,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   .filter(([key]) =>
                     [
                       "client",
+                      "apelido",
                       "document",
                       "address",
                       "number",
@@ -553,6 +554,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   .map(([key, value]) => {
                     const labelMap: { [key: string]: string } = {
                       client: "Nome do Cliente",
+                      apelido: "Apelido",
                       document: "Documento",
                       address: "Endereço",
                       number: "Número",
