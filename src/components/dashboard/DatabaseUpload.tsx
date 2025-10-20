@@ -478,7 +478,10 @@ const DatabaseUpload: React.FC = () => {
 
         const { error } = await supabase
           .from("BANCO_DADOS")
-          .insert(processedChunk)
+          .upsert(processedChunk, {
+            onConflict: "id_parcela",
+            ignoreDuplicates: true,
+          })
           .select(); // Adicionar select para ver o que foi inserido
 
         if (error) {
