@@ -289,9 +289,12 @@ const DatabaseUpload: React.FC = () => {
       const idParcela = row.id_parcela || row["id_parcela"];
       const status = row.status || row["status"];
       const situacao = row.situacao || row["situacao"];
+      const data_de_recebimento =
+        row.data_de_recebimento || row["data_de_recebimento"];
+      const valor_recebido = row.valor_recebido || row["valor_recebido"];
 
       console.log(
-        `📝 Processando: ID=${idParcela}, Status=${status}, Situação=${situacao}`,
+        `📝 Processando: ID=${idParcela}, Status=${status}, Situação=${situacao}, Data Recebimento=${data_de_recebimento}, Valor Recebido=${valor_recebido}`,
       );
 
       if (!idParcela) {
@@ -303,11 +306,12 @@ const DatabaseUpload: React.FC = () => {
         continue;
       }
 
-      if (!status && !situacao) {
+      if (!status && !situacao && !data_de_recebimento && !valor_recebido) {
         updates.push({
           id_parcela: idParcela,
           status: "error",
-          error: "status ou situacao não fornecido",
+          error:
+            "Pelo menos um dos campos (status, situacao, data_de_recebimento, valor_recebido) deve ser fornecido",
         });
         continue;
       }
@@ -331,6 +335,14 @@ const DatabaseUpload: React.FC = () => {
         // Criar objeto de atualização dinamicamente
         const updateObj: any = {};
         if (status) updateObj.status = status;
+        if (data_de_recebimento)
+          updateObj.data_de_recebimento = data_de_recebimento;
+        if (valor_recebido) {
+          const valor = Number(valor_recebido.replace(",", "."));
+          if (!isNaN(valor)) {
+            updateObj.valor_recebido = valor;
+          }
+        }
 
         // Validar situacao antes de adicionar ao objeto de atualização
         const validatedSituacao = validateSituacao(situacao);
@@ -341,7 +353,9 @@ const DatabaseUpload: React.FC = () => {
           updates.push({
             id_parcela: idParcela,
             status: "error",
-            error: `Valor de situacao inválido: "${situacao}". Valores aceitos: ${VALID_SITUACAO_VALUES.join(", ")} ou vazio.`,
+            error: `Valor de situacao inválido: "${situacao}". Valores aceitos: ${VALID_SITUACAO_VALUES.join(
+              ", "
+            )} ou vazio.`,
           });
           continue;
         }
@@ -764,8 +778,13 @@ const DatabaseUpload: React.FC = () => {
             Faça upload de um arquivo CSV com as colunas:{" "}
             <code className="bg-gray-100 px-1 rounded">id_parcela</code> e
             opcionalmente{" "}
-            <code className="bg-gray-100 px-1 rounded">status</code> e/ou{" "}
-            <code className="bg-gray-100 px-1 rounded">situacao</code>
+            <code className="bg-gray-100 px-1 rounded">status</code>,{" "}
+            <code className="bg-gray-100 px-1 rounded">situacao</code>,{" "}
+            <code className="bg-gray-100 px-1 rounded">
+              data_de_recebimento
+            </code>{" "}
+            e/ou{" "}
+            <code className="bg-gray-100 px-1 rounded">valor_recebido</code>
           </p>
           <div className="bg-blue-50 border-l-4 border-blue-400 p-3 text-sm flex items-start">
             <Info className="h-5 w-5 mr-3 text-blue-700 flex-shrink-0" />
