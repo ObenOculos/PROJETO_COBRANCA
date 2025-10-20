@@ -3,7 +3,6 @@ import { supabase } from "../../lib/supabase";
 import { Modal } from "../Modal"; // Importar o componente Modal
 import { useCollection } from "../../contexts/CollectionContext";
 import {
-  X,
   UploadCloud,
   CheckCircle,
   AlertCircle,
@@ -28,6 +27,7 @@ interface InsertResult {
   message?: string;
   error?: string;
   details?: any;
+  validRows?: FileData[];
   invalidRows?: FileData[];
 }
 
@@ -64,6 +64,15 @@ const DatabaseUpload: React.FC = () => {
   const [showProgressModal, setShowProgressModal] = useState<boolean>(false);
   const [progressPercentage, setProgressPercentage] = useState<number>(0);
   const [progressMessage, setProgressMessage] = useState<string>("");
+
+  // Estados para o modal de resultados
+  const [showResultsModal, setShowResultsModal] = useState<boolean>(false);
+  const [uploadResults, setUploadResults] = useState<UpdateResult[]>([]);
+  const [activeTab, setActiveTab] = useState<"sintetico" | "analitico">(
+    "sintetico",
+  );
+  const [needsRefresh, setNeedsRefresh] = useState<boolean>(false);
+  const [modalTitle, setModalTitle] = useState<string>("");
 
   const handleStatusFileChange = (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -103,6 +112,15 @@ const DatabaseUpload: React.FC = () => {
       "newParcelaFileInput",
     ) as HTMLInputElement;
     if (input) input.value = "";
+  };
+
+  const handleCloseResultsModal = async () => {
+    setShowResultsModal(false);
+    if (needsRefresh) {
+      // Idealmente, mostrar um indicador de loading global aqui
+      await refreshData();
+      setNeedsRefresh(false); // Reset
+    }
   };
 
   // Função para testar conexão com Supabase
@@ -249,31 +267,7 @@ const DatabaseUpload: React.FC = () => {
     });
   };
 
-  // Função para verificar se registro existe
-  const checkRecordExists = async (idParcela: string): Promise<boolean> => {
-    try {
-      const { data, error } = await supabase
-        .from("BANCO_DADOS")
-        .select("id_parcela")
-        .eq("id_parcela", idParcela)
-        .single();
 
-      if (error && error.code !== "PGRST116") {
-        // PGRST116 = no rows found
-        console.error(`❌ Erro ao verificar registro ${idParcela}:`, error);
-        return false;
-      }
-
-      const exists = !!data;
-      console.log(
-        `🔍 Registro ${idParcela} ${exists ? "existe" : "não existe"}`,
-      );
-      return exists;
-    } catch (error) {
-      console.error(`❌ Erro ao verificar registro ${idParcela}:`, error);
-      return false;
-    }
-  };
 
   // Função para atualizar status no Supabase
   const updateStatusInSupabase = async (
@@ -281,11 +275,87 @@ const DatabaseUpload: React.FC = () => {
     onProgress?: (percentage: number, message: string) => void,
   ): Promise<UpdateResult[]> => {
     const updates: UpdateResult[] = [];
-
     console.log(`🔄 Iniciando atualização de ${data.length} registros...`);
 
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
+    // 1. Extrair todos os IDs de parcela do arquivo
+    const allIds = data
+      .map((row) => row.id_parcela || row["id_parcela"])
+      .filter((id) => id);
+
+    if (allIds.length === 0) {
+      console.log("Nenhum id_parcela encontrado no arquivo.");
+      return [];
+    }
+
+    console.log(`🔍 Verificando a existência de ${allIds.length} títulos...`);
+    if (onProgress) onProgress(10, `Verificando ${allIds.length} títulos...`);
+
+    // 2. Verificar quais IDs existem no banco de dados em batches
+    const CHUNK_SIZE = 500; // Reduzir o tamanho do batch para evitar URLs muito longas
+    const existingIds = new Set<string>();
+    let fetchError: any = null;
+
+    for (let i = 0; i < allIds.length; i += CHUNK_SIZE) {
+      const chunk = allIds.slice(i, i + CHUNK_SIZE);
+      const { data: chunkRecords, error: chunkError } = await supabase
+        .from("BANCO_DADOS")
+        .select("id_parcela")
+        .in("id_parcela", chunk);
+
+      if (chunkError) {
+        console.error("❌ Erro ao verificar um chunk de títulos:", chunkError);
+        fetchError = chunkError;
+        // Decide se quer parar no primeiro erro ou tentar continuar
+        // Aqui, vamos parar para evitar mais erros de rede.
+        break;
+      }
+
+      if (chunkRecords) {
+        chunkRecords.forEach((rec) => existingIds.add(rec.id_parcela.toString()));
+      }
+    }
+
+    if (fetchError) {
+      console.error("❌ Erro final ao verificar títulos existentes:", fetchError);
+      return data.map((row) => ({
+        id_parcela: row.id_parcela || row["id_parcela"],
+        status: "error",
+        error: `Falha ao verificar títulos: ${fetchError.message}`,
+      }));
+    }
+    console.log(`✅ Encontrados ${existingIds.size} títulos existentes.`);
+
+    // 3. Filtrar os dados do arquivo para manter apenas os registros que existem
+    const dataToUpdate = data.filter((row) =>
+      existingIds.has(row.id_parcela || row["id_parcela"]),
+    );
+    const ignoredData = data.filter(
+      (row) => !existingIds.has(row.id_parcela || row["id_parcela"]),
+    );
+
+    if (ignoredData.length > 0) {
+      console.warn(
+        `⚠️ Ignorando ${
+          ignoredData.length
+        } registros pois os títulos não foram encontrados no banco:`,
+        ignoredData.map((r) => r.id_parcela || r["id_parcela"]),
+      );
+      ignoredData.forEach((row) => {
+        updates.push({
+          id_parcela: row.id_parcela || row["id_parcela"],
+          status: "error",
+          error: "Título não encontrado no banco de dados.",
+        });
+      });
+    }
+
+    console.log(`🔄 Atualizando ${dataToUpdate.length} registros...`);
+    if (onProgress)
+      onProgress(30, `Atualizando ${dataToUpdate.length} registros...`);
+
+    // 4. Iterar e atualizar apenas os registros filtrados
+    for (let i = 0; i < dataToUpdate.length; i++) {
+      const row = dataToUpdate[i];
       const idParcela = row.id_parcela || row["id_parcela"];
       const status = row.status || row["status"];
       const situacao = row.situacao || row["situacao"];
@@ -293,18 +363,7 @@ const DatabaseUpload: React.FC = () => {
         row.data_de_recebimento || row["data_de_recebimento"];
       const valor_recebido = row.valor_recebido || row["valor_recebido"];
 
-      console.log(
-        `📝 Processando: ID=${idParcela}, Status=${status}, Situação=${situacao}, Data Recebimento=${data_de_recebimento}, Valor Recebido=${valor_recebido}`,
-      );
-
-      if (!idParcela) {
-        updates.push({
-          id_parcela: "N/A",
-          status: "error",
-          error: "id_parcela não fornecido",
-        });
-        continue;
-      }
+      if (!idParcela) continue; // Segurança, embora já filtrado
 
       if (!status && !situacao && !data_de_recebimento && !valor_recebido) {
         updates.push({
@@ -317,22 +376,6 @@ const DatabaseUpload: React.FC = () => {
       }
 
       try {
-        // Verificar se o registro existe primeiro
-        const exists = await checkRecordExists(idParcela);
-        if (!exists) {
-          updates.push({
-            id_parcela: idParcela,
-            status: "error",
-            error: `Registro com id_parcela ${idParcela} não encontrado`,
-          });
-          continue;
-        }
-
-        console.log(
-          `🔄 Atualizando ${idParcela} com status: ${status}, situação: ${situacao}`,
-        );
-
-        // Criar objeto de atualização dinamicamente
         const updateObj: any = {};
         if (status) updateObj.status = status;
         if (data_de_recebimento)
@@ -344,18 +387,23 @@ const DatabaseUpload: React.FC = () => {
           }
         }
 
-        // Validar situacao antes de adicionar ao objeto de atualização
         const validatedSituacao = validateSituacao(situacao);
         if (situacao && validatedSituacao !== null) {
           updateObj.situacao = validatedSituacao;
         } else if (situacao) {
-          // Se tinha um valor mas foi invalidado, registrar como aviso
           updates.push({
             id_parcela: idParcela,
             status: "error",
-            error: `Valor de situacao inválido: "${situacao}". Valores aceitos: ${VALID_SITUACAO_VALUES.join(
-              ", "
-            )} ou vazio.`,
+            error: `Valor de situacao inválido: "${situacao}".`,
+          });
+          continue;
+        }
+
+        if (Object.keys(updateObj).length === 0) {
+          updates.push({
+            id_parcela: idParcela,
+            status: "error",
+            error: "Nenhum campo válido para atualização.",
           });
           continue;
         }
@@ -364,7 +412,7 @@ const DatabaseUpload: React.FC = () => {
           .from("BANCO_DADOS")
           .update(updateObj)
           .eq("id_parcela", idParcela)
-          .select(); // Adicionar select para ver o que foi atualizado
+          .select();
 
         if (error) {
           console.error(`❌ Erro ao atualizar ${idParcela}:`, error);
@@ -372,15 +420,10 @@ const DatabaseUpload: React.FC = () => {
             id_parcela: idParcela,
             status: "error",
             error: error.message,
-            details: error,
           });
         } else {
           console.log(`✅ Sucesso ao atualizar ${idParcela}:`, updateData);
-          updates.push({
-            id_parcela: idParcela,
-            status: "success",
-            details: updateData,
-          });
+          updates.push({ id_parcela: idParcela, status: "success" });
         }
       } catch (error) {
         console.error(`❌ Exceção ao atualizar ${idParcela}:`, error);
@@ -390,11 +433,12 @@ const DatabaseUpload: React.FC = () => {
           error: (error as Error).message,
         });
       }
+
       if (onProgress) {
-        const percentage = Math.round(((i + 1) / data.length) * 100);
+        const percentage = 30 + Math.round(((i + 1) / dataToUpdate.length) * 70);
         onProgress(
           percentage,
-          `Atualizando registro ${i + 1} de ${data.length}...`,
+          `Atualizando registro ${i + 1} de ${dataToUpdate.length}...`,
         );
       }
     }
@@ -528,6 +572,7 @@ const DatabaseUpload: React.FC = () => {
         success: true,
         message: message,
         details: null,
+        validRows: validData,
         invalidRows: invalidRows,
       };
     } catch (error) {
@@ -579,35 +624,24 @@ const DatabaseUpload: React.FC = () => {
 
       const successful = results.filter((r) => r.status === "success").length;
       const failed = results.filter((r) => r.status === "error").length;
+      const finalProgressMessage = "✅ Atualização concluída!";
+      const statusMessage = `Status: ${successful} sucesso(s), ${failed} falha(s).`;
 
-      setUploadStatus(
-        `✅ Atualização concluída: ${successful} sucessos, ${failed} falhas`,
-      );
-      setProgressMessage(
-        `✅ Atualização concluída: ${successful} sucessos, ${failed} falhas`,
-      );
+      setUploadStatus(statusMessage);
+      setProgressMessage(finalProgressMessage);
       setProgressPercentage(100);
 
-      if (failed > 0) {
-        console.log(
-          "❌ Erros encontrados:",
-          results.filter((r) => r.status === "error"),
-        );
-        const errorDetails = results
-          .filter((r) => r.status === "error")
-          .map((r) => `${r.id_parcela}: ${r.error}`)
-          .join("\n");
-        setDebugInfo(`❌ Erros:\n${errorDetails}`);
-      } else {
-        setDebugInfo("✅ Todas as atualizações foram realizadas com sucesso!");
-      }
-
-      // Refresh dos dados após atualização bem-sucedida
+      // Armazenar resultados e preparar para abrir o modal
+      setModalTitle("Resultado da Atualização de Status");
+      setUploadResults(results);
+      setActiveTab("sintetico");
       if (successful > 0) {
-        setProgressMessage("🔄 Atualizando dados na interface...");
-        await refreshData();
-        setProgressMessage("✅ Dados atualizados na interface!");
+        setNeedsRefresh(true);
       }
+      setShowResultsModal(true);
+
+      // Limpar a informação de debug antiga
+      setDebugInfo("");
     } catch (error) {
       const errorMsg = (error as Error).message;
       setUploadStatus(`❌ Erro: ${errorMsg}`);
@@ -655,36 +689,43 @@ const DatabaseUpload: React.FC = () => {
       const result = await insertNewParcelasInSupabase(
         data,
         (percentage, message) => {
-          setProgressPercentage(40 + percentage * 0.6); // 40% para processamento, 60% para upload
+          setProgressPercentage(40 + percentage * 0.6);
           setProgressMessage(message);
         },
       );
 
+      const resultsForModal: UpdateResult[] = [];
       if (result.success) {
-        setUploadStatus(`✅ ${result.message}`);
-        setProgressMessage(`✅ ${result.message}`);
+        result.validRows?.forEach((row) => {
+          resultsForModal.push({
+            id_parcela: row.id_parcela || "N/A",
+            status: "success",
+          });
+        });
+        result.invalidRows?.forEach((row) => {
+          resultsForModal.push({
+            id_parcela: row.id_parcela || "N/A",
+            status: "error",
+            error: "Linha inválida ou id_parcela ausente.",
+          });
+        });
+
+        const successful = resultsForModal.filter(r => r.status === 'success').length;
+        const failed = resultsForModal.filter(r => r.status === 'error').length;
+
+        setUploadStatus(`Status: ${successful} sucesso(s), ${failed} falha(s).`);
+        setProgressMessage("✅ Inserção concluída!");
         setProgressPercentage(100);
 
-        if (result.invalidRows && result.invalidRows.length > 0) {
-          const invalidRowsInfo = result.invalidRows
-            .map((row) => JSON.stringify(row))
-            .join("\n");
-          setDebugInfo(
-            `✅ Inserção concluída, mas ${result.invalidRows.length} linhas foram ignoradas por falta de id_parcela:\n${invalidRowsInfo}`,
-          );
-        } else {
-          setDebugInfo(
-            "✅ Todas as novas parcelas foram inseridas com sucesso!",
-          );
+        setModalTitle("Resultado da Adição de Novas Parcelas");
+        setUploadResults(resultsForModal);
+        setActiveTab("sintetico");
+        if (successful > 0) {
+          setNeedsRefresh(true);
         }
-
-        // Refresh dos dados após inserção bem-sucedida
-        setProgressMessage("🔄 Atualizando dados na interface...");
-        await refreshData();
-        setProgressMessage("✅ Dados atualizados na interface!");
+        setShowResultsModal(true);
       } else {
         setUploadStatus(`❌ Erro: ${result.error}`);
-        setDebugInfo(`❌ Erro detalhado: ${result.error}`);
         setProgressMessage(`❌ Erro: ${result.error}`);
         setProgressPercentage(0);
       }
@@ -697,8 +738,7 @@ const DatabaseUpload: React.FC = () => {
       console.error("❌ Erro detalhado:", error);
     } finally {
       setLoading(false);
-      // Manter o modal aberto por um breve período para o usuário ver o status final
-      setTimeout(() => setShowProgressModal(false), 3000);
+      setTimeout(() => setShowProgressModal(false), 2000);
     }
   };
 
@@ -767,139 +807,141 @@ const DatabaseUpload: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Upload para atualizar status */}
-        <div className="border border-gray-200 rounded-2xl p-4 space-y-3">
-          <h3 className="text-lg font-medium text-gray-800 flex items-center">
-            <UploadCloud className="h-5 w-5 mr-2" />
-            Atualizar Status de Parcelas
-          </h3>
-          <p className="text-sm text-gray-600">
-            Faça upload de um arquivo CSV com as colunas:{" "}
-            <code className="bg-gray-100 px-1 rounded">id_parcela</code> e
-            opcionalmente{" "}
-            <code className="bg-gray-100 px-1 rounded">status</code>,{" "}
-            <code className="bg-gray-100 px-1 rounded">situacao</code>,{" "}
-            <code className="bg-gray-100 px-1 rounded">
-              data_de_recebimento
-            </code>{" "}
-            e/ou{" "}
-            <code className="bg-gray-100 px-1 rounded">valor_recebido</code>
-          </p>
-          <div className="bg-blue-50 border-l-4 border-blue-400 p-3 text-sm flex items-start">
-            <Info className="h-5 w-5 mr-3 text-blue-700 flex-shrink-0" />
-            <div>
-              <strong>Importante:</strong> O <code>id_parcela</code> deve
-              corresponder a um registro existente na tabela. Os campos{" "}
-              <code>status</code> e <code>situacao</code> serão atualizados
-              conforme fornecidos.
-              <br />
-              <strong>Valores de situação aceitos:</strong> "Em mãos", "Em
-              tratamento" ou deixar vazio.
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Card: Atualizar Status de Parcelas */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transition-all hover:shadow-xl">
+          <div className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-100 p-3 rounded-full">
+                <UploadCloud className="h-6 w-6 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">
+                Atualizar Status de Parcelas
+              </h3>
+            </div>
+            <p className="text-gray-500 mt-3 text-sm">
+              Envie um arquivo CSV para atualizar o status, situação, data de
+              recebimento ou valor recebido de múltiplas parcelas de uma só vez.
+            </p>
+          </div>
+
+          <div className="px-6 pb-6">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
+              <div>
+                <label
+                  htmlFor="statusFileInput"
+                  className="cursor-pointer block border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors"
+                >
+                  <UploadCloud className="mx-auto h-10 w-10 text-gray-400" />
+                  <span className="mt-2 block text-sm font-semibold text-gray-700">
+                    {statusFile
+                      ? statusFile.name
+                      : "Clique para selecionar o arquivo"}
+                  </span>
+                  <span className="mt-1 block text-xs text-gray-500">
+                    Formato CSV, até 10MB
+                  </span>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleStatusFileChange}
+                    disabled={loading}
+                    id="statusFileInput"
+                    className="sr-only"
+                  />
+                </label>
+                {statusFile && (
+                  <button
+                    onClick={clearStatusFile}
+                    className="mt-3 w-full text-sm text-red-600 hover:text-red-800 transition-colors font-semibold"
+                  >
+                    Remover arquivo
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={handleUploadStatus}
+                disabled={loading || !statusFile}
+                className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {loading ? (
+                  <RefreshCcw className="h-5 w-5 mr-2 animate-spin" />
+                ) : (
+                  <UploadCloud className="h-5 w-5 mr-2" />
+                )}
+                {loading ? "Processando..." : "Enviar e Atualizar"}
+              </button>
             </div>
           </div>
-
-          <div className="flex items-center space-x-2">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleStatusFileChange}
-              disabled={loading}
-              id="statusFileInput"
-              className="block w-full text-sm text-gray-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-md file:border-0
-                file:text-sm file:font-semibold
-                file:bg-blue-50 file:text-blue-700
-                hover:file:bg-blue-100
-                disabled:opacity-50"
-            />
-            {statusFile && (
-              <button
-                onClick={clearStatusFile}
-                className="p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                title="Limpar arquivo selecionado"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            )}
-          </div>
-          <button
-            onClick={handleUploadStatus}
-            disabled={loading || !statusFile}
-            className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <RefreshCcw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <UploadCloud className="h-4 w-4 mr-2" />
-            )}
-            {loading ? "Processando..." : "Upload para Atualizar Status"}
-          </button>
-          {statusFile && (
-            <p className="text-sm text-gray-500 mt-2">
-              Arquivo selecionado:{" "}
-              <span className="font-medium">{statusFile.name}</span>
-            </p>
-          )}
         </div>
 
-        {/* Upload para adicionar novas parcelas */}
-        <div className="border border-gray-200 rounded-2xl p-4 space-y-3">
-          <h3 className="text-lg font-medium text-gray-800 flex items-center">
-            <UploadCloud className="h-5 w-5 mr-2" />
-            Adicionar Novas Parcelas
-          </h3>
-          <p className="text-sm text-gray-600">
-            Faça upload de um arquivo CSV contendo os dados das novas parcelas a
-            serem adicionadas. O arquivo pode incluir a coluna "situacao" com
-            valores aceitos: "Em mãos", "Em tratamento" ou deixar vazio.
-          </p>
-          <div className="flex items-center space-x-2">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleNewParcelaFileChange}
-              disabled={loading}
-              id="newParcelaFileInput"
-              className="block w-full text-sm text-gray-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-md file:border-0
-                file:text-sm file:font-semibold
-                file:bg-green-50 file:text-green-700
-                hover:file:bg-green-100
-                disabled:opacity-50"
-            />
-            {newParcelaFile && (
-              <button
-                onClick={clearNewParcelaFile}
-                className="p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                title="Limpar arquivo selecionado"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            )}
-          </div>
-          <button
-            onClick={handleUploadNewParcela}
-            disabled={loading || !newParcelaFile}
-            className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <RefreshCcw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <UploadCloud className="h-4 w-4 mr-2" />
-            )}
-            {loading
-              ? "Processando..."
-              : "Upload para Adicionar Novas Parcelas"}
-          </button>
-          {newParcelaFile && (
-            <p className="text-sm text-gray-500 mt-2">
-              Arquivo selecionado:{" "}
-              <span className="font-medium">{newParcelaFile.name}</span>
+        {/* Card: Adicionar Novas Parcelas */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transition-all hover:shadow-xl">
+          <div className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="bg-green-100 p-3 rounded-full">
+                <FileText className="h-6 w-6 text-green-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">
+                Adicionar Novas Parcelas
+              </h3>
+            </div>
+            <p className="text-gray-500 mt-3 text-sm">
+              Envie um arquivo CSV com novas parcelas para serem adicionadas ao
+              banco de dados. Certifique-se que o `id_parcela` seja único.
             </p>
-          )}
+          </div>
+
+          <div className="px-6 pb-6">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
+              <div>
+                <label
+                  htmlFor="newParcelaFileInput"
+                  className="cursor-pointer block border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-500 transition-colors"
+                >
+                  <UploadCloud className="mx-auto h-10 w-10 text-gray-400" />
+                  <span className="mt-2 block text-sm font-semibold text-gray-700">
+                    {newParcelaFile
+                      ? newParcelaFile.name
+                      : "Clique para selecionar o arquivo"}
+                  </span>
+                  <span className="mt-1 block text-xs text-gray-500">
+                    Formato CSV, até 10MB
+                  </span>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleNewParcelaFileChange}
+                    disabled={loading}
+                    id="newParcelaFileInput"
+                    className="sr-only"
+                  />
+                </label>
+                {newParcelaFile && (
+                  <button
+                    onClick={clearNewParcelaFile}
+                    className="mt-3 w-full text-sm text-red-600 hover:text-red-800 transition-colors font-semibold"
+                  >
+                    Remover arquivo
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={handleUploadNewParcela}
+                disabled={loading || !newParcelaFile}
+                className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {loading ? (
+                  <RefreshCcw className="h-5 w-5 mr-2 animate-spin" />
+                ) : (
+                  <UploadCloud className="h-5 w-5 mr-2" />
+                )}
+                {loading ? "Processando..." : "Enviar e Adicionar"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -923,11 +965,154 @@ const DatabaseUpload: React.FC = () => {
         </div>
       </div>
 
+      {/* Modal de Resultados */}
+      <Modal
+        isOpen={showResultsModal}
+        onClose={handleCloseResultsModal}
+        title={modalTitle}
+        size="3xl"
+      >
+        <div className="p-4">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-6" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab("sintetico")}
+                className={`${
+                  activeTab === "sintetico"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                } whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm`}
+              >
+                Visão Sintética
+              </button>
+              <button
+                onClick={() => setActiveTab("analitico")}
+                className={`${
+                  activeTab === "analitico"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                } whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm`}
+              >
+                Visão Analítica
+              </button>
+            </nav>
+          </div>
+
+          <div className="py-4 min-h-[300px]">
+            {activeTab === "sintetico" && (
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">
+                  Resumo da Operação
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-green-50 p-4 rounded-lg flex items-center space-x-3">
+                    <CheckCircle className="h-8 w-8 text-green-500" />
+                    <div>
+                      <p className="text-sm text-gray-600">Títulos Atualizados</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {
+                          uploadResults.filter((r) => r.status === "success")
+                            .length
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <div className="bg-red-50 p-4 rounded-lg flex items-center space-x-3">
+                    <AlertCircle className="h-8 w-8 text-red-500" />
+                    <div>
+                      <p className="text-sm text-gray-600">Títulos com Falha</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {
+                          uploadResults.filter((r) => r.status === "error")
+                            .length
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "analitico" && (
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">
+                  Detalhes da Operação
+                </h3>
+                <div className="space-y-6">
+                  {/* Falhas */}
+                  <div>
+                    <h4 className="text-md font-semibold text-red-700 mb-2">
+                      Títulos com Falha (
+                      {
+                        uploadResults.filter((r) => r.status === "error")
+                          .length
+                      }
+                      )
+                    </h4>
+                    <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2 bg-gray-50">
+                      {uploadResults.filter((r) => r.status === "error")
+                        .length > 0 ? (
+                        <ul className="divide-y divide-gray-200">
+                          {uploadResults
+                            .filter((r) => r.status === "error")
+                            .map((result, index) => (
+                              <li key={index} className="py-2 px-2">
+                                <p className="text-sm font-medium text-gray-800">
+                                  ID Parcela: {result.id_parcela}
+                                </p>
+                                <p className="text-sm text-red-600">
+                                  Erro: {result.error}
+                                </p>
+                              </li>
+                            ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-gray-500 p-4 text-center">Nenhuma falha registrada.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sucessos */}
+                  <div>
+                    <h4 className="text-md font-semibold text-green-700 mb-2">
+                      Títulos Atualizados com Sucesso (
+                      {
+                        uploadResults.filter((r) => r.status === "success")
+                          .length
+                      }
+                      )
+                    </h4>
+                    <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2 bg-gray-50">
+                     {uploadResults.filter((r) => r.status === "success")
+                        .length > 0 ? (
+                        <ul className="divide-y divide-gray-200">
+                          {uploadResults
+                            .filter((r) => r.status === "success")
+                            .map((result, index) => (
+                              <li key={index} className="py-2 px-2">
+                                <p className="text-sm font-medium text-gray-800">
+                                  ID Parcela: {result.id_parcela}
+                                </p>
+                              </li>
+                            ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-gray-500 p-4 text-center">Nenhum título atualizado com sucesso.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
+
       {/* Modal de Progresso */}
       <Modal
         isOpen={showProgressModal}
         onClose={() => setShowProgressModal(false)}
-        title="Progresso da Atualização"
+        title="Processando Solicitação"
       >
         <div className="text-center p-4">
           <p className="text-lg font-medium mb-4 text-gray-800">
@@ -940,7 +1125,7 @@ const DatabaseUpload: React.FC = () => {
             ></div>
           </div>
           <p className="text-sm text-gray-600 mt-2">
-            {progressPercentage}% Concluído
+            {progressPercentage < 100 ? "Por favor, aguarde..." : "Concluído!"}
           </p>
         </div>
       </Modal>
