@@ -24,10 +24,9 @@ interface UpdateResult {
 
 interface InsertResult {
   success: boolean;
-  message?: string;
   error?: string;
-  details?: any;
-  validRows?: FileData[];
+  insertedRows?: FileData[];
+  duplicateRows?: FileData[];
   invalidRows?: FileData[];
 }
 
@@ -452,135 +451,97 @@ const DatabaseUpload: React.FC = () => {
     onProgress?: (percentage: number, message: string) => void,
   ): Promise<InsertResult> => {
     try {
+      // 1. Separar linhas inválidas (sem id_parcela)
       const validData = data.filter(
         (row) => row.id_parcela && row.id_parcela.trim() !== "",
       );
       const invalidRows = data.filter(
         (row) => !row.id_parcela || row.id_parcela.trim() === "",
       );
-      const invalidRowsCount = invalidRows.length;
 
-      if (invalidRowsCount > 0) {
-        console.warn(
-          `[DataUpload] Ignorando ${invalidRowsCount} linhas por não terem um id_parcela válido.`,
-        );
+      if (validData.length === 0) {
+        return { success: true, insertedRows: [], duplicateRows: [], invalidRows };
       }
 
-      console.log(`🔄 Inserindo ${validData.length} novos registros...`);
-      console.log("📄 Dados a serem inseridos:", validData);
+      // 2. Verificar duplicatas em lote
+      if (onProgress) onProgress(10, "Verificando duplicatas...");
+      const allIds = validData.map((row) => row.id_parcela);
+      const existingIds = new Set<string>();
+      const CHUNK_SIZE = 500;
 
-      // Dividir os dados em chunks para inserção em lote, se necessário
-      const chunkSize = 1000; // Exemplo: inserir 1000 registros por vez
-      let successfulInserts = 0;
-
-      for (let i = 0; i < validData.length; i += chunkSize) {
-        const chunk = validData.slice(i, i + chunkSize);
-
-        // Mapear e converter tipos para o chunk
-        const processedChunk = chunk.map((row) => {
-          const newRow: { [key: string]: any } = { ...row };
-          // Converter campos bigint para número ou null se vazio
-          newRow.dias_em_atraso = newRow.dias_em_atraso
-            ? Number(newRow.dias_em_atraso)
-            : null;
-          newRow.numero_titulo = newRow.numero_titulo
-            ? Number(newRow.numero_titulo)
-            : null;
-          newRow.parcela = newRow.parcela ? Number(newRow.parcela) : null;
-          newRow.id_parcela = Number(row.id_parcela); // Convertido com segurança após a filtragem
-          newRow.venda_n = newRow.venda_n ? Number(newRow.venda_n) : null;
-
-          // Converter valores monetários para número ou null se vazio
-          newRow.valor_original = newRow.valor_original
-            ? Number(newRow.valor_original.replace(",", "."))
-            : null;
-          newRow.valor_reajustado = newRow.valor_reajustado
-            ? Number(newRow.valor_reajustado.replace(",", "."))
-            : null;
-          newRow.multa = newRow.multa
-            ? Number(newRow.multa.replace(",", "."))
-            : null;
-          newRow.juros_por_dia = newRow.juros_por_dia
-            ? Number(newRow.juros_por_dia.replace(",", "."))
-            : null;
-          newRow.multa_aplicada = newRow.multa_aplicada
-            ? Number(newRow.multa_aplicada.replace(",", "."))
-            : null;
-          newRow.juros_aplicado = newRow.juros_aplicado
-            ? Number(newRow.juros_aplicado.replace(",", "."))
-            : null;
-          newRow.valor_recebido = newRow.valor_recebido
-            ? Number(newRow.valor_recebido.replace(",", "."))
-            : null;
-          newRow.desconto = newRow.desconto
-            ? Number(newRow.desconto.replace(",", "."))
-            : null;
-          newRow.acrescimo = newRow.acrescimo
-            ? Number(newRow.acrescimo.replace(",", "."))
-            : null;
-          newRow.multa_paga = newRow.multa_paga
-            ? Number(newRow.multa_paga.replace(",", "."))
-            : null;
-          newRow.juros_pago = newRow.juros_pago
-            ? Number(newRow.juros_pago.replace(",", "."))
-            : null;
-          if (newRow.user_id === "") newRow.user_id = null;
-
-          // Validar situacao antes de inserir
-          if (newRow.situacao !== undefined) {
-            newRow.situacao = validateSituacao(newRow.situacao);
-          }
-
-          return newRow;
-        });
-
-        const { error } = await supabase
+      for (let i = 0; i < allIds.length; i += CHUNK_SIZE) {
+        const chunk = allIds.slice(i, i + CHUNK_SIZE);
+        const { data: chunkRecords, error: chunkError } = await supabase
           .from("BANCO_DADOS")
-          .upsert(processedChunk, {
-            onConflict: "id_parcela",
-            ignoreDuplicates: true,
-          })
-          .select(); // Adicionar select para ver o que foi inserido
+          .select("id_parcela")
+          .in("id_parcela", chunk);
 
-        if (error) {
-          console.error("❌ Erro ao inserir dados:", error);
-          return {
-            success: false,
-            error: error.message,
-            details: error,
-          };
+        if (chunkError) {
+          console.error("❌ Erro ao verificar duplicatas:", chunkError);
+          return { success: false, error: chunkError.message };
         }
-        successfulInserts += chunk.length;
-        if (onProgress) {
-          const percentage = Math.round(
-            (successfulInserts / validData.length) * 100,
-          );
-          onProgress(
-            percentage,
-            `Inserindo ${successfulInserts} de ${validData.length} novos registros...`,
-          );
-        }
+        chunkRecords?.forEach((rec) => existingIds.add(rec.id_parcela.toString()));
       }
 
-      let message = `${successfulInserts} parcelas inseridas com sucesso`;
-      if (invalidRowsCount > 0) {
-        message += `. ${invalidRowsCount} linhas foram ignoradas. Veja os detalhes no debug.`;
+      // 3. Separar dados em "para inserir" e "duplicatas"
+      const rowsToInsert = validData.filter(
+        (row) => !existingIds.has(row.id_parcela),
+      );
+      const duplicateRows = validData.filter((row) =>
+        existingIds.has(row.id_parcela),
+      );
+
+      if (rowsToInsert.length === 0) {
+        if (onProgress) onProgress(100, "Nenhuma nova parcela para inserir.");
+        return { success: true, insertedRows: [], duplicateRows, invalidRows };
       }
 
-      console.log("✅ Dados inseridos com sucesso:", successfulInserts);
+      // 4. Inserir apenas as novas linhas
+      if (onProgress) onProgress(50, `Inserindo ${rowsToInsert.length} novas parcelas...`);
+      
+      // Mapear e converter tipos
+      const processedChunk = rowsToInsert.map((row) => {
+        const newRow: { [key: string]: any } = { ...row };
+        newRow.dias_em_atraso = newRow.dias_em_atraso ? Number(newRow.dias_em_atraso) : null;
+        newRow.numero_titulo = newRow.numero_titulo ? Number(newRow.numero_titulo) : null;
+        newRow.parcela = newRow.parcela ? Number(newRow.parcela) : null;
+        newRow.id_parcela = Number(row.id_parcela);
+        newRow.venda_n = newRow.venda_n ? Number(newRow.venda_n) : null;
+        newRow.valor_original = newRow.valor_original ? Number(newRow.valor_original.replace(",", ".")) : null;
+        newRow.valor_reajustado = newRow.valor_reajustado ? Number(newRow.valor_reajustado.replace(",", ".")) : null;
+        newRow.multa = newRow.multa ? Number(newRow.multa.replace(",", ".")) : null;
+        newRow.juros_por_dia = newRow.juros_por_dia ? Number(newRow.juros_por_dia.replace(",", ".")) : null;
+        newRow.multa_aplicada = newRow.multa_aplicada ? Number(newRow.multa_aplicada.replace(",", ".")) : null;
+        newRow.juros_aplicado = newRow.juros_aplicado ? Number(newRow.juros_aplicado.replace(",", ".")) : null;
+        newRow.valor_recebido = newRow.valor_recebido ? Number(newRow.valor_recebido.replace(",", ".")) : null;
+        newRow.desconto = newRow.desconto ? Number(newRow.desconto.replace(",", ".")) : null;
+        newRow.acrescimo = newRow.acrescimo ? Number(newRow.acrescimo.replace(",", ".")) : null;
+        newRow.multa_paga = newRow.multa_paga ? Number(newRow.multa_paga.replace(",", ".")) : null;
+        newRow.juros_pago = newRow.juros_pago ? Number(newRow.juros_pago.replace(",", ".")) : null;
+        if (newRow.user_id === "") newRow.user_id = null;
+        if (newRow.situacao !== undefined) {
+          newRow.situacao = validateSituacao(newRow.situacao);
+        }
+        return newRow;
+      });
+
+      const { error } = await supabase.from("BANCO_DADOS").insert(processedChunk);
+
+      if (error) {
+        console.error("❌ Erro ao inserir dados:", error);
+        return { success: false, error: error.message };
+      }
+
+      if (onProgress) onProgress(100, "Inserção concluída.");
       return {
         success: true,
-        message: message,
-        details: null,
-        validRows: validData,
-        invalidRows: invalidRows,
+        insertedRows: rowsToInsert,
+        duplicateRows,
+        invalidRows,
       };
     } catch (error) {
       console.error("❌ Exceção ao inserir dados:", error);
-      return {
-        success: false,
-        error: (error as Error).message,
-      };
+      return { success: false, error: (error as Error).message };
     }
   };
 
@@ -670,36 +631,29 @@ const DatabaseUpload: React.FC = () => {
     setDebugInfo("");
 
     try {
-      setProgressMessage("🔍 Testando conexão com Supabase...");
-      const connectionOk = await testSupabaseConnection();
-      if (!connectionOk) {
-        setProgressMessage("❌ Falha na conexão com Supabase");
-        setUploadStatus("❌ Falha na conexão com Supabase");
-        return;
-      }
-
       setProgressMessage("📤 Processando arquivo...");
-      setProgressPercentage(20);
       const data = await processFile(newParcelaFile);
-      setProgressMessage(
-        `📋 ${data.length} registros encontrados. Inserindo no Supabase...`,
-      );
-      setProgressPercentage(40);
-
-      const result = await insertNewParcelasInSupabase(
-        data,
-        (percentage, message) => {
-          setProgressPercentage(40 + percentage * 0.6);
-          setProgressMessage(message);
-        },
-      );
+      setProgressPercentage(20);
+      setProgressMessage(`Processando ${data.length} linhas...`);
+      
+      const result = await insertNewParcelasInSupabase(data, (p, m) => {
+        setProgressPercentage(20 + p * 0.8); // 20% para processar, 80% para inserir
+        setProgressMessage(m);
+      });
 
       const resultsForModal: UpdateResult[] = [];
       if (result.success) {
-        result.validRows?.forEach((row) => {
+        result.insertedRows?.forEach((row) => {
           resultsForModal.push({
             id_parcela: row.id_parcela || "N/A",
             status: "success",
+          });
+        });
+        result.duplicateRows?.forEach((row) => {
+          resultsForModal.push({
+            id_parcela: row.id_parcela || "N/A",
+            status: "error",
+            error: "Título já consta no Banco de Dados.",
           });
         });
         result.invalidRows?.forEach((row) => {
@@ -713,8 +667,8 @@ const DatabaseUpload: React.FC = () => {
         const successful = resultsForModal.filter(r => r.status === 'success').length;
         const failed = resultsForModal.filter(r => r.status === 'error').length;
 
-        setUploadStatus(`Status: ${successful} sucesso(s), ${failed} falha(s).`);
-        setProgressMessage("✅ Inserção concluída!");
+        setUploadStatus(`Status: ${successful} inserido(s), ${failed} falha(s)/duplicata(s).`);
+        setProgressMessage("✅ Processo concluído!");
         setProgressPercentage(100);
 
         setModalTitle("Resultado da Adição de Novas Parcelas");
