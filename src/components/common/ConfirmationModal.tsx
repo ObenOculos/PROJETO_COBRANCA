@@ -44,35 +44,38 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         }
       }}
     >
-      <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+      <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden">
+        {/* Red Header with Icon */}
+        <div className="bg-red-600 p-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <AlertTriangle className="h-6 w-6 text-white mr-3" />
+            <h3 className="text-lg font-semibold text-white">{title}</h3>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+            className="p-1 rounded-full text-white hover:bg-red-700 transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="flex items-start mb-6">
-          <AlertTriangle className="h-6 w-6 text-red-500 mr-3 flex-shrink-0" />
-          <p className="text-sm text-gray-700">{displayMessage}</p>
-        </div>
+        <div className="p-6">
+          <p className="text-sm text-gray-700 mb-6">{displayMessage}</p>
 
-        <div className="flex justify-between gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
-          >
-            {cancelButtonText}
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors"
-          >
-            {confirmButtonText}
-          </button>
+          <div className="flex justify-between gap-3 mt-6">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
+            >
+              {cancelButtonText}
+            </button>
+            <button
+              onClick={onConfirm}
+              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors"
+            >
+              {confirmButtonText}
+            </button>
+          </div>
         </div>
       </div>
     </div>
