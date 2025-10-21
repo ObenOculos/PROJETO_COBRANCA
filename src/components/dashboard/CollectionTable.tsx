@@ -110,6 +110,26 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
       new Set(),
     );
 
+    const [isMobile, setIsMobile] = useState(
+      typeof window !== "undefined" && window.innerWidth < 640,
+    );
+    const [maxButtons, setMaxButtons] = useState(
+      typeof window !== "undefined" && window.innerWidth < 640 ? 2 : 5,
+    );
+
+    React.useEffect(() => {
+      const handleResize = () => {
+        const mobile = window.innerWidth < 640;
+        setIsMobile(mobile);
+        setMaxButtons(mobile ? 2 : 5);
+      };
+
+      window.addEventListener("resize", handleResize);
+      return () => {
+        window.removeEventListener("resize", handleResize);
+      };
+    }, []);
+
     const handleSort = (field: typeof sortField) => {
       if (sortField === field) {
         setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -538,13 +558,13 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   >
                     <div className="flex items-center gap-1 justify-between">
                       <div className="flex items-center flex-1 min-w-0">
-                        <div className="flex-shrink-0 mr-3">
+                        <div className="hidden sm:block flex-shrink-0 mr-3">
                           <User className="h-5 w-5 text-blue-600" />
                         </div>
 
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-base font-medium text-gray-900 truncate">
-                            {clientGroup.client}
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <h3 className="text-base font-medium text-gray-900">
+                            {clientGroup.client.length > 20 ? `${clientGroup.client.slice(0, 20)}...` : clientGroup.client}
                           </h3>
                           <p className="text-sm text-gray-500 truncate">
                             {clientGroup.document}
@@ -638,13 +658,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   <div className="flex space-x-3 flex-1 justify-center sm:flex-none">
                     {Array.from(
                       {
-                        length: Math.min(
-                          window.innerWidth < 640 ? 3 : 5,
-                          totalPages,
-                        ),
+                        length: Math.min(maxButtons, totalPages),
                       },
                       (_, i) => {
-                        const maxButtons = window.innerWidth < 640 ? 3 : 5;
                         let pageNum;
 
                         if (totalPages <= maxButtons) {
@@ -667,7 +683,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                             id={`pagination-page-${pageNum}`}
                             name={`paginationPage${pageNum}`}
                             onClick={() => setCurrentPage(pageNum)}
-                            className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
+                            className={`px-2 sm:px-2 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
                               pageNum === currentPage
                                 ? "bg-white text-purple-600 shadow-lg transform scale-105"
                                 : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
@@ -688,7 +704,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       setCurrentPage(Math.min(totalPages, currentPage + 1))
                     }
                     disabled={currentPage === totalPages}
-                    className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    className="flex items-center px-2 sm:px-2 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                   >
                     <span className="hidden sm:inline">Próxima</span>
                     <ChevronRight className="h-4 w-4 sm:ml-1" />
@@ -700,7 +716,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                     name="paginationEnd"
                     onClick={() => setCurrentPage(totalPages)}
                     disabled={currentPage === totalPages}
-                    className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    className="flex items-center px-2 sm:px-2 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                   >
                     <span className="text-xs">Fim</span>
                   </button>
@@ -767,7 +783,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     // Fallback to simple list view
     return (
       <>
-        <div className="rounded-2xl border border-gray-200 sm:border-0">
+        <div className="rounded-2xl">
           {/* Header Minimalista */}
           <div className="bg-white p-4 rounded-2xl mb-4">
             <div className="space-y-3">
@@ -965,7 +981,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           </div>
 
           {/* Lista de Clientes Agrupados */}
-          <div className="divide-y px-2 sm:px-0 divide-gray-100">
+          <div className="divide-y sm:px-0 divide-gray-100">
             {paginatedSalesGroups.map((clientGroup) => (
               <div
                 key={clientGroup.document}
@@ -977,20 +993,23 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   onClick={() => toggleClientExpansion(clientGroup.document)}
                 >
                   <div className="flex-1 px-4 sm:px-6 py-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div className="flex items-center flex-1 min-w-0">
-                        <div className="flex-shrink-0 mr-3">
-                          <User className="h-5 w-5 text-blue-600" />
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      {/* Client Info */}
+                      <div className="flex items-center flex-1 min-w-0 pb-4 sm:pb-0 border-b sm:border-0 border-gray-100">
+                        <div className="hidden sm:block flex-shrink-0 mr-4">
+                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <User className="h-5 w-5 text-blue-600" />
+                          </div>
                         </div>
 
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-md font-semibold text-gray-900 truncate">
-                            {clientGroup.client}
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <h3 className="text-base font-semibold text-gray-800">
+                            {clientGroup.client.length > 20 ? `${clientGroup.client.slice(0, 20)}...` : clientGroup.client}
                           </h3>
-                          <p className="text-sm text-gray-600 truncate font-mono bg-gray-100 px-2 py-1 rounded-2xl mt-1 inline-block">
+                          <p className="text-sm text-gray-500 truncate font-mono">
                             {clientGroup.document}
                           </p>
-                          <div className="flex items-center text-xs text-gray-500 mt-2">
+                          <div className="flex items-center text-xs text-gray-500 mt-1.5">
                             <MapPin className="h-3 w-3 mr-1 text-gray-400" />
                             <span className="truncate">
                               {clientGroup.bairro}, {clientGroup.cidade}
@@ -999,24 +1018,28 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                         </div>
                       </div>
 
-                      <div className="w-full sm:w-auto sm:text-right">
-                        <div className="text-xl font-bold text-gray-900">
-                          {formatCurrency(clientGroup.totalValue)}
+                      {/* Financial Info */}
+                      <div className="w-full sm:w-auto flex-shrink-0">
+                        <div className="flex items-baseline justify-between sm:justify-end sm:gap-4">
+                          <span className="text-sm sm:hidden text-gray-600">Valor Total</span>
+                          <div className="text-2xl font-bold text-gray-800">
+                            {formatCurrency(clientGroup.totalValue, !isMobile)}
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-600 mt-1">
+                        <div className="text-xs text-gray-500 sm:text-right mt-1">
                           {clientGroup.sales.length} venda
                           {clientGroup.sales.length !== 1 ? "s" : ""}
                         </div>
-                        <div className="flex flex-wrap justify-start sm:justify-end gap-2 mt-3">
+                        <div className="flex flex-wrap justify-start sm:justify-end gap-2 mt-4">
                           {clientGroup.totalReceived > 0 && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-2xl text-xs font-semibold bg-green-100 text-green-800 shadow-sm">
-                              <TrendingUp className="h-3 w-3 mr-1" />
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                              <TrendingUp className="h-3 w-3 mr-1.5" />
                               {formatCurrency(clientGroup.totalReceived)}
                             </span>
                           )}
                           {clientGroup.pendingValue > 0 && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-2xl text-xs font-semibold bg-red-100 text-red-800 shadow-sm">
-                              <AlertCircle className="h-3 w-3 mr-1" />
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                              <AlertCircle className="h-3 w-3 mr-1.5" />
                               {formatCurrency(clientGroup.pendingValue)}
                             </span>
                           )}
@@ -1078,76 +1101,60 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                         return (
                           <div
                             key={sale.saleNumber}
-                            className="bg-white border border-gray-200 rounded-2xl hover:border-gray-300 transition-colors"
+                            className="bg-white border border-gray-200 rounded-2xl hover:shadow-md transition-all duration-200"
                           >
                             <div className="p-4">
                               {/* Header */}
-                              <div className="flex items-center gap-1 justify-between mb-3">
-                                <div className="font-medium text-gray-900">
-                                  Venda #{sale.saleNumber}
+                              <div className="flex items-start justify-between mb-4">
+                                <div>
+                                  <h4 className="font-semibold text-gray-800">
+                                    Venda #{sale.saleNumber}
+                                  </h4>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {sale.installments.length} parcela
+                                    {sale.installments.length !== 1 ? "s" : ""}
+                                  </p>
                                 </div>
-                                <div className="flex items-center space-x-2">
+                                <span
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${statusColor}`}
+                                >
                                   {getStatusIcon(
                                     displayStatus === "Quitado"
                                       ? "recebido"
                                       : "pendente",
                                   )}
-                                  <span
-                                    className={`inline-flex px-2 py-1 text-xs font-medium rounded-2xl ${statusColor}`}
-                                  >
-                                    {displayStatus}
-                                  </span>
-                                </div>
+                                  {displayStatus}
+                                </span>
                               </div>
 
                               {/* Financial info */}
-                              <div className="grid grid-cols-2 gap-4 mb-3">
-                                <div>
-                                  <div className="text-sm text-gray-500">
-                                    Total
-                                  </div>
-                                  <div className="font-semibold text-gray-900">
-                                    {formatCurrency(sale.totalValue)}
-                                  </div>
+                              <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm text-gray-600">Valor Total</span>
+                                  <span className="font-semibold text-gray-800">
+                                    {formatCurrency(sale.totalValue, !isMobile)}
+                                  </span>
                                 </div>
                                 {sale.totalReceived > 0 && (
-                                  <div>
-                                    <div className="text-sm text-gray-500">
-                                      Recebido
-                                    </div>
-                                    <div className="font-semibold text-green-600">
-                                      {formatCurrency(sale.totalReceived)}
-                                    </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-600">Valor Recebido</span>
+                                    <span className="font-semibold text-green-600">
+                                      {formatCurrency(sale.totalReceived, !isMobile)}
+                                    </span>
                                   </div>
                                 )}
-                                <div className="col-span-2">
-                                  <div className="text-sm text-gray-500">
-                                    {sale.pendingValue > 0
-                                      ? "Pendente"
-                                      : "Status"}
+                                {sale.pendingValue > 0 && (
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-600">Valor Pendente</span>
+                                    <span className="font-semibold text-red-600">
+                                      {formatCurrency(sale.pendingValue, !isMobile)}
+                                    </span>
                                   </div>
-                                  <div
-                                    className={`font-semibold ${
-                                      sale.pendingValue > 0
-                                        ? "text-red-600"
-                                        : "text-green-600"
-                                    }`}
-                                  >
-                                    {sale.pendingValue > 0
-                                      ? formatCurrency(sale.pendingValue)
-                                      : "Quitado"}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Parcelas info */}
-                              <div className="text-sm text-gray-500 mb-3">
-                                {sale.installments.length} parcela
-                                {sale.installments.length !== 1 ? "s" : ""}
+                                )}
                               </div>
 
                               {/* Actions */}
-                              <div className="flex space-x-2">
+                              <div className="mt-5 pt-4 border-t border-gray-100 flex gap-3">
                                 <button
                                   id={`view-sale-${sale.saleNumber}`}
                                   name={`viewSale${sale.saleNumber}`}
@@ -1170,11 +1177,11 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                                       setIsSaleModalOpen(true);
                                     }
                                   }}
-                                  className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors text-sm flex-1"
+                                  className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-colors text-sm font-medium"
                                   title="Ver detalhes da venda"
                                 >
                                   <Eye className="h-4 w-4 mr-2" />
-                                  <span>Ver Detalhes</span>
+                                  <span>Detalhes</span>
                                 </button>
                                 {userType === "collector" && (
                                   <button
@@ -1192,7 +1199,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                                         handleViewClient(clientGroupForModal);
                                       }
                                     }}
-                                    className="flex items-center justify-center px-3 py-2 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 transition-colors text-sm flex-1"
+                                    className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors text-sm font-medium"
                                     title="Gerenciar pagamentos"
                                   >
                                     <DollarSign className="h-4 w-4 mr-2" />
@@ -1260,7 +1267,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   name="paginationStart2"
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
-                  className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  className="flex items-center px-2 sm:px-2 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                 >
                   <span className="text-xs">Início</span>
                 </button>
@@ -1271,56 +1278,52 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   name="paginationPrevious2"
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  className="flex items-center px-2 sm:px-2 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                 >
                   <ChevronLeft className="h-4 w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Anterior</span>
                 </button>
 
                 {/* Números das páginas */}
-                <div className="flex space-x-3 flex-1 justify-center sm:flex-none">
-                  {Array.from(
-                    {
-                      length: Math.min(
-                        window.innerWidth < 640 ? 3 : 5,
-                        totalPages,
-                      ),
-                    },
-                    (_, i) => {
-                      const maxButtons = window.innerWidth < 640 ? 3 : 5;
-                      let pageNum;
-
-                      if (totalPages <= maxButtons) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= Math.ceil(maxButtons / 2)) {
-                        pageNum = i + 1;
-                      } else if (
-                        currentPage >=
-                        totalPages - Math.floor(maxButtons / 2)
-                      ) {
-                        pageNum = totalPages - maxButtons + 1 + i;
-                      } else {
-                        pageNum = currentPage - Math.floor(maxButtons / 2) + i;
-                      }
-
-                      return (
-                        <button
-                          key={pageNum}
-                          id={`pagination-page-${pageNum}-2`}
-                          name={`paginationPage${pageNum}2`}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
-                            pageNum === currentPage
-                              ? "bg-white text-purple-600 shadow-lg transform scale-105"
-                              : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    },
-                  )}
-                </div>
+                                <div className="flex space-x-3 flex-1 justify-center sm:flex-none">
+                                                    {Array.from(
+                                                      {
+                                                        length: Math.min(maxButtons, totalPages),
+                                                      },
+                                                      (_, i) => {
+                                                        let pageNum;
+                                  
+                                                        if (totalPages <= maxButtons) {
+                                                          pageNum = i + 1;
+                                                        } else if (currentPage <= Math.ceil(maxButtons / 2)) {
+                                                          pageNum = i + 1;
+                                                        } else if (
+                                                          currentPage >=
+                                                          totalPages - Math.floor(maxButtons / 2)
+                                                        ) {
+                                                          pageNum = totalPages - maxButtons + 1 + i;
+                                                        } else {
+                                                          pageNum = currentPage - Math.floor(maxButtons / 2) + i;
+                                                        }
+                                  
+                                                        return (
+                                                          <button
+                                                            key={pageNum}
+                                                            id={`pagination-page-${pageNum}-2`}
+                                                            name={`paginationPage${pageNum}2`}
+                                                            onClick={() => setCurrentPage(pageNum)}
+                                                            className={`px-2 sm:px-2 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[34px] ${
+                                                              pageNum === currentPage
+                                                                ? "bg-white text-gray shadow-lg"
+                                                                : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
+                                                            }`}
+                                                          >
+                                                            {pageNum}
+                                                          </button>
+                                                        );
+                                                      },
+                                                    )}
+                                </div>
 
                 {/* Botão Próxima */}
                 <button

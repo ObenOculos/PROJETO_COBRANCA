@@ -113,6 +113,21 @@ export const ClientAssignment = React.memo(() => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
+  const [maxButtons, setMaxButtons] = useState(
+    typeof window !== "undefined" && window.innerWidth < 640 ? 2 : 5,
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setMaxButtons(window.innerWidth < 640 ? 2 : 5);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
   // Limite para operações em massa
   const MAX_BATCH_SIZE = 100;
 
@@ -1491,7 +1506,7 @@ export const ClientAssignment = React.memo(() => {
                 name="paginationStart2"
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="flex items-center px-2 sm:px-2 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
                 <span className="text-xs">Início</span>
               </button>
@@ -1502,7 +1517,7 @@ export const ClientAssignment = React.memo(() => {
                 name="paginationPrevious2"
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="flex items-center px-2 sm:px-2 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
                 <ChevronLeft className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline">Anterior</span>
@@ -1512,13 +1527,9 @@ export const ClientAssignment = React.memo(() => {
               <div className="flex space-x-1 flex-1 justify-center sm:flex-none">
                 {Array.from(
                   {
-                    length: Math.min(
-                      window.innerWidth < 640 ? 3 : 5,
-                      totalPages,
-                    ),
+                    length: Math.min(maxButtons, totalPages),
                   },
                   (_, i) => {
-                    const maxButtons = window.innerWidth < 640 ? 3 : 5;
                     let pageNum;
 
                     if (totalPages <= maxButtons) {
@@ -1540,9 +1551,9 @@ export const ClientAssignment = React.memo(() => {
                         id={`pagination-page-${pageNum}-2`}
                         name={`paginationPage${pageNum}2`}
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
+                        className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[34px] ${
                           pageNum === currentPage
-                            ? "bg-white text-purple-600 shadow-lg transform scale-105"
+                            ? "bg-white text-gray shadow-lg"
                             : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
                         }`}
                       >
