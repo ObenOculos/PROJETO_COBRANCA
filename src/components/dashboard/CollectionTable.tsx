@@ -22,6 +22,7 @@ import {
   Maximize2,
   Minimize2,
   EyeIcon,
+  Trash2,
 } from "lucide-react";
 import { Collection, ClientGroup, SaleGroup } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
@@ -52,7 +53,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     showFilterBar,
     onToggleFilterBar,
   }) => {
-    const { getClientGroups, loading } = useCollection();
+    const { getClientGroups, loading, deleteClient } = useCollection();
     const [selectedCollection, setSelectedCollection] =
       useState<Collection | null>(null);
     const [selectedClientGroup, setSelectedClientGroup] =
@@ -924,16 +925,15 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           {/* Lista de Clientes Agrupados */}
           <div className="divide-y px-2 sm:px-0 divide-gray-100">
             {paginatedSalesGroups.map((clientGroup) => (
-              <div
-                key={clientGroup.document}
-                className="mt-4 rounded-2xl hover:shadow-sm transition-all duration-200"
-              >
-                {/* Cabeçalho do Cliente */}
-                <div
-                  className="px-4 sm:px-6 py-3 rounded-2xl border-b border-gray-200 bg-white cursor-pointer"
-                  onClick={() => toggleClientExpansion(clientGroup.document)}
-                >
-                  <div className="flex items-center gap-1 justify-between">
+                                              <div
+                                                key={clientGroup.document}
+                                                className="mt-4 rounded-2xl hover:shadow-sm transition-all duration-200"
+                                              >
+                                                {/* Cabeçalho do Cliente */}
+                                                <div
+                                                  className="px-4 sm:px-6 py-3 rounded-2xl border-b border-gray-200 bg-white cursor-pointer"
+                                                  onClick={() => toggleClientExpansion(clientGroup.document)}
+                                                >                  <div className="flex items-center gap-1 justify-between">
                     <div className="flex items-center flex-1 min-w-0">
                       <div className="hidden sm:flex flex-shrink-0 mr-3">
                         <button
@@ -971,7 +971,34 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       </div>
                     </div>
 
-                    <div className="flex-shrink-0 text-right">
+                    <div className="flex-shrink-0 text-right relative">
+                      {userType === "manager" && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation(); // Prevent opening client detail modal
+                            if (
+                              window.confirm(
+                                `Tem certeza que deseja deletar o cliente ${clientGroup.client} (${clientGroup.document}) e todos os seus dados relacionados? Esta ação é irreversível.`,
+                              )
+                            ) {
+                              try {
+                                await deleteClient(clientGroup.document);
+                                // Optionally, show a success toast/notification
+                                alert("Cliente deletado com sucesso!");
+                              } catch (error) {
+                                console.error("Erro ao deletar cliente:", error);
+                                alert(
+                                  "Erro ao deletar cliente. Verifique o console para mais detalhes.",
+                                );
+                              }
+                            }
+                          }}
+                          className="absolute top-0 right-0 p-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors z-10"
+                          title="Deletar Cliente"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                       <div className="text-xl font-bold text-gray-900">
                         {formatCurrency(clientGroup.totalValue)}
                       </div>

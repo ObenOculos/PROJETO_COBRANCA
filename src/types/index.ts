@@ -316,6 +316,7 @@ export interface CollectionContextType {
     reason?: string,
   ) => Promise<void>;
   updateScheduledVisitsAfterPayment: (clientDocument: string) => Promise<void>;
+  deleteClient: (clientDocument: string) => Promise<void>;
 }
 
 // Sale payment types

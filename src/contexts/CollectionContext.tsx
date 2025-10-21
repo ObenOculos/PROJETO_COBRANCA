@@ -627,6 +627,79 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
+  const deleteClient = async (clientDocument: string) => {
+    try {
+      setGlobalLoading(true, `Deletando cliente ${clientDocument}...`);
+      setLoading(true);
+
+      if (!isOnline) {
+        throw new Error("Não é possível deletar clientes offline.");
+      }
+
+      // 1. Delete from BANCO_DADOS (collections)
+      const { error: collectionsError } = await supabase
+        .from("BANCO_DADOS")
+        .delete()
+        .eq("documento", clientDocument);
+
+      if (collectionsError) {
+        throw collectionsError;
+      }
+
+      // 2. Delete from sale_payments
+      const { error: paymentsError } = await supabase
+        .from("sale_payments")
+        .delete()
+        .eq("client_document", clientDocument);
+
+      if (paymentsError) {
+        console.warn(
+          `Aviso: Erro ao deletar pagamentos do cliente ${clientDocument}:`,
+          paymentsError.message,
+        );
+        // Don't throw, as collections might have been deleted successfully
+      }
+
+      // 3. Delete from scheduled_visits
+      const { error: visitsError } = await supabase
+        .from("scheduled_visits")
+        .delete()
+        .eq("clientDocument", clientDocument);
+
+      if (visitsError) {
+        console.warn(
+          `Aviso: Erro ao deletar visitas agendadas do cliente ${clientDocument}:`,
+          visitsError.message,
+        );
+      }
+
+      // 4. Delete from authorization_history
+      const { error: authHistoryError } = await supabase
+        .from("authorization_history")
+        .delete()
+        .eq("client_document", clientDocument);
+
+      if (authHistoryError) {
+        console.warn(
+          `Aviso: Erro ao deletar histórico de autorização do cliente ${clientDocument}:`,
+          authHistoryError.message,
+        );
+      }
+
+      console.log(`✅ Cliente ${clientDocument} e dados relacionados deletados.`);
+      await refreshData(); // Refresh all data after deletion
+    } catch (err) {
+      console.error(`Erro ao deletar cliente ${clientDocument}:`, err);
+      setError(
+        err instanceof Error ? err.message : "Erro ao deletar cliente",
+      );
+      throw err;
+    } finally {
+      setLoading(false);
+      setGlobalLoading(false);
+    }
+  };
+
   const fetchMonthlyGoals = async (useCache = true) => {
     try {
       const cacheKey = "monthly_goals";
@@ -3346,6 +3419,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     getClientDataForVisit,
     rescheduleVisit,
     updateScheduledVisitsAfterPayment,
+    deleteClient,
   };
 
   return (
