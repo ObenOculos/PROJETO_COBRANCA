@@ -977,7 +977,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   onClick={() => toggleClientExpansion(clientGroup.document)}
                 >
                   <div className="flex-1 px-4 sm:px-6 py-3">
-                    <div className="flex items-center gap-1 justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="flex items-center flex-1 min-w-0">
                         <div className="flex-shrink-0 mr-3">
                           <User className="h-5 w-5 text-blue-600" />
@@ -999,7 +999,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                         </div>
                       </div>
 
-                      <div className="flex-shrink-0 text-right">
+                      <div className="w-full sm:w-auto sm:text-right">
                         <div className="text-xl font-bold text-gray-900">
                           {formatCurrency(clientGroup.totalValue)}
                         </div>
@@ -1007,7 +1007,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                           {clientGroup.sales.length} venda
                           {clientGroup.sales.length !== 1 ? "s" : ""}
                         </div>
-                        <div className="flex flex-col sm:flex-row justify-end gap-1 sm:gap-2 mt-3">
+                        <div className="flex flex-wrap justify-start sm:justify-end gap-2 mt-3">
                           {clientGroup.totalReceived > 0 && (
                             <span className="inline-flex items-center px-2.5 py-1 rounded-2xl text-xs font-semibold bg-green-100 text-green-800 shadow-sm">
                               <TrendingUp className="h-3 w-3 mr-1" />
