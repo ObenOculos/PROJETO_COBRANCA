@@ -298,7 +298,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                   </p>
                   <p className="font-semibold text-gray-900">
                     {saleData.apelido}
-                  </p>  
+                  </p>
                 </div>
 
                 {(saleData.telefone || saleData.celular) && (

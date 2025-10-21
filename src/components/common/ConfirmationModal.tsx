@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, AlertTriangle } from 'lucide-react';
+import React from "react";
+import { X, AlertTriangle } from "lucide-react";
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -21,17 +21,20 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   message,
   clientName,
   clientDocument,
-  confirmButtonText = 'Confirmar',
-  cancelButtonText = 'Cancelar',
+  confirmButtonText = "Confirmar",
+  cancelButtonText = "Cancelar",
 }) => {
   if (!isOpen) return null;
 
   const displayMessage = message || (
     <>
-      Você tem certeza que deseja deletar o cliente {' '}
-      {clientName && <strong className="font-semibold">{clientName}</strong>}{' '}
-      {clientDocument && <span className="font-mono font-semibold">({clientDocument})</span>}{' '}
-      e todos os seus dados relacionados (cobranças, pagamentos, visitas, histórico de autorização)? Esta ação é irreversível.
+      Você tem certeza que deseja deletar o cliente{" "}
+      {clientName && <strong className="font-semibold">{clientName}</strong>}{" "}
+      {clientDocument && (
+        <span className="font-mono font-semibold">({clientDocument})</span>
+      )}{" "}
+      e todos os seus dados relacionados (cobranças, pagamentos, visitas,
+      histórico de autorização)? Esta ação é irreversível.
     </>
   );
 

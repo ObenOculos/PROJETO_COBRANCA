@@ -66,7 +66,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
     // State for delete confirmation modal
     const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-    const [clientToDelete, setClientToDelete] = useState<ClientGroup | null>(null);
+    const [clientToDelete, setClientToDelete] = useState<ClientGroup | null>(
+      null,
+    );
 
     const handleConfirmDelete = async () => {
       if (clientToDelete) {
@@ -75,7 +77,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           alert("Cliente deletado com sucesso!");
         } catch (error) {
           console.error("Erro ao deletar cliente:", error);
-          alert("Erro ao deletar cliente. Verifique o console para mais detalhes.");
+          alert(
+            "Erro ao deletar cliente. Verifique o console para mais detalhes.",
+          );
         }
         setClientToDelete(null);
         setShowDeleteConfirmation(false);
@@ -963,91 +967,93 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           {/* Lista de Clientes Agrupados */}
           <div className="divide-y px-2 sm:px-0 divide-gray-100">
             {paginatedSalesGroups.map((clientGroup) => (
-                                                                                                                            <div
-                                                                                                                              key={clientGroup.document}
-                                                                                                                              className="mt-4 rounded-2xl hover:shadow-sm transition-all duration-200"
-                                                                                                                            >
-                                                                                                                              {/* Cabeçalho do Cliente */}
-                                                                                                                              <div
-                                                                                                                                className="flex items-center bg-white rounded-2xl border border-gray-200 cursor-pointer overflow-hidden"
-                                                                                                                                onClick={() => toggleClientExpansion(clientGroup.document)}
-                                                                                                                              >
-                                                                                                                                <div className="flex-1 px-4 sm:px-6 py-3">
-                                                                                                                                  <div className="flex items-center gap-1 justify-between">
-                                                                                                                                    <div className="flex items-center flex-1 min-w-0">
-                                                                                                                                      <div className="flex-shrink-0 mr-3">
-                                                                                                                                        <User className="h-5 w-5 text-blue-600" />
-                                                                                                                                      </div>
-                                                                                                            
-                                                                                                                                      <div className="flex-1 min-w-0">
-                                                                                                                                        <h3 className="text-md font-semibold text-gray-900 truncate">
-                                                                                                                                          {clientGroup.client}
-                                                                                                                                        </h3>
-                                                                                                                                        <p className="text-sm text-gray-600 truncate font-mono bg-gray-100 px-2 py-1 rounded-2xl mt-1 inline-block">
-                                                                                                                                          {clientGroup.document}
-                                                                                                                                        </p>
-                                                                                                                                        <div className="flex items-center text-xs text-gray-500 mt-2">
-                                                                                                                                          <MapPin className="h-3 w-3 mr-1 text-gray-400" />
-                                                                                                                                          <span className="truncate">
-                                                                                                                                            {clientGroup.bairro}, {clientGroup.cidade}
-                                                                                                                                          </span>
-                                                                                                                                        </div>
-                                                                                                                                      </div>
-                                                                                                                                    </div>
-                                                                                                            
-                                                                                                                                    <div className="flex-shrink-0 text-right">
-                                                                                                                                      <div className="text-xl font-bold text-gray-900">
-                                                                                                                                        {formatCurrency(clientGroup.totalValue)}
-                                                                                                                                      </div>
-                                                                                                                                      <div className="text-sm text-gray-600 mt-1">
-                                                                                                                                        {clientGroup.sales.length} venda
-                                                                                                                                        {clientGroup.sales.length !== 1 ? "s" : ""}
-                                                                                                                                      </div>
-                                                                                                                                      <div className="flex flex-col sm:flex-row justify-end gap-1 sm:gap-2 mt-3">
-                                                                                                                                        {clientGroup.totalReceived > 0 && (
-                                                                                                                                          <span className="inline-flex items-center px-2.5 py-1 rounded-2xl text-xs font-semibold bg-green-100 text-green-800 shadow-sm">
-                                                                                                                                            <TrendingUp className="h-3 w-3 mr-1" />
-                                                                                                                                            {formatCurrency(clientGroup.totalReceived)}
-                                                                                                                                          </span>
-                                                                                                                                        )}
-                                                                                                                                        {clientGroup.pendingValue > 0 && (
-                                                                                                                                          <span className="inline-flex items-center px-2.5 py-1 rounded-2xl text-xs font-semibold bg-red-100 text-red-800 shadow-sm">
-                                                                                                                                            <AlertCircle className="h-3 w-3 mr-1" />
-                                                                                                                                            {formatCurrency(clientGroup.pendingValue)}
-                                                                                                                                          </span>
-                                                                                                                                        )}
-                                                                                                                                      </div>
-                                                                                                                                    </div>
-                                                                                                                                  </div>
-                                                                                                            
-                                                                                                                                  {/* Seta para Mobile - na parte inferior */}
-                                                                                                                                  <div className="flex sm:hidden justify-center mt-3 pt-3 border-t border-gray-100">
-                                                                                                                                    <button className="p-2 rounded-full bg-blue-50 hover:bg-blue-100 transition-colors">
-                                                                                                                                      {expandedClients.has(clientGroup.document) ? (
-                                                                                                                                        <ChevronUp className="h-4 w-4 text-blue-600" />
-                                                                                                                                      ) : (
-                                                                                                                                        <ChevronDown className="h-4 w-4 text-blue-600" />
-                                                                                                                                      )}
-                                                                                                                                    </button>
-                                                                                                                                  </div>
-                                                                                                                                </div>
-                                                                                                            
-                                                                                                                                                                                                  {userType === "manager" && (
-                                                                                                                                                                                                    <button
-                                                                                                                                                                                                      onClick={async (e) => {
-                                                                                                                                                                                                        e.stopPropagation(); // Prevent opening client detail modal
-                                                                                                                                                                                                        const fullClientGroup = clientGroups.find(cg => cg.document === clientGroup.document);
-                                                                                                                                                                                                        if (fullClientGroup) {
-                                                                                                                                                                                                          setClientToDelete(fullClientGroup);
-                                                                                                                                                                                                          setShowDeleteConfirmation(true);
-                                                                                                                                                                                                        }
-                                                                                                                                                                                                      }}
-                                                                                                                                                                                                      className="flex items-center justify-center w-12 bg-red-500 text-white hover:bg-red-600 transition-colors flex-shrink-0 self-stretch rounded-r-2xl"
-                                                                                                                                                                                                      title="Deletar Cliente"
-                                                                                                                                                                                                    >
-                                                                                                                                                                                                      <Trash2 className="h-5 w-5" />
-                                                                                                                                                                                                    </button>
-                                                                                                                                                                                                  )}                                                                                                                              </div>
+              <div
+                key={clientGroup.document}
+                className="mt-4 rounded-2xl hover:shadow-sm transition-all duration-200"
+              >
+                {/* Cabeçalho do Cliente */}
+                <div
+                  className="flex items-center bg-white rounded-2xl border border-gray-200 cursor-pointer overflow-hidden"
+                  onClick={() => toggleClientExpansion(clientGroup.document)}
+                >
+                  <div className="flex-1 px-4 sm:px-6 py-3">
+                    <div className="flex items-center gap-1 justify-between">
+                      <div className="flex items-center flex-1 min-w-0">
+                        <div className="flex-shrink-0 mr-3">
+                          <User className="h-5 w-5 text-blue-600" />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-md font-semibold text-gray-900 truncate">
+                            {clientGroup.client}
+                          </h3>
+                          <p className="text-sm text-gray-600 truncate font-mono bg-gray-100 px-2 py-1 rounded-2xl mt-1 inline-block">
+                            {clientGroup.document}
+                          </p>
+                          <div className="flex items-center text-xs text-gray-500 mt-2">
+                            <MapPin className="h-3 w-3 mr-1 text-gray-400" />
+                            <span className="truncate">
+                              {clientGroup.bairro}, {clientGroup.cidade}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex-shrink-0 text-right">
+                        <div className="text-xl font-bold text-gray-900">
+                          {formatCurrency(clientGroup.totalValue)}
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">
+                          {clientGroup.sales.length} venda
+                          {clientGroup.sales.length !== 1 ? "s" : ""}
+                        </div>
+                        <div className="flex flex-col sm:flex-row justify-end gap-1 sm:gap-2 mt-3">
+                          {clientGroup.totalReceived > 0 && (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-2xl text-xs font-semibold bg-green-100 text-green-800 shadow-sm">
+                              <TrendingUp className="h-3 w-3 mr-1" />
+                              {formatCurrency(clientGroup.totalReceived)}
+                            </span>
+                          )}
+                          {clientGroup.pendingValue > 0 && (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-2xl text-xs font-semibold bg-red-100 text-red-800 shadow-sm">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              {formatCurrency(clientGroup.pendingValue)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Seta para Mobile - na parte inferior */}
+                    <div className="flex sm:hidden justify-center mt-3 pt-3 border-t border-gray-100">
+                      <button className="p-2 rounded-full bg-blue-50 hover:bg-blue-100 transition-colors">
+                        {expandedClients.has(clientGroup.document) ? (
+                          <ChevronUp className="h-4 w-4 text-blue-600" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-blue-600" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  {userType === "manager" && (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation(); // Prevent opening client detail modal
+                        const fullClientGroup = clientGroups.find(
+                          (cg) => cg.document === clientGroup.document,
+                        );
+                        if (fullClientGroup) {
+                          setClientToDelete(fullClientGroup);
+                          setShowDeleteConfirmation(true);
+                        }
+                      }}
+                      className="flex items-center justify-center w-12 bg-red-500 text-white hover:bg-red-600 transition-colors flex-shrink-0 self-stretch rounded-r-2xl"
+                      title="Deletar Cliente"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  )}{" "}
+                </div>
 
                 {/* Lista de Vendas do Cliente - Condicional */}
                 {expandedClients.has(clientGroup.document) && (

@@ -270,12 +270,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     if (!user || user.type !== "collector") return [];
 
     const clientGroups = getClientGroups(user.id);
-    
+
     // Debug: Log clientes com apelido no VisitScheduler
-    const clientsWithApelido = clientGroups.filter(client => client.apelido);
+    const clientsWithApelido = clientGroups.filter((client) => client.apelido);
     if (clientsWithApelido.length > 0) {
-      console.log(`[VisitScheduler] Clientes com apelido encontrados:`, 
-        clientsWithApelido.map(c => ({ nome: c.client, apelido: c.apelido, documento: c.document }))
+      console.log(
+        `[VisitScheduler] Clientes com apelido encontrados:`,
+        clientsWithApelido.map((c) => ({
+          nome: c.client,
+          apelido: c.apelido,
+          documento: c.document,
+        })),
       );
     }
 

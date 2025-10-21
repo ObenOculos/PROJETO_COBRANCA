@@ -686,13 +686,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         );
       }
 
-      console.log(`✅ Cliente ${clientDocument} e dados relacionados deletados.`);
+      console.log(
+        `✅ Cliente ${clientDocument} e dados relacionados deletados.`,
+      );
       await refreshData(); // Refresh all data after deletion
     } catch (err) {
       console.error(`Erro ao deletar cliente ${clientDocument}:`, err);
-      setError(
-        err instanceof Error ? err.message : "Erro ao deletar cliente",
-      );
+      setError(err instanceof Error ? err.message : "Erro ao deletar cliente");
       throw err;
     } finally {
       setLoading(false);
@@ -1270,10 +1270,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }
 
         // Debug: Log clientes com apelido
-        const clientsWithApelido = Array.from(clientMap.values()).filter(client => client.apelido);
+        const clientsWithApelido = Array.from(clientMap.values()).filter(
+          (client) => client.apelido,
+        );
         if (clientsWithApelido.length > 0) {
-          console.log(`[getClientGroups] Encontrados ${clientsWithApelido.length} clientes com apelido:`, 
-            clientsWithApelido.map(c => ({ nome: c.client, apelido: c.apelido, documento: c.document }))
+          console.log(
+            `[getClientGroups] Encontrados ${clientsWithApelido.length} clientes com apelido:`,
+            clientsWithApelido.map((c) => ({
+              nome: c.client,
+              apelido: c.apelido,
+              documento: c.document,
+            })),
           );
         }
 

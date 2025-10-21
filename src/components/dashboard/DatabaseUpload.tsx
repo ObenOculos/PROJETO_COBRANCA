@@ -266,8 +266,6 @@ const DatabaseUpload: React.FC = () => {
     });
   };
 
-
-
   // Função para atualizar status no Supabase
   const updateStatusInSupabase = async (
     data: FileData[],
@@ -310,12 +308,17 @@ const DatabaseUpload: React.FC = () => {
       }
 
       if (chunkRecords) {
-        chunkRecords.forEach((rec) => existingIds.add(rec.id_parcela.toString()));
+        chunkRecords.forEach((rec) =>
+          existingIds.add(rec.id_parcela.toString()),
+        );
       }
     }
 
     if (fetchError) {
-      console.error("❌ Erro final ao verificar títulos existentes:", fetchError);
+      console.error(
+        "❌ Erro final ao verificar títulos existentes:",
+        fetchError,
+      );
       return data.map((row) => ({
         id_parcela: row.id_parcela || row["id_parcela"],
         status: "error",
@@ -434,7 +437,8 @@ const DatabaseUpload: React.FC = () => {
       }
 
       if (onProgress) {
-        const percentage = 30 + Math.round(((i + 1) / dataToUpdate.length) * 70);
+        const percentage =
+          30 + Math.round(((i + 1) / dataToUpdate.length) * 70);
         onProgress(
           percentage,
           `Atualizando registro ${i + 1} de ${dataToUpdate.length}...`,
@@ -460,7 +464,12 @@ const DatabaseUpload: React.FC = () => {
       );
 
       if (validData.length === 0) {
-        return { success: true, insertedRows: [], duplicateRows: [], invalidRows };
+        return {
+          success: true,
+          insertedRows: [],
+          duplicateRows: [],
+          invalidRows,
+        };
       }
 
       // 2. Verificar duplicatas em lote
@@ -480,7 +489,9 @@ const DatabaseUpload: React.FC = () => {
           console.error("❌ Erro ao verificar duplicatas:", chunkError);
           return { success: false, error: chunkError.message };
         }
-        chunkRecords?.forEach((rec) => existingIds.add(rec.id_parcela.toString()));
+        chunkRecords?.forEach((rec) =>
+          existingIds.add(rec.id_parcela.toString()),
+        );
       }
 
       // 3. Separar dados em "para inserir" e "duplicatas"
@@ -497,27 +508,54 @@ const DatabaseUpload: React.FC = () => {
       }
 
       // 4. Inserir apenas as novas linhas
-      if (onProgress) onProgress(50, `Inserindo ${rowsToInsert.length} novas parcelas...`);
-      
+      if (onProgress)
+        onProgress(50, `Inserindo ${rowsToInsert.length} novas parcelas...`);
+
       // Mapear e converter tipos
       const processedChunk = rowsToInsert.map((row) => {
         const newRow: { [key: string]: any } = { ...row };
-        newRow.dias_em_atraso = newRow.dias_em_atraso ? Number(newRow.dias_em_atraso) : null;
-        newRow.numero_titulo = newRow.numero_titulo ? Number(newRow.numero_titulo) : null;
+        newRow.dias_em_atraso = newRow.dias_em_atraso
+          ? Number(newRow.dias_em_atraso)
+          : null;
+        newRow.numero_titulo = newRow.numero_titulo
+          ? Number(newRow.numero_titulo)
+          : null;
         newRow.parcela = newRow.parcela ? Number(newRow.parcela) : null;
         newRow.id_parcela = Number(row.id_parcela);
         newRow.venda_n = newRow.venda_n ? Number(newRow.venda_n) : null;
-        newRow.valor_original = newRow.valor_original ? Number(newRow.valor_original.replace(",", ".")) : null;
-        newRow.valor_reajustado = newRow.valor_reajustado ? Number(newRow.valor_reajustado.replace(",", ".")) : null;
-        newRow.multa = newRow.multa ? Number(newRow.multa.replace(",", ".")) : null;
-        newRow.juros_por_dia = newRow.juros_por_dia ? Number(newRow.juros_por_dia.replace(",", ".")) : null;
-        newRow.multa_aplicada = newRow.multa_aplicada ? Number(newRow.multa_aplicada.replace(",", ".")) : null;
-        newRow.juros_aplicado = newRow.juros_aplicado ? Number(newRow.juros_aplicado.replace(",", ".")) : null;
-        newRow.valor_recebido = newRow.valor_recebido ? Number(newRow.valor_recebido.replace(",", ".")) : null;
-        newRow.desconto = newRow.desconto ? Number(newRow.desconto.replace(",", ".")) : null;
-        newRow.acrescimo = newRow.acrescimo ? Number(newRow.acrescimo.replace(",", ".")) : null;
-        newRow.multa_paga = newRow.multa_paga ? Number(newRow.multa_paga.replace(",", ".")) : null;
-        newRow.juros_pago = newRow.juros_pago ? Number(newRow.juros_pago.replace(",", ".")) : null;
+        newRow.valor_original = newRow.valor_original
+          ? Number(newRow.valor_original.replace(",", "."))
+          : null;
+        newRow.valor_reajustado = newRow.valor_reajustado
+          ? Number(newRow.valor_reajustado.replace(",", "."))
+          : null;
+        newRow.multa = newRow.multa
+          ? Number(newRow.multa.replace(",", "."))
+          : null;
+        newRow.juros_por_dia = newRow.juros_por_dia
+          ? Number(newRow.juros_por_dia.replace(",", "."))
+          : null;
+        newRow.multa_aplicada = newRow.multa_aplicada
+          ? Number(newRow.multa_aplicada.replace(",", "."))
+          : null;
+        newRow.juros_aplicado = newRow.juros_aplicado
+          ? Number(newRow.juros_aplicado.replace(",", "."))
+          : null;
+        newRow.valor_recebido = newRow.valor_recebido
+          ? Number(newRow.valor_recebido.replace(",", "."))
+          : null;
+        newRow.desconto = newRow.desconto
+          ? Number(newRow.desconto.replace(",", "."))
+          : null;
+        newRow.acrescimo = newRow.acrescimo
+          ? Number(newRow.acrescimo.replace(",", "."))
+          : null;
+        newRow.multa_paga = newRow.multa_paga
+          ? Number(newRow.multa_paga.replace(",", "."))
+          : null;
+        newRow.juros_pago = newRow.juros_pago
+          ? Number(newRow.juros_pago.replace(",", "."))
+          : null;
         if (newRow.user_id === "") newRow.user_id = null;
         if (newRow.situacao !== undefined) {
           newRow.situacao = validateSituacao(newRow.situacao);
@@ -525,7 +563,9 @@ const DatabaseUpload: React.FC = () => {
         return newRow;
       });
 
-      const { error } = await supabase.from("BANCO_DADOS").insert(processedChunk);
+      const { error } = await supabase
+        .from("BANCO_DADOS")
+        .insert(processedChunk);
 
       if (error) {
         console.error("❌ Erro ao inserir dados:", error);
@@ -635,7 +675,7 @@ const DatabaseUpload: React.FC = () => {
       const data = await processFile(newParcelaFile);
       setProgressPercentage(20);
       setProgressMessage(`Processando ${data.length} linhas...`);
-      
+
       const result = await insertNewParcelasInSupabase(data, (p, m) => {
         setProgressPercentage(20 + p * 0.8); // 20% para processar, 80% para inserir
         setProgressMessage(m);
@@ -664,10 +704,16 @@ const DatabaseUpload: React.FC = () => {
           });
         });
 
-        const successful = resultsForModal.filter(r => r.status === 'success').length;
-        const failed = resultsForModal.filter(r => r.status === 'error').length;
+        const successful = resultsForModal.filter(
+          (r) => r.status === "success",
+        ).length;
+        const failed = resultsForModal.filter(
+          (r) => r.status === "error",
+        ).length;
 
-        setUploadStatus(`Status: ${successful} inserido(s), ${failed} falha(s)/duplicata(s).`);
+        setUploadStatus(
+          `Status: ${successful} inserido(s), ${failed} falha(s)/duplicata(s).`,
+        );
         setProgressMessage("✅ Processo concluído!");
         setProgressPercentage(100);
 
@@ -962,7 +1008,9 @@ const DatabaseUpload: React.FC = () => {
                   <div className="bg-green-50 p-4 rounded-lg flex items-center space-x-3">
                     <CheckCircle className="h-8 w-8 text-green-500" />
                     <div>
-                      <p className="text-sm text-gray-600">Títulos Atualizados</p>
+                      <p className="text-sm text-gray-600">
+                        Títulos Atualizados
+                      </p>
                       <p className="text-2xl font-bold text-gray-900">
                         {
                           uploadResults.filter((r) => r.status === "success")
@@ -997,10 +1045,7 @@ const DatabaseUpload: React.FC = () => {
                   <div>
                     <h4 className="text-md font-semibold text-red-700 mb-2">
                       Títulos com Falha (
-                      {
-                        uploadResults.filter((r) => r.status === "error")
-                          .length
-                      }
+                      {uploadResults.filter((r) => r.status === "error").length}
                       )
                     </h4>
                     <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2 bg-gray-50">
@@ -1021,7 +1066,9 @@ const DatabaseUpload: React.FC = () => {
                             ))}
                         </ul>
                       ) : (
-                        <p className="text-sm text-gray-500 p-4 text-center">Nenhuma falha registrada.</p>
+                        <p className="text-sm text-gray-500 p-4 text-center">
+                          Nenhuma falha registrada.
+                        </p>
                       )}
                     </div>
                   </div>
@@ -1037,7 +1084,7 @@ const DatabaseUpload: React.FC = () => {
                       )
                     </h4>
                     <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2 bg-gray-50">
-                     {uploadResults.filter((r) => r.status === "success")
+                      {uploadResults.filter((r) => r.status === "success")
                         .length > 0 ? (
                         <ul className="divide-y divide-gray-200">
                           {uploadResults
@@ -1051,7 +1098,9 @@ const DatabaseUpload: React.FC = () => {
                             ))}
                         </ul>
                       ) : (
-                        <p className="text-sm text-gray-500 p-4 text-center">Nenhum título atualizado com sucesso.</p>
+                        <p className="text-sm text-gray-500 p-4 text-center">
+                          Nenhum título atualizado com sucesso.
+                        </p>
                       )}
                     </div>
                   </div>
