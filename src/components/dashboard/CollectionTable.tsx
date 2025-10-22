@@ -74,12 +74,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
       if (clientToDelete) {
         try {
           await deleteClient(clientToDelete.document);
-          alert("Cliente deletado com sucesso!");
         } catch (error) {
           console.error("Erro ao deletar cliente:", error);
-          alert(
-            "Erro ao deletar cliente. Verifique o console para mais detalhes.",
-          );
         }
         setClientToDelete(null);
         setShowDeleteConfirmation(false);
