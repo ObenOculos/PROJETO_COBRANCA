@@ -560,7 +560,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                         <div className="flex-1 min-w-0 overflow-hidden">
                           <h3 className="text-base font-medium text-gray-900">
-                            {clientGroup.client.length > 20 ? `${clientGroup.client.slice(0, 20)}...` : clientGroup.client}
+                            {isMobile && clientGroup.client.length > 20 ? `${clientGroup.client.slice(0, 20)}...` : clientGroup.client}
                           </h3>
                           <p className="text-sm text-gray-500 truncate">
                             {clientGroup.document}
@@ -568,7 +568,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                           <div className="flex items-center text-xs text-gray-500 mt-1">
                             <MapPin className="h-3 w-3 mr-1" />
                             <span className="truncate">
-                              {clientGroup.neighborhood}, {clientGroup.city}
+                              {isMobile && `${clientGroup.neighborhood}, ${clientGroup.city}`.length > 25
+                                ? `${`${clientGroup.neighborhood}, ${clientGroup.city}`.slice(0, 25)}...`
+                                : `${clientGroup.neighborhood}, ${clientGroup.city}`}
                             </span>
                           </div>
                         </div>
@@ -784,22 +786,22 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
           <div className="bg-white p-4 rounded-2xl mb-4">
             <div className="space-y-3">
               {/* Linha Principal */}
-              <div className="flex items-center gap-1 justify-between">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-1 justify-between">
+                <div className="flex items-center gap-3 mb-2 sm:mb-0">
                   <DollarSign className="h-5 w-5 text-blue-600" />
                   <h2 className="text-lg font-semibold text-gray-900">
                     {userType === "manager"
                       ? "Todas as Cobranças"
                       : "Minha Carteira"}
                   </h2>
+                </div>
+                <div className="flex flex-1 justify-around sm:flex-none sm:flex items-center gap-1">
                   <div className="flex items-center gap- text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
                     <div className="flex items-center gap-1 text-sm text-gray-500">
                       <Hash className="h-3 w-3" />
                       {filteredAndGroupedSales.length}
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1 justify-between">
                   <div className="flex items-center gap- text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
                     <EyeIcon className="h-4 w-4 text-gray-400" />
                     <select
@@ -1000,7 +1002,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                         <div className="flex-1 min-w-0 overflow-hidden">
                           <h3 className="text-base font-semibold text-gray-800">
-                            {clientGroup.client.length > 20 ? `${clientGroup.client.slice(0, 20)}...` : clientGroup.client}
+                            {isMobile && clientGroup.client.length > 20 ? `${clientGroup.client.slice(0, 20)}...` : clientGroup.client}
                           </h3>
                           <p className="text-sm text-gray-500 truncate font-mono">
                             {clientGroup.document}
@@ -1008,7 +1010,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                           <div className="flex items-center text-xs text-gray-500 mt-1.5">
                             <MapPin className="h-3 w-3 mr-1 text-gray-400" />
                             <span className="truncate">
-                              {clientGroup.bairro}, {clientGroup.cidade}
+                              {isMobile && `${clientGroup.bairro}, ${clientGroup.cidade}`.length > 25
+                                ? `${`${clientGroup.bairro}, ${clientGroup.cidade}`.slice(0, 25)}...`
+                                : `${clientGroup.bairro}, ${clientGroup.cidade}`}
                             </span>
                           </div>
                         </div>
