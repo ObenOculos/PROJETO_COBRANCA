@@ -100,6 +100,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     // Estados para filtros
     const [statusFilter, setStatusFilter] = useState<string>("");
     const [showFilters, setShowFilters] = useState(false);
+    const [showSortOptions, setShowSortOptions] = useState(false);
 
     // Estado para controlar quais clientes estão expandidos
     const [expandedClients, setExpandedClients] = useState<Set<string>>(
@@ -782,12 +783,13 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     return (
       <>
         <div className="rounded-2xl">
-          {/* Header Minimalista */}
+          {/* Header Minimalista Refatorado */}
           <div className="bg-white p-4 rounded-2xl mb-4">
-            <div className="space-y-3">
-              {/* Linha Principal */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-1 justify-between">
-                <div className="flex items-center gap-3 mb-2 sm:mb-0">
+            <div className="flex flex-col gap-3"> {/* Main vertical stack */}
+
+              {/* Top Row: Title and Global Actions (e.g., Expand/Collapse) */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
                   <DollarSign className="h-5 w-5 text-blue-600" />
                   <h2 className="text-lg font-semibold text-gray-900">
                     {userType === "manager"
@@ -795,103 +797,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       : "Minha Carteira"}
                   </h2>
                 </div>
-                <div className="flex flex-1 justify-around sm:flex-none sm:flex items-center gap-1">
-                  <div className="flex items-center gap- text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
-                      <Hash className="h-3 w-3" />
-                      {filteredAndGroupedSales.length}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap- text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
-                    <EyeIcon className="h-4 w-4 text-gray-400" />
-                    <select
-                      id="items-per-page"
-                      name="itemsPerPage"
-                      value={itemsPerPage}
-                      onChange={(e) => {
-                        setItemsPerPage(Number(e.target.value));
-                        setCurrentPage(1);
-                      }}
-                      className="text-sm border-0 bg-transparent focus:ring-0 text-gray-600"
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Linha de Controles */}
-              <div className="flex items-center gap-1 justify-between">
-                {/* Ordenação */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleSort("cliente")}
-                    className={`p-2 rounded-2xl transition-colors ${
-                      sortField === "cliente"
-                        ? "bg-blue-600 text-white"
-                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-                    }`}
-                    title="Ordenar por Cliente"
-                  >
-                    <User className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleSort("valor")}
-                    className={`p-2 rounded-2xl transition-colors ${
-                      sortField === "valor"
-                        ? "bg-blue-600 text-white"
-                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-                    }`}
-                    title="Ordenar por Valor"
-                  >
-                    <DollarSign className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleSort("cidade")}
-                    className={`p-2 rounded-2xl transition-colors ${
-                      sortField === "cidade"
-                        ? "bg-blue-600 text-white"
-                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-                    }`}
-                    title="Ordenar por Cidade"
-                  >
-                    <MapPin className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* Controles Secundários */}
-                <div className="flex items-center gap-1">
-                  {/* Navegação Rápida */}
-                  {totalPages > 1 && (
-                    <>
-                      <button
-                        onClick={() =>
-                          setCurrentPage(Math.max(1, currentPage - 1))
-                        }
-                        disabled={currentPage === 1}
-                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
-                        title="Página anterior"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() =>
-                          setCurrentPage(Math.min(totalPages, currentPage + 1))
-                        }
-                        disabled={currentPage === totalPages}
-                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
-                        title="Próxima página"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                      <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                    </>
-                  )}
-
-                  {/* Filtros */}
+                {/* Global Actions - e.g., Expand/Collapse, maybe Filter for Manager */}
+                <div className="flex items-center gap-2">
+                  {/* Filter Button for Collector (if not already in a dedicated filter bar) */}
                   {userType === "collector" && (
                     <button
                       id="toggle-filters"
@@ -907,7 +815,6 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       <Filter className="h-4 w-4" />
                     </button>
                   )}
-
                   {/* Expansão */}
                   <button
                     onClick={() => {
@@ -946,7 +853,119 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                 </div>
               </div>
 
-              {/* Filtros Expandidos */}
+              {/* Second Row: Total Count and Items Per Page (always visible) */}
+              <div className="flex justify-between sm:flex-row items-start sm:items-center gap-2">
+                {/* Total Count */}
+                <div className="flex items-center gap- text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
+                  <div className="flex items-center gap-1 text-sm text-gray-500">
+                    <Hash className="h-3 w-3" />
+                    {filteredAndGroupedSales.length}
+                  </div>
+                </div>
+                {/* Items Per Page Selector */}
+                <div className="flex items-center gap- text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
+                  <EyeIcon className="h-4 w-4 text-gray-400" />
+                  <select
+                    id="items-per-page"
+                    name="itemsPerPage"
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="text-sm border-0 bg-transparent focus:ring-0 text-gray-600"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              </div>
+
+                                          {/* Third Row: Sorting and Pagination Controls (can be hidden/collapsed on mobile) */}
+                                          <div className="flex justify-between sm:flex-row items-start sm:items-center gap-2 sm:gap-1">
+                                            {/* Sorting */}
+                                            <div className="flex items-center gap-1">
+                                              {isMobile ? (
+                                                <button
+                                                  onClick={() => setShowSortOptions(!showSortOptions)}
+                                                  className={`p-2 rounded-2xl transition-colors ${
+                                                    showSortOptions
+                                                      ? "bg-blue-600 text-white"
+                                                      : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                                                  }`}
+                                                  title="Opções de Ordenação"
+                                                >
+                                                  <ArrowUpDown className="h-4 w-4" />
+                                                </button>
+                                              ) : null}
+                                              {(showSortOptions || !isMobile) && (
+                                                <>
+                                                  <button
+                                                    onClick={() => handleSort("cliente")}
+                                                    className={`p-2 rounded-2xl transition-colors ${
+                                                      sortField === "cliente"
+                                                        ? "bg-blue-600 text-white"
+                                                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"}
+                                                    `}
+                                                    title="Ordenar por Cliente"
+                                                  >
+                                                    <User className="h-4 w-4" />
+                                                  </button>
+                                                  <button
+                                                    onClick={() => handleSort("valor")}
+                                                    className={`p-2 rounded-2xl transition-colors ${
+                                                      sortField === "valor"
+                                                        ? "bg-blue-600 text-white"
+                                                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"}
+                                                    `}
+                                                    title="Ordenar por Valor"
+                                                  >
+                                                    <DollarSign className="h-4 w-4" />
+                                                  </button>
+                                                  <button
+                                                    onClick={() => handleSort("cidade")}
+                                                    className={`p-2 rounded-2xl transition-colors ${
+                                                      sortField === "cidade"
+                                                        ? "bg-blue-600 text-white"
+                                                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"}
+                                                    `}
+                                                    title="Ordenar por Cidade"
+                                                  >
+                                                    <MapPin className="h-4 w-4" />
+                                                  </button>
+                                                </>
+                                              )}
+                                            </div>
+                            
+                                            {/* Quick Navigation (Pagination) */}
+                                            {totalPages > 1 && (
+                                              <div className="flex items-center gap-1">
+                                                <button
+                                                  onClick={() =>
+                                                    setCurrentPage(Math.max(1, currentPage - 1))
+                                                  }
+                                                  disabled={currentPage === 1}
+                                                  className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                                                  title="Página anterior"
+                                                >
+                                                  <ChevronLeft className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                  onClick={() =>
+                                                    setCurrentPage(Math.min(totalPages, currentPage + 1))
+                                                  }
+                                                  disabled={currentPage === totalPages}
+                                                  className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                                                  title="Próxima página"
+                                                >
+                                                  <ChevronRight className="h-4 w-4" />
+                                                </button>
+                                                <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                                              </div>
+                                            )}
+                                          </div>              {/* Expanded Filters (Conditional) */}
               {userType === "collector" && showFilters && (
                 <div className="flex items-center gap-3 py-2 border-t border-gray-100">
                   <Filter className="h-4 w-4 text-blue-600" />
