@@ -561,7 +561,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                         <div className="flex-1 min-w-0 overflow-hidden">
                           <h3 className="text-base font-medium text-gray-900">
-                            {isMobile && clientGroup.client.length > 20 ? `${clientGroup.client.slice(0, 20)}...` : clientGroup.client}
+                            {isMobile && clientGroup.client.length > 20
+                              ? `${clientGroup.client.slice(0, 20)}...`
+                              : clientGroup.client}
                           </h3>
                           <p className="text-sm text-gray-500 truncate">
                             {clientGroup.document}
@@ -569,7 +571,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                           <div className="flex items-center text-xs text-gray-500 mt-1">
                             <MapPin className="h-3 w-3 mr-1" />
                             <span className="truncate">
-                              {isMobile && `${clientGroup.neighborhood}, ${clientGroup.city}`.length > 25
+                              {isMobile &&
+                              `${clientGroup.neighborhood}, ${clientGroup.city}`
+                                .length > 25
                                 ? `${`${clientGroup.neighborhood}, ${clientGroup.city}`.slice(0, 25)}...`
                                 : `${clientGroup.neighborhood}, ${clientGroup.city}`}
                             </span>
@@ -785,8 +789,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
         <div className="rounded-2xl">
           {/* Header Minimalista Refatorado */}
           <div className="bg-white p-4 rounded-2xl mb-4">
-            <div className="flex flex-col gap-3"> {/* Main vertical stack */}
-
+            <div className="flex flex-col gap-3">
+              {" "}
+              {/* Main vertical stack */}
               {/* Top Row: Title and Global Actions (e.g., Expand/Collapse) */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -852,7 +857,6 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   </button>
                 </div>
               </div>
-
               {/* Second Row: Total Count and Items Per Page (always visible) */}
               <div className="flex justify-between sm:flex-row items-start sm:items-center gap-2">
                 {/* Total Count */}
@@ -882,90 +886,93 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                   </select>
                 </div>
               </div>
+              {/* Third Row: Sorting and Pagination Controls (can be hidden/collapsed on mobile) */}
+              <div className="flex justify-between sm:flex-row items-start sm:items-center gap-2 sm:gap-1">
+                {/* Sorting */}
+                <div className="flex items-center gap-1">
+                  {isMobile ? (
+                    <button
+                      onClick={() => setShowSortOptions(!showSortOptions)}
+                      className={`p-2 rounded-2xl transition-colors ${
+                        showSortOptions
+                          ? "bg-blue-600 text-white"
+                          : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                      }`}
+                      title="Opções de Ordenação"
+                    >
+                      <ArrowUpDown className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                  {(showSortOptions || !isMobile) && (
+                    <>
+                      <button
+                        onClick={() => handleSort("cliente")}
+                        className={`p-2 rounded-2xl transition-colors ${
+                          sortField === "cliente"
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                        }
+                                                    `}
+                        title="Ordenar por Cliente"
+                      >
+                        <User className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleSort("valor")}
+                        className={`p-2 rounded-2xl transition-colors ${
+                          sortField === "valor"
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                        }
+                                                    `}
+                        title="Ordenar por Valor"
+                      >
+                        <DollarSign className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleSort("cidade")}
+                        className={`p-2 rounded-2xl transition-colors ${
+                          sortField === "cidade"
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                        }
+                                                    `}
+                        title="Ordenar por Cidade"
+                      >
+                        <MapPin className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
 
-                                          {/* Third Row: Sorting and Pagination Controls (can be hidden/collapsed on mobile) */}
-                                          <div className="flex justify-between sm:flex-row items-start sm:items-center gap-2 sm:gap-1">
-                                            {/* Sorting */}
-                                            <div className="flex items-center gap-1">
-                                              {isMobile ? (
-                                                <button
-                                                  onClick={() => setShowSortOptions(!showSortOptions)}
-                                                  className={`p-2 rounded-2xl transition-colors ${
-                                                    showSortOptions
-                                                      ? "bg-blue-600 text-white"
-                                                      : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-                                                  }`}
-                                                  title="Opções de Ordenação"
-                                                >
-                                                  <ArrowUpDown className="h-4 w-4" />
-                                                </button>
-                                              ) : null}
-                                              {(showSortOptions || !isMobile) && (
-                                                <>
-                                                  <button
-                                                    onClick={() => handleSort("cliente")}
-                                                    className={`p-2 rounded-2xl transition-colors ${
-                                                      sortField === "cliente"
-                                                        ? "bg-blue-600 text-white"
-                                                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"}
-                                                    `}
-                                                    title="Ordenar por Cliente"
-                                                  >
-                                                    <User className="h-4 w-4" />
-                                                  </button>
-                                                  <button
-                                                    onClick={() => handleSort("valor")}
-                                                    className={`p-2 rounded-2xl transition-colors ${
-                                                      sortField === "valor"
-                                                        ? "bg-blue-600 text-white"
-                                                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"}
-                                                    `}
-                                                    title="Ordenar por Valor"
-                                                  >
-                                                    <DollarSign className="h-4 w-4" />
-                                                  </button>
-                                                  <button
-                                                    onClick={() => handleSort("cidade")}
-                                                    className={`p-2 rounded-2xl transition-colors ${
-                                                      sortField === "cidade"
-                                                        ? "bg-blue-600 text-white"
-                                                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"}
-                                                    `}
-                                                    title="Ordenar por Cidade"
-                                                  >
-                                                    <MapPin className="h-4 w-4" />
-                                                  </button>
-                                                </>
-                                              )}
-                                            </div>
-                            
-                                            {/* Quick Navigation (Pagination) */}
-                                            {totalPages > 1 && (
-                                              <div className="flex items-center gap-1">
-                                                <button
-                                                  onClick={() =>
-                                                    setCurrentPage(Math.max(1, currentPage - 1))
-                                                  }
-                                                  disabled={currentPage === 1}
-                                                  className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
-                                                  title="Página anterior"
-                                                >
-                                                  <ChevronLeft className="h-4 w-4" />
-                                                </button>
-                                                <button
-                                                  onClick={() =>
-                                                    setCurrentPage(Math.min(totalPages, currentPage + 1))
-                                                  }
-                                                  disabled={currentPage === totalPages}
-                                                  className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
-                                                  title="Próxima página"
-                                                >
-                                                  <ChevronRight className="h-4 w-4" />
-                                                </button>
-                                                <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                                              </div>
-                                            )}
-                                          </div>              {/* Expanded Filters (Conditional) */}
+                {/* Quick Navigation (Pagination) */}
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() =>
+                        setCurrentPage(Math.max(1, currentPage - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                      title="Página anterior"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() =>
+                        setCurrentPage(Math.min(totalPages, currentPage + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                      className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                      title="Próxima página"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                    <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                  </div>
+                )}
+              </div>{" "}
+              {/* Expanded Filters (Conditional) */}
               {userType === "collector" && showFilters && (
                 <div className="flex items-center gap-3 py-2 border-t border-gray-100">
                   <Filter className="h-4 w-4 text-blue-600" />
@@ -1021,7 +1028,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
                         <div className="flex-1 min-w-0 overflow-hidden">
                           <h3 className="text-base font-semibold text-gray-800">
-                            {isMobile && clientGroup.client.length > 20 ? `${clientGroup.client.slice(0, 20)}...` : clientGroup.client}
+                            {isMobile && clientGroup.client.length > 20
+                              ? `${clientGroup.client.slice(0, 20)}...`
+                              : clientGroup.client}
                           </h3>
                           <p className="text-sm text-gray-500 truncate font-mono">
                             {clientGroup.document}
@@ -1029,7 +1038,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                           <div className="flex items-center text-xs text-gray-500 mt-1.5">
                             <MapPin className="h-3 w-3 mr-1 text-gray-400" />
                             <span className="truncate">
-                              {isMobile && `${clientGroup.bairro}, ${clientGroup.cidade}`.length > 25
+                              {isMobile &&
+                              `${clientGroup.bairro}, ${clientGroup.cidade}`
+                                .length > 25
                                 ? `${`${clientGroup.bairro}, ${clientGroup.cidade}`.slice(0, 25)}...`
                                 : `${clientGroup.bairro}, ${clientGroup.cidade}`}
                             </span>
@@ -1040,7 +1051,9 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                       {/* Financial Info */}
                       <div className="w-full sm:w-auto flex-shrink-0">
                         <div className="flex items-baseline justify-between sm:justify-end sm:gap-4">
-                          <span className="text-sm sm:hidden text-gray-600">Valor Total</span>
+                          <span className="text-sm sm:hidden text-gray-600">
+                            Valor Total
+                          </span>
                           <div className="text-2xl font-bold text-gray-800">
                             {formatCurrency(clientGroup.totalValue, !isMobile)}
                           </div>
@@ -1149,24 +1162,36 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                               {/* Financial info */}
                               <div className="space-y-3">
                                 <div className="flex justify-between items-center">
-                                  <span className="text-sm text-gray-600">Valor Total</span>
+                                  <span className="text-sm text-gray-600">
+                                    Valor Total
+                                  </span>
                                   <span className="font-semibold text-gray-800">
                                     {formatCurrency(sale.totalValue, !isMobile)}
                                   </span>
                                 </div>
                                 {sale.totalReceived > 0 && (
                                   <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">Valor Recebido</span>
+                                    <span className="text-sm text-gray-600">
+                                      Valor Recebido
+                                    </span>
                                     <span className="font-semibold text-green-600">
-                                      {formatCurrency(sale.totalReceived, !isMobile)}
+                                      {formatCurrency(
+                                        sale.totalReceived,
+                                        !isMobile,
+                                      )}
                                     </span>
                                   </div>
                                 )}
                                 {sale.pendingValue > 0 && (
                                   <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">Valor Pendente</span>
+                                    <span className="text-sm text-gray-600">
+                                      Valor Pendente
+                                    </span>
                                     <span className="font-semibold text-red-600">
-                                      {formatCurrency(sale.pendingValue, !isMobile)}
+                                      {formatCurrency(
+                                        sale.pendingValue,
+                                        !isMobile,
+                                      )}
                                     </span>
                                   </div>
                                 )}
@@ -1304,45 +1329,45 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                 </button>
 
                 {/* Números das páginas */}
-                                <div className="flex space-x-3 flex-1 justify-center sm:flex-none">
-                                                    {Array.from(
-                                                      {
-                                                        length: Math.min(maxButtons, totalPages),
-                                                      },
-                                                      (_, i) => {
-                                                        let pageNum;
-                                  
-                                                        if (totalPages <= maxButtons) {
-                                                          pageNum = i + 1;
-                                                        } else if (currentPage <= Math.ceil(maxButtons / 2)) {
-                                                          pageNum = i + 1;
-                                                        } else if (
-                                                          currentPage >=
-                                                          totalPages - Math.floor(maxButtons / 2)
-                                                        ) {
-                                                          pageNum = totalPages - maxButtons + 1 + i;
-                                                        } else {
-                                                          pageNum = currentPage - Math.floor(maxButtons / 2) + i;
-                                                        }
-                                  
-                                                        return (
-                                                          <button
-                                                            key={pageNum}
-                                                            id={`pagination-page-${pageNum}-2`}
-                                                            name={`paginationPage${pageNum}2`}
-                                                            onClick={() => setCurrentPage(pageNum)}
-                                                            className={`px-2 sm:px-2 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[34px] ${
-                                                              pageNum === currentPage
-                                                                ? "bg-white text-gray shadow-lg"
-                                                                : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
-                                                            }`}
-                                                          >
-                                                            {pageNum}
-                                                          </button>
-                                                        );
-                                                      },
-                                                    )}
-                                </div>
+                <div className="flex space-x-3 flex-1 justify-center sm:flex-none">
+                  {Array.from(
+                    {
+                      length: Math.min(maxButtons, totalPages),
+                    },
+                    (_, i) => {
+                      let pageNum;
+
+                      if (totalPages <= maxButtons) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= Math.ceil(maxButtons / 2)) {
+                        pageNum = i + 1;
+                      } else if (
+                        currentPage >=
+                        totalPages - Math.floor(maxButtons / 2)
+                      ) {
+                        pageNum = totalPages - maxButtons + 1 + i;
+                      } else {
+                        pageNum = currentPage - Math.floor(maxButtons / 2) + i;
+                      }
+
+                      return (
+                        <button
+                          key={pageNum}
+                          id={`pagination-page-${pageNum}-2`}
+                          name={`paginationPage${pageNum}2`}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-2 sm:px-2 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[34px] ${
+                            pageNum === currentPage
+                              ? "bg-white text-gray shadow-lg"
+                              : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    },
+                  )}
+                </div>
 
                 {/* Botão Próxima */}
                 <button
