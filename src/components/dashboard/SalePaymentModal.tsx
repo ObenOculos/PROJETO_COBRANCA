@@ -42,6 +42,7 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = memo(
     const [showRescheduleModal, setShowRescheduleModal] = useState(false);
     const [rescheduleDate, setRescheduleDate] = useState("");
     const [rescheduleTime, setRescheduleTime] = useState("");
+    const [withDiscount, setWithDiscount] = useState(false);
 
     useEffect(() => {
       // Desabilitar scroll do body quando o modal estiver aberto
@@ -173,12 +174,18 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = memo(
 
       try {
         setLoading(true);
+
+        let paymentNotes = notes.trim();
+        if (withDiscount) {
+          paymentNotes = `Pagamento com desconto para quitação. ${paymentNotes}`.trim();
+        }
+
         const payment: SalePaymentInput = {
           saleNumber: saleGroup.saleNumber,
           clientDocument: saleGroup.clientDocument,
           paymentAmount: amount,
           paymentMethod,
-          notes: notes.trim() || undefined,
+          notes: paymentNotes || undefined,
         };
 
         await processSalePayment(payment, user.id);
@@ -198,12 +205,16 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = memo(
       const amount = parseFloat(paymentAmount);
       const newPendingValue = saleBalance.remainingBalance - amount;
 
-      if (newPendingValue > 0.01) {
+      if (newPendingValue > 0.01 && !withDiscount) {
         setShowRescheduleModal(true);
       } else {
         const success = await handleProcessPayment();
         if (success) {
-          showSuccessNotification();
+          showSuccessNotification(
+            withDiscount
+              ? "Pagamento com desconto processado com sucesso!"
+              : undefined,
+          );
           onSuccess();
           onClose();
         }
@@ -440,6 +451,21 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = memo(
                   >
                     R$ 500
                   </button>
+                </div>
+
+                {/* Opção de Desconto */}
+                <div className="mt-4">
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={withDiscount}
+                      onChange={(e) => setWithDiscount(e.target.checked)}
+                      className="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    />
+                    <span className="text-gray-700 font-medium">
+                      Pagamento com desconto (quitar saldo devedor)
+                    </span>
+                  </label>
                 </div>
               </div>
 
