@@ -19,7 +19,6 @@ import {
   SalePayment,
   SalePaymentInput,
   SaleBalance,
-  PaymentDistribution,
   ScheduledVisit,
 } from "../types";
 import { supabase } from "../lib/supabase";
@@ -983,48 +982,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       } else {
         // Para qualquer outro status não tratado acima, usar a lógica de parcela individual
         filtered = filtered.filter((c) => {
-          const valorRecebido = c.valor_recebido || 0;
-          const valorOriginal = c.valor_original || 0;
+          const currentStatus = c.status?.toLowerCase() || 'pendente';
+          const filterStatus = filters.status?.toLowerCase();
 
-          let realStatus: string;
+          if (!filterStatus) return true; // No status filter
 
-          if (valorRecebido === 0) {
-            realStatus = "pendente";
-          } else if (valorRecebido >= valorOriginal) {
-            realStatus = "pago";
-          } else {
-            realStatus = "parcial";
+          if (filterStatus === 'pago') {
+            return currentStatus === 'pago' || currentStatus === 'pago com desconto';
           }
-
-          if (c.status) {
-            const status = c.status.toLowerCase();
-            if (
-              [
-                "recebido",
-                "pago",
-                "paid",
-                "received",
-                "quitado",
-                "finalizado",
-              ].includes(status)
-            ) {
-              realStatus = "pago";
-            } else if (
-              [
-                "parcialmente_pago",
-                "parcialmente pago",
-                "pago parcial",
-                "partial",
-                "parcial",
-              ].includes(status)
-            ) {
-              realStatus = "parcial";
-            } else {
-              realStatus = "pendente";
-            }
-          }
-
-          return realStatus === filters.status?.toLowerCase();
+          
+          // For other statuses like 'parcial' or 'pendente', do an exact match.
+          return currentStatus === filterStatus;
         });
       }
     }
@@ -1501,19 +1469,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
-  const refreshDataExceptVisits = async () => {
-    setGlobalLoading(true, "Atualizando dados...");
-    try {
-      await Promise.all([
-        fetchCollections(),
-        fetchUsers(),
-        fetchSalePayments(),
-      ]);
-    } finally {
-      setGlobalLoading(false);
-    }
-  };
-
   const assignCollectorToClients = async (
     collectorId: string,
     clientIdentifiers: { document?: string; clientName?: string }[],
@@ -1769,300 +1724,56 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
-  // Algoritmo de distribuição de pagamento
-  const distributeSalePayment = (
-    installments: Collection[],
-    paymentAmount: number,
-  ): {
-    updatedInstallments: Collection[];
-    distributionDetails: PaymentDistribution[];
-  } => {
-    console.log(
-      "Distribuindo pagamento:",
-      paymentAmount,
-      "entre",
-      installments.length,
-      "parcelas",
-    );
-
-    // 1. Filtrar apenas parcelas pendentes
-    const pendingInstallments = installments.filter(
-      (inst) => inst.valor_recebido < inst.valor_original,
-    );
-
-    if (pendingInstallments.length === 0) {
-      return { updatedInstallments: installments, distributionDetails: [] };
-    }
-
-    // 2. Ordenar por prioridade (vencidas primeiro, depois por data)
-    const sortedInstallments = [...pendingInstallments].sort((a, b) => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const aDate = new Date(a.data_vencimento || "");
-      const bDate = new Date(b.data_vencimento || "");
-      aDate.setHours(0, 0, 0, 0);
-      bDate.setHours(0, 0, 0, 0);
-
-      const aOverdue = aDate < today;
-      const bOverdue = bDate < today;
-
-      // Vencidas primeiro
-      if (aOverdue && !bOverdue) return -1;
-      if (!aOverdue && bOverdue) return 1;
-
-      // Se ambas vencidas ou ambas não vencidas, ordenar por data
-      return aDate.getTime() - bDate.getTime();
-    });
-
-    // 3. Distribuir o pagamento
-    let remainingPayment = paymentAmount;
-    const distributionDetails: PaymentDistribution[] = [];
-    const updatedInstallments = [...installments];
-
-    // Função helper para arredondamento
-    const roundTo2Decimals = (num: number) =>
-      Math.round((num + Number.EPSILON) * 100) / 100;
-
-    for (const installment of sortedInstallments) {
-      if (remainingPayment <= 0.01) break; // Parar se restante for <= 1 centavo
-
-      const pendingAmount = roundTo2Decimals(
-        installment.valor_original - installment.valor_recebido,
-      );
-      const paymentForThisInstallment = roundTo2Decimals(
-        Math.min(remainingPayment, pendingAmount),
-      );
-
-      if (paymentForThisInstallment > 0.01) {
-        // Só processar se valor for > 1 centavo
-        // Encontrar e atualizar a parcela no array
-        const installmentIndex = updatedInstallments.findIndex(
-          (inst) => inst.id_parcela === installment.id_parcela,
-        );
-
-        if (installmentIndex !== -1) {
-          // Garantir que os valores são números
-          const currentReceived =
-            Number(updatedInstallments[installmentIndex].valor_recebido) || 0;
-          const paymentAmount = Number(paymentForThisInstallment) || 0;
-
-          console.log("🔢 Verificando tipos de valores:", {
-            installmentId: installment.id_parcela,
-            currentReceived: {
-              value: currentReceived,
-              type: typeof currentReceived,
-            },
-            paymentAmount: { value: paymentAmount, type: typeof paymentAmount },
-          });
-
-          const newValueReceived = roundTo2Decimals(
-            currentReceived + paymentAmount,
-          );
-          const remainingValue = roundTo2Decimals(
-            updatedInstallments[installmentIndex].valor_original -
-              newValueReceived,
-          );
-
-          updatedInstallments[installmentIndex] = {
-            ...updatedInstallments[installmentIndex],
-            valor_recebido: newValueReceived,
-            status:
-              remainingValue <= 0.01 // Considera pago se restante for <= 1 centavo
-                ? "recebido"
-                : "parcialmente_pago",
-            data_de_recebimento: new Date().toISOString().split("T")[0],
-          };
-
-          distributionDetails.push({
-            installmentId: installment.id_parcela,
-            originalAmount: pendingAmount,
-            appliedAmount: paymentForThisInstallment,
-            installmentStatus:
-              updatedInstallments[installmentIndex].status || "pendente",
-          });
-
-          remainingPayment = roundTo2Decimals(
-            remainingPayment - paymentForThisInstallment,
-          );
-        }
-      }
-    }
-
-    console.log("Distribuição concluída. Valor restante:", remainingPayment);
-    console.log("Detalhes da distribuição:", distributionDetails);
-
-    return { updatedInstallments, distributionDetails };
-  };
-
   const processSalePayment = async (
     payment: SalePaymentInput & { discountAmount?: number },
     collectorId: string,
   ) => {
+    setGlobalLoading(true, "Processando pagamento...");
     try {
-      setLoading(true);
-      console.log("Processando pagamento de venda:", payment);
-
-      // 1. Buscar todas as parcelas da venda para o cliente
-      const saleInstallments = collections.filter(
-        (collection) =>
-          Number(collection.venda_n) === Number(payment.saleNumber) &&
-          collection.documento === payment.clientDocument,
-      );
-
-      if (saleInstallments.length === 0) {
-        console.error("Debug - Erro ao buscar parcelas:", {
-          saleNumber: payment.saleNumber,
-          saleNumberType: typeof payment.saleNumber,
-          clientDocument: payment.clientDocument,
-          totalCollections: collections.length,
-          samplesOfVendaN: collections.slice(0, 5).map((c) => ({
-            venda_n: c.venda_n,
-            type: typeof c.venda_n,
-            documento: c.documento,
-          })),
-        });
-        throw new Error("Nenhuma parcela encontrada para esta venda e cliente");
-      }
-
-      console.log("Parcelas encontradas:", saleInstallments.length);
-
-      // 2. Distribuir o pagamento
-      const amountToDistribute =
-        (payment.paymentAmount || 0) + (payment.discountAmount || 0);
-      const { updatedInstallments, distributionDetails } =
-        distributeSalePayment(saleInstallments, amountToDistribute);
-
-      // 3. Verificar se está offline
+      // OFFLINE LOGIC
       if (!isOnline) {
         console.log("Modo offline: Adicionando pagamento à fila");
-
-        // Adicionar à fila offline
-        const collector = users.find((u) => u.id === collectorId);
-        const client = saleInstallments[0];
-
         addToOfflineQueue({
           type: "DISTRIBUTE_PAYMENT",
           data: {
             saleNumber: payment.saleNumber,
             clientDocument: payment.clientDocument,
-            paymentAmount: payment.paymentAmount,
-            discountAmount: payment.discountAmount,
+            paymentAmount: payment.paymentAmount || 0,
+            discountAmount: payment.discountAmount || 0,
             paymentMethod: payment.paymentMethod,
             notes: payment.notes,
             collectorId: collectorId,
-            distributionDetails: distributionDetails,
-            client_name: client?.cliente || "Cliente não informado",
-            collector_name: collector?.name || "Cobrador não encontrado",
-            store_name: client?.nome_da_loja || null,
           },
         });
-
-        // Atualizar estado local imediatamente para melhor UX
-        setCollections((prevCollections) =>
-          prevCollections.map((collection) => {
-            const updatedInstallment = updatedInstallments.find(
-              (inst) => inst.id_parcela === collection.id_parcela,
-            );
-            return updatedInstallment || collection;
-          }),
-        );
-
-        // Mostrar mensagem de sucesso offline
         console.log("✅ Pagamento adicionado à fila offline");
-        setLoading(false);
-        return;
+        return; // Exit early
       }
 
-      // 4. Atualizar no banco de dados (apenas quando online)
-      for (const installment of updatedInstallments) {
-        const originalInstallment = saleInstallments.find(
-          (inst) => inst.id_parcela === installment.id_parcela,
-        );
+      // ONLINE LOGIC
+      console.log("Chamando RPC process_payment para venda:", payment);
+      const { error } = await supabase.rpc('process_payment', {
+        p_collector_id: collectorId,
+        p_client_document: payment.clientDocument,
+        p_payment_amount: payment.paymentAmount || 0,
+        p_discount_amount: payment.discountAmount || 0,
+        p_payment_method: payment.paymentMethod || 'default',
+        p_notes: payment.notes || '',
+        p_sale_number: payment.saleNumber,
+      });
 
-        // Se houve mudança, atualizar no banco
-        if (
-          originalInstallment &&
-          (originalInstallment.valor_recebido !== installment.valor_recebido ||
-            originalInstallment.status !== installment.status)
-        ) {
-          const { error } = await supabase
-            .from("BANCO_DADOS")
-            .update({
-              valor_recebido: installment.valor_recebido,
-              status: installment.status,
-              data_de_recebimento: installment.data_de_recebimento,
-            })
-            .eq("id_parcela", installment.id_parcela);
-
-          if (error) {
-            console.error("Erro ao atualizar parcela:", error);
-            throw error;
-          }
-        }
+      if (error) {
+        console.error("Erro ao chamar RPC process_payment:", error);
+        throw new Error(`Erro no processamento do pagamento: ${error.message}`);
       }
 
-      // 4. Registrar o pagamento na tabela sale_payments
-      const collector = users.find((u) => u.id === collectorId);
-      const client = saleInstallments[0]; // Usar primeira parcela para obter dados do cliente
-
-      const paymentRecord = {
-        sale_number: payment.saleNumber,
-        client_document: payment.clientDocument,
-        client_name: client?.cliente || "Cliente não informado",
-        payment_amount: payment.paymentAmount,
-        payment_date: new Date().toISOString().split("T")[0],
-        payment_method: payment.paymentMethod,
-        notes: payment.notes || "",
-        collector_id: collectorId,
-        collector_name: collector?.name || "Cobrador não encontrado",
-        distribution_details: distributionDetails,
-        store_name: client?.nome_da_loja || null,
-        discount_amount: payment.discountAmount,
-      };
-
-      const { data: insertedPayment, error: paymentError } = await supabase
-        .from("sale_payments")
-        .insert(paymentRecord)
-        .select()
-        .single();
-
-      if (paymentError) {
-        console.error(
-          "Erro ao registrar pagamento na tabela sale_payments:",
-          paymentError,
-        );
-        // Não falhar se não conseguir registrar o histórico, apenas logar
-      } else {
-        console.log(
-          "✅ Pagamento registrado na tabela sale_payments:",
-          insertedPayment,
-        );
-      }
-
-      // 5. Atualizar estado local das collections imediatamente
-      setCollections((prevCollections) =>
-        prevCollections.map((collection) => {
-          const updatedInstallment = updatedInstallments.find(
-            (inst) => inst.id_parcela === collection.id_parcela,
-          );
-          return updatedInstallment || collection;
-        }),
-      );
-
-      // 6. Atualizar dados do banco (refresh collections apenas)
-      await refreshDataExceptVisits();
-
-      // 7. Atualizar visitas agendadas do cliente com dados refreshed
-      await updateScheduledVisitsAfterPayment(payment.clientDocument);
+      console.log("✅ RPC process_payment executado com sucesso.");
+      await refreshData();
     } catch (err) {
       console.error("Erro ao processar pagamento de venda:", err);
-      setError(
-        err instanceof Error ? err.message : "Erro ao processar pagamento",
-      );
+      setError(err instanceof Error ? err.message : "Erro ao processar pagamento");
       throw err;
     } finally {
-      setLoading(false);
+      setGlobalLoading(false);
     }
   };
 
@@ -2073,292 +1784,56 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     notes: string,
     collectorId: string,
   ) => {
+    setGlobalLoading(true, "Processando pagamento...");
     try {
-      setLoading(true);
-      console.log(
-        "Processando pagamento geral do cliente:",
-        clientDocument,
-        "Valor:",
-        paymentAmount,
-      );
-
-      // 1. Buscar todas as parcelas pendentes do cliente
-      console.log("Total de collections no contexto:", collections.length);
-      console.log("Buscando parcelas para cliente:", clientDocument);
-
-      const clientInstallments = collections.filter(
-        (collection) =>
-          collection.documento === clientDocument &&
-          collection.valor_recebido < collection.valor_original,
-      );
-
-      console.log(
-        "Parcelas encontradas para o cliente:",
-        clientInstallments.length,
-      );
-
-      if (clientInstallments.length === 0) {
-        throw new Error(
-          `Nenhuma parcela pendente encontrada para o cliente ${clientDocument}`,
-        );
-      }
-
-      console.log("Parcelas pendentes encontradas:", clientInstallments.length);
-
-      // 2. Ordenar por prioridade (vencidas primeiro, depois por data de vencimento)
-      const sortedInstallments = clientInstallments.sort((a, b) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const aDate = new Date(a.data_vencimento || "");
-        const bDate = new Date(b.data_vencimento || "");
-        aDate.setHours(0, 0, 0, 0);
-        bDate.setHours(0, 0, 0, 0);
-
-        const aOverdue = aDate < today;
-        const bOverdue = bDate < today;
-
-        // Parcelas vencidas primeiro
-        if (aOverdue && !bOverdue) return -1;
-        if (!aOverdue && bOverdue) return 1;
-
-        // Depois por data de vencimento
-        return aDate.getTime() - bDate.getTime();
-      });
-
-      // 3. Distribuir o pagamento
-      let remainingPayment = paymentAmount;
-      const updatedInstallments: Collection[] = [];
-      const distributionDetails: any[] = [];
-
-      for (const installment of sortedInstallments) {
-        if (remainingPayment <= 0) break;
-
-        // Garantir que os valores são números
-        const originalAmount = Number(installment.valor_original) || 0;
-        const currentReceived = Number(installment.valor_recebido) || 0;
-        const pendingAmount = originalAmount - currentReceived;
-        const paymentForThisInstallment = Math.min(
-          remainingPayment,
-          pendingAmount,
-        );
-
-        console.log("🔢 ProcessGeneralPayment - Verificando valores:", {
-          installmentId: installment.id_parcela,
-          originalAmount: {
-            value: originalAmount,
-            type: typeof originalAmount,
-          },
-          currentReceived: {
-            value: currentReceived,
-            type: typeof currentReceived,
-          },
-          pendingAmount,
-          paymentForThisInstallment,
-        });
-
-        if (paymentForThisInstallment > 0) {
-          const newReceivedAmount = currentReceived + paymentForThisInstallment;
-
-          const updatedInstallment: Collection = {
-            ...installment,
-            valor_recebido: newReceivedAmount,
-            status:
-              newReceivedAmount >= originalAmount
-                ? "recebido"
-                : "parcialmente_pago",
-            data_de_recebimento:
-              newReceivedAmount >= originalAmount
-                ? new Date().toISOString().split("T")[0]
-                : installment.data_de_recebimento,
-          };
-
-          updatedInstallments.push(updatedInstallment);
-
-          distributionDetails.push({
-            installmentId: installment.id_parcela,
-            saleNumber: installment.venda_n,
-            installmentNumber: installment.parcela,
-            originalAmount: pendingAmount,
-            appliedAmount: paymentForThisInstallment,
-            installmentStatus: updatedInstallment.status,
-          });
-
-          remainingPayment -= paymentForThisInstallment;
-        }
-      }
-
-      // 4. Verificar se está offline
+      // OFFLINE LOGIC
       if (!isOnline) {
         console.log("Modo offline: Adicionando pagamento geral à fila");
-
-        // Agrupar por venda para criar registros de pagamento separados
-        const salesMap = new Map<number, any>();
-
-        const collector = users.find((u) => u.id === collectorId);
-        const client = clientInstallments[0];
-
-        distributionDetails.forEach((detail) => {
-          if (!salesMap.has(detail.saleNumber)) {
-            salesMap.set(detail.saleNumber, {
-              saleNumber: detail.saleNumber,
-              clientDocument: clientDocument,
-              paymentAmount: 0,
-              paymentMethod: paymentMethod,
-              notes: notes,
-              collectorId: collectorId,
-              distributionDetails: [],
-              client_name: client?.cliente || "Cliente não informado",
-              collector_name: collector?.name || "Cobrador não encontrado",
-              store_name: client?.nome_da_loja || null,
-            });
-          }
-
-          const sale = salesMap.get(detail.saleNumber);
-          sale.paymentAmount =
-            Number(sale.paymentAmount) + Number(detail.appliedAmount);
-          sale.distributionDetails.push({
-            installmentId: detail.installmentId,
-            originalAmount: detail.originalAmount,
-            appliedAmount: detail.appliedAmount,
-            installmentStatus: detail.installmentStatus,
-          });
+        addToOfflineQueue({
+          type: "DISTRIBUTE_PAYMENT",
+          data: {
+            saleNumber: null,
+            clientDocument: clientDocument,
+            paymentAmount: paymentAmount,
+            discountAmount: 0,
+            paymentMethod: paymentMethod,
+            notes: notes,
+            collectorId: collectorId,
+          },
         });
-
-        // Adicionar cada venda à fila offline
-        for (const salePayment of salesMap.values()) {
-          addToOfflineQueue({
-            type: "DISTRIBUTE_PAYMENT",
-            data: salePayment,
-          });
-        }
-
-        // Atualizar estado local imediatamente para melhor UX
-        setCollections((prevCollections) =>
-          prevCollections.map((collection) => {
-            const updatedInstallment = updatedInstallments.find(
-              (inst) => inst.id_parcela === collection.id_parcela,
-            );
-            return updatedInstallment || collection;
-          }),
-        );
-
         console.log("✅ Pagamento geral adicionado à fila offline");
-        setLoading(false);
-        return;
+        return; // Exit early
       }
 
-      // 5. Atualizar no banco de dados (apenas quando online)
+      // ONLINE LOGIC
       console.log(
-        "Atualizando",
-        updatedInstallments.length,
-        "parcelas no banco de dados...",
+        "Chamando RPC process_payment para pagamento geral:",
+        clientDocument,
       );
-      for (const installment of updatedInstallments) {
-        console.log(
-          "Atualizando parcela",
-          installment.id_parcela,
-          "valor recebido:",
-          installment.valor_recebido,
+      const { error } = await supabase.rpc('process_payment', {
+        p_collector_id: collectorId,
+        p_client_document: clientDocument,
+        p_payment_amount: paymentAmount || 0,
+        p_discount_amount: 0,
+        p_payment_method: paymentMethod || 'default',
+        p_notes: notes || '',
+        p_sale_number: null,
+      });
+
+      if (error) {
+        console.error(
+          "Erro ao chamar RPC process_payment para pagamento geral:",
+          error,
         );
-
-        const { error: updateError } = await supabase
-          .from("BANCO_DADOS")
-          .update({
-            valor_recebido: installment.valor_recebido,
-            status: installment.status,
-            data_de_recebimento: installment.data_de_recebimento,
-          })
-          .eq("id_parcela", installment.id_parcela);
-
-        if (updateError) {
-          console.error(
-            "Erro ao atualizar parcela",
-            installment.id_parcela,
-            ":",
-            updateError,
-          );
-          throw updateError;
-        }
-      }
-
-      // 6. Registrar o pagamento geral na tabela sale_payments
-      try {
-        const collector = users.find((u) => u.id === collectorId);
-        const client = updatedInstallments[0]; // Usar primeira parcela para obter dados do cliente
-
-        const affectedSales = [
-          ...new Set(distributionDetails.map((d) => d.saleNumber)),
-        ];
-
-        for (const saleNumber of affectedSales) {
-          const saleDistribution = distributionDetails.filter(
-            (d) => d.saleNumber === saleNumber,
-          );
-          const salePaymentAmount = saleDistribution.reduce(
-            (sum, d) => sum + d.appliedAmount,
-            0,
-          );
-
-          const paymentRecord = {
-            sale_number: saleNumber,
-            client_document: clientDocument,
-            client_name: client?.cliente || "Cliente não informado",
-            payment_amount: salePaymentAmount,
-            payment_date: new Date().toISOString().split("T")[0],
-            payment_method: paymentMethod,
-            notes: `Pagamento geral do cliente. ${notes}`.trim(),
-            collector_id: collectorId,
-            collector_name: collector?.name || "Cobrador não encontrado",
-            distribution_details: saleDistribution,
-            store_name: client?.nome_da_loja || null,
-          };
-
-          const { data: insertedPayment, error: paymentError } = await supabase
-            .from("sale_payments")
-            .insert(paymentRecord)
-            .select()
-            .single();
-
-          if (paymentError) {
-            console.error(
-              "Erro ao registrar pagamento na tabela sale_payments:",
-              paymentError,
-            );
-            // Não falhar se não conseguir registrar o histórico, apenas logar
-          } else {
-            console.log(
-              "✅ Pagamento registrado na tabela sale_payments:",
-              insertedPayment,
-            );
-          }
-        }
-      } catch (historyError) {
-        console.warn(
-          "Erro ao registrar histórico de pagamento (não crítico):",
-          historyError,
+        throw new Error(
+          `Erro no processamento do pagamento geral: ${error.message}`,
         );
       }
 
-      // 6. Atualizar estado local das collections imediatamente
-      setCollections((prevCollections) =>
-        prevCollections.map((collection) => {
-          const updatedInstallment = updatedInstallments.find(
-            (inst) => inst.id_parcela === collection.id_parcela,
-          );
-          return updatedInstallment || collection;
-        }),
-      );
-
-      // 7. Atualizar dados do banco (refresh collections apenas)
-      await refreshDataExceptVisits();
-
-      // 8. Atualizar visitas agendadas do cliente com dados refreshed
-      await updateScheduledVisitsAfterPayment(clientDocument);
-
-      console.log("✅ Pagamento geral processado com sucesso!");
+      console.log("✅ RPC process_payment (geral) executado com sucesso.");
+      await refreshData();
     } catch (err) {
-      console.error("Erro ao processar pagamento geral:", err);
+      console.error("Erro ao processar pagamento geral via RPC:", err);
       setError(
         err instanceof Error
           ? err.message
@@ -2366,7 +1841,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
       throw err;
     } finally {
-      setLoading(false);
+      setGlobalLoading(false);
     }
   };
 

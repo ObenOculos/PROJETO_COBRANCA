@@ -117,13 +117,15 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
       data_de_recebimento: correctedDate || null,
     };
 
+    const discount = collection.desconto || 0;
+
     // Atualizar status baseado no valor
-    if (value === 0) {
-      updates.status = "pendente";
-    } else if (value >= collection.valor_original) {
-      updates.status = "recebido";
+    if (value + discount >= collection.valor_original) {
+      updates.status = discount > 0 ? "Pago com Desconto" : "Pago";
+    } else if (value > 0 || discount > 0) {
+      updates.status = "Parcial";
     } else {
-      updates.status = "parcialmente_pago";
+      updates.status = "pendente";
     }
 
     await updateCollection(collection.id_parcela, updates);
@@ -268,9 +270,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                       >
                         {formatCurrency(collection.valor_recebido)}
                       </p>
-                      {collection.valor_recebido > 0 &&
-                        collection.valor_recebido <
-                          collection.valor_original && (
+                      {collection.status === 'Parcial' && (
                           <p className="text-sm text-red-600">
                             Restante:{" "}
                             {formatCurrency(

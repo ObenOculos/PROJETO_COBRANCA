@@ -24,16 +24,13 @@ export interface OfflineAction {
 export interface DistributePaymentAction {
   type: "DISTRIBUTE_PAYMENT";
   data: {
-    saleNumber: number;
+    saleNumber: number | null;
     clientDocument: string;
     paymentAmount: number;
+    discountAmount?: number;
     paymentMethod?: string;
     notes?: string;
     collectorId: string;
-    client_name?: string;
-    collector_name?: string;
-    store_name?: string;
-    distributionDetails: PaymentDistribution[];
   };
 }
 
@@ -262,81 +259,30 @@ export const useOffline = () => {
   };
 
   const processDistributePayment = async (data: unknown) => {
-    // Type guard para verificar se data tem a estrutura esperada
     if (!data || typeof data !== "object") {
       throw new Error("Dados inválidos para distribuição de pagamento");
     }
 
     const paymentData = data as DistributePaymentAction["data"];
-    try {
-      // Criar registro de pagamento no banco
-      const paymentRecord = {
-        sale_number: paymentData.saleNumber,
-        client_document: paymentData.clientDocument,
-        client_name: paymentData.client_name,
-        payment_amount: paymentData.paymentAmount,
-        payment_method: paymentData.paymentMethod || "dinheiro",
-        notes: paymentData.notes || "",
-        collector_id: paymentData.collectorId,
-        collector_name: paymentData.collector_name,
-        store_name: paymentData.store_name,
-        payment_date: new Date().toISOString().split("T")[0],
-        distribution_details: paymentData.distributionDetails,
-      };
 
-      const { error: paymentError } = await supabase
-        .from("sale_payments")
-        .insert(paymentRecord);
+    console.log("Sincronizando pagamento offline via RPC:", paymentData);
 
-      if (paymentError) {
-        throw new Error(`Erro ao salvar pagamento: ${paymentError.message}`);
-      }
+    const { error } = await supabase.rpc('process_payment', {
+        p_collector_id: paymentData.collectorId,
+        p_client_document: paymentData.clientDocument,
+        p_payment_amount: paymentData.paymentAmount,
+        p_discount_amount: paymentData.discountAmount || 0,
+        p_payment_method: paymentData.paymentMethod || 'default',
+        p_notes: paymentData.notes || '',
+        p_sale_number: paymentData.saleNumber
+    });
 
-      for (const distribution of paymentData.distributionDetails) {
-        const { data: currentData, error: fetchError } = await supabase
-          .from("BANCO_DADOS")
-          .select("valor_recebido, valor_original")
-          .eq("id_parcela", distribution.installmentId)
-          .single();
-
-        if (fetchError) {
-          throw new Error(
-            `Erro ao buscar parcela ${distribution.installmentId}: ${fetchError.message}`,
-          );
-        }
-
-        const currentReceived = currentData?.valor_recebido || 0;
-        const originalValue = currentData?.valor_original || 0;
-        const appliedAmount = distribution.appliedAmount || 0;
-
-        const newReceivedValue = currentReceived + appliedAmount;
-
-        const remainingValue = originalValue - newReceivedValue;
-        const newStatus =
-          remainingValue <= 0.01 ? "recebido" : "parcialmente_pago";
-
-        if (appliedAmount <= 0) {
-          continue;
-        }
-
-        const { error: updateError } = await supabase
-          .from("BANCO_DADOS")
-          .update({
-            valor_recebido: newReceivedValue,
-            status: newStatus,
-            data_de_recebimento: new Date().toISOString().split("T")[0],
-          })
-          .eq("id_parcela", distribution.installmentId);
-
-        if (updateError) {
-          throw new Error(
-            `Erro ao atualizar parcela ${distribution.installmentId}: ${updateError.message}`,
-          );
-        }
-      }
-    } catch (error) {
-      throw error;
+    if (error) {
+        console.error("Erro ao sincronizar pagamento offline via RPC:", error);
+        throw new Error(`Erro ao sincronizar pagamento: ${error.message}`);
     }
+
+    console.log("✅ Pagamento offline sincronizado com sucesso.");
   };
 
   const showSyncNotification = (

@@ -396,14 +396,12 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                     {saleData.collections.map((collection, index) => {
                       const pending =
                         collection.valor_original - collection.valor_recebido;
+                      const dbStatus = collection.status?.toLowerCase() || 'pendente';
                       let status = "pendente";
-                      if (collection.valor_recebido > 0 && pending > 0) {
-                        status = "parcial";
-                      } else if (
-                        pending <= 0.01 &&
-                        collection.valor_recebido > 0
-                      ) {
+                      if (dbStatus === 'pago' || dbStatus === 'pago com desconto') {
                         status = "pago";
+                      } else if (dbStatus === 'parcial') {
+                        status = "parcial";
                       }
 
                       return (
