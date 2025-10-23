@@ -52,12 +52,17 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
       (sum, c) => sum + c.valor_recebido,
       0,
     );
-    const totalPending = totalOriginal - totalReceived;
+    const totalDiscount = collections.reduce(
+      (sum, c) => sum + (c.desconto || 0),
+      0,
+    );
+
+    const totalPending = totalOriginal - totalReceived - totalDiscount;
 
     let saleStatus = "pendente";
-    if (totalReceived > 0 && totalPending > 0) {
+    if (totalReceived > 0 && totalPending > 0.01) {
       saleStatus = "parcial";
-    } else if (totalPending <= 0.01 && totalReceived > 0) {
+    } else if (totalPending <= 0.01 && (totalReceived > 0 || totalDiscount > 0)) {
       saleStatus = "pago";
     }
 
@@ -65,6 +70,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
       ...firstCollection,
       totalOriginal,
       totalReceived,
+      totalDiscount,
       totalPending,
       saleStatus,
       installmentsCount: collections.length,
@@ -209,19 +215,35 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-2xl border border-orange-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-orange-700">
-                    Pendente
-                  </p>
-                  <p className="text-2xl font-bold text-orange-900">
-                    {formatCurrency(saleData.totalPending)}
-                  </p>
+            {saleData.saleStatus === 'pago' && saleData.totalDiscount > 0 ? (
+              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-4 rounded-2xl border border-purple-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-purple-700">
+                      Desconto Total
+                    </p>
+                    <p className="text-2xl font-bold text-purple-900">
+                      {formatCurrency(saleData.totalDiscount)}
+                    </p>
+                  </div>
+                  <Calendar className="h-8 w-8 text-purple-600" />
                 </div>
-                <Calendar className="h-8 w-8 text-orange-600" />
               </div>
-            </div>
+            ) : (
+              <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-2xl border border-orange-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-orange-700">
+                      Pendente
+                    </p>
+                    <p className="text-2xl font-bold text-orange-900">
+                      {formatCurrency(saleData.totalPending)}
+                    </p>
+                  </div>
+                  <Calendar className="h-8 w-8 text-orange-600" />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sale Information */}

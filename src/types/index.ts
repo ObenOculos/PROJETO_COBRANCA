@@ -279,6 +279,7 @@ export interface CollectionContextType {
     paymentMethod: string,
     notes: string,
     collectorId: string,
+    discountAmount?: number,
   ) => Promise<void>;
   getSalePayments: (
     saleNumber: number,
@@ -373,6 +374,7 @@ export interface SalePaymentInput {
 export interface SaleBalance {
   totalValue: number;
   totalPaid: number;
+  totalDiscount?: number;
   remainingBalance: number;
   status: "pending" | "partially_paid" | "fully_paid";
   installmentBreakdown: {

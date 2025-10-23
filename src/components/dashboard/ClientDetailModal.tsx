@@ -717,10 +717,19 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                 <div className="text-sm font-medium text-gray-900">
                                   {formatCurrency(sale.totalValue)}
                                 </div>
-                                <div className="text-xs text-red-600 font-medium">
-                                  Restante:{" "}
-                                  {formatCurrency(saleBalance.remainingBalance)}
-                                </div>
+                                {saleBalance.status === "fully_paid" &&
+                                saleBalance.totalDiscount &&
+                                saleBalance.totalDiscount > 0 ? (
+                                  <div className="text-xs text-blue-600 font-medium">
+                                    Desconto:{" "}
+                                    {formatCurrency(saleBalance.totalDiscount)}
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-red-600 font-medium">
+                                    Restante:{" "}
+                                    {formatCurrency(saleBalance.remainingBalance)}
+                                  </div>
+                                )}
                               </div>
                             </div>
 
@@ -786,16 +795,29 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                     Já Pago
                                   </div>
                                 </div>
-                                <div className="text-center p-3 bg-red-50 rounded-2xl">
-                                  <div className="text-sm sm:text-lg font-bold text-red-600">
-                                    {formatCurrency(
-                                      saleBalance.remainingBalance,
-                                    )}
+                                {saleBalance.status === 'fully_paid' &&
+                                saleBalance.totalDiscount &&
+                                saleBalance.totalDiscount > 0 ? (
+                                  <div className="text-center p-3 bg-blue-50 rounded-2xl">
+                                    <div className="text-sm sm:text-lg font-bold text-blue-600">
+                                      {formatCurrency(saleBalance.totalDiscount)}
+                                    </div>
+                                    <div className="text-xs text-gray-600">
+                                      Desconto Total
+                                    </div>
                                   </div>
-                                  <div className="text-xs text-gray-600">
-                                    Saldo Devedor
+                                ) : (
+                                  <div className="text-center p-3 bg-red-50 rounded-2xl">
+                                    <div className="text-sm sm:text-lg font-bold text-red-600">
+                                      {formatCurrency(
+                                        saleBalance.remainingBalance,
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-gray-600">
+                                      Saldo Devedor
+                                    </div>
                                   </div>
-                                </div>
+                                )}
                               </div>
 
                               {/* Additional Info */}

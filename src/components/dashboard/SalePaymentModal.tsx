@@ -60,6 +60,10 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = memo(
       saleGroup.clientDocument,
     );
 
+    const amount = parseFloat(paymentAmount) || 0;
+    const discountAmount = withDiscount && amount > 0 ? saleBalance.remainingBalance - amount : 0;
+    const showDiscountBox = discountAmount >= 0 && withDiscount;
+
     useEffect(() => {
       if (withDiscount) {
         const amount = parseFloat(paymentAmount) || 0;
@@ -394,14 +398,25 @@ const SalePaymentModal: React.FC<SalePaymentModalProps> = memo(
                     </div>
                   </div>
 
-                  <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
-                    <div className="text-lg sm:text-xl font-bold text-red-600">
-                      {formatCurrency(saleBalance.remainingBalance)}
+                  {showDiscountBox ? (
+                    <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
+                      <div className="text-lg sm:text-xl font-bold text-blue-600">
+                        {formatCurrency(discountAmount)}
+                      </div>
+                      <div className="text-xs sm:text-sm text-gray-600">
+                        Desconto Aplicado
+                      </div>
                     </div>
-                    <div className="text-xs sm:text-sm text-gray-600">
-                      Saldo Devedor
+                  ) : (
+                    <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
+                      <div className="text-lg sm:text-xl font-bold text-red-600">
+                        {formatCurrency(saleBalance.remainingBalance)}
+                      </div>
+                      <div className="text-xs sm:text-sm text-gray-600">
+                        Saldo Devedor
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Status Badge */}

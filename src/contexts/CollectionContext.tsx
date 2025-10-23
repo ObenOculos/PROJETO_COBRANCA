@@ -1783,6 +1783,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     paymentMethod: string,
     notes: string,
     collectorId: string,
+    discountAmount?: number, // New parameter
   ) => {
     setGlobalLoading(true, "Processando pagamento...");
     try {
@@ -1795,7 +1796,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             saleNumber: null,
             clientDocument: clientDocument,
             paymentAmount: paymentAmount,
-            discountAmount: 0,
+            discountAmount: discountAmount || 0, // Use new parameter
             paymentMethod: paymentMethod,
             notes: notes,
             collectorId: collectorId,
@@ -1814,7 +1815,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         p_collector_id: collectorId,
         p_client_document: clientDocument,
         p_payment_amount: paymentAmount || 0,
-        p_discount_amount: 0,
+        p_discount_amount: discountAmount || 0, // Use new parameter
         p_payment_method: paymentMethod || 'default',
         p_notes: notes || '',
         p_sale_number: null,
@@ -1873,45 +1874,50 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }
     });
 
-    // Arredondar para 2 casas decimais para evitar problemas de precisão
     const roundTo2Decimals = (num: number) =>
       Math.round((num + Number.EPSILON) * 100) / 100;
 
     const totalValue = roundTo2Decimals(
-      saleInstallments.reduce((sum, inst) => sum + inst.valor_original, 0),
+      saleInstallments.reduce((sum, inst) => sum + (inst.valor_original || 0), 0),
     );
-    // Limitar o valor pago ao valor original para evitar valores negativos
     const totalPaid = roundTo2Decimals(
-      Math.min(
-        totalValue,
-        saleInstallments.reduce((sum, inst) => sum + inst.valor_recebido, 0),
-      ),
+      saleInstallments.reduce((sum, inst) => sum + (inst.valor_recebido || 0), 0),
     );
-    const remainingBalance = roundTo2Decimals(totalValue - totalPaid);
+    const totalDiscount = roundTo2Decimals(
+      saleInstallments.reduce((sum, inst) => sum + (inst.desconto || 0), 0),
+    );
+
+    const effectiveTotalPaid = totalPaid + totalDiscount;
+    const remainingBalance = roundTo2Decimals(totalValue - effectiveTotalPaid);
 
     let status: "pending" | "partially_paid" | "fully_paid" = "pending";
-    if (totalPaid === 0) {
+    if (effectiveTotalPaid === 0) {
       status = "pending";
-    } else if (remainingBalance <= 0.01) {
-      // Considera pago se restante for <= 1 centavo
-      status = "fully_paid";
-    } else {
+    } else if (remainingBalance > 0.01) {
       status = "partially_paid";
+    } else {
+      status = "fully_paid";
     }
 
-    const installmentBreakdown = saleInstallments.map((inst) => ({
-      installmentId: inst.id_parcela,
-      originalValue: inst.valor_original,
-      paidValue: Math.min(inst.valor_original, inst.valor_recebido), // Limitar valor pago ao valor original
-      remainingValue: roundTo2Decimals(
-        Math.max(0, inst.valor_original - inst.valor_recebido),
-      ),
-      status: inst.status || "pendente",
-    }));
+    const installmentBreakdown = saleInstallments.map((inst) => {
+      const paidValue = inst.valor_recebido || 0;
+      const discountValue = inst.desconto || 0;
+      const originalValue = inst.valor_original || 0;
+      const remainingValue = originalValue - paidValue - discountValue;
+      
+      return {
+        installmentId: inst.id_parcela,
+        originalValue: originalValue,
+        paidValue: paidValue,
+        remainingValue: roundTo2Decimals(Math.max(0, remainingValue)),
+        status: inst.status || "pendente",
+      };
+    });
 
     return {
       totalValue,
       totalPaid,
+      totalDiscount,
       remainingBalance,
       status,
       installmentBreakdown,

@@ -29,6 +29,8 @@ interface SaleDistributionItem {
   currentReceived: number;
   newAmount: number;
   appliedAmount: number;
+  appliedDiscount: number;
+  willBeComplete: boolean;
 }
 
 const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
@@ -48,6 +50,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       Record<number, string>
     >({});
     const [paymentMethod, setPaymentMethod] = useState("dinheiro");
+    const [withDiscount, setWithDiscount] = useState(false);
     const [showRescheduleModal, setShowRescheduleModal] = useState(false);
     const [rescheduleDate, setRescheduleDate] = useState("");
     const [rescheduleTime, setRescheduleTime] = useState("");
@@ -72,57 +75,64 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         return sum + (sale.totalReceived || 0);
       }, 0) || 0;
 
-    const totalPending =
-      clientSales?.reduce((sum, sale) => {
-        return sum + (sale.pendingValue || 0);
-      }, 0) || 0;
-
+        const totalPending = 
+          clientSales?.reduce((sum, sale) => {
+            return sum + (sale.pendingValue || 0);
+          }, 0) || 0;
+    
+        const amountToDistribute = parseFloat(distributionAmount) || 0;
+        const discountAmount = withDiscount && amountToDistribute > 0 ? totalPending - amountToDistribute : 0;
+        const showDiscountBox = discountAmount >= 0 && withDiscount;
     // Calcular distribuição automática por venda
     const calculateSaleDistribution = React.useCallback(() => {
-      const amount = parseFloat(distributionAmount) || 0;
-      if (amount <= 0) {
+      const paymentAmount = parseFloat(distributionAmount) || 0;
+      if (paymentAmount <= 0 && !withDiscount) {
         setSaleDistribution([]);
         return;
       }
 
-      let remainingAmount = amount;
+      let remainingPayment = paymentAmount;
+      let remainingDiscount = withDiscount ? totalPending - paymentAmount : 0;
+      if (remainingDiscount < 0) remainingDiscount = 0;
+
       const newDistribution: SaleDistributionItem[] = [];
 
-      // Ordenar vendas por prioridade (vendas com menor saldo devedor primeiro)
       const sortedSales = [...(clientSales || [])].sort((a, b) => {
         return (a.pendingValue || 0) - (b.pendingValue || 0);
       });
 
       for (const sale of sortedSales) {
-        if (remainingAmount <= 0) break;
+        let pendingValue = sale.pendingValue || 0;
+        if (pendingValue <= 0) continue;
 
-        const currentReceived = sale.totalReceived || 0;
-        const pendingValue = sale.pendingValue || 0;
+        const discountForThisSale = Math.min(remainingDiscount, pendingValue);
+        pendingValue -= discountForThisSale;
+        remainingDiscount -= discountForThisSale;
 
-        if (pendingValue > 0) {
-          const appliedAmount = Math.min(remainingAmount, pendingValue);
-          const newAmount = currentReceived + appliedAmount;
+        const paymentForThisSale = Math.min(remainingPayment, pendingValue);
+        pendingValue -= paymentForThisSale;
+        remainingPayment -= paymentForThisSale;
 
+        if (paymentForThisSale > 0 || discountForThisSale > 0) {
           newDistribution.push({
             sale,
-            currentReceived,
-            newAmount,
-            appliedAmount,
+            currentReceived: sale.totalReceived || 0,
+            appliedAmount: paymentForThisSale,
+            appliedDiscount: discountForThisSale,
+            newAmount: (sale.totalReceived || 0) + paymentForThisSale,
+            willBeComplete: pendingValue <= 0.01,
           });
-
-          remainingAmount -= appliedAmount;
         }
       }
 
       setSaleDistribution(newDistribution);
 
-      // Inicializar valores manuais por venda
       const initialManualValues: Record<number, string> = {};
       newDistribution.forEach((item) => {
         initialManualValues[item.sale.saleNumber] = item.newAmount.toFixed(2);
       });
       setManualSaleEdits(initialManualValues);
-    }, [distributionAmount, clientSales]);
+    }, [distributionAmount, clientSales, withDiscount, totalPending]);
 
     // Recalcular distribuição quando o valor mudar
     useEffect(() => {
@@ -168,28 +178,31 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         return;
       }
 
-      if (saleDistribution.length === 0) {
-        alert("Nenhuma distribuição foi calculada");
+      const inputAmount = parseFloat(distributionAmount) || 0;
+      if (inputAmount <= 0) {
+        alert("O valor a distribuir deve ser maior que zero.");
         return;
       }
 
-      const totalDistributed = getTotalDistributed();
-      const inputAmount = parseFloat(distributionAmount) || 0;
+      const calculatedDiscount = withDiscount ? totalPending - inputAmount : 0;
 
-      if (Math.abs(totalDistributed - inputAmount) > 0.01) {
-        const confirm = window.confirm(
-          `O valor distribuído (${formatCurrency(totalDistributed)}) é diferente do valor informado (${formatCurrency(inputAmount)}).\n\nDeseja continuar?`,
+      if (withDiscount && calculatedDiscount < 0) {
+        showErrorNotification(
+          new Error(
+            "O valor do pagamento com desconto não pode ser maior que o saldo devedor.",
+          ),
         );
-        if (!confirm) return;
+        return;
       }
 
-      const newPendingValue = totalPending - inputAmount;
+      const totalToDistribute = inputAmount + (withDiscount ? calculatedDiscount : 0);
+      const newPendingValue = totalPending - totalToDistribute;
 
-      if (newPendingValue > 0.01) {
+      if (newPendingValue > 0.01 && !withDiscount) {
         // Pagamento parcial, mostrar modal de reagendamento primeiro
         setShowRescheduleModal(true);
       } else {
-        // Pagamento integral, processar diretamente
+        // Pagamento integral ou com desconto, processar diretamente
         try {
           setLoading(true);
           await processGeneralPayment(
@@ -198,6 +211,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             paymentMethod,
             `Distribuição geral de ${formatCurrency(inputAmount)}`,
             user.id,
+            calculatedDiscount > 0 ? calculatedDiscount : undefined,
           );
           showSuccessNotification("Pagamento distribuído com sucesso!");
           onSuccess();
@@ -376,14 +390,25 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     </div>
                   </div>
 
-                  <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
-                    <div className="text-lg sm:text-xl font-bold text-red-600">
-                      {formatCurrency(totalPending)}
+                  {showDiscountBox ? (
+                    <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
+                      <div className="text-lg sm:text-xl font-bold text-blue-600">
+                        {formatCurrency(discountAmount)}
+                      </div>
+                      <div className="text-xs sm:text-sm text-gray-600">
+                        Desconto Aplicado
+                      </div>
                     </div>
-                    <div className="text-xs sm:text-sm text-gray-600">
-                      Saldo Devedor
+                  ) : (
+                    <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
+                      <div className="text-lg sm:text-xl font-bold text-red-600">
+                        {formatCurrency(totalPending)}
+                      </div>
+                      <div className="text-xs sm:text-sm text-gray-600">
+                        Saldo Devedor
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
                     <div className="text-lg sm:text-xl font-bold text-purple-600">
@@ -448,6 +473,21 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       R$ 1.000
                     </button>
                   </div>
+                </div>
+
+                {/* Opção de Desconto */}
+                <div className="mt-4">
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={withDiscount}
+                      onChange={(e) => setWithDiscount(e.target.checked)}
+                      className="h-5 w-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    />
+                    <span className="text-gray-700 font-medium">
+                      Pagamento com desconto (quitar saldo devedor)
+                    </span>
+                  </label>
                 </div>
               </div>
 
@@ -610,19 +650,26 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
                         {/* Status da Venda */}
                         <div className="mt-3 flex items-center justify-between">
-                          <div className="text-sm text-gray-600">
-                            Saldo devedor:{" "}
-                            <span className="font-medium text-red-600">
-                              {formatCurrency(
-                                Math.max(
-                                  0,
-                                  (item.sale.totalValue || 0) - item.newAmount,
-                                ),
-                              )}
-                            </span>
-                          </div>
+                          {item.willBeComplete && item.appliedDiscount > 0 ? (
+                            <div className="flex items-center text-blue-600 text-sm font-medium">
+                              <TrendingDown className="h-4 w-4 mr-1" />
+                              Quitado com Desconto: {formatCurrency(item.appliedDiscount)}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-600">
+                              Saldo devedor:{" "}
+                              <span className="font-medium text-red-600">
+                                {formatCurrency(
+                                  Math.max(
+                                    0,
+                                    (item.sale.totalValue || 0) - item.newAmount - (item.appliedDiscount || 0),
+                                  ),
+                                )}
+                              </span>
+                            </div>
+                          )}
 
-                          {item.newAmount >= (item.sale.totalValue || 0) && (
+                          {item.willBeComplete && (
                             <div className="flex items-center text-green-600 text-sm font-medium">
                               <CheckCircle className="h-4 w-4 mr-1" />
                               Venda será quitada
