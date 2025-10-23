@@ -205,6 +205,17 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         // Pagamento integral ou com desconto, processar diretamente
         try {
           setLoading(true);
+          // Corrigir lógica: 0 para renegociada, número real para venda única, undefined para geral
+          let saleNumberToUse: number | undefined;
+          if (clientSales?.length === 1) {
+            // Se for uma venda única, use o saleNumber (incluindo 0)
+            saleNumberToUse = clientSales[0].saleNumber;
+          } else if (clientSales?.length > 1 && clientSales.some(sale => sale.saleNumber === 0)) {
+            // Se houver venda 0 entre várias, priorize 0
+            saleNumberToUse = 0;
+          } else {
+            saleNumberToUse = undefined;
+          }
           await processGeneralPayment(
             clientGroup.document || "",
             inputAmount,
@@ -212,6 +223,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             `Distribuição geral de ${formatCurrency(inputAmount)}`,
             user.id,
             calculatedDiscount > 0 ? calculatedDiscount : undefined,
+            null,
           );
           showSuccessNotification("Pagamento distribuído com sucesso!");
           onSuccess();

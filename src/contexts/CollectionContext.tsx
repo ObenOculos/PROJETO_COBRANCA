@@ -1742,12 +1742,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   };
 
   const processGeneralPayment = async (
-    clientDocument: string,
-    paymentAmount: number,
-    paymentMethod: string,
-    notes: string,
-    collectorId: string,
-    discountAmount?: number, // New parameter
+  clientDocument: string,
+  paymentAmount: number,
+  paymentMethod: string,
+  notes: string,
+  collectorId: string,
+  discountAmount?: number,
+  saleNumber?: number | null,
   ) => {
     setGlobalLoading(true, "Processando pagamento...");
     try {
@@ -1757,7 +1758,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         addToOfflineQueue({
           type: "DISTRIBUTE_PAYMENT",
           data: {
-            saleNumber: null,
+            saleNumber: 0, // Garantir que seja 0 e nunca null
             clientDocument: clientDocument,
             paymentAmount: paymentAmount,
             discountAmount: discountAmount || 0, // Use new parameter
@@ -1782,7 +1783,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         p_discount_amount: discountAmount || 0, // Use new parameter
         p_payment_method: paymentMethod || 'default',
         p_notes: notes || '',
-        p_sale_number: null,
+  p_sale_number: saleNumber === null ? null : (typeof saleNumber === 'number' ? saleNumber : 0),
       });
 
       if (error) {

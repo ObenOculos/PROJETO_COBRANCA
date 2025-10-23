@@ -275,14 +275,15 @@ export interface CollectionContextType {
     payment: SalePaymentInput,
     collectorId: string,
   ) => Promise<void>;
-  processGeneralPayment: (
-    clientDocument: string,
-    paymentAmount: number,
-    paymentMethod: string,
-    notes: string,
-    collectorId: string,
-    discountAmount?: number,
-  ) => Promise<void>;
+    processGeneralPayment: (
+      clientDocument: string,
+      paymentAmount: number,
+      paymentMethod: string,
+      notes: string,
+      collectorId: string,
+      discountAmount?: number,
+      saleNumber?: number | null,
+    ) => Promise<void>;
   getSalePayments: (
     saleNumber: number,
     clientDocument: string,
