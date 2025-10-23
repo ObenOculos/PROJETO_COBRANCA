@@ -337,8 +337,10 @@ export type Database = {
           collector_id: string
           collector_name: string | null
           created_at: string | null
+          discount_amount: number | null
           distribution_details: Json | null
           id: string
+          is_agreement: boolean | null
           notes: string | null
           payment_amount: number
           payment_date: string
@@ -353,8 +355,10 @@ export type Database = {
           collector_id: string
           collector_name?: string | null
           created_at?: string | null
+          discount_amount?: number | null
           distribution_details?: Json | null
           id?: string
+          is_agreement?: boolean | null
           notes?: string | null
           payment_amount: number
           payment_date?: string
@@ -369,8 +373,10 @@ export type Database = {
           collector_id?: string
           collector_name?: string | null
           created_at?: string | null
+          discount_amount?: number | null
           distribution_details?: Json | null
           id?: string
+          is_agreement?: boolean | null
           notes?: string | null
           payment_amount?: number
           payment_date?: string
