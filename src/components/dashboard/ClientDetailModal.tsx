@@ -9,12 +9,12 @@ import {
   Info,
   Receipt,
 } from "lucide-react";
-import { ClientGroup, SaleGroup } from "../../types";
+import { ClientGroup } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
-import SalePaymentModal from "./SalePaymentModal";
+
 import GeneralPaymentModal from "./GeneralPaymentModal";
 import GeneralPaymentEditModal from "./GeneralPaymentEditModal";
 
@@ -32,9 +32,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   const { getSalesByClient, calculateSaleBalance, refreshCollections } =
     useCollection();
   const { user } = useAuth();
-  const [selectedSaleForPayment, setSelectedSaleForPayment] =
-    useState<SaleGroup | null>(null);
-  const [isSalePaymentModalOpen, setIsSalePaymentModalOpen] = useState(false);
+
+
   const [isGeneralPaymentModalOpen, setIsGeneralPaymentModalOpen] =
     useState(false);
   const [isGeneralEditModalOpen, setIsGeneralEditModalOpen] = useState(false);
@@ -240,37 +239,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     return sales;
   }, [getSalesByClient, clientGroup.document, refreshKey]);
 
-  const handleOpenSalePayment = (sale: SaleGroup) => {
-    setSelectedSaleForPayment(sale);
-    setIsSalePaymentModalOpen(true);
-  };
 
-  const handleCloseSalePayment = () => {
-    setSelectedSaleForPayment(null);
-    setIsSalePaymentModalOpen(false);
-  };
-
-  const handlePaymentSuccess = async () => {
-    // Pequeno delay para garantir que a operação no banco seja concluída
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Forçar refresh dos dados do contexto
-    await refreshCollections();
-
-    // Disparar evento global para atualizar outros componentes
-    window.dispatchEvent(
-      new CustomEvent("paymentProcessed", {
-        detail: {
-          clientDocument: clientGroup.document,
-          type: "sale",
-        },
-      }),
-    );
-
-    // Forçar uma nova renderização local
-    setRefreshKey((prev) => prev + 1);
-    handleCloseSalePayment();
-  };
 
   const handleGeneralPaymentSuccess = async () => {
     // Pequeno delay para garantir que a operação no banco seja concluída
@@ -666,22 +635,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                 </div>
                               </div>
 
-                              {userType === "collector" &&
-                                saleBalance.remainingBalance > 0 && (
-                                  <button
-                                    id={`receive-payment-${sale.saleNumber}`}
-                                    name={`receivePayment${sale.saleNumber}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenSalePayment(sale);
-                                    }}
-                                    className="flex items-center px-3 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors text-sm font-medium shadow-sm"
-                                    title="Receber pagamento da venda"
-                                  >
-                                    <CreditCard className="h-4 w-4 mr-1" />
-                                    <span>Receber</span>
-                                  </button>
-                                )}
+
                             </div>
                           </div>
 
@@ -751,22 +705,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               </span>
                             </div>
 
-                            {userType === "collector" &&
-                              saleBalance.remainingBalance > 0 && (
-                                <button
-                                  id={`receive-payment-mobile-${sale.saleNumber}`}
-                                  name={`receivePaymentMobile${sale.saleNumber}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenSalePayment(sale);
-                                  }}
-                                  className="flex items-center justify-center w-full px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium shadow-sm"
-                                  title="Receber pagamento da venda"
-                                >
-                                  <CreditCard className="h-5 w-5 mr-2" />
-                                  <span>Receber Pagamento</span>
-                                </button>
-                              )}
+
                           </div>
                         </div>
 
@@ -861,14 +800,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         </div>
       </div>
 
-      {/* Sale Payment Modal */}
-      {isSalePaymentModalOpen && selectedSaleForPayment && (
-        <SalePaymentModal
-          saleGroup={selectedSaleForPayment}
-          onClose={handleCloseSalePayment}
-          onSuccess={handlePaymentSuccess}
-        />
-      )}
+
 
       {/* Authorization Modal */}
       {showAuthModal && (

@@ -1934,7 +1934,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           const balance = calculateSaleBalance(saleNumber, clientDocument);
           const payments = getSalePayments(saleNumber, clientDocument);
           return {
-            saleNumber,
+            saleNumber: saleNumber || 0, // Ensure saleNumber is always a number
             titleNumber: installments[0]?.numero_titulo || 0,
             description: installments[0]?.descricao || `Venda ${saleNumber}`,
             installments,
