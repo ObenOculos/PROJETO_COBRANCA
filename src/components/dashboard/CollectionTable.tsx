@@ -12,6 +12,7 @@ import {
   ChevronRight,
   DollarSign,
   TrendingUp,
+  TrendingDown,
   Filter,
   ArrowUpDown,
   ArrowUp,
@@ -32,9 +33,7 @@ import SaleDetailsModal from "./SaleDetailsModal";
 import { useCollection } from "../../contexts/CollectionContext";
 import ConfirmationModal from "../common/ConfirmationModal";
 
-interface ClientGroupWithMapSales extends Omit<ClientGroup, "sales"> {
-  sales: Map<string, SaleGroup>;
-}
+
 
 interface CollectionTableProps {
   collections: Collection[];
@@ -198,13 +197,11 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
     // Para gerentes, criar grupos de clientes baseados nas collections filtradas
     const clientGroups = useMemo(() => {
-      // Early return for empty collections
       if (collections.length === 0) return [];
 
       if (userType === "manager") {
-        const groupsMap = new Map<string, ClientGroupWithMapSales>();
+        const groupsMap = new Map<string, ClientGroup>();
 
-        // Process collections in batches to avoid blocking the UI
         collections.forEach((collection) => {
           const key = (collection.documento || collection.cliente || "").trim();
           if (!key) return;
@@ -216,66 +213,79 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
               document: collection.documento || "",
               phone: collection.telefone || "",
               mobile: collection.celular || "",
-              address:
-                `${collection.endereco || ""}, ${collection.numero || ""}`.trim(),
+              address: `${collection.endereco || ""}, ${collection.numero || ""}`.trim(),
               number: collection.numero || "",
               neighborhood: collection.bairro || "",
               city: collection.cidade || "",
               state: collection.estado || "",
               totalValue: 0,
               totalReceived: 0,
+              totalDiscount: 0,
               pendingValue: 0,
-              sales: new Map<string, SaleGroup>(),
+              sales: [],
             });
           }
 
-          const group = groupsMap.get(key)!;
-          const originalValue = collection.valor_original || 0;
-          const receivedValue = collection.valor_recebido || 0;
-
-          group.totalValue += originalValue;
-          group.totalReceived += receivedValue;
-          // Avoid parseFloat and toFixed for better performance
-          group.pendingValue = Math.max(
-            0,
-            group.totalValue - group.totalReceived,
+          const clientGroup = groupsMap.get(key)!;
+          let saleGroup = clientGroup.sales.find(
+            (s) => s.saleNumber === (collection.venda_n || 0),
           );
 
-          const saleKey = `${collection.venda_n}-${collection.documento}`;
-          if (!group.sales.has(saleKey)) {
-            group.sales.set(saleKey, {
+          if (!saleGroup) {
+            saleGroup = {
               saleNumber: collection.venda_n || 0,
               titleNumber: collection.numero_titulo || 0,
               description: collection.descricao || "",
+              installments: [],
               totalValue: 0,
               totalReceived: 0,
               pendingValue: 0,
               saleStatus: "pending" as const,
               payments: [],
               clientDocument: collection.documento || "",
-              installments: [],
-            });
+            };
+            clientGroup.sales.push(saleGroup);
           }
-
-          const sale = group.sales.get(saleKey)!;
-          sale.totalValue += originalValue;
-          sale.totalReceived += receivedValue;
-          sale.pendingValue = Math.max(0, sale.totalValue - sale.totalReceived);
-          sale.installments.push(collection);
-
-          // Optimize status computation
-          sale.saleStatus =
-            sale.totalReceived === 0
-              ? "pending"
-              : sale.totalReceived >= sale.totalValue
-                ? "fully_paid"
-                : "partially_paid";
+          saleGroup.installments.push(collection);
         });
 
-        return Array.from(groupsMap.values()).map((group) => ({
-          ...group,
-          sales: Array.from(group.sales.values()),
-        })) as ClientGroup[];
+        groupsMap.forEach((clientGroup) => {
+          const roundTo2Decimals = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
+
+          let clientTotalDiscount = 0;
+
+          clientGroup.sales.forEach((saleGroup) => {
+            const saleTotalValue = saleGroup.installments.reduce((sum, inst) => sum + (inst.valor_original || 0), 0);
+            const saleTotalReceived = saleGroup.installments.reduce((sum, inst) => sum + (inst.valor_recebido || 0), 0);
+            const saleTotalDiscount = saleGroup.installments.reduce((sum, inst) => sum + (inst.desconto || 0), 0);
+
+            saleGroup.totalValue = roundTo2Decimals(saleTotalValue);
+            saleGroup.totalReceived = roundTo2Decimals(saleTotalReceived);
+            saleGroup.totalDiscount = roundTo2Decimals(saleTotalDiscount);
+            saleGroup.pendingValue = roundTo2Decimals(saleTotalValue - saleTotalReceived - saleTotalDiscount);
+
+            const effectiveSalePaid = saleTotalReceived + saleTotalDiscount;
+            saleGroup.saleStatus =
+              effectiveSalePaid === 0
+                ? "pending"
+                : saleGroup.pendingValue <= 0.01
+                ? "fully_paid"
+                : "partially_paid";
+
+            clientTotalDiscount += saleGroup.totalDiscount;
+          });
+
+          const clientTotalValue = clientGroup.sales.reduce((sum, sale) => sum + sale.totalValue, 0);
+          const clientTotalReceived = clientGroup.sales.reduce((sum, sale) => sum + sale.totalReceived, 0);
+
+          clientGroup.totalValue = roundTo2Decimals(clientTotalValue);
+          clientGroup.totalReceived = roundTo2Decimals(clientTotalReceived);
+          clientGroup.totalDiscount = roundTo2Decimals(clientTotalDiscount);
+          clientGroup.pendingValue = roundTo2Decimals(clientTotalValue - clientTotalReceived - clientTotalDiscount);
+        });
+
+        return Array.from(groupsMap.values());
+
       } else {
         return getClientGroups(collectorId);
       }
@@ -369,6 +379,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
         totalValue: group.totalValue,
         totalReceived: group.totalReceived,
         pendingValue: group.pendingValue,
+        totalDiscount: group.totalDiscount,
       }));
 
       // Optimize sorting - only sort if needed
@@ -593,15 +604,22 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                     </div>
 
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {clientGroup.totalReceived > 0 && (
+                      {!!clientGroup.totalReceived && (
                         <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-2xl bg-green-100 text-green-800">
                           <TrendingUp className="h-3 w-3 mr-1" />
-                          {formatCurrency(clientGroup.totalReceived)} recebido
+                          {formatCurrency(clientGroup.totalReceived)}
                         </span>
                       )}
-                      {clientGroup.pendingValue > 0.01 && (
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-2xl bg-red-100 text-red-800">
-                          {formatCurrency(clientGroup.pendingValue)} pendente
+                      {!!clientGroup.totalDiscount && (
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-2xl bg-blue-100 text-blue-800">
+                          <TrendingDown className="h-3 w-3 mr-1" />
+                          {formatCurrency(clientGroup.totalDiscount)}
+                        </span>
+                      )}
+                      {!!clientGroup.pendingValue && clientGroup.pendingValue > 0.01 && (
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-2xl bg-red-100 text-red-800">
+                           <AlertCircle className="h-3 w-3 mr-1" />
+                          {formatCurrency(clientGroup.pendingValue)}
                         </span>
                       )}
                     </div>
@@ -1063,13 +1081,19 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                           {clientGroup.sales.length !== 1 ? "s" : ""}
                         </div>
                         <div className="flex flex-wrap justify-start sm:justify-end gap-2 mt-4">
-                          {clientGroup.totalReceived > 0 && (
+                          {!!clientGroup.totalReceived && (
                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
                               <TrendingUp className="h-3 w-3 mr-1.5" />
                               {formatCurrency(clientGroup.totalReceived)}
                             </span>
                           )}
-                          {clientGroup.pendingValue > 0 && (
+                          {!!clientGroup.totalDiscount && clientGroup.totalDiscount > 0 && (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                              <TrendingDown className="h-3 w-3 mr-1.5" />
+                              {formatCurrency(clientGroup.totalDiscount)}
+                            </span>
+                          )}
+                          {!!clientGroup.pendingValue && clientGroup.pendingValue > 0 && (
                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
                               <AlertCircle className="h-3 w-3 mr-1.5" />
                               {formatCurrency(clientGroup.pendingValue)}
@@ -1169,7 +1193,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                                     {formatCurrency(sale.totalValue, !isMobile)}
                                   </span>
                                 </div>
-                                {sale.totalReceived > 0 && (
+                                {!!sale.totalReceived && (
                                   <div className="flex justify-between items-center">
                                     <span className="text-sm text-gray-600">
                                       Valor Recebido
@@ -1177,6 +1201,19 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                                     <span className="font-semibold text-green-600">
                                       {formatCurrency(
                                         sale.totalReceived,
+                                        !isMobile,
+                                      )}
+                                    </span>
+                                  </div>
+                                )}
+                                {!!sale.totalDiscount && (
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-600">
+                                      Desconto
+                                    </span>
+                                    <span className="font-semibold text-blue-600">
+                                      {formatCurrency(
+                                        sale.totalDiscount,
                                         !isMobile,
                                       )}
                                     </span>

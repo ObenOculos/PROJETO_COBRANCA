@@ -175,6 +175,7 @@ export interface ClientGroup {
   sales: SaleGroup[];
   totalValue: number;
   totalReceived: number;
+  totalDiscount?: number;
   pendingValue: number;
 }
 
@@ -185,6 +186,7 @@ export interface SaleGroup {
   installments: Collection[];
   totalValue: number;
   totalReceived: number;
+  totalDiscount?: number;
   pendingValue: number;
   saleStatus: "pending" | "partially_paid" | "fully_paid";
   payments: SalePayment[];

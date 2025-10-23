@@ -663,7 +663,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const { error: visitsError } = await supabase
         .from("scheduled_visits")
         .delete()
-        .eq("clientDocument", clientDocument);
+        .eq("client_document", clientDocument);
 
       if (visitsError) {
         console.warn(
@@ -1104,7 +1104,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       (collectorId?: string): ClientGroup[] => {
         const cacheKey = `client-groups-${collectorId || "all"}`;
 
-        // Try to get from cache first
         const cachedData = dataCache.get<ClientGroup[]>(cacheKey);
         if (cachedData) {
           return cachedData;
@@ -1125,12 +1124,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         let skippedCollectionsCount = 0;
 
         filteredCollections.forEach((collection) => {
-          // Group strictly by 'documento' (CPF) as the unique identifier.
           const clientId = collection.documento?.trim();
-
           if (!clientId) {
             skippedCollectionsCount++;
-            return; // Skip collections without a document.
+            return;
           }
 
           if (!clientMap.has(clientId)) {
@@ -1149,19 +1146,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               sales: [],
               totalValue: 0,
               totalReceived: 0,
+              totalDiscount: 0,
               pendingValue: 0,
             });
-          } else {
-            // Se o cliente já existe, atualize o apelido se a parcela atual tiver um apelido e o cliente não tiver ainda
-            const existingClient = clientMap.get(clientId)!;
-            if (!existingClient.apelido && collection.apelido) {
-              existingClient.apelido = collection.apelido;
-            }
           }
 
           const clientGroup = clientMap.get(clientId)!;
 
-          // Group by sale number (venda_n)
           let saleGroup = clientGroup.sales.find(
             (s) => s.saleNumber === (collection.venda_n || 0),
           );
@@ -1181,54 +1172,43 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             clientGroup.sales.push(saleGroup!);
           }
 
-          if (saleGroup) {
-            saleGroup.installments.push(collection);
-
-            const roundTo2Decimals = (num: number) =>
-              Math.round((num + Number.EPSILON) * 100) / 100;
-
-            saleGroup.totalValue = roundTo2Decimals(
-              saleGroup.totalValue + collection.valor_original,
-            );
-            saleGroup.totalReceived = roundTo2Decimals(
-              saleGroup.totalReceived + collection.valor_recebido,
-            );
-
-            const pendingForThisInstallment = roundTo2Decimals(
-              collection.valor_original - collection.valor_recebido,
-            );
-            if (pendingForThisInstallment > 0.01) {
-              saleGroup.pendingValue = roundTo2Decimals(
-                saleGroup.pendingValue + pendingForThisInstallment,
-              );
-            }
-          }
-
-          const roundTo2Decimals = (num: number) =>
-            Math.round((num + Number.EPSILON) * 100) / 100;
-
-          clientGroup.totalValue = roundTo2Decimals(
-            clientGroup.totalValue + collection.valor_original,
-          );
-          clientGroup.totalReceived = roundTo2Decimals(
-            clientGroup.totalReceived + collection.valor_recebido,
-          );
+          saleGroup.installments.push(collection);
         });
 
-        // Calculate pendingValue for each clientGroup and saleGroup after all collections are processed
         clientMap.forEach((clientGroup) => {
           const roundTo2Decimals = (num: number) =>
             Math.round((num + Number.EPSILON) * 100) / 100;
 
+          let clientTotalDiscount = 0;
+
           clientGroup.sales.forEach((saleGroup) => {
-            saleGroup.pendingValue = roundTo2Decimals(
-              saleGroup.totalValue - saleGroup.totalReceived,
-            );
+            const saleTotalValue = saleGroup.installments.reduce((sum, inst) => sum + (inst.valor_original || 0), 0);
+            const saleTotalReceived = saleGroup.installments.reduce((sum, inst) => sum + (inst.valor_recebido || 0), 0);
+            const saleTotalDiscount = saleGroup.installments.reduce((sum, inst) => sum + (inst.desconto || 0), 0);
+            
+            saleGroup.totalValue = roundTo2Decimals(saleTotalValue);
+            saleGroup.totalReceived = roundTo2Decimals(saleTotalReceived);
+            saleGroup.totalDiscount = roundTo2Decimals(saleTotalDiscount);
+            saleGroup.pendingValue = roundTo2Decimals(saleTotalValue - saleTotalReceived - saleTotalDiscount);
+
+            const effectiveSalePaid = saleTotalReceived + saleTotalDiscount;
+            saleGroup.saleStatus =
+              effectiveSalePaid === 0
+                ? "pending"
+                : saleGroup.pendingValue <= 0.01
+                  ? "fully_paid"
+                  : "partially_paid";
+            
+            clientTotalDiscount += saleGroup.totalDiscount;
           });
 
-          clientGroup.pendingValue = roundTo2Decimals(
-            clientGroup.totalValue - clientGroup.totalReceived,
-          );
+          const clientTotalValue = clientGroup.sales.reduce((sum, sale) => sum + sale.totalValue, 0);
+          const clientTotalReceived = clientGroup.sales.reduce((sum, sale) => sum + sale.totalReceived, 0);
+          
+          clientGroup.totalValue = roundTo2Decimals(clientTotalValue);
+          clientGroup.totalReceived = roundTo2Decimals(clientTotalReceived);
+          clientGroup.totalDiscount = roundTo2Decimals(clientTotalDiscount);
+          clientGroup.pendingValue = roundTo2Decimals(clientTotalValue - clientTotalReceived - clientTotalDiscount);
         });
 
         if (skippedCollectionsCount > 0) {
@@ -1237,26 +1217,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           );
         }
 
-        // Debug: Log clientes com apelido
-        const clientsWithApelido = Array.from(clientMap.values()).filter(
-          (client) => client.apelido,
-        );
-        if (clientsWithApelido.length > 0) {
-          console.log(
-            `[getClientGroups] Encontrados ${clientsWithApelido.length} clientes com apelido:`,
-            clientsWithApelido.map((c) => ({
-              nome: c.client,
-              apelido: c.apelido,
-              documento: c.document,
-            })),
-          );
-        }
-
         const result = Array.from(clientMap.values()).sort((a, b) =>
           a.client.localeCompare(b.client),
         );
 
-        // Cache the result
         dataCache.set(cacheKey, result);
 
         return result;

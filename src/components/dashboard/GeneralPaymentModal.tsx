@@ -287,6 +287,17 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
       try {
         setLoading(true);
+
+        // Primeiro, processar o pagamento parcial
+        await processGeneralPayment(
+          clientGroup.document || "",
+          parseFloat(distributionAmount) || 0,
+          paymentMethod,
+          `Pagamento parcial de ${formatCurrency(parseFloat(distributionAmount) || 0)}`,
+          user.id,
+        );
+
+        // Depois, agendar a nova visita
         const visitData: Omit<ScheduledVisit, "id" | "createdAt"> = {
           collectorId: user.id,
           clientDocument: clientGroup.document,
