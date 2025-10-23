@@ -36,6 +36,21 @@ export interface AuthorizationHistory {
   notes?: string;
   created_at: string;
   updated_at: string;
+  client_address?: string;
+  client_city?: string;
+  client_mobile?: string;
+  client_neighborhood?: string;
+  client_phone?: string;
+  collector_performance_score?: number;
+  last_payment_amount?: number;
+  last_payment_date?: string;
+  metadata?: any;
+  overdue_installments_count?: number;
+  total_pending_value?: number;
+  total_received_value?: number;
+  total_sales_count?: number;
+  total_sales_value?: number;
+  type: string;
 }
 
 // Scheduled visits for collectors
@@ -324,6 +339,7 @@ export interface SalePayment {
   id: string;
   saleNumber: number;
   clientDocument: string;
+  clientName?: string;
   paymentAmount: number;
   paymentDate: string;
   paymentMethod?: string;
@@ -332,6 +348,10 @@ export interface SalePayment {
   collectorName?: string;
   createdAt: string;
   distributionDetails: PaymentDistribution[];
+  discountAmount?: number;
+  isAgreement?: boolean;
+  storeName?: string;
+  updatedAt?: string;
 }
 
 export interface PaymentDistribution {
