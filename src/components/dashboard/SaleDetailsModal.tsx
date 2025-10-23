@@ -29,7 +29,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
   collections,
   onClose,
 }) => {
-  const { scheduledVisits, users } = useCollection();
+  const { scheduledVisits, users, salePayments } = useCollection();
 
   // Desabilitar scroll do body quando o modal estiver aberto
   React.useEffect(() => {
@@ -73,6 +73,21 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
       ),
     };
   }, [collections]);
+
+  const salePaymentHistory = useMemo(() => {
+    if (!saleData?.venda_n || !salePayments) return [];
+    return salePayments
+      .filter(
+        (p) =>
+          p.saleNumber === saleData.venda_n &&
+          p.clientDocument === saleData.documento &&
+          p.notes,
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+  }, [saleData, salePayments]);
 
   // Buscar visitas relacionadas a este cliente
   const clientVisits = useMemo(() => {
@@ -434,6 +449,48 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Payment History */}
+          {salePaymentHistory.length > 0 && (
+            <div className="mt-8 space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <DollarSign className="h-5 w-5 mr-2 text-blue-600" />
+                Histórico de Pagamentos
+              </h3>
+              <div className="space-y-3">
+                {salePaymentHistory.map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="bg-gray-50 p-4 rounded-2xl border border-gray-200"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="font-semibold text-gray-800">
+                            {formatCurrency(payment.paymentAmount)}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            - {payment.paymentMethod}
+                          </span>
+                        </div>
+                        {payment.notes && (
+                          <div className="bg-white p-3 rounded-2xl border border-gray-200">
+                            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+                              {payment.notes}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center text-xs text-gray-400">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        {formatDate(payment.paymentDate)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Visit History */}
           {clientVisits.length > 0 && (

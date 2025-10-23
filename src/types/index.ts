@@ -347,6 +347,7 @@ export interface SalePaymentInput {
   paymentAmount: number;
   paymentMethod?: string;
   notes?: string;
+  discountAmount?: number;
 }
 
 export interface SaleBalance {

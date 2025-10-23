@@ -1896,7 +1896,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   };
 
   const processSalePayment = async (
-    payment: SalePaymentInput,
+    payment: SalePaymentInput & { discountAmount?: number },
     collectorId: string,
   ) => {
     try {
@@ -1928,8 +1928,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       console.log("Parcelas encontradas:", saleInstallments.length);
 
       // 2. Distribuir o pagamento
+      const amountToDistribute =
+        (payment.paymentAmount || 0) + (payment.discountAmount || 0);
       const { updatedInstallments, distributionDetails } =
-        distributeSalePayment(saleInstallments, payment.paymentAmount);
+        distributeSalePayment(saleInstallments, amountToDistribute);
 
       // 3. Verificar se está offline
       if (!isOnline) {
@@ -1945,6 +1947,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             saleNumber: payment.saleNumber,
             clientDocument: payment.clientDocument,
             paymentAmount: payment.paymentAmount,
+            discountAmount: payment.discountAmount,
             paymentMethod: payment.paymentMethod,
             notes: payment.notes,
             collectorId: collectorId,
@@ -2015,6 +2018,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         collector_name: collector?.name || "Cobrador não encontrado",
         distribution_details: distributionDetails,
         store_name: client?.nome_da_loja || null,
+        discount_amount: payment.discountAmount,
       };
 
       const { data: insertedPayment, error: paymentError } = await supabase
