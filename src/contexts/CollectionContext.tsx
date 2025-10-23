@@ -982,15 +982,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       } else {
         // Para qualquer outro status não tratado acima, usar a lógica de parcela individual
         filtered = filtered.filter((c) => {
-          const currentStatus = c.status?.toLowerCase() || 'pendente';
+          const currentStatus = c.status?.toLowerCase() || "pendente";
           const filterStatus = filters.status?.toLowerCase();
 
           if (!filterStatus) return true; // No status filter
 
-          if (filterStatus === 'pago') {
-            return currentStatus === 'pago' || currentStatus === 'pago com desconto';
+          if (filterStatus === "pago") {
+            return (
+              currentStatus === "pago" || currentStatus === "pago com desconto"
+            );
           }
-          
+
           // For other statuses like 'parcial' or 'pendente', do an exact match.
           return currentStatus === filterStatus;
         });
@@ -1182,14 +1184,25 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           let clientTotalDiscount = 0;
 
           clientGroup.sales.forEach((saleGroup) => {
-            const saleTotalValue = saleGroup.installments.reduce((sum, inst) => sum + (inst.valor_original || 0), 0);
-            const saleTotalReceived = saleGroup.installments.reduce((sum, inst) => sum + (inst.valor_recebido || 0), 0);
-            const saleTotalDiscount = saleGroup.installments.reduce((sum, inst) => sum + (inst.desconto || 0), 0);
-            
+            const saleTotalValue = saleGroup.installments.reduce(
+              (sum, inst) => sum + (inst.valor_original || 0),
+              0,
+            );
+            const saleTotalReceived = saleGroup.installments.reduce(
+              (sum, inst) => sum + (inst.valor_recebido || 0),
+              0,
+            );
+            const saleTotalDiscount = saleGroup.installments.reduce(
+              (sum, inst) => sum + (inst.desconto || 0),
+              0,
+            );
+
             saleGroup.totalValue = roundTo2Decimals(saleTotalValue);
             saleGroup.totalReceived = roundTo2Decimals(saleTotalReceived);
             saleGroup.totalDiscount = roundTo2Decimals(saleTotalDiscount);
-            saleGroup.pendingValue = roundTo2Decimals(saleTotalValue - saleTotalReceived - saleTotalDiscount);
+            saleGroup.pendingValue = roundTo2Decimals(
+              saleTotalValue - saleTotalReceived - saleTotalDiscount,
+            );
 
             const effectiveSalePaid = saleTotalReceived + saleTotalDiscount;
             saleGroup.saleStatus =
@@ -1198,17 +1211,25 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
                 : saleGroup.pendingValue <= 0.01
                   ? "fully_paid"
                   : "partially_paid";
-            
+
             clientTotalDiscount += saleGroup.totalDiscount;
           });
 
-          const clientTotalValue = clientGroup.sales.reduce((sum, sale) => sum + sale.totalValue, 0);
-          const clientTotalReceived = clientGroup.sales.reduce((sum, sale) => sum + sale.totalReceived, 0);
-          
+          const clientTotalValue = clientGroup.sales.reduce(
+            (sum, sale) => sum + sale.totalValue,
+            0,
+          );
+          const clientTotalReceived = clientGroup.sales.reduce(
+            (sum, sale) => sum + sale.totalReceived,
+            0,
+          );
+
           clientGroup.totalValue = roundTo2Decimals(clientTotalValue);
           clientGroup.totalReceived = roundTo2Decimals(clientTotalReceived);
           clientGroup.totalDiscount = roundTo2Decimals(clientTotalDiscount);
-          clientGroup.pendingValue = roundTo2Decimals(clientTotalValue - clientTotalReceived - clientTotalDiscount);
+          clientGroup.pendingValue = roundTo2Decimals(
+            clientTotalValue - clientTotalReceived - clientTotalDiscount,
+          );
         });
 
         if (skippedCollectionsCount > 0) {
@@ -1715,13 +1736,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // ONLINE LOGIC
       console.log("Chamando RPC process_payment para venda:", payment);
-      const { error } = await supabase.rpc('process_payment', {
+      const { error } = await supabase.rpc("process_payment", {
         p_collector_id: collectorId,
         p_client_document: payment.clientDocument,
         p_payment_amount: payment.paymentAmount || 0,
         p_discount_amount: payment.discountAmount || 0,
-        p_payment_method: payment.paymentMethod || 'default',
-        p_notes: payment.notes || '',
+        p_payment_method: payment.paymentMethod || "default",
+        p_notes: payment.notes || "",
         p_sale_number: payment.saleNumber,
       });
 
@@ -1734,7 +1755,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       await refreshData();
     } catch (err) {
       console.error("Erro ao processar pagamento de venda:", err);
-      setError(err instanceof Error ? err.message : "Erro ao processar pagamento");
+      setError(
+        err instanceof Error ? err.message : "Erro ao processar pagamento",
+      );
       throw err;
     } finally {
       setGlobalLoading(false);
@@ -1742,13 +1765,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   };
 
   const processGeneralPayment = async (
-  clientDocument: string,
-  paymentAmount: number,
-  paymentMethod: string,
-  notes: string,
-  collectorId: string,
-  discountAmount?: number,
-  saleNumber?: number | null,
+    clientDocument: string,
+    paymentAmount: number,
+    paymentMethod: string,
+    notes: string,
+    collectorId: string,
+    discountAmount?: number,
+    saleNumber?: number | null,
   ) => {
     setGlobalLoading(true, "Processando pagamento...");
     try {
@@ -1776,14 +1799,19 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         "Chamando RPC process_payment para pagamento geral:",
         clientDocument,
       );
-      const { error } = await supabase.rpc('process_payment', {
+      const { error } = await supabase.rpc("process_payment", {
         p_collector_id: collectorId,
         p_client_document: clientDocument,
         p_payment_amount: paymentAmount || 0,
         p_discount_amount: discountAmount || 0, // Use new parameter
-        p_payment_method: paymentMethod || 'default',
-        p_notes: notes || '',
-  p_sale_number: saleNumber === null ? null : (typeof saleNumber === 'number' ? saleNumber : 0),
+        p_payment_method: paymentMethod || "default",
+        p_notes: notes || "",
+        p_sale_number:
+          saleNumber === null
+            ? null
+            : typeof saleNumber === "number"
+              ? saleNumber
+              : 0,
       });
 
       if (error) {
@@ -1843,10 +1871,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       Math.round((num + Number.EPSILON) * 100) / 100;
 
     const totalValue = roundTo2Decimals(
-      saleInstallments.reduce((sum, inst) => sum + (inst.valor_original || 0), 0),
+      saleInstallments.reduce(
+        (sum, inst) => sum + (inst.valor_original || 0),
+        0,
+      ),
     );
     const totalPaid = roundTo2Decimals(
-      saleInstallments.reduce((sum, inst) => sum + (inst.valor_recebido || 0), 0),
+      saleInstallments.reduce(
+        (sum, inst) => sum + (inst.valor_recebido || 0),
+        0,
+      ),
     );
     const totalDiscount = roundTo2Decimals(
       saleInstallments.reduce((sum, inst) => sum + (inst.desconto || 0), 0),
@@ -1869,7 +1903,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const discountValue = inst.desconto || 0;
       const originalValue = inst.valor_original || 0;
       const remainingValue = originalValue - paidValue - discountValue;
-      
+
       return {
         installmentId: inst.id_parcela,
         originalValue: originalValue,

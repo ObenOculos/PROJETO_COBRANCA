@@ -33,8 +33,6 @@ import SaleDetailsModal from "./SaleDetailsModal";
 import { useCollection } from "../../contexts/CollectionContext";
 import ConfirmationModal from "../common/ConfirmationModal";
 
-
-
 interface CollectionTableProps {
   collections: Collection[];
   userType: "manager" | "collector";
@@ -213,7 +211,8 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
               document: collection.documento || "",
               phone: collection.telefone || "",
               mobile: collection.celular || "",
-              address: `${collection.endereco || ""}, ${collection.numero || ""}`.trim(),
+              address:
+                `${collection.endereco || ""}, ${collection.numero || ""}`.trim(),
               number: collection.numero || "",
               neighborhood: collection.bairro || "",
               city: collection.cidade || "",
@@ -250,42 +249,61 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
         });
 
         groupsMap.forEach((clientGroup) => {
-          const roundTo2Decimals = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
+          const roundTo2Decimals = (num: number) =>
+            Math.round((num + Number.EPSILON) * 100) / 100;
 
           let clientTotalDiscount = 0;
 
           clientGroup.sales.forEach((saleGroup) => {
-            const saleTotalValue = saleGroup.installments.reduce((sum, inst) => sum + (inst.valor_original || 0), 0);
-            const saleTotalReceived = saleGroup.installments.reduce((sum, inst) => sum + (inst.valor_recebido || 0), 0);
-            const saleTotalDiscount = saleGroup.installments.reduce((sum, inst) => sum + (inst.desconto || 0), 0);
+            const saleTotalValue = saleGroup.installments.reduce(
+              (sum, inst) => sum + (inst.valor_original || 0),
+              0,
+            );
+            const saleTotalReceived = saleGroup.installments.reduce(
+              (sum, inst) => sum + (inst.valor_recebido || 0),
+              0,
+            );
+            const saleTotalDiscount = saleGroup.installments.reduce(
+              (sum, inst) => sum + (inst.desconto || 0),
+              0,
+            );
 
             saleGroup.totalValue = roundTo2Decimals(saleTotalValue);
             saleGroup.totalReceived = roundTo2Decimals(saleTotalReceived);
             saleGroup.totalDiscount = roundTo2Decimals(saleTotalDiscount);
-            saleGroup.pendingValue = roundTo2Decimals(saleTotalValue - saleTotalReceived - saleTotalDiscount);
+            saleGroup.pendingValue = roundTo2Decimals(
+              saleTotalValue - saleTotalReceived - saleTotalDiscount,
+            );
 
             const effectiveSalePaid = saleTotalReceived + saleTotalDiscount;
             saleGroup.saleStatus =
               effectiveSalePaid === 0
                 ? "pending"
                 : saleGroup.pendingValue <= 0.01
-                ? "fully_paid"
-                : "partially_paid";
+                  ? "fully_paid"
+                  : "partially_paid";
 
             clientTotalDiscount += saleGroup.totalDiscount;
           });
 
-          const clientTotalValue = clientGroup.sales.reduce((sum, sale) => sum + sale.totalValue, 0);
-          const clientTotalReceived = clientGroup.sales.reduce((sum, sale) => sum + sale.totalReceived, 0);
+          const clientTotalValue = clientGroup.sales.reduce(
+            (sum, sale) => sum + sale.totalValue,
+            0,
+          );
+          const clientTotalReceived = clientGroup.sales.reduce(
+            (sum, sale) => sum + sale.totalReceived,
+            0,
+          );
 
           clientGroup.totalValue = roundTo2Decimals(clientTotalValue);
           clientGroup.totalReceived = roundTo2Decimals(clientTotalReceived);
           clientGroup.totalDiscount = roundTo2Decimals(clientTotalDiscount);
-          clientGroup.pendingValue = roundTo2Decimals(clientTotalValue - clientTotalReceived - clientTotalDiscount);
+          clientGroup.pendingValue = roundTo2Decimals(
+            clientTotalValue - clientTotalReceived - clientTotalDiscount,
+          );
         });
 
         return Array.from(groupsMap.values());
-
       } else {
         return getClientGroups(collectorId);
       }
@@ -616,12 +634,13 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                           {formatCurrency(clientGroup.totalDiscount)}
                         </span>
                       )}
-                      {!!clientGroup.pendingValue && clientGroup.pendingValue > 0.01 && (
-                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-2xl bg-red-100 text-red-800">
-                           <AlertCircle className="h-3 w-3 mr-1" />
-                          {formatCurrency(clientGroup.pendingValue)}
-                        </span>
-                      )}
+                      {!!clientGroup.pendingValue &&
+                        clientGroup.pendingValue > 0.01 && (
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-2xl bg-red-100 text-red-800">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            {formatCurrency(clientGroup.pendingValue)}
+                          </span>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -1087,18 +1106,20 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                               {formatCurrency(clientGroup.totalReceived)}
                             </span>
                           )}
-                          {!!clientGroup.totalDiscount && clientGroup.totalDiscount > 0 && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                              <TrendingDown className="h-3 w-3 mr-1.5" />
-                              {formatCurrency(clientGroup.totalDiscount)}
-                            </span>
-                          )}
-                          {!!clientGroup.pendingValue && clientGroup.pendingValue > 0 && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                              <AlertCircle className="h-3 w-3 mr-1.5" />
-                              {formatCurrency(clientGroup.pendingValue)}
-                            </span>
-                          )}
+                          {!!clientGroup.totalDiscount &&
+                            clientGroup.totalDiscount > 0 && (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                <TrendingDown className="h-3 w-3 mr-1.5" />
+                                {formatCurrency(clientGroup.totalDiscount)}
+                              </span>
+                            )}
+                          {!!clientGroup.pendingValue &&
+                            clientGroup.pendingValue > 0 && (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                                <AlertCircle className="h-3 w-3 mr-1.5" />
+                                {formatCurrency(clientGroup.pendingValue)}
+                              </span>
+                            )}
                         </div>
                       </div>
                     </div>

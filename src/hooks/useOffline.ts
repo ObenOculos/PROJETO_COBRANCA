@@ -267,19 +267,19 @@ export const useOffline = () => {
 
     console.log("Sincronizando pagamento offline via RPC:", paymentData);
 
-    const { error } = await supabase.rpc('process_payment', {
-        p_collector_id: paymentData.collectorId,
-        p_client_document: paymentData.clientDocument,
-        p_payment_amount: paymentData.paymentAmount,
-        p_discount_amount: paymentData.discountAmount || 0,
-        p_payment_method: paymentData.paymentMethod || 'default',
-        p_notes: paymentData.notes || '',
-        p_sale_number: paymentData.saleNumber
+    const { error } = await supabase.rpc("process_payment", {
+      p_collector_id: paymentData.collectorId,
+      p_client_document: paymentData.clientDocument,
+      p_payment_amount: paymentData.paymentAmount,
+      p_discount_amount: paymentData.discountAmount || 0,
+      p_payment_method: paymentData.paymentMethod || "default",
+      p_notes: paymentData.notes || "",
+      p_sale_number: paymentData.saleNumber,
     });
 
     if (error) {
-        console.error("Erro ao sincronizar pagamento offline via RPC:", error);
-        throw new Error(`Erro ao sincronizar pagamento: ${error.message}`);
+      console.error("Erro ao sincronizar pagamento offline via RPC:", error);
+      throw new Error(`Erro ao sincronizar pagamento: ${error.message}`);
     }
 
     console.log("✅ Pagamento offline sincronizado com sucesso.");

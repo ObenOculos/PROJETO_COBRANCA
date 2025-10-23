@@ -33,7 +33,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     useCollection();
   const { user } = useAuth();
 
-
   const [isGeneralPaymentModalOpen, setIsGeneralPaymentModalOpen] =
     useState(false);
   const [isGeneralEditModalOpen, setIsGeneralEditModalOpen] = useState(false);
@@ -238,8 +237,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     );
     return sales;
   }, [getSalesByClient, clientGroup.document, refreshKey]);
-
-
 
   const handleGeneralPaymentSuccess = async () => {
     // Pequeno delay para garantir que a operação no banco seja concluída
@@ -634,8 +631,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                   {formatCurrency(saleBalance.remainingBalance)}
                                 </div>
                               </div>
-
-
                             </div>
                           </div>
 
@@ -681,7 +676,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                 ) : (
                                   <div className="text-xs text-red-600 font-medium">
                                     Restante:{" "}
-                                    {formatCurrency(saleBalance.remainingBalance)}
+                                    {formatCurrency(
+                                      saleBalance.remainingBalance,
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -705,7 +702,21 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               </span>
                             </div>
 
-
+                            {userType === "collector" &&
+                              saleBalance.remainingBalance > 0 && (
+                                <button
+                                  id={`receive-payment-mobile-${sale.saleNumber}`}
+                                  name={`receivePaymentMobile${sale.saleNumber}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                  }}
+                                  className="flex items-center justify-center w-full px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium shadow-sm"
+                                  title="Receber pagamento da venda"
+                                >
+                                  <CreditCard className="h-5 w-5 mr-2" />
+                                  <span>Receber Pagamento</span>
+                                </button>
+                              )}
                           </div>
                         </div>
 
@@ -734,12 +745,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                     Já Pago
                                   </div>
                                 </div>
-                                {saleBalance.status === 'fully_paid' &&
+                                {saleBalance.status === "fully_paid" &&
                                 saleBalance.totalDiscount &&
                                 saleBalance.totalDiscount > 0 ? (
                                   <div className="text-center p-3 bg-blue-50 rounded-2xl">
                                     <div className="text-sm sm:text-lg font-bold text-blue-600">
-                                      {formatCurrency(saleBalance.totalDiscount)}
+                                      {formatCurrency(
+                                        saleBalance.totalDiscount,
+                                      )}
                                     </div>
                                     <div className="text-xs text-gray-600">
                                       Desconto Total
@@ -799,8 +812,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           )}
         </div>
       </div>
-
-
 
       {/* Authorization Modal */}
       {showAuthModal && (

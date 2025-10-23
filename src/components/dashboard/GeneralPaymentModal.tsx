@@ -75,14 +75,17 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         return sum + (sale.totalReceived || 0);
       }, 0) || 0;
 
-        const totalPending = 
-          clientSales?.reduce((sum, sale) => {
-            return sum + (sale.pendingValue || 0);
-          }, 0) || 0;
-    
-        const amountToDistribute = parseFloat(distributionAmount) || 0;
-        const discountAmount = withDiscount && amountToDistribute > 0 ? totalPending - amountToDistribute : 0;
-        const showDiscountBox = discountAmount >= 0 && withDiscount;
+    const totalPending =
+      clientSales?.reduce((sum, sale) => {
+        return sum + (sale.pendingValue || 0);
+      }, 0) || 0;
+
+    const amountToDistribute = parseFloat(distributionAmount) || 0;
+    const discountAmount =
+      withDiscount && amountToDistribute > 0
+        ? totalPending - amountToDistribute
+        : 0;
+    const showDiscountBox = discountAmount >= 0 && withDiscount;
     // Calcular distribuição automática por venda
     const calculateSaleDistribution = React.useCallback(() => {
       const paymentAmount = parseFloat(distributionAmount) || 0;
@@ -195,7 +198,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         return;
       }
 
-      const totalToDistribute = inputAmount + (withDiscount ? calculatedDiscount : 0);
+      const totalToDistribute =
+        inputAmount + (withDiscount ? calculatedDiscount : 0);
       const newPendingValue = totalPending - totalToDistribute;
 
       if (newPendingValue > 0.01 && !withDiscount) {
@@ -210,7 +214,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           if (clientSales?.length === 1) {
             // Se for uma venda única, use o saleNumber (incluindo 0)
             saleNumberToUse = clientSales[0].saleNumber;
-          } else if (clientSales?.length > 1 && clientSales.some(sale => sale.saleNumber === 0)) {
+          } else if (
+            clientSales?.length > 1 &&
+            clientSales.some((sale) => sale.saleNumber === 0)
+          ) {
             // Se houver venda 0 entre várias, priorize 0
             saleNumberToUse = 0;
           } else {
@@ -676,7 +683,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                           {item.willBeComplete && item.appliedDiscount > 0 ? (
                             <div className="flex items-center text-blue-600 text-sm font-medium">
                               <TrendingDown className="h-4 w-4 mr-1" />
-                              Quitado com Desconto: {formatCurrency(item.appliedDiscount)}
+                              Quitado com Desconto:{" "}
+                              {formatCurrency(item.appliedDiscount)}
                             </div>
                           ) : (
                             <div className="text-sm text-gray-600">
@@ -685,7 +693,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                                 {formatCurrency(
                                   Math.max(
                                     0,
-                                    (item.sale.totalValue || 0) - item.newAmount - (item.appliedDiscount || 0),
+                                    (item.sale.totalValue || 0) -
+                                      item.newAmount -
+                                      (item.appliedDiscount || 0),
                                   ),
                                 )}
                               </span>

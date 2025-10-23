@@ -62,7 +62,10 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
     let saleStatus = "pendente";
     if (totalReceived > 0 && totalPending > 0.01) {
       saleStatus = "parcial";
-    } else if (totalPending <= 0.01 && (totalReceived > 0 || totalDiscount > 0)) {
+    } else if (
+      totalPending <= 0.01 &&
+      (totalReceived > 0 || totalDiscount > 0)
+    ) {
       saleStatus = "pago";
     }
 
@@ -215,7 +218,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
               </div>
             </div>
 
-            {saleData.saleStatus === 'pago' && saleData.totalDiscount > 0 ? (
+            {saleData.saleStatus === "pago" && saleData.totalDiscount > 0 ? (
               <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-4 rounded-2xl border border-purple-200">
                 <div className="flex items-center justify-between">
                   <div>
@@ -418,11 +421,15 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                     {saleData.collections.map((collection, index) => {
                       const pending =
                         collection.valor_original - collection.valor_recebido;
-                      const dbStatus = collection.status?.toLowerCase() || 'pendente';
+                      const dbStatus =
+                        collection.status?.toLowerCase() || "pendente";
                       let status = "pendente";
-                      if (dbStatus === 'pago' || dbStatus === 'pago com desconto') {
+                      if (
+                        dbStatus === "pago" ||
+                        dbStatus === "pago com desconto"
+                      ) {
                         status = "pago";
-                      } else if (dbStatus === 'parcial') {
+                      } else if (dbStatus === "parcial") {
                         status = "parcial";
                       }
 

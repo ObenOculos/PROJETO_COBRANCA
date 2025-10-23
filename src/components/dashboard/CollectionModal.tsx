@@ -270,15 +270,15 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                       >
                         {formatCurrency(collection.valor_recebido)}
                       </p>
-                      {collection.status === 'Parcial' && (
-                          <p className="text-sm text-red-600">
-                            Restante:{" "}
-                            {formatCurrency(
-                              collection.valor_original -
-                                collection.valor_recebido,
-                            )}
-                          </p>
-                        )}
+                      {collection.status === "Parcial" && (
+                        <p className="text-sm text-red-600">
+                          Restante:{" "}
+                          {formatCurrency(
+                            collection.valor_original -
+                              collection.valor_recebido,
+                          )}
+                        </p>
+                      )}
                     </div>
 
                     <div>
