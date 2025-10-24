@@ -213,7 +213,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           let saleNumberToUse: number | null;
           if (clientSales?.length === 1) {
             const n = clientSales[0].saleNumber;
-            saleNumberToUse = n === 0 || n === undefined || n === null ? null : n;
+            saleNumberToUse =
+              n === 0 || n === undefined || n === null ? null : n;
           } else {
             saleNumberToUse = null;
           }
