@@ -376,6 +376,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         salesPaymentMap.set(saleKey, {
           saleKey,
           client:
+            payment.clientName || // Prioritize clientName from salePayment
             relatedCollection?.cliente ||
             payment.clientDocument ||
             "Cliente não informado",
