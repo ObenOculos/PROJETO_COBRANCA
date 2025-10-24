@@ -698,9 +698,15 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         </div>
                         <div className="bg-white rounded-md p-2">
                           <div className="font-semibold text-xs text-blue-600 truncate">
+                            {formatCurrency(collector.totalAmount)}
+                          </div>
+                          <div className="text-xs text-gray-600">Atribuído</div>
+                        </div>
+                        <div className="bg-white rounded-md p-2">
+                          <div className="font-semibold text-xs text-green-600 truncate">
                             {formatCurrency(collector.receivedAmount)}
                           </div>
-                          <div className="text-xs text-gray-600">Valor</div>
+                          <div className="text-xs text-gray-600">Recebido</div>
                         </div>
                       </div>
 
@@ -740,7 +746,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                           Taxa
                         </th>
                         <th className="text-left py-3 px-4 font-medium text-gray-900">
-                          Valor Total
+                          Valor Atribuído
+                        </th>
+                        <th className="text-left py-3 px-4 font-medium text-gray-900">
+                          Valor Recebido
                         </th>
                         <th className="text-left py-3 px-4 font-medium text-gray-900">
                           Tempo Médio
@@ -751,7 +760,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       {performance.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={7}
+                            colSpan={8}
                             className="py-8 text-center text-gray-500"
                           >
                             Nenhum cobrador encontrado
@@ -789,6 +798,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                               >
                                 {collector.conversionRate.toFixed(1)}%
                               </span>
+                            </td>
+                            <td className="py-3 px-4 text-gray-600">
+                              {formatCurrency(collector.totalAmount)}
                             </td>
                             <td className="py-3 px-4 text-gray-600">
                               {formatCurrency(collector.receivedAmount)}
