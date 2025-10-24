@@ -345,6 +345,10 @@ export interface CollectionContextType {
   ) => Promise<void>;
   updateScheduledVisitsAfterPayment: (clientDocument: string) => Promise<void>;
   deleteClient: (clientDocument: string) => Promise<void>;
+  deleteSalesFromClient: (
+    clientDocument: string,
+    saleNumbers: number[],
+  ) => Promise<void>;
 }
 
 // Sale payment types

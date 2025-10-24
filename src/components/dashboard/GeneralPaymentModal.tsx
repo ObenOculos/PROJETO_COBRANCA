@@ -35,7 +35,7 @@ interface SaleDistributionItem {
 
 const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
   ({ clientGroup, clientSales, onClose, onSuccess }) => {
-    const { processGeneralPayment, scheduleVisit } = useCollection();
+    const { scheduleVisit, processSalePayment } = useCollection();
     const { user } = useAuth();
     const { isOnline } = useOffline();
     const [loading, setLoading] = useState(false);
@@ -209,24 +209,24 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         // Pagamento integral ou com desconto, processar diretamente
         try {
           setLoading(true);
-          // Corrigir lógica: null quando não houver número, número real quando existir
-          let saleNumberToUse: number | null;
-          if (clientSales?.length === 1) {
-            const n = clientSales[0].saleNumber;
-            saleNumberToUse =
-              n === 0 || n === undefined || n === null ? null : n;
-          } else {
-            saleNumberToUse = null;
+
+          // Process each distributed sale individually
+          for (const item of saleDistribution) {
+            if (item.appliedAmount > 0 || item.appliedDiscount > 0) {
+              await processSalePayment(
+                {
+                  saleNumber: item.sale.saleNumber,
+                  clientDocument: clientGroup.document || "",
+                  paymentAmount: item.appliedAmount,
+                  paymentMethod: paymentMethod,
+                  notes: `Pagamento distribuído para Venda #${item.sale.saleNumber}`,
+                  discountAmount: item.appliedDiscount,
+                },
+                user.id,
+              );
+            }
           }
-          await processGeneralPayment(
-            clientGroup.document || "",
-            inputAmount,
-            paymentMethod,
-            `Distribuição geral de ${formatCurrency(inputAmount)}`,
-            user.id,
-            calculatedDiscount > 0 ? calculatedDiscount : undefined,
-            saleNumberToUse,
-          );
+
           showSuccessNotification("Pagamento distribuído com sucesso!");
           onSuccess();
           onClose();
@@ -303,13 +303,22 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         setLoading(true);
 
         // Primeiro, processar o pagamento parcial
-        await processGeneralPayment(
-          clientGroup.document || "",
-          parseFloat(distributionAmount) || 0,
-          paymentMethod,
-          `Pagamento parcial de ${formatCurrency(parseFloat(distributionAmount) || 0)}`,
-          user.id,
-        );
+        // Iterate over saleDistribution to process each distributed sale individually
+        for (const item of saleDistribution) {
+          if (item.appliedAmount > 0 || item.appliedDiscount > 0) {
+            await processSalePayment(
+              {
+                saleNumber: item.sale.saleNumber,
+                clientDocument: clientGroup.document || "",
+                paymentAmount: item.appliedAmount,
+                paymentMethod: paymentMethod,
+                notes: `Pagamento parcial distribuído para Venda #${item.sale.saleNumber}`,
+                discountAmount: item.appliedDiscount,
+              },
+              user.id,
+            );
+          }
+        }
 
         // Depois, agendar a nova visita
         const visitData: Omit<ScheduledVisit, "id" | "createdAt"> = {

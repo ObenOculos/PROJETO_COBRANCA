@@ -147,9 +147,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   );
 
   const getVisitsByCollector = (collectorId: string) => {
-    return scheduledVisits.filter(
-      (visit: ScheduledVisit) => visit.collectorId === collectorId,
-    );
+    return scheduledVisits.filter((visit: ScheduledVisit) => visit.collectorId === collectorId);
   };
 
   // Cache invalidation hooks
@@ -709,6 +707,134 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     } catch (err) {
       console.error("Erro ao deletar usuário:", err);
       setError(err instanceof Error ? err.message : "Erro ao deletar usuário");
+    }
+  };
+
+  const deleteSalesFromClient = async (
+    clientDocument: string,
+    saleNumbers: number[],
+  ) => {
+    try {
+      setGlobalLoading(
+        true,
+        `Deletando ${saleNumbers.length} venda(s) do cliente ${clientDocument}...`,
+      );
+      setLoading(true);
+
+      if (!isOnline) {
+        throw new Error("Não é possível deletar vendas offline.");
+      }
+
+      // 1. Delete from BANCO_DADOS (collections/installments)
+      const validSaleNumbers = saleNumbers.filter((num) => num > 0);
+      const includesRenegotiated = saleNumbers.includes(0);
+
+      let collectionsQuery = supabase
+        .from("BANCO_DADOS")
+        .delete()
+        .eq("documento", clientDocument);
+
+      if (validSaleNumbers.length > 0 && includesRenegotiated) {
+        collectionsQuery = collectionsQuery.or(
+          `venda_n.in.(${validSaleNumbers.join(",")}),venda_n.is.null`,
+        );
+      } else if (validSaleNumbers.length > 0) {
+        collectionsQuery = collectionsQuery.in("venda_n", validSaleNumbers);
+      } else if (includesRenegotiated) {
+        collectionsQuery = collectionsQuery.is("venda_n", null);
+      }
+
+      const { error: collectionsError } = await collectionsQuery;
+
+      if (collectionsError) {
+        throw collectionsError;
+      }
+
+      // 2. Delete from sale_payments
+      let paymentsQuery = supabase
+        .from("sale_payments")
+        .delete()
+        .eq("client_document", clientDocument);
+
+      if (validSaleNumbers.length > 0 && includesRenegotiated) {
+        paymentsQuery = paymentsQuery.or(
+          `sale_number.in.(${validSaleNumbers.join(",")}),sale_number.is.null`,
+        );
+      } else if (validSaleNumbers.length > 0) {
+        paymentsQuery = paymentsQuery.in("sale_number", validSaleNumbers);
+      } else if (includesRenegotiated) {
+        paymentsQuery = paymentsQuery.is("sale_number", null);
+      }
+
+      const { error: paymentsError } = await paymentsQuery;
+
+      if (paymentsError) {
+        console.warn(
+          `Aviso: Erro ao deletar pagamentos das vendas ${saleNumbers} do cliente ${clientDocument}:`,
+          paymentsError.message,
+        );
+      }
+
+      console.log(
+        `✅ ${saleNumbers.length} venda(s) do cliente ${clientDocument} e pagamentos relacionados deletados.`,
+      );
+
+      // After deleting sales, check if the client still has any remaining sales
+      const { data: remainingSales, error: fetchRemainingSalesError } = await supabase
+        .from("BANCO_DADOS")
+        .select("venda_n")
+        .eq("documento", clientDocument)
+        .limit(1); // Only need to know if at least one exists
+
+      if (fetchRemainingSalesError) {
+        console.error(
+          "Erro ao verificar vendas restantes do cliente:",
+          fetchRemainingSalesError,
+        );
+        // Continue without deleting other client data if we can't verify remaining sales
+      } else if (!remainingSales || remainingSales.length === 0) {
+        console.log(
+          `Cliente ${clientDocument} não possui mais vendas. Deletando dados relacionados (visitas, histórico de autorização).`,
+        );
+
+        // 3. Delete from scheduled_visits
+        const { error: visitsError } = await supabase
+          .from("scheduled_visits")
+          .delete()
+          .eq("client_document", clientDocument);
+
+        if (visitsError) {
+          console.warn(
+            `Aviso: Erro ao deletar visitas agendadas do cliente ${clientDocument}:`,
+            visitsError.message,
+          );
+        }
+
+        // 4. Delete from authorization_history
+        const { error: authHistoryError } = await supabase
+          .from("authorization_history")
+          .delete()
+          .eq("client_document", clientDocument);
+
+        if (authHistoryError) {
+          console.warn(
+            `Aviso: Erro ao deletar histórico de autorização do cliente ${clientDocument}:`,
+            authHistoryError.message,
+          );
+        }
+      }
+
+      await refreshData(); // Refresh all data after deletion
+    } catch (err) {
+      console.error(
+        `Erro ao deletar vendas ${saleNumbers} do cliente ${clientDocument}:`,
+        err,
+      );
+      setError(err instanceof Error ? err.message : "Erro ao deletar vendas");
+      throw err;
+    } finally {
+      setLoading(false);
+      setGlobalLoading(false);
     }
   };
 
@@ -1935,16 +2061,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     notes?: string,
   ) => {
     setGlobalLoading(true, "Registrando ajuste de pagamento...");
-    try {
-      // This try block should encompass all the logic that can throw errors
-      console.log("Registrando ajuste de pagamento na tabela sale_payments:", {
-        saleNumber,
-        clientDocument,
-        adjustmentAmount,
-        managerId,
-        managerName,
-        notes,
-      });
+    try { // This try block should encompass all the logic that can throw errors
+      console.log(
+        "Registrando ajuste de pagamento na tabela sale_payments:",
+        {
+          saleNumber,
+          clientDocument,
+          adjustmentAmount,
+          managerId,
+          managerName,
+          notes,
+        },
+      );
 
       if (adjustmentAmount === 0) {
         console.log("Ajuste de pagamento é zero, ignorando registro.");
@@ -1978,21 +2106,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       if (error) {
         console.error("Erro ao registrar ajuste de pagamento:", error);
-        throw new Error(
-          `Erro ao registrar ajuste de pagamento: ${error.message}`,
-        );
+        throw new Error(`Erro ao registrar ajuste de pagamento: ${error.message}`);
       }
 
       console.log("✅ Ajuste de pagamento registrado com sucesso.");
       invalidatePayments(); // Invalidate cache to force refresh of sale payments
       await fetchSalePayments(false); // Force fresh fetch
-    } catch (err) {
-      // This catch block handles errors from the entire try block
+    } catch (err) { // This catch block handles errors from the entire try block
       console.error("Erro ao processar ajuste de pagamento:", err);
       setError(
-        err instanceof Error
-          ? err.message
-          : "Erro ao registrar ajuste de pagamento",
+        err instanceof Error ? err.message : "Erro ao registrar ajuste de pagamento",
       );
       throw err;
     } finally {
@@ -2205,6 +2328,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     },
     [collections, calculateSaleBalance, getSalePayments],
   );
+
+
 
   const scheduleVisit = async (
     visitData: Omit<ScheduledVisit, "id" | "createdAt" | "updatedAt">,
@@ -2582,6 +2707,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       return matchesDate && matchesCollector;
     });
   };
+
+
 
   const getClientDataForVisit = (clientDocument: string) => {
     const clientGroups = getClientGroups();
@@ -2989,6 +3116,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     rescheduleVisit,
     updateScheduledVisitsAfterPayment,
     deleteClient,
+    deleteSalesFromClient,
   };
 
   return (

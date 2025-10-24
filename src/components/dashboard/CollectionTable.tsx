@@ -31,7 +31,8 @@ import CollectionModal from "./CollectionModal";
 import ClientDetailModal from "./ClientDetailModal";
 import SaleDetailsModal from "./SaleDetailsModal";
 import { useCollection } from "../../contexts/CollectionContext";
-import ConfirmationModal from "../common/ConfirmationModal";
+
+import DeleteSalesModal from "./DeleteSalesModal";
 
 interface CollectionTableProps {
   collections: Collection[];
@@ -51,7 +52,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     showFilterBar,
     onToggleFilterBar,
   }) => {
-    const { getClientGroups, loading, deleteClient } = useCollection();
+    const { getClientGroups, loading, deleteSalesFromClient } = useCollection();
     const [selectedCollection, setSelectedCollection] =
       useState<Collection | null>(null);
     const [selectedClientGroup, setSelectedClientGroup] =
@@ -67,12 +68,12 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
       null,
     );
 
-    const handleConfirmDelete = async () => {
-      if (clientToDelete) {
+    const handleConfirmDeleteSales = async (selectedSaleNumbers: number[]) => {
+      if (clientToDelete && selectedSaleNumbers.length > 0) {
         try {
-          await deleteClient(clientToDelete.document);
+          await deleteSalesFromClient(clientToDelete.document, selectedSaleNumbers);
         } catch (error) {
-          console.error("Erro ao deletar cliente:", error);
+          console.error("Erro ao deletar vendas:", error);
         }
         setClientToDelete(null);
         setShowDeleteConfirmation(false);
@@ -805,15 +806,11 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
           {/* Confirmation Modal for Delete Client */}
           {clientToDelete && (
-            <ConfirmationModal
+            <DeleteSalesModal
               isOpen={showDeleteConfirmation}
               onClose={handleCancelDelete}
-              onConfirm={handleConfirmDelete}
-              title="Confirmar Exclusão de Cliente"
-              clientName={clientToDelete.client || ""}
-              clientDocument={clientToDelete.document || ""}
-              confirmButtonText="Deletar"
-              cancelButtonText="Cancelar"
+              onConfirm={handleConfirmDeleteSales}
+              clientGroup={clientToDelete}
             />
           )}
         </>
@@ -1484,15 +1481,11 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
 
         {/* Confirmation Modal for Delete Client */}
         {clientToDelete && (
-          <ConfirmationModal
+          <DeleteSalesModal
             isOpen={showDeleteConfirmation}
             onClose={handleCancelDelete}
-            onConfirm={handleConfirmDelete}
-            title="Confirmar Exclusão de Cliente"
-            clientName={clientToDelete.client || ""}
-            clientDocument={clientToDelete.document || ""}
-            confirmButtonText="Deletar"
-            cancelButtonText="Cancelar"
+            onConfirm={handleConfirmDeleteSales}
+            clientGroup={clientToDelete}
           />
         )}
       </>
