@@ -284,6 +284,15 @@ export interface CollectionContextType {
     discountAmount?: number,
     saleNumber?: number | null,
   ) => Promise<void>;
+  recordPaymentAdjustment: (
+    saleNumber: number,
+    clientDocument: string,
+    clientName: string, // Added clientName
+    adjustmentAmount: number,
+    managerId: string,
+    managerName: string,
+    notes?: string,
+  ) => Promise<void>;
   getSalePayments: (
     saleNumber: number,
     clientDocument: string,
@@ -340,8 +349,8 @@ export interface CollectionContextType {
 
 // Sale payment types
 export interface SalePayment {
-  id: string;
-  saleNumber: number;
+  id: string; // Re-added
+  saleNumber: number | null;
   clientDocument: string;
   clientName?: string;
   paymentAmount: number;
@@ -366,7 +375,7 @@ export interface PaymentDistribution {
 }
 
 export interface SalePaymentInput {
-  saleNumber: number;
+  saleNumber: number | null;
   clientDocument: string;
   paymentAmount: number;
   paymentMethod?: string;

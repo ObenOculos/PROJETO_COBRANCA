@@ -66,6 +66,90 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Scheduled Visits Functions (Moved to earlier declaration)
+  const fetchScheduledVisits = React.useCallback(
+    async (useCache = true) => {
+      const cacheKey = "scheduled-visits";
+
+      // 1. Load from cache if available
+      if (useCache) {
+        const cachedData = dataCache.get<ScheduledVisit[]>(cacheKey);
+        if (cachedData) {
+          console.log("✅ Dados de scheduled visits carregados do cache");
+          setScheduledVisits(cachedData);
+        }
+      }
+
+      // 2. If offline, do not proceed to fetch from network
+      if (!isOnline) {
+        console.log("🚫 Offline, não buscando visitas agendadas do servidor.");
+        // If there was no cache, the state will be an empty array, which is correct.
+        // If there was cache, it's already set.
+        return;
+      }
+
+      // 3. If online, fetch fresh data
+      try {
+        console.log("Buscando visitas agendadas...");
+
+        const { data, error: supabaseError } = await supabase
+          .from("scheduled_visits")
+          .select("*")
+          .order("scheduled_date", { ascending: true });
+
+        if (supabaseError) {
+          // If fetch fails, we just log it but DON'T clear the state.
+          // The user will see stale data from cache, which is the desired offline behavior.
+          console.error("Erro ao buscar visitas agendadas:", supabaseError);
+          return; // Exit without clearing state
+        }
+
+        const transformedVisits: ScheduledVisit[] = (data || []).map(
+          (visit) => ({
+            id: visit.id,
+            collectorId: visit.collector_id,
+            clientDocument: visit.client_document,
+            clientName: visit.client_name,
+            scheduledDate: visit.scheduled_date,
+            scheduledTime: visit.scheduled_time,
+            status: visit.status,
+            notes: visit.notes,
+            createdAt: visit.created_at,
+            updatedAt: visit.updated_at,
+            dataVisitaRealizada: visit.data_visita_realizada,
+            clientAddress: visit.client_address,
+            clientNeighborhood: visit.client_neighborhood,
+            clientCity: visit.client_city,
+            totalPendingValue: visit.total_pending_value,
+            overdueCount: visit.overdue_count,
+            cancellationRequestDate: visit.cancellation_request_date,
+            cancellationRequestReason: visit.cancellation_request_reason,
+            cancellationApprovedBy: visit.cancellation_approved_by,
+            cancellationApprovedAt: visit.cancellation_approved_at,
+            cancellationRejectedBy: visit.cancellation_rejected_by,
+            cancellationRejectedAt: visit.cancellation_rejected_at,
+            cancellationRejectionReason: visit.cancellation_rejection_reason,
+          }),
+        );
+
+        setScheduledVisits(transformedVisits);
+
+        // Cache the fresh data
+        dataCache.set(cacheKey, transformedVisits);
+
+        console.log("Visitas agendadas carregadas:", transformedVisits.length);
+      } catch (err) {
+        // Also log error here and do not clear state
+        console.error("Erro ao carregar visitas agendadas:", err);
+      }
+    },
+    [isOnline, setScheduledVisits, dataCache, supabase],
+  );
+
+  const getVisitsByCollector = (collectorId: string) => {
+    return scheduledVisits.filter((visit: ScheduledVisit) => visit.collectorId === collectorId);
+  };
+
   // Cache invalidation hooks
   const {
     invalidateCollections,
@@ -1839,6 +1923,78 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
+  const recordPaymentAdjustment = async (
+    saleNumber: number,
+    clientDocument: string,
+    clientName: string, // Added clientName
+    adjustmentAmount: number,
+    managerId: string,
+    managerName: string,
+    notes?: string,
+  ) => {
+    setGlobalLoading(true, "Registrando ajuste de pagamento...");
+    try { // This try block should encompass all the logic that can throw errors
+      console.log(
+        "Registrando ajuste de pagamento na tabela sale_payments:",
+        {
+          saleNumber,
+          clientDocument,
+          adjustmentAmount,
+          managerId,
+          managerName,
+          notes,
+        },
+      );
+
+      if (adjustmentAmount === 0) {
+        console.log("Ajuste de pagamento é zero, ignorando registro.");
+        return; // Exit early if no adjustment
+      }
+
+      const isNegativeAdjustment = adjustmentAmount < 0;
+      const finalPaymentMethod = isNegativeAdjustment
+        ? "Estorno/Ajuste Negativo"
+        : "Ajuste Administrativo";
+      const finalNotes =
+        notes ||
+        (isNegativeAdjustment
+          ? "Estorno/Redução de valor recebido via edição do gerente"
+          : "Ajuste de valor recebido via edição do gerente");
+
+      const { error } = await supabase.from("sale_payments").insert({
+        sale_number: saleNumber,
+        client_document: clientDocument,
+        client_name: clientName, // Added client_name
+        payment_amount: adjustmentAmount, // Directly use adjustmentAmount (can be negative)
+        payment_date: new Date().toISOString().split("T")[0], // Current date
+        payment_method: finalPaymentMethod,
+        notes: finalNotes,
+        collector_id: managerId,
+        collector_name: managerName,
+        created_at: new Date().toISOString(),
+        distribution_details: [], // No specific distribution for an adjustment
+        is_agreement: false,
+      });
+
+      if (error) {
+        console.error("Erro ao registrar ajuste de pagamento:", error);
+        throw new Error(`Erro ao registrar ajuste de pagamento: ${error.message}`);
+      }
+
+      console.log("✅ Ajuste de pagamento registrado com sucesso.");
+      invalidatePayments(); // Invalidate cache to force refresh of sale payments
+      await fetchSalePayments(false); // Force fresh fetch
+    } catch (err) { // This catch block handles errors from the entire try block
+      console.error("Erro ao processar ajuste de pagamento:", err);
+      setError(
+        err instanceof Error ? err.message : "Erro ao registrar ajuste de pagamento",
+      );
+      throw err;
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+
   const getSalePayments = (
     saleNumber: number,
     clientDocument: string,
@@ -2045,85 +2201,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     [collections, calculateSaleBalance, getSalePayments],
   );
 
-  // Scheduled Visits Functions
-  const fetchScheduledVisits = React.useCallback(
-    async (useCache = true) => {
-      const cacheKey = "scheduled-visits";
 
-      // 1. Load from cache if available
-      if (useCache) {
-        const cachedData = dataCache.get<ScheduledVisit[]>(cacheKey);
-        if (cachedData) {
-          console.log("✅ Dados de scheduled visits carregados do cache");
-          setScheduledVisits(cachedData);
-        }
-      }
-
-      // 2. If offline, do not proceed to fetch from network
-      if (!isOnline) {
-        console.log("🚫 Offline, não buscando visitas agendadas do servidor.");
-        // If there was no cache, the state will be an empty array, which is correct.
-        // If there was cache, it's already set.
-        return;
-      }
-
-      // 3. If online, fetch fresh data
-      try {
-        console.log("Buscando visitas agendadas...");
-
-        const { data, error: supabaseError } = await supabase
-          .from("scheduled_visits")
-          .select("*")
-          .order("scheduled_date", { ascending: true });
-
-        if (supabaseError) {
-          // If fetch fails, we just log it but DON'T clear the state.
-          // The user will see stale data from cache, which is the desired offline behavior.
-          console.error("Erro ao buscar visitas agendadas:", supabaseError);
-          return; // Exit without clearing state
-        }
-
-        const transformedVisits: ScheduledVisit[] = (data || []).map(
-          (visit) => ({
-            id: visit.id,
-            collectorId: visit.collector_id,
-            clientDocument: visit.client_document,
-            clientName: visit.client_name,
-            scheduledDate: visit.scheduled_date,
-            scheduledTime: visit.scheduled_time,
-            status: visit.status,
-            notes: visit.notes,
-            createdAt: visit.created_at,
-            updatedAt: visit.updated_at,
-            dataVisitaRealizada: visit.data_visita_realizada,
-            clientAddress: visit.client_address,
-            clientNeighborhood: visit.client_neighborhood,
-            clientCity: visit.client_city,
-            totalPendingValue: visit.total_pending_value,
-            overdueCount: visit.overdue_count,
-            cancellationRequestDate: visit.cancellation_request_date,
-            cancellationRequestReason: visit.cancellation_request_reason,
-            cancellationApprovedBy: visit.cancellation_approved_by,
-            cancellationApprovedAt: visit.cancellation_approved_at,
-            cancellationRejectedBy: visit.cancellation_rejected_by,
-            cancellationRejectedAt: visit.cancellation_rejected_at,
-            cancellationRejectionReason: visit.cancellation_rejection_reason,
-          }),
-        );
-
-        setScheduledVisits(transformedVisits);
-
-        // Cache the fresh data
-        dataCache.set(cacheKey, transformedVisits);
-
-        console.log("Visitas agendadas carregadas:", transformedVisits.length);
-      } catch (err) {
-        // Also log error here and do not clear state
-        console.error("Erro ao carregar visitas agendadas:", err);
-      }
-    },
-    [isOnline, setScheduledVisits, dataCache, supabase],
-  );
 
   const scheduleVisit = async (
     visitData: Omit<ScheduledVisit, "id" | "createdAt" | "updatedAt">,
@@ -2502,9 +2580,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     });
   };
 
-  const getVisitsByCollector = (collectorId: string) => {
-    return scheduledVisits.filter((visit) => visit.collectorId === collectorId);
-  };
+
 
   const getClientDataForVisit = (clientDocument: string) => {
     const clientGroups = getClientGroups();
@@ -2893,6 +2969,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     // Sale payment methods
     processSalePayment,
     processGeneralPayment,
+    recordPaymentAdjustment, // Added
     getSalePayments,
     calculateSaleBalance,
     getSalesByClient,

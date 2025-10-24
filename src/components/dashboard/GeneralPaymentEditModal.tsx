@@ -25,7 +25,7 @@ interface GeneralPaymentEditModalProps {
 
 const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
   ({ clientGroup, clientSales, onClose, onSuccess }) => {
-    const { updateCollection } = useCollection();
+    const { updateCollection, recordPaymentAdjustment } = useCollection();
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [salePaymentEdits, setSalePaymentEdits] = useState<
@@ -254,6 +254,21 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
             await updateCollection(installment.id_parcela, updates);
 
             remainingAmount -= appliedAmount;
+          }
+        }
+
+        // Registrar ajustes na tabela sale_payments
+        for (const change of changes) {
+          if (change.difference !== 0) {
+            await recordPaymentAdjustment(
+              change.sale.saleNumber,
+              clientGroup.document,
+              clientGroup.client, // Added clientName
+              change.difference,
+              user.id,
+              user.name,
+              `Ajuste de valor recebido para venda #${change.sale.saleNumber}. Diferença: ${formatCurrency(change.difference)}`,
+            );
           }
         }
 
