@@ -591,7 +591,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               </div>
                               <div>
                                 <h4 className="font-medium text-gray-900">
-                                  Venda {sale.saleNumber}
+                                  Venda #
+                                  {sale.saleNumber === 0
+                                    ? "Renegociada"
+                                    : sale.saleNumber}
                                 </h4>
                                 <p className="text-sm text-gray-600">
                                   {sale.installments.length} parcela

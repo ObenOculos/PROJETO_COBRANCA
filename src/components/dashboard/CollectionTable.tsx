@@ -1182,7 +1182,10 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
                               <div className="flex items-start justify-between mb-4">
                                 <div>
                                   <h4 className="font-semibold text-gray-800">
-                                    Venda #{sale.saleNumber}
+                                    Venda #
+                                    {sale.saleNumber === 0
+                                      ? "Renegociada"
+                                      : sale.saleNumber}
                                   </h4>
                                   <p className="text-xs text-gray-500 mt-1">
                                     {sale.installments.length} parcela
