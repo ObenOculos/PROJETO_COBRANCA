@@ -3409,8 +3409,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                                       {/* Client Info */}
                                                       <div className="flex items-start justify-between mb-2">
                                                         <div className="min-w-0 flex-1">
-                                                          <h3 className="font-semibold text-gray-900 text-lg truncate">
-                                                            {client.client}
+                                                          <h3 className="font-semibold text-gray-900 text-lg">
+                                                            {client.client.length > 25 ? `${client.client.substring(0, 25)}...` : client.client}
                                                           </h3>
                                                           {client.apelido && (
                                                             <p className="text-sm text-blue-600 mt-1">
@@ -3487,7 +3487,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                       <div className="flex items-center justify-between mb-2">
                                         <div>
                                           <span className="font-medium text-gray-900">
-                                            {client.client}
+                                            {client.client.length > 25 ? `${client.client.substring(0, 25)}...` : client.client}
                                             {client.apelido && (
                                               <span className="text-sm text-blue-600 ml-1">
                                                 ({client.apelido})
