@@ -397,10 +397,10 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       const saleData = salesPaymentMap.get(saleKey)!;
       // Para sale_payments, cada registro representa um pagamento completo
       if (
-        payment.distributionDetails &&
-        Array.isArray(payment.distributionDetails)
+        payment.distribution_details &&
+        Array.isArray(payment.distribution_details)
       ) {
-        payment.distributionDetails.forEach((detail: any) => {
+        payment.distribution_details.forEach((detail: any) => {
           saleData.installments.push({
             collectionId: detail.installmentId || payment.id,
             originalValue: detail.originalAmount || 0,

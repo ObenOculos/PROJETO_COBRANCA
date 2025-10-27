@@ -758,12 +758,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       if (validSaleNumbers.length > 0 && includesRenegotiated) {
         paymentsQuery = paymentsQuery.or(
-          `sale_number.in.(${validSaleNumbers.join(",")}),sale_number.is.null`,
+          `sale_number.in.(${validSaleNumbers.join(",")}),sale_number.eq.0`,
         );
       } else if (validSaleNumbers.length > 0) {
         paymentsQuery = paymentsQuery.in("sale_number", validSaleNumbers);
       } else if (includesRenegotiated) {
-        paymentsQuery = paymentsQuery.is("sale_number", null);
+        paymentsQuery = paymentsQuery.eq("sale_number", 0);
       }
 
       const { error: paymentsError } = await paymentsQuery;

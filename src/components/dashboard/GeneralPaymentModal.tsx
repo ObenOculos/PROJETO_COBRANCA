@@ -687,12 +687,19 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
                         {/* Status da Venda */}
                         <div className="mt-3 flex items-center justify-between">
-                          {item.willBeComplete && item.appliedDiscount > 0 ? (
-                            <div className="flex items-center text-blue-600 text-sm font-medium">
-                              <TrendingDown className="h-4 w-4 mr-1" />
-                              Quitado com Desconto:{" "}
-                              {formatCurrency(item.appliedDiscount)}
-                            </div>
+                          {item.willBeComplete ? (
+                            item.appliedDiscount > 0 ? (
+                              <div className="flex items-center text-blue-600 text-sm font-medium">
+                                <TrendingDown className="h-4 w-4 mr-1" />
+                                Quitado com Desconto:{" "}
+                                {formatCurrency(item.appliedDiscount)}
+                              </div>
+                            ) : (
+                              <div className="flex items-center text-green-600 text-sm font-medium">
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Venda Quitada
+                              </div>
+                            )
                           ) : (
                             <div className="text-sm text-gray-600">
                               Saldo devedor:{" "}
@@ -706,13 +713,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                                   ),
                                 )}
                               </span>
-                            </div>
-                          )}
-
-                          {item.willBeComplete && (
-                            <div className="flex items-center text-green-600 text-sm font-medium">
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Venda será quitada
                             </div>
                           )}
                         </div>

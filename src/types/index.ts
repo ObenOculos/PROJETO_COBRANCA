@@ -364,7 +364,7 @@ export interface SalePayment {
   collectorId: string;
   collectorName?: string;
   createdAt: string;
-  distributionDetails: PaymentDistribution[];
+  distribution_details: PaymentDistribution[];
   discountAmount?: number;
   isAgreement?: boolean;
   storeName?: string;
@@ -373,8 +373,8 @@ export interface SalePayment {
 
 export interface PaymentDistribution {
   installmentId: number;
-  originalAmount: number;
   appliedAmount: number;
+  appliedDiscount: number;
   installmentStatus: string;
 }
 

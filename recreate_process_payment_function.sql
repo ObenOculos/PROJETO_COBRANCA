@@ -25,7 +25,7 @@ DECLARE
     v_collector_name text;
 BEGIN
     -- Get client and collector names
-    SELECT name INTO v_client_name FROM public."BANCO_DADOS" WHERE documento = p_client_document LIMIT 1;
+    SELECT cliente INTO v_client_name FROM public."BANCO_DADOS" WHERE documento = p_client_document LIMIT 1;
     SELECT name INTO v_collector_name FROM public.users WHERE id = p_collector_id LIMIT 1;
 
     -- Insert into sale_payments
@@ -63,20 +63,20 @@ BEGIN
             FROM public."BANCO_DADOS"
             WHERE documento = p_client_document
               AND venda_n = p_sale_number
-              AND (valor_recebido + desconto) < valor_original -- Only update if not fully paid
+              AND (COALESCE(REPLACE(valor_recebido, ',', '.')::numeric, 0) + COALESCE(REPLACE(desconto, ',', '.')::numeric, 0)) < COALESCE(REPLACE(valor_original, ',', '.')::numeric, 0)
             ORDER BY data_vencimento ASC, id_parcela ASC
         LOOP
             -- Apply discount first
             IF v_remaining_discount > 0 THEN
                 DECLARE
-                    v_pending_after_discount numeric := v_installments_to_update.valor_original - v_installments_to_update.valor_recebido - v_installments_to_update.desconto;
+                    v_pending_after_discount numeric := COALESCE(REPLACE(v_installments_to_update.valor_original, ',', '.')::numeric, 0) - COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) - COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0);
                     v_discount_to_apply numeric := LEAST(v_remaining_discount, v_pending_after_discount);
                 BEGIN
                     UPDATE public."BANCO_DADOS"
                     SET
-                        desconto = v_installments_to_update.desconto + v_discount_to_apply,
+                        desconto = TO_CHAR(COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0) + v_discount_to_apply, 'FM999999990.00'),
                         status = CASE
-                                    WHEN (v_installments_to_update.valor_recebido + v_installments_to_update.desconto + v_discount_to_apply) >= v_installments_to_update.valor_original THEN 'pago com desconto'
+                                    WHEN (COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) + COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0) + v_discount_to_apply) >= COALESCE(REPLACE(v_installments_to_update.valor_original, ',', '.')::numeric, 0) THEN 'pago com desconto'
                                     ELSE 'parcial'
                                  END
                     WHERE id_parcela = v_installments_to_update.id_parcela;
@@ -87,16 +87,16 @@ BEGIN
             -- Apply payment
             IF v_remaining_payment > 0 THEN
                 DECLARE
-                    v_current_pending numeric := v_installments_to_update.valor_original - v_installments_to_update.valor_recebido - v_installments_to_update.desconto;
+                    v_current_pending numeric := COALESCE(REPLACE(v_installments_to_update.valor_original, ',', '.')::numeric, 0) - COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) - COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0);
                     v_payment_to_apply numeric := LEAST(v_remaining_payment, v_current_pending);
                 BEGIN
                     UPDATE public."BANCO_DADOS"
                     SET
-                        valor_recebido = v_installments_to_update.valor_recebido + v_payment_to_apply,
+                        valor_recebido = TO_CHAR(COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) + v_payment_to_apply, 'FM999999990.00'),
                         data_de_recebimento = CURRENT_DATE,
                         status = CASE
-                                    WHEN (v_installments_to_update.valor_recebido + v_payment_to_apply + v_installments_to_update.desconto) >= v_installments_to_update.valor_original THEN 'recebido'
-                                    ELSE 'parcial'
+                                    WHEN (COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) + v_payment_to_apply + COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0)) >= COALESCE(REPLACE(v_installments_to_update.valor_original, ',', '.')::numeric, 0) THEN 'Pago'
+                                    ELSE 'Pago Parcial'
                                  END
                     WHERE id_parcela = v_installments_to_update.id_parcela;
                     v_remaining_payment := v_remaining_payment - v_payment_to_apply;
@@ -114,20 +114,20 @@ BEGIN
             FROM public."BANCO_DADOS"
             WHERE documento = p_client_document
               AND venda_n IS NULL -- Target installments with NULL venda_n
-              AND (valor_recebido + desconto) < valor_original
+              AND (COALESCE(REPLACE(valor_recebido, ',', '.')::numeric, 0) + COALESCE(REPLACE(desconto, ',', '.')::numeric, 0)) < COALESCE(REPLACE(valor_original, ',', '.')::numeric, 0)
             ORDER BY data_vencimento ASC, id_parcela ASC
         LOOP
             -- Apply discount first
             IF v_remaining_discount > 0 THEN
                 DECLARE
-                    v_pending_after_discount numeric := v_installments_to_update.valor_original - v_installments_to_update.valor_recebido - v_installments_to_update.desconto;
+                    v_pending_after_discount numeric := COALESCE(REPLACE(v_installments_to_update.valor_original, ',', '.')::numeric, 0) - COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) - COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0);
                     v_discount_to_apply numeric := LEAST(v_remaining_discount, v_pending_after_discount);
                 BEGIN
                     UPDATE public."BANCO_DADOS"
                     SET
-                        desconto = v_installments_to_update.desconto + v_discount_to_apply,
+                        desconto = TO_CHAR(COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0) + v_discount_to_apply, 'FM999999990.00'),
                         status = CASE
-                                    WHEN (v_installments_to_update.valor_recebido + v_installments_to_update.desconto + v_discount_to_apply) >= v_installments_to_update.valor_original THEN 'pago com desconto'
+                                    WHEN (COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) + COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0) + v_discount_to_apply) >= COALESCE(REPLACE(v_installments_to_update.valor_original, ',', '.')::numeric, 0) THEN 'pago com desconto'
                                     ELSE 'parcial'
                                  END
                     WHERE id_parcela = v_installments_to_update.id_parcela;
@@ -138,16 +138,16 @@ BEGIN
             -- Apply payment
             IF v_remaining_payment > 0 THEN
                 DECLARE
-                    v_current_pending numeric := v_installments_to_update.valor_original - v_installments_to_update.valor_recebido - v_installments_to_update.desconto;
+                    v_current_pending numeric := COALESCE(REPLACE(v_installments_to_update.valor_original, ',', '.')::numeric, 0) - COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) - COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0);
                     v_payment_to_apply numeric := LEAST(v_remaining_payment, v_current_pending);
                 BEGIN
                     UPDATE public."BANCO_DADOS"
                     SET
-                        valor_recebido = v_installments_to_update.valor_recebido + v_payment_to_apply,
+                        valor_recebido = TO_CHAR(COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) + v_payment_to_apply, 'FM999999990.00'),
                         data_de_recebimento = CURRENT_DATE,
                         status = CASE
-                                    WHEN (v_installments_to_update.valor_recebido + v_payment_to_apply + v_installments_to_update.desconto) >= v_installments_to_update.valor_original THEN 'recebido'
-                                    ELSE 'parcial'
+                                    WHEN (COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) + v_payment_to_apply + COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0)) >= COALESCE(REPLACE(v_installments_to_update.valor_original, ',', '.')::numeric, 0) THEN 'Pago'
+                                    ELSE 'Pago Parcial'
                                  END
                     WHERE id_parcela = v_installments_to_update.id_parcela;
                     v_remaining_payment := v_remaining_payment - v_payment_to_apply;
@@ -163,20 +163,20 @@ BEGIN
             SELECT id_parcela, valor_original, valor_reajustado, valor_recebido, desconto
             FROM public."BANCO_DADOS"
             WHERE documento = p_client_document
-              AND (valor_recebido + desconto) < valor_original -- Only update if not fully paid
+              AND (COALESCE(REPLACE(valor_recebido, ',', '.')::numeric, 0) + COALESCE(REPLACE(desconto, ',', '.')::numeric, 0)) < COALESCE(REPLACE(valor_original, ',', '.')::numeric, 0)
             ORDER BY data_vencimento ASC, id_parcela ASC
         LOOP
             -- Apply discount first
             IF v_remaining_discount > 0 THEN
                 DECLARE
-                    v_pending_after_discount numeric := v_installments_to_update.valor_original - v_installments_to_update.valor_recebido - v_installments_to_update.desconto;
+                    v_pending_after_discount numeric := COALESCE(REPLACE(v_installments_to_update.valor_original, ',', '.')::numeric, 0) - COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) - COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0);
                     v_discount_to_apply numeric := LEAST(v_remaining_discount, v_pending_after_discount);
                 BEGIN
                     UPDATE public."BANCO_DADOS"
                     SET
-                        desconto = v_installments_to_update.desconto + v_discount_to_apply,
+                        desconto = TO_CHAR(COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0) + v_discount_to_apply, 'FM999999990.00'),
                         status = CASE
-                                    WHEN (v_installments_to_update.valor_recebido + v_installments_to_update.desconto + v_discount_to_apply) >= v_installments_to_update.valor_original THEN 'pago com desconto'
+                                    WHEN (COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) + COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0) + v_discount_to_apply) >= COALESCE(REPLACE(v_installments_to_update.valor_original, ',', '.')::numeric, 0) THEN 'pago com desconto'
                                     ELSE 'parcial'
                                  END
                     WHERE id_parcela = v_installments_to_update.id_parcela;
@@ -187,16 +187,16 @@ BEGIN
             -- Apply payment
             IF v_remaining_payment > 0 THEN
                 DECLARE
-                    v_current_pending numeric := v_installments_to_update.valor_original - v_installments_to_update.valor_recebido - v_installments_to_update.desconto;
+                    v_current_pending numeric := COALESCE(REPLACE(v_installments_to_update.valor_original, ',', '.')::numeric, 0) - COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) - COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0);
                     v_payment_to_apply numeric := LEAST(v_remaining_payment, v_current_pending);
                 BEGIN
                     UPDATE public."BANCO_DADOS"
                     SET
-                        valor_recebido = v_installments_to_update.valor_recebido + v_payment_to_apply,
+                        valor_recebido = TO_CHAR(COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) + v_payment_to_apply, 'FM999999990.00'),
                         data_de_recebimento = CURRENT_DATE,
                         status = CASE
-                                    WHEN (v_installments_to_update.valor_recebido + v_payment_to_apply + v_installments_to_update.desconto) >= v_installments_to_update.valor_original THEN 'recebido'
-                                    ELSE 'parcial'
+                                    WHEN (COALESCE(REPLACE(v_installments_to_update.valor_recebido, ',', '.')::numeric, 0) + v_payment_to_apply + COALESCE(REPLACE(v_installments_to_update.desconto, ',', '.')::numeric, 0)) >= COALESCE(REPLACE(v_installments_to_update.valor_original, ',', '.')::numeric, 0) THEN 'Pago'
+                                    ELSE 'Pago Parcial'
                                  END
                     WHERE id_parcela = v_installments_to_update.id_parcela;
                     v_remaining_payment := v_remaining_payment - v_payment_to_apply;
@@ -210,7 +210,7 @@ BEGIN
     END IF;
 
     -- Update client's total pending value in scheduled_visits (if any)
-    SELECT SUM(valor_original - valor_recebido - desconto) INTO v_total_pending_client
+    SELECT SUM(COALESCE(REPLACE(valor_original, ',', '.')::numeric, 0) - COALESCE(REPLACE(valor_recebido, ',', '.')::numeric, 0) - COALESCE(REPLACE(desconto, ',', '.')::numeric, 0)) INTO v_total_pending_client
     FROM public."BANCO_DADOS"
     WHERE documento = p_client_document;
 
