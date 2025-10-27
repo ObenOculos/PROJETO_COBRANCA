@@ -1304,17 +1304,15 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const newSelection = new Set<string>();
-      const newSchedules = new Map<string, { date: string; time: string }>();
-      availableClients.forEach((client) => {
-        newSelection.add(client.document);
-        newSchedules.set(client.document, {
-          date: selectedDate,
-          time: selectedTime,
-        });
-      });
-      setSelectedClients(newSelection);
-      setClientSchedules(newSchedules);
+      const allClientDocuments = new Set(availableClients.map(client => client.document));
+      const allClientSchedules = new Map(
+        availableClients.map(client => [
+          client.document,
+          { date: selectedDate, time: selectedTime }
+        ])
+      );
+      setSelectedClients(allClientDocuments);
+      setClientSchedules(allClientSchedules);
     } else {
       setSelectedClients(new Set());
       setClientSchedules(new Map());
@@ -2824,19 +2822,29 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                 className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-500 px-4 lg:px-6 py-4 border-b border-gray-200 bg-white rounded-t-2xl flex-shrink-0">
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-500 px-4 lg:px-6 py-4 rounded-t-2xl flex-shrink-0">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-white">
-                      {modalStep === "selection"
-                        ? "Selecionar Clientes para Visita"
-                        : "Confirmar Agendamento"}
-                    </h3>
+                    <div className="flex items-center">
+                      {modalStep === "selection" ? (
+                        <Users className="h-5 w-5 text-white mr-2" />
+                      ) : (
+                        <CheckCircle className="h-5 w-5 text-white mr-2" />
+                      )}
+                      <h3 className="text-lg font-semibold text-white">
+                        {modalStep === "selection"
+                          ? `Selecionar Clientes para Visita (${selectedClients.size} selecionados)`
+                          : "Confirmar Agendamento"}
+                      </h3>
+                      <span className="ml-3 text-sm text-blue-100">
+                        {modalStep === "selection" ? "(Passo 1 de 2)" : "(Passo 2 de 2)"}
+                      </span>
+                    </div>
                     <button
                       onClick={() => setShowScheduleModal(false)}
-                      className="p-2 bg-white hover:bg-gray-100 rounded-full transition-colors"
+                      className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
                       title="Fechar"
                     >
-                      <X className="h-5 w-5 text-gray-500" />
+                      <X className="h-5 w-5 text-white" />
                     </button>
                   </div>
                 </div>
@@ -3244,16 +3252,20 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                     }`}
                               </h4>
                               {availableClients.length > 0 && (
-                                <label className="flex items-center space-x-2 text-sm text-gray-600">
+                                <label
+                                  className={`flex items-center space-x-2 text-sm font-medium rounded-lg transition-colors cursor-pointer
+                                    ${isAllSelected ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}
+                                    p-2 border border-gray-300`}
+                                >
                                   <input
                                     type="checkbox"
                                     checked={isAllSelected}
                                     onChange={(e) =>
                                       handleSelectAll(e.target.checked)
                                     }
-                                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    className="h-4 w-4 text-blue-600 border-gray-400 rounded focus:ring-blue-500 focus:ring-offset-1"
                                   />
-                                  <span>Selecionar Todos</span>
+                                  <span>Todos</span>
                                 </label>
                               )}
                               {/* Indicador de Paginação */}
