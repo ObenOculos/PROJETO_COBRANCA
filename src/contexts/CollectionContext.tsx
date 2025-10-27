@@ -147,7 +147,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   );
 
   const getVisitsByCollector = (collectorId: string) => {
-    return scheduledVisits.filter((visit: ScheduledVisit) => visit.collectorId === collectorId);
+    return scheduledVisits.filter(
+      (visit: ScheduledVisit) => visit.collectorId === collectorId,
+    );
   };
 
   // Cache invalidation hooks
@@ -780,11 +782,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
 
       // After deleting sales, check if the client still has any remaining sales
-      const { data: remainingSales, error: fetchRemainingSalesError } = await supabase
-        .from("BANCO_DADOS")
-        .select("venda_n")
-        .eq("documento", clientDocument)
-        .limit(1); // Only need to know if at least one exists
+      const { data: remainingSales, error: fetchRemainingSalesError } =
+        await supabase
+          .from("BANCO_DADOS")
+          .select("venda_n")
+          .eq("documento", clientDocument)
+          .limit(1); // Only need to know if at least one exists
 
       if (fetchRemainingSalesError) {
         console.error(
@@ -2061,18 +2064,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     notes?: string,
   ) => {
     setGlobalLoading(true, "Registrando ajuste de pagamento...");
-    try { // This try block should encompass all the logic that can throw errors
-      console.log(
-        "Registrando ajuste de pagamento na tabela sale_payments:",
-        {
-          saleNumber,
-          clientDocument,
-          adjustmentAmount,
-          managerId,
-          managerName,
-          notes,
-        },
-      );
+    try {
+      // This try block should encompass all the logic that can throw errors
+      console.log("Registrando ajuste de pagamento na tabela sale_payments:", {
+        saleNumber,
+        clientDocument,
+        adjustmentAmount,
+        managerId,
+        managerName,
+        notes,
+      });
 
       if (adjustmentAmount === 0) {
         console.log("Ajuste de pagamento é zero, ignorando registro.");
@@ -2106,16 +2107,21 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       if (error) {
         console.error("Erro ao registrar ajuste de pagamento:", error);
-        throw new Error(`Erro ao registrar ajuste de pagamento: ${error.message}`);
+        throw new Error(
+          `Erro ao registrar ajuste de pagamento: ${error.message}`,
+        );
       }
 
       console.log("✅ Ajuste de pagamento registrado com sucesso.");
       invalidatePayments(); // Invalidate cache to force refresh of sale payments
       await fetchSalePayments(false); // Force fresh fetch
-    } catch (err) { // This catch block handles errors from the entire try block
+    } catch (err) {
+      // This catch block handles errors from the entire try block
       console.error("Erro ao processar ajuste de pagamento:", err);
       setError(
-        err instanceof Error ? err.message : "Erro ao registrar ajuste de pagamento",
+        err instanceof Error
+          ? err.message
+          : "Erro ao registrar ajuste de pagamento",
       );
       throw err;
     } finally {
@@ -2328,8 +2334,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     },
     [collections, calculateSaleBalance, getSalePayments],
   );
-
-
 
   const scheduleVisit = async (
     visitData: Omit<ScheduledVisit, "id" | "createdAt" | "updatedAt">,
@@ -2707,8 +2711,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       return matchesDate && matchesCollector;
     });
   };
-
-
 
   const getClientDataForVisit = (clientDocument: string) => {
     const clientGroups = getClientGroups();

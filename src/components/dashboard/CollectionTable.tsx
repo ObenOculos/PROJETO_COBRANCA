@@ -71,7 +71,10 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     const handleConfirmDeleteSales = async (selectedSaleNumbers: number[]) => {
       if (clientToDelete && selectedSaleNumbers.length > 0) {
         try {
-          await deleteSalesFromClient(clientToDelete.document, selectedSaleNumbers);
+          await deleteSalesFromClient(
+            clientToDelete.document,
+            selectedSaleNumbers,
+          );
         } catch (error) {
           console.error("Erro ao deletar vendas:", error);
         }
