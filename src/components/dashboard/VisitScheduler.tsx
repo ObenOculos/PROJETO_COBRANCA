@@ -75,6 +75,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   const [selectedClients, setSelectedClients] = useState<Set<string>>(
     new Set(),
   );
+  const [isAllSelected, setIsAllSelected] = useState(false);
   const [clientSchedules, setClientSchedules] = useState<
     Map<string, { date: string; time: string }>
   >(new Map());
@@ -586,6 +587,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
       visitStatus: "",
     });
     setSearchTerm("");
+    setSelectedClients(new Set());
+    setClientSchedules(new Map());
+    setIsAllSelected(false);
   };
 
   // Reset pagination when filters change
@@ -1298,6 +1302,26 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     }
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const newSelection = new Set<string>();
+      const newSchedules = new Map<string, { date: string; time: string }>();
+      availableClients.forEach((client) => {
+        newSelection.add(client.document);
+        newSchedules.set(client.document, {
+          date: selectedDate,
+          time: selectedTime,
+        });
+      });
+      setSelectedClients(newSelection);
+      setClientSchedules(newSchedules);
+    } else {
+      setSelectedClients(new Set());
+      setClientSchedules(new Map());
+    }
+    setIsAllSelected(checked);
+  };
+
   const handleToggleClientSelection = (clientDocument: string) => {
     const newSelection = new Set(selectedClients);
     const newSchedules = new Map(clientSchedules);
@@ -1316,6 +1340,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
     setSelectedClients(newSelection);
     setClientSchedules(newSchedules);
+
+    // Update isAllSelected based on the new selection
+    setIsAllSelected(newSelection.size === availableClients.length);
   };
 
   const getSelectedClientsData = () => {
@@ -3212,10 +3239,23 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                   ? "Nenhum cliente para visita"
                                   : `${availableClients.length} ${
                                       availableClients.length === 1
-                                        ? "cliente para visita"
-                                        : "clientes para visita"
+                                        ? "cliente"
+                                        : "clientes"
                                     }`}
                               </h4>
+                              {availableClients.length > 0 && (
+                                <label className="flex items-center space-x-2 text-sm text-gray-600">
+                                  <input
+                                    type="checkbox"
+                                    checked={isAllSelected}
+                                    onChange={(e) =>
+                                      handleSelectAll(e.target.checked)
+                                    }
+                                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                  />
+                                  <span>Selecionar Todos</span>
+                                </label>
+                              )}
                               {/* Indicador de Paginação */}
                               {availableClients.length >
                                 modalClientsPerPage && (
