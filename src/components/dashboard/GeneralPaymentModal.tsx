@@ -39,9 +39,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const { isOnline } = useOffline();
     const [loading, setLoading] = useState(false);
     const [distributionAmount, setDistributionAmount] = useState<string>("");
-    const [distributionMode] = useState<"auto" | "manual">(
-      "auto",
-    );
+    const [distributionMode] = useState<"auto" | "manual">("auto");
     const [saleDistribution, setSaleDistribution] = useState<
       SaleDistributionItem[]
     >([]);
@@ -219,7 +217,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   clientDocument: clientGroup.document || "",
                   paymentAmount: item.appliedAmount,
                   paymentMethod: paymentMethod,
-                                    notes: observations.trim() || `Pagamento distribuído para Venda #${item.sale.saleNumber}`,                  discountAmount: item.appliedDiscount,
+                  notes:
+                    observations.trim() ||
+                    `Pagamento distribuído para Venda #${item.sale.saleNumber}`,
+                  discountAmount: item.appliedDiscount,
                 },
                 user.id,
               );
@@ -311,7 +312,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 clientDocument: clientGroup.document || "",
                 paymentAmount: item.appliedAmount,
                 paymentMethod: paymentMethod,
-                                notes: observations.trim() || `Pagamento parcial distribuído para Venda #${item.sale.saleNumber}`,                discountAmount: item.appliedDiscount,
+                notes:
+                  observations.trim() ||
+                  `Pagamento parcial distribuído para Venda #${item.sale.saleNumber}`,
+                discountAmount: item.appliedDiscount,
               },
               user.id,
             );

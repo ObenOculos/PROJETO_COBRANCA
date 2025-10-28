@@ -1304,12 +1304,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const allClientDocuments = new Set(availableClients.map(client => client.document));
+      const allClientDocuments = new Set(
+        availableClients.map((client) => client.document),
+      );
       const allClientSchedules = new Map(
-        availableClients.map(client => [
+        availableClients.map((client) => [
           client.document,
-          { date: selectedDate, time: selectedTime }
-        ])
+          { date: selectedDate, time: selectedTime },
+        ]),
       );
       setSelectedClients(allClientDocuments);
       setClientSchedules(allClientSchedules);
@@ -2869,7 +2871,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                           : "Confirmar Agendamento"}
                       </h3>
                       <span className="ml-3 text-sm text-blue-100">
-                        {modalStep === "selection" ? "(Passo 1 de 2)" : "(Passo 2 de 2)"}
+                        {modalStep === "selection"
+                          ? "(Passo 1 de 2)"
+                          : "(Passo 2 de 2)"}
                       </span>
                     </div>
                     <button
@@ -3287,7 +3291,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                               {availableClients.length > 0 && (
                                 <label
                                   className={`flex items-center space-x-2 text-sm font-medium rounded-lg transition-colors cursor-pointer
-                                    ${isAllSelected ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}
+                                    ${isAllSelected ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"}
                                     p-2 border border-gray-300`}
                                 >
                                   <input
@@ -3443,7 +3447,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                                       <div className="flex items-start justify-between mb-2">
                                                         <div className="min-w-0 flex-1">
                                                           <h3 className="font-semibold text-gray-900 text-lg">
-                                                            {client.client.length > 25 ? `${client.client.substring(0, 25)}...` : client.client}
+                                                            {client.client
+                                                              .length > 25
+                                                              ? `${client.client.substring(0, 25)}...`
+                                                              : client.client}
                                                           </h3>
                                                           {client.apelido && (
                                                             <p className="text-sm text-blue-600 mt-1">
@@ -3520,7 +3527,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                                       <div className="flex items-center justify-between mb-2">
                                         <div>
                                           <span className="font-medium text-gray-900">
-                                            {client.client.length > 25 ? `${client.client.substring(0, 25)}...` : client.client}
+                                            {client.client.length > 25
+                                              ? `${client.client.substring(0, 25)}...`
+                                              : client.client}
                                             {client.apelido && (
                                               <span className="text-sm text-blue-600 ml-1">
                                                 ({client.apelido})
