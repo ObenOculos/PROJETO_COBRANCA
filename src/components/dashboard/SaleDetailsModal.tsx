@@ -84,11 +84,12 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
   }, [collections]);
 
   const salePaymentHistory = useMemo(() => {
-    if (saleData?.venda_n == null || !salePayments) return [];
+    if (!saleData || !salePayments) return [];
+    
     return salePayments
       .filter(
         (p) =>
-          p.saleNumber === saleData.venda_n &&
+          String(p.saleNumber ?? 0) === String(saleData.venda_n ?? 0) &&
           p.clientDocument === saleData.documento,
       )
       .sort(

@@ -174,6 +174,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
 
+      if (!observations.trim()) {
+        alert("O campo de observações é obrigatório.");
+        return;
+      }
+
       if (!user) {
         alert("Usuário não identificado");
         return;
@@ -217,9 +222,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   clientDocument: clientGroup.document || "",
                   paymentAmount: item.appliedAmount,
                   paymentMethod: paymentMethod,
-                  notes:
-                    observations.trim() ||
-                    `Pagamento distribuído para Venda #${item.sale.saleNumber}`,
+                  notes: observations.trim(),
                   discountAmount: item.appliedDiscount,
                 },
                 user.id,
@@ -312,9 +315,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 clientDocument: clientGroup.document || "",
                 paymentAmount: item.appliedAmount,
                 paymentMethod: paymentMethod,
-                notes:
-                  observations.trim() ||
-                  `Pagamento parcial distribuído para Venda #${item.sale.saleNumber}`,
+                notes: observations.trim(),
                 discountAmount: item.appliedDiscount,
               },
               user.id,
@@ -555,6 +556,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   rows={3}
                   placeholder="Adicione observações sobre este pagamento..."
+                  required
                 />
               </div>
 

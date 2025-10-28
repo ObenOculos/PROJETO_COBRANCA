@@ -209,26 +209,16 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
             ) || [];
           let remainingAmount = newValue;
 
-          // Primeiro, zerar todas as parcelas
+          // Itera sobre as parcelas para aplicar o novo valor e zerar o desconto
           for (const installment of installments) {
             if (!installment.id_parcela) continue;
-
-            await updateCollection(installment.id_parcela, {
-              valor_recebido: 0,
-              status: CollectionStatus.PENDENTE,
-              data_de_recebimento: null,
-            });
-          }
-
-          // Depois, distribuir o valor entre as parcelas
-          for (const installment of installments) {
-            if (!installment.id_parcela || remainingAmount <= 0) continue;
 
             const installmentValue = installment.valor_original || 0;
             const appliedAmount = Math.min(remainingAmount, installmentValue);
 
             const updates: any = {
               valor_recebido: appliedAmount,
+              desconto: "0", // Changed from 0 to "0"
             };
 
             // Atualizar status baseado no valor

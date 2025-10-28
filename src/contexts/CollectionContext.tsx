@@ -585,6 +585,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         dbUpdates.data_de_recebimento = updates.data_de_recebimento;
       if (updates.obs !== undefined) dbUpdates.obs = updates.obs;
       if (updates.user_id !== undefined) dbUpdates.user_id = updates.user_id;
+      if (updates.desconto !== undefined) dbUpdates.desconto = updates.desconto; // Added this line
 
       const { error: supabaseError } = await supabase
         .from("BANCO_DADOS")
@@ -1902,7 +1903,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           collectorId: payment.collector_id,
           collectorName: payment.collector_name,
           createdAt: payment.created_at,
-          distributionDetails: payment.distribution_details || [],
+          distribution_details: payment.distribution_details || [], // Corrected casing
         }),
       );
 
