@@ -20,6 +20,18 @@ import { useAuth } from "../../contexts/AuthContext";
 import { ScheduledVisit } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 
+// Helper function to parse YYYY-MM-DD date strings safely
+const parseDateString = (dateString: string): Date | null => {
+  if (!dateString) return null;
+  try {
+    const [year, month, day] = dateString.split("-");
+    // Create date in UTC to avoid timezone shifts
+    return new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
+  } catch {
+    return null;
+  }
+};
+
 interface VisitTrackingProps {
   onClose?: () => void;
 }
@@ -46,7 +58,6 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const [expandedCollectors, setExpandedCollectors] = useState<Set<string>>(
     new Set(),
   );
-  const [] = useState<boolean>(false);
   const [overdueFilter, setOverdueFilter] = useState<string>("all"); // 'all', 'overdue', 'not_overdue'
 
   // Estados para cancelamentos
@@ -180,13 +191,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [year, month, day] = visit.scheduledDate.split("-");
-      const visitDate = new Date(
-        parseInt(year),
-        parseInt(month) - 1,
-        parseInt(day),
-      );
-      visitDate.setHours(0, 0, 0, 0);
+      const visitDate = parseDateString(visit.scheduledDate);
+      if (!visitDate) return false; // Handle invalid date
+
+      visitDate.setHours(0, 0, 0, 0); // Ensure comparison is only by date
 
       return visitDate < today;
     } catch {
@@ -200,9 +208,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [year, month, day] = visitDate.split("-");
-      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      date.setHours(0, 0, 0, 0);
+      const date = parseDateString(visitDate);
+      if (!date) return 0; // Handle invalid date
+
+      date.setHours(0, 0, 0, 0); // Ensure comparison is only by date
 
       const diffTime = today.getTime() - date.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
@@ -215,9 +224,9 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
   const formatSafeDateTime = (dateString: string, timeString?: string) => {
     try {
-      // Garantir que não há conversão de timezone
-      const [year, month, day] = dateString.split("-");
-      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      const date = parseDateString(dateString);
+      if (!date) return `${dateString} às ${timeString || "00:00"}`; // Handle invalid date
+
       const dateFormatted = date.toLocaleDateString("pt-BR");
       return `${dateFormatted} às ${timeString || "00:00"}`;
     } catch {
@@ -227,9 +236,9 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
   const formatSafeDate = (dateString: string) => {
     try {
-      // Garantir que não há conversão de timezone
-      const [year, month, day] = dateString.split("-");
-      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      const date = parseDateString(dateString);
+      if (!date) return dateString; // Handle invalid date
+
       return date.toLocaleDateString("pt-BR");
     } catch {
       return dateString;
@@ -241,35 +250,21 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     if (!dateFromFilter && !dateToFilter) return true;
 
     try {
-      // Criar datas sem problemas de timezone
-      const [visitYear, visitMonth, visitDay] = dateString.split("-");
-      const visitDate = new Date(
-        parseInt(visitYear),
-        parseInt(visitMonth) - 1,
-        parseInt(visitDay),
-      );
-      visitDate.setHours(0, 0, 0, 0);
+      const visitDate = parseDateString(dateString);
+      if (!visitDate) return false; // Handle invalid date
+
+      visitDate.setHours(0, 0, 0, 0); // Ensure comparison is only by date
 
       let fromDate = null;
       if (dateFromFilter) {
-        const [fromYear, fromMonth, fromDay] = dateFromFilter.split("-");
-        fromDate = new Date(
-          parseInt(fromYear),
-          parseInt(fromMonth) - 1,
-          parseInt(fromDay),
-        );
-        fromDate.setHours(0, 0, 0, 0);
+        fromDate = parseDateString(dateFromFilter);
+        if (fromDate) fromDate.setHours(0, 0, 0, 0);
       }
 
       let toDate = null;
       if (dateToFilter) {
-        const [toYear, toMonth, toDay] = dateToFilter.split("-");
-        toDate = new Date(
-          parseInt(toYear),
-          parseInt(toMonth) - 1,
-          parseInt(toDay),
-        );
-        toDate.setHours(23, 59, 59, 999); // Fim do dia
+        toDate = parseDateString(dateToFilter);
+        if (toDate) toDate.setHours(23, 59, 59, 999); // End of day
       }
 
       if (fromDate && visitDate < fromDate) return false;
@@ -335,20 +330,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     // Ordena as visitas dentro de cada grupo por data
     Object.keys(grouped).forEach((collectorId) => {
       grouped[collectorId].sort((a, b) => {
-        // Criar datas sem problemas de timezone
-        const [yearA, monthA, dayA] = a.scheduledDate.split("-");
-        const dateA = new Date(
-          parseInt(yearA),
-          parseInt(monthA) - 1,
-          parseInt(dayA),
-        );
+        const dateA = parseDateString(a.scheduledDate);
+        const dateB = parseDateString(b.scheduledDate);
 
-        const [yearB, monthB, dayB] = b.scheduledDate.split("-");
-        const dateB = new Date(
-          parseInt(yearB),
-          parseInt(monthB) - 1,
-          parseInt(dayB),
-        );
+        if (!dateA || !dateB) return 0; // Handle invalid dates
 
         return dateB.getTime() - dateA.getTime(); // Mais recentes primeiro
       });
@@ -780,6 +765,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                     <div className="flex items-center">
                                       <MapPin className="h-4 w-4 mr-2" />
                                       {visit.clientAddress}
+                                      {visit.clientNeighborhood && `, ${visit.clientNeighborhood}`}
+                                      {visit.clientCity && `, ${visit.clientCity}`}
                                     </div>
                                   </div>
 
@@ -806,8 +793,18 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                 </div>
 
                                 {visit.notes && (
-                                  <div className="text-sm text-gray-500 italic mb-3 whitespace-pre-line">
-                                    Observações: {visit.notes}
+                                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 mb-3">
+                                    <div className="flex items-start">
+                                      <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
+                                      <div>
+                                        <div className="text-sm font-medium text-gray-700 mb-1">
+                                          Observações da visita:
+                                        </div>
+                                        <div className="text-sm text-gray-600 italic whitespace-pre-line">
+                                          {visit.notes}
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
                                 )}
 
@@ -1014,16 +1011,17 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
         // Incluir visitas finalizadas (não agendadas)
         if (visit.status === "agendada") return false;
 
-        try {
-          // Verificar se a visita foi atualizada nos últimos 30 dias
-          const updatedDate = visit.updatedAt
-            ? new Date(visit.updatedAt)
-            : new Date(visit.createdAt);
-          return updatedDate >= thirtyDaysAgo;
-        } catch {
-          return false;
-        }
-      });
+                  try {
+                    const updatedDate = visit.updatedAt
+                      ? parseDateString(visit.updatedAt.split("T")[0]) // Assuming updatedAt is ISO string
+                      : parseDateString(visit.createdAt.split("T")[0]); // Assuming createdAt is ISO string
+        
+                    if (!updatedDate) return false; // Handle invalid date
+        
+                    return updatedDate >= thirtyDaysAgo;
+                  } catch {
+                    return false;
+                  }      });
     };
 
     // Agrupar por cobrador
@@ -1041,8 +1039,11 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       // Ordenar as visitas dentro de cada grupo por data de atualização (mais recentes primeiro)
       Object.keys(grouped).forEach((collectorId) => {
         grouped[collectorId].sort((a, b) => {
-          const dateA = new Date(a.updatedAt || a.createdAt);
-          const dateB = new Date(b.updatedAt || b.createdAt);
+          const dateA = parseDateString((a.updatedAt || a.createdAt).split("T")[0]);
+          const dateB = parseDateString((b.updatedAt || b.createdAt).split("T")[0]);
+
+          if (!dateA || !dateB) return 0; // Handle invalid dates
+
           return dateB.getTime() - dateA.getTime();
         });
       });
@@ -1171,20 +1172,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600 mb-3">
-                                  <div className="space-y-2">
-                                    <div className="flex items-center">
-                                      <Calendar className="h-4 w-4 mr-2" />
-                                      Visita:{" "}
-                                      {formatSafeDateTime(
-                                        visit.scheduledDate,
-                                        visit.scheduledTime,
-                                      )}
-                                    </div>
                                     <div className="flex items-center">
                                       <MapPin className="h-4 w-4 mr-2" />
                                       {visit.clientAddress}
+                                      {visit.clientNeighborhood && `, ${visit.clientNeighborhood}`}
+                                      {visit.clientCity && `, ${visit.clientCity}`}
                                     </div>
-                                  </div>
 
                                   <div className="space-y-2">
                                     {visit.totalPendingValue && (
@@ -1209,11 +1202,20 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                 </div>
 
                                 {visit.notes && (
-                                  <div className="text-sm text-gray-500 italic mb-3 whitespace-pre-line">
-                                    Observações: {visit.notes}
+                                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 mb-3">
+                                    <div className="flex items-start">
+                                      <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
+                                      <div>
+                                        <div className="text-sm font-medium text-gray-700 mb-1">
+                                          Observações da visita:
+                                        </div>
+                                        <div className="text-sm text-gray-600 italic whitespace-pre-line">
+                                          {visit.notes}
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
                                 )}
-
                                 {visit.cancellationRequestReason && (
                                   <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3 mb-3">
                                     <div className="flex items-start">
@@ -1266,16 +1268,16 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   // Calculate overview statistics
   const overviewStats = useMemo(() => {
     try {
-      const totalVisits = scheduledVisits?.length || 0;
+      const totalVisits = scheduledVisits.length;
       const agendadas =
-        scheduledVisits?.filter((v) => v.status === "agendada")?.length || 0;
+        scheduledVisits.filter((v) => v.status === "agendada").length;
       const realizadas =
-        scheduledVisits?.filter((v) => v.status === "realizada")?.length || 0;
+        scheduledVisits.filter((v) => v.status === "realizada").length;
       const canceladas =
-        scheduledVisits?.filter((v) => v.status === "cancelada")?.length || 0;
+        scheduledVisits.filter((v) => v.status === "cancelada").length;
       const atrasadas =
-        scheduledVisits?.filter((v) => isVisitOverdue(v))?.length || 0;
-      const pendingRequests = getPendingCancellationRequests()?.length || 0;
+        scheduledVisits.filter((v) => isVisitOverdue(v)).length;
+      const pendingRequests = getPendingCancellationRequests().length;
 
       return {
         totalVisits,
