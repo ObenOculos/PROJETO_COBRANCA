@@ -52,9 +52,26 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   >("visits");
   const [selectedCollector, setSelectedCollector] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [dateFromFilter, setDateFromFilter] = useState<string>("");
-  const [dateToFilter, setDateToFilter] = useState<string>("");
   const [clientSearchFilter, setClientSearchFilter] = useState<string>("");
+
+  // Calculate first and last day of the current month for default filters
+  const today = new Date();
+  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+  const formatDateToYYYYMMDD = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const [dateFromFilter, setDateFromFilter] = useState<string>(
+    formatDateToYYYYMMDD(firstDayOfMonth),
+  );
+  const [dateToFilter, setDateToFilter] = useState<string>(
+    formatDateToYYYYMMDD(lastDayOfMonth),
+  );
   const [expandedCollectors, setExpandedCollectors] = useState<Set<string>>(
     new Set(),
   );
