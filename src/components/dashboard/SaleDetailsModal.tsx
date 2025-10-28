@@ -84,13 +84,12 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
   }, [collections]);
 
   const salePaymentHistory = useMemo(() => {
-    if (!saleData?.venda_n || !salePayments) return [];
+    if (saleData?.venda_n == null || !salePayments) return [];
     return salePayments
       .filter(
         (p) =>
           p.saleNumber === saleData.venda_n &&
-          p.clientDocument === saleData.documento &&
-          p.notes,
+          p.clientDocument === saleData.documento,
       )
       .sort(
         (a, b) =>
@@ -500,13 +499,6 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                             - {payment.paymentMethod}
                           </span>
                         </div>
-                        {payment.notes && (
-                          <div className="bg-white p-3 rounded-2xl border border-gray-200">
-                            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-                              {payment.notes}
-                            </p>
-                          </div>
-                        )}
                       </div>
                       <div className="flex items-center text-xs text-gray-400">
                         <Calendar className="h-3 w-3 mr-1" />
@@ -580,16 +572,29 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
             </div>
           )}
 
-          {/* Observations */}
-          {saleData.obs && (
+          {/* Observa{/* Payment Notes */}
+          {salePaymentHistory.some((p) => p.notes) && (
             <div className="mt-8 space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                 <FileText className="h-5 w-5 mr-2 text-blue-600" />
-                Observações da Venda
+                Observações de Pagamentos
               </h3>
-              <div className="bg-blue-50 p-4 rounded-2xl border border-blue-200">
-                <p className="text-sm text-gray-700">{saleData.obs}</p>
-              </div>
+              {salePaymentHistory.map(
+                (payment) =>
+                  payment.notes && (
+                    <div
+                      key={payment.id}
+                      className="bg-blue-50 p-4 rounded-2xl border border-blue-200"
+                    >
+                      <p className="text-sm text-gray-700 whitespace-pre-line">
+                        {payment.notes}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-2 text-right">
+                        Registrado em {formatDate(payment.paymentDate)}
+                      </p>
+                    </div>
+                  ),
+              )}
             </div>
           )}
         </div>
