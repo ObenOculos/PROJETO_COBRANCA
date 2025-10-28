@@ -1550,10 +1550,39 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                       selectedCalendarDate?.toDateString() ===
                       date.toDateString();
                     const isPast = date < today;
-                    const hasVisits =
-                      visitsForDay.filter(
-                        (visit) => visit.status !== "nao_encontrado",
-                      ).length > 0;
+                    const hasVisits = visitsForDay.length > 0;
+
+                    const getVisitStatusForDay = (visits: ScheduledVisit[]) => {
+                      if (visits.length === 0) return "";
+
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+
+                      const hasPending = visits.some(
+                        (v) =>
+                          v.status === "agendada" ||
+                          v.status === "cancelamento_solicitado",
+                      );
+
+                      if (!hasPending) {
+                        return "bg-green-500"; // Verde: Todas as visitas concluídas ou finalizadas
+                      }
+
+                      const hasOverdue = visits.some(
+                        (v) =>
+                          (v.status === "agendada" ||
+                            v.status === "cancelamento_solicitado") &&
+                          new Date(v.scheduledDate) < today,
+                      );
+
+                      if (hasOverdue) {
+                        return "bg-red-500"; // Vermelho: Há visitas pendentes e atrasadas
+                      }
+
+                      return "bg-yellow-500"; // Amarelo: Há visitas pendentes, mas não atrasadas
+                    };
+
+                    const dotColor = getVisitStatusForDay(visitsForDay);
 
                     days.push(
                       <button
@@ -1575,11 +1604,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
                         `}
                       >
                         <span className="text-sm font-medium">{day}</span>
-                        {hasVisits && (
+                        {dotColor && (
                           <div className="absolute bottom-1">
                             <div
                               className={`w-2 h-2 rounded-full ${
-                                isSelected ? "bg-white" : "bg-blue-500"
+                                isSelected ? "bg-white" : dotColor
                               }`}
                             />
                           </div>
@@ -1593,18 +1622,22 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
               </div>
 
               {/* Legenda */}
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-600">
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
                 <div className="flex items-center">
-                  <div className="w-4 h-4 bg-blue-100 rounded mr-1.5" />
+                  <div className="w-3 h-3 bg-green-500 rounded-full mr-1.5" />
+                  <span>Concluídas</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-red-500 rounded-full mr-1.5" />
+                  <span>Atrasadas</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-yellow-500 rounded-full mr-1.5" />
+                  <span>Pendentes</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-blue-100 rounded-full mr-1.5" />
                   <span>Hoje</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-4 h-4 bg-blue-600 rounded mr-1.5" />
-                  <span>Selecionado</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-4 h-4 border border-blue-400 rounded mr-1.5" />
-                  <span>Com visitas</span>
                 </div>
               </div>
             </div>
