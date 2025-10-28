@@ -1,7 +1,6 @@
 import React, { useState, useEffect, memo } from "react";
 import {
   X,
-  Edit,
   DollarSign,
   CheckCircle,
   Receipt,
@@ -40,7 +39,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const { isOnline } = useOffline();
     const [loading, setLoading] = useState(false);
     const [distributionAmount, setDistributionAmount] = useState<string>("");
-    const [distributionMode, setDistributionMode] = useState<"auto" | "manual">(
+    const [distributionMode] = useState<"auto" | "manual">(
       "auto",
     );
     const [saleDistribution, setSaleDistribution] = useState<
@@ -54,6 +53,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const [showRescheduleModal, setShowRescheduleModal] = useState(false);
     const [rescheduleDate, setRescheduleDate] = useState("");
     const [rescheduleTime, setRescheduleTime] = useState("");
+    const [observations, setObservations] = useState(""); // New state
 
     // Desabilitar scroll do body quando o modal estiver aberto
     useEffect(() => {
@@ -219,8 +219,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   clientDocument: clientGroup.document || "",
                   paymentAmount: item.appliedAmount,
                   paymentMethod: paymentMethod,
-                  notes: `Pagamento distribuído para Venda #${item.sale.saleNumber}`,
-                  discountAmount: item.appliedDiscount,
+                                    notes: observations.trim() || `Pagamento distribuído para Venda #${item.sale.saleNumber}`,                  discountAmount: item.appliedDiscount,
                 },
                 user.id,
               );
@@ -312,8 +311,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 clientDocument: clientGroup.document || "",
                 paymentAmount: item.appliedAmount,
                 paymentMethod: paymentMethod,
-                notes: `Pagamento parcial distribuído para Venda #${item.sale.saleNumber}`,
-                discountAmount: item.appliedDiscount,
+                                notes: observations.trim() || `Pagamento parcial distribuído para Venda #${item.sale.saleNumber}`,                discountAmount: item.appliedDiscount,
               },
               user.id,
             );
@@ -542,39 +540,18 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 </select>
               </div>
 
-              {/* Modo de Distribuição */}
+              {/* Campo de Observações (New) */}
               <div className="mb-6">
-                <div className="flex items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setDistributionMode("auto")}
-                    className={`flex items-center px-4 py-2 rounded-2xl font-medium transition-colors ${
-                      distributionMode === "auto"
-                        ? "bg-purple-600 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    <TrendingDown className="h-4 w-4 mr-2" />
-                    Distribuição Automática
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDistributionMode("manual")}
-                    className={`flex items-center px-4 py-2 rounded-2xl font-medium transition-colors ${
-                      distributionMode === "manual"
-                        ? "bg-purple-600 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Ajuste Manual
-                  </button>
-                </div>
-                <p className="text-sm text-gray-600 mt-2">
-                  {distributionMode === "auto"
-                    ? "O valor será distribuído automaticamente entre as vendas com saldo devedor"
-                    : "Você pode ajustar manualmente o valor recebido de cada venda"}
-                </p>
+                <label className="block text-lg font-semibold text-gray-900 mb-3">
+                  Observações
+                </label>
+                <textarea
+                  value={observations}
+                  onChange={(e) => setObservations(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  rows={3}
+                  placeholder="Adicione observações sobre este pagamento..."
+                />
               </div>
 
               {/* Preview da Distribuição */}
