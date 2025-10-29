@@ -1619,7 +1619,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       if (visits.length === 0) return "";
 
                       const today = new Date();
-                      today.setHours(0, 0, 0, 0);
+                      const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
 
                       const hasPending = visits.some(
                         (v) =>
@@ -1631,12 +1631,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                         return "bg-green-500"; // Verde: Todas as visitas concluídas ou finalizadas
                       }
 
-                      const hasOverdue = visits.some(
-                        (v) =>
+                      const hasOverdue = visits.some((v) => {
+                        const visitDate = new Date(Date.UTC(
+                          parseInt(v.scheduledDate.split('-')[0]),
+                          parseInt(v.scheduledDate.split('-')[1]) - 1,
+                          parseInt(v.scheduledDate.split('-')[2])
+                        ));
+                        return (
                           (v.status === "agendada" ||
                             v.status === "cancelamento_solicitado") &&
-                          new Date(v.scheduledDate) < today,
-                      );
+                          visitDate < todayUTC
+                        );
+                      });
 
                       if (hasOverdue) {
                         return "bg-red-500"; // Vermelho: Há visitas pendentes e atrasadas
