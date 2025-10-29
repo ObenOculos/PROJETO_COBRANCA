@@ -226,14 +226,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
     try {
       const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
 
       const visitDate = parseDateString(visit.scheduledDate);
-      if (!visitDate) return false; // Handle invalid date
+      if (!visitDate) return false; // This is already a UTC date at midnight
 
-      visitDate.setHours(0, 0, 0, 0); // Ensure comparison is only by date
-
-      return visitDate < today;
+      return visitDate < todayUTC;
     } catch {
       return false;
     }
@@ -243,14 +241,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const getOverdueDays = (visitDate: string): number => {
     try {
       const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
 
       const date = parseDateString(visitDate);
-      if (!date) return 0; // Handle invalid date
+      if (!date) return 0; // This is already a UTC date at midnight
 
-      date.setHours(0, 0, 0, 0); // Ensure comparison is only by date
-
-      const diffTime = today.getTime() - date.getTime();
+      const diffTime = todayUTC.getTime() - date.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
       return Math.max(0, diffDays);
@@ -264,7 +260,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       const date = parseDateString(dateString);
       if (!date) return `${dateString} às ${timeString || "00:00"}`; // Handle invalid date
 
-      const dateFormatted = date.toLocaleDateString("pt-BR");
+      const dateFormatted = date.toLocaleDateString("pt-BR", { timeZone: 'UTC' });
       return `${dateFormatted} às ${timeString || "00:00"}`;
     } catch {
       return `${dateString} às ${timeString || "00:00"}`;
@@ -276,7 +272,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       const date = parseDateString(dateString);
       if (!date) return dateString; // Handle invalid date
 
-      return date.toLocaleDateString("pt-BR");
+      return date.toLocaleDateString("pt-BR", { timeZone: 'UTC' });
     } catch {
       return dateString;
     }
