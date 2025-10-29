@@ -19,6 +19,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { ScheduledVisit } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
+import VisitScheduler from "./VisitScheduler"; // Import the VisitScheduler component
 
 // Helper function to parse YYYY-MM-DD date strings safely
 const parseDateString = (dateString: string): Date | null => {
@@ -88,6 +89,11 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   >(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // State for the scheduling modal
+  const [showSchedulerModal, setShowSchedulerModal] = useState(false);
+  const [selectedCollectorForScheduler, setSelectedCollectorForScheduler] =
+    useState<string | null>(null);
 
   useEffect(() => {
     const requests = getPendingCancellationRequests();
@@ -725,6 +731,19 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                           </div>
                           <div className="text-sm text-gray-600">Visitas</div>
                         </div>
+                        {user?.type === "manager" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent collector card from expanding
+                              setSelectedCollectorForScheduler(collectorId);
+                              setShowSchedulerModal(true);
+                            }}
+                            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
+                            title="Agendar Visita"
+                          >
+                            <Calendar className="h-5 w-5" />
+                          </button>
+                        )}
                         {isExpanded ? (
                           <ChevronUp className="h-5 w-5 text-gray-600" />
                         ) : (
@@ -1572,6 +1591,30 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     : "Rejeitar"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Scheduler Modal */}
+      {showSchedulerModal && selectedCollectorForScheduler && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={() => {
+            setShowSchedulerModal(false);
+            setSelectedCollectorForScheduler(null);
+          }}
+        >
+          <div
+            className="w-full md:max-w-[90%] mx-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <VisitScheduler
+              collectorId={selectedCollectorForScheduler}
+              onClose={() => {
+                setShowSchedulerModal(false);
+                setSelectedCollectorForScheduler(null);
+              }}
+            />
           </div>
         </div>
       )}

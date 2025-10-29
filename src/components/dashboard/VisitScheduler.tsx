@@ -34,9 +34,13 @@ import { DateValidationModal } from "../common/DateValidationModal";
 
 interface VisitSchedulerProps {
   onClose?: () => void;
+  collectorId?: string;
 }
 
-const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
+const VisitScheduler: React.FC<VisitSchedulerProps> = ({
+  onClose,
+  collectorId,
+}) => {
   const {
     getClientGroups,
     scheduleVisit,
@@ -48,8 +52,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     rescheduleVisit,
     refreshData,
     isOnline,
+    users, // Get users from context
   } = useCollection();
   const { user } = useAuth();
+
+  const effectiveCollectorId = collectorId || user?.id;
+
+  const collectorName = useMemo(() => {
+    if (!collectorId) return null;
+    const collector = users.find((u) => u.id === collectorId);
+    return collector?.name || null;
+  }, [collectorId, users]);
+
 
   const getLocalDate = () => {
     const today = new Date();
@@ -268,9 +282,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   }, [showScheduleModal]);
 
   const availableClients = React.useMemo(() => {
-    if (!user || user.type !== "collector") return [];
+    if (!effectiveCollectorId) return [];
 
-    const clientGroups = getClientGroups(user.id);
+    const clientGroups = getClientGroups(effectiveCollectorId);
 
     // Debug: Log clientes com apelido no VisitScheduler
     const clientsWithApelido = clientGroups.filter((client) => client.apelido);
@@ -286,7 +300,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     }
 
     // Obter visitas ativas (agendadas) do cobrador
-    const activeVisits = getVisitsByCollector(user.id).filter(
+    const activeVisits = getVisitsByCollector(effectiveCollectorId).filter(
       (visit) => visit.status === "agendada",
     );
     const activeClientDocuments = new Set(
@@ -432,7 +446,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
   // Obter visitas organizadas por data
   const { upcomingVisits, allVisits } = React.useMemo(() => {
-    if (!user)
+    if (!effectiveCollectorId)
       return {
         upcomingVisits: [],
         allVisits: [],
@@ -444,7 +458,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
     const month = String(today.getMonth() + 1).padStart(2, "0");
     const day = String(today.getDate()).padStart(2, "0");
     const todayStr = `${year}-${month}-${day}`;
-    const visits = getVisitsByCollector(user.id);
+    const visits = getVisitsByCollector(effectiveCollectorId);
 
     const upcomingVisits = visits
       .filter((visit) => {
@@ -599,9 +613,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
 
   // Obter lista de cidades únicas (apenas de clientes com pendências)
   const availableCities = React.useMemo(() => {
-    if (!user || user.type !== "collector") return [];
+    if (!effectiveCollectorId) return [];
 
-    const clientGroups = getClientGroups(user.id);
+    const clientGroups = getClientGroups(effectiveCollectorId);
     // Filtrar apenas clientes com pendências
     const clientsWithPending = clientGroups.filter(
       (client) => client.pendingValue > 0,
@@ -789,7 +803,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
           const visitTime = clientSchedule?.time || selectedTime;
 
           const visitData: Omit<ScheduledVisit, "id" | "createdAt"> = {
-            collectorId: user!.id,
+            collectorId: effectiveCollectorId!,
             clientDocument: client.document,
             clientName: client.client,
             scheduledDate: visitDate,
@@ -845,7 +859,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   };
 
   const handleScheduleMultipleVisits = async () => {
-    if (selectedClients.size === 0 || !user) {
+    if (selectedClients.size === 0 || !effectiveCollectorId) {
       alert("Selecione pelo menos um cliente para agendar as visitas");
       return;
     }
@@ -1346,9 +1360,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
   };
 
   const getSelectedClientsData = () => {
-    if (!user || user.type !== "collector") return [];
+    if (!effectiveCollectorId) return [];
 
-    const allClients = getClientGroups(user.id);
+    const allClients = getClientGroups(effectiveCollectorId);
     return allClients.filter((client) => selectedClients.has(client.document));
   };
 
@@ -1481,11 +1495,28 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({}) => {
           <div className="space-y-6">
             {/* Calendário de Visitas */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Calendar className="h-5 w-5 mr-2 text-blue-600" />
-                  Calendário de Visitas
-                </h3>
+              <div className="relative -mt-4 -mx-4 mb-8 p-2 bg-gray-50 rounded-t-2xl border-b">
+                {onClose && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={onClose}
+                      className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-full transition-colors"
+                      title="Fechar"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between mb-4 -mt-4">
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <Calendar className="h-5 w-5 mr-2 text-blue-600" />
+                    {collectorName
+                      ? `Agendando para ${collectorName}`
+                      : "Calendário de Visitas"}
+                  </h3>
+                </div>
                 <div className="flex items-center">
                   <button
                     onClick={() => navigateMonth("prev")}
