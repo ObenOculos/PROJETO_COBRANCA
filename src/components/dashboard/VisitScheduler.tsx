@@ -66,7 +66,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     return collector?.name || null;
   }, [collectorId, users]);
 
-
   const getLocalDate = () => {
     const today = new Date();
     // Garantir que pegamos a data local, não UTC
@@ -256,15 +255,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   // Listen for visits scheduled by a manager to refresh data
   useEffect(() => {
     const handleVisitScheduled = async () => {
-      if (!collectorId) { // Only collectors should refresh their own view
+      if (!collectorId) {
+        // Only collectors should refresh their own view
         await fetchScheduledVisits(false); // Force a fresh fetch, bypassing cache
       }
     };
 
-    window.addEventListener('visitScheduledByManager', handleVisitScheduled);
+    window.addEventListener("visitScheduledByManager", handleVisitScheduled);
 
     return () => {
-      window.removeEventListener('visitScheduledByManager', handleVisitScheduled);
+      window.removeEventListener(
+        "visitScheduledByManager",
+        handleVisitScheduled,
+      );
     };
   }, [collectorId, fetchScheduledVisits]);
 
@@ -839,9 +842,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           successCount++;
 
           // If a manager is scheduling, dispatch an event
-          if (collectorId && user?.type === 'manager') {
+          if (collectorId && user?.type === "manager") {
             window.dispatchEvent(
-              new CustomEvent('visitScheduledByManager', {
+              new CustomEvent("visitScheduledByManager", {
                 detail: {
                   collectorId: effectiveCollectorId,
                   clientName: client.client,
@@ -1619,7 +1622,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       if (visits.length === 0) return "";
 
                       const today = new Date();
-                      const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+                      const todayUTC = new Date(
+                        Date.UTC(
+                          today.getUTCFullYear(),
+                          today.getUTCMonth(),
+                          today.getUTCDate(),
+                        ),
+                      );
 
                       const hasPending = visits.some(
                         (v) =>
@@ -1632,11 +1641,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       }
 
                       const hasOverdue = visits.some((v) => {
-                        const visitDate = new Date(Date.UTC(
-                          parseInt(v.scheduledDate.split('-')[0]),
-                          parseInt(v.scheduledDate.split('-')[1]) - 1,
-                          parseInt(v.scheduledDate.split('-')[2])
-                        ));
+                        const visitDate = new Date(
+                          Date.UTC(
+                            parseInt(v.scheduledDate.split("-")[0]),
+                            parseInt(v.scheduledDate.split("-")[1]) - 1,
+                            parseInt(v.scheduledDate.split("-")[2]),
+                          ),
+                        );
                         return (
                           (v.status === "agendada" ||
                             v.status === "cancelamento_solicitado") &&
@@ -1876,7 +1887,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                               {visit.scheduled_by_manager_id && (
                                 <div className="flex items-center text-yellow-600">
                                   <Star className="h-4 w-4 mr-1" />
-                                  <span className="text-xs font-medium">Agendado pelo gerente</span>
+                                  <span className="text-xs font-medium">
+                                    Agendado pelo gerente
+                                  </span>
                                 </div>
                               )}
                             </div>

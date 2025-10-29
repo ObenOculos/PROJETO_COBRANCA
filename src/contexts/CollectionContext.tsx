@@ -2380,10 +2380,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             notes: visitData.notes,
             client_address: visitData.clientAddress,
             client_neighborhood: visitData.clientNeighborhood,
-        client_city: visitData.clientCity,
-        total_pending_value: visitData.totalPendingValue,
-        overdue_count: visitData.overdueCount,
-        scheduled_by_manager_id: visitData.scheduled_by_manager_id,
+            client_city: visitData.clientCity,
+            total_pending_value: visitData.totalPendingValue,
+            overdue_count: visitData.overdueCount,
+            scheduled_by_manager_id: visitData.scheduled_by_manager_id,
             reschedule_count: 0, // Initialize rescheduleCount to 0
           },
         ])

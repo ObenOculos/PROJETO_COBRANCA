@@ -85,7 +85,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
 
   const salePaymentHistory = useMemo(() => {
     if (!saleData || !salePayments) return [];
-    
+
     return salePayments
       .filter(
         (p) =>
