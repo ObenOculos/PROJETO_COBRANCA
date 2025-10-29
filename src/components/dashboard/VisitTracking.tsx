@@ -14,12 +14,14 @@ import {
   ChevronDown,
   ChevronUp,
   Search,
+  Star, // Add Star icon
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { ScheduledVisit } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import VisitScheduler from "./VisitScheduler"; // Import the VisitScheduler component
+import "../../styles/components.css"; // Import custom components styles
 
 // Helper function to parse YYYY-MM-DD date strings safely
 const parseDateString = (dateString: string): Date | null => {
@@ -94,6 +96,18 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const [showSchedulerModal, setShowSchedulerModal] = useState(false);
   const [selectedCollectorForScheduler, setSelectedCollectorForScheduler] =
     useState<string | null>(null);
+
+  useEffect(() => {
+    if (showSchedulerModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "auto";
+    }
+
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [showSchedulerModal]);
 
   useEffect(() => {
     const requests = getPendingCancellationRequests();
@@ -784,6 +798,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                         1
                                           ? "dia"
                                           : "dias"}
+                                      </span>
+                                    )}
+                                    {visit.scheduled_by_manager_id && (
+                                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 flex items-center">
+                                        <Star className="h-3 w-3 mr-1" />
+                                        Agendado pelo gerente
                                       </span>
                                     )}
                                   </div>
@@ -1605,7 +1625,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           }}
         >
           <div
-            className="w-full md:max-w-[90%] mx-auto"
+            className="rounded-2xl shadow-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto minimal-scrollbar pr-4"
             onClick={(e) => e.stopPropagation()}
           >
             <VisitScheduler

@@ -87,6 +87,7 @@ export interface ScheduledVisit {
   cancellationRejectedAt?: string;
   cancellationRejectionReason?: string;
   rescheduleCount?: number;
+  scheduled_by_manager_id?: string; // Added for manager scheduling
 }
 
 // Collection types based on BANCO_DADOS table

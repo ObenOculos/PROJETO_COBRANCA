@@ -21,6 +21,7 @@ import {
   MapPinIcon,
   ArrowUpDown,
   Info,
+  Star, // Add Star icon
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -815,6 +816,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
             clientCity: clientData.city,
             totalPendingValue: clientData.totalPendingValue,
             overdueCount: clientData.overdueCount,
+            scheduled_by_manager_id: collectorId ? user?.id : undefined,
           };
 
           await scheduleVisit(visitData);
@@ -1836,6 +1838,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                     </span>
                                   )}
                                 </>
+                              )}
+                              {visit.scheduled_by_manager_id && (
+                                <div className="flex items-center text-yellow-600">
+                                  <Star className="h-4 w-4 mr-1" />
+                                  <span className="text-xs font-medium">Agendado pelo gerente</span>
+                                </div>
                               )}
                             </div>
 
