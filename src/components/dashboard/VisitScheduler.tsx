@@ -54,6 +54,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     refreshData,
     isOnline,
     users, // Get users from context
+    fetchScheduledVisits, // Add fetchScheduledVisits
   } = useCollection();
   const { user } = useAuth();
 
@@ -251,6 +252,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       document.body.style.overflow = "unset";
     };
   }, [showScheduleModal]);
+
+  // Listen for visits scheduled by a manager to refresh data
+  useEffect(() => {
+    const handleVisitScheduled = async () => {
+      if (!collectorId) { // Only collectors should refresh their own view
+        await fetchScheduledVisits(false); // Force a fresh fetch, bypassing cache
+      }
+    };
+
+    window.addEventListener('visitScheduledByManager', handleVisitScheduled);
+
+    return () => {
+      window.removeEventListener('visitScheduledByManager', handleVisitScheduled);
+    };
+  }, [collectorId, fetchScheduledVisits]);
 
   // Gerenciar scroll da página quando modal de visitas atrasadas abre/fecha
   useEffect(() => {
@@ -821,6 +837,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
           await scheduleVisit(visitData);
           successCount++;
+
+          // If a manager is scheduling, dispatch an event
+          if (collectorId && user?.type === 'manager') {
+            window.dispatchEvent(
+              new CustomEvent('visitScheduledByManager', {
+                detail: {
+                  collectorId: effectiveCollectorId,
+                  clientName: client.client,
+                },
+              }),
+            );
+          }
         } catch (error) {
           console.error(`Erro ao agendar visita para ${client.client}:`, error);
           errorCount++;

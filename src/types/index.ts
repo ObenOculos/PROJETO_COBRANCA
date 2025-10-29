@@ -304,7 +304,7 @@ export interface CollectionContextType {
   ) => SaleBalance;
   getSalesByClient: (clientDocument: string) => SaleGroup[];
   // Visit scheduling methods
-  fetchScheduledVisits: () => Promise<void>;
+  fetchScheduledVisits: (useCache?: boolean) => Promise<void>;
   scheduleVisit: (
     visitData: Omit<ScheduledVisit, "id" | "createdAt">,
   ) => Promise<ScheduledVisit>;
