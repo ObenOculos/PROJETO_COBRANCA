@@ -84,6 +84,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         ? totalPending - amountToDistribute
         : 0;
     const showDiscountBox = discountAmount >= 0 && withDiscount;
+    
     // Calcular distribuição automática por venda
     const calculateSaleDistribution = React.useCallback(() => {
       const paymentAmount = parseFloat(distributionAmount) || 0;
@@ -185,7 +186,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       }
 
       const inputAmount = parseFloat(distributionAmount) || 0;
-      if (inputAmount <= 0) {
+      if (inputAmount <= 0 && !withDiscount) {
         alert("O valor a distribuir deve ser maior que zero.");
         return;
       }
@@ -753,7 +754,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     disabled={
                       loading ||
                       saleDistribution.length === 0 ||
-                      !distributionAmount
+                      (amountToDistribute <= 0 && !withDiscount)
                     }
                     className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg"
                   >

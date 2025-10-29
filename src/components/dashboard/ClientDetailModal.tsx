@@ -238,6 +238,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     return sales;
   }, [getSalesByClient, clientGroup.document, refreshKey]);
 
+  // Calcular se há pendências reais considerando descontos
+  const hasRealPendingValue = React.useMemo(() => {
+    return clientSales.some((sale) => {
+      const saleBalance = calculateSaleBalance(sale.saleNumber, clientGroup.document);
+      return saleBalance.remainingBalance > 0.01;
+    });
+  }, [clientSales, calculateSaleBalance, clientGroup.document]);
+
   const handleGeneralPaymentSuccess = async () => {
     // Pequeno delay para garantir que a operação no banco seja concluída
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -454,8 +462,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   <span className="hidden sm:inline">Ver Vendas</span>
                 </span>
               </button>
-              {clientSales.reduce((sum, sale) => sum + sale.pendingValue, 0) >
-                0 && (
+              {hasRealPendingValue && (
                 <button
                   id="distribute-payment"
                   name="distributePayment"
