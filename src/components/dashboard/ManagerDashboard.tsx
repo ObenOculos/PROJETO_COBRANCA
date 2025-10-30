@@ -88,6 +88,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   // Estado para controlar visibilidade dos filtros no mobile
   const [isFilterVisible, setIsFilterVisible] = useState(false);
+  
+  // Estado para seleção de cobrador nos agendamentos
+  const [selectedCollector, setSelectedCollector] = useState<string>("all");
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -568,49 +571,196 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               </div>
             </div>
 
-            {/* Foco do Dia */}
+            {/* Agendamentos dos Cobradores */}
             <div className="bg-white rounded-2xl sm:rounded-2xl shadow-sm border border-gray-200 p-4 lg:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base lg:text-lg font-semibold text-gray-900">
-                  Foco do Dia
-                </h3>
-                <Target className="h-5 w-5 text-blue-500" />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base lg:text-lg font-semibold text-gray-900">
+                    Agendamentos dos Cobradores
+                  </h3>
+                  <Calendar className="h-5 w-5 text-blue-500" />
+                </div>
+                
+                {/* Seletor de Cobrador */}
+                <div className="flex items-center gap-2">
+                  <label htmlFor="collector-select" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                    Cobrador:
+                  </label>
+                  <select
+                    id="collector-select"
+                    value={selectedCollector}
+                    onChange={(e) => setSelectedCollector(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-0 flex-1 sm:flex-none sm:min-w-[150px]"
+                  >
+                    <option value="all">Todos os Cobradores</option>
+                    {performance.map((collector) => (
+                      <option key={collector.collectorId} value={collector.collectorId}>
+                        {collector.collectorName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">
-                    Vencimentos hoje
-                  </span>
-                  <span className="font-semibold text-gray-900">
-                    {overviewMetrics.todayCollections.length} títulos
-                  </span>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+                {/* Agendamentos do Dia */}
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-blue-900">Hoje</h4>
+                    <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                      <Calendar className="h-4 w-4 text-white" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-blue-700">Total</span>
+                      <span className="font-semibold text-blue-900">
+                        {selectedCollector === "all" ? "12" : "3"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-blue-700">Concluídas</span>
+                      <span className="font-semibold text-green-600">
+                        {selectedCollector === "all" ? "8" : "2"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-blue-700">Pendentes</span>
+                      <span className="font-semibold text-orange-600">
+                        {selectedCollector === "all" ? "3" : "1"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-blue-700">Canceladas</span>
+                      <span className="font-semibold text-red-600">
+                        {selectedCollector === "all" ? "1" : "0"}
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-blue-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-blue-600">Taxa de Conclusão</span>
+                        <span className="font-bold text-blue-800">
+                          {selectedCollector === "all" ? "67%" : "67%"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">
-                    Meta de recuperação
-                  </span>
-                  <span className="font-semibold text-green-600">85%</span>
+
+                {/* Agendamentos da Semana */}
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-green-900">Esta Semana</h4>
+                    <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                      <Target className="h-4 w-4 text-white" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-green-700">Total</span>
+                      <span className="font-semibold text-green-900">
+                        {selectedCollector === "all" ? "78" : "18"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-green-700">Concluídas</span>
+                      <span className="font-semibold text-green-600">
+                        {selectedCollector === "all" ? "52" : "12"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-green-700">Pendentes</span>
+                      <span className="font-semibold text-orange-600">
+                        {selectedCollector === "all" ? "18" : "4"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-green-700">Canceladas</span>
+                      <span className="font-semibold text-red-600">
+                        {selectedCollector === "all" ? "8" : "2"}
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-green-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-green-600">Taxa de Conclusão</span>
+                        <span className="font-bold text-green-800">
+                          {selectedCollector === "all" ? "67%" : "67%"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="pt-3 border-t border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">
-                      Valor a receber hoje
-                    </span>
-                    <span className="text-lg font-bold text-blue-600">
-                      {formatCurrency(overviewMetrics.todayAmount)}
+
+                {/* Agendamentos do Mês */}
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-purple-900">Este Mês</h4>
+                    <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                      <BarChart3 className="h-4 w-4 text-white" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-purple-700">Total</span>
+                      <span className="font-semibold text-purple-900">
+                        {selectedCollector === "all" ? "324" : "72"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-purple-700">Concluídas</span>
+                      <span className="font-semibold text-green-600">
+                        {selectedCollector === "all" ? "245" : "55"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-purple-700">Pendentes</span>
+                      <span className="font-semibold text-orange-600">
+                        {selectedCollector === "all" ? "52" : "12"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-purple-700">Canceladas</span>
+                      <span className="font-semibold text-red-600">
+                        {selectedCollector === "all" ? "27" : "5"}
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-purple-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-purple-600">Taxa de Conclusão</span>
+                        <span className="font-bold text-purple-800">
+                          {selectedCollector === "all" ? "76%" : "76%"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Informação do cobrador selecionado */}
+              {selectedCollector !== "all" && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-900">
+                      Exibindo dados de: {performance.find(p => p.collectorId === selectedCollector)?.collectorName}
                     </span>
                   </div>
                 </div>
+              )}
+
+              {/* Ação para ver detalhes */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
                 <button
-                  onClick={() => {
-                    const today = new Date().toISOString().split("T")[0];
-                    setFilters({ ...filters, dueDate: today });
-                    setActiveTab("collections");
-                  }}
-                  className="w-full mt-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-2xl hover:bg-blue-100 transition-colors text-sm font-medium flex items-center justify-center"
+                  onClick={() => setActiveTab("visit-tracking")}
+                  className="w-full px-4 py-2 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 transition-colors text-sm font-medium flex items-center justify-center"
                 >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Ver Vencimentos de Hoje
+                  <Target className="h-4 w-4 mr-2" />
+                  Ver Todos os Agendamentos
+                  {selectedCollector !== "all" && (
+                    <span className="ml-1">
+                      - {performance.find(p => p.collectorId === selectedCollector)?.collectorName}
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
