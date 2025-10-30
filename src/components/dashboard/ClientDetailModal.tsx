@@ -241,7 +241,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   // Calcular se há pendências reais considerando descontos
   const hasRealPendingValue = React.useMemo(() => {
     return clientSales.some((sale) => {
-      const saleBalance = calculateSaleBalance(sale.saleNumber, clientGroup.document);
+      const saleBalance = calculateSaleBalance(
+        sale.saleNumber,
+        clientGroup.document,
+      );
       return saleBalance.remainingBalance > 0.01;
     });
   }, [clientSales, calculateSaleBalance, clientGroup.document]);

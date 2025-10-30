@@ -426,9 +426,15 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                   <tbody className="bg-white divide-y divide-gray-200">
                     {saleData.collections.map((collection, index) => {
                       const discount = collection.desconto || 0;
-                      const pending = Math.max(0, collection.valor_original - collection.valor_recebido - discount);
-                      const dbStatus = collection.status?.toLowerCase() || "pendente";
-                      
+                      const pending = Math.max(
+                        0,
+                        collection.valor_original -
+                          collection.valor_recebido -
+                          discount,
+                      );
+                      const dbStatus =
+                        collection.status?.toLowerCase() || "pendente";
+
                       let status = "pendente";
                       if (
                         dbStatus === "pago" ||
@@ -436,7 +442,10 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                         pending <= 0.01
                       ) {
                         status = "pago";
-                      } else if (collection.valor_recebido > 0 || discount > 0) {
+                      } else if (
+                        collection.valor_recebido > 0 ||
+                        discount > 0
+                      ) {
                         status = "parcial";
                       }
 

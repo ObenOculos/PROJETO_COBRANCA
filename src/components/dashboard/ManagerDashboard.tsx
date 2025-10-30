@@ -88,7 +88,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   // Estado para controlar visibilidade dos filtros no mobile
   const [isFilterVisible, setIsFilterVisible] = useState(false);
-  
+
   // Estado para seleção de cobrador nos agendamentos
   const [selectedCollector, setSelectedCollector] = useState<string>("all");
 
@@ -229,55 +229,83 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   // Calculate scheduling metrics based on real data
   const calculateSchedulingMetrics = useMemo(() => {
-    if (!scheduledVisits) return {
-      today: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
-      week: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
-      month: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
-    };
+    if (!scheduledVisits)
+      return {
+        today: {
+          total: 0,
+          completed: 0,
+          pending: 0,
+          cancelled: 0,
+          completionRate: 0,
+        },
+        week: {
+          total: 0,
+          completed: 0,
+          pending: 0,
+          cancelled: 0,
+          completionRate: 0,
+        },
+        month: {
+          total: 0,
+          completed: 0,
+          pending: 0,
+          cancelled: 0,
+          completionRate: 0,
+        },
+      };
 
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    
+    const todayStr = today.toISOString().split("T")[0];
+
     // Start of week (Monday)
     const startOfWeek = new Date(today);
     const day = startOfWeek.getDay();
     const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
     startOfWeek.setDate(diff);
     startOfWeek.setHours(0, 0, 0, 0);
-    
+
     // Start of month
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
     const filterVisitsByCollector = (visits: any[]) => {
       if (selectedCollector === "all") return visits;
-      return visits.filter(visit => visit.collectorId === selectedCollector);
+      return visits.filter((visit) => visit.collectorId === selectedCollector);
     };
 
     const calculatePeriodMetrics = (filterFn: (visit: any) => boolean) => {
-      const periodVisits = filterVisitsByCollector(scheduledVisits.filter(filterFn));
-      
+      const periodVisits = filterVisitsByCollector(
+        scheduledVisits.filter(filterFn),
+      );
+
       const total = periodVisits.length;
-      const completed = periodVisits.filter(v => v.status === 'completed').length;
-      const cancelled = periodVisits.filter(v => v.status === 'cancelled').length;
-      const pending = periodVisits.filter(v => v.status === 'scheduled' || v.status === 'in_progress').length;
-      const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+      const completed = periodVisits.filter(
+        (v) => v.status === "completed",
+      ).length;
+      const cancelled = periodVisits.filter(
+        (v) => v.status === "cancelled",
+      ).length;
+      const pending = periodVisits.filter(
+        (v) => v.status === "scheduled" || v.status === "in_progress",
+      ).length;
+      const completionRate =
+        total > 0 ? Math.round((completed / total) * 100) : 0;
 
       return { total, completed, pending, cancelled, completionRate };
     };
 
     // Today's visits
-    const todayMetrics = calculatePeriodMetrics(visit => 
-      visit.scheduledDate === todayStr
+    const todayMetrics = calculatePeriodMetrics(
+      (visit) => visit.scheduledDate === todayStr,
     );
 
     // This week's visits
-    const weekMetrics = calculatePeriodMetrics(visit => {
+    const weekMetrics = calculatePeriodMetrics((visit) => {
       const visitDate = new Date(visit.scheduledDate);
       return visitDate >= startOfWeek && visitDate <= today;
     });
 
     // This month's visits
-    const monthMetrics = calculatePeriodMetrics(visit => {
+    const monthMetrics = calculatePeriodMetrics((visit) => {
       const visitDate = new Date(visit.scheduledDate);
       return visitDate >= startOfMonth && visitDate <= today;
     });
@@ -498,7 +526,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <h5 className="text-sm font-medium text-gray-900">Valor Total</h5>
+                          <h5 className="text-sm font-medium text-gray-900">
+                            Valor Total
+                          </h5>
                           <DollarSign className="h-4 w-4 text-gray-600" />
                         </div>
                         <div className="text-2xl font-bold text-gray-900 mb-1">
@@ -513,7 +543,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <h5 className="text-sm font-medium text-gray-900">Total em Aberto</h5>
+                          <h5 className="text-sm font-medium text-gray-900">
+                            Total em Aberto
+                          </h5>
                           <DollarSign className="h-4 w-4 text-gray-600" />
                         </div>
                         <div className="text-2xl font-bold text-gray-900 mb-1">
@@ -528,7 +560,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <h5 className="text-sm font-medium text-gray-900">Total Recebido</h5>
+                          <h5 className="text-sm font-medium text-gray-900">
+                            Total Recebido
+                          </h5>
                           <TrendingUp className="h-4 w-4 text-gray-600" />
                         </div>
                         <div className="text-2xl font-bold text-gray-900 mb-1">
@@ -543,7 +577,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <h5 className="text-sm font-medium text-gray-900">Taxa de Conversão</h5>
+                          <h5 className="text-sm font-medium text-gray-900">
+                            Taxa de Conversão
+                          </h5>
                           <BarChart3 className="h-4 w-4 text-gray-600" />
                         </div>
                         <div className="text-2xl font-bold text-gray-900 mb-1">
@@ -570,14 +606,22 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <h5 className="text-sm font-medium text-gray-900">Vendas Finalizadas</h5>
+                          <h5 className="text-sm font-medium text-gray-900">
+                            Vendas Finalizadas
+                          </h5>
                           <CheckCircle className="h-4 w-4 text-gray-600" />
                         </div>
                         <div className="text-2xl font-bold text-gray-900 mb-1">
                           {overviewMetrics.completedSalesCount}
                         </div>
                         <div className="text-xs text-gray-600">
-                          {((overviewMetrics.completedSalesCount / (overviewMetrics.completedSalesCount + overviewMetrics.pendingSalesCount)) * 100).toFixed(1)}% concluídas
+                          {(
+                            (overviewMetrics.completedSalesCount /
+                              (overviewMetrics.completedSalesCount +
+                                overviewMetrics.pendingSalesCount)) *
+                            100
+                          ).toFixed(1)}
+                          % concluídas
                         </div>
                       </div>
                       <div
@@ -585,7 +629,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <h5 className="text-sm font-medium text-gray-900">Clientes com Pendências</h5>
+                          <h5 className="text-sm font-medium text-gray-900">
+                            Clientes com Pendências
+                          </h5>
                           <Users className="h-4 w-4 text-gray-600" />
                         </div>
                         <div className="text-2xl font-bold text-gray-900 mb-1">
@@ -604,7 +650,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <h5 className="text-sm font-medium text-gray-900">Vencimentos Hoje</h5>
+                          <h5 className="text-sm font-medium text-gray-900">
+                            Vencimentos Hoje
+                          </h5>
                           <Calendar className="h-4 w-4 text-gray-600" />
                         </div>
                         <div className="text-2xl font-bold text-gray-900 mb-1">
@@ -631,7 +679,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <h5 className="text-sm font-medium text-gray-900">Time Ativo</h5>
+                          <h5 className="text-sm font-medium text-gray-900">
+                            Time Ativo
+                          </h5>
                           <Users className="h-4 w-4 text-gray-600" />
                         </div>
                         <div className="text-2xl font-bold text-gray-900 mb-1">
@@ -646,7 +696,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <h5 className="text-sm font-medium text-gray-900">Cobertura da Rede</h5>
+                          <h5 className="text-sm font-medium text-gray-900">
+                            Cobertura da Rede
+                          </h5>
                           <Store className="h-4 w-4 text-gray-600" />
                         </div>
                         <div className="text-2xl font-bold text-gray-900 mb-1">
@@ -661,7 +713,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <h5 className="text-sm font-medium text-gray-900">Eficiência Média</h5>
+                          <h5 className="text-sm font-medium text-gray-900">
+                            Eficiência Média
+                          </h5>
                           <TrendingUp className="h-4 w-4 text-gray-600" />
                         </div>
                         <div className="text-2xl font-bold text-gray-900 mb-1">
@@ -704,10 +758,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     Métricas de visitas agendadas
                   </p>
                 </div>
-                
+
                 {/* Seletor de Cobrador */}
                 <div className="flex items-center gap-2">
-                  <label htmlFor="collector-select" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                  <label
+                    htmlFor="collector-select"
+                    className="text-sm font-medium text-gray-700 whitespace-nowrap"
+                  >
                     Cobrador:
                   </label>
                   <select
@@ -718,14 +775,17 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   >
                     <option value="all">Todos os Cobradores</option>
                     {performance.map((collector) => (
-                      <option key={collector.collectorId} value={collector.collectorId}>
+                      <option
+                        key={collector.collectorId}
+                        value={collector.collectorId}
+                      >
                         {collector.collectorName}
                       </option>
                     ))}
                   </select>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
                 {/* Agendamentos do Dia */}
                 <div className="border border-gray-200 rounded-lg p-4">
@@ -760,7 +820,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     </div>
                     <div className="pt-3 border-t border-gray-200">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-600">Taxa de Conclusão</span>
+                        <span className="text-xs text-gray-600">
+                          Taxa de Conclusão
+                        </span>
                         <span className="font-bold text-gray-900">
                           {calculateSchedulingMetrics.today.completionRate}%
                         </span>
@@ -802,7 +864,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     </div>
                     <div className="pt-3 border-t border-gray-200">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-600">Taxa de Conclusão</span>
+                        <span className="text-xs text-gray-600">
+                          Taxa de Conclusão
+                        </span>
                         <span className="font-bold text-gray-900">
                           {calculateSchedulingMetrics.week.completionRate}%
                         </span>
@@ -844,7 +908,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     </div>
                     <div className="pt-3 border-t border-gray-200">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-600">Taxa de Conclusão</span>
+                        <span className="text-xs text-gray-600">
+                          Taxa de Conclusão
+                        </span>
                         <span className="font-bold text-gray-900">
                           {calculateSchedulingMetrics.month.completionRate}%
                         </span>
@@ -860,7 +926,12 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-gray-600" />
                     <span className="text-sm font-medium text-gray-900">
-                      Exibindo dados de: {performance.find(p => p.collectorId === selectedCollector)?.collectorName}
+                      Exibindo dados de:{" "}
+                      {
+                        performance.find(
+                          (p) => p.collectorId === selectedCollector,
+                        )?.collectorName
+                      }
                     </span>
                   </div>
                 </div>
@@ -876,7 +947,12 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   Ver Todos os Agendamentos
                   {selectedCollector !== "all" && (
                     <span className="ml-1">
-                      - {performance.find(p => p.collectorId === selectedCollector)?.collectorName}
+                      -{" "}
+                      {
+                        performance.find(
+                          (p) => p.collectorId === selectedCollector,
+                        )?.collectorName
+                      }
                     </span>
                   )}
                 </button>
@@ -921,9 +997,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               {/* Top 3 - Design Clean */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 {performance.slice(0, 3).map((collector, index) => {
-                  const borderColors = ["border-blue-200", "border-gray-200", "border-orange-200"];
+                  const borderColors = [
+                    "border-blue-200",
+                    "border-gray-200",
+                    "border-orange-200",
+                  ];
                   const bgColors = ["bg-blue-50", "bg-gray-50", "bg-orange-50"];
-                  
+
                   return (
                     <div
                       key={collector.collectorId}
@@ -932,7 +1012,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       <div className="absolute -top-2 -right-2 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center text-xs font-medium text-gray-600">
                         {index + 1}
                       </div>
-                      
+
                       <div className="space-y-3">
                         <div>
                           <h3 className="font-medium text-gray-900 text-sm truncate">
@@ -942,14 +1022,18 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                             {collector.conversionRate.toFixed(1)}%
                           </p>
                         </div>
-                        
+
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className="text-center p-2 bg-white rounded border">
-                            <div className="font-semibold text-gray-900">{collector.totalReceived}</div>
+                            <div className="font-semibold text-gray-900">
+                              {collector.totalReceived}
+                            </div>
                             <div className="text-gray-600">Pagas</div>
                           </div>
                           <div className="text-center p-2 bg-white rounded border">
-                            <div className="font-semibold text-gray-900">{collector.clientCount}</div>
+                            <div className="font-semibold text-gray-900">
+                              {collector.clientCount}
+                            </div>
                             <div className="text-gray-600">Clientes</div>
                           </div>
                         </div>
@@ -964,29 +1048,43 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 <div className="border border-gray-200 rounded-lg p-4">
                   <div className="text-sm text-gray-600 mb-1">Tempo Médio</div>
                   <div className="text-xl font-semibold text-gray-900">
-                    {performance.length > 0 
-                      ? (performance.reduce((acc, p) => acc + p.averageTime, 0) / performance.length).toFixed(0)
-                      : 0
-                    } dias
+                    {performance.length > 0
+                      ? (
+                          performance.reduce(
+                            (acc, p) => acc + p.averageTime,
+                            0,
+                          ) / performance.length
+                        ).toFixed(0)
+                      : 0}{" "}
+                    dias
                   </div>
                 </div>
 
                 <div className="border border-gray-200 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-1">Total Recuperado</div>
+                  <div className="text-sm text-gray-600 mb-1">
+                    Total Recuperado
+                  </div>
                   <div className="text-xl font-semibold text-gray-900">
                     {formatCurrency(
-                      performance.reduce((acc, p) => acc + p.receivedAmount, 0)
+                      performance.reduce((acc, p) => acc + p.receivedAmount, 0),
                     )}
                   </div>
                 </div>
 
                 <div className="border border-gray-200 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-1">Eficiência Geral</div>
+                  <div className="text-sm text-gray-600 mb-1">
+                    Eficiência Geral
+                  </div>
                   <div className="text-xl font-semibold text-gray-900">
                     {performance.length > 0
-                      ? (performance.reduce((acc, p) => acc + p.conversionRate, 0) / performance.length).toFixed(1)
-                      : 0
-                    }%
+                      ? (
+                          performance.reduce(
+                            (acc, p) => acc + p.conversionRate,
+                            0,
+                          ) / performance.length
+                        ).toFixed(1)
+                      : 0}
+                    %
                   </div>
                 </div>
               </div>
@@ -996,7 +1094,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 <h3 className="font-medium text-gray-900">
                   Todos os Cobradores
                 </h3>
-                
+
                 {/* Mobile Cards - Minimalista */}
                 <div className="space-y-3 lg:hidden">
                   {performance.map((collector, index) => (
@@ -1024,19 +1122,27 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
                       <div className="grid grid-cols-4 gap-3 text-center text-xs">
                         <div>
-                          <div className="font-medium text-gray-900">{collector.totalAssigned}</div>
+                          <div className="font-medium text-gray-900">
+                            {collector.totalAssigned}
+                          </div>
                           <div className="text-gray-600">Atribuídas</div>
                         </div>
                         <div>
-                          <div className="font-medium text-gray-900">{collector.totalReceived}</div>
+                          <div className="font-medium text-gray-900">
+                            {collector.totalReceived}
+                          </div>
                           <div className="text-gray-600">Pagas</div>
                         </div>
                         <div>
-                          <div className="font-medium text-gray-900">{collector.clientCount}</div>
+                          <div className="font-medium text-gray-900">
+                            {collector.clientCount}
+                          </div>
                           <div className="text-gray-600">Clientes</div>
                         </div>
                         <div>
-                          <div className="font-medium text-gray-900">{collector.averageTime.toFixed(0)}d</div>
+                          <div className="font-medium text-gray-900">
+                            {collector.averageTime.toFixed(0)}d
+                          </div>
                           <div className="text-gray-600">Tempo</div>
                         </div>
                       </div>
@@ -1044,9 +1150,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       {/* Barra de Progresso Simples */}
                       <div className="mt-3">
                         <div className="w-full bg-gray-200 rounded-full h-1">
-                          <div 
+                          <div
                             className="bg-gray-900 h-1 rounded-full transition-all duration-300"
-                            style={{ width: `${Math.min((collector.totalReceived / collector.totalAssigned) * 100, 100)}%` }}
+                            style={{
+                              width: `${Math.min((collector.totalReceived / collector.totalAssigned) * 100, 100)}%`,
+                            }}
                           ></div>
                         </div>
                       </div>
@@ -1060,19 +1168,36 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     <table className="w-full">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">#</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">Cobrador</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">Eficiência</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">Vendas</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">Clientes</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">Valor Recebido</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">Tempo Médio</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                            #
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                            Cobrador
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                            Eficiência
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                            Vendas
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                            Clientes
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                            Valor Recebido
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                            Tempo Médio
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {performance.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="py-8 text-center text-gray-500 text-sm">
+                            <td
+                              colSpan={7}
+                              className="py-8 text-center text-gray-500 text-sm"
+                            >
                               Nenhum cobrador encontrado
                             </td>
                           </tr>
@@ -1095,9 +1220,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                               <td className="py-3 px-4">
                                 <div className="flex items-center gap-3">
                                   <div className="w-16 bg-gray-200 rounded-full h-1.5">
-                                    <div 
+                                    <div
                                       className="bg-gray-900 h-1.5 rounded-full"
-                                      style={{ width: `${Math.min(collector.conversionRate, 100)}%` }}
+                                      style={{
+                                        width: `${Math.min(collector.conversionRate, 100)}%`,
+                                      }}
                                     ></div>
                                   </div>
                                   <span className="text-sm font-medium text-gray-900 min-w-[40px]">
@@ -1107,8 +1234,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                               </td>
                               <td className="py-3 px-4">
                                 <div className="text-sm text-gray-900">
-                                  <span className="font-medium">{collector.totalReceived}</span>
-                                  <span className="text-gray-500"> / {collector.totalAssigned}</span>
+                                  <span className="font-medium">
+                                    {collector.totalReceived}
+                                  </span>
+                                  <span className="text-gray-500">
+                                    {" "}
+                                    / {collector.totalAssigned}
+                                  </span>
                                 </div>
                               </td>
                               <td className="py-3 px-4">

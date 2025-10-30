@@ -84,7 +84,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         ? totalPending - amountToDistribute
         : 0;
     const showDiscountBox = discountAmount >= 0 && withDiscount;
-    
+
     // Calcular distribuição automática por venda
     const calculateSaleDistribution = React.useCallback(() => {
       const paymentAmount = parseFloat(distributionAmount) || 0;
