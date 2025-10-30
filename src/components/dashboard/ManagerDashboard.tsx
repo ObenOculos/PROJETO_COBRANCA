@@ -14,7 +14,6 @@ import {
   ChevronRight,
   Filter,
 } from "lucide-react";
-import StatsCard from "../common/StatsCard";
 import FilterBar from "../common/FilterBar";
 import CollectionTable from "./CollectionTable";
 import EnhancedPerformanceChart from "./EnhancedPerformanceChart";
@@ -49,6 +48,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     getFilteredCollections,
     getPendingCancellationRequests,
     collections,
+    scheduledVisits,
   } = useCollection();
 
   // Recupera a aba ativa do localStorage ou usa 'overview' como padrão
@@ -226,6 +226,68 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     pauseAutoPlay();
     setCurrentSlide((prevSlide) => (prevSlide - 1 + 3) % 3);
   };
+
+  // Calculate scheduling metrics based on real data
+  const calculateSchedulingMetrics = useMemo(() => {
+    if (!scheduledVisits) return {
+      today: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
+      week: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
+      month: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
+    };
+
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    // Start of week (Monday)
+    const startOfWeek = new Date(today);
+    const day = startOfWeek.getDay();
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+    startOfWeek.setDate(diff);
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    // Start of month
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    const filterVisitsByCollector = (visits: any[]) => {
+      if (selectedCollector === "all") return visits;
+      return visits.filter(visit => visit.collectorId === selectedCollector);
+    };
+
+    const calculatePeriodMetrics = (filterFn: (visit: any) => boolean) => {
+      const periodVisits = filterVisitsByCollector(scheduledVisits.filter(filterFn));
+      
+      const total = periodVisits.length;
+      const completed = periodVisits.filter(v => v.status === 'completed').length;
+      const cancelled = periodVisits.filter(v => v.status === 'cancelled').length;
+      const pending = periodVisits.filter(v => v.status === 'scheduled' || v.status === 'in_progress').length;
+      const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      return { total, completed, pending, cancelled, completionRate };
+    };
+
+    // Today's visits
+    const todayMetrics = calculatePeriodMetrics(visit => 
+      visit.scheduledDate === todayStr
+    );
+
+    // This week's visits
+    const weekMetrics = calculatePeriodMetrics(visit => {
+      const visitDate = new Date(visit.scheduledDate);
+      return visitDate >= startOfWeek && visitDate <= today;
+    });
+
+    // This month's visits
+    const monthMetrics = calculatePeriodMetrics(visit => {
+      const visitDate = new Date(visit.scheduledDate);
+      return visitDate >= startOfMonth && visitDate <= today;
+    });
+
+    return {
+      today: todayMetrics,
+      week: weekMetrics,
+      month: monthMetrics,
+    };
+  }, [scheduledVisits, selectedCollector]);
 
   const stats = useMemo(() => getDashboardStats(), [collections]);
   const performance = useMemo(() => getCollectorPerformance(), [collections]);
@@ -425,130 +487,190 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   {/* Slide 1: Métricas Financeiras */}
                   <div className="w-full flex-shrink-0">
                     <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                      <DollarSign className="h-4 w-4 text-blue-600" />
+                      <DollarSign className="h-4 w-4 text-gray-600" />
                       <h4 className="font-medium text-gray-900 text-sm sm:text-base">
                         Métricas Financeiras
                       </h4>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-4">
-                      <StatsCard
-                        title="Valor Total"
-                        value={formatCurrency(overviewStats.totalAmount)}
-                        change={`${overviewStats.totalCollections} cobranças`}
-                        changeType="neutral"
-                        icon={DollarSign}
-                        iconColor="bg-blue-500"
+                      <div
                         onClick={() => setActiveTab("collections")}
-                      />
-                      <StatsCard
-                        title="Total em Aberto"
-                        value={formatCurrency(overviewStats.pendingAmount)}
-                        change="+12% vs mês anterior"
-                        changeType="positive"
-                        icon={DollarSign}
-                        iconColor="bg-red-500"
+                        className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-sm font-medium text-gray-900">Valor Total</h5>
+                          <DollarSign className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">
+                          {formatCurrency(overviewStats.totalAmount)}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {overviewStats.totalCollections} cobranças
+                        </div>
+                      </div>
+                      <div
                         onClick={() => setActiveTab("collections")}
-                      />
-                      <StatsCard
-                        title="Total Recebido"
-                        value={formatCurrency(overviewStats.receivedAmount)}
-                        change="+8% vs mês anterior"
-                        changeType="positive"
-                        icon={TrendingUp}
-                        iconColor="bg-green-500"
+                        className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-sm font-medium text-gray-900">Total em Aberto</h5>
+                          <DollarSign className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">
+                          {formatCurrency(overviewStats.pendingAmount)}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          +12% vs mês anterior
+                        </div>
+                      </div>
+                      <div
                         onClick={() => setActiveTab("collections")}
-                      />
-                      <StatsCard
-                        title="Taxa de Conversão"
-                        value={`${overviewStats.conversionRate.toFixed(1)}%`}
-                        change="+2.1% vs mês anterior"
-                        changeType="positive"
-                        icon={BarChart3}
-                        iconColor="bg-blue-500"
+                        className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-sm font-medium text-gray-900">Total Recebido</h5>
+                          <TrendingUp className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">
+                          {formatCurrency(overviewStats.receivedAmount)}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          +8% vs mês anterior
+                        </div>
+                      </div>
+                      <div
                         onClick={() => setActiveTab("performance")}
-                      />
+                        className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-sm font-medium text-gray-900">Taxa de Conversão</h5>
+                          <BarChart3 className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">
+                          {overviewStats.conversionRate.toFixed(1)}%
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          +2.1% vs mês anterior
+                        </div>
+                      </div>
                     </div>
                   </div>
 
                   {/* Slide 2: Métricas Operacionais */}
                   <div className="w-full flex-shrink-0">
                     <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                      <Target className="h-4 w-4 text-green-600" />
+                      <Target className="h-4 w-4 text-gray-600" />
                       <h4 className="font-medium text-gray-900 text-sm sm:text-base">
                         Métricas Operacionais
                       </h4>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
-                      <StatsCard
-                        title="Vendas Finalizadas"
-                        value={overviewMetrics.completedSalesCount.toString()}
-                        change={`${((overviewMetrics.completedSalesCount / (overviewMetrics.completedSalesCount + overviewMetrics.pendingSalesCount)) * 100).toFixed(1)}% concluídas`}
-                        changeType="positive"
-                        icon={CheckCircle}
-                        iconColor="bg-green-500"
+                      <div
                         onClick={() => setActiveTab("collections")}
-                      />
-                      <StatsCard
-                        title="Clientes com Pendências"
-                        value={overviewMetrics.clientsWithPendingCount.toString()}
-                        change={`${overviewMetrics.pendingSalesCount} vendas pendentes`}
-                        changeType="negative"
-                        icon={Users}
-                        iconColor="bg-orange-600"
+                        className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-sm font-medium text-gray-900">Vendas Finalizadas</h5>
+                          <CheckCircle className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">
+                          {overviewMetrics.completedSalesCount}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {((overviewMetrics.completedSalesCount / (overviewMetrics.completedSalesCount + overviewMetrics.pendingSalesCount)) * 100).toFixed(1)}% concluídas
+                        </div>
+                      </div>
+                      <div
                         onClick={() => setActiveTab("collections")}
-                      />
-                      <StatsCard
-                        title="Vencimentos Hoje"
-                        value={formatCurrency(overviewMetrics.todayAmount)}
-                        change={`${overviewMetrics.todayCollections.length} títulos`}
-                        changeType="neutral"
-                        icon={Calendar}
-                        iconColor="bg-orange-500"
+                        className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-sm font-medium text-gray-900">Clientes com Pendências</h5>
+                          <Users className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">
+                          {overviewMetrics.clientsWithPendingCount}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {overviewMetrics.pendingSalesCount} vendas pendentes
+                        </div>
+                      </div>
+                      <div
                         onClick={() => {
                           const today = new Date().toISOString().split("T")[0];
                           setFilters({ ...filters, dueDate: today });
                           setActiveTab("collections");
                         }}
-                      />
+                        className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-sm font-medium text-gray-900">Vencimentos Hoje</h5>
+                          <Calendar className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">
+                          {formatCurrency(overviewMetrics.todayAmount)}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {overviewMetrics.todayCollections.length} títulos
+                        </div>
+                      </div>
                     </div>
                   </div>
 
                   {/* Slide 3: Ecossistema de Cobrança */}
                   <div className="w-full flex-shrink-0">
                     <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                      <Target className="h-4 w-4 text-indigo-600" />
+                      <Target className="h-4 w-4 text-gray-600" />
                       <h4 className="font-medium text-gray-900 text-sm sm:text-base">
                         Ecossistema de Cobrança
                       </h4>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
-                      <StatsCard
-                        title="Time Ativo"
-                        value={stats.collectorsCount.toString()}
-                        change="cobradores em campo"
-                        changeType="neutral"
-                        icon={Users}
-                        iconColor="bg-purple-500"
+                      <div
                         onClick={() => setActiveTab("users")}
-                      />
-                      <StatsCard
-                        title="Cobertura da Rede"
-                        value={overviewMetrics.storesWithCollections.toString()}
-                        change="pontos ativos"
-                        changeType="neutral"
-                        icon={Store}
-                        iconColor="bg-indigo-500"
+                        className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-sm font-medium text-gray-900">Time Ativo</h5>
+                          <Users className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">
+                          {stats.collectorsCount}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          cobradores em campo
+                        </div>
+                      </div>
+                      <div
                         onClick={() => setActiveTab("stores")}
-                      />
-                      <StatsCard
-                        title="Eficiência Média"
-                        value={`${overviewMetrics.averageEfficiency}%`}
-                        change="conversão da equipe"
-                        changeType="positive"
-                        icon={TrendingUp}
-                        iconColor="bg-green-500"
+                        className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-sm font-medium text-gray-900">Cobertura da Rede</h5>
+                          <Store className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">
+                          {overviewMetrics.storesWithCollections}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          pontos ativos
+                        </div>
+                      </div>
+                      <div
                         onClick={() => setActiveTab("performance")}
-                      />
+                        className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-sm font-medium text-gray-900">Eficiência Média</h5>
+                          <TrendingUp className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">
+                          {overviewMetrics.averageEfficiency}%
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          conversão da equipe
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -572,13 +694,15 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             </div>
 
             {/* Agendamentos dos Cobradores */}
-            <div className="bg-white rounded-2xl sm:rounded-2xl shadow-sm border border-gray-200 p-4 lg:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base lg:text-lg font-semibold text-gray-900">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
                     Agendamentos dos Cobradores
                   </h3>
-                  <Calendar className="h-5 w-5 text-blue-500" />
+                  <p className="text-sm text-gray-600">
+                    Métricas de visitas agendadas
+                  </p>
                 </div>
                 
                 {/* Seletor de Cobrador */}
@@ -604,43 +728,41 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
                 {/* Agendamentos do Dia */}
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-blue-900">Hoje</h4>
-                    <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                      <Calendar className="h-4 w-4 text-white" />
-                    </div>
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium text-gray-900">Hoje</h4>
+                    <Calendar className="h-4 w-4 text-gray-600" />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-blue-700">Total</span>
-                      <span className="font-semibold text-blue-900">
-                        {selectedCollector === "all" ? "12" : "3"}
+                      <span className="text-sm text-gray-600">Total</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.today.total}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-blue-700">Concluídas</span>
-                      <span className="font-semibold text-green-600">
-                        {selectedCollector === "all" ? "8" : "2"}
+                      <span className="text-sm text-gray-600">Concluídas</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.today.completed}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-blue-700">Pendentes</span>
-                      <span className="font-semibold text-orange-600">
-                        {selectedCollector === "all" ? "3" : "1"}
+                      <span className="text-sm text-gray-600">Pendentes</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.today.pending}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-blue-700">Canceladas</span>
-                      <span className="font-semibold text-red-600">
-                        {selectedCollector === "all" ? "1" : "0"}
+                      <span className="text-sm text-gray-600">Canceladas</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.today.cancelled}
                       </span>
                     </div>
-                    <div className="pt-2 border-t border-blue-200">
+                    <div className="pt-3 border-t border-gray-200">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-blue-600">Taxa de Conclusão</span>
-                        <span className="font-bold text-blue-800">
-                          {selectedCollector === "all" ? "67%" : "67%"}
+                        <span className="text-xs text-gray-600">Taxa de Conclusão</span>
+                        <span className="font-bold text-gray-900">
+                          {calculateSchedulingMetrics.today.completionRate}%
                         </span>
                       </div>
                     </div>
@@ -648,43 +770,41 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 </div>
 
                 {/* Agendamentos da Semana */}
-                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-green-900">Esta Semana</h4>
-                    <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-                      <Target className="h-4 w-4 text-white" />
-                    </div>
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium text-gray-900">Esta Semana</h4>
+                    <Target className="h-4 w-4 text-gray-600" />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-green-700">Total</span>
-                      <span className="font-semibold text-green-900">
-                        {selectedCollector === "all" ? "78" : "18"}
+                      <span className="text-sm text-gray-600">Total</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.week.total}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-green-700">Concluídas</span>
-                      <span className="font-semibold text-green-600">
-                        {selectedCollector === "all" ? "52" : "12"}
+                      <span className="text-sm text-gray-600">Concluídas</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.week.completed}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-green-700">Pendentes</span>
-                      <span className="font-semibold text-orange-600">
-                        {selectedCollector === "all" ? "18" : "4"}
+                      <span className="text-sm text-gray-600">Pendentes</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.week.pending}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-green-700">Canceladas</span>
-                      <span className="font-semibold text-red-600">
-                        {selectedCollector === "all" ? "8" : "2"}
+                      <span className="text-sm text-gray-600">Canceladas</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.week.cancelled}
                       </span>
                     </div>
-                    <div className="pt-2 border-t border-green-200">
+                    <div className="pt-3 border-t border-gray-200">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-green-600">Taxa de Conclusão</span>
-                        <span className="font-bold text-green-800">
-                          {selectedCollector === "all" ? "67%" : "67%"}
+                        <span className="text-xs text-gray-600">Taxa de Conclusão</span>
+                        <span className="font-bold text-gray-900">
+                          {calculateSchedulingMetrics.week.completionRate}%
                         </span>
                       </div>
                     </div>
@@ -692,43 +812,41 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 </div>
 
                 {/* Agendamentos do Mês */}
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-purple-900">Este Mês</h4>
-                    <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
-                      <BarChart3 className="h-4 w-4 text-white" />
-                    </div>
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium text-gray-900">Este Mês</h4>
+                    <BarChart3 className="h-4 w-4 text-gray-600" />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-700">Total</span>
-                      <span className="font-semibold text-purple-900">
-                        {selectedCollector === "all" ? "324" : "72"}
+                      <span className="text-sm text-gray-600">Total</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.month.total}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-700">Concluídas</span>
-                      <span className="font-semibold text-green-600">
-                        {selectedCollector === "all" ? "245" : "55"}
+                      <span className="text-sm text-gray-600">Concluídas</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.month.completed}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-700">Pendentes</span>
-                      <span className="font-semibold text-orange-600">
-                        {selectedCollector === "all" ? "52" : "12"}
+                      <span className="text-sm text-gray-600">Pendentes</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.month.pending}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-700">Canceladas</span>
-                      <span className="font-semibold text-red-600">
-                        {selectedCollector === "all" ? "27" : "5"}
+                      <span className="text-sm text-gray-600">Canceladas</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.month.cancelled}
                       </span>
                     </div>
-                    <div className="pt-2 border-t border-purple-200">
+                    <div className="pt-3 border-t border-gray-200">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-purple-600">Taxa de Conclusão</span>
-                        <span className="font-bold text-purple-800">
-                          {selectedCollector === "all" ? "76%" : "76%"}
+                        <span className="text-xs text-gray-600">Taxa de Conclusão</span>
+                        <span className="font-bold text-gray-900">
+                          {calculateSchedulingMetrics.month.completionRate}%
                         </span>
                       </div>
                     </div>
@@ -738,10 +856,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
               {/* Informação do cobrador selecionado */}
               {selectedCollector !== "all" && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="mt-6 p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-900">
+                    <Users className="h-4 w-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-900">
                       Exibindo dados de: {performance.find(p => p.collectorId === selectedCollector)?.collectorName}
                     </span>
                   </div>
@@ -749,10 +867,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               )}
 
               {/* Ação para ver detalhes */}
-              <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="mt-6 pt-4 border-t border-gray-200">
                 <button
                   onClick={() => setActiveTab("visit-tracking")}
-                  className="w-full px-4 py-2 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 transition-colors text-sm font-medium flex items-center justify-center"
+                  className="w-full px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium flex items-center justify-center border border-gray-200"
                 >
                   <Target className="h-4 w-4 mr-2" />
                   Ver Todos os Agendamentos
@@ -789,180 +907,231 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               </div>
             )}
 
-            {/* Performance Overview - Enhanced Mobile Optimization */}
-            <div className="bg-white rounded-2xl sm:rounded-2xl shadow-sm border border-gray-200 p-4 lg:p-6">
-              <div>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-6">
-                  <div className="min-w-0">
-                    <h2 className="text-base lg:text-lg font-semibold text-gray-900">
-                      Desempenho dos Cobradores
-                    </h2>
-                    <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                      Acompanhamento detalhado por cobrador
-                    </p>
+            {/* Performance Overview - Design Minimalista */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                  Performance dos Cobradores
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Ranking de eficiência da equipe
+                </p>
+              </div>
+
+              {/* Top 3 - Design Clean */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                {performance.slice(0, 3).map((collector, index) => {
+                  const borderColors = ["border-blue-200", "border-gray-200", "border-orange-200"];
+                  const bgColors = ["bg-blue-50", "bg-gray-50", "bg-orange-50"];
+                  
+                  return (
+                    <div
+                      key={collector.collectorId}
+                      className={`relative border-2 ${borderColors[index]} ${bgColors[index]} rounded-lg p-4 transition-all duration-200 hover:shadow-sm`}
+                    >
+                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center text-xs font-medium text-gray-600">
+                        {index + 1}
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <h3 className="font-medium text-gray-900 text-sm truncate">
+                            {collector.collectorName}
+                          </h3>
+                          <p className="text-2xl font-bold text-gray-900 mt-1">
+                            {collector.conversionRate.toFixed(1)}%
+                          </p>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="text-center p-2 bg-white rounded border">
+                            <div className="font-semibold text-gray-900">{collector.totalReceived}</div>
+                            <div className="text-gray-600">Pagas</div>
+                          </div>
+                          <div className="text-center p-2 bg-white rounded border">
+                            <div className="font-semibold text-gray-900">{collector.clientCount}</div>
+                            <div className="text-gray-600">Clientes</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Métricas da Equipe - Simples */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="text-sm text-gray-600 mb-1">Tempo Médio</div>
+                  <div className="text-xl font-semibold text-gray-900">
+                    {performance.length > 0 
+                      ? (performance.reduce((acc, p) => acc + p.averageTime, 0) / performance.length).toFixed(0)
+                      : 0
+                    } dias
                   </div>
                 </div>
 
-                {/* Mobile-friendly performance cards */}
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="text-sm text-gray-600 mb-1">Total Recuperado</div>
+                  <div className="text-xl font-semibold text-gray-900">
+                    {formatCurrency(
+                      performance.reduce((acc, p) => acc + p.receivedAmount, 0)
+                    )}
+                  </div>
+                </div>
+
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="text-sm text-gray-600 mb-1">Eficiência Geral</div>
+                  <div className="text-xl font-semibold text-gray-900">
+                    {performance.length > 0
+                      ? (performance.reduce((acc, p) => acc + p.conversionRate, 0) / performance.length).toFixed(1)
+                      : 0
+                    }%
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista Completa */}
+              <div className="space-y-4">
+                <h3 className="font-medium text-gray-900">
+                  Todos os Cobradores
+                </h3>
+                
+                {/* Mobile Cards - Minimalista */}
                 <div className="space-y-3 lg:hidden">
-                  {performance.map((collector) => (
+                  {performance.map((collector, index) => (
                     <div
                       key={collector.collectorId}
-                      className="bg-gray-50 rounded-2xl p-3 border border-gray-200"
+                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-medium text-sm text-gray-900 truncate flex-1 mr-2">
-                          {collector.collectorName}
-                        </h3>
-                        <span
-                          className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap ${
-                            collector.conversionRate >= 50
-                              ? "bg-green-100 text-green-800"
-                              : collector.conversionRate >= 25
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {collector.conversionRate.toFixed(1)}%
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 text-center">
-                        <div className="bg-white rounded-md p-2">
-                          <div className="font-semibold text-sm text-gray-900">
-                            {collector.totalAssigned}
+                        <div className="flex items-center gap-3">
+                          <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium text-gray-600">
+                            {index + 1}
                           </div>
-                          <div className="text-xs text-gray-600">Vendas</div>
+                          <div>
+                            <h4 className="font-medium text-gray-900 text-sm">
+                              {collector.collectorName}
+                            </h4>
+                          </div>
                         </div>
-                        <div className="bg-white rounded-md p-2">
-                          <div className="font-semibold text-sm text-green-600">
-                            {collector.totalReceived}
+                        <div className="text-right">
+                          <div className="font-semibold text-gray-900">
+                            {collector.conversionRate.toFixed(1)}%
                           </div>
-                          <div className="text-xs text-gray-600">Pagas</div>
-                        </div>
-                        <div className="bg-white rounded-md p-2">
-                          <div className="font-semibold text-sm text-blue-600">
-                            {collector.clientCount}
-                          </div>
-                          <div className="text-xs text-gray-600">Clientes</div>
-                        </div>
-                        <div className="bg-white rounded-md p-2">
-                          <div className="font-semibold text-xs text-blue-600 truncate">
-                            {formatCurrency(collector.totalAmount)}
-                          </div>
-                          <div className="text-xs text-gray-600">Atribuído</div>
-                        </div>
-                        <div className="bg-white rounded-md p-2">
-                          <div className="font-semibold text-xs text-green-600 truncate">
-                            {formatCurrency(collector.receivedAmount)}
-                          </div>
-                          <div className="text-xs text-gray-600">Recebido</div>
                         </div>
                       </div>
 
-                      {/* Additional mobile info */}
-                      <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-600">
-                        <div className="flex justify-between">
-                          <span>
-                            Tempo médio:{" "}
-                            <span className="font-medium text-gray-900">
-                              {collector.averageTime.toFixed(0)} dias
-                            </span>
-                          </span>
+                      <div className="grid grid-cols-4 gap-3 text-center text-xs">
+                        <div>
+                          <div className="font-medium text-gray-900">{collector.totalAssigned}</div>
+                          <div className="text-gray-600">Atribuídas</div>
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{collector.totalReceived}</div>
+                          <div className="text-gray-600">Pagas</div>
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{collector.clientCount}</div>
+                          <div className="text-gray-600">Clientes</div>
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{collector.averageTime.toFixed(0)}d</div>
+                          <div className="text-gray-600">Tempo</div>
+                        </div>
+                      </div>
+
+                      {/* Barra de Progresso Simples */}
+                      <div className="mt-3">
+                        <div className="w-full bg-gray-200 rounded-full h-1">
+                          <div 
+                            className="bg-gray-900 h-1 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min((collector.totalReceived / collector.totalAssigned) * 100, 100)}%` }}
+                          ></div>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                {/* Desktop table */}
-                <div className="hidden lg:block overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">
-                          Cobrador
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">
-                          Clientes
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">
-                          Vendas Atribuídas
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">
-                          Vendas Pagas
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">
-                          Taxa
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">
-                          Valor Atribuído
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">
-                          Valor Recebido
-                        </th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-900">
-                          Tempo Médio
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {performance.length === 0 ? (
+                {/* Desktop Table - Clean */}
+                <div className="hidden lg:block">
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
                         <tr>
-                          <td
-                            colSpan={8}
-                            className="py-8 text-center text-gray-500"
-                          >
-                            Nenhum cobrador encontrado
-                          </td>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">#</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">Cobrador</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">Eficiência</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">Vendas</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">Clientes</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">Valor Recebido</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">Tempo Médio</th>
                         </tr>
-                      ) : (
-                        performance.map((collector) => (
-                          <tr
-                            key={collector.collectorId}
-                            className="border-b border-gray-100 hover:bg-gray-50"
-                          >
-                            <td className="py-3 px-4">
-                              <div className="font-medium text-gray-900">
-                                {collector.collectorName}
-                              </div>
-                            </td>
-                            <td className="py-3 px-4 text-gray-600">
-                              {collector.clientCount}
-                            </td>
-                            <td className="py-3 px-4 text-gray-600">
-                              {collector.totalAssigned}
-                            </td>
-                            <td className="py-3 px-4 text-gray-600">
-                              {collector.totalReceived}
-                            </td>
-                            <td className="py-3 px-4">
-                              <span
-                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                  collector.conversionRate >= 50
-                                    ? "bg-green-100 text-green-800"
-                                    : collector.conversionRate >= 25
-                                      ? "bg-yellow-100 text-yellow-800"
-                                      : "bg-red-100 text-red-800"
-                                }`}
-                              >
-                                {collector.conversionRate.toFixed(1)}%
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-gray-600">
-                              {formatCurrency(collector.totalAmount)}
-                            </td>
-                            <td className="py-3 px-4 text-gray-600">
-                              {formatCurrency(collector.receivedAmount)}
-                            </td>
-                            <td className="py-3 px-4 text-gray-600">
-                              {collector.averageTime.toFixed(0)} dias
+                      </thead>
+                      <tbody>
+                        {performance.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-8 text-center text-gray-500 text-sm">
+                              Nenhum cobrador encontrado
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                        ) : (
+                          performance.map((collector, index) => (
+                            <tr
+                              key={collector.collectorId}
+                              className="border-t border-gray-100 hover:bg-gray-50 transition-colors"
+                            >
+                              <td className="py-3 px-4">
+                                <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium text-gray-600">
+                                  {index + 1}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="font-medium text-gray-900 text-sm">
+                                  {collector.collectorName}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-16 bg-gray-200 rounded-full h-1.5">
+                                    <div 
+                                      className="bg-gray-900 h-1.5 rounded-full"
+                                      style={{ width: `${Math.min(collector.conversionRate, 100)}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-sm font-medium text-gray-900 min-w-[40px]">
+                                    {collector.conversionRate.toFixed(1)}%
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="text-sm text-gray-900">
+                                  <span className="font-medium">{collector.totalReceived}</span>
+                                  <span className="text-gray-500"> / {collector.totalAssigned}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {collector.clientCount}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {formatCurrency(collector.receivedAmount)}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {collector.averageTime.toFixed(0)} dias
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
