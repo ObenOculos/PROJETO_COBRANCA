@@ -398,6 +398,9 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        ID
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Parcela
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -410,6 +413,9 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                         Valor Recebido
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Desconto
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Pendente
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -419,17 +425,18 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {saleData.collections.map((collection, index) => {
-                      const pending =
-                        collection.valor_original - collection.valor_recebido;
-                      const dbStatus =
-                        collection.status?.toLowerCase() || "pendente";
+                      const discount = collection.desconto || 0;
+                      const pending = Math.max(0, collection.valor_original - collection.valor_recebido - discount);
+                      const dbStatus = collection.status?.toLowerCase() || "pendente";
+                      
                       let status = "pendente";
                       if (
                         dbStatus === "pago" ||
-                        dbStatus === "pago com desconto"
+                        dbStatus === "pago com desconto" ||
+                        pending <= 0.01
                       ) {
                         status = "pago";
-                      } else if (dbStatus === "parcial") {
+                      } else if (collection.valor_recebido > 0 || discount > 0) {
                         status = "parcial";
                       }
 
@@ -440,6 +447,9 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                             index % 2 === 0 ? "bg-white" : "bg-gray-50"
                           }
                         >
+                          <td className="px-4 py-3 text-sm font-medium text-gray-500">
+                            {collection.id_parcela}
+                          </td>
                           <td className="px-4 py-3 text-sm font-medium text-gray-900">
                             {collection.parcela}° Parcela
                           </td>
@@ -451,6 +461,9 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                           </td>
                           <td className="px-4 py-3 text-sm font-semibold text-green-600">
                             {formatCurrency(collection.valor_recebido)}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-blue-600">
+                            {formatCurrency(discount)}
                           </td>
                           <td className="px-4 py-3 text-sm font-semibold text-orange-600">
                             {formatCurrency(pending)}
