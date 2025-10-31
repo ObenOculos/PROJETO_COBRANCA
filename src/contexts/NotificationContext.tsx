@@ -9,6 +9,8 @@ import React, {
 import { useCollection } from "./CollectionContext";
 import { useAuth } from "./AuthContext";
 
+import { formatCurrency } from "../utils/formatters";
+
 export interface Notification {
   id: string;
   type: "payment" | "overdue" | "assignment" | "system" | "visit";
@@ -18,6 +20,7 @@ export interface Notification {
   read: boolean;
   priority: "low" | "medium" | "high";
   relatedId?: string;
+  targetUserType?: "manager" | "collector" | "all"; // Novo campo para direcionamento
 }
 
 interface NotificationContextType {
@@ -65,7 +68,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       return new Set();
     }
   });
-  const { collections } = useCollection();
+  const { collections, salePayments } = useCollection();
   const { user } = useAuth();
 
   // Salvar notificações dispensadas no localStorage sempre que mudarem
@@ -82,7 +85,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
   // Generate notifications based on system data with debouncing
   useEffect(() => {
-    if (!collections || !user) return;
+    if (!collections || !user || !salePayments) return;
 
     // Debounce notifications generation
     const timeoutId = setTimeout(() => {
@@ -90,7 +93,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [collections, user?.id]); // Only depend on user.id, not entire user object
+  }, [collections, user?.id, salePayments]); // Only depend on user.id, not entire user object
 
   const generateAndSetNotifications = () => {
     if (!user) return; // Guard clause for null user
@@ -259,16 +262,53 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       });
 
       if (highValuePending.length > 0) {
-        newNotifications.push({
-          type: "payment",
-          title: "Valores Altos Pendentes",
-          message: `${highValuePending.length} cobrança${highValuePending.length > 1 ? "s de alto valor" : " de alto valor"} pendente${highValuePending.length > 1 ? "s" : ""}`,
-          priority: "high",
-        });
-      }
-
-      return newNotifications;
-    };
+                newNotifications.push({
+                  type: "payment",
+                  title: "Valores Altos Pendentes",
+                  message: `${highValuePending.length} cobrança${
+                    highValuePending.length > 1 ? "s de alto valor" : " de alto valor"
+                  } pendente${
+                    highValuePending.length > 1 ? "s" : ""
+                  }`,
+                  priority: "high",
+                });
+              }
+        
+                    // 6. Manager-specific: Recent payments with discounts
+                    if (user.type === "manager") {
+                      const recentDiscountedPayments = salePayments.filter((p) => {
+                        if (!p.createdAt || !p.discountAmount || p.discountAmount <= 0) {
+                          return false;
+                        }
+                        const paymentDate = new Date(p.createdAt);
+                        const yesterday = new Date(now);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        return paymentDate >= yesterday;
+                      });
+              
+                              recentDiscountedPayments.forEach((p) => {
+                                const saleNumber = p.saleNumber;
+                                const clientDoc = p.clientDocument;
+                                const discountAmount = p.discountAmount;
+                      
+                                if (saleNumber !== null && saleNumber !== undefined && clientDoc && discountAmount) {
+                                  const title = saleNumber === 0 ? "Desconto na Venda Renegociada" : `Desconto na Venda #${saleNumber}`;
+                                  const message = `Um desconto de ${formatCurrency(
+                                    discountAmount,
+                                  )} foi aplicado na venda ${saleNumber === 0 ? 'Renegociada' : `#${saleNumber}`}.`;
+                      
+                                  newNotifications.push({
+                                    type: "payment",
+                                    title: title,
+                                    message: message,
+                                    priority: "medium",
+                                    targetUserType: "manager",
+                                    relatedId: `sale-${saleNumber}-client-${clientDoc}`,
+                                  });
+                                }
+                              });                    }        
+              return newNotifications;
+            };
 
     const generatedNotifications = generateNotifications();
 
@@ -283,16 +323,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
             (n.relatedId &&
               (n.relatedId.startsWith("discount-") ||
                 n.relatedId.startsWith("manual-"))),
-        );
-
-        console.log("🔄 Regenerando notificações automáticas:");
-        console.log(
-          "   Notificações manuais preservadas:",
-          manualNotifications.length,
-        );
-        console.log(
-          "   Novas notificações automáticas:",
-          generatedNotifications.length,
         );
 
         const newOnes = generatedNotifications
@@ -355,21 +385,30 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       read: false,
     };
 
-    console.log("📝 Adicionando notificação manual:", newNotification);
-
     setNotifications((prev) => {
       const updated = [newNotification, ...prev];
-      console.log("📋 Total de notificações após adicionar:", updated.length);
       return updated;
     });
   };
 
-  // Memoize sorted notifications to avoid sorting on every render
+  // Memoize sorted and filtered notifications to avoid sorting on every render
   const sortedNotifications = useMemo(() => {
-    return notifications.sort(
+    if (!user) return [];
+    
+    const filtered = notifications.filter((notification) => {
+      // Se não tem targetUserType, mostra para todos (comportamento antigo)
+      if (!notification.targetUserType || notification.targetUserType === "all") {
+        return true;
+      }
+      
+      // Filtra por tipo de usuário específico
+      return notification.targetUserType === user.type;
+    });
+    
+    return filtered.sort(
       (a, b) => b.timestamp.getTime() - a.timestamp.getTime(),
     );
-  }, [notifications]);
+  }, [notifications, user?.type]);
 
   const value: NotificationContextType = {
     notifications: sortedNotifications,

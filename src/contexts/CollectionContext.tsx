@@ -1905,6 +1905,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           collectorName: payment.collector_name,
           createdAt: payment.created_at,
           distribution_details: payment.distribution_details || [], // Corrected casing
+          discountAmount: payment.discount_amount, // Added this line
         }),
       );
 

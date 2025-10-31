@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
 import {
   Eye,
@@ -43,15 +43,20 @@ interface CollectionTableProps {
   onToggleFilterBar?: () => void;
 }
 
-const CollectionTable: React.FC<CollectionTableProps> = React.memo(
-  ({
+export interface CollectionTableRef {
+  openSaleDetails: (saleNumber: number, clientDocument: string) => void;
+}
+
+const CollectionTable = React.memo(
+  React.forwardRef<CollectionTableRef, CollectionTableProps>((
+  {
     collections,
     userType,
     showGrouped = true,
     collectorId,
     showFilterBar,
     onToggleFilterBar,
-  }) => {
+  }, ref) => {
     const { getClientGroups, loading, deleteSalesFromClient } = useCollection();
     const [selectedCollection, setSelectedCollection] =
       useState<Collection | null>(null);
@@ -67,6 +72,33 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
     const [clientToDelete, setClientToDelete] = useState<ClientGroup | null>(
       null,
     );
+
+    useImperativeHandle(ref, () => ({
+      openSaleDetails: (saleNumber: number, clientDocument: string) => {
+        const clientGroup = clientGroups.find(cg => cg.document === clientDocument);
+        if (clientGroup) {
+          const sale = clientGroup.sales.find(s => s.saleNumber === saleNumber);
+          if (sale) {
+            const saleCollections = sale.installments
+              .map((inst: Collection) =>
+                collections.find(
+                  (c: Collection) =>
+                    c.id_parcela === inst.id_parcela,
+                ),
+              )
+              .filter(
+                (c: Collection | undefined) =>
+                  c !== undefined,
+              ) as Collection[];
+
+            if (saleCollections.length > 0) {
+              setSelectedSale(saleCollections);
+              setIsSaleModalOpen(true);
+            }
+          }
+        }
+      }
+    }));
 
     const handleConfirmDeleteSales = async (selectedSaleNumbers: number[]) => {
       if (clientToDelete && selectedSaleNumbers.length > 0) {
@@ -1496,7 +1528,7 @@ const CollectionTable: React.FC<CollectionTableProps> = React.memo(
         )}
       </>
     );
-  },
+  })
 );
 
 export default CollectionTable;

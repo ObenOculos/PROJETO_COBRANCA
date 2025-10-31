@@ -176,19 +176,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
     // Função para notificar manager sobre pagamentos com desconto
     const notifyManagerAboutDiscount = (discountAmount: number) => {
-      console.log("🔔 notifyManagerAboutDiscount chamada:", {
-        user: user?.name,
-        userType: user?.type,
-        discountAmount,
-        clientName: clientGroup.client,
-      });
-
       if (!user || user.type !== "collector" || discountAmount <= 0) {
-        console.log("❌ Notificação não enviada - condições não atendidas:", {
-          hasUser: !!user,
-          userType: user?.type,
-          discountAmount,
-        });
         return;
       }
 
@@ -206,13 +194,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         priority:
           discountAmount > 1000 ? ("high" as const) : ("medium" as const),
         relatedId: `discount-${clientGroup.document}-${Date.now()}`,
+        targetUserType: "manager" as const, // Notificação direcionada para managers
       };
-
-      console.log("📤 Enviando notificação:", notificationData);
 
       try {
         addNotification(notificationData);
-        console.log("✅ Notificação enviada com sucesso!");
       } catch (error) {
         console.error("❌ Erro ao enviar notificação:", error);
       }
@@ -283,25 +269,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             0,
           );
 
-          console.log("💰 Verificando desconto aplicado:", {
-            totalDiscountApplied,
-            saleDistribution: saleDistribution.map((item) => ({
-              saleNumber: item.sale.saleNumber,
-              appliedDiscount: item.appliedDiscount,
-              appliedAmount: item.appliedAmount,
-            })),
-          });
-
           if (totalDiscountApplied > 0) {
-            console.log(
-              "🎯 Chamando notifyManagerAboutDiscount com desconto:",
-              totalDiscountApplied,
-            );
             notifyManagerAboutDiscount(totalDiscountApplied);
-          } else {
-            console.log(
-              "ℹ️ Nenhum desconto aplicado, não enviando notificação",
-            );
           }
 
           showSuccessNotification("Pagamento distribuído com sucesso!");

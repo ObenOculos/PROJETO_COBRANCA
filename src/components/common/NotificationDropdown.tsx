@@ -225,15 +225,17 @@ const NotificationDropdown: React.FC = () => {
       notification: Notification;
       isMobile?: boolean;
     }) => (
-      <div
-        key={notification.id}
-        className={`relative p-3 mb-2 rounded-2xl border-l-4 transition-all duration-200 hover:bg-gray-50 hover:shadow-sm ${
-          notification.read
-            ? "bg-gray-50 border-l-gray-200"
-            : getPriorityColor(notification.priority)
-        } ${!notification.read ? "border-l-4" : "border-l-gray-200"}`}
-        role="listitem"
-        aria-labelledby={`notification-title-${notification.id}`}
+          <div
+            key={notification.id}
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('notificationClick', { detail: notification }));
+              handleCloseDropdown();
+            }}
+            className={`relative p-3 mb-2 rounded-2xl border-l-4 transition-all duration-200 hover:bg-gray-50 hover:shadow-sm ${
+              notification.read
+                ? "bg-gray-50 border-l-gray-200"
+                : getPriorityColor(notification.priority)
+            } ${!notification.read ? "border-l-4" : "border-l-gray-200"}`}        aria-labelledby={`notification-title-${notification.id}`}
         aria-describedby={`notification-message-${notification.id}`}
       >
         <div className="flex items-start justify-between">

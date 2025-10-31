@@ -31,6 +31,9 @@ import { formatCurrency } from "../../utils/formatters";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 import { navigationItems } from "../../config/navigation";
 
+import { CollectionTableRef } from "./CollectionTable";
+import { Notification } from "../../contexts/NotificationContext";
+
 // Export tabs for use in Header
 
 interface ManagerDashboardProps {
@@ -101,6 +104,33 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const [pendingAuthorizations, setPendingAuthorizations] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const autoPlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const collectionTableRef = useRef<CollectionTableRef>(null);
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (notification.relatedId && notification.relatedId.startsWith("sale-")) {
+      const parts = notification.relatedId.split("-");
+      const saleNumber = parseInt(parts[1], 10);
+      const clientDocument = parts[3];
+      if (saleNumber && clientDocument && collectionTableRef.current) {
+        setActiveTab("collections");
+        setTimeout(() => {
+          collectionTableRef.current?.openSaleDetails(saleNumber, clientDocument);
+        }, 100);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const listener = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      handleNotificationClick(customEvent.detail);
+    };
+    window.addEventListener('notificationClick', listener);
+    return () => {
+      window.removeEventListener('notificationClick', listener);
+    };
+  }, []);
 
   // Salva a aba ativa no localStorage sempre que mudar
   useEffect(() => {
@@ -1332,6 +1362,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   />
                 </div>
                 <CollectionTable
+                  ref={collectionTableRef}
                   collections={filteredCollections}
                   userType="manager"
                   showGrouped={false}
