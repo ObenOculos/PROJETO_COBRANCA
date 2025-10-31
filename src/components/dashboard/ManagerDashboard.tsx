@@ -15,7 +15,7 @@ import {
   Filter,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
-import CollectionTable from "./CollectionTable";
+import { CollectionTable } from "./CollectionTable";
 import EnhancedPerformanceChart from "./EnhancedPerformanceChart";
 import UserManagement from "./UserManagement";
 import EnhancedStoreManagement from "./EnhancedStoreManagement";

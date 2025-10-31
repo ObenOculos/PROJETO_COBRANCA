@@ -22,7 +22,7 @@ import {
   Clock,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
-import CollectionTable from "./CollectionTable";
+import { CollectionTable } from "./CollectionTable";
 import RouteMap from "./RouteMap";
 import VisitScheduler from "./VisitScheduler";
 import RadialApprovalChart from "./RadialApprovalChart";

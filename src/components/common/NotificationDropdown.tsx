@@ -16,11 +16,15 @@ import {
   Settings,
 } from "lucide-react";
 import { useNotifications } from "../../contexts/NotificationContext";
+import { useCollection } from "../../contexts/CollectionContext";
 import type { Notification } from "../../contexts/NotificationContext";
+import SaleDetailsModal from "../dashboard/SaleDetailsModal";
 
 const NotificationDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [selectedSaleCollections, setSelectedSaleCollections] = useState<any[]>([]);
+  const [showSaleModal, setShowSaleModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const {
@@ -31,6 +35,46 @@ const NotificationDropdown: React.FC = () => {
     clearNotification,
     clearAllNotifications,
   } = useNotifications();
+  
+  const { collections } = useCollection();
+
+  // Function to extract sale info from notification
+  const extractSaleInfoFromNotification = useCallback((notification: Notification) => {
+    // Check if it's a sale-related notification
+    if (notification.relatedId && notification.relatedId.includes('sale-')) {
+      const match = notification.relatedId.match(/sale-(\d+)-client-(.+)/);
+      if (match) {
+        const [, saleNumber, clientDocument] = match;
+        return { saleNumber: parseInt(saleNumber), clientDocument };
+      }
+    }
+    return null;
+  }, []);
+
+  // Function to handle notification click
+  const handleNotificationClick = useCallback((notification: Notification) => {
+    const saleInfo = extractSaleInfoFromNotification(notification);
+    
+    if (saleInfo && collections) {
+      // Find collections for this sale
+      const saleCollections = collections.filter(c => 
+        String(c.venda_n ?? 0) === String(saleInfo.saleNumber) && 
+        c.documento === saleInfo.clientDocument
+      );
+      
+      if (saleCollections.length > 0) {
+        setSelectedSaleCollections(saleCollections);
+        setShowSaleModal(true);
+        markAsRead(notification.id);
+        handleCloseDropdown();
+        return;
+      }
+    }
+    
+    // Default behavior for other notifications
+    window.dispatchEvent(new CustomEvent('notificationClick', { detail: notification }));
+    handleCloseDropdown();
+  }, [collections, markAsRead, extractSaleInfoFromNotification]);
 
   // Memoized functions to prevent unnecessary re-renders
   const handleToggleDropdown = useCallback(() => {
@@ -225,17 +269,15 @@ const NotificationDropdown: React.FC = () => {
       notification: Notification;
       isMobile?: boolean;
     }) => (
-          <div
-            key={notification.id}
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent('notificationClick', { detail: notification }));
-              handleCloseDropdown();
-            }}
-            className={`relative p-3 mb-2 rounded-2xl border-l-4 transition-all duration-200 hover:bg-gray-50 hover:shadow-sm ${
-              notification.read
-                ? "bg-gray-50 border-l-gray-200"
-                : getPriorityColor(notification.priority)
-            } ${!notification.read ? "border-l-4" : "border-l-gray-200"}`}        aria-labelledby={`notification-title-${notification.id}`}
+      <div
+        key={notification.id}
+        onClick={() => handleNotificationClick(notification)}
+        className={`relative p-3 mb-2 rounded-2xl border-l-4 transition-all duration-200 hover:bg-gray-50 hover:shadow-sm cursor-pointer ${
+          notification.read
+            ? "bg-gray-50 border-l-gray-200"
+            : getPriorityColor(notification.priority)
+        } ${!notification.read ? "border-l-4" : "border-l-gray-200"}`}
+        aria-labelledby={`notification-title-${notification.id}`}
         aria-describedby={`notification-message-${notification.id}`}
       >
         <div className="flex items-start justify-between">
@@ -300,6 +342,7 @@ const NotificationDropdown: React.FC = () => {
       formatTimestamp,
       handleMarkAsRead,
       handleClearNotification,
+      handleNotificationClick,
     ],
   );
 
@@ -386,88 +429,101 @@ const NotificationDropdown: React.FC = () => {
   }, [notifications.length, handleClearAllNotifications]);
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      {/* Notification Bell Button */}
-      <button
-        ref={buttonRef}
-        onClick={handleToggleDropdown}
-        className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        aria-label={`Notificações${unreadCount > 0 ? ` (${unreadCount} não lidas)` : ""}`}
-        aria-expanded={isOpen}
-        aria-haspopup="dialog"
-        disabled={isAnimating}
-      >
-        <Bell className="h-5 w-5" />
-        {unreadCount > 0 && (
-          <span
-            className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs font-medium rounded-full flex items-center justify-center animate-pulse"
-            aria-hidden="true"
-          >
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
-        )}
-      </button>
-
-      {/* Mobile Modal */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-50 sm:hidden"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="notifications-title"
+    <>
+      <div className="relative" ref={dropdownRef}>
+        {/* Notification Bell Button */}
+        <button
+          ref={buttonRef}
+          onClick={handleToggleDropdown}
+          className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label={`Notificações${unreadCount > 0 ? ` (${unreadCount} não lidas)` : ""}`}
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
+          disabled={isAnimating}
         >
-          {/* Overlay with animation */}
-          <div
-            className={`fixed inset-0 bg-black transition-opacity duration-200 ${
-              isAnimating ? "opacity-0" : "opacity-50"
-            }`}
-            onClick={handleCloseDropdown}
-            aria-hidden="true"
-          />
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span
+              className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs font-medium rounded-full flex items-center justify-center animate-pulse"
+              aria-hidden="true"
+            >
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
 
-          {/* Modal Content with animation */}
+        {/* Mobile Modal */}
+        {isOpen && (
           <div
-            className={`fixed inset-x-2 top-12 bottom-12 bg-white rounded-2xl shadow-xl flex flex-col max-h-[calc(100vh-6rem)] transform transition-all duration-200 ${
+            className="fixed inset-0 z-50 sm:hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notifications-title"
+          >
+            {/* Overlay with animation */}
+            <div
+              className={`fixed inset-0 bg-black transition-opacity duration-200 ${
+                isAnimating ? "opacity-0" : "opacity-50"
+              }`}
+              onClick={handleCloseDropdown}
+              aria-hidden="true"
+            />
+
+            {/* Modal Content with animation */}
+            <div
+              className={`fixed inset-x-2 top-12 bottom-12 bg-white rounded-2xl shadow-xl flex flex-col max-h-[calc(100vh-6rem)] transform transition-all duration-200 ${
+                isAnimating ? "scale-95 opacity-0" : "scale-100 opacity-100"
+              }`}
+            >
+              {/* Header */}
+              <NotificationHeader />
+
+              {/* Notifications List */}
+              <div className="flex-1 overflow-y-auto">
+                <NotificationList isMobile={true} />
+              </div>
+
+              {/* Footer */}
+              <NotificationFooter />
+            </div>
+          </div>
+        )}
+
+        {/* Desktop Dropdown */}
+        {isOpen && (
+          <div
+            className={`hidden sm:block absolute right-0 mt-2 w-96 bg-white rounded-2xl shadow-lg border border-gray-200 z-50 max-h-96 flex-col transform transition-all duration-200 ${
               isAnimating ? "scale-95 opacity-0" : "scale-100 opacity-100"
             }`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notifications-title"
           >
             {/* Header */}
             <NotificationHeader />
 
             {/* Notifications List */}
             <div className="flex-1 overflow-y-auto">
-              <NotificationList isMobile={true} />
+              <NotificationList />
             </div>
 
             {/* Footer */}
             <NotificationFooter />
           </div>
-        </div>
+        )}
+      </div>
+
+      {/* Sale Details Modal */}
+      {showSaleModal && selectedSaleCollections.length > 0 && (
+        <SaleDetailsModal
+          collections={selectedSaleCollections}
+          onClose={() => {
+            setShowSaleModal(false);
+            setSelectedSaleCollections([]);
+          }}
+        />
       )}
-
-      {/* Desktop Dropdown */}
-      {isOpen && (
-        <div
-          className={`hidden sm:block absolute right-0 mt-2 w-96 bg-white rounded-2xl shadow-lg border border-gray-200 z-50 max-h-96 flex-col transform transition-all duration-200 ${
-            isAnimating ? "scale-95 opacity-0" : "scale-100 opacity-100"
-          }`}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="notifications-title"
-        >
-          {/* Header */}
-          <NotificationHeader />
-
-          {/* Notifications List */}
-          <div className="flex-1 overflow-y-auto">
-            <NotificationList />
-          </div>
-
-          {/* Footer */}
-          <NotificationFooter />
-        </div>
-      )}
-    </div>
+    </>
   );
 };
 

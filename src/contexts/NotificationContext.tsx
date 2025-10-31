@@ -286,27 +286,28 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
                         return paymentDate >= yesterday;
                       });
               
-                              recentDiscountedPayments.forEach((p) => {
-                                const saleNumber = p.saleNumber;
-                                const clientDoc = p.clientDocument;
-                                const discountAmount = p.discountAmount;
-                      
-                                if (saleNumber !== null && saleNumber !== undefined && clientDoc && discountAmount) {
-                                  const title = saleNumber === 0 ? "Desconto na Venda Renegociada" : `Desconto na Venda #${saleNumber}`;
-                                  const message = `Um desconto de ${formatCurrency(
-                                    discountAmount,
-                                  )} foi aplicado na venda ${saleNumber === 0 ? 'Renegociada' : `#${saleNumber}`}.`;
-                      
-                                  newNotifications.push({
-                                    type: "payment",
-                                    title: title,
-                                    message: message,
-                                    priority: "medium",
-                                    targetUserType: "manager",
-                                    relatedId: `sale-${saleNumber}-client-${clientDoc}`,
-                                  });
-                                }
-                              });                    }        
+                      recentDiscountedPayments.forEach((p) => {
+                        const saleNumber = p.saleNumber;
+                        const clientDoc = p.clientDocument;
+                        const discountAmount = p.discountAmount;
+              
+                        if (saleNumber !== null && saleNumber !== undefined && clientDoc && discountAmount) {
+                          const title = saleNumber === 0 ? "Desconto na Venda Renegociada" : `Desconto na Venda #${saleNumber}`;
+                          const message = `Um desconto de ${formatCurrency(
+                            discountAmount,
+                          )} foi aplicado na venda ${saleNumber === 0 ? 'Renegociada' : `#${saleNumber}`}. Clique para ver detalhes.`;
+              
+                          newNotifications.push({
+                            type: "payment",
+                            title: title,
+                            message: message,
+                            priority: "medium",
+                            targetUserType: "manager",
+                            relatedId: `sale-${saleNumber}-client-${clientDoc}`,
+                          });
+                        }
+                      });
+                    }        
               return newNotifications;
             };
 

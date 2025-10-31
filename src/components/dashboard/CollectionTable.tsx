@@ -47,9 +47,8 @@ export interface CollectionTableRef {
   openSaleDetails: (saleNumber: number, clientDocument: string) => void;
 }
 
-const CollectionTable = React.memo(
-  React.forwardRef<CollectionTableRef, CollectionTableProps>((
-  {
+export const CollectionTable = React.forwardRef<CollectionTableRef, CollectionTableProps>((
+{
     collections,
     userType,
     showGrouped = true,
@@ -1528,7 +1527,5 @@ const CollectionTable = React.memo(
         )}
       </>
     );
-  })
+  }
 );
-
-export default CollectionTable;
