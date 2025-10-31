@@ -19,7 +19,7 @@ import { CollectionTable } from "./CollectionTable";
 import EnhancedPerformanceChart from "./EnhancedPerformanceChart";
 import UserManagement from "./UserManagement";
 import EnhancedStoreManagement from "./EnhancedStoreManagement";
-import DatabaseUpload from "./DatabaseUpload";
+import DatabaseUpload from "../admin/DatabaseUpload";
 import { ClientAssignment } from "../ClientAssignment";
 import VisitTracking from "./VisitTracking";
 import DailyCashReport from "./DailyCashReport";
