@@ -275,8 +275,26 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     // Only update if notifications changed
     if (generatedNotifications.length > 0) {
       setNotifications((prev) => {
-        // Remove old auto-generated notifications (keep only manual 'system' ones)
-        const manualNotifications = prev.filter((n) => n.type === "system");
+        // Remove old auto-generated notifications (keep manual notifications)
+        // Manual notifications are those with specific relatedId patterns or type "system"
+        const manualNotifications = prev.filter(
+          (n) =>
+            n.type === "system" ||
+            (n.relatedId &&
+              (n.relatedId.startsWith("discount-") ||
+                n.relatedId.startsWith("manual-"))),
+        );
+
+        console.log("🔄 Regenerando notificações automáticas:");
+        console.log(
+          "   Notificações manuais preservadas:",
+          manualNotifications.length,
+        );
+        console.log(
+          "   Novas notificações automáticas:",
+          generatedNotifications.length,
+        );
+
         const newOnes = generatedNotifications
           .filter((n) => !dismissedNotifications.has(`${n.type}-${n.title}`))
           .map((n, index) => ({
@@ -336,7 +354,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       timestamp: new Date(),
       read: false,
     };
-    setNotifications((prev) => [newNotification, ...prev]);
+
+    console.log("📝 Adicionando notificação manual:", newNotification);
+
+    setNotifications((prev) => {
+      const updated = [newNotification, ...prev];
+      console.log("📋 Total de notificações após adicionar:", updated.length);
+      return updated;
+    });
   };
 
   // Memoize sorted notifications to avoid sorting on every render

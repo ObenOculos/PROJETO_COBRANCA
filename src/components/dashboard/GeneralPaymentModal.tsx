@@ -14,6 +14,7 @@ import { ClientGroup, SaleGroup, ScheduledVisit } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useOffline } from "../../hooks/useOffline";
+import { useNotifications } from "../../contexts/NotificationContext";
 import { formatCurrency } from "../../utils/formatters";
 
 interface GeneralPaymentModalProps {
@@ -37,6 +38,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const { scheduleVisit, processSalePayment } = useCollection();
     const { user } = useAuth();
     const { isOnline } = useOffline();
+    const { addNotification } = useNotifications();
     const [loading, setLoading] = useState(false);
     const [distributionAmount, setDistributionAmount] = useState<string>("");
     const [distributionMode] = useState<"auto" | "manual">("auto");
@@ -172,6 +174,50 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       );
     };
 
+    // Função para notificar manager sobre pagamentos com desconto
+    const notifyManagerAboutDiscount = (discountAmount: number) => {
+      console.log("🔔 notifyManagerAboutDiscount chamada:", {
+        user: user?.name,
+        userType: user?.type,
+        discountAmount,
+        clientName: clientGroup.client,
+      });
+
+      if (!user || user.type !== "collector" || discountAmount <= 0) {
+        console.log("❌ Notificação não enviada - condições não atendidas:", {
+          hasUser: !!user,
+          userType: user?.type,
+          discountAmount,
+        });
+        return;
+      }
+
+      const paymentAmount = parseFloat(distributionAmount) || 0;
+      const originalPendingAmount = totalPending;
+      const discountPercentage = (
+        (discountAmount / originalPendingAmount) *
+        100
+      ).toFixed(1);
+
+      const notificationData = {
+        type: "payment" as const,
+        title: "Pagamento com Desconto Aplicado",
+        message: `${user.name || "Cobrador"} aplicou desconto de ${formatCurrency(discountAmount)} (${discountPercentage}%) no cliente ${clientGroup.client}. Valor pago: ${formatCurrency(paymentAmount)} | Valor original: ${formatCurrency(originalPendingAmount)}`,
+        priority:
+          discountAmount > 1000 ? ("high" as const) : ("medium" as const),
+        relatedId: `discount-${clientGroup.document}-${Date.now()}`,
+      };
+
+      console.log("📤 Enviando notificação:", notificationData);
+
+      try {
+        addNotification(notificationData);
+        console.log("✅ Notificação enviada com sucesso!");
+      } catch (error) {
+        console.error("❌ Erro ao enviar notificação:", error);
+      }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
 
@@ -229,6 +275,33 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 user.id,
               );
             }
+          }
+
+          // Verificar se houve desconto aplicado e notificar manager
+          const totalDiscountApplied = saleDistribution.reduce(
+            (sum, item) => sum + item.appliedDiscount,
+            0,
+          );
+
+          console.log("💰 Verificando desconto aplicado:", {
+            totalDiscountApplied,
+            saleDistribution: saleDistribution.map((item) => ({
+              saleNumber: item.sale.saleNumber,
+              appliedDiscount: item.appliedDiscount,
+              appliedAmount: item.appliedAmount,
+            })),
+          });
+
+          if (totalDiscountApplied > 0) {
+            console.log(
+              "🎯 Chamando notifyManagerAboutDiscount com desconto:",
+              totalDiscountApplied,
+            );
+            notifyManagerAboutDiscount(totalDiscountApplied);
+          } else {
+            console.log(
+              "ℹ️ Nenhum desconto aplicado, não enviando notificação",
+            );
           }
 
           showSuccessNotification("Pagamento distribuído com sucesso!");
@@ -322,6 +395,16 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               user.id,
             );
           }
+        }
+
+        // Verificar se houve desconto aplicado e notificar manager
+        const totalDiscountApplied = saleDistribution.reduce(
+          (sum, item) => sum + item.appliedDiscount,
+          0,
+        );
+
+        if (totalDiscountApplied > 0) {
+          notifyManagerAboutDiscount(totalDiscountApplied);
         }
 
         // Depois, agendar a nova visita
