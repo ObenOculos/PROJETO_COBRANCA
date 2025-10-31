@@ -47,15 +47,21 @@ export interface CollectionTableRef {
   openSaleDetails: (saleNumber: number, clientDocument: string) => void;
 }
 
-export const CollectionTable = React.forwardRef<CollectionTableRef, CollectionTableProps>((
-{
-    collections,
-    userType,
-    showGrouped = true,
-    collectorId,
-    showFilterBar,
-    onToggleFilterBar,
-  }, ref) => {
+export const CollectionTable = React.forwardRef<
+  CollectionTableRef,
+  CollectionTableProps
+>(
+  (
+    {
+      collections,
+      userType,
+      showGrouped = true,
+      collectorId,
+      showFilterBar,
+      onToggleFilterBar,
+    },
+    ref,
+  ) => {
     const { getClientGroups, loading, deleteSalesFromClient } = useCollection();
     const [selectedCollection, setSelectedCollection] =
       useState<Collection | null>(null);
@@ -74,20 +80,22 @@ export const CollectionTable = React.forwardRef<CollectionTableRef, CollectionTa
 
     useImperativeHandle(ref, () => ({
       openSaleDetails: (saleNumber: number, clientDocument: string) => {
-        const clientGroup = clientGroups.find(cg => cg.document === clientDocument);
+        const clientGroup = clientGroups.find(
+          (cg) => cg.document === clientDocument,
+        );
         if (clientGroup) {
-          const sale = clientGroup.sales.find(s => s.saleNumber === saleNumber);
+          const sale = clientGroup.sales.find(
+            (s) => s.saleNumber === saleNumber,
+          );
           if (sale) {
             const saleCollections = sale.installments
               .map((inst: Collection) =>
                 collections.find(
-                  (c: Collection) =>
-                    c.id_parcela === inst.id_parcela,
+                  (c: Collection) => c.id_parcela === inst.id_parcela,
                 ),
               )
               .filter(
-                (c: Collection | undefined) =>
-                  c !== undefined,
+                (c: Collection | undefined) => c !== undefined,
               ) as Collection[];
 
             if (saleCollections.length > 0) {
@@ -96,7 +104,7 @@ export const CollectionTable = React.forwardRef<CollectionTableRef, CollectionTa
             }
           }
         }
-      }
+      },
     }));
 
     const handleConfirmDeleteSales = async (selectedSaleNumbers: number[]) => {
@@ -1527,5 +1535,5 @@ export const CollectionTable = React.forwardRef<CollectionTableRef, CollectionTa
         )}
       </>
     );
-  }
+  },
 );

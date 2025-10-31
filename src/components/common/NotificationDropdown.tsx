@@ -23,7 +23,9 @@ import SaleDetailsModal from "../dashboard/SaleDetailsModal";
 const NotificationDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [selectedSaleCollections, setSelectedSaleCollections] = useState<any[]>([]);
+  const [selectedSaleCollections, setSelectedSaleCollections] = useState<any[]>(
+    [],
+  );
   const [showSaleModal, setShowSaleModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -35,46 +37,55 @@ const NotificationDropdown: React.FC = () => {
     clearNotification,
     clearAllNotifications,
   } = useNotifications();
-  
+
   const { collections } = useCollection();
 
   // Function to extract sale info from notification
-  const extractSaleInfoFromNotification = useCallback((notification: Notification) => {
-    // Check if it's a sale-related notification
-    if (notification.relatedId && notification.relatedId.includes('sale-')) {
-      const match = notification.relatedId.match(/sale-(\d+)-client-(.+)/);
-      if (match) {
-        const [, saleNumber, clientDocument] = match;
-        return { saleNumber: parseInt(saleNumber), clientDocument };
+  const extractSaleInfoFromNotification = useCallback(
+    (notification: Notification) => {
+      // Check if it's a sale-related notification
+      if (notification.relatedId && notification.relatedId.includes("sale-")) {
+        const match = notification.relatedId.match(/sale-(\d+)-client-(.+)/);
+        if (match) {
+          const [, saleNumber, clientDocument] = match;
+          return { saleNumber: parseInt(saleNumber), clientDocument };
+        }
       }
-    }
-    return null;
-  }, []);
+      return null;
+    },
+    [],
+  );
 
   // Function to handle notification click
-  const handleNotificationClick = useCallback((notification: Notification) => {
-    const saleInfo = extractSaleInfoFromNotification(notification);
-    
-    if (saleInfo && collections) {
-      // Find collections for this sale
-      const saleCollections = collections.filter(c => 
-        String(c.venda_n ?? 0) === String(saleInfo.saleNumber) && 
-        c.documento === saleInfo.clientDocument
-      );
-      
-      if (saleCollections.length > 0) {
-        setSelectedSaleCollections(saleCollections);
-        setShowSaleModal(true);
-        markAsRead(notification.id);
-        handleCloseDropdown();
-        return;
+  const handleNotificationClick = useCallback(
+    (notification: Notification) => {
+      const saleInfo = extractSaleInfoFromNotification(notification);
+
+      if (saleInfo && collections) {
+        // Find collections for this sale
+        const saleCollections = collections.filter(
+          (c) =>
+            String(c.venda_n ?? 0) === String(saleInfo.saleNumber) &&
+            c.documento === saleInfo.clientDocument,
+        );
+
+        if (saleCollections.length > 0) {
+          setSelectedSaleCollections(saleCollections);
+          setShowSaleModal(true);
+          markAsRead(notification.id);
+          handleCloseDropdown();
+          return;
+        }
       }
-    }
-    
-    // Default behavior for other notifications
-    window.dispatchEvent(new CustomEvent('notificationClick', { detail: notification }));
-    handleCloseDropdown();
-  }, [collections, markAsRead, extractSaleInfoFromNotification]);
+
+      // Default behavior for other notifications
+      window.dispatchEvent(
+        new CustomEvent("notificationClick", { detail: notification }),
+      );
+      handleCloseDropdown();
+    },
+    [collections, markAsRead, extractSaleInfoFromNotification],
+  );
 
   // Memoized functions to prevent unnecessary re-renders
   const handleToggleDropdown = useCallback(() => {

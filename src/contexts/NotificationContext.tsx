@@ -262,54 +262,60 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       });
 
       if (highValuePending.length > 0) {
-                newNotifications.push({
-                  type: "payment",
-                  title: "Valores Altos Pendentes",
-                  message: `${highValuePending.length} cobrança${
-                    highValuePending.length > 1 ? "s de alto valor" : " de alto valor"
-                  } pendente${
-                    highValuePending.length > 1 ? "s" : ""
-                  }`,
-                  priority: "high",
-                });
-              }
-        
-                    // 6. Manager-specific: Recent payments with discounts
-                    if (user.type === "manager") {
-                      const recentDiscountedPayments = salePayments.filter((p) => {
-                        if (!p.createdAt || !p.discountAmount || p.discountAmount <= 0) {
-                          return false;
-                        }
-                        const paymentDate = new Date(p.createdAt);
-                        const yesterday = new Date(now);
-                        yesterday.setDate(yesterday.getDate() - 1);
-                        return paymentDate >= yesterday;
-                      });
-              
-                      recentDiscountedPayments.forEach((p) => {
-                        const saleNumber = p.saleNumber;
-                        const clientDoc = p.clientDocument;
-                        const discountAmount = p.discountAmount;
-              
-                        if (saleNumber !== null && saleNumber !== undefined && clientDoc && discountAmount) {
-                          const title = saleNumber === 0 ? "Desconto na Venda Renegociada" : `Desconto na Venda #${saleNumber}`;
-                          const message = `Um desconto de ${formatCurrency(
-                            discountAmount,
-                          )} foi aplicado na venda ${saleNumber === 0 ? 'Renegociada' : `#${saleNumber}`}. Clique para ver detalhes.`;
-              
-                          newNotifications.push({
-                            type: "payment",
-                            title: title,
-                            message: message,
-                            priority: "medium",
-                            targetUserType: "manager",
-                            relatedId: `sale-${saleNumber}-client-${clientDoc}`,
-                          });
-                        }
-                      });
-                    }        
-              return newNotifications;
-            };
+        newNotifications.push({
+          type: "payment",
+          title: "Valores Altos Pendentes",
+          message: `${highValuePending.length} cobrança${
+            highValuePending.length > 1 ? "s de alto valor" : " de alto valor"
+          } pendente${highValuePending.length > 1 ? "s" : ""}`,
+          priority: "high",
+        });
+      }
+
+      // 6. Manager-specific: Recent payments with discounts
+      if (user.type === "manager") {
+        const recentDiscountedPayments = salePayments.filter((p) => {
+          if (!p.createdAt || !p.discountAmount || p.discountAmount <= 0) {
+            return false;
+          }
+          const paymentDate = new Date(p.createdAt);
+          const yesterday = new Date(now);
+          yesterday.setDate(yesterday.getDate() - 1);
+          return paymentDate >= yesterday;
+        });
+
+        recentDiscountedPayments.forEach((p) => {
+          const saleNumber = p.saleNumber;
+          const clientDoc = p.clientDocument;
+          const discountAmount = p.discountAmount;
+
+          if (
+            saleNumber !== null &&
+            saleNumber !== undefined &&
+            clientDoc &&
+            discountAmount
+          ) {
+            const title =
+              saleNumber === 0
+                ? "Desconto na Venda Renegociada"
+                : `Desconto na Venda #${saleNumber}`;
+            const message = `Um desconto de ${formatCurrency(
+              discountAmount,
+            )} foi aplicado na venda ${saleNumber === 0 ? "Renegociada" : `#${saleNumber}`}. Clique para ver detalhes.`;
+
+            newNotifications.push({
+              type: "payment",
+              title: title,
+              message: message,
+              priority: "medium",
+              targetUserType: "manager",
+              relatedId: `sale-${saleNumber}-client-${clientDoc}`,
+            });
+          }
+        });
+      }
+      return newNotifications;
+    };
 
     const generatedNotifications = generateNotifications();
 
@@ -395,17 +401,20 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   // Memoize sorted and filtered notifications to avoid sorting on every render
   const sortedNotifications = useMemo(() => {
     if (!user) return [];
-    
+
     const filtered = notifications.filter((notification) => {
       // Se não tem targetUserType, mostra para todos (comportamento antigo)
-      if (!notification.targetUserType || notification.targetUserType === "all") {
+      if (
+        !notification.targetUserType ||
+        notification.targetUserType === "all"
+      ) {
         return true;
       }
-      
+
       // Filtra por tipo de usuário específico
       return notification.targetUserType === user.type;
     });
-    
+
     return filtered.sort(
       (a, b) => b.timestamp.getTime() - a.timestamp.getTime(),
     );

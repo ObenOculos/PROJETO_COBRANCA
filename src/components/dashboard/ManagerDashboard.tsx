@@ -115,7 +115,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       if (saleNumber && clientDocument && collectionTableRef.current) {
         setActiveTab("collections");
         setTimeout(() => {
-          collectionTableRef.current?.openSaleDetails(saleNumber, clientDocument);
+          collectionTableRef.current?.openSaleDetails(
+            saleNumber,
+            clientDocument,
+          );
         }, 100);
       }
     }
@@ -126,9 +129,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       const customEvent = e as CustomEvent;
       handleNotificationClick(customEvent.detail);
     };
-    window.addEventListener('notificationClick', listener);
+    window.addEventListener("notificationClick", listener);
     return () => {
-      window.removeEventListener('notificationClick', listener);
+      window.removeEventListener("notificationClick", listener);
     };
   }, []);
 
