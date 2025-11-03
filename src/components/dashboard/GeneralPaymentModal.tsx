@@ -574,7 +574,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       onChange={(e) => setWithDiscount(e.target.checked)}
                       className="h-5 w-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                     />
-                    <span className="text-gray-700 font-medium">
+                    <span className="text-base text-gray-700 font-medium">
                       Pagamento com desconto (quitar saldo devedor)
                     </span>
                   </label>
@@ -589,7 +589,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base"
                 >
                   <option value="dinheiro">Dinheiro</option>
                   <option value="pix">PIX</option>
@@ -606,7 +606,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 <textarea
                   value={observations}
                   onChange={(e) => setObservations(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base"
                   rows={3}
                   placeholder="Adicione observações sobre este pagamento..."
                   required
@@ -664,7 +664,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             <div className="text-xs text-gray-600">
                               Valor Total
                             </div>
-                            <div className="font-semibold text-gray-900">
+                            <div className="font-semibold text-gray-900 text-base">
                               {formatCurrency(item.sale.totalValue || 0)}
                             </div>
                           </div>
@@ -676,7 +676,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             <div className="text-xs text-gray-600 mb-1">
                               Recebido Atualmente
                             </div>
-                            <div className="font-semibold text-gray-900">
+                            <div className="font-semibold text-gray-900 text-base">
                               {formatCurrency(item.currentReceived)}
                             </div>
                           </div>
@@ -705,7 +705,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                                 />
                               </div>
                             ) : (
-                              <div className="font-semibold text-green-600">
+                              <div className="font-semibold text-green-600 text-base">
                                 {formatCurrency(item.newAmount)}
                               </div>
                             )}
@@ -715,7 +715,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             <div className="text-xs text-gray-600 mb-1">
                               Valor Aplicado
                             </div>
-                            <div className="font-semibold text-purple-600">
+                            <div className="font-semibold text-purple-600 text-base">
                               +{formatCurrency(item.appliedAmount)}
                             </div>
                           </div>
@@ -762,7 +762,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       <span className="font-medium text-gray-700">
                         Valor Informado:
                       </span>
-                      <span className="font-bold text-gray-900">
+                      <span className="font-bold text-gray-900 text-base">
                         {formatCurrency(parseFloat(distributionAmount) || 0)}
                       </span>
                     </div>
@@ -770,7 +770,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       <span className="font-medium text-gray-700">
                         Total Distribuído:
                       </span>
-                      <span className="font-bold text-green-600">
+                      <span className="font-bold text-green-600 text-base">
                         {formatCurrency(totalDistributed)}
                       </span>
                     </div>
@@ -780,7 +780,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                           Diferença:
                         </span>
                         <span
-                          className={`font-bold ${remainingToDistribute > 0 ? "text-orange-600" : "text-red-600"}`}
+                          className={`font-bold ${remainingToDistribute > 0 ? "text-orange-600" : "text-red-600"} text-base`}
                         >
                           {formatCurrency(Math.abs(remainingToDistribute))}
                         </span>
@@ -796,7 +796,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   <button
                     type="button"
                     onClick={onClose}
-                    className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors font-medium"
+                    className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors font-medium text-base"
                   >
                     Cancelar
                   </button>
@@ -808,7 +808,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       saleDistribution.length === 0 ||
                       (amountToDistribute <= 0 && !withDiscount)
                     }
-                    className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg"
+                    className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg text-base"
                   >
                     {loading ? (
                       <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
@@ -850,7 +850,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         type="date"
                         value={rescheduleDate}
                         onChange={(e) => setRescheduleDate(e.target.value)}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
                         required
                       />
                     </div>
@@ -868,7 +868,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         type="time"
                         value={rescheduleTime}
                         onChange={(e) => setRescheduleTime(e.target.value)}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
                         required
                       />
                     </div>
@@ -880,7 +880,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 <button
                   onClick={handleConfirmReschedule}
                   disabled={loading || !rescheduleDate || !rescheduleTime}
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-base"
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   {loading ? "Agendando..." : "Confirmar Agendamento"}

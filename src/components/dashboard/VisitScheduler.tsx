@@ -83,7 +83,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     return `${hours}:${minutes}`;
   };
 
-  const [selectedDate] = useState<string>(getLocalDate());
+  const [selectedDate, setSelectedDate] = useState<string>(getLocalDate());
+
+
 
   const [selectedTime] = useState<string>(getDefaultTime());
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -104,6 +106,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(
     null,
   );
+
+  useEffect(() => {
+    if (selectedCalendarDate) {
+      setSelectedDate(selectedCalendarDate.toISOString().split('T')[0]);
+    }
+  }, [selectedCalendarDate]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentPage, setCurrentPage] = useState(1);
   const [visitsPerPage] = useState(10);
@@ -131,11 +139,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     city: [] as string[],
+    neighborhood: [] as string[],
     minValue: "",
     maxValue: "",
     visitStatus: "",
   });
   const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [showNeighborhoodDropdown, setShowNeighborhoodDropdown] = useState(false);
 
   // Estados para ordenação
   const [sortField, setSortField] = useState<
@@ -345,6 +355,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           client.document.toLowerCase().includes(searchLower) ||
           client.address.toLowerCase().includes(searchLower) ||
           client.city.toLowerCase().includes(searchLower) ||
+          client.neighborhood.toLowerCase().includes(searchLower) ||
           (client.apelido && client.apelido.toLowerCase().includes(searchLower))
         );
       });
@@ -354,6 +365,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     if (filters.city.length > 0) {
       filteredClients = filteredClients.filter((client) =>
         filters.city.includes(client.city),
+      );
+    }
+
+    // Filtro por bairro
+    if (filters.neighborhood.length > 0) {
+      filteredClients = filteredClients.filter((client) =>
+        filters.neighborhood.includes(client.neighborhood),
       );
     }
 
@@ -609,13 +627,23 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       const newCities = prev.city.includes(city)
         ? prev.city.filter((c) => c !== city)
         : [...prev.city, city];
-      return { ...prev, city: newCities };
+      return { ...prev, city: newCities, neighborhood: [] };
+    });
+  };
+
+  const handleNeighborhoodFilterChange = (neighborhood: string) => {
+    setFilters((prev) => {
+      const newNeighborhoods = prev.neighborhood.includes(neighborhood)
+        ? prev.neighborhood.filter((n) => n !== neighborhood)
+        : [...prev.neighborhood, neighborhood];
+      return { ...prev, neighborhood: newNeighborhoods };
     });
   };
 
   const clearAllFilters = () => {
     setFilters({
       city: [],
+      neighborhood: [],
       minValue: "",
       maxValue: "",
       visitStatus: "",
@@ -645,6 +673,24 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     ];
     return cities.sort();
   }, [user, getClientGroups]);
+
+  const availableNeighborhoods = React.useMemo(() => {
+    if (!effectiveCollectorId) return [];
+
+    const clientGroups = getClientGroups(effectiveCollectorId);
+    let clients = clientGroups.filter(
+      (client) => client.pendingValue > 0,
+    );
+
+    if (filters.city.length > 0) {
+      clients = clients.filter((client) => filters.city.includes(client.city));
+    }
+
+    const neighborhoods = [
+      ...new Set(clients.map((client) => client.neighborhood)),
+    ];
+    return neighborhoods.sort();
+  }, [user, getClientGroups, filters.city]);
 
   // Funções do calendário
   const getDaysInMonth = (date: Date) => {
@@ -1380,7 +1426,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       newSelection.add(clientDocument);
       // Inicializar com data e hora padrão
       newSchedules.set(clientDocument, {
-        date: selectedDate,
+        date: selectedCalendarDate
+          ? selectedCalendarDate.toISOString().split("T")[0]
+          : selectedDate,
         time: selectedTime,
       });
     }
@@ -3082,6 +3130,46 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                             className="mr-2"
                                           />
                                           {city}
+                                        </label>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                  <MapPin className="h-3 w-3 mr-1" />
+                                  Bairro
+                                </label>
+                                <div className="relative">
+                                  <button
+                                    onClick={() =>
+                                      setShowNeighborhoodDropdown(!showNeighborhoodDropdown)
+                                    }
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-left bg-white"
+                                  >
+                                    {filters.neighborhood.length === 0
+                                      ? "Todos os bairros"
+                                      : `${filters.neighborhood.length} bairros selecionados`}
+                                  </button>
+                                  {showNeighborhoodDropdown && (
+                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
+                                      {availableNeighborhoods.map((neighborhood) => (
+                                        <label
+                                          key={neighborhood}
+                                          className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={filters.neighborhood.includes(
+                                              neighborhood,
+                                            )}
+                                            onChange={() =>
+                                              handleNeighborhoodFilterChange(neighborhood)
+                                            }
+                                            className="mr-2"
+                                          />
+                                          {neighborhood}
                                         </label>
                                       ))}
                                     </div>
