@@ -714,22 +714,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                     : "Pendente"}
                               </span>
                             </div>
-
-                            {userType === "collector" &&
-                              saleBalance.remainingBalance > 0 && (
-                                <button
-                                  id={`receive-payment-mobile-${sale.saleNumber}`}
-                                  name={`receivePaymentMobile${sale.saleNumber}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                  }}
-                                  className="flex items-center justify-center w-full px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium shadow-sm"
-                                  title="Receber pagamento da venda"
-                                >
-                                  <CreditCard className="h-5 w-5 mr-2" />
-                                  <span>Receber Pagamento</span>
-                                </button>
-                              )}
                           </div>
                         </div>
 
