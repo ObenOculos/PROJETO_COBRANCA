@@ -256,6 +256,59 @@ Verifique se a aparência visual permanece consistente após a migração.
 2. As mudanças se aplicam automaticamente
 3. Teste em todas as páginas
 
+## 📜 **Scrollbar Customizada**
+
+### Scrollbar Global
+
+O sistema possui uma scrollbar minimalista aplicada globalmente em todos os elementos com scroll.
+
+**Características:**
+- Largura: 8px
+- Cores suaves (cinza claro)
+- Efeito hover
+- Compatível com Firefox e WebKit browsers
+
+**Variáveis:**
+```css
+--scrollbar-width: 8px;
+--scrollbar-height: 8px;
+--scrollbar-track-bg: #f1f5f9;
+--scrollbar-thumb-bg: #cbd5e1;
+--scrollbar-thumb-hover-bg: #94a3b8;
+--scrollbar-border-radius: 4px;
+```
+
+**Classes Disponíveis:**
+```css
+.scrollbar-primary    /* Scrollbar com cor primária (azul) */
+.minimal-scrollbar    /* Scrollbar padrão (compatibilidade) */
+.custom-scrollbar     /* Scrollbar com cores antigas (legado) */
+```
+
+**Exemplo de Uso:**
+```tsx
+// Scrollbar global (aplicada automaticamente)
+<div className="overflow-y-auto max-h-96">
+  {/* Conteúdo com scroll automático */}
+</div>
+
+// Scrollbar com cor primária
+<div className="overflow-y-auto max-h-96 scrollbar-primary">
+  {/* Scroll com cor azul */}
+</div>
+```
+
+**Customização:**
+
+Para alterar as cores da scrollbar globalmente, modifique as variáveis em `variables.css`:
+
+```css
+:root {
+  --scrollbar-thumb-bg: #sua-cor-aqui;
+  --scrollbar-thumb-hover-bg: #sua-cor-hover;
+}
+```
+
 ## 🎨 Customização
 
 ### Variáveis CSS

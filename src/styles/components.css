@@ -1,19 +1,44 @@
-/* Minimalist Scrollbar */
+/* ===========================================
+   SCROLLBAR - Estilos Customizados
+   =========================================== */
+
+/* Classe de compatibilidade (agora usa as variáveis globais) */
 .minimal-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: var(--scrollbar-width);
+  height: var(--scrollbar-height);
 }
 
 .minimal-scrollbar::-webkit-scrollbar-track {
+  background: var(--scrollbar-track-bg);
+  border-radius: var(--scrollbar-border-radius);
+}
+
+.minimal-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb-bg);
+  border-radius: var(--scrollbar-border-radius);
+  border: 2px solid var(--scrollbar-track-bg);
+}
+
+.minimal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover-bg);
+}
+
+/* Scrollbar customizada (legado - usa cores antigas) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+  height: var(--scrollbar-height);
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
   background: #f1f1f1;
   border-radius: 10px;
 }
 
-.minimal-scrollbar::-webkit-scrollbar-thumb {
+.custom-scrollbar::-webkit-scrollbar-thumb {
   background: #c0c0c0;
   border-radius: 10px;
 }
 
-.minimal-scrollbar::-webkit-scrollbar-thumb:hover {
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #a0a0a0;
 }

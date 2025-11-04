@@ -17,6 +17,7 @@ const AllowedVisitDatesManager: React.FC = () => {
   const [showDayDropdown, setShowDayDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dayDropdownRef = useRef<HTMLDivElement>(null);
+  const calendarModalRef = useRef<HTMLDivElement>(null);
   const [expandedCities, setExpandedCities] = useState<Set<string>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [cityToDelete, setCityToDelete] = useState<string | null>(null);
@@ -27,7 +28,7 @@ const AllowedVisitDatesManager: React.FC = () => {
   const [calendarFilterCollector, setCalendarFilterCollector] = useState<string>('all');
   const [filterCollector, setFilterCollector] = useState<string>('all');
 
-  // Fechar dropdown ao clicar fora
+  // Fechar dropdown e modal ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -36,16 +37,35 @@ const AllowedVisitDatesManager: React.FC = () => {
       if (dayDropdownRef.current && !dayDropdownRef.current.contains(event.target as Node)) {
         setShowDayDropdown(false);
       }
+      if (showCalendarModal && calendarModalRef.current && !calendarModalRef.current.contains(event.target as Node)) {
+        setShowCalendarModal(false);
+        setCalendarFilterCity('all');
+        setCalendarFilterNeighborhood('all');
+        setCalendarFilterCollector('all');
+      }
     };
 
-    if (showNeighborhoodDropdown || showDayDropdown) {
+    if (showNeighborhoodDropdown || showDayDropdown || showCalendarModal) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showNeighborhoodDropdown, showDayDropdown]);
+  }, [showNeighborhoodDropdown, showDayDropdown, showCalendarModal]);
+
+  // Gerenciar scroll da página quando modal abre/fecha
+  useEffect(() => {
+    if (showCalendarModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showCalendarModal]);
 
   // Resetar bairros quando mudar a cidade
   useEffect(() => {
@@ -781,7 +801,7 @@ const AllowedVisitDatesManager: React.FC = () => {
       {/* Modal do Calendário */}
       {showCalendarModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-full md:max-w-4xl lg:max-w-6xl w-full max-h-[95vh] overflow-y-auto">
+          <div ref={calendarModalRef} className="bg-white rounded-2xl shadow-xl max-w-full md:max-w-4xl lg:max-w-6xl w-full max-h-[95vh] overflow-y-auto">
             {/* Header */}
             <div className="p-4 md:p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl z-10">
               <div>

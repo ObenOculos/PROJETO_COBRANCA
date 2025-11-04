@@ -1690,8 +1690,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         <div className="p-0 lg:p-0">
           <div className="space-y-6">
             {/* Calendário de Visitas */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-              <div className="relative -mt-4 -mx-4 mb-8 p-2 bg-gray-50 rounded-t-2xl border-b">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 sm:p-4">
+              <div className="relative -mt-4 -mx-4 mb-8 p-2 sm:p-4 bg-gray-50 rounded-t-2xl border-b">
                 {onClose && (
                   <div className="flex justify-end">
                     <button
@@ -1739,7 +1739,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
               </div>
 
               {/* Grade do Calendário */}
-              <div className="grid grid-cols-7 gap-3">
+              <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-3">
                 {/* Cabeçalho dos dias da semana */}
                 {weekDays.map((day) => (
                   <div
@@ -1761,7 +1761,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   // Dias vazios no início
                   for (let i = 0; i < startingDayOfWeek; i++) {
                     days.push(
-                      <div key={`empty-${i}`} className="h-10 lg:h-12" />,
+                      <div key={`empty-${i}`} className="h-10 sm:h-12" />,
                     );
                   }
 
@@ -1832,7 +1832,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                         key={day}
                         onClick={() => selectDate(date)}
                         className={`
-                          h-10 lg:h-16 rounded-lg flex flex-col items-center justify-center
+                          h-10 sm:h-12 md:h-16 rounded-lg flex flex-col items-center justify-center
                           relative transition-all duration-200 transform hover:scale-105
                           ${
                             isSelected
@@ -1865,7 +1865,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
               </div>
 
               {/* Legenda */}
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 sm:gap-x-4 gap-y-1 sm:gap-y-2 text-xs text-gray-600">
                 <div className="flex items-center">
                   <div className="w-3 h-3 bg-green-500 rounded-full mr-1.5" />
                   <span>Concluídas</span>

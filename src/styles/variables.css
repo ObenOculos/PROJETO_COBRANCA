@@ -106,6 +106,52 @@
   --breakpoint-lg: 1024px;
   --breakpoint-xl: 1280px;
   --breakpoint-2xl: 1536px;
+
+  /* ===== SCROLLBAR ===== */
+  --scrollbar-width: 8px;
+  --scrollbar-height: 8px;
+  --scrollbar-track-bg: #f1f5f9;
+  --scrollbar-thumb-bg: #cbd5e1;
+  --scrollbar-thumb-hover-bg: #94a3b8;
+  --scrollbar-border-radius: 4px;
+}
+
+/* ===== SCROLLBAR GLOBAL MINIMALISTA ===== */
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb-bg) var(--scrollbar-track-bg);
+}
+
+/* WebKit browsers (Chrome, Safari, Edge) */
+*::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+  height: var(--scrollbar-height);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track-bg);
+  border-radius: var(--scrollbar-border-radius);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb-bg);
+  border-radius: var(--scrollbar-border-radius);
+  border: 2px solid var(--scrollbar-track-bg);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover-bg);
+}
+
+/* Scrollbar para elementos específicos com cores personalizadas */
+.scrollbar-primary::-webkit-scrollbar-thumb {
+  background: var(--color-primary-light);
+  border: 2px solid var(--scrollbar-track-bg);
+}
+
+.scrollbar-primary::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
 }
 
 /* ===== CLASSES UTILITÁRIAS COM VARIÁVEIS ===== */
