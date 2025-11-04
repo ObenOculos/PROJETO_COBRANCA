@@ -252,21 +252,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     }
   };
 
-  // Gerenciar scroll da página quando modal abre/fecha
-  useEffect(() => {
-    if (showScheduleModal) {
-      // Prevenir scroll da página de fundo
-      document.body.style.overflow = "hidden";
-    } else {
-      // Restaurar scroll da página
-      document.body.style.overflow = "unset";
-    }
 
-    // Cleanup: sempre restaurar o scroll quando componente desmonta
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [showScheduleModal]);
 
   // Listen for visits scheduled by a manager to refresh data
   useEffect(() => {
@@ -287,17 +273,59 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     };
   }, [collectorId, fetchScheduledVisits]);
 
-  // Gerenciar scroll da página quando modal de visitas atrasadas abre/fecha
+  // Gerenciar scroll da página quando qualquer modal estiver ativo
   useEffect(() => {
-    if (showOverdueNotificationModal) {
-      // Prevenir scroll da página de fundo
+    // Se o componente for renderizado com a prop onClose, assume-se que o controle de scroll é feito pelo componente pai.
+    if (onClose) {
+      return;
+    }
+
+    const anyModalOpen =
+      showScheduleModal ||
+      showCancellationModal ||
+      showClientModal ||
+      showConflictModal ||
+      showRescheduleModal ||
+      showCompletedModal ||
+      showNotFoundConfirmModal ||
+      showNotFoundObservationModal ||
+      showPaymentQuestionModal ||
+      showTimeWarningModal ||
+      showDateValidationModal ||
+      showOverdueNotificationModal;
+
+    if (anyModalOpen) {
+      document.documentElement.style.overflow = "hidden";
       document.body.style.overflow = "hidden";
+    } else {
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
     }
 
     return () => {
-      document.body.style.overflow = "unset";
+      // Apenas limpa o estilo se não for controlado pelo pai
+      if (!onClose) {
+        document.documentElement.style.overflow = "";
+        document.body.style.overflow = "";
+      }
     };
-  }, [showOverdueNotificationModal]);
+  }, [
+    onClose, // Adicionado ao array de dependências
+    showScheduleModal,
+    showCancellationModal,
+    showClientModal,
+    showConflictModal,
+    showRescheduleModal,
+    showCompletedModal,
+    showNotFoundConfirmModal,
+    showNotFoundObservationModal,
+    showPaymentQuestionModal,
+    showTimeWarningModal,
+    showDateValidationModal,
+    showOverdueNotificationModal,
+  ]);
+
+
 
   // Fechar modal com tecla ESC
   useEffect(() => {
@@ -1690,8 +1718,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         <div className="p-0 lg:p-0">
           <div className="space-y-6">
             {/* Calendário de Visitas */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 sm:p-4">
-              <div className="relative -mt-4 -mx-4 mb-8 p-2 sm:p-4 bg-gray-50 rounded-t-2xl border-b">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="relative p-2 sm:p-4 bg-gray-50 border-b">
                 {onClose && (
                   <div className="flex justify-end">
                     <button
@@ -1704,13 +1732,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   </div>
                 )}
               </div>
-              <div className="flex items-center justify-between mb-4 -mt-4">
+              <div className="p-2 sm:p-4">
+                <div className="flex items-center justify-between mb-4">
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                     <Calendar className="h-5 w-5 mr-2 text-blue-600" />
-                    {collectorName
-                      ? `Agendando para ${collectorName}`
-                      : "Calendário de Visitas"}
+                    <div>
+                      <span>Agendando</span>
+                      {collectorName && (
+                        <span className="block text-xs font-normal text-blue-500 -mt-1">
+                          para {collectorName}
+                        </span>
+                      )}
+                    </div>
                   </h3>
                 </div>
                 <div className="flex items-center">
@@ -1739,7 +1773,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
               </div>
 
               {/* Grade do Calendário */}
-              <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-3">
+              <div className="grid grid-cols-7 gap-2 sm:gap-2 md:gap-3">
                 {/* Cabeçalho dos dias da semana */}
                 {weekDays.map((day) => (
                   <div
@@ -1882,6 +1916,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   <div className="w-3 h-3 bg-blue-100 rounded-full mr-1.5" />
                   <span>Hoje</span>
                 </div>
+              </div>
               </div>
             </div>
 

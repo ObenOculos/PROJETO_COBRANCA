@@ -102,16 +102,21 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     useState<string | null>(null);
 
   useEffect(() => {
-    if (showSchedulerModal) {
+    const anyModalOpen = showSchedulerModal || showApprovalModal;
+
+    if (anyModalOpen) {
+      document.documentElement.style.overflow = "hidden";
       document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = "auto";
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
     }
 
     return () => {
-      document.body.style.overflow = "auto";
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
     };
-  }, [showSchedulerModal]);
+  }, [showSchedulerModal, showApprovalModal]);
 
   useEffect(() => {
     const requests = getPendingCancellationRequests();
