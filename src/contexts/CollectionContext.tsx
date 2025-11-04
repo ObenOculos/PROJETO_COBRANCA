@@ -20,6 +20,7 @@ import {
   SalePaymentInput,
   SaleBalance,
   ScheduledVisit,
+  AllowedVisitDate,
 } from "../types";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
@@ -63,6 +64,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [salePayments, setSalePayments] = useState<SalePayment[]>([]);
   const [scheduledVisits, setScheduledVisits] = useState<ScheduledVisit[]>([]);
   const [monthlyGoals, setMonthlyGoals] = useState<MonthlyGoal[]>([]);
+  const [allowedVisitDates, setAllowedVisitDates] = useState<AllowedVisitDate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -153,6 +155,57 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     );
   };
 
+  // Fetch allowed visit dates
+  const fetchAllowedVisitDates = React.useCallback(async () => {
+    const cacheKey = "allowed-visit-dates";
+
+    // Load from cache if available
+    const cachedData = dataCache.get<AllowedVisitDate[]>(cacheKey);
+    if (cachedData) {
+      console.log("✅ Dados de datas permitidas carregados do cache");
+      setAllowedVisitDates(cachedData);
+    }
+
+    // If offline, do not proceed to fetch from network
+    if (!isOnline) {
+      console.log("🚫 Offline, não buscando datas permitidas do servidor.");
+      return;
+    }
+
+    // If online, fetch fresh data
+    try {
+      console.log("Buscando datas de visita permitidas...");
+
+      const { data, error: supabaseError } = await supabase
+        .from("allowed_visit_dates")
+        .select("*")
+        .order("city", { ascending: true });
+
+      if (supabaseError) {
+        console.error("Erro ao buscar datas permitidas:", supabaseError);
+        return;
+      }
+
+      const transformedDates: AllowedVisitDate[] = data.map((date) => ({
+        id: date.id,
+        city: date.city,
+        neighborhood: date.neighborhood,
+        allowed_date: date.allowed_date,
+        created_at: date.created_at,
+        updated_at: date.updated_at,
+      }));
+
+      setAllowedVisitDates(transformedDates);
+
+      // Cache the fresh data
+      dataCache.set(cacheKey, transformedDates);
+
+      console.log("Datas permitidas carregadas:", transformedDates.length);
+    } catch (err) {
+      console.error("Erro ao carregar datas permitidas:", err);
+    }
+  }, [isOnline, setAllowedVisitDates, dataCache, supabase]);
+
   // Cache invalidation hooks
   const {
     invalidateCollections,
@@ -194,6 +247,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             fetchSalePayments(),
             fetchScheduledVisits(),
             fetchMonthlyGoals(),
+            fetchAllowedVisitDates(),
           ]);
 
           // Now fetch collections
@@ -3078,12 +3132,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     salePayments,
     scheduledVisits,
     monthlyGoals,
+    allowedVisitDates,
     loading,
     error,
     isOnline,
     fetchCollections,
     fetchUsers,
     fetchSalePayments,
+    fetchAllowedVisitDates,
     refreshData,
     refreshCollections,
     updateCollection,

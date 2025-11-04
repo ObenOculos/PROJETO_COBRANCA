@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Calendar,
+  CalendarClock,
   Clock,
   MapPin,
   DollarSign,
@@ -370,11 +371,24 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
     const grouped: { [key: string]: ScheduledVisit[] } = {};
 
+    // Inicializar apenas os cobradores relevantes
+    // Se houver filtro específico de cobrador, inicializar apenas ele
+    // Caso contrário, inicializar todos os cobradores
+    if (selectedCollector !== "all") {
+      // Filtro específico: inicializar apenas o cobrador selecionado
+      grouped[selectedCollector] = [];
+    } else {
+      // Sem filtro: inicializar todos os cobradores
+      collectors.forEach((collector) => {
+        grouped[collector.id] = [];
+      });
+    }
+
+    // Adicionar visitas aos cobradores
     filteredVisits.forEach((visit) => {
-      if (!grouped[visit.collectorId]) {
-        grouped[visit.collectorId] = [];
+      if (grouped[visit.collectorId]) {
+        grouped[visit.collectorId].push(visit);
       }
-      grouped[visit.collectorId].push(visit);
     });
 
     // Ordena as visitas dentro de cada grupo por data
@@ -714,10 +728,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
             <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Nenhuma visita encontrada
+              Nenhum cobrador encontrado
             </h3>
             <p className="text-gray-600">
-              Ajuste os filtros para ver mais resultados
+              Cadastre cobradores para começar a agendar visitas
             </p>
           </div>
         ) : (
@@ -783,7 +797,18 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   {/* Lista de visitas */}
                   {isExpanded && (
                     <div className="p-4 lg:p-6 pt-0 space-y-4">
-                      {visits.map((visit) => {
+                      {visits.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                          <p className="text-gray-500 text-sm">
+                            Nenhuma visita agendada para este cobrador
+                          </p>
+                          <p className="text-gray-400 text-xs mt-1">
+                            Ajuste os filtros ou clique no ícone de calendário para agendar
+                          </p>
+                        </div>
+                      ) : (
+                        visits.map((visit) => {
                         const isOverdue = isVisitOverdue(visit);
                         return (
                           <div
@@ -927,7 +952,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                             </div>
                           </div>
                         );
-                      })}
+                      })
+                      )}
                     </div>
                   )}
                 </div>
@@ -1461,7 +1487,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 }`}
                 title="Datas Programadas"
               >
-                <Calendar className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+                <CalendarClock className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Datas Programadas</span>
               </button>
             )}

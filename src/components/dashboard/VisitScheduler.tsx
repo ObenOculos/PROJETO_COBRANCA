@@ -32,6 +32,7 @@ import {
 } from "../../utils/formatters";
 import ClientDetailModal from "./ClientDetailModal";
 import { DateValidationModal } from "../common/DateValidationModal";
+import { getNextAllowedVisitDate } from "../../utils/visitScheduling";
 
 interface VisitSchedulerProps {
   onClose?: () => void;
@@ -55,6 +56,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     isOnline,
     users, // Get users from context
     fetchScheduledVisits, // Add fetchScheduledVisits
+    allowedVisitDates, // Add allowedVisitDates
   } = useCollection();
   const { user } = useAuth();
 
@@ -204,6 +206,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   } | null>(null);
   const [showDateValidationModal, setShowDateValidationModal] = useState(false);
   const [dateValidationMessage, setDateValidationMessage] = useState("");
+
+  // Estado para rastrear visitas que caem no domingo
+  const [sundayVisits, setSundayVisits] = useState<Set<string>>(new Set());
 
   // Estado para o modal de notificação de visitas atrasadas
   const [showOverdueNotificationModal, setShowOverdueNotificationModal] =
@@ -683,6 +688,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     setSearchTerm("");
     setSelectedClients(new Set());
     setClientSchedules(new Map());
+    setSundayVisits(new Set());
     setIsAllSelected(false);
   };
 
@@ -1430,17 +1436,52 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       const allClientDocuments = new Set(
         availableClients.map((client) => client.document),
       );
+      
+      const newSundayVisits = new Set<string>();
+      
+      // Criar schedules com datas permitidas quando disponíveis
       const allClientSchedules = new Map(
-        availableClients.map((client) => [
-          client.document,
-          { date: selectedDate, time: selectedTime },
-        ]),
+        availableClients.map((client) => {
+          // Verificar se existe data permitida configurada
+          const allowedDate = getNextAllowedVisitDate(
+            client.city,
+            client.neighborhood,
+            allowedVisitDates
+          );
+          
+          const scheduledDate = allowedDate || selectedDate;
+          
+          // Verificar se cai em domingo
+          if (allowedDate) {
+            const date = new Date(allowedDate);
+            const dayOfWeek = date.getDay();
+            
+            if (dayOfWeek === 0) {
+              newSundayVisits.add(client.document);
+              console.warn(
+                `⚠️ ATENÇÃO: Data automática para ${client.client} cai em um DOMINGO (${allowedDate})`
+              );
+            }
+            
+            console.log(
+              `📅 Data automática definida para ${client.client}: ${allowedDate} (Dia ${allowedVisitDates.find(d => d.city === client.city && d.neighborhood === client.neighborhood)?.allowed_date} de cada mês)${dayOfWeek === 0 ? ' ⚠️ DOMINGO' : ''}`
+            );
+          }
+          
+          return [
+            client.document,
+            { date: scheduledDate, time: selectedTime },
+          ];
+        }),
       );
+      
       setSelectedClients(allClientDocuments);
       setClientSchedules(allClientSchedules);
+      setSundayVisits(newSundayVisits);
     } else {
       setSelectedClients(new Set());
       setClientSchedules(new Map());
+      setSundayVisits(new Set());
     }
     setIsAllSelected(checked);
   };
@@ -1448,23 +1489,67 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const handleToggleClientSelection = (clientDocument: string) => {
     const newSelection = new Set(selectedClients);
     const newSchedules = new Map(clientSchedules);
+    const newSundayVisits = new Set(sundayVisits);
 
     if (newSelection.has(clientDocument)) {
       newSelection.delete(clientDocument);
       newSchedules.delete(clientDocument);
+      newSundayVisits.delete(clientDocument);
     } else {
       newSelection.add(clientDocument);
-      // Inicializar com data e hora padrão
+      
+      // Buscar dados do cliente para obter cidade e bairro
+      const clientData = getClientGroups(effectiveCollectorId!).find(
+        (c) => c.document === clientDocument
+      );
+      
+      let scheduledDate = selectedCalendarDate
+        ? selectedCalendarDate.toISOString().split("T")[0]
+        : selectedDate;
+      
+      let isSunday = false;
+      
+      // Verificar se existe data permitida configurada para esta cidade/bairro
+      if (clientData) {
+        const allowedDate = getNextAllowedVisitDate(
+          clientData.city,
+          clientData.neighborhood,
+          allowedVisitDates
+        );
+        
+        if (allowedDate) {
+          scheduledDate = allowedDate;
+          
+          // Verificar se a data cai em um domingo
+          const date = new Date(allowedDate);
+          const dayOfWeek = date.getDay(); // 0 = Domingo, 6 = Sábado
+          
+          if (dayOfWeek === 0) {
+            isSunday = true;
+            newSundayVisits.add(clientDocument);
+            
+            // É domingo - mostrar aviso
+            console.warn(
+              `⚠️ ATENÇÃO: Data automática para ${clientData.client} cai em um DOMINGO (${allowedDate})`
+            );
+          }
+          
+          console.log(
+            `📅 Data automática definida para ${clientData.client}: ${allowedDate} (Dia ${allowedVisitDates.find(d => d.city === clientData.city && d.neighborhood === clientData.neighborhood)?.allowed_date} de cada mês)${isSunday ? ' ⚠️ DOMINGO' : ''}`
+          );
+        }
+      }
+      
+      // Inicializar com data (permitida ou padrão) e hora padrão
       newSchedules.set(clientDocument, {
-        date: selectedCalendarDate
-          ? selectedCalendarDate.toISOString().split("T")[0]
-          : selectedDate,
+        date: scheduledDate,
         time: selectedTime,
       });
     }
 
     setSelectedClients(newSelection);
     setClientSchedules(newSchedules);
+    setSundayVisits(newSundayVisits);
 
     // Update isAllSelected based on the new selection
     setIsAllSelected(newSelection.size === availableClients.length);
@@ -3899,6 +3984,73 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   </div>
                                 );
                               })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Aviso de Visitas em Domingo */}
+                        {sundayVisits.size > 0 && (
+                          <div className="bg-orange-50 border-2 border-orange-300 rounded-2xl p-4">
+                            <div className="flex items-start">
+                              <AlertTriangle className="h-5 w-5 text-orange-600 mr-3 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-orange-900 mb-2">
+                                  ⚠️ Atenção: Visitas Agendadas para Domingo
+                                </h4>
+                                <p className="text-sm text-orange-800 mb-3">
+                                  {sundayVisits.size === 1
+                                    ? "Uma visita foi agendada"
+                                    : `${sundayVisits.size} visitas foram agendadas`}{" "}
+                                  para um <strong>domingo</strong> devido à configuração de data automática.
+                                  Verifique se deseja manter essa data ou ajustá-la manualmente.
+                                </p>
+                                <div className="space-y-2">
+                                  {getSelectedClientsData()
+                                    .filter((client) =>
+                                      sundayVisits.has(client.document),
+                                    )
+                                    .map((client) => {
+                                      const schedule = clientSchedules.get(
+                                        client.document,
+                                      ) || { date: "", time: "" };
+                                      return (
+                                        <div
+                                          key={client.document}
+                                          className="flex items-center justify-between text-sm bg-white rounded-xl p-3 border border-orange-200"
+                                        >
+                                          <div className="flex items-center">
+                                            <AlertTriangle className="h-4 w-4 text-orange-500 mr-2" />
+                                            <div>
+                                              <span className="font-medium text-gray-900">
+                                                {client.client}
+                                                {client.apelido && (
+                                                  <span className="text-sm text-blue-600 ml-1">
+                                                    ({client.apelido})
+                                                  </span>
+                                                )}
+                                              </span>
+                                              <div className="text-xs text-gray-500">
+                                                {client.city} - {client.neighborhood}
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <div className="text-right">
+                                            <div className="font-semibold text-orange-700">
+                                              {formatSafeDate(schedule.date)}
+                                            </div>
+                                            <div className="text-xs text-orange-600">
+                                              Domingo
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                </div>
+                                <div className="mt-3 text-xs text-orange-700 bg-orange-100 rounded-lg p-2">
+                                  <strong>Dica:</strong> Você pode ajustar a data individualmente na lista acima,
+                                  ou configurar um dia diferente nas "Datas Permitidas" para evitar domingos.
+                                </div>
+                              </div>
                             </div>
                           </div>
                         )}

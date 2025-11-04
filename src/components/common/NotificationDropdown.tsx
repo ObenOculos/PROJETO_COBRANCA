@@ -365,7 +365,7 @@ const NotificationDropdown: React.FC = () => {
       }
 
       return (
-        <div className="p-2" role="list" aria-label="Lista de notificações">
+        <div className="p-2 overflow-y-auto" role="list" aria-label="Lista de notificações">
           {groupedNotifications.map((notification) => (
             <NotificationItem
               key={notification.id}
@@ -490,7 +490,7 @@ const NotificationDropdown: React.FC = () => {
               <NotificationHeader />
 
               {/* Notifications List */}
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto min-h-0">
                 <NotificationList isMobile={true} />
               </div>
 
@@ -503,7 +503,7 @@ const NotificationDropdown: React.FC = () => {
         {/* Desktop Dropdown */}
         {isOpen && (
           <div
-            className={`hidden sm:block absolute right-0 mt-2 w-96 bg-white rounded-2xl shadow-lg border border-gray-200 z-50 max-h-96 flex-col transform transition-all duration-200 ${
+            className={`hidden sm:flex flex-col absolute right-0 mt-2 w-96 bg-white rounded-2xl shadow-lg border border-gray-200 z-50 max-h-[32rem] transform transition-all duration-200 ${
               isAnimating ? "scale-95 opacity-0" : "scale-100 opacity-100"
             }`}
             role="dialog"
@@ -514,7 +514,7 @@ const NotificationDropdown: React.FC = () => {
             <NotificationHeader />
 
             {/* Notifications List */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto min-h-0">
               <NotificationList />
             </div>
 
