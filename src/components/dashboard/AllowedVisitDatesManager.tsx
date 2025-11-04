@@ -66,13 +66,18 @@ const AllowedVisitDatesManager: React.FC = () => {
   useEffect(() => {
     if (collections) {
       const uniqueCities = [...new Set(collections.map(c => c.cidade).filter(Boolean))] as string[];
+      // Ordenar cidades em ordem alfabética
+      uniqueCities.sort((a, b) => a.localeCompare(b, 'pt-BR'));
       setCities(uniqueCities);
     }
   }, [collections]);
 
   const filteredNeighborhoods = useMemo(() => {
     if (selectedCity) {
-      return [...new Set(collections.filter(c => c.cidade === selectedCity).map(c => c.bairro).filter(Boolean))] as string[];
+      const neighborhoods = [...new Set(collections.filter(c => c.cidade === selectedCity).map(c => c.bairro).filter(Boolean))] as string[];
+      // Ordenar bairros em ordem alfabética
+      neighborhoods.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      return neighborhoods;
     }
     return [];
   }, [selectedCity, collections]);
@@ -426,8 +431,27 @@ const AllowedVisitDatesManager: React.FC = () => {
               : 'Nenhuma data permitida cadastrada. Configure as datas de visita para cada cidade/bairro.'}
           </div>
         ) : (
-          Array.from(groupedByCity.entries()).map(([city, dates]) => {
+          Array.from(groupedByCity.entries())
+            .sort(([cityA], [cityB]) => cityA.localeCompare(cityB, 'pt-BR'))
+            .map(([city, dates]) => {
             const isExpanded = expandedCities.has(city);
+            // Extrair dias únicos e ordenar numericamente
+            const uniqueDays = [...new Set(dates.map(d => d.allowed_date))].sort((a, b) => a - b);
+            
+            let daysText = '';
+            if (uniqueDays.length === 1) {
+              daysText = `Dia ${uniqueDays[0]}`;
+            } else if (uniqueDays.length <= 10) {
+              const lastDay = uniqueDays[uniqueDays.length - 1];
+              const otherDays = uniqueDays.slice(0, -1);
+              daysText = `Dias ${otherDays.join(', ')} e ${lastDay}`;
+            } else {
+              const first10 = uniqueDays.slice(0, 10);
+              const lastDay = first10[first10.length - 1];
+              const otherDays = first10.slice(0, -1);
+              daysText = `Dias ${otherDays.join(', ')}, ${lastDay}...`;
+            }
+            
             return (
               <div key={city} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                 <div className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
@@ -445,7 +469,7 @@ const AllowedVisitDatesManager: React.FC = () => {
                     </svg>
                     <h4 className="text-base font-semibold text-gray-900">{city}</h4>
                     <span className="text-sm text-gray-500">
-                      ({dates.length} {dates.length === 1 ? 'configuração' : 'configurações'})
+                      ({daysText})
                     </span>
                   </button>
                   
