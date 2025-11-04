@@ -15,6 +15,8 @@ import GlobalLoading from "./components/common/GlobalLoading";
 import OfflineIndicator from "./components/common/OfflineIndicator";
 import { navigationItems } from "./config/navigation";
 
+import VersionChecker from "./components/common/VersionChecker"; // Import VersionChecker
+
 const AppContent: React.FC = () => {
   const { user, isLoading: authLoading } = useAuth();
   const { loading: collectionLoading, getPendingCancellationRequests } =
@@ -148,6 +150,7 @@ function App() {
         <CollectionProvider>
           <NotificationProvider>
             <AppContent />
+            <VersionChecker /> {/* Render VersionChecker here */}
           </NotificationProvider>
         </CollectionProvider>
       </AuthProvider>
