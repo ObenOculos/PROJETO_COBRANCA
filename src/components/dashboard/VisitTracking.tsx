@@ -21,6 +21,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { ScheduledVisit } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import VisitScheduler from "./VisitScheduler"; // Import the VisitScheduler component
+import AllowedVisitDatesManager from "./AllowedVisitDatesManager"; // Import the AllowedVisitDatesManager component
 import "../../styles/components.css"; // Import custom components styles
 
 // Helper function to parse YYYY-MM-DD date strings safely
@@ -53,7 +54,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<
-    "visits" | "cancellations" | "history"
+    "visits" | "cancellations" | "history" | "scheduledDates"
   >("visits");
   const [selectedCollector, setSelectedCollector] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -1450,6 +1451,20 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               <Clock className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Histórico</span>
             </button>
+            {user?.type === "manager" && (
+              <button
+                onClick={() => setActiveTab("scheduledDates")}
+                className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-2xl text-sm font-medium transition-colors ${
+                  activeTab === "scheduledDates"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+                title="Datas Programadas"
+              >
+                <Calendar className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Datas Programadas</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1503,6 +1518,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             {activeTab === "visits" && renderVisitsTab()}
             {activeTab === "cancellations" && renderCancellationsTab()}
             {activeTab === "history" && renderHistoryTab()}
+            {activeTab === "scheduledDates" && <AllowedVisitDatesManager />}
           </div>
         </div>
       </div>

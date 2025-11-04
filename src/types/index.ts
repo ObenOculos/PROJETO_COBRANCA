@@ -90,6 +90,15 @@ export interface ScheduledVisit {
   scheduled_by_manager_id?: string; // Added for manager scheduling
 }
 
+export interface AllowedVisitDate {
+  allowed_date: number; // Day of month (1-31)
+  city: string;
+  created_at: string | null;
+  id: string;
+  neighborhood: string;
+  updated_at: string | null;
+}
+
 // Collection types based on BANCO_DADOS table
 export interface Collection {
   id_parcela: number;
@@ -235,12 +244,14 @@ export interface CollectionContextType {
   salePayments: SalePayment[];
   scheduledVisits: ScheduledVisit[];
   monthlyGoals: MonthlyGoal[]; // Added
+  allowedVisitDates: AllowedVisitDate[];
   loading: boolean;
   error: string | null;
   isOnline: boolean;
   fetchCollections: () => Promise<void>;
   fetchUsers: () => Promise<void>;
   fetchSalePayments: () => Promise<void>;
+  fetchAllowedVisitDates: () => Promise<void>;
   refreshData: () => Promise<void>;
   refreshCollections: () => Promise<void>;
   updateCollection: (id: number, updates: Partial<Collection>) => Promise<void>;
