@@ -85,8 +85,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
   const [selectedDate, setSelectedDate] = useState<string>(getLocalDate());
 
-
-
   const [selectedTime] = useState<string>(getDefaultTime());
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedClients, setSelectedClients] = useState<Set<string>>(
@@ -109,7 +107,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
   useEffect(() => {
     if (selectedCalendarDate) {
-      setSelectedDate(selectedCalendarDate.toISOString().split('T')[0]);
+      setSelectedDate(selectedCalendarDate.toISOString().split("T")[0]);
     }
   }, [selectedCalendarDate]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -143,9 +141,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     minValue: "",
     maxValue: "",
     visitStatus: "",
+    dueDateStart: "",
+    dueDateEnd: "",
   });
   const [showCityDropdown, setShowCityDropdown] = useState(false);
-  const [showNeighborhoodDropdown, setShowNeighborhoodDropdown] = useState(false);
+  const [showNeighborhoodDropdown, setShowNeighborhoodDropdown] =
+    useState(false);
 
   // Estados para ordenação
   const [sortField, setSortField] = useState<
@@ -438,6 +439,35 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       });
     }
 
+    // Filtro por período de vencimento
+    if (filters.dueDateStart || filters.dueDateEnd) {
+      const startDate = filters.dueDateStart
+        ? new Date(filters.dueDateStart)
+        : null;
+      const endDate = filters.dueDateEnd ? new Date(filters.dueDateEnd) : null;
+
+      if (startDate) startDate.setHours(0, 0, 0, 0);
+      if (endDate) endDate.setHours(23, 59, 59, 999);
+
+      filteredClients = filteredClients.filter((client) => {
+        return client.sales.some((sale) => {
+          return sale.installments.some((installment) => {
+            if (!installment.data_vencimento) return false;
+
+            const dueDate = new Date(installment.data_vencimento);
+
+            if (startDate && dueDate < startDate) {
+              return false;
+            }
+            if (endDate && dueDate > endDate) {
+              return false;
+            }
+            return true;
+          });
+        });
+      });
+    }
+
     // Aplicar ordenação
     if (sortField) {
       filteredClients.sort((a, b) => {
@@ -647,6 +677,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       minValue: "",
       maxValue: "",
       visitStatus: "",
+      dueDateStart: "",
+      dueDateEnd: "",
     });
     setSearchTerm("");
     setSelectedClients(new Set());
@@ -678,9 +710,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     if (!effectiveCollectorId) return [];
 
     const clientGroups = getClientGroups(effectiveCollectorId);
-    let clients = clientGroups.filter(
-      (client) => client.pendingValue > 0,
-    );
+    let clients = clientGroups.filter((client) => client.pendingValue > 0);
 
     if (filters.city.length > 0) {
       clients = clients.filter((client) => filters.city.includes(client.city));
@@ -3001,7 +3031,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       )}
                       <h3 className="text-lg font-semibold text-white">
                         {modalStep === "selection"
-                          ? `Selecionar Clientes para Visita (${selectedClients.size} selecionados)`
+                          ? `Clientes para Visita (${selectedClients.size} selecionados)`
                           : "Confirmar Agendamento"}
                       </h3>
                       <span className="ml-3 text-sm text-blue-100">
@@ -3094,7 +3124,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
                         {/* Filtros Expandidos */}
                         {showFilters && (
-                          <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
+                          <div className="bg-gray-100 rounded-2xl p-4 space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                               <div>
                                 <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
@@ -3144,7 +3174,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 <div className="relative">
                                   <button
                                     onClick={() =>
-                                      setShowNeighborhoodDropdown(!showNeighborhoodDropdown)
+                                      setShowNeighborhoodDropdown(
+                                        !showNeighborhoodDropdown,
+                                      )
                                     }
                                     className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-left bg-white"
                                   >
@@ -3154,24 +3186,28 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   </button>
                                   {showNeighborhoodDropdown && (
                                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
-                                      {availableNeighborhoods.map((neighborhood) => (
-                                        <label
-                                          key={neighborhood}
-                                          className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={filters.neighborhood.includes(
-                                              neighborhood,
-                                            )}
-                                            onChange={() =>
-                                              handleNeighborhoodFilterChange(neighborhood)
-                                            }
-                                            className="mr-2"
-                                          />
-                                          {neighborhood}
-                                        </label>
-                                      ))}
+                                      {availableNeighborhoods.map(
+                                        (neighborhood) => (
+                                          <label
+                                            key={neighborhood}
+                                            className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={filters.neighborhood.includes(
+                                                neighborhood,
+                                              )}
+                                              onChange={() =>
+                                                handleNeighborhoodFilterChange(
+                                                  neighborhood,
+                                                )
+                                              }
+                                              className="mr-2"
+                                            />
+                                            {neighborhood}
+                                          </label>
+                                        ),
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -3246,14 +3282,55 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   </option>
                                 </select>
                               </div>
+                              <div>
+                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                  <Calendar className="h-3 w-3 mr-1" />
+                                  Vencimento De
+                                </label>
+                                <input
+                                  type="date"
+                                  value={filters.dueDateStart}
+                                  onChange={(e) =>
+                                    handleFilterChange(
+                                      "dueDateStart",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                  <Calendar className="h-3 w-3 mr-1" />
+                                  Vencimento Até
+                                </label>
+                                <input
+                                  type="date"
+                                  value={filters.dueDateEnd}
+                                  onChange={(e) =>
+                                    handleFilterChange(
+                                      "dueDateEnd",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                />
+                              </div>
                             </div>
-                            <div className="flex justify-end">
+                            <div className="flex flex-col items-center gap-2 mt-4">
                               <button
                                 onClick={clearAllFilters}
                                 className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors flex items-center"
                               >
                                 <RefreshCw className="h-3 w-3 mr-1" />
                                 Limpar filtros
+                              </button>
+                              <button
+                                onClick={() => setShowFilters(false)}
+                                className="mt-4 px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-2xl hover:bg-gray-300 transition-colors flex items-center"
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                Fechar
                               </button>
                             </div>
                           </div>
@@ -3464,7 +3541,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                               </h4>
                               {availableClients.length > 0 && (
                                 <label
-                                  className={`flex items-center space-x-2 text-sm font-medium rounded-lg transition-colors cursor-pointer
+                                  className={`relative flex items-center space-x-2 text-sm font-medium rounded-lg transition-colors cursor-pointer
                                     ${isAllSelected ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"}
                                     p-2 border border-gray-300`}
                                 >
@@ -3474,9 +3551,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                     onChange={(e) =>
                                       handleSelectAll(e.target.checked)
                                     }
-                                    className="h-4 w-4 text-blue-600 border-gray-400 rounded focus:ring-blue-500 focus:ring-offset-1"
+                                    className="sr-only"
                                   />
-                                  <span>Todos</span>
+                                  <span className="!ml-0">Todos</span>
                                 </label>
                               )}
                               {/* Indicador de Paginação */}
