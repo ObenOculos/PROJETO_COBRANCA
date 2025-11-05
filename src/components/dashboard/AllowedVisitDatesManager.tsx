@@ -27,6 +27,7 @@ const AllowedVisitDatesManager: React.FC = () => {
   const [calendarFilterNeighborhood, setCalendarFilterNeighborhood] = useState<string>('all');
   const [calendarFilterCollector, setCalendarFilterCollector] = useState<string>('all');
   const [filterCollector, setFilterCollector] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Fechar dropdown e modal ao clicar fora
   useEffect(() => {
@@ -279,16 +280,16 @@ const AllowedVisitDatesManager: React.FC = () => {
     setLoading(false);
   };
 
-  const handleDeleteAllowedDate = async (id: string) => {
+  const handleDeleteNeighborhoodDates = async (ids: string[]) => {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.from('allowed_visit_dates').delete().match({ id });
+    const { error } = await supabase.from('allowed_visit_dates').delete().in('id', ids);
 
     if (error) {
       setError(error.message);
     } else {
-      setAllowedDates(allowedDates.filter(d => d.id !== id));
+      setAllowedDates(allowedDates.filter(d => !ids.includes(d.id)));
     }
 
     setLoading(false);
@@ -656,100 +657,154 @@ const AllowedVisitDatesManager: React.FC = () => {
               : 'Nenhuma data permitida cadastrada. Configure as datas de visita para cada cidade/bairro.'}
           </div>
         ) : (
-          Array.from(groupedByCity.entries())
-            .sort(([cityA], [cityB]) => cityA.localeCompare(cityB, 'pt-BR'))
-            .map(([city, dates]) => {
-            const isExpanded = expandedCities.has(city);
-            // Extrair dias únicos e ordenar numericamente
-            const uniqueDays = [...new Set(dates.map(d => d.allowed_date))].sort((a, b) => a - b);
-            
-            let daysText = '';
-            if (uniqueDays.length === 1) {
-              daysText = `Dia ${uniqueDays[0]}`;
-            } else if (uniqueDays.length <= 10) {
-              const lastDay = uniqueDays[uniqueDays.length - 1];
-              const otherDays = uniqueDays.slice(0, -1);
-              daysText = `Dias ${otherDays.join(', ')} e ${lastDay}`;
-            } else {
-              const first10 = uniqueDays.slice(0, 10);
-              const lastDay = first10[first10.length - 1];
-              const otherDays = first10.slice(0, -1);
-              daysText = `Dias ${otherDays.join(', ')}, ${lastDay}...`;
-            }
-            
+          (() => {
+            const CITIES_PER_PAGE = 10;
+            const sortedCities = Array.from(groupedByCity.entries()).sort(([cityA], [cityB]) => cityA.localeCompare(cityB, 'pt-BR'));
+            const totalPages = Math.ceil(sortedCities.length / CITIES_PER_PAGE);
+            const paginatedCities = sortedCities.slice((currentPage - 1) * CITIES_PER_PAGE, currentPage * CITIES_PER_PAGE);
+
             return (
-              <div key={city} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                <div className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                  <button
-                    onClick={() => toggleCity(city)}
-                    className="flex items-center space-x-3 flex-1"
-                  >
-                    <svg
-                      className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                    <h4 className="text-base font-semibold text-gray-900">{city}</h4>
-                    <span className="text-sm text-gray-500">
-                      ({daysText})
-                    </span>
-                  </button>
-                  
-                  <div className="flex items-center gap-2">
+              <>
+                <div className="space-y-2">
+                  {paginatedCities.map(([city, dates]) => {
+                    const isExpanded = expandedCities.has(city);
+                    // Extrair dias únicos e ordenar numericamente
+                    const uniqueDays = [...new Set(dates.map(d => d.allowed_date))].sort((a, b) => a - b);
+                    
+                    let daysText = '';
+                    if (uniqueDays.length === 1) {
+                      daysText = `Dia ${uniqueDays[0]}`;
+                    } else if (uniqueDays.length <= 10) {
+                      const lastDay = uniqueDays[uniqueDays.length - 1];
+                      const otherDays = uniqueDays.slice(0, -1);
+                      daysText = `Dias ${otherDays.join(', ')} e ${lastDay}`;
+                    } else {
+                      const first10 = uniqueDays.slice(0, 10);
+                      const lastDay = first10[first10.length - 1];
+                      const otherDays = first10.slice(0, -1);
+                      daysText = `Dias ${otherDays.join(', ')}, ${lastDay}...`;
+                    }
+                    
+                    return (
+                      <div key={city} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                          <button
+                            onClick={() => toggleCity(city)}
+                            className="flex items-center space-x-3 flex-1"
+                          >
+                            <svg
+                              className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            <h4 className="text-base font-semibold text-gray-900">{city}</h4>
+                            <span className="text-sm text-gray-500">
+                              ({daysText})
+                            </span>
+                          </button>
+                          
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteAllCityDates(city);
+                              }}
+                              disabled={loading}
+                              className="p-2 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={`Excluir todas as configurações de ${city}`}
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {isExpanded && (
+                          <div className="border-t border-gray-200">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bairro</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dia do Mês</th>
+                                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {(() => {
+                                  const groupedByNeighborhood = dates.reduce((acc, date) => {
+                                    if (!acc[date.neighborhood]) {
+                                      acc[date.neighborhood] = {
+                                        dates: [],
+                                        ids: []
+                                      };
+                                    }
+                                    acc[date.neighborhood].dates.push(date.allowed_date);
+                                    acc[date.neighborhood].ids.push(date.id);
+                                    return acc;
+                                  }, {} as Record<string, { dates: number[], ids: string[] }>);
+
+                                  return Object.entries(groupedByNeighborhood)
+                                    .sort(([neighborhoodA], [neighborhoodB]) => neighborhoodA.localeCompare(neighborhoodB))
+                                    .map(([neighborhood, data]) => {
+                                      data.dates.sort((a, b) => a - b);
+                                      return (
+                                        <tr key={neighborhood} className="hover:bg-gray-50">
+                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{neighborhood}</td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            Dias {data.dates.join(', ')} de cada mês
+                                          </td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                                            <button
+                                              onClick={() => handleDeleteNeighborhoodDates(data.ids)}
+                                              disabled={loading}
+                                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                                            >
+                                              Excluir
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    });
+                                })()}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex justify-between items-center mt-4 p-2 bg-white border border-gray-200 rounded-lg">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteAllCityDates(city);
-                      }}
-                      disabled={loading}
-                      className="p-2 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={`Excluir todas as configurações de ${city}`}
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="p-2 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="Página anterior"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <span className="text-sm font-medium text-gray-700">
+                      {currentPage} / {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="p-2 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="Próxima página"
+                    >
+                      <ChevronRight className="w-5 h-5" />
                     </button>
                   </div>
-                </div>
-                
-                {isExpanded && (
-                  <div className="border-t border-gray-200">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bairro</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dia do Mês</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {dates.map(date => (
-                          <tr key={date.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{date.neighborhood}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              Dia {date.allowed_date} de cada mês
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                              <button
-                                onClick={() => handleDeleteAllowedDate(date.id)}
-                                disabled={loading}
-                                className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                              >
-                                Excluir
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
                 )}
-              </div>
+              </>
             );
-          })
+          })()
         )}
       </div>
 
