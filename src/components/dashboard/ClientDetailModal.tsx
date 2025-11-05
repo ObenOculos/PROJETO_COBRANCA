@@ -24,6 +24,114 @@ interface ClientDetailModalProps {
   onClose: () => void;
 }
 
+// ============================================
+// COMPONENTES AUXILIARES MINIMALISTAS
+// ============================================
+
+// Formatar data no padrão brasileiro
+const formatDate = (dateString: string | null): string => {
+  if (!dateString) return "-";
+  
+  try {
+    let date: Date;
+    
+    // Verificar se já está no formato brasileiro (dd/mm/yyyy)
+    if (dateString.includes('/')) {
+      const [day, month, year] = dateString.split('/');
+      date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    } 
+    // Se estiver no formato ISO (yyyy-mm-dd)
+    else if (dateString.includes('-')) {
+      const dateStr = dateString.includes('T') ? dateString : `${dateString}T00:00:00`;
+      date = new Date(dateStr);
+    } 
+    // Outros formatos
+    else {
+      date = new Date(dateString);
+    }
+    
+    // Verificar se a data é válida
+    if (isNaN(date.getTime())) {
+      console.warn('Data inválida:', dateString);
+      return dateString; // Retorna a string original se não conseguir converter
+    }
+    
+    return date.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch (error) {
+    console.error('Erro ao formatar data:', dateString, error);
+    return dateString; // Retorna a string original em caso de erro
+  }
+};
+
+// Formatar dias de atraso de forma intuitiva
+const formatDaysOverdue = (days: number | null): string => {
+  if (!days || days <= 0) return "";
+  
+  const years = Math.floor(days / 365);
+  const months = Math.floor((days % 365) / 30);
+  const remainingDays = days % 30;
+  
+  const parts: string[] = [];
+  
+  if (years > 0) {
+    parts.push(`${years}${years === 1 ? 'ano' : 'a'}`);
+  }
+  if (months > 0) {
+    parts.push(`${months}${months === 1 ? 'mês' : 'm'}`);
+  }
+  if (remainingDays > 0 || parts.length === 0) {
+    parts.push(`${remainingDays}d`);
+  }
+  
+  return parts.join(' ');
+};
+
+// Badge de status minimalista (outline)
+const StatusBadge: React.FC<{
+  status: "pending" | "partially_paid" | "fully_paid";
+}> = ({ status }) => {
+  const styles = {
+    fully_paid: "text-green-600 border-green-300 bg-green-50",
+    partially_paid: "text-amber-600 border-amber-300 bg-amber-50",
+    pending: "text-red-600 border-red-300 bg-red-50",
+  };
+
+  const labels = {
+    fully_paid: "Pago",
+    partially_paid: "Parcial",
+    pending: "Pendente",
+  };
+
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs border ${styles[status]}`}
+    >
+      {labels[status]}
+    </span>
+  );
+};
+
+// Indicador de status para parcelas (dot)
+const InstallmentStatusDot: React.FC<{
+  status: string | null;
+  daysOverdue: number | null;
+}> = ({ status, daysOverdue }) => {
+  const isPaid = status?.toLowerCase().includes("pago");
+  const isOverdue = (daysOverdue ?? 0) > 0;
+
+  const dotColor = isPaid
+    ? "bg-green-500"
+    : isOverdue
+      ? "bg-red-500"
+      : "bg-gray-400";
+
+  return <div className={`w-2 h-2 rounded-full ${dotColor} flex-shrink-0`} />;
+};
+
 const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   clientGroup,
   userType,
@@ -516,7 +624,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           {/* Sales and Collections or Client Data */}
           {showClientData ? (
             <div className="overflow-y-auto max-h-[60vh] p-4 lg:p-6">
-              <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-4">
+              <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-2">
                 Dados de Cadastro do Cliente
               </h3>
               <div className="bg-gray-200 p-4 space-y-3 rounded-lg text-xs sm:text-sm text-gray-700">
@@ -586,224 +694,168 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     return (
                       <div
                         key={sale.saleNumber}
-                        className="border border-gray-200 rounded-2xl overflow-hidden"
+                        className="border border-gray-200 rounded-xl overflow-hidden bg-white"
                       >
-                        {/* Sale Header */}
-                        <div className="px-4 py-3 bg-gray-50">
-                          {/* Desktop Layout */}
-                          <div className="hidden sm:flex items-center justify-between">
-                            <div
-                              id={`sale-expansion-${sale.saleNumber}`}
-                              className="flex items-center flex-1 cursor-pointer hover:bg-gray-100 p-2 rounded-2xl -m-2"
-                              onClick={() =>
-                                toggleSaleExpansion(sale.saleNumber)
-                              }
-                            >
-                              <div className="mr-3">
+                        {/* Sale Header - Minimalista */}
+                        <div
+                          className="px-3 py-2 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+                          onClick={() => toggleSaleExpansion(sale.saleNumber)}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            {/* Left: Chevron + Info */}
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className="flex-shrink-0">
                                 {expandedSales.has(sale.saleNumber) ? (
-                                  <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  <ChevronDown className="h-4 w-4 text-gray-400" />
                                 ) : (
-                                  <ChevronRight className="h-5 w-5 text-gray-400" />
+                                  <ChevronRight className="h-4 w-4 text-gray-400" />
                                 )}
                               </div>
-                              <div>
-                                <h4 className="font-medium text-gray-900">
-                                  Venda #
-                                  {sale.saleNumber === 0
-                                    ? "Renegociada"
-                                    : sale.saleNumber}
-                                </h4>
-                                <p className="text-sm text-gray-600">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="text-sm font-medium text-gray-900">
+                                    Venda #
+                                    {sale.saleNumber === 0
+                                      ? "Renegociada"
+                                      : sale.saleNumber}
+                                  </h4>
+                                  <StatusBadge status={saleBalance.status} />
+                                </div>
+                                <p className="text-xs text-gray-500">
                                   {sale.installments.length} parcela
                                   {sale.installments.length !== 1 ? "s" : ""}
                                 </p>
-                                <div className="flex items-center mt-1">
-                                  <span
-                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                      saleBalance.status === "fully_paid"
-                                        ? "bg-green-100 text-green-800"
-                                        : saleBalance.status ===
-                                            "partially_paid"
-                                          ? "bg-yellow-100 text-yellow-800"
-                                          : "bg-red-100 text-red-800"
-                                    }`}
-                                  >
-                                    {saleBalance.status === "fully_paid"
-                                      ? "Pago Integralmente"
-                                      : saleBalance.status === "partially_paid"
-                                        ? "Parcialmente Pago"
-                                        : "Pendente"}
-                                  </span>
-                                </div>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {formatCurrency(sale.totalValue)}
-                                </div>
-                                <div className="text-xs text-green-600 font-medium">
-                                  Pago: {formatCurrency(saleBalance.totalPaid)}
-                                </div>
-                                <div className="text-xs text-red-600 font-medium">
-                                  Restante:{" "}
-                                  {formatCurrency(saleBalance.remainingBalance)}
-                                </div>
+                            {/* Right: Valores */}
+                            <div className="text-right flex-shrink-0">
+                              <div className="text-sm font-semibold text-gray-900">
+                                {formatCurrency(sale.totalValue)}
                               </div>
-                            </div>
-                          </div>
-
-                          {/* Mobile Layout */}
-                          <div className="sm:hidden space-y-3">
-                            <div
-                              id={`sale-expansion-mobile-${sale.saleNumber}`}
-                              className="flex items-center justify-between cursor-pointer hover:bg-gray-100 p-2 rounded-2xl -m-2"
-                              onClick={() =>
-                                toggleSaleExpansion(sale.saleNumber)
-                              }
-                            >
-                              <div className="flex items-center">
-                                <div className="mr-3">
-                                  {expandedSales.has(sale.saleNumber) ? (
-                                    <ChevronDown className="h-5 w-5 text-gray-400" />
-                                  ) : (
-                                    <ChevronRight className="h-5 w-5 text-gray-400" />
-                                  )}
-                                </div>
-                                <div>
-                                  <h4 className="font-medium text-gray-900">
-                                    Venda {sale.saleNumber}
-                                  </h4>
-                                  <p className="text-xs text-gray-600">
-                                    {sale.installments.length} parcela
-                                    {sale.installments.length !== 1 ? "s" : ""}
-                                  </p>
-                                </div>
+                              <div className="text-xs text-green-600">
+                                ↑ {formatCurrency(saleBalance.totalPaid)}
                               </div>
-
-                              <div className="text-right">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {formatCurrency(sale.totalValue)}
-                                </div>
-                                {saleBalance.status === "fully_paid" &&
-                                saleBalance.totalDiscount &&
-                                saleBalance.totalDiscount > 0 ? (
-                                  <div className="text-xs text-blue-600 font-medium">
-                                    Desconto:{" "}
-                                    {formatCurrency(saleBalance.totalDiscount)}
-                                  </div>
-                                ) : (
-                                  <div className="text-xs text-red-600 font-medium">
-                                    Restante:{" "}
-                                    {formatCurrency(
-                                      saleBalance.remainingBalance,
-                                    )}
-                                  </div>
-                                )}
+                              <div className="text-xs text-red-600">
+                                ↓ {formatCurrency(saleBalance.remainingBalance)}
                               </div>
-                            </div>
-
-                            <div className="flex items-center justify-center">
-                              <span
-                                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                                  saleBalance.status === "fully_paid"
-                                    ? "bg-green-100 text-green-800"
-                                    : saleBalance.status === "partially_paid"
-                                      ? "bg-yellow-100 text-yellow-800"
-                                      : "bg-red-100 text-red-800"
-                                }`}
-                              >
-                                {saleBalance.status === "fully_paid"
-                                  ? "Pago Integralmente"
-                                  : saleBalance.status === "partially_paid"
-                                    ? "Parcialmente Pago"
-                                    : "Pendente"}
-                              </span>
                             </div>
                           </div>
                         </div>
 
-                        {/* Expanded Sale Details */}
+                        {/* Expanded Sale Details - Minimalista */}
                         {expandedSales.has(sale.saleNumber) && (
-                          <div className="px-4 py-3 bg-gray-50">
-                            <div className="space-y-3">
-                              {/* Sale Summary */}
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="text-center p-3 bg-blue-50 rounded-2xl">
-                                  <div className="text-sm sm:text-base lg:text-lg font-bold text-blue-600">
-                                    {formatCurrency(
-                                      saleBalance.totalValue,
-                                      false,
-                                    )}
-                                  </div>
-                                  <div className="text-xs text-gray-600">
-                                    Valor Total
-                                  </div>
-                                </div>
-                                <div className="text-center p-3 bg-green-50 rounded-2xl">
-                                  <div className="text-sm sm:text-lg font-bold text-green-600">
-                                    {formatCurrency(saleBalance.totalPaid)}
-                                  </div>
-                                  <div className="text-xs text-gray-600">
-                                    Já Pago
-                                  </div>
-                                </div>
-                                {saleBalance.status === "fully_paid" &&
-                                saleBalance.totalDiscount &&
-                                saleBalance.totalDiscount > 0 ? (
-                                  <div className="text-center p-3 bg-blue-50 rounded-2xl">
-                                    <div className="text-sm sm:text-lg font-bold text-blue-600">
-                                      {formatCurrency(
-                                        saleBalance.totalDiscount,
-                                      )}
+                          <div className="px-3 py-3 bg-white border-t border-gray-100">
+                            {/* Resumo em linha única */}
+                            <div className="flex justify-between text-xs mb-3 pb-2 border-b border-gray-100">
+                              <span className="text-gray-600">
+                                Total:{" "}
+                                <strong className="text-gray-900">
+                                  {formatCurrency(saleBalance.totalValue)}
+                                </strong>
+                              </span>
+                              <span className="text-gray-600">
+                                Pago:{" "}
+                                <strong className="text-green-600">
+                                  {formatCurrency(saleBalance.totalPaid)}
+                                </strong>
+                              </span>
+                              <span className="text-gray-600">
+                                Falta:{" "}
+                                <strong className="text-red-600">
+                                  {formatCurrency(saleBalance.remainingBalance)}
+                                </strong>
+                              </span>
+                            </div>
+
+                            {/* Tabela de Parcelas */}
+                            <div className="space-y-1">
+                              <h4 className="text-xs font-medium text-gray-700 mb-2">
+                                Parcelas ({sale.installments.length})
+                              </h4>
+
+                              {/* Mobile: Cards compactos */}
+                              <div className="space-y-1.5">
+                                {sale.installments.map((installment) => {
+                                  const isPaid =
+                                    installment.status
+                                      ?.toLowerCase()
+                                      .includes("pago") || false;
+                                  const isOverdue =
+                                    (installment.dias_em_atraso ?? 0) > 0;
+                                  
+                                  // Usar valor_original se valor_reajustado for 0
+                                  const installmentValue = installment.valor_reajustado > 0 
+                                    ? installment.valor_reajustado 
+                                    : installment.valor_original;
+
+                                  return (
+                                    <div
+                                      key={installment.id_parcela}
+                                      className="flex items-center justify-between py-1.5 px-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 rounded transition-colors"
+                                    >
+                                      {/* Left: ID, Data, Status */}
+                                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <InstallmentStatusDot
+                                          status={installment.status}
+                                          daysOverdue={
+                                            installment.dias_em_atraso
+                                          }
+                                        />
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-mono text-xs text-gray-500">
+                                              #{installment.id_parcela}
+                                            </span>
+                                            {isOverdue && !isPaid && (
+                                              <span className="text-xs text-red-600 font-medium">
+                                                {formatDaysOverdue(installment.dias_em_atraso)}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-xs text-gray-600 truncate">
+                                            {formatDate(
+                                              installment.data_vencimento,
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Right: Valores */}
+                                      <div className="text-right flex-shrink-0">
+                                        <div className="font-medium text-xs text-gray-900">
+                                          {formatCurrency(installmentValue)}
+                                        </div>
+                                        {installment.valor_recebido > 0 && (
+                                          <div className="text-xs text-green-600">
+                                            ✓{" "}
+                                            {formatCurrency(
+                                              installment.valor_recebido,
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                    <div className="text-xs text-gray-600">
-                                      Desconto Total
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="text-center p-3 bg-red-50 rounded-2xl">
-                                    <div className="text-sm sm:text-lg font-bold text-red-600">
-                                      {formatCurrency(
-                                        saleBalance.remainingBalance,
-                                      )}
-                                    </div>
-                                    <div className="text-xs text-gray-600">
-                                      Saldo Devedor
+                                  );
+                                })}
+                              </div>
+
+                              {/* Informações adicionais (se houver desconto) */}
+                              {saleBalance.totalDiscount !== undefined &&
+                                saleBalance.totalDiscount > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-gray-100">
+                                    <div className="flex justify-between items-center text-xs">
+                                      <span className="text-gray-600">
+                                        Desconto total:
+                                      </span>
+                                      <span className="font-medium text-blue-600">
+                                        {formatCurrency(
+                                          saleBalance.totalDiscount,
+                                        )}
+                                      </span>
                                     </div>
                                   </div>
                                 )}
-                              </div>
-
-                              {/* Additional Info */}
-                              <div className="text-xs sm:text-sm text-gray-600 pt-2 border-t border-gray-200">
-                                <div className="flex justify-between items-center">
-                                  <span>Número de parcelas:</span>
-                                  <span className="font-medium">
-                                    {sale.installments.length}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between items-center mt-1">
-                                  <span>Status da venda:</span>
-                                  <span
-                                    className={`font-medium ${
-                                      saleBalance.status === "fully_paid"
-                                        ? "text-green-600"
-                                        : saleBalance.status ===
-                                            "partially_paid"
-                                          ? "text-yellow-600"
-                                          : "text-red-600"
-                                    }`}
-                                  >
-                                    {saleBalance.status === "fully_paid"
-                                      ? "Quitada"
-                                      : saleBalance.status === "partially_paid"
-                                        ? "Parcial"
-                                        : "Pendente"}
-                                  </span>
-                                </div>
-                              </div>
                             </div>
                           </div>
                         )}

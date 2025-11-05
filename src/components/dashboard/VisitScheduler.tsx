@@ -350,19 +350,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
     const clientGroups = getClientGroups(effectiveCollectorId);
 
-    // Debug: Log clientes com apelido no VisitScheduler
-    const clientsWithApelido = clientGroups.filter((client) => client.apelido);
-    if (clientsWithApelido.length > 0) {
-      console.log(
-        `[VisitScheduler] Clientes com apelido encontrados:`,
-        clientsWithApelido.map((c) => ({
-          nome: c.client,
-          apelido: c.apelido,
-          documento: c.document,
-        })),
-      );
-    }
-
     // Obter visitas ativas (agendadas) do cobrador
     const activeVisits = getVisitsByCollector(effectiveCollectorId).filter(
       (visit) => visit.status === "agendada",
@@ -1481,8 +1468,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           
           // Verificar se cai em domingo
           if (allowedDate) {
-            const date = new Date(allowedDate);
-            const dayOfWeek = date.getDay();
+            // Parsear data corretamente para evitar problemas de timezone
+            const [year, month, day] = allowedDate.split('-').map(Number);
+            const date = new Date(year, month - 1, day);
+            const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
             
             if (dayOfWeek === 0) {
               newSundayVisits.add(client.document);
@@ -1491,9 +1480,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
               );
             }
             
-            console.log(
-              `📅 Data automática definida para ${client.client}: ${allowedDate} (Dia ${allowedVisitDates.find(d => d.city === client.city && d.neighborhood === client.neighborhood)?.allowed_date} de cada mês)${dayOfWeek === 0 ? ' ⚠️ DOMINGO' : ''}`
-            );
+          //  console.log(
+           //   `📅 Data automática definida para ${client.client}: ${allowedDate} (Dia ${allowedVisitDates.find(d => d.city === client.city && d.neighborhood === client.neighborhood)?.allowed_date} de cada mês)${dayOfWeek === 0 ? ' ⚠️ DOMINGO' : ''}`
+          //  );
           }
           
           return [
@@ -1535,8 +1524,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         ? selectedCalendarDate.toISOString().split("T")[0]
         : selectedDate;
       
-      let isSunday = false;
-      
       // Verificar se existe data permitida configurada para esta cidade/bairro
       if (clientData) {
         const allowedDate = getNextAllowedVisitDate(
@@ -1549,11 +1536,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           scheduledDate = allowedDate;
           
           // Verificar se a data cai em um domingo
-          const date = new Date(allowedDate);
-          const dayOfWeek = date.getDay(); // 0 = Domingo, 6 = Sábado
+          // Parsear data corretamente para evitar problemas de timezone
+          const [year, month, day] = allowedDate.split('-').map(Number);
+          const date = new Date(year, month - 1, day);
+          const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
           
           if (dayOfWeek === 0) {
-            isSunday = true;
             newSundayVisits.add(clientDocument);
             
             // É domingo - mostrar aviso
@@ -1562,9 +1550,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
             );
           }
           
-          console.log(
-            `📅 Data automática definida para ${clientData.client}: ${allowedDate} (Dia ${allowedVisitDates.find(d => d.city === clientData.city && d.neighborhood === clientData.neighborhood)?.allowed_date} de cada mês)${isSunday ? ' ⚠️ DOMINGO' : ''}`
-          );
+          //console.log(
+           // `📅 Data automática definida para ${clientData.client}: ${allowedDate} (Dia ${allowedVisitDates.find(d => d.city === clientData.city && d.neighborhood === clientData.neighborhood)?.allowed_date} de cada mês)${dayOfWeek === 0 ? ' ⚠️ DOMINGO' : ''}`
+          //);
         }
       }
       
@@ -1607,6 +1595,37 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     });
 
     setClientSchedules(newSchedules);
+    
+    // Se o campo alterado foi a data, recalcular se é domingo
+    if (field === "date") {
+      const newSundayVisits = new Set(sundayVisits);
+      
+      // Parsear data corretamente para evitar problemas de timezone
+      const [year, month, day] = value.split('-').map(Number);
+      const date = new Date(year, month - 1, day); // Month é 0-indexed
+      const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+      
+      if (dayOfWeek === 0) {
+        // É domingo - adicionar ao set e mostrar notificação
+        newSundayVisits.add(clientDocument);
+        
+        // Buscar nome do cliente
+        const clientData = getClientGroups(effectiveCollectorId!).find(
+          (c) => c.document === clientDocument
+        );
+        
+        // Mostrar notificação
+        triggerNotification(
+          `⚠️ Atenção: Visita de ${clientData?.client || "cliente"} agendada para DOMINGO (${formatSafeDate(value)})`,
+          "info"
+        );
+      } else {
+        // Não é domingo - remover do set
+        newSundayVisits.delete(clientDocument);
+      }
+      
+      setSundayVisits(newSundayVisits);
+    }
   };
 
   const getClientStatus = (client: any) => {
@@ -3648,39 +3667,41 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
                           {/* Lista de Clientes Disponíveis */}
                           <div>
-                            <div className="flex items-center justify-between mb-4">
-                              <h4 className="font-semibold text-gray-900 flex items-center">
-                                <Users className="h-5 w-5 mr-2 text-blue-600" />
-                                {availableClients.length === 0
-                                  ? "Nenhum cliente para visita"
-                                  : `${availableClients.length} ${
-                                      availableClients.length === 1
-                                        ? "cliente"
-                                        : "clientes"
-                                    }`}
+                            <div className="flex items-center justify-between mb-3 gap-2">
+                              <h4 className="font-semibold text-gray-900 flex items-center text-sm sm:text-base">
+                                <Users className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 text-blue-600 flex-shrink-0" />
+                                <span className="truncate">
+                                  {availableClients.length === 0
+                                    ? "Nenhum cliente"
+                                    : `${availableClients.length} ${
+                                        availableClients.length === 1
+                                          ? "cliente"
+                                          : "clientes"
+                                      }`}
+                                </span>
                               </h4>
-                              {availableClients.length > 0 && (
-                                <label
-                                  className={`relative flex items-center space-x-2 text-sm font-medium rounded-lg transition-colors cursor-pointer
-                                    ${isAllSelected ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"}
-                                    p-2 border border-gray-300`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={isAllSelected}
-                                    onChange={(e) =>
-                                      handleSelectAll(e.target.checked)
-                                    }
-                                    className="sr-only"
-                                  />
-                                  <span className="!ml-0">Todos</span>
-                                </label>
-                              )}
-                              {/* Indicador de Paginação */}
-                              {availableClients.length >
-                                modalClientsPerPage && (
-                                <div className="flex items-center space-x-3">
-                                  <div className="flex items-center space-x-1">
+                              <div className="flex items-center gap-2">
+                                {availableClients.length > 0 && (
+                                  <label
+                                    className={`relative flex items-center text-xs sm:text-sm font-medium rounded-lg transition-colors cursor-pointer
+                                      ${isAllSelected ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"}
+                                      px-2 py-1 sm:p-2 border border-gray-300`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isAllSelected}
+                                      onChange={(e) =>
+                                        handleSelectAll(e.target.checked)
+                                      }
+                                      className="sr-only"
+                                    />
+                                    <span className="whitespace-nowrap">Todos</span>
+                                  </label>
+                                )}
+                                {/* Indicador de Paginação */}
+                                {availableClients.length >
+                                  modalClientsPerPage && (
+                                  <div className="flex items-center">
                                     <button
                                       onClick={() =>
                                         setModalCurrentPage(
@@ -3693,7 +3714,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                     >
                                       <ChevronLeft className="h-4 w-4" />
                                     </button>
-                                    <span className="px-2 py-1 text-sm font-medium text-gray-700 min-w-[40px] text-center">
+                                    <span className="px-1 sm:px-2 text-xs sm:text-sm font-medium text-gray-700 min-w-[35px] sm:min-w-[40px] text-center">
                                       {modalCurrentPage}/
                                       {Math.ceil(
                                         availableClients.length /
@@ -3719,8 +3740,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                       <ChevronRight className="h-4 w-4" />
                                     </button>
                                   </div>
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </div>
                             {loading ? (
                               <div className="flex items-center justify-center py-12">
@@ -3771,20 +3792,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
                                   return Object.entries(groupedClients).map(
                                     ([neighborhood, clients]) => (
-                                      <div key={neighborhood} className="mb-4">
+                                      <div key={neighborhood} className="mb-3 sm:mb-4">
                                         {/* Neighborhood Header */}
-                                        <div className="flex items-center mb-3 pb-2 border-b border-gray-200">
-                                          <MapPin className="h-4 w-4 text-gray-500 mr-2" />
-                                          <h4 className="text-sm font-medium text-gray-700">
+                                        <div className="flex items-center mb-2 pb-1.5 border-b border-gray-200">
+                                          <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500 mr-1 sm:mr-2 flex-shrink-0" />
+                                          <h4 className="text-xs sm:text-sm font-medium text-gray-700 truncate">
                                             {neighborhood}
                                           </h4>
-                                          <span className="ml-2 text-xs text-gray-500">
-                                            ({clients.length} cliente
-                                            {clients.length !== 1 ? "s" : ""})
+                                          <span className="ml-1 sm:ml-2 text-[10px] sm:text-xs text-gray-500 whitespace-nowrap">
+                                            ({clients.length} {clients.length !== 1 ? "clientes" : "cliente"})
                                           </span>
                                         </div>
                                         {/* Client Cards */}
-                                        <div className="grid grid-cols-1 gap-3">
+                                        <div className="grid grid-cols-1 gap-2 sm:gap-3">
                                           {clients.map((client) => {
                                             const isSelected =
                                               selectedClients.has(
@@ -3795,7 +3815,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                             return (
                                               <div
                                                 key={client.document}
-                                                className={`relative bg-white rounded-2xl border transition-all duration-200 cursor-pointer hover:shadow-md ${
+                                                className={`relative bg-white rounded-xl sm:rounded-2xl border transition-all duration-200 cursor-pointer hover:shadow-md ${
                                                   isSelected
                                                     ? "border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200"
                                                     : "border-gray-200 hover:border-gray-300"
@@ -3807,48 +3827,48 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                                 }
                                               >
                                                 <div
-                                                  className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium border ${status.color}`}
+                                                  className={`absolute top-2 sm:top-3 right-2 sm:right-3 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border ${status.color}`}
                                                 >
                                                   {status.days}
                                                 </div>
-                                                <div className="p-4 bg-white border-1 rounded-2xl">
+                                                <div className="p-2.5 sm:p-4 bg-white border-1 rounded-xl sm:rounded-2xl">
                                                   <div className="flex items-start">
-                                                    <div className="flex-1 min-w-0">
+                                                    <div className="flex-1 min-w-0 pr-12 sm:pr-16">
                                                       {/* Client Info */}
-                                                      <div className="flex items-start justify-between mb-2">
+                                                      <div className="flex items-start justify-between mb-1.5 sm:mb-2">
                                                         <div className="min-w-0 flex-1">
-                                                          <h3 className="font-semibold text-gray-900 text-lg">
+                                                          <h3 className="font-semibold text-gray-900 text-sm sm:text-lg leading-tight">
                                                             {client.client
                                                               .length > 25
                                                               ? `${client.client.substring(0, 25)}...`
                                                               : client.client}
                                                           </h3>
                                                           {client.apelido && (
-                                                            <p className="text-sm text-blue-600 mt-1">
+                                                            <p className="text-xs sm:text-sm text-blue-600 mt-0.5 sm:mt-1">
                                                               {client.apelido}
                                                             </p>
                                                           )}
-                                                          <p className="text-sm text-gray-600 mt-1">
+                                                          <p className="text-[11px] sm:text-sm text-gray-600 mt-0.5 sm:mt-1">
                                                             {client.document}
                                                           </p>
                                                         </div>
                                                       </div>
                                                       {/* Client Details */}
-                                                      <div className="space-y-2 text-sm text-gray-600">
+                                                      <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-600">
                                                         <div className="flex items-center">
-                                                          <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                                                          <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
                                                           <span className="truncate">
                                                             {client.address},{" "}
                                                             {client.city}
                                                           </span>
                                                         </div>
                                                         <div className="flex items-center">
-                                                          <DollarSign className="h-4 w-4 mr-2 flex-shrink-0" />
+                                                          <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
                                                           <span className="font-medium text-red-600">
                                                             {formatCurrency(
                                                               client.pendingValue,
                                                             )}{" "}
-                                                            pendente
+                                                            <span className="hidden sm:inline">pendente</span>
                                                           </span>
                                                         </div>
                                                       </div>
@@ -3873,12 +3893,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       <div className="space-y-6">
                         {/* Lista de Clientes Selecionados - Mesmo conteúdo do componente principal */}
                         {selectedClients.size > 0 && (
-                          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                            <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 sm:p-4">
+                            <h4 className="font-semibold text-blue-900 mb-2 sm:mb-3 flex items-center text-sm sm:text-base">
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Clientes Selecionados ({selectedClients.size})
                             </h4>
-                            <div className="grid grid-cols-1 gap-3 max-h-95 overflow-y-auto">
+                            <div className="grid grid-cols-1 gap-2 sm:gap-3 max-h-95 overflow-y-auto">
                               {availableClients
                                 .filter((client) =>
                                   selectedClients.has(client.document),
@@ -3890,38 +3910,50 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                     date: "",
                                     time: "",
                                   };
+                                  
+                                  // Verificar se a data agendada é domingo
+                                  const isSunday = schedule.date ? (() => {
+                                    const [year, month, day] = schedule.date.split('-').map(Number);
+                                    const date = new Date(year, month - 1, day);
+                                    return date.getDay() === 0;
+                                  })() : false;
+                                  
                                   return (
                                     <div
                                       key={client.document}
-                                      className="bg-white rounded-2xl p-3 border border-gray-200"
+                                      className={`rounded-xl sm:rounded-2xl p-2 sm:p-3 border ${
+                                        isSunday 
+                                          ? 'bg-orange-50 border-orange-300' 
+                                          : 'bg-white border-gray-200'
+                                      }`}
                                     >
-                                      <div className="flex items-center justify-between mb-2">
-                                        <div>
-                                          <span className="font-medium text-gray-900">
-                                            {client.client.length > 25
-                                              ? `${client.client.substring(0, 25)}...`
+                                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-1 sm:gap-0">
+                                        <div className="min-w-0">
+                                          <span className="font-medium text-gray-900 text-xs sm:text-sm block truncate">
+                                            {client.client.length > 30
+                                              ? `${client.client.substring(0, 30)}...`
                                               : client.client}
                                             {client.apelido && (
-                                              <span className="text-sm text-blue-600 ml-1">
+                                              <span className="text-[10px] sm:text-sm text-blue-600 ml-1">
                                                 ({client.apelido})
                                               </span>
                                             )}
                                           </span>
-                                          <span className="text-gray-500 ml-2 text-sm">
-                                            ({client.document})
+                                          <span className="text-gray-500 text-[10px] sm:text-sm block sm:inline sm:ml-2">
+                                            {client.document}
                                           </span>
                                         </div>
-                                        <div className="text-right">
-                                          <div className="text-sm text-gray-600">
+                                        <div className="text-left sm:text-right flex-shrink-0">
+                                          <div className="text-[11px] sm:text-sm text-gray-600">
                                             {formatSafeDate(schedule.date)} às{" "}
                                             {schedule.time}
                                           </div>
                                         </div>
                                       </div>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                          <div className="flex items-center">
-                                            <Calendar className="h-3 w-3 text-gray-400 mr-1" />
+                                      <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                                        <div>
+                                          <div className="flex items-center gap-1">
+                                            <Calendar className="h-3 w-3 text-gray-400 flex-shrink-0" />
                                             <input
                                               type="date"
                                               value={schedule.date}
@@ -3939,14 +3971,36 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                                 setClientSchedules(
                                                   newSchedules,
                                                 );
+                                                
+                                                // Recalcular se é domingo
+                                                const newSundayVisits = new Set(sundayVisits);
+                                                
+                                                // Parsear data corretamente para evitar problemas de timezone
+                                                const [year, month, day] = e.target.value.split('-').map(Number);
+                                                const date = new Date(year, month - 1, day);
+                                                const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+                                                
+                                                if (dayOfWeek === 0) {
+                                                  newSundayVisits.add(client.document);
+                                                  
+                                                  // Mostrar notificação
+                                                  triggerNotification(
+                                                    `⚠️ Atenção: Visita de ${client.client} agendada para DOMINGO (${formatSafeDate(e.target.value)})`,
+                                                    "info"
+                                                  );
+                                                } else {
+                                                  newSundayVisits.delete(client.document);
+                                                }
+                                                
+                                                setSundayVisits(newSundayVisits);
                                               }}
-                                              className="w-full text-sm border border-gray-300 rounded-2xl px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                              className="w-full text-[11px] sm:text-sm border border-gray-300 rounded-lg sm:rounded-2xl px-1.5 sm:px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                                             />
                                           </div>
                                         </div>
-                                        <div className="space-y-2">
-                                          <div className="flex items-center">
-                                            <Clock className="h-3 w-3 text-gray-400 mr-1" />
+                                        <div>
+                                          <div className="flex items-center gap-1">
+                                            <Clock className="h-3 w-3 text-gray-400 flex-shrink-0" />
                                             <input
                                               type="time"
                                               value={schedule.time}
@@ -3965,7 +4019,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                                   newSchedules,
                                                 );
                                               }}
-                                              className="w-full text-sm border border-gray-300 rounded-2xl px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                              className="w-full text-[11px] sm:text-sm border border-gray-300 rounded-lg sm:rounded-2xl px-1.5 sm:px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                                             />
                                           </div>
                                         </div>
@@ -3979,12 +4033,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
                         {/* Resumo dos Agendamentos - Mesmo conteúdo do componente principal */}
                         {selectedClients.size > 0 && (
-                          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                            <h3 className="font-semibold text-gray-900 mb-2 flex items-center">
-                              <Calendar className="h-4 w-4 mr-2" />
+                          <div className="bg-blue-50 border border-blue-200 rounded-xl sm:rounded-2xl p-3 sm:p-4">
+                            <h3 className="font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center text-sm sm:text-base">
+                              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
                               Resumo dos Agendamentos
                             </h3>
-                            <div className="space-y-2">
+                            <div className="space-y-1.5 sm:space-y-2">
                               {getSelectedClientsData().map((client) => {
                                 const schedule = clientSchedules.get(
                                   client.document,
@@ -3995,23 +4049,25 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 return (
                                   <div
                                     key={client.document}
-                                    className="flex items-center justify-between text-sm bg-white rounded-2xl p-2"
+                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs sm:text-sm bg-white rounded-lg sm:rounded-2xl p-2 sm:p-2.5"
                                   >
-                                    <div>
-                                      <span className="font-medium">
-                                        {client.client}
+                                    <div className="min-w-0">
+                                      <span className="font-medium text-gray-900 block truncate">
+                                        {client.client.length > 30
+                                          ? `${client.client.substring(0, 30)}...`
+                                          : client.client}
                                         {client.apelido && (
-                                          <span className="text-sm text-blue-600 ml-1">
+                                          <span className="text-[10px] sm:text-sm text-blue-600 ml-1">
                                             ({client.apelido})
                                           </span>
                                         )}
                                       </span>
-                                      <span className="text-gray-500 ml-2">
-                                        ({client.document})
+                                      <span className="text-gray-500 text-[10px] sm:text-xs block sm:inline sm:ml-2">
+                                        {client.document}
                                       </span>
                                     </div>
-                                    <div className="text-right">
-                                      <div className="font-medium text-blue-600">
+                                    <div className="text-left sm:text-right flex-shrink-0">
+                                      <div className="font-medium text-blue-600 text-[11px] sm:text-sm whitespace-nowrap">
                                         {formatSafeDate(schedule.date)} às{" "}
                                         {schedule.time}
                                       </div>
@@ -4025,21 +4081,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
                         {/* Aviso de Visitas em Domingo */}
                         {sundayVisits.size > 0 && (
-                          <div className="bg-orange-50 border-2 border-orange-300 rounded-2xl p-4">
-                            <div className="flex items-start">
-                              <AlertTriangle className="h-5 w-5 text-orange-600 mr-3 flex-shrink-0 mt-0.5" />
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-orange-900 mb-2">
-                                  ⚠️ Atenção: Visitas Agendadas para Domingo
+                          <div className="bg-orange-50 border-2 border-orange-300 rounded-xl sm:rounded-2xl p-3 sm:p-4">
+                            
+                              
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-orange-900 text-center sm:text-2xl mb-1.5 sm:mb-2">
+                                  Existe visitas agendadas para domingo!
                                 </h4>
-                                <p className="text-sm text-orange-800 mb-3">
+                                <p className="text-xs sm:text-sm text-justify text-orange-800 mb-2 sm:mb-3">
                                   {sundayVisits.size === 1
                                     ? "Uma visita foi agendada"
                                     : `${sundayVisits.size} visitas foram agendadas`}{" "}
                                   para um <strong>domingo</strong> devido à configuração de data automática.
                                   Verifique se deseja manter essa data ou ajustá-la manualmente.
                                 </p>
-                                <div className="space-y-2">
+                                <div className="space-y-1.5 sm:space-y-2">
                                   {getSelectedClientsData()
                                     .filter((client) =>
                                       sundayVisits.has(client.document),
@@ -4051,29 +4107,31 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                       return (
                                         <div
                                           key={client.document}
-                                          className="flex items-center justify-between text-sm bg-white rounded-xl p-3 border border-orange-200"
+                                          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-0 text-xs sm:text-sm bg-white rounded-lg sm:rounded-xl p-2 sm:p-3 border border-orange-200"
                                         >
-                                          <div className="flex items-center">
-                                            <AlertTriangle className="h-4 w-4 text-orange-500 mr-2" />
-                                            <div>
-                                              <span className="font-medium text-gray-900">
-                                                {client.client}
+                                          <div className="flex items-start sm:items-center min-w-0">
+                                            <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500 mr-1.5 sm:mr-2 flex-shrink-0 mt-0.5 sm:mt-0" />
+                                            <div className="min-w-0 flex-1">
+                                              <span className="font-medium text-gray-900 block truncate text-xs sm:text-sm">
+                                                {client.client.length > 25
+                                                  ? `${client.client.substring(0, 25)}...`
+                                                  : client.client}
                                                 {client.apelido && (
-                                                  <span className="text-sm text-blue-600 ml-1">
+                                                  <span className="text-[10px] sm:text-sm text-blue-600 ml-1">
                                                     ({client.apelido})
                                                   </span>
                                                 )}
                                               </span>
-                                              <div className="text-xs text-gray-500">
+                                              <div className="text-[10px] sm:text-xs text-gray-500 truncate">
                                                 {client.city} - {client.neighborhood}
                                               </div>
                                             </div>
                                           </div>
-                                          <div className="text-right">
-                                            <div className="font-semibold text-orange-700">
+                                          <div className="text-left sm:text-right flex-shrink-0 ml-5 sm:ml-0">
+                                            <div className="font-semibold text-orange-700 text-[11px] sm:text-sm whitespace-nowrap">
                                               {formatSafeDate(schedule.date)}
                                             </div>
-                                            <div className="text-xs text-orange-600">
+                                            <div className="text-[10px] sm:text-xs text-orange-600">
                                               Domingo
                                             </div>
                                           </div>
@@ -4081,13 +4139,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                       );
                                     })}
                                 </div>
-                                <div className="mt-3 text-xs text-orange-700 bg-orange-100 rounded-lg p-2">
+                                <div className="mt-2 sm:mt-3 text-[10px] sm:text-xs text-orange-700 bg-orange-100 rounded-md sm:rounded-lg p-1.5 sm:p-2">
                                   <strong>Dica:</strong> Você pode ajustar a data individualmente na lista acima,
                                   ou configurar um dia diferente nas "Datas Permitidas" para evitar domingos.
                                 </div>
                               </div>
-                            </div>
-                          </div>
+                            </div>                          
                         )}
                       </div>
                     )}
