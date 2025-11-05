@@ -11,8 +11,15 @@ const versionPlugin = () => {
       const version = {
         version: Date.now().toString(), // Use timestamp as version
       };
-      const outputPath = path.resolve(__dirname, "dist", "version.json");
-      fs.writeFileSync(outputPath, JSON.stringify(version, null, 2));
+      
+      // Write to dist folder
+      const distPath = path.resolve(__dirname, "dist", "version.json");
+      fs.writeFileSync(distPath, JSON.stringify(version, null, 2));
+      
+      // Also update public folder for consistency
+      const publicPath = path.resolve(__dirname, "public", "version.json");
+      fs.writeFileSync(publicPath, JSON.stringify(version, null, 2));
+      
       console.log(`Generated version.json: ${version.version}`);
     },
   };

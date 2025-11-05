@@ -121,6 +121,7 @@
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb-bg) var(--scrollbar-track-bg);
+  line-height: 1;
 }
 
 /* WebKit browsers (Chrome, Safari, Edge) */

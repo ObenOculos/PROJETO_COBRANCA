@@ -15,12 +15,20 @@ const VersionChecker: React.FC<VersionCheckerProps> = ({ pollingInterval = 30000
     try {
       const response = await fetch('/version.json?t=' + new Date().getTime()); // Add cache-buster
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        console.warn(`Failed to fetch version.json: ${response.status}`);
+        return null;
       }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('version.json returned non-JSON content, skipping version check');
+        return null;
+      }
+      
       const data = await response.json();
       return data.version;
     } catch (error) {
-      console.error('Failed to fetch version.json:', error);
+      console.warn('Version check skipped:', error instanceof Error ? error.message : error);
       return null;
     }
   };

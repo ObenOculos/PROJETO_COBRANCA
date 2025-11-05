@@ -216,10 +216,15 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
   // Desabilitar scroll do body quando o modal estiver aberto
   React.useEffect(() => {
+    const originalBodyOverflow = window.getComputedStyle(document.body).overflow;
+    const originalDocElementOverflow = window.getComputedStyle(document.documentElement).overflow;
+    
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
 
     return () => {
-      document.body.style.overflow = "unset";
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalDocElementOverflow;
     };
   }, []);
 
@@ -414,23 +419,25 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       >
         <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
           {/* Header */}
-          <div className="px-4 lg:px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <div className="flex items-center flex-1 min-w-0">
+          <div className="relative px-4 py-4 border-b border-gray-200 sm:flex sm:items-center sm:justify-between">
+            <div className="flex items-center pr-8 sm:pr-0">
               <User className="h-6 w-6 text-blue-600 mr-3 flex-shrink-0" />
               <div className="min-w-0 flex-1">
-                <h2 className="text-sm sm:text-lg lg:text-xl font-semibold text-gray-900 truncate">
+                <h3 className="text-sm font-medium text-gray-600">Detalhes do Cliente</h3>
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
                   {clientGroup.client}
                 </h2>
-                <p className="text-xs sm:text-sm text-gray-600 truncate">
+                <p className="text-xs sm:text-sm text-gray-500 truncate">
                   {clientGroup.document}
                 </p>
               </div>
             </div>
-            <button
+            <button 
               id="close-modal"
               name="closeModal"
-              onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+              onClick={onClose} 
+              className="absolute top-3 right-3 p-2 text-gray-500 hover:text-gray-800 sm:static sm:p-2 sm:ml-4 rounded-full hover:bg-gray-100 transition-colors"
+              aria-label="Fechar modal"
             >
               <X className="h-5 w-5" />
             </button>
