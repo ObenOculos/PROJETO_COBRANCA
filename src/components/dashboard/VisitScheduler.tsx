@@ -3157,42 +3157,44 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
               }}
             >
               <div
-                className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
+                className="bg-white rounded-xl sm:rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-500 px-4 lg:px-6 py-4 rounded-t-2xl flex-shrink-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-500 px-3 sm:px-4 lg:px-6 py-3 sm:py-4 rounded-t-xl sm:rounded-t-2xl flex-shrink-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center min-w-0 flex-1">
                       {modalStep === "selection" ? (
-                        <Users className="h-5 w-5 text-white mr-2" />
+                        <Users className="h-4 w-4 sm:h-5 sm:w-5 text-white mr-1.5 sm:mr-2 flex-shrink-0" />
                       ) : (
-                        <CheckCircle className="h-5 w-5 text-white mr-2" />
+                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-white mr-1.5 sm:mr-2 flex-shrink-0" />
                       )}
-                      <h3 className="text-lg font-semibold text-white">
-                        {modalStep === "selection"
-                          ? `Clientes para Visita (${selectedClients.size} selecionados)`
-                          : "Confirmar Agendamento"}
-                      </h3>
-                      <span className="ml-3 text-sm text-blue-100">
-                        {modalStep === "selection"
-                          ? "(Passo 1 de 2)"
-                          : "(Passo 2 de 2)"}
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm sm:text-lg font-semibold text-white truncate">
+                          {modalStep === "selection"
+                            ? `Clientes para Visita (${selectedClients.size})`
+                            : "Confirmar Agendamento"}
+                        </h3>
+                        <span className="text-[10px] sm:text-sm text-blue-100 block sm:inline sm:ml-3">
+                          {modalStep === "selection"
+                            ? "Passo 1 de 2"
+                            : "Passo 2 de 2"}
+                        </span>
+                      </div>
                     </div>
                     <button
                       onClick={() => setShowScheduleModal(false)}
-                      className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+                      className="p-1.5 sm:p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors flex-shrink-0"
                       title="Fechar"
                     >
-                      <X className="h-5 w-5 text-white" />
+                      <X className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                     </button>
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
-                  <div className="bg-gray-50 px-4 lg:px-6 py-4">
+                  <div className="bg-gray-50 px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
                     {/* Content from the schedule tab */}
                     {modalStep === "selection" ? (
-                      <div className="space-y-6">
+                      <div className="space-y-4 sm:space-y-6">
                         {/* Busca e Filtros */}
                         <div>
                           <div className="flex items-center gap-2 mb-3">
@@ -3263,11 +3265,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
                         {/* Filtros Expandidos */}
                         {showFilters && (
-                          <div className="bg-gray-100 rounded-2xl p-4 space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="bg-gray-100 rounded-xl sm:rounded-2xl p-3 sm:p-4 space-y-3 sm:space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                               <div>
-                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                                  <MapPin className="h-3 w-3 mr-1" />
+                                <label className="flex items-center text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                  <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
                                   Cidade
                                 </label>
                                 <div className="relative">
@@ -3275,18 +3277,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                     onClick={() =>
                                       setShowCityDropdown(!showCityDropdown)
                                     }
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-left bg-white"
+                                    className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-xl sm:rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm text-left bg-white"
                                   >
                                     {filters.city.length === 0
                                       ? "Todas as cidades"
                                       : `${filters.city.length} cidades selecionadas`}
                                   </button>
                                   {showCityDropdown && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
+                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl sm:rounded-2xl shadow-lg max-h-60 overflow-y-auto">
                                       {availableCities.map((city) => (
                                         <label
                                           key={city}
-                                          className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                          className="flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                         >
                                           <input
                                             type="checkbox"
@@ -3306,8 +3308,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 </div>
                               </div>
                               <div>
-                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                                  <MapPin className="h-3 w-3 mr-1" />
+                                <label className="flex items-center text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                  <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
                                   Bairro
                                 </label>
                                 <div className="relative">
@@ -3317,19 +3319,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                         !showNeighborhoodDropdown,
                                       )
                                     }
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-left bg-white"
+                                    className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-xl sm:rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm text-left bg-white"
                                   >
                                     {filters.neighborhood.length === 0
                                       ? "Todos os bairros"
                                       : `${filters.neighborhood.length} bairros selecionados`}
                                   </button>
                                   {showNeighborhoodDropdown && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
+                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl sm:rounded-2xl shadow-lg max-h-60 overflow-y-auto">
                                       {availableNeighborhoods.map(
                                         (neighborhood) => (
                                           <label
                                             key={neighborhood}
-                                            className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                            className="flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                           >
                                             <input
                                               type="checkbox"
@@ -3352,12 +3354,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 </div>
                               </div>
                               <div>
-                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                                  <DollarSign className="h-3 w-3 mr-1" />
+                                <label className="flex items-center text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                  <DollarSign className="h-3 w-3 mr-1 flex-shrink-0" />
                                   Valor Mínimo
                                 </label>
                                 <div className="relative">
-                                  <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                  <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
                                   <input
                                     type="number"
                                     placeholder="0"
@@ -3368,17 +3370,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                         minValue: e.target.value,
                                       })
                                     }
-                                    className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    className="w-full pl-7 sm:pl-8 pr-2 sm:pr-3 py-1.5 sm:py-2 border border-gray-300 rounded-xl sm:rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm"
                                   />
                                 </div>
                               </div>
                               <div>
-                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                                  <DollarSign className="h-3 w-3 mr-1" />
+                                <label className="flex items-center text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                  <DollarSign className="h-3 w-3 mr-1 flex-shrink-0" />
                                   Valor Máximo
                                 </label>
                                 <div className="relative">
-                                  <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                  <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
                                   <input
                                     type="number"
                                     placeholder="∞"
@@ -3389,13 +3391,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                         maxValue: e.target.value,
                                       })
                                     }
-                                    className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    className="w-full pl-7 sm:pl-8 pr-2 sm:pr-3 py-1.5 sm:py-2 border border-gray-300 rounded-xl sm:rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm"
                                   />
                                 </div>
                               </div>
                               <div>
-                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                                  <Eye className="h-3 w-3 mr-1" />
+                                <label className="flex items-center text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                  <Eye className="h-3 w-3 mr-1 flex-shrink-0" />
                                   Status da Visita
                                 </label>
                                 <select
@@ -3406,7 +3408,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                       e.target.value,
                                     )
                                   }
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                  className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-xl sm:rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm"
                                 >
                                   <option value="">Todos os status</option>
                                   <option value="recent">
@@ -3422,8 +3424,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 </select>
                               </div>
                               <div>
-                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                                  <Calendar className="h-3 w-3 mr-1" />
+                                <label className="flex items-center text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                  <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
                                   Vencimento De
                                 </label>
                                 <input
@@ -3435,12 +3437,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                       e.target.value,
                                     )
                                   }
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                  className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-xl sm:rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm"
                                 />
                               </div>
                               <div>
-                                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                                  <Calendar className="h-3 w-3 mr-1" />
+                                <label className="flex items-center text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                  <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
                                   Vencimento Até
                                 </label>
                                 <input
@@ -3452,21 +3454,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                       e.target.value,
                                     )
                                   }
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                  className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-xl sm:rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm"
                                 />
                               </div>
                             </div>
-                            <div className="flex flex-col items-center gap-2 mt-4">
+                            <div className="flex flex-col items-center gap-2 mt-3 sm:mt-4">
                               <button
                                 onClick={clearAllFilters}
-                                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors flex items-center"
+                                className="px-3 py-1.5 text-xs sm:text-sm text-gray-600 hover:text-gray-800 transition-colors flex items-center"
                               >
                                 <RefreshCw className="h-3 w-3 mr-1" />
                                 Limpar filtros
                               </button>
                               <button
                                 onClick={() => setShowFilters(false)}
-                                className="mt-4 px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-2xl hover:bg-gray-300 transition-colors flex items-center"
+                                className="mt-2 sm:mt-4 px-3 py-1.5 text-xs sm:text-sm bg-gray-200 text-gray-700 rounded-xl sm:rounded-2xl hover:bg-gray-300 transition-colors flex items-center"
                               >
                                 <X className="h-3 w-3 mr-1" />
                                 Fechar
