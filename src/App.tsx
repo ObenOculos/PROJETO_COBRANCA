@@ -113,7 +113,7 @@ const AppContent: React.FC = () => {
     user?.type === "manager" ? getPendingCancellationRequests() : [];
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="flex h-screen bg-slate-100">
       <Header
         tabs={tabs}
         activeTab={
@@ -126,17 +126,19 @@ const AppContent: React.FC = () => {
         }
         pendingCancellations={pendingCancellations.length}
       />
-      {user.type === "manager" ? (
-        <ManagerDashboard
-          activeTab={managerActiveTab}
-          onTabChange={handleManagerTabChange}
-        />
-      ) : (
-        <CollectorDashboard
-          activeTab={collectorActiveTab}
-          onTabChange={handleCollectorTabChange}
-        />
-      )}
+      <main className="flex-1 overflow-y-auto">
+        {user.type === "manager" ? (
+          <ManagerDashboard
+            activeTab={managerActiveTab}
+            onTabChange={handleManagerTabChange}
+          />
+        ) : (
+          <CollectorDashboard
+            activeTab={collectorActiveTab}
+            onTabChange={handleCollectorTabChange}
+          />
+        )}
+      </main>
       <OfflineIndicator />
       <SpeedInsights />
     </div>

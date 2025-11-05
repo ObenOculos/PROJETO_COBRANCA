@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  MapPin,
   Target,
   CheckCircle,
   Users,
   Calendar,
-  BarChart3,
   Trophy,
   Diamond,
   Medal,
@@ -563,12 +561,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     };
   }, [salesMap, clientGroups, myVisits]);
 
-  const tabs = [
-    { id: "overview", name: "Resumo", icon: BarChart3 },
-    { id: "collections", name: "Minha Carteira", icon: Target },
-    { id: "route", name: "Rota de Cobrança", icon: MapPin },
-    { id: "visits", name: "Visitas Agendadas", icon: Calendar },
-  ];
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -879,51 +871,11 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   };
 
   return (
-    <div className="min-h-screen">
-      <div className="p-4 w-full md:max-w-[90%] mx-auto">
-        {/* Desktop: Traditional Tab Navigation */}
-        <div className="hidden lg:block mb-4 sm:mb-6 lg:mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="flex space-x-1">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() =>
-                      setActiveTab(
-                        tab.id as
-                          | "overview"
-                          | "collections"
-                          | "route"
-                          | "visits",
-                      )
-                    }
-                    className={`flex items-center py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap relative transition-colors ${
-                      activeTab === tab.id
-                        ? "border-blue-500 text-blue-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4 mr-2 flex-shrink-0" />
-                    <span>{tab.name}</span>
-                    {tab.id === "visits" && stats.visits > 0 && (
-                      <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                        {stats.visits}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        </div>
-
-        {/* Tab Content */}
-        <TabTransition activeKey={activeTab}>
-          {renderTabContent()}
-        </TabTransition>
-      </div>
+    <div className="p-4 sm:p-6 lg:p-8 pt-16 lg:pt-8">
+      {/* Tab Content */}
+      <TabTransition activeKey={activeTab}>
+        {renderTabContent()}
+      </TabTransition>
     </div>
   );
 };

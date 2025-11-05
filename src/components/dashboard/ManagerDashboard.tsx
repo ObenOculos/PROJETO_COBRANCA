@@ -29,7 +29,6 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
-import { navigationItems } from "../../config/navigation";
 
 import { CollectionTableRef } from "./CollectionTable";
 import { Notification } from "../../contexts/NotificationContext";
@@ -101,7 +100,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const [touchEnd, setTouchEnd] = useState(0);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
-  const [pendingAuthorizations, setPendingAuthorizations] = useState(0);
+  const [, setPendingAuthorizations] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const autoPlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -399,13 +398,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   }, [overviewCollections]);
 
   const pendingCancellations = getPendingCancellationRequests();
-  const tabs = useMemo(() => {
-    return navigationItems
-      .filter((item) => item.roles.includes("manager"))
-      .map((item) => {
-        return { id: item.id, name: item.managerName, icon: item.managerIcon };
-      });
-  }, []);
 
   // Sales map for overview tab - moved from renderTabContent to fix hooks violation
   const salesMap = useMemo(() => {
@@ -1401,50 +1393,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   };
 
   return (
-    <div className="min-h-screen">
-      <div className="p-6 w-full md:max-w-[90%] mx-auto">
-        {/* Desktop Tab Navigation */}
-        <div className="hidden lg:block mb-4 sm:mb-6 lg:mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="flex space-x-1">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap relative transition-colors ${
-                      activeTab === tab.id
-                        ? "border-blue-500 text-blue-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4 mr-2 flex-shrink-0" />
-                    <span>{tab.name}</span>
-                    {tab.id === "visit-tracking" &&
-                      pendingCancellations.length > 0 && (
-                        <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                          {pendingCancellations.length}
-                        </span>
-                      )}
-                    {tab.id === "authorization" &&
-                      pendingAuthorizations > 0 && (
-                        <span className="absolute -top-1 -right-1 h-5 w-5 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                          {pendingAuthorizations}
-                        </span>
-                      )}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        </div>
-
-        {/* Tab Content */}
-        <TabTransition activeKey={activeTab} avoidTransformConflicts={true}>
-          {renderTabContent()}
-        </TabTransition>
-      </div>
+    <div className="p-4 sm:p-6 lg:p-8 pt-16 lg:pt-8">
+      {/* Tab Content */}
+      <TabTransition activeKey={activeTab} avoidTransformConflicts={true}>
+        {renderTabContent()}
+      </TabTransition>
     </div>
   );
 };

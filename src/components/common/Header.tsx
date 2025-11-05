@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { LogOut, User, Menu, X, LucideIcon } from "lucide-react";
+import {
+  LogOut,
+  User,
+  Menu,
+  X,
+  LucideIcon,
+  ChevronsLeft,
+} from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import NotificationDropdown from "./NotificationDropdown";
 
@@ -24,217 +31,166 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, logout, isLoading } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
+  const SidebarContent = () => (
+    <div className={`flex flex-col h-full ${isCollapsed ? 'items-center' : ''}`}>
+      {/* Simple header */}
+      <div className={`p-4 border-b border-gray-100 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+        <div className={`flex items-center space-x-3 ${isCollapsed ? 'hidden' : ''}`}>
+          <div className="h-8 w-8 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-semibold text-sm">SC</span>
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Sistema de Cobrança
+          </h2>
+        </div>
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-2xl transition-colors hidden lg:block"
+        >
+          <ChevronsLeft className={`h-5 w-5 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} />
+        </button>
+        <button
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-2xl transition-colors lg:hidden"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* User Info */}
+      <div className={`p-4 border-b border-gray-100 w-full ${isCollapsed ? 'hidden' : ''}`}>
+        {isLoading ? (
+          <div className="flex items-center justify-between animate-pulse">
+            <div className="flex items-center space-x-3">
+              <div className="h-10 w-10 bg-gray-200 rounded-full"></div>
+              <div className="flex-1 space-y-1">
+                <div className="h-4 bg-gray-200 rounded w-28"></div>
+                <div className="h-3 bg-gray-200 rounded w-20"></div>
+              </div>
+            </div>
+            <div className="h-8 w-8 bg-gray-200 rounded-full"></div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
+                <User className="h-5 w-5 text-gray-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900">
+                  {user?.name}
+                </p>
+                <p className="text-xs text-gray-500 capitalize">
+                  {user?.type === "manager" ? "Gerente" : "Cobrador"}
+                </p>
+              </div>
+            </div>
+            <NotificationDropdown />
+          </div>
+        )}
+      </div>
+
+      {/* Navigation */}
+      {tabs.length > 0 && (
+        <div className="p-4 flex-1 overflow-y-auto w-full">
+          <nav className="space-y-1">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    onTabChange(tab.id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`group w-full flex items-center px-3 py-2 rounded-2xl text-left transition-all duration-200 ${isCollapsed ? 'justify-center' : ''} ${
+                    activeTab === tab.id
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`}
+                  title={isCollapsed ? tab.name : undefined}
+                >
+                  <Icon
+                    className={`h-5 w-5 ${isCollapsed ? '' : 'mr-3'} ${
+                      activeTab === tab.id
+                        ? "text-blue-600"
+                        : "text-gray-400"
+                    }`}
+                  />
+                  <span className={`font-medium ${isCollapsed ? 'hidden' : ''}`}>{tab.name}</span>
+
+                  {tab.id === "visit-tracking" &&
+                    pendingCancellations > 0 && (
+                      <span className={`ml-auto h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium ${isCollapsed ? 'hidden' : ''}`}>
+                        {pendingCancellations}
+                      </span>
+                    )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      )}
+
+      {/* Logout Button - Fixed at bottom */}
+      <div className="mt-auto p-4 border-t border-gray-200 bg-gray-50 w-full">
+        <button
+          onClick={logout}
+          className={`w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-2xl transition-colors font-medium ${isCollapsed ? 'justify-center' : ''}`}
+          title={isCollapsed ? 'Sair' : 'Sair do Sistema'}
+        >
+          <LogOut className="h-4 w-4" />
+          <span className={isCollapsed ? 'hidden' : ''}>Sair do Sistema</span>
+        </button>
+      </div>
+    </div>
+  );
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-      <div className="mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center py-3 lg:py-4">
-          <div className="flex items-center flex-1 min-w-0">
-            <div className="h-8 w-8 bg-blue-600 rounded-2xl flex items-center justify-center mr-3 flex-shrink-0">
-              <span className="text-white font-bold text-sm">SC</span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-lg lg:text-xl font-bold text-gray-900 truncate">
-                Sistema de Cobrança
-              </h1>
-              {isLoading ? (
-                <div className="h-4 bg-gray-200 rounded w-32 mt-1 animate-pulse"></div>
-              ) : (
-                <p className="text-xs lg:text-sm text-gray-500 truncate">
-                  {user?.type === "manager"
-                    ? "Painel Gerencial"
-                    : "Carteira de Cobrança"}
-                </p>
-              )}
-            </div>
-          </div>
+    <>
+      {/* Mobile Menu Button - now positioned top-left in the main content area */}
+      <div className="lg:hidden absolute top-0 left-0 z-50 p-4">
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 text-gray-500 bg-gray-100 rounded-md"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
+      </div>
 
-          {/* Desktop Menu */}
-          <div className="hidden sm:flex items-center space-x-4">
-            <NotificationDropdown />
-
-            <div className="flex items-center space-x-3">
-              {isLoading ? (
-                <div className="flex items-center space-x-2 animate-pulse">
-                  <div className="h-8 w-8 bg-gray-200 rounded-full"></div>
-                  <div className="space-y-1">
-                    <div className="h-4 bg-gray-200 rounded w-24"></div>
-                    <div className="h-3 bg-gray-200 rounded w-16"></div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
-                    <User className="h-4 w-4 text-gray-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {user?.name}
-                    </p>
-                    <p className="text-xs text-gray-500 capitalize">
-                      {user?.type === "manager" ? "Gerente" : "Cobrador"}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <button
-                onClick={logout}
-                className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                title="Sair"
-                disabled={isLoading}
-              >
-                <LogOut className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile Menu Button */}
-          <div className="sm:hidden">
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              {isMobileMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Sidebar Overlay */}
+      {/* Mobile Sidebar Overlay */}
+      <div
+        className={`lg:hidden fixed inset-0 z-50 transition-all duration-300 ease-in-out ${
+          isMobileMenuOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
+      >
+        {/* Backdrop */}
         <div
-          className={`sm:hidden fixed inset-0 z-50 transition-all duration-300 ease-in-out ${
-            isMobileMenuOpen
-              ? "opacity-100 pointer-events-auto"
-              : "opacity-0 pointer-events-none"
+          className={`absolute inset-0 bg-black backdrop-blur-sm transition-all duration-300 ease-in-out ${
+            isMobileMenuOpen ? "bg-opacity-50" : "bg-opacity-0"
+          }`}
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+
+        {/* Sidebar */}
+        <div
+          className={`fixed left-0 top-0 h-full w-72 bg-white shadow-xl transform transition-all duration-300 ease-out overflow-hidden flex flex-col ${
+            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          {/* Backdrop with enhanced blur */}
-          <div
-            className={`absolute inset-0 bg-black backdrop-blur-md transition-all duration-300 ease-in-out ${
-              isMobileMenuOpen ? "bg-opacity-60" : "bg-opacity-0"
-            }`}
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
-
-          {/* Sidebar */}
-          <div
-            className={`fixed left-0 top-0 h-full w-72 bg-white shadow-xl transform transition-all duration-300 ease-out overflow-hidden flex flex-col ${
-              isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-            }`}
-          >
-            {/* Simple header */}
-            <div className="p-4 border-b border-gray-100">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="h-8 w-8 bg-blue-600 rounded-2xl flex items-center justify-center">
-                    <span className="text-white font-semibold text-sm">SC</span>
-                  </div>
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Sistema de Cobrança
-                  </h2>
-                </div>
-                <button
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-2xl transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* User Info */}
-            <div className="p-4 border-b border-gray-100">
-              {isLoading ? (
-                <div className="flex items-center justify-between animate-pulse">
-                  <div className="flex items-center space-x-3">
-                    <div className="h-10 w-10 bg-gray-200 rounded-full"></div>
-                    <div className="flex-1 space-y-1">
-                      <div className="h-4 bg-gray-200 rounded w-28"></div>
-                      <div className="h-3 bg-gray-200 rounded w-20"></div>
-                    </div>
-                  </div>
-                  <div className="h-8 w-8 bg-gray-200 rounded-full"></div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
-                      <User className="h-5 w-5 text-gray-600" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">
-                        {user?.name}
-                      </p>
-                      <p className="text-xs text-gray-500 capitalize">
-                        {user?.type === "manager" ? "Gerente" : "Cobrador"}
-                      </p>
-                    </div>
-                  </div>
-                  <NotificationDropdown />
-                </div>
-              )}
-            </div>
-
-            {/* Navigation */}
-            {tabs.length > 0 && (
-              <div className="p-4 flex-1 overflow-y-auto">
-                <nav className="space-y-1">
-                  {tabs.map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => {
-                          onTabChange(tab.id);
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className={`group w-full flex items-center px-3 py-2 rounded-2xl text-left transition-all duration-200 ${
-                          activeTab === tab.id
-                            ? "bg-blue-50 text-blue-700 border-l-3 border-blue-500 transform scale-105"
-                            : "text-gray-700 hover:bg-gray-50 hover:scale-102"
-                        }`}
-                      >
-                        <Icon
-                          className={`h-5 w-5 mr-3 ${
-                            activeTab === tab.id
-                              ? "text-blue-600"
-                              : "text-gray-400"
-                          }`}
-                        />
-                        <span className="font-medium">{tab.name}</span>
-
-                        {tab.id === "visit-tracking" &&
-                          pendingCancellations > 0 && (
-                            <span className="ml-auto h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                              {pendingCancellations}
-                            </span>
-                          )}
-                      </button>
-                    );
-                  })}
-                </nav>
-              </div>
-            )}
-
-            {/* Logout Button - Fixed at bottom */}
-            <div className="mt-auto p-4 border-t border-gray-200 bg-gray-50">
-              <button
-                onClick={logout}
-                className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-2xl transition-colors font-medium"
-                title="Sair"
-              >
-                <LogOut className="h-4 w-4" />
-                <span>Sair do Sistema</span>
-              </button>
-            </div>
-          </div>
+          <SidebarContent />
         </div>
       </div>
-    </header>
+
+      {/* Desktop Sidebar */}
+      <aside className={`hidden lg:block bg-white shadow-md flex-shrink-0 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-72'}`}>
+        <SidebarContent />
+      </aside>
+    </>
   );
 };
 

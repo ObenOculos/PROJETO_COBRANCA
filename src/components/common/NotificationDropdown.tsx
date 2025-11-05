@@ -503,7 +503,7 @@ const NotificationDropdown: React.FC = () => {
         {/* Desktop Dropdown */}
         {isOpen && (
           <div
-            className={`hidden sm:flex flex-col absolute right-0 mt-2 w-96 bg-white rounded-2xl shadow-lg border border-gray-200 z-50 max-h-[32rem] transform transition-all duration-200 ${
+            className={`hidden sm:flex flex-col absolute left-full ml-2 mt-2 w-96 bg-white rounded-2xl shadow-lg border border-gray-200 z-50 max-h-[32rem] transform transition-all duration-200 ${
               isAnimating ? "scale-95 opacity-0" : "scale-100 opacity-100"
             }`}
             role="dialog"
