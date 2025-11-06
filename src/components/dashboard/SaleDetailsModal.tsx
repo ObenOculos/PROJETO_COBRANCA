@@ -297,6 +297,15 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
 
                 <div className="flex justify-between">
                   <span className="text-sm font-medium text-gray-600">
+                    Cobrador:
+                  </span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {getCollectorName(saleData.user_id || "")}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-600">
                     Status da Venda:
                   </span>
                   <span
@@ -310,7 +319,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                   >
                     {getStatusLabel(saleData.saleStatus)}
                   </span>
-                </div>
+                </div>                
               </div>
             </div>
 
