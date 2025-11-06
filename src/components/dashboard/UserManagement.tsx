@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Plus, Edit, Trash2, User, Shield, MoreVertical } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { User as UserType } from "../../types";
@@ -10,6 +10,8 @@ const UserManagement: React.FC = () => {
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserType | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -73,6 +75,22 @@ const UserManagement: React.FC = () => {
       handleCloseDeleteModal();
     }
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setActiveDropdown(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
@@ -162,7 +180,10 @@ const UserManagement: React.FC = () => {
                       <MoreVertical className="h-5 w-5" />
                     </button>
                     {activeDropdown === user.id && (
-                      <div className="absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg z-10 border">
+                      <div
+                        className="absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg z-10 border"
+                        ref={dropdownRef}
+                      >
                         <a
                           href="#"
                           onClick={(e) => {
@@ -212,7 +233,7 @@ const UserManagement: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div
             className="bg-white rounded-lg shadow-xl max-w-md w-full"
-            ref={useRef<HTMLDivElement>(null)}
+            ref={modalRef}
           >
             <div className="p-6 border-b">
               <h3 className="text-lg font-semibold">

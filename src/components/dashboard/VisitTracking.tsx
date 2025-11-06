@@ -691,6 +691,26 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
                   <div>
                     <label
+                      htmlFor="overdue-filter"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
+                      Atrasadas
+                    </label>
+                    <select
+                      id="overdue-filter"
+                      name="overdue"
+                      value={overdueFilter}
+                      onChange={(e) => setOverdueFilter(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">Todas</option>
+                      <option value="overdue">Somente atrasadas</option>
+                      <option value="not_overdue">Somente não atrasadas</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
                       htmlFor="date-from-filter"
                       className="block text-sm font-medium text-gray-700 mb-2"
                     >

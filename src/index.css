@@ -6,3 +6,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+* {
+  font-family: "League Spartan", sans-serif !important;
+  font-optical-sizing: auto !important;
+  font-style: normal !important;
+}

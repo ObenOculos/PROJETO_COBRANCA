@@ -750,7 +750,7 @@ const AllowedVisitDatesManager: React.FC = () => {
             <button
               onClick={handleAddAllowedDate}
               disabled={loading}
-              className="w-full px-4 py-1.5 bg-blue-600 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3 py-1.5 border text-white bg-blue-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-center transition-colors appearance-none cursor-pointer text-base"
             >
               {loading ? "Adicionando..." : "Adicionar Data"}
             </button>
