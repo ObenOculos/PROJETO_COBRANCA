@@ -48,10 +48,18 @@ interface CardProps {
   onToggleMinimize: (cardId: string) => void;
 }
 
-const Card: React.FC<CardProps> = ({ title, icon: Icon, children, cardId, minimized, onToggleMinimize }) => {
+const Card: React.FC<CardProps> = ({
+  title,
+  icon: Icon,
+  children,
+  cardId,
+  minimized,
+  onToggleMinimize,
+}) => {
   return (
-<div className={`bg-white rounded-2xl border border-gray-200 p-4 transition-all duration-300 ease-in-out ${minimized ? 'h-20 overflow-hidden' : ''}`}> 
-      
+    <div
+      className={`bg-white rounded-2xl border border-gray-200 p-4 transition-all duration-300 ease-in-out ${minimized ? "h-20 overflow-hidden" : ""}`}
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className={`p-2 bg-purple-500 rounded-2xl`}>
@@ -59,8 +67,15 @@ const Card: React.FC<CardProps> = ({ title, icon: Icon, children, cardId, minimi
           </div>
           <h3 className="font-semibold text-gray-900">{title}</h3>
         </div>
-        <button onClick={() => onToggleMinimize(cardId)} className="p-1 rounded-md hover:bg-gray-200">
-          {minimized ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+        <button
+          onClick={() => onToggleMinimize(cardId)}
+          className="p-1 rounded-md hover:bg-gray-200"
+        >
+          {minimized ? (
+            <ChevronDown className="w-4 h-4" />
+          ) : (
+            <ChevronUp className="w-4 h-4" />
+          )}
         </button>
       </div>
       {!minimized && children}
@@ -445,7 +460,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       );
     }, [clientsByCity]);
 
-    const visibleCities = showAllCities ? sortedCities : sortedCities.slice(0, 4);
+    const visibleCities = showAllCities
+      ? sortedCities
+      : sortedCities.slice(0, 4);
 
     return (
       <>
@@ -605,10 +622,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         acc[city].dates.add(visit.scheduledDate);
         return acc;
       },
-      {} as Record<
-        string,
-        { count: number; dates: Set<string> }
-      >,
+      {} as Record<string, { count: number; dates: Set<string> }>,
     );
   }, [myVisits]);
 
@@ -655,28 +669,45 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   }, [salesMap, clientGroups, myVisits]);
 
   const handleToggleMinimize = (cardId: string) => {
-    setMinimizedCards(prev => 
-      prev.includes(cardId) ? prev.filter(id => id !== cardId) : [...prev, cardId]
+    setMinimizedCards((prev) =>
+      prev.includes(cardId)
+        ? prev.filter((id) => id !== cardId)
+        : [...prev, cardId],
     );
   };
 
   const renderTabContent = () => {
     const dashboardCards = [
-      { id: "clients", Component: ClientsCardContent, title: "Clientes", icon: Users },
-      { id: "sales", Component: SalesCardContent, title: "Vendas", icon: Target },
-      { id: "visits", Component: VisitsCardContent, title: "Visitas", icon: Calendar },
+      {
+        id: "clients",
+        Component: ClientsCardContent,
+        title: "Clientes",
+        icon: Users,
+      },
+      {
+        id: "sales",
+        Component: SalesCardContent,
+        title: "Vendas",
+        icon: Target,
+      },
+      {
+        id: "visits",
+        Component: VisitsCardContent,
+        title: "Visitas",
+        icon: Calendar,
+      },
 
       {
         id: "schedulesByCity",
         Component: SchedulesByCityCardContent,
         title: "Agendamentos por Cidade",
-        icon: Calendar
+        icon: Calendar,
       },
-            {
+      {
         id: "clientsByCity",
         Component: ClientsByCityCardContent,
         title: "Clientes por Cidade",
-        icon: Users
+        icon: Users,
       },
     ];
 
@@ -712,29 +743,40 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             {/* Customize Menu */}
             {isCustomizeMenuOpen && (
               <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Personalizar Cards</h3>
+                <h3 className="font-semibold text-gray-900 mb-3">
+                  Personalizar Cards
+                </h3>
                 <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-gray-700">Ordem e Visibilidade</h4>
+                  <h4 className="font-medium text-sm text-gray-700">
+                    Ordem e Visibilidade
+                  </h4>
                   {cardOrder.map((cardId, index) => {
                     const card = dashboardCards.find((c) => c.id === cardId);
                     if (!card) return null;
 
                     return (
-                      <div key={card.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+                      <div
+                        key={card.id}
+                        className="flex items-center justify-between p-2 rounded-lg bg-gray-50"
+                      >
                         <div className="flex items-center gap-2">
                           <input
                             type="checkbox"
                             checked={visibleCards.includes(card.id)}
                             onChange={() => {
                               if (visibleCards.includes(card.id)) {
-                                setVisibleCards(visibleCards.filter((id) => id !== card.id));
+                                setVisibleCards(
+                                  visibleCards.filter((id) => id !== card.id),
+                                );
                               } else {
                                 setVisibleCards([...visibleCards, card.id]);
                               }
                             }}
                             className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                           />
-                          <span className="text-sm font-medium text-gray-800">{card.title}</span>
+                          <span className="text-sm font-medium text-gray-800">
+                            {card.title}
+                          </span>
                         </div>
                         <div className="flex items-center gap-1">
                           <button
@@ -785,7 +827,12 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                     key={card.id}
                     className="transition duration-300 hover:scale-105"
                   >
-                    <Card {...rest} cardId={card.id} minimized={minimizedCards.includes(card.id)} onToggleMinimize={handleToggleMinimize}>
+                    <Card
+                      {...rest}
+                      cardId={card.id}
+                      minimized={minimizedCards.includes(card.id)}
+                      onToggleMinimize={handleToggleMinimize}
+                    >
                       <Component />
                     </Card>
                   </div>
@@ -1090,9 +1137,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   return (
     <div className="p-4 sm:p-6 lg:p-16 pt-16 lg:pt-16">
       {/* Tab Content */}
-      <TabTransition activeKey={activeTab}>
-        {renderTabContent()}
-      </TabTransition>
+      <TabTransition activeKey={activeTab}>{renderTabContent()}</TabTransition>
     </div>
   );
 };

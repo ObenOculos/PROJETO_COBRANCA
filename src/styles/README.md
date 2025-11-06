@@ -263,12 +263,14 @@ Verifique se a aparência visual permanece consistente após a migração.
 O sistema possui uma scrollbar minimalista aplicada globalmente em todos os elementos com scroll.
 
 **Características:**
+
 - Largura: 8px
 - Cores suaves (cinza claro)
 - Efeito hover
 - Compatível com Firefox e WebKit browsers
 
 **Variáveis:**
+
 ```css
 --scrollbar-width: 8px;
 --scrollbar-height: 8px;
@@ -279,6 +281,7 @@ O sistema possui uma scrollbar minimalista aplicada globalmente em todos os elem
 ```
 
 **Classes Disponíveis:**
+
 ```css
 .scrollbar-primary    /* Scrollbar com cor primária (azul) */
 .minimal-scrollbar    /* Scrollbar padrão (compatibilidade) */
@@ -286,6 +289,7 @@ O sistema possui uma scrollbar minimalista aplicada globalmente em todos os elem
 ```
 
 **Exemplo de Uso:**
+
 ```tsx
 // Scrollbar global (aplicada automaticamente)
 <div className="overflow-y-auto max-h-96">

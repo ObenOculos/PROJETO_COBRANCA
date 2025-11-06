@@ -365,7 +365,11 @@ const NotificationDropdown: React.FC = () => {
       }
 
       return (
-        <div className="p-2 overflow-y-auto" role="list" aria-label="Lista de notificações">
+        <div
+          className="p-2 overflow-y-auto"
+          role="list"
+          aria-label="Lista de notificações"
+        >
           {groupedNotifications.map((notification) => (
             <NotificationItem
               key={notification.id}

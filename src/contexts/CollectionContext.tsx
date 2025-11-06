@@ -64,7 +64,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [salePayments, setSalePayments] = useState<SalePayment[]>([]);
   const [scheduledVisits, setScheduledVisits] = useState<ScheduledVisit[]>([]);
   const [monthlyGoals, setMonthlyGoals] = useState<MonthlyGoal[]>([]);
-  const [allowedVisitDates, setAllowedVisitDates] = useState<AllowedVisitDate[]>([]);
+  const [allowedVisitDates, setAllowedVisitDates] = useState<
+    AllowedVisitDate[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

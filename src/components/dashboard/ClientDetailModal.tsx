@@ -31,38 +31,40 @@ interface ClientDetailModalProps {
 // Formatar data no padrão brasileiro
 const formatDate = (dateString: string | null): string => {
   if (!dateString) return "-";
-  
+
   try {
     let date: Date;
-    
+
     // Verificar se já está no formato brasileiro (dd/mm/yyyy)
-    if (dateString.includes('/')) {
-      const [day, month, year] = dateString.split('/');
+    if (dateString.includes("/")) {
+      const [day, month, year] = dateString.split("/");
       date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    } 
+    }
     // Se estiver no formato ISO (yyyy-mm-dd)
-    else if (dateString.includes('-')) {
-      const dateStr = dateString.includes('T') ? dateString : `${dateString}T00:00:00`;
+    else if (dateString.includes("-")) {
+      const dateStr = dateString.includes("T")
+        ? dateString
+        : `${dateString}T00:00:00`;
       date = new Date(dateStr);
-    } 
+    }
     // Outros formatos
     else {
       date = new Date(dateString);
     }
-    
+
     // Verificar se a data é válida
     if (isNaN(date.getTime())) {
-      console.warn('Data inválida:', dateString);
+      console.warn("Data inválida:", dateString);
       return dateString; // Retorna a string original se não conseguir converter
     }
-    
+
     return date.toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     });
   } catch (error) {
-    console.error('Erro ao formatar data:', dateString, error);
+    console.error("Erro ao formatar data:", dateString, error);
     return dateString; // Retorna a string original em caso de erro
   }
 };
@@ -70,24 +72,24 @@ const formatDate = (dateString: string | null): string => {
 // Formatar dias de atraso de forma intuitiva
 const formatDaysOverdue = (days: number | null): string => {
   if (!days || days <= 0) return "";
-  
+
   const years = Math.floor(days / 365);
   const months = Math.floor((days % 365) / 30);
   const remainingDays = days % 30;
-  
+
   const parts: string[] = [];
-  
+
   if (years > 0) {
-    parts.push(`${years}${years === 1 ? 'ano' : 'a'}`);
+    parts.push(`${years}${years === 1 ? "ano" : "a"}`);
   }
   if (months > 0) {
-    parts.push(`${months}${months === 1 ? 'mês' : 'm'}`);
+    parts.push(`${months}${months === 1 ? "mês" : "m"}`);
   }
   if (remainingDays > 0 || parts.length === 0) {
     parts.push(`${remainingDays}d`);
   }
-  
-  return parts.join(' ');
+
+  return parts.join(" ");
 };
 
 // Badge de status minimalista (outline)
@@ -324,9 +326,13 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
   // Desabilitar scroll do body quando o modal estiver aberto
   React.useEffect(() => {
-    const originalBodyOverflow = window.getComputedStyle(document.body).overflow;
-    const originalDocElementOverflow = window.getComputedStyle(document.documentElement).overflow;
-    
+    const originalBodyOverflow = window.getComputedStyle(
+      document.body,
+    ).overflow;
+    const originalDocElementOverflow = window.getComputedStyle(
+      document.documentElement,
+    ).overflow;
+
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
 
@@ -531,7 +537,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             <div className="flex items-center pr-8 sm:pr-0">
               <User className="h-6 w-6 text-blue-600 mr-3 flex-shrink-0" />
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-medium text-gray-600">Detalhes do Cliente</h3>
+                <h3 className="text-sm font-medium text-gray-600">
+                  Detalhes do Cliente
+                </h3>
                 <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
                   {clientGroup.client}
                 </h2>
@@ -540,10 +548,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 </p>
               </div>
             </div>
-            <button 
+            <button
               id="close-modal"
               name="closeModal"
-              onClick={onClose} 
+              onClick={onClose}
               className="absolute top-3 right-3 p-2 text-gray-500 hover:text-gray-800 sm:static sm:p-2 sm:ml-4 rounded-full hover:bg-gray-100 transition-colors"
               aria-label="Fechar modal"
             >
@@ -783,11 +791,12 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                       .includes("pago") || false;
                                   const isOverdue =
                                     (installment.dias_em_atraso ?? 0) > 0;
-                                  
+
                                   // Usar valor_original se valor_reajustado for 0
-                                  const installmentValue = installment.valor_reajustado > 0 
-                                    ? installment.valor_reajustado 
-                                    : installment.valor_original;
+                                  const installmentValue =
+                                    installment.valor_reajustado > 0
+                                      ? installment.valor_reajustado
+                                      : installment.valor_original;
 
                                   return (
                                     <div
@@ -809,7 +818,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                             </span>
                                             {isOverdue && !isPaid && (
                                               <span className="text-xs text-red-600 font-medium">
-                                                {formatDaysOverdue(installment.dias_em_atraso)}
+                                                {formatDaysOverdue(
+                                                  installment.dias_em_atraso,
+                                                )}
                                               </span>
                                             )}
                                           </div>

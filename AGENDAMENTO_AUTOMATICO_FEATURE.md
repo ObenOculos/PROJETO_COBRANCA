@@ -11,11 +11,12 @@ Foi implementado um sistema de **agendamento automático de visitas** baseado em
 Os gerentes podem configurar datas recorrentes para cada combinação de cidade/bairro através do menu **"Datas Permitidas"**:
 
 - Selecione a **Cidade**
-- Selecione o **Bairro**  
+- Selecione o **Bairro**
 - Escolha o **Dia do Mês** (1-31)
 - Clique em **Adicionar Data**
 
 **Exemplo:**
+
 - Cidade: São Paulo
 - Bairro: Centro
 - Dia: 15
@@ -40,10 +41,10 @@ O sistema calcula a próxima data permitida seguindo estas regras:
 ```
 Se o dia configurado ainda não passou no mês atual:
   → Agenda para esse dia no mês atual
-  
+
 Senão:
   → Agenda para esse dia no próximo mês
-  
+
 Se o dia não existe no próximo mês (ex: 31 em fevereiro):
   → Tenta o mês seguinte
 ```
@@ -51,14 +52,18 @@ Se o dia não existe no próximo mês (ex: 31 em fevereiro):
 ### 3. **Indicadores Visuais**
 
 #### Console Logs
+
 Quando uma data é definida automaticamente, aparece no console:
+
 ```
 📅 Data automática definida para João Silva: 2024-11-15 (Dia 15 de cada mês)
 ⚠️ ATENÇÃO: Data automática para João Silva cai em um DOMINGO (2024-11-17)
 ```
 
 #### Aviso de Domingo
+
 Quando uma ou mais visitas são agendadas para um domingo:
+
 - ✅ **Banner laranja** aparece na tela de confirmação
 - ✅ Lista todos os clientes com visitas em domingo
 - ✅ Mostra a data e o dia da semana
@@ -66,6 +71,7 @@ Quando uma ou mais visitas são agendadas para um domingo:
 - ✅ Sugere reconfigurar nas "Datas Permitidas"
 
 #### Interface do Usuário
+
 - Clientes sem configuração: usam a data padrão selecionada
 - Clientes com configuração: a data é ajustada automaticamente
 - Clientes com data em domingo: aparecem destacados no aviso
@@ -73,6 +79,7 @@ Quando uma ou mais visitas são agendadas para um domingo:
 ## Arquivos Modificados
 
 ### 1. **CollectionContext.tsx**
+
 ```typescript
 // Adicionado estado
 const [allowedVisitDates, setAllowedVisitDates] = useState<AllowedVisitDate[]>([]);
@@ -82,6 +89,7 @@ const fetchAllowedVisitDates = async () => { ... }
 ```
 
 ### 2. **visitScheduling.ts** (novo arquivo)
+
 ```typescript
 // Função principal
 export const getNextAllowedVisitDate = (
@@ -97,6 +105,7 @@ export const getAllowedDayOfMonth = (...)
 ```
 
 ### 3. **VisitScheduler.tsx**
+
 ```typescript
 import { getNextAllowedVisitDate } from "../../utils/visitScheduling";
 
@@ -112,11 +121,11 @@ const allowedDate = getNextAllowedVisitDate(
 
 if (allowedDate) {
   scheduledDate = allowedDate;
-  
+
   // Verificar se cai em domingo
   const date = new Date(allowedDate);
   const dayOfWeek = date.getDay();
-  
+
   if (dayOfWeek === 0) {
     isSunday = true;
     newSundayVisits.add(clientDocument);
@@ -134,11 +143,13 @@ if (allowedDate) {
 ```
 
 ### 4. **AllowedVisitDatesManager.tsx**
+
 - Alterado de `date` (data completa) para `number` (dia do mês)
 - Interface atualizada para selecionar dia de 1-31
 - Exibição mostra "Dia X de cada mês"
 
 ### 5. **types/index.ts**
+
 ```typescript
 export interface AllowedVisitDate {
   allowed_date: number; // Day of month (1-31)
@@ -169,7 +180,7 @@ ALTER TABLE public.allowed_visit_dates DROP COLUMN allowed_date;
 ALTER TABLE public.allowed_visit_dates RENAME COLUMN day_of_month TO allowed_date;
 
 -- Step 5: Adicionar constraint
-ALTER TABLE public.allowed_visit_dates 
+ALTER TABLE public.allowed_visit_dates
 ADD CONSTRAINT allowed_date_range CHECK (allowed_date >= 1 AND allowed_date <= 31);
 
 -- Step 6: Adicionar comentário
@@ -177,6 +188,7 @@ COMMENT ON COLUMN public.allowed_visit_dates.allowed_date IS 'Day of month (1-31
 ```
 
 Depois atualize os tipos:
+
 ```bash
 npx supabase gen types typescript --project-id "rseiuknbwhmfjaiiywkj" --schema public > src/types/database.types.ts
 ```
@@ -184,21 +196,23 @@ npx supabase gen types typescript --project-id "rseiuknbwhmfjaiiywkj" --schema p
 ## Exemplos de Uso
 
 ### Exemplo 1: Cliente com Data Configurada
+
 ```
 Cliente: João Silva
 Cidade: São Paulo
 Bairro: Centro
 Configuração: Dia 15
 
-Resultado: 
+Resultado:
 - Se hoje é 10/11/2024 → Agenda para 15/11/2024
 - Se hoje é 20/11/2024 → Agenda para 15/12/2024
 ```
 
 ### Exemplo 2: Cliente sem Data Configurada
+
 ```
 Cliente: Maria Santos
-Cidade: Rio de Janeiro  
+Cidade: Rio de Janeiro
 Bairro: Copacabana
 Configuração: Não existe
 
@@ -207,6 +221,7 @@ Resultado:
 ```
 
 ### Exemplo 3: Seleção Múltipla
+
 ```
 Seleciona 10 clientes:
 - 5 de São Paulo/Centro (Dia 15) → 15/11/2024
@@ -223,13 +238,13 @@ Cada cliente recebe sua data apropriada automaticamente!
 ✅ **Flexibilidade**: Permite configuração por cidade/bairro  
 ✅ **Inteligente**: Calcula automaticamente a próxima data válida  
 ✅ **Transparente**: Logs mostram quando usa data automática  
-✅ **Seguro**: Avisa quando a data cai em domingo  
+✅ **Seguro**: Avisa quando a data cai em domingo
 
 ## Próximos Passos (Opcional)
 
 Melhorias futuras possíveis:
 
-1. **Badge visual** no modal mostrando "Data Automática" 
+1. **Badge visual** no modal mostrando "Data Automática"
 2. **Relatório** de coberturas de datas configuradas
 3. **Validação** impedindo conflitos de datas
 4. **Notificação** quando não há configuração para uma região

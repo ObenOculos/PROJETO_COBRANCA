@@ -399,7 +399,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       } finally {
         setLoading(false);
       }
-    };    
+    };
 
     return (
       <div
@@ -563,17 +563,19 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
                 {/* Opção de Desconto */}
                 <div className="mt-4">
-                  <label className={`flex sm:inline-flex justify-center sm:justify-start items-center gap-2 px-4 py-2.5 rounded-full cursor-pointer transition-all ${
-                    withDiscount
-                      ? 'bg-purple-100 text-purple-700'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-150'
-                  }`}>
-                    <input                      
+                  <label
+                    className={`flex sm:inline-flex justify-center sm:justify-start items-center gap-2 px-4 py-2.5 rounded-full cursor-pointer transition-all ${
+                      withDiscount
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-150"
+                    }`}
+                  >
+                    <input
                       type="checkbox"
                       id="with-discount"
                       className="sr-only"
                       checked={withDiscount}
-                      onChange={(e) => setWithDiscount(e.target.checked)}                      
+                      onChange={(e) => setWithDiscount(e.target.checked)}
                     />
                     <TrendingDown className="h-4 w-4" />
                     <span className="text-sm font-medium">
@@ -746,8 +748,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               {/* Botões de Ação */}
               <div className="mt-6 pt-4 sm:pt-6 border-t border-gray-200">
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:justify-end">
-
-
                   <button
                     id="confirm-button"
                     type="submit"
@@ -774,7 +774,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   >
                     Cancelar
                   </button>
-
                 </div>
               </div>
             </form>

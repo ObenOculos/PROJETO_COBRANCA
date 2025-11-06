@@ -5,10 +5,12 @@
 O sistema de **Datas de Visita Permitidas** agora funciona com **dias do mês recorrentes**.
 
 ### Antes:
+
 - Você selecionava uma data específica (ex: 2024-11-01)
 - A visita só seria permitida naquela data específica
 
 ### Agora:
+
 - Você seleciona o **dia do mês** (1 a 31)
 - A visita será permitida **nesse dia em TODOS os meses**
 - Exemplo: Se você selecionar "Dia 5" para uma cidade/bairro, as visitas serão permitidas todo dia 5 de cada mês
@@ -23,11 +25,13 @@ O sistema de **Datas de Visita Permitidas** agora funciona com **dias do mês re
 ## Exemplo prático:
 
 Se você configurar:
+
 - Cidade: São Paulo
 - Bairro: Centro
 - Dia: 15
 
 Isso significa que visitas ao bairro Centro de São Paulo serão permitidas:
+
 - 15 de janeiro
 - 15 de fevereiro
 - 15 de março
@@ -52,7 +56,7 @@ ALTER TABLE public.allowed_visit_dates DROP COLUMN allowed_date;
 ALTER TABLE public.allowed_visit_dates RENAME COLUMN day_of_month TO allowed_date;
 
 -- Step 5: Add a constraint to ensure allowed_date is between 1 and 31
-ALTER TABLE public.allowed_visit_dates 
+ALTER TABLE public.allowed_visit_dates
 ADD CONSTRAINT allowed_date_range CHECK (allowed_date >= 1 AND allowed_date <= 31);
 
 -- Step 6: Add a comment to the column explaining the new format
@@ -62,6 +66,7 @@ COMMENT ON COLUMN public.allowed_visit_dates.allowed_date IS 'Day of month (1-31
 ## Validação no código:
 
 O componente agora:
+
 - ✅ Mostra um select com dias de 1 a 31
 - ✅ Salva apenas o número do dia
 - ✅ Exibe como "Dia X de cada mês" na tabela

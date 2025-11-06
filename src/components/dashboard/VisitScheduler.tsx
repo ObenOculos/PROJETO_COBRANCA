@@ -147,7 +147,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     dueDateEnd: "",
   });
   const [showCityDropdown, setShowCityDropdown] = useState(false);
-  const [showNeighborhoodDropdown, setShowNeighborhoodDropdown] = useState(false);
+  const [showNeighborhoodDropdown, setShowNeighborhoodDropdown] =
+    useState(false);
 
   // Estados para ordenação
   const [sortField, setSortField] = useState<
@@ -251,8 +252,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     }
   };
 
-
-
   // Listen for visits scheduled by a manager to refresh data
   useEffect(() => {
     const handleVisitScheduled = async () => {
@@ -323,8 +322,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     showDateValidationModal,
     showOverdueNotificationModal,
   ]);
-
-
 
   // Fechar modal com tecla ESC
   useEffect(() => {
@@ -1451,9 +1448,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       const allClientDocuments = new Set(
         availableClients.map((client) => client.document),
       );
-      
+
       const newSundayVisits = new Set<string>();
-      
+
       // Criar schedules com datas permitidas quando disponíveis
       const allClientSchedules = new Map(
         availableClients.map((client) => {
@@ -1461,30 +1458,27 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           const allowedDate = getNextAllowedVisitDate(
             client.city,
             client.neighborhood,
-            allowedVisitDates
+            allowedVisitDates,
           );
-          
+
           const scheduledDate = allowedDate || selectedDate;
-          
+
           // Verificar se cai em domingo
           if (allowedDate) {
             // Parsear data corretamente para evitar problemas de timezone
-            const [year, month, day] = allowedDate.split('-').map(Number);
+            const [year, month, day] = allowedDate.split("-").map(Number);
             const date = new Date(year, month - 1, day);
             const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
-            
+
             if (dayOfWeek === 0) {
               newSundayVisits.add(client.document);
             }
           }
-          
-          return [
-            client.document,
-            { date: scheduledDate, time: selectedTime },
-          ];
+
+          return [client.document, { date: scheduledDate, time: selectedTime }];
         }),
       );
-      
+
       setSelectedClients(allClientDocuments);
       setClientSchedules(allClientSchedules);
       setSundayVisits(newSundayVisits);
@@ -1507,39 +1501,39 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       newSundayVisits.delete(clientDocument);
     } else {
       newSelection.add(clientDocument);
-      
+
       // Buscar dados do cliente para obter cidade e bairro
       const clientData = getClientGroups(effectiveCollectorId!).find(
-        (c) => c.document === clientDocument
+        (c) => c.document === clientDocument,
       );
-      
+
       let scheduledDate = selectedCalendarDate
         ? selectedCalendarDate.toISOString().split("T")[0]
         : selectedDate;
-      
+
       // Verificar se existe data permitida configurada para esta cidade/bairro
       if (clientData) {
         const allowedDate = getNextAllowedVisitDate(
           clientData.city,
           clientData.neighborhood,
-          allowedVisitDates
+          allowedVisitDates,
         );
-        
+
         if (allowedDate) {
           scheduledDate = allowedDate;
-          
+
           // Verificar se a data cai em um domingo
           // Parsear data corretamente para evitar problemas de timezone
-          const [year, month, day] = allowedDate.split('-').map(Number);
+          const [year, month, day] = allowedDate.split("-").map(Number);
           const date = new Date(year, month - 1, day);
           const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
-          
+
           if (dayOfWeek === 0) {
-            newSundayVisits.add(clientDocument);            
+            newSundayVisits.add(clientDocument);
           }
         }
       }
-      
+
       // Inicializar com data (permitida ou padrão) e hora padrão
       newSchedules.set(clientDocument, {
         date: scheduledDate,
@@ -1579,35 +1573,35 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     });
 
     setClientSchedules(newSchedules);
-    
+
     // Se o campo alterado foi a data, recalcular se é domingo
     if (field === "date") {
       const newSundayVisits = new Set(sundayVisits);
-      
+
       // Parsear data corretamente para evitar problemas de timezone
-      const [year, month, day] = value.split('-').map(Number);
+      const [year, month, day] = value.split("-").map(Number);
       const date = new Date(year, month - 1, day); // Month é 0-indexed
       const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
-      
+
       if (dayOfWeek === 0) {
         // É domingo - adicionar ao set e mostrar notificação
         newSundayVisits.add(clientDocument);
-        
+
         // Buscar nome do cliente
         const clientData = getClientGroups(effectiveCollectorId!).find(
-          (c) => c.document === clientDocument
+          (c) => c.document === clientDocument,
         );
-        
+
         // Mostrar notificação
         triggerNotification(
           `⚠️ Atenção: Visita de ${clientData?.client || "cliente"} agendada para DOMINGO (${formatSafeDate(value)})`,
-          "info"
+          "info",
         );
       } else {
         // Não é domingo - remover do set
         newSundayVisits.delete(clientDocument);
       }
-      
+
       setSundayVisits(newSundayVisits);
     }
   };
@@ -1737,138 +1731,140 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
               </div>
               <div className="p-2 sm:p-4">
                 <div className="flex items-center justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                    <Calendar className="h-5 w-5 mr-2 text-blue-600" />
-                    <div>
-                      <span>Agendando</span>
-                      {collectorName && (
-                        <span className="block text-xs font-normal text-blue-500 -mt-1">
-                          para {collectorName}
-                        </span>
-                      )}
-                    </div>
-                  </h3>
-                </div>
-                <div className="flex items-center">
-                  <button
-                    onClick={() => navigateMonth("prev")}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <span className="text-sm font-medium min-w-[110px] text-center">
-                    <span className="hidden sm:inline">
-                      {monthNames[currentMonth.getMonth()]}
-                    </span>
-                    <span className="sm:hidden">
-                      {monthNamesAbbr[currentMonth.getMonth()]}
-                    </span>{" "}
-                    {currentMonth.getFullYear()}
-                  </span>
-                  <button
-                    onClick={() => navigateMonth("next")}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Grade do Calendário */}
-              <div className="grid grid-cols-7 gap-2 sm:gap-2 md:gap-3">
-                {/* Cabeçalho dos dias da semana */}
-                {weekDays.map((day) => (
-                  <div
-                    key={day}
-                    className="flex items-center justify-center text-xs font-medium text-gray-500 pb-2"
-                  >
-                    {day}
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                      <Calendar className="h-5 w-5 mr-2 text-blue-600" />
+                      <div>
+                        <span>Agendando</span>
+                        {collectorName && (
+                          <span className="block text-xs font-normal text-blue-500 -mt-1">
+                            para {collectorName}
+                          </span>
+                        )}
+                      </div>
+                    </h3>
                   </div>
-                ))}
+                  <div className="flex items-center">
+                    <button
+                      onClick={() => navigateMonth("prev")}
+                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <span className="text-sm font-medium min-w-[110px] text-center">
+                      <span className="hidden sm:inline">
+                        {monthNames[currentMonth.getMonth()]}
+                      </span>
+                      <span className="sm:hidden">
+                        {monthNamesAbbr[currentMonth.getMonth()]}
+                      </span>{" "}
+                      {currentMonth.getFullYear()}
+                    </span>
+                    <button
+                      onClick={() => navigateMonth("next")}
+                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
 
-                {/* Dias do mês */}
-                {(() => {
-                  const { daysInMonth, startingDayOfWeek } =
-                    getDaysInMonth(currentMonth);
-                  const days = [];
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
+                {/* Grade do Calendário */}
+                <div className="grid grid-cols-7 gap-2 sm:gap-2 md:gap-3">
+                  {/* Cabeçalho dos dias da semana */}
+                  {weekDays.map((day) => (
+                    <div
+                      key={day}
+                      className="flex items-center justify-center text-xs font-medium text-gray-500 pb-2"
+                    >
+                      {day}
+                    </div>
+                  ))}
 
-                  // Dias vazios no início
-                  for (let i = 0; i < startingDayOfWeek; i++) {
-                    days.push(
-                      <div key={`empty-${i}`} className="h-10 sm:h-12" />,
-                    );
-                  }
+                  {/* Dias do mês */}
+                  {(() => {
+                    const { daysInMonth, startingDayOfWeek } =
+                      getDaysInMonth(currentMonth);
+                    const days = [];
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
 
-                  // Dias do mês
-                  for (let day = 1; day <= daysInMonth; day++) {
-                    const date = new Date(
-                      currentMonth.getFullYear(),
-                      currentMonth.getMonth(),
-                      day,
-                    );
-                    const visitsForDay = getVisitsForDate(date);
-                    const isToday =
-                      date.toDateString() === today.toDateString();
-                    const isSelected =
-                      selectedCalendarDate?.toDateString() ===
-                      date.toDateString();
-                    const isPast = date < today;
-                    const hasVisits = visitsForDay.length > 0;
-
-                    const getVisitStatusForDay = (visits: ScheduledVisit[]) => {
-                      if (visits.length === 0) return "";
-
-                      const today = new Date();
-                      const todayUTC = new Date(
-                        Date.UTC(
-                          today.getUTCFullYear(),
-                          today.getUTCMonth(),
-                          today.getUTCDate(),
-                        ),
+                    // Dias vazios no início
+                    for (let i = 0; i < startingDayOfWeek; i++) {
+                      days.push(
+                        <div key={`empty-${i}`} className="h-10 sm:h-12" />,
                       );
+                    }
 
-                      const hasPending = visits.some(
-                        (v) =>
-                          v.status === "agendada" ||
-                          v.status === "cancelamento_solicitado",
+                    // Dias do mês
+                    for (let day = 1; day <= daysInMonth; day++) {
+                      const date = new Date(
+                        currentMonth.getFullYear(),
+                        currentMonth.getMonth(),
+                        day,
                       );
+                      const visitsForDay = getVisitsForDate(date);
+                      const isToday =
+                        date.toDateString() === today.toDateString();
+                      const isSelected =
+                        selectedCalendarDate?.toDateString() ===
+                        date.toDateString();
+                      const isPast = date < today;
+                      const hasVisits = visitsForDay.length > 0;
 
-                      if (!hasPending) {
-                        return "bg-green-500"; // Verde: Todas as visitas concluídas ou finalizadas
-                      }
+                      const getVisitStatusForDay = (
+                        visits: ScheduledVisit[],
+                      ) => {
+                        if (visits.length === 0) return "";
 
-                      const hasOverdue = visits.some((v) => {
-                        const visitDate = new Date(
+                        const today = new Date();
+                        const todayUTC = new Date(
                           Date.UTC(
-                            parseInt(v.scheduledDate.split("-")[0]),
-                            parseInt(v.scheduledDate.split("-")[1]) - 1,
-                            parseInt(v.scheduledDate.split("-")[2]),
+                            today.getUTCFullYear(),
+                            today.getUTCMonth(),
+                            today.getUTCDate(),
                           ),
                         );
-                        return (
-                          (v.status === "agendada" ||
-                            v.status === "cancelamento_solicitado") &&
-                          visitDate < todayUTC
+
+                        const hasPending = visits.some(
+                          (v) =>
+                            v.status === "agendada" ||
+                            v.status === "cancelamento_solicitado",
                         );
-                      });
 
-                      if (hasOverdue) {
-                        return "bg-red-500"; // Vermelho: Há visitas pendentes e atrasadas
-                      }
+                        if (!hasPending) {
+                          return "bg-green-500"; // Verde: Todas as visitas concluídas ou finalizadas
+                        }
 
-                      return "bg-yellow-500"; // Amarelo: Há visitas pendentes, mas não atrasadas
-                    };
+                        const hasOverdue = visits.some((v) => {
+                          const visitDate = new Date(
+                            Date.UTC(
+                              parseInt(v.scheduledDate.split("-")[0]),
+                              parseInt(v.scheduledDate.split("-")[1]) - 1,
+                              parseInt(v.scheduledDate.split("-")[2]),
+                            ),
+                          );
+                          return (
+                            (v.status === "agendada" ||
+                              v.status === "cancelamento_solicitado") &&
+                            visitDate < todayUTC
+                          );
+                        });
 
-                    const dotColor = getVisitStatusForDay(visitsForDay);
+                        if (hasOverdue) {
+                          return "bg-red-500"; // Vermelho: Há visitas pendentes e atrasadas
+                        }
 
-                    days.push(
-                      <button
-                        key={day}
-                        onClick={() => selectDate(date)}
-                        className={`
+                        return "bg-yellow-500"; // Amarelo: Há visitas pendentes, mas não atrasadas
+                      };
+
+                      const dotColor = getVisitStatusForDay(visitsForDay);
+
+                      days.push(
+                        <button
+                          key={day}
+                          onClick={() => selectDate(date)}
+                          className={`
                           h-10 sm:h-12 md:h-16 rounded-lg flex flex-col items-center justify-center
                           relative transition-all duration-200 transform hover:scale-105
                           ${
@@ -1882,44 +1878,44 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                           }
                           ${hasVisits ? "ring-2 ring-blue-400 ring-offset-1" : ""}
                         `}
-                      >
-                        <span className="text-sm font-medium">{day}</span>
-                        {dotColor && (
-                          <div className="absolute bottom-1">
-                            <div
-                              className={`w-2 h-2 rounded-full ${
-                                isSelected ? "bg-white" : dotColor
-                              }`}
-                            />
-                          </div>
-                        )}
-                      </button>,
-                    );
-                  }
+                        >
+                          <span className="text-sm font-medium">{day}</span>
+                          {dotColor && (
+                            <div className="absolute bottom-1">
+                              <div
+                                className={`w-2 h-2 rounded-full ${
+                                  isSelected ? "bg-white" : dotColor
+                                }`}
+                              />
+                            </div>
+                          )}
+                        </button>,
+                      );
+                    }
 
-                  return days;
-                })()}
-              </div>
+                    return days;
+                  })()}
+                </div>
 
-              {/* Legenda */}
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 sm:gap-x-4 gap-y-1 sm:gap-y-2 text-xs text-gray-600">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-green-500 rounded-full mr-1.5" />
-                  <span>Concluídas</span>
+                {/* Legenda */}
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 sm:gap-x-4 gap-y-1 sm:gap-y-2 text-xs text-gray-600">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-green-500 rounded-full mr-1.5" />
+                    <span>Concluídas</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-red-500 rounded-full mr-1.5" />
+                    <span>Atrasadas</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full mr-1.5" />
+                    <span>Pendentes</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-blue-100 rounded-full mr-1.5" />
+                    <span>Hoje</span>
+                  </div>
                 </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-red-500 rounded-full mr-1.5" />
-                  <span>Atrasadas</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-yellow-500 rounded-full mr-1.5" />
-                  <span>Pendentes</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-blue-100 rounded-full mr-1.5" />
-                  <span>Hoje</span>
-                </div>
-              </div>
               </div>
             </div>
 
@@ -3688,7 +3684,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                       }
                                       className="sr-only"
                                     />
-                                    <span className="whitespace-nowrap">Todos</span>
+                                    <span className="whitespace-nowrap">
+                                      Todos
+                                    </span>
                                   </label>
                                 )}
                                 {/* Indicador de Paginação */}
@@ -3785,7 +3783,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
                                   return Object.entries(groupedClients).map(
                                     ([neighborhood, clients]) => (
-                                      <div key={neighborhood} className="mb-3 sm:mb-4">
+                                      <div
+                                        key={neighborhood}
+                                        className="mb-3 sm:mb-4"
+                                      >
                                         {/* Neighborhood Header */}
                                         <div className="flex items-center mb-2 pb-1.5 border-b border-gray-200">
                                           <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500 mr-1 sm:mr-2 flex-shrink-0" />
@@ -3793,7 +3794,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                             {neighborhood}
                                           </h4>
                                           <span className="ml-1 sm:ml-2 text-[10px] sm:text-xs text-gray-500 whitespace-nowrap">
-                                            ({clients.length} {clients.length !== 1 ? "clientes" : "cliente"})
+                                            ({clients.length}{" "}
+                                            {clients.length !== 1
+                                              ? "clientes"
+                                              : "cliente"}
+                                            )
                                           </span>
                                         </div>
                                         {/* Client Cards */}
@@ -3861,7 +3866,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                                             {formatCurrency(
                                                               client.pendingValue,
                                                             )}{" "}
-                                                            <span className="hidden sm:inline">pendente</span>
+                                                            <span className="hidden sm:inline">
+                                                              pendente
+                                                            </span>
                                                           </span>
                                                         </div>
                                                       </div>
@@ -3903,21 +3910,29 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                     date: "",
                                     time: "",
                                   };
-                                  
+
                                   // Verificar se a data agendada é domingo
-                                  const isSunday = schedule.date ? (() => {
-                                    const [year, month, day] = schedule.date.split('-').map(Number);
-                                    const date = new Date(year, month - 1, day);
-                                    return date.getDay() === 0;
-                                  })() : false;
-                                  
+                                  const isSunday = schedule.date
+                                    ? (() => {
+                                        const [year, month, day] = schedule.date
+                                          .split("-")
+                                          .map(Number);
+                                        const date = new Date(
+                                          year,
+                                          month - 1,
+                                          day,
+                                        );
+                                        return date.getDay() === 0;
+                                      })()
+                                    : false;
+
                                   return (
                                     <div
                                       key={client.document}
                                       className={`rounded-xl sm:rounded-2xl p-2 sm:p-3 border ${
-                                        isSunday 
-                                          ? 'bg-orange-50 border-orange-300' 
-                                          : 'bg-white border-gray-200'
+                                        isSunday
+                                          ? "bg-orange-50 border-orange-300"
+                                          : "bg-white border-gray-200"
                                       }`}
                                     >
                                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-1 sm:gap-0">
@@ -3965,28 +3980,43 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                                 setClientSchedules(
                                                   newSchedules,
                                                 );
-                                                
+
                                                 // Recalcular se é domingo
-                                                const newSundayVisits = new Set(sundayVisits);
-                                                
+                                                const newSundayVisits = new Set(
+                                                  sundayVisits,
+                                                );
+
                                                 // Parsear data corretamente para evitar problemas de timezone
-                                                const [year, month, day] = e.target.value.split('-').map(Number);
-                                                const date = new Date(year, month - 1, day);
+                                                const [year, month, day] =
+                                                  e.target.value
+                                                    .split("-")
+                                                    .map(Number);
+                                                const date = new Date(
+                                                  year,
+                                                  month - 1,
+                                                  day,
+                                                );
                                                 const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
-                                                
+
                                                 if (dayOfWeek === 0) {
-                                                  newSundayVisits.add(client.document);
-                                                  
+                                                  newSundayVisits.add(
+                                                    client.document,
+                                                  );
+
                                                   // Mostrar notificação
                                                   triggerNotification(
                                                     `⚠️ Atenção: Visita de ${client.client} agendada para DOMINGO (${formatSafeDate(e.target.value)})`,
-                                                    "info"
+                                                    "info",
                                                   );
                                                 } else {
-                                                  newSundayVisits.delete(client.document);
+                                                  newSundayVisits.delete(
+                                                    client.document,
+                                                  );
                                                 }
-                                                
-                                                setSundayVisits(newSundayVisits);
+
+                                                setSundayVisits(
+                                                  newSundayVisits,
+                                                );
                                               }}
                                               className="w-full text-[11px] sm:text-sm border border-gray-300 rounded-lg sm:rounded-2xl px-1.5 sm:px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                                             />
@@ -4077,69 +4107,72 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                         {/* Aviso de Visitas em Domingo */}
                         {sundayVisits.size > 0 && (
                           <div className="bg-orange-50 border-2 border-orange-300 rounded-xl sm:rounded-2xl p-3 sm:p-4">
-                            
-                              
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-semibold text-orange-900 text-center sm:text-2xl mb-1.5 sm:mb-2">
-                                  Existe visitas agendadas para domingo!
-                                </h4>
-                                <p className="text-xs sm:text-sm text-justify text-orange-800 mb-2 sm:mb-3">
-                                  {sundayVisits.size === 1
-                                    ? "Uma visita foi agendada"
-                                    : `${sundayVisits.size} visitas foram agendadas`}{" "}
-                                  para um <strong>domingo</strong> devido à configuração de data automática.
-                                  Verifique se deseja manter essa data ou ajustá-la manualmente.
-                                </p>
-                                <div className="space-y-1.5 sm:space-y-2">
-                                  {getSelectedClientsData()
-                                    .filter((client) =>
-                                      sundayVisits.has(client.document),
-                                    )
-                                    .map((client) => {
-                                      const schedule = clientSchedules.get(
-                                        client.document,
-                                      ) || { date: "", time: "" };
-                                      return (
-                                        <div
-                                          key={client.document}
-                                          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-0 text-xs sm:text-sm bg-white rounded-lg sm:rounded-xl p-2 sm:p-3 border border-orange-200"
-                                        >
-                                          <div className="flex items-start sm:items-center min-w-0">
-                                            <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500 mr-1.5 sm:mr-2 flex-shrink-0 mt-0.5 sm:mt-0" />
-                                            <div className="min-w-0 flex-1">
-                                              <span className="font-medium text-gray-900 block truncate text-xs sm:text-sm">
-                                                {client.client.length > 25
-                                                  ? `${client.client.substring(0, 25)}...`
-                                                  : client.client}
-                                                {client.apelido && (
-                                                  <span className="text-[10px] sm:text-sm text-blue-600 ml-1">
-                                                    ({client.apelido})
-                                                  </span>
-                                                )}
-                                              </span>
-                                              <div className="text-[10px] sm:text-xs text-gray-500 truncate">
-                                                {client.city} - {client.neighborhood}
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div className="text-left sm:text-right flex-shrink-0 ml-5 sm:ml-0">
-                                            <div className="font-semibold text-orange-700 text-[11px] sm:text-sm whitespace-nowrap">
-                                              {formatSafeDate(schedule.date)}
-                                            </div>
-                                            <div className="text-[10px] sm:text-xs text-orange-600">
-                                              Domingo
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-orange-900 text-center sm:text-2xl mb-1.5 sm:mb-2">
+                                Existe visitas agendadas para domingo!
+                              </h4>
+                              <p className="text-xs sm:text-sm text-justify text-orange-800 mb-2 sm:mb-3">
+                                {sundayVisits.size === 1
+                                  ? "Uma visita foi agendada"
+                                  : `${sundayVisits.size} visitas foram agendadas`}{" "}
+                                para um <strong>domingo</strong> devido à
+                                configuração de data automática. Verifique se
+                                deseja manter essa data ou ajustá-la
+                                manualmente.
+                              </p>
+                              <div className="space-y-1.5 sm:space-y-2">
+                                {getSelectedClientsData()
+                                  .filter((client) =>
+                                    sundayVisits.has(client.document),
+                                  )
+                                  .map((client) => {
+                                    const schedule = clientSchedules.get(
+                                      client.document,
+                                    ) || { date: "", time: "" };
+                                    return (
+                                      <div
+                                        key={client.document}
+                                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-0 text-xs sm:text-sm bg-white rounded-lg sm:rounded-xl p-2 sm:p-3 border border-orange-200"
+                                      >
+                                        <div className="flex items-start sm:items-center min-w-0">
+                                          <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500 mr-1.5 sm:mr-2 flex-shrink-0 mt-0.5 sm:mt-0" />
+                                          <div className="min-w-0 flex-1">
+                                            <span className="font-medium text-gray-900 block truncate text-xs sm:text-sm">
+                                              {client.client.length > 25
+                                                ? `${client.client.substring(0, 25)}...`
+                                                : client.client}
+                                              {client.apelido && (
+                                                <span className="text-[10px] sm:text-sm text-blue-600 ml-1">
+                                                  ({client.apelido})
+                                                </span>
+                                              )}
+                                            </span>
+                                            <div className="text-[10px] sm:text-xs text-gray-500 truncate">
+                                              {client.city} -{" "}
+                                              {client.neighborhood}
                                             </div>
                                           </div>
                                         </div>
-                                      );
-                                    })}
-                                </div>
-                                <div className="mt-2 sm:mt-3 text-[10px] sm:text-xs text-orange-700 bg-orange-100 rounded-md sm:rounded-lg p-1.5 sm:p-2">
-                                  <strong>Dica:</strong> Você pode ajustar a data individualmente na lista acima,
-                                  ou configurar um dia diferente nas "Datas Permitidas" para evitar domingos.
-                                </div>
+                                        <div className="text-left sm:text-right flex-shrink-0 ml-5 sm:ml-0">
+                                          <div className="font-semibold text-orange-700 text-[11px] sm:text-sm whitespace-nowrap">
+                                            {formatSafeDate(schedule.date)}
+                                          </div>
+                                          <div className="text-[10px] sm:text-xs text-orange-600">
+                                            Domingo
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                               </div>
-                            </div>                          
+                              <div className="mt-2 sm:mt-3 text-[10px] sm:text-xs text-orange-700 bg-orange-100 rounded-md sm:rounded-lg p-1.5 sm:p-2">
+                                <strong>Dica:</strong> Você pode ajustar a data
+                                individualmente na lista acima, ou configurar um
+                                dia diferente nas "Datas Permitidas" para evitar
+                                domingos.
+                              </div>
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}
