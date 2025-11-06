@@ -20,6 +20,7 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
+  Settings,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable } from "./CollectionTable";
@@ -38,9 +39,37 @@ interface CollectorDashboardProps {
   onTabChange?: (tabId: string) => void;
 }
 
+interface CardProps {
+  title: string;
+  icon: React.ElementType;
+  children: React.ReactNode;
+  cardId: string;
+  minimized: boolean;
+  onToggleMinimize: (cardId: string) => void;
+}
+
+const Card: React.FC<CardProps> = ({ title, icon: Icon, children, cardId, minimized, onToggleMinimize }) => {
+  return (
+<div className={`bg-white rounded-2xl border border-gray-200 p-4 transition-all duration-300 ease-in-out ${minimized ? 'h-20 overflow-hidden' : ''}`}> 
+      
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className={`p-2 bg-purple-500 rounded-2xl`}>
+            <Icon className="w-4 h-4 text-white" />
+          </div>
+          <h3 className="font-semibold text-gray-900">{title}</h3>
+        </div>
+        <button onClick={() => onToggleMinimize(cardId)} className="p-1 rounded-md hover:bg-gray-200">
+          {minimized ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+        </button>
+      </div>
+      {!minimized && children}
+    </div>
+  );
+};
+
 const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   activeTab: externalActiveTab,
-  onTabChange: externalOnTabChange,
 }) => {
   const { user } = useAuth();
   const {
@@ -53,7 +82,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   } = useCollection();
 
   // Usa a aba externa se fornecida, senão gerencia internamente
-  const [internalActiveTab, setInternalActiveTab] = useState<
+  const [internalActiveTab] = useState<
     "overview" | "collections" | "route" | "visits"
   >(() => {
     const savedTab = localStorage.getItem("collectorActiveTab");
@@ -61,13 +90,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   });
 
   const activeTab = externalActiveTab || internalActiveTab;
-  const setActiveTab = (tab: string) => {
-    if (externalOnTabChange) {
-      externalOnTabChange(tab);
-    } else {
-      setInternalActiveTab(tab as any);
-    }
-  };
 
   const [filters, setFilters] = useState<FilterOptions>({});
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -77,6 +99,11 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   const [isAutoSliding, setIsAutoSliding] = useState(true);
   const [showAllCities, setShowAllCities] = useState(false);
   const [showAllSchedules, setShowAllSchedules] = useState(false);
+
+  const [cardOrder, setCardOrder] = useState<string[]>([]);
+  const [visibleCards, setVisibleCards] = useState<string[]>([]);
+  const [isCustomizeMenuOpen, setIsCustomizeMenuOpen] = useState(false);
+  const [minimizedCards, setMinimizedCards] = useState<string[]>([]);
 
   // Configuração dos slides para mobile
   const mobileSlides = [
@@ -320,142 +347,174 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     return { text: "Hora de começar!", icon: Target };
   };
 
-  // Componente consolidado para clientes
-  const ClientsCard = () => (
-    <div
-      className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-purple-300 transition-colors cursor-pointer"
-      onClick={() => setActiveTab("collections")}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-purple-500 rounded-2xl">
-            <Users className="w-4 h-4 text-white" />
-          </div>
-          <h3 className="font-semibold text-gray-900">Clientes</h3>
+  // Card Content Components
+  const ClientsCardContent = () => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-1">
+          <AlertCircle className="w-3 h-3 text-orange-500" />
+          <span className="text-gray-600">Pendentes</span>
         </div>
-        <div className="text-1xl font-bold text-gray-900">{stats.clients}</div>
+        <span className="font-medium text-orange-600">
+          {stats.clientsWithPending}
+        </span>
       </div>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-1">
-            <AlertCircle className="w-3 h-3 text-orange-500" />
-            <span className="text-gray-600">Pendentes</span>
-          </div>
-          <span className="font-medium text-orange-600">
-            {stats.clientsWithPending}
-          </span>
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-1">
+          <CheckCircle className="w-3 h-3 text-green-500" />
+          <span className="text-gray-600">Em dia</span>
         </div>
+        <span className="font-medium text-green-600">
+          {stats.clients - stats.clientsWithPending}
+        </span>
+      </div>
 
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-1">
-            <CheckCircle className="w-3 h-3 text-green-500" />
-            <span className="text-gray-600">Em dia</span>
-          </div>
-          <span className="font-medium text-green-600">
-            {stats.clients - stats.clientsWithPending}
-          </span>
-        </div>
-
-        <div className="pt-2 border-t border-gray-100">
-          <div className="text-xs text-gray-500">
-            {stats.pending} vendas pendentes
-          </div>
+      <div className="pt-2 border-t border-gray-100">
+        <div className="text-xs text-gray-500">
+          {stats.pending} vendas pendentes
         </div>
       </div>
     </div>
   );
 
-  // Componente consolidado para vendas
-  const SalesCard = () => (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-blue-300 transition-colors">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-blue-500 rounded-2xl">
-            <Target className="w-4 h-4 text-white" />
-          </div>
-          <h3 className="font-semibold text-gray-900">Vendas</h3>
+  const SalesCardContent = () => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-1">
+          <CheckCircle className="w-3 h-3 text-green-500" />
+          <span className="text-gray-600">Finalizadas</span>
         </div>
-        <div className="text-1xl font-bold text-gray-900">{stats.total}</div>
+        <span className="font-medium text-green-600">{stats.completed}</span>
       </div>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-1">
-            <CheckCircle className="w-3 h-3 text-green-500" />
-            <span className="text-gray-600">Finalizadas</span>
-          </div>
-          <span className="font-medium text-green-600">{stats.completed}</span>
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-1">
+          <Clock className="w-3 h-3 text-orange-500" />
+          <span className="text-gray-600">Pendentes</span>
         </div>
+        <span className="font-medium text-orange-600">{stats.pending}</span>
+      </div>
 
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-1">
-            <Clock className="w-3 h-3 text-orange-500" />
-            <span className="text-gray-600">Pendentes</span>
-          </div>
-          <span className="font-medium text-orange-600">{stats.pending}</span>
-        </div>
-
-        <div className="pt-2 border-t border-gray-100">
-          <div className="text-xs text-gray-500">
-            {stats.total > 0
-              ? ((stats.completed / stats.total) * 100).toFixed(1)
-              : 0}
-            % concluídas
-          </div>
+      <div className="pt-2 border-t border-gray-100">
+        <div className="text-xs text-gray-500">
+          {stats.total > 0
+            ? ((stats.completed / stats.total) * 100).toFixed(1)
+            : 0}
+          % concluídas
         </div>
       </div>
     </div>
   );
 
-  // Componente consolidado para visitas
-  const VisitsCard = () => (
-    <div
-      className="bg-white rounded-2xl border border-gray-200 p-4 hover:border-orange-300 transition-colors cursor-pointer"
-      onClick={() => setActiveTab("visits")}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-orange-500 rounded-2xl">
-            <Calendar className="w-4 h-4 text-white" />
-          </div>
-          <h3 className="font-semibold text-gray-900">Visitas</h3>
+  const VisitsCardContent = () => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-1">
+          <Sun className="w-3 h-3 text-yellow-500" />
+          <span className="text-gray-600">Hoje</span>
         </div>
-        <div className="text-1xl font-bold text-gray-900">
-          {stats.visitStats.scheduled}
-        </div>
+        <span className="font-medium text-yellow-600">
+          {stats.visitStats.today}
+        </span>
       </div>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-1">
-            <Sun className="w-3 h-3 text-yellow-500" />
-            <span className="text-gray-600">Hoje</span>
-          </div>
-          <span className="font-medium text-yellow-600">
-            {stats.visitStats.today}
-          </span>
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-1">
+          <CheckCircle className="w-3 h-3 text-green-500" />
+          <span className="text-gray-600">Realizadas</span>
         </div>
+        <span className="font-medium text-green-600">
+          {stats.visitStats.completed}
+        </span>
+      </div>
 
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-1">
-            <CheckCircle className="w-3 h-3 text-green-500" />
-            <span className="text-gray-600">Realizadas</span>
-          </div>
-          <span className="font-medium text-green-600">
-            {stats.visitStats.completed}
-          </span>
-        </div>
-
-        <div className="pt-2 border-t border-gray-100">
-          <div className="text-xs text-gray-500">
-            {stats.visitStats.scheduled + stats.visitStats.completed} visitas no
-            total
-          </div>
+      <div className="pt-2 border-t border-gray-100">
+        <div className="text-xs text-gray-500">
+          {stats.visitStats.scheduled + stats.visitStats.completed} visitas no
+          total
         </div>
       </div>
     </div>
   );
+
+  const ClientsByCityCardContent = () => {
+    const sortedCities = useMemo(() => {
+      return Object.entries(clientsByCity).sort(
+        ([, countA], [, countB]) => countB - countA,
+      );
+    }, [clientsByCity]);
+
+    const visibleCities = showAllCities ? sortedCities : sortedCities.slice(0, 4);
+
+    return (
+      <>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          {visibleCities.map(([city, count]) => (
+            <div key={city} className="bg-gray-50 p-2 rounded-lg text-center">
+              <div className="font-bold text-gray-800">{count}</div>
+              <div className="text-gray-600">{city}</div>
+            </div>
+          ))}
+        </div>
+        {sortedCities.length > 10 && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setShowAllCities(!showAllCities)}
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-500 flex items-center justify-center w-full"
+            >
+              {showAllCities ? "Mostrar Menos" : "Mostrar Mais"}
+              {showAllCities ? (
+                <ChevronUp className="w-4 h-4 ml-1" />
+              ) : (
+                <ChevronDown className="w-4 h-4 ml-1" />
+              )}
+            </button>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const SchedulesByCityCardContent = () => {
+    const sortedSchedules = useMemo(() => {
+      return Object.entries(schedulesByCity).sort(
+        ([, dataA], [, dataB]) => dataB.count - dataA.count,
+      );
+    }, [schedulesByCity]);
+
+    const visibleSchedules = showAllSchedules
+      ? sortedSchedules
+      : sortedSchedules.slice(0, 4);
+
+    return (
+      <>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          {visibleSchedules.map(([city, data]) => (
+            <div key={city} className="bg-gray-50 p-2 rounded-lg text-center">
+              <div className="font-bold text-gray-800">{data.count}</div>
+              <div className="text-gray-600">{city}</div>
+            </div>
+          ))}
+        </div>
+        {sortedSchedules.length > 10 && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setShowAllSchedules(!showAllSchedules)}
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-500 flex items-center justify-center w-full"
+            >
+              {showAllSchedules ? "Mostrar Menos" : "Mostrar Mais"}
+              {showAllSchedules ? (
+                <ChevronUp className="w-4 h-4 ml-1" />
+              ) : (
+                <ChevronDown className="w-4 h-4 ml-1" />
+              )}
+            </button>
+          </div>
+        )}
+      </>
+    );
+  };
 
   // Salva a aba ativa no localStorage apenas quando gerenciado internamente
   useEffect(() => {
@@ -595,114 +654,143 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     };
   }, [salesMap, clientGroups, myVisits]);
 
-
-  // Componente para Clientes por Cidade
-  const ClientsByCityCard = () => {
-    const sortedCities = useMemo(() => {
-      return Object.entries(clientsByCity).sort(
-        ([, countA], [, countB]) => countB - countA,
-      );
-    }, [clientsByCity]);
-
-    const visibleCities = showAllCities ? sortedCities : sortedCities.slice(0, 6);
-
-    return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="p-2 bg-green-500 rounded-2xl">
-            <Users className="w-4 h-4 text-white" />
-          </div>
-          <h3 className="font-semibold text-gray-900">Clientes por Cidade</h3>
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          {visibleCities.map(([city, count]) => (
-            <div key={city} className="bg-gray-50 p-2 rounded-lg text-center">
-              <div className="font-bold text-gray-800">{count}</div>
-              <div className="text-gray-600">{city}</div>
-            </div>
-          ))}
-        </div>
-        {sortedCities.length > 10 && (
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => setShowAllCities(!showAllCities)}
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-500 flex items-center justify-center w-full"
-            >
-              {showAllCities ? "Mostrar Menos" : "Mostrar Mais"}
-              {showAllCities ? (
-                <ChevronUp className="w-4 h-4 ml-1" />
-              ) : (
-                <ChevronDown className="w-4 h-4 ml-1" />
-              )}
-            </button>
-          </div>
-        )}
-      </div>
+  const handleToggleMinimize = (cardId: string) => {
+    setMinimizedCards(prev => 
+      prev.includes(cardId) ? prev.filter(id => id !== cardId) : [...prev, cardId]
     );
   };
-
-  // Componente para Agendamentos por Cidade
-  const SchedulesByCityCard = () => {
-    const sortedSchedules = useMemo(() => {
-      return Object.entries(schedulesByCity).sort(
-        ([, dataA], [, dataB]) => dataB.count - dataA.count,
-      );
-    }, [schedulesByCity]);
-
-    const visibleSchedules = showAllSchedules
-      ? sortedSchedules
-      : sortedSchedules.slice(0, 10);
-
-    return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="p-2 bg-yellow-500 rounded-2xl">
-            <Calendar className="w-4 h-4 text-white" />
-          </div>
-          <h3 className="font-semibold text-gray-900">
-            Agendamentos por Cidade
-          </h3>
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          {visibleSchedules.map(([city, data]) => (
-            <div key={city} className="bg-gray-50 p-2 rounded-lg text-center">
-              <div className="font-bold text-gray-800">{data.count}</div>
-              <div className="text-gray-600">{city}</div>
-            </div>
-          ))}
-        </div>
-        {sortedSchedules.length > 10 && (
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => setShowAllSchedules(!showAllSchedules)}
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-500 flex items-center justify-center w-full"
-            >
-              {showAllSchedules ? "Mostrar Menos" : "Mostrar Mais"}
-              {showAllSchedules ? (
-                <ChevronUp className="w-4 h-4 ml-1" />
-              ) : (
-                <ChevronDown className="w-4 h-4 ml-1" />
-              )}
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  };
-
 
   const renderTabContent = () => {
+    const dashboardCards = [
+      { id: "clients", Component: ClientsCardContent, title: "Clientes", icon: Users },
+      { id: "sales", Component: SalesCardContent, title: "Vendas", icon: Target },
+      { id: "visits", Component: VisitsCardContent, title: "Visitas", icon: Calendar },
+
+      {
+        id: "schedulesByCity",
+        Component: SchedulesByCityCardContent,
+        title: "Agendamentos por Cidade",
+        icon: Calendar
+      },
+            {
+        id: "clientsByCity",
+        Component: ClientsByCityCardContent,
+        title: "Clientes por Cidade",
+        icon: Users
+      },
+    ];
+
+    // Initialize card order and visibility
+    useEffect(() => {
+      if (cardOrder.length === 0) {
+        setCardOrder(dashboardCards.map((c) => c.id));
+      }
+      if (visibleCards.length === 0) {
+        setVisibleCards(dashboardCards.map((c) => c.id));
+      }
+    }, []);
+
+    const orderedAndVisibleCards = cardOrder
+      .map((id) => dashboardCards.find((c) => c.id === id))
+      .filter((c) => c && visibleCards.includes(c.id));
+
     switch (activeTab) {
       case "overview":
         return (
           <div className="space-y-6">
+            {/* Customize Button */}
+            <div className="flex mb-4">
+              <button
+                onClick={() => setIsCustomizeMenuOpen(!isCustomizeMenuOpen)}
+                className="flex items-center gap-2 text-sm font-medium text-gray-600 bg-white px-4 py-2 rounded-2xl border border-gray-200 hover:bg-gray-50"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Personalizar</span>
+              </button>
+            </div>
+
+            {/* Customize Menu */}
+            {isCustomizeMenuOpen && (
+              <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-4">
+                <h3 className="font-semibold text-gray-900 mb-3">Personalizar Cards</h3>
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm text-gray-700">Ordem e Visibilidade</h4>
+                  {cardOrder.map((cardId, index) => {
+                    const card = dashboardCards.find((c) => c.id === cardId);
+                    if (!card) return null;
+
+                    return (
+                      <div key={card.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={visibleCards.includes(card.id)}
+                            onChange={() => {
+                              if (visibleCards.includes(card.id)) {
+                                setVisibleCards(visibleCards.filter((id) => id !== card.id));
+                              } else {
+                                setVisibleCards([...visibleCards, card.id]);
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="text-sm font-medium text-gray-800">{card.title}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              if (index > 0) {
+                                const newOrder = [...cardOrder];
+                                const temp = newOrder[index];
+                                newOrder[index] = newOrder[index - 1];
+                                newOrder[index - 1] = temp;
+                                setCardOrder(newOrder);
+                              }
+                            }}
+                            disabled={index === 0}
+                            className="p-1 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <ChevronUp className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (index < cardOrder.length - 1) {
+                                const newOrder = [...cardOrder];
+                                const temp = newOrder[index];
+                                newOrder[index] = newOrder[index + 1];
+                                newOrder[index + 1] = temp;
+                                setCardOrder(newOrder);
+                              }
+                            }}
+                            disabled={index === cardOrder.length - 1}
+                            className="p-1 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <ChevronDown className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Enhanced Mobile Stats Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
-              <ClientsCard />
-              <SalesCard />
-              <VisitsCard />
-              <ClientsByCityCard />
-              <SchedulesByCityCard />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4">
+              {orderedAndVisibleCards.map((card) => {
+                if (!card) return null;
+                const { Component, ...rest } = card;
+                return (
+                  <div
+                    key={card.id}
+                    className="transition duration-300 hover:scale-105"
+                  >
+                    <Card {...rest} cardId={card.id} minimized={minimizedCards.includes(card.id)} onToggleMinimize={handleToggleMinimize}>
+                      <Component />
+                    </Card>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Métricas Gamificadas */}

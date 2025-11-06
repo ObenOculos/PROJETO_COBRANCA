@@ -147,8 +147,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     dueDateEnd: "",
   });
   const [showCityDropdown, setShowCityDropdown] = useState(false);
-  const [showNeighborhoodDropdown, setShowNeighborhoodDropdown] =
-    useState(false);
+  const [showNeighborhoodDropdown, setShowNeighborhoodDropdown] = useState(false);
 
   // Estados para ordenação
   const [sortField, setSortField] = useState<
@@ -1120,19 +1119,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     setSelectedVisitForCompletion(null);
   };
 
-  // Função para abrir modal de confirmação "Não Encontrado"
+  // Função para abrir modal de confirmação "Não Localizado"
   const handleMarkAsNotFound = (visit: ScheduledVisit) => {
     setSelectedVisitForNotFound(visit);
     setShowNotFoundConfirmModal(true);
   };
 
-  // Função para confirmar que quer marcar como "Não Encontrado"
+  // Função para confirmar que quer marcar como "Não Localizado"
   const handleConfirmNotFoundFirst = () => {
     setShowNotFoundConfirmModal(false);
     setShowNotFoundObservationModal(true);
   };
 
-  // Função para confirmar "Não Encontrado" com observação
+  // Função para confirmar "Não Localizado" com observação
   const handleConfirmNotFound = async (selectedNote: string) => {
     if (selectedVisitForNotFound) {
       await handleUpdateVisitStatus(
@@ -1200,7 +1199,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       case "cancelada":
         return "Cancelada";
       case "nao_encontrado":
-        return "Não Encontrado";
+        return "Não Localizado";
       case "cancelamento_solicitado":
         return "Cancelamento Solicitado";
       case "pending_sync":
@@ -1224,6 +1223,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       case "cancelada":
         return "bg-red-100 text-red-800";
       case "nao_encontrado":
+        return "bg-orange-100 text-orange-800";
         return "bg-orange-100 text-orange-800";
       case "cancelamento_solicitado":
         return "bg-yellow-100 text-yellow-800 border border-yellow-300";
@@ -1475,14 +1475,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
             
             if (dayOfWeek === 0) {
               newSundayVisits.add(client.document);
-              console.warn(
-                `⚠️ ATENÇÃO: Data automática para ${client.client} cai em um DOMINGO (${allowedDate})`
-              );
             }
-            
-          //  console.log(
-           //   `📅 Data automática definida para ${client.client}: ${allowedDate} (Dia ${allowedVisitDates.find(d => d.city === client.city && d.neighborhood === client.neighborhood)?.allowed_date} de cada mês)${dayOfWeek === 0 ? ' ⚠️ DOMINGO' : ''}`
-          //  );
           }
           
           return [
@@ -1542,17 +1535,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
           
           if (dayOfWeek === 0) {
-            newSundayVisits.add(clientDocument);
-            
-            // É domingo - mostrar aviso
-            console.warn(
-              `⚠️ ATENÇÃO: Data automática para ${clientData.client} cai em um DOMINGO (${allowedDate})`
-            );
+            newSundayVisits.add(clientDocument);            
           }
-          
-          //console.log(
-           // `📅 Data automática definida para ${clientData.client}: ${allowedDate} (Dia ${allowedVisitDates.find(d => d.city === clientData.city && d.neighborhood === clientData.neighborhood)?.allowed_date} de cada mês)${dayOfWeek === 0 ? ' ⚠️ DOMINGO' : ''}`
-          //);
         }
       }
       
@@ -2154,7 +2138,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 onClick={() => handleMarkAsNotFound(visit)}
                                 className="px-3 py-2 bg-orange-500 text-white rounded-2xl text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
                               >
-                                Não Encontrado
+                                Não Localizado
                               </button>
                               <button
                                 onClick={() => handleOpenRescheduleModal(visit)}
@@ -2324,7 +2308,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                               onClick={() => handleMarkAsNotFound(visit)}
                               className="px-3 py-2 bg-orange-100 text-orange-700 rounded-2xl text-sm hover:bg-orange-200 transition-colors flex items-center justify-center"
                             >
-                              Não Encontrado
+                              Não Localizado
                             </button>
                             <button
                               onClick={() => handleOpenRescheduleModal(visit)}
@@ -2917,7 +2901,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
             document.body,
           )}
 
-        {/* Modal de Confirmação para "Não Encontrado" - Renderizado via Portal */}
+        {/* Modal de Confirmação para "Não Localizado" - Renderizado via Portal */}
         {showNotFoundConfirmModal &&
           selectedVisitForNotFound &&
           createPortal(
@@ -2926,7 +2910,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                 <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                     <AlertTriangle className="h-5 w-5 mr-2 text-orange-600" />
-                    Confirmar "Não Encontrado"
+                    Confirmar "Não Localizado"
                   </h3>
                 </div>
 
@@ -2941,7 +2925,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   </p>
                   <p className="text-gray-700">
                     Tem certeza de que deseja marcar esta visita como{" "}
-                    <strong>"Não Encontrado"</strong>?
+                    <strong>"Não Localizado"</strong>?
                   </p>
                 </div>
 
@@ -2967,7 +2951,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
             document.body,
           )}
 
-        {/* Modal de "Não Encontrado" com Observações Pré-programadas - Renderizado via Portal */}
+        {/* Modal de "Não Localizado" com Observações Pré-programadas - Renderizado via Portal */}
         {showNotFoundObservationModal &&
           selectedVisitForNotFound &&
           createPortal(
@@ -2976,7 +2960,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                 <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                     <AlertTriangle className="h-5 w-5 mr-2 text-orange-600" />
-                    Marcar como "Não Encontrado"
+                    Marcar como "Não Localizado"
                   </h3>
                   <p className="text-sm text-gray-600 mt-1">
                     Cliente: {selectedVisitForNotFound.clientName}
@@ -3291,6 +3275,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                           className="flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                         >
                                           <input
+                                            id={`city-filter-${city}`}
                                             type="checkbox"
                                             checked={filters.city.includes(
                                               city,
@@ -3334,6 +3319,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                             className="flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                           >
                                             <input
+                                              id={`neighborhood-filter-${neighborhood}`}
                                               type="checkbox"
                                               checked={filters.neighborhood.includes(
                                                 neighborhood,
@@ -3361,6 +3347,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 <div className="relative">
                                   <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
                                   <input
+                                    id="valorminimo"
                                     type="number"
                                     placeholder="0"
                                     value={filters.minValue}
@@ -3382,6 +3369,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 <div className="relative">
                                   <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
                                   <input
+                                    id="valormaximo"
                                     type="number"
                                     placeholder="∞"
                                     value={filters.maxValue}
@@ -3429,6 +3417,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   Vencimento De
                                 </label>
                                 <input
+                                  id="vencimentode"
                                   type="date"
                                   value={filters.dueDateStart}
                                   onChange={(e) =>
@@ -3446,6 +3435,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   Vencimento Até
                                 </label>
                                 <input
+                                  id="vencimentoate"
                                   type="date"
                                   value={filters.dueDateEnd}
                                   onChange={(e) =>
@@ -3690,6 +3680,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                       px-2 py-1 sm:p-2 border border-gray-300`}
                                   >
                                     <input
+                                      id="select-all"
                                       type="checkbox"
                                       checked={isAllSelected}
                                       onChange={(e) =>
@@ -3957,6 +3948,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                           <div className="flex items-center gap-1">
                                             <Calendar className="h-3 w-3 text-gray-400 flex-shrink-0" />
                                             <input
+                                              id={`date-input-${client.document}`}
                                               type="date"
                                               value={schedule.date}
                                               onChange={(e) => {
@@ -4004,6 +3996,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                           <div className="flex items-center gap-1">
                                             <Clock className="h-3 w-3 text-gray-400 flex-shrink-0" />
                                             <input
+                                              id={`time-input-${client.document}`}
                                               type="time"
                                               value={schedule.time}
                                               onChange={(e) => {
