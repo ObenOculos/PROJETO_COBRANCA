@@ -507,7 +507,7 @@ export const CollectionTable = React.forwardRef<
         <>
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
             <div className="px-4 py-4 border-b border-gray-200">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <div id="teste_nome_mudar">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1093,7 +1093,7 @@ export const CollectionTable = React.forwardRef<
                   onClick={() => toggleClientExpansion(clientGroup.document)}
                 >
                   <div className="flex-1 px-4 sm:px-6 py-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                       {/* Client Info */}
                       <div className="flex items-center flex-1 min-w-0 pb-4 sm:pb-0 border-b sm:border-0 border-gray-100">
                         <div className="hidden sm:block flex-shrink-0 mr-4">

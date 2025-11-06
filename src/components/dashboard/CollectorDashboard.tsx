@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Target,
+  Clock,
   CheckCircle,
   Users,
   Calendar,
@@ -17,7 +18,8 @@ import {
   Rocket,
   ThumbsUp,
   AlertCircle,
-  Clock,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable } from "./CollectionTable";
@@ -73,6 +75,8 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [showFilterBar, setShowFilterBar] = useState(false);
   const [isAutoSliding, setIsAutoSliding] = useState(true);
+  const [showAllCities, setShowAllCities] = useState(false);
+  const [showAllSchedules, setShowAllSchedules] = useState(false);
 
   // Configuração dos slides para mobile
   const mobileSlides = [
@@ -593,46 +597,98 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
 
   // Componente para Clientes por Cidade
-  const ClientsByCityCard = () => (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="p-2 bg-green-500 rounded-2xl">
-          <Users className="w-4 h-4 text-white" />
+  const ClientsByCityCard = () => {
+    const sortedCities = useMemo(() => {
+      return Object.entries(clientsByCity).sort(
+        ([, countA], [, countB]) => countB - countA,
+      );
+    }, [clientsByCity]);
+
+    const visibleCities = showAllCities ? sortedCities : sortedCities.slice(0, 6);
+
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="p-2 bg-green-500 rounded-2xl">
+            <Users className="w-4 h-4 text-white" />
+          </div>
+          <h3 className="font-semibold text-gray-900">Clientes por Cidade</h3>
         </div>
-        <h3 className="font-semibold text-gray-900">Clientes por Cidade</h3>
-      </div>
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        {Object.entries(clientsByCity)
-          .sort(([, countA], [, countB]) => countB - countA) // Sort by count in descending order
-          .map(([city, count]) => (
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          {visibleCities.map(([city, count]) => (
             <div key={city} className="bg-gray-50 p-2 rounded-lg text-center">
               <div className="font-bold text-gray-800">{count}</div>
               <div className="text-gray-600">{city}</div>
             </div>
           ))}
+        </div>
+        {sortedCities.length > 10 && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setShowAllCities(!showAllCities)}
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-500 flex items-center justify-center w-full"
+            >
+              {showAllCities ? "Mostrar Menos" : "Mostrar Mais"}
+              {showAllCities ? (
+                <ChevronUp className="w-4 h-4 ml-1" />
+              ) : (
+                <ChevronDown className="w-4 h-4 ml-1" />
+              )}
+            </button>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // Componente para Agendamentos por Cidade
-  const SchedulesByCityCard = () => (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="p-2 bg-yellow-500 rounded-2xl">
-          <Calendar className="w-4 h-4 text-white" />
-        </div>
-        <h3 className="font-semibold text-gray-900">Agendamentos por Cidade</h3>
-      </div>
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        {Object.entries(schedulesByCity).map(([city, data]) => (
-          <div key={city} className="bg-gray-50 p-2 rounded-lg text-center">
-            <div className="font-bold text-gray-800">{data.count}</div>
-            <div className="text-gray-600">{city}</div>
+  const SchedulesByCityCard = () => {
+    const sortedSchedules = useMemo(() => {
+      return Object.entries(schedulesByCity).sort(
+        ([, dataA], [, dataB]) => dataB.count - dataA.count,
+      );
+    }, [schedulesByCity]);
+
+    const visibleSchedules = showAllSchedules
+      ? sortedSchedules
+      : sortedSchedules.slice(0, 10);
+
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="p-2 bg-yellow-500 rounded-2xl">
+            <Calendar className="w-4 h-4 text-white" />
           </div>
-        ))}
+          <h3 className="font-semibold text-gray-900">
+            Agendamentos por Cidade
+          </h3>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          {visibleSchedules.map(([city, data]) => (
+            <div key={city} className="bg-gray-50 p-2 rounded-lg text-center">
+              <div className="font-bold text-gray-800">{data.count}</div>
+              <div className="text-gray-600">{city}</div>
+            </div>
+          ))}
+        </div>
+        {sortedSchedules.length > 10 && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setShowAllSchedules(!showAllSchedules)}
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-500 flex items-center justify-center w-full"
+            >
+              {showAllSchedules ? "Mostrar Menos" : "Mostrar Mais"}
+              {showAllSchedules ? (
+                <ChevronUp className="w-4 h-4 ml-1" />
+              ) : (
+                <ChevronDown className="w-4 h-4 ml-1" />
+              )}
+            </button>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
 
   const renderTabContent = () => {
@@ -641,7 +697,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         return (
           <div className="space-y-6">
             {/* Enhanced Mobile Stats Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
               <ClientsCard />
               <SalesCard />
               <VisitsCard />
@@ -665,9 +721,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                   <div className="text-sm text-gray-600 bg-white px-4 py-2 rounded-2xl border border-gray-200">
                     <div className="font-medium">
                       {new Date().toLocaleDateString("pt-BR", {
-                        weekday: "long",
+                        weekday: "short",
                         day: "numeric",
-                        month: "long",
+                        month: "short",
                       })}
                     </div>
                   </div>
@@ -831,7 +887,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                         return (
                           <div key={slide.id} className="w-full flex-shrink-0">
                             <div
-                              className={`bg-white/70 backdrop-blur-sm rounded-2xl p-4 border ${
+                              className={`bg-white/70 backdrop-blur-sm rounded-2xl p-2 border ${
                                 slide.color === "yellow"
                                   ? "border-yellow-200"
                                   : slide.color === "blue"
@@ -839,7 +895,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                                     : "border-purple-200"
                               }`}
                             >
-                              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                              <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
                                 <Icon
                                   className={`w-5 h-5 ${
                                     slide.color === "yellow"
@@ -851,7 +907,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                                 />
                                 {slide.title}
                               </h3>
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 gap-2">
                                 <RadialApprovalChart
                                   current={metrics.visits}
                                   goal={goalsPeriod.visits}
@@ -891,7 +947,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                   </div>
 
                   {/* Indicadores de navegação */}
-                  <div className="flex justify-center mt-4 space-x-2">
+                  <div className="flex justify-center mt-2 space-x-2">
                     {mobileSlides.map((slide, index) => (
                       <button
                         key={slide.id}
@@ -944,7 +1000,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 pt-16 lg:pt-8">
+    <div className="p-4 sm:p-6 lg:p-16 pt-16 lg:pt-16">
       {/* Tab Content */}
       <TabTransition activeKey={activeTab}>
         {renderTabContent()}
