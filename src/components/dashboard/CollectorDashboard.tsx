@@ -519,6 +519,36 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     return map;
   }, [myCollections]);
 
+  const clientsByCity = useMemo(() => {
+    return clientGroups.reduce(
+      (acc, group) => {
+        const city = group.city || "Sem cidade";
+        acc[city] = (acc[city] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+  }, [clientGroups]);
+
+  const schedulesByCity = useMemo(() => {
+    const scheduled = myVisits.filter((v) => v.status === "agendada");
+    return scheduled.reduce(
+      (acc, visit) => {
+        const city = visit.clientCity || "Sem cidade";
+        if (!acc[city]) {
+          acc[city] = { count: 0, dates: new Set<string>() };
+        }
+        acc[city].count++;
+        acc[city].dates.add(visit.scheduledDate);
+        return acc;
+      },
+      {} as Record<
+        string,
+        { count: number; dates: Set<string> }
+      >,
+    );
+  }, [myVisits]);
+
   const stats = useMemo(() => {
     const salesArray = Array.from(salesMap.values());
     const pendingSales = salesArray.filter((s) => s.isPending);
@@ -562,6 +592,49 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   }, [salesMap, clientGroups, myVisits]);
 
 
+  // Componente para Clientes por Cidade
+  const ClientsByCityCard = () => (
+    <div className="bg-white rounded-2xl border border-gray-200 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="p-2 bg-green-500 rounded-2xl">
+          <Users className="w-4 h-4 text-white" />
+        </div>
+        <h3 className="font-semibold text-gray-900">Clientes por Cidade</h3>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        {Object.entries(clientsByCity)
+          .sort(([, countA], [, countB]) => countB - countA) // Sort by count in descending order
+          .map(([city, count]) => (
+            <div key={city} className="bg-gray-50 p-2 rounded-lg text-center">
+              <div className="font-bold text-gray-800">{count}</div>
+              <div className="text-gray-600">{city}</div>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+
+  // Componente para Agendamentos por Cidade
+  const SchedulesByCityCard = () => (
+    <div className="bg-white rounded-2xl border border-gray-200 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="p-2 bg-yellow-500 rounded-2xl">
+          <Calendar className="w-4 h-4 text-white" />
+        </div>
+        <h3 className="font-semibold text-gray-900">Agendamentos por Cidade</h3>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        {Object.entries(schedulesByCity).map(([city, data]) => (
+          <div key={city} className="bg-gray-50 p-2 rounded-lg text-center">
+            <div className="font-bold text-gray-800">{data.count}</div>
+            <div className="text-gray-600">{city}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+
   const renderTabContent = () => {
     switch (activeTab) {
       case "overview":
@@ -571,9 +644,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
               <ClientsCard />
               <SalesCard />
-              <div className="col-span-2 lg:col-span-1">
-                <VisitsCard />
-              </div>
+              <VisitsCard />
+              <ClientsByCityCard />
+              <SchedulesByCityCard />
             </div>
 
             {/* Métricas Gamificadas */}
