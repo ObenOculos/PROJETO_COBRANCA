@@ -131,11 +131,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const [showClientModal, setShowClientModal] = useState(false);
   const [selectedClientForModal, setSelectedClientForModal] =
     useState<any>(null);
-  const [showConflictModal, setShowConflictModal] = useState(false);
-  const [conflictData, setConflictData] = useState<{
-    errors: string[];
-    conflicts: string[];
-  }>({ errors: [], conflicts: [] });
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     city: [] as string[],
@@ -282,7 +277,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       showScheduleModal ||
       showCancellationModal ||
       showClientModal ||
-      showConflictModal ||
       showRescheduleModal ||
       showCompletedModal ||
       showNotFoundConfirmModal ||
@@ -312,7 +306,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     showScheduleModal,
     showCancellationModal,
     showClientModal,
-    showConflictModal,
     showRescheduleModal,
     showCompletedModal,
     showNotFoundConfirmModal,
@@ -608,57 +601,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
   const handleScheduleVisit = async () => {
     return handleScheduleMultipleVisits();
-  };
-
-  const validateClientSchedules = () => {
-    const errors: string[] = [];
-    const conflicts: string[] = [];
-    const scheduleMap = new Map<string, string[]>();
-
-    for (const client of getSelectedClientsData()) {
-      const schedule = clientSchedules.get(client.document);
-      if (!schedule) {
-        errors.push(`${client.client}: Data e horário não configurados`);
-        continue;
-      }
-
-      // Validar se a data não é no passado (data de hoje é válida)
-      const todayString = getLocalDate(); // Usar a mesma função que define a data de hoje
-
-      if (schedule.date < todayString) {
-        errors.push(`${client.client}: Data não pode ser anterior a hoje`);
-        continue;
-      }
-
-      // Verificar conflitos de horário no mesmo dia
-      const dateTimeKey = `${schedule.date}_${schedule.time}`;
-      if (!scheduleMap.has(dateTimeKey)) {
-        scheduleMap.set(dateTimeKey, []);
-      }
-      scheduleMap.get(dateTimeKey)!.push(client.client);
-    }
-
-    // Verificar conflitos
-    for (const [dateTime, clients] of scheduleMap.entries()) {
-      if (clients.length > 1) {
-        const [date, time] = dateTime.split("_");
-        conflicts.push(
-          `${formatSafeDate(date)} às ${time}: ${clients.join(", ")}`,
-        );
-      }
-    }
-
-    return { errors, conflicts };
-  };
-
-  const handleConfirmScheduleWithConflicts = async () => {
-    setShowConflictModal(false);
-    await proceedWithScheduling();
-  };
-
-  const handleCloseConflictModal = () => {
-    setShowConflictModal(false);
-    setConflictData({ errors: [], conflicts: [] });
   };
 
   const handleFilterChange = (key: string, value: string) => {
@@ -990,32 +932,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       return;
     }
 
-    // Validar agendamentos
-    const { errors, conflicts } = validateClientSchedules();
-
-    if (errors.length > 0) {
-      // Verificar se há erro de data passada
-      const pastDateErrors = errors.filter((error) =>
-        error.includes("Data não pode ser anterior a hoje"),
-      );
-      if (pastDateErrors.length > 0) {
-        setDateValidationMessage(
-          "Não é possível agendar visitas para datas passadas",
-        );
-        setShowDateValidationModal(true);
-        return;
-      }
-      // Outros erros
-      alert(`Erros encontrados:\n\n${errors.join("\n")}`);
-      return;
-    }
-
-    if (conflicts.length > 0) {
-      setConflictData({ errors, conflicts });
-      setShowConflictModal(true);
-      return;
-    }
-
     await proceedWithScheduling();
   };
 
@@ -1220,7 +1136,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       case "cancelada":
         return "bg-red-100 text-red-800";
       case "nao_encontrado":
-        return "bg-orange-100 text-orange-800";
         return "bg-orange-100 text-orange-800";
       case "cancelamento_solicitado":
         return "bg-yellow-100 text-yellow-800 border border-yellow-300";
@@ -2733,103 +2648,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Reagendar
-                  </button>
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )}
-
-        {/* Modal de Conflito de Horários - Renderizado via Portal */}
-        {showConflictModal &&
-          createPortal(
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
-                {/* Header */}
-                <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-4 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <AlertTriangle className="h-6 w-6 text-white mr-3" />
-                    <div>
-                      <h2 className="text-xl font-bold text-white">
-                        Conflitos de Horário Detectados
-                      </h2>
-                      <p className="text-orange-100 text-sm">
-                        Alguns clientes têm o mesmo horário agendado
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleCloseConflictModal}
-                    className="p-2 hover:bg-white hover:bg-opacity-20 rounded-2xl transition-colors"
-                  >
-                    <X className="h-5 w-5 text-white" />
-                  </button>
-                </div>
-
-                <div className="overflow-y-auto max-h-[calc(90vh-140px)]">
-                  <div className="p-6">
-                    {/* Lista de Conflitos */}
-                    <div className="mb-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                        <Clock className="h-5 w-5 text-orange-600 mr-2" />
-                        Conflitos Encontrados
-                      </h3>
-
-                      <div className="space-y-3">
-                        {conflictData.conflicts.map((conflict, index) => (
-                          <div
-                            key={index}
-                            className="bg-orange-50 border border-orange-200 rounded-2xl p-4"
-                          >
-                            <div className="flex items-start">
-                              <AlertTriangle className="h-5 w-5 text-orange-600 mr-3 mt-0.5 flex-shrink-0" />
-                              <div className="text-sm text-orange-800">
-                                <div className="font-medium">{conflict}</div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Opções */}
-                    <div className="bg-gray-50 rounded-2xl p-4">
-                      <h4 className="font-medium text-gray-900 mb-2">
-                        O que você gostaria de fazer?
-                      </h4>
-                      <ul className="text-sm text-gray-600 space-y-1">
-                        <li>
-                          • <strong>Cancelar:</strong> Volte e ajuste os
-                          horários manualmente
-                        </li>
-                        <li>
-                          • <strong>Continuar:</strong> Agende mesmo com
-                          conflitos (não recomendado)
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={handleCloseConflictModal}
-                    className="flex-1 px-6 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors font-medium"
-                  >
-                    Cancelar e Ajustar
-                  </button>
-                  <button
-                    onClick={handleConfirmScheduleWithConflicts}
-                    disabled={loading}
-                    className="flex-1 px-6 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center"
-                  >
-                    {loading ? (
-                      <div className="animate-spin h-4 w-4 border border-white border-t-transparent rounded-full mr-2"></div>
-                    ) : (
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                    )}
-                    {loading ? "Agendando..." : "Continuar Mesmo Assim"}
                   </button>
                 </div>
               </div>
