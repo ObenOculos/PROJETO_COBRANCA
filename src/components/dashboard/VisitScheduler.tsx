@@ -3149,7 +3149,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                         <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-white mr-1.5 sm:mr-2 flex-shrink-0" />
                       )}
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-sm sm:text-lg font-semibold text-white truncate">
+                        <h3 className="text-sm sm:text-lg font-semibold text-white truncate sm:ml-3">
                           {modalStep === "selection"
                             ? `Clientes para Visita (${selectedClients.size})`
                             : "Confirmar Agendamento"}
