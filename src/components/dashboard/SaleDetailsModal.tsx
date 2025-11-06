@@ -319,7 +319,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                   >
                     {getStatusLabel(saleData.saleStatus)}
                   </span>
-                </div>                
+                </div>
               </div>
             </div>
 
