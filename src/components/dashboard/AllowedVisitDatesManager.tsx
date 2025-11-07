@@ -531,14 +531,14 @@ const AllowedVisitDatesManager: React.FC = () => {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">
-          Gerenciar Datas de Visita Permitidas
+          Gerenciar Datas
         </h3>
         <button
           onClick={openCalendarModal}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
         >
           <CalendarIcon className="w-5 h-5" />
-          <span>Ver Calendário</span>
+          <span>Calendário</span>
         </button>
       </div>
 

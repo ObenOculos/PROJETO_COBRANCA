@@ -32,7 +32,24 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { FilterOptions } from "../../types";
 
-// Export tabs for use in Header
+const toDate = (dateInput: string | Date | null | undefined): Date | null => {
+  if (!dateInput) return null;
+  if (dateInput instanceof Date) return new Date(dateInput);
+  if (typeof dateInput === "string") {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+      return new Date(dateInput + "T00:00:00");
+    }
+  }
+  return new Date(dateInput);
+};
+
+const INITIAL_CARD_IDS = [
+  "clients",
+  "sales",
+  "visits",
+  "schedulesByCity",
+  "clientsByCity",
+];
 
 interface CollectorDashboardProps {
   activeTab?: string;
@@ -97,12 +114,8 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   } = useCollection();
 
   // Usa a aba externa se fornecida, senão gerencia internamente
-  const [internalActiveTab] = useState<
-    "overview" | "collections" | "route" | "visits"
-  >(() => {
-    const savedTab = localStorage.getItem("collectorActiveTab");
-    return (savedTab as any) || "overview";
-  });
+  const internalActiveTab: "overview" | "collections" | "route" | "visits" =
+    (localStorage.getItem("collectorActiveTab") as any) || "overview";
 
   const activeTab = externalActiveTab || internalActiveTab;
 
@@ -115,8 +128,8 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   const [showAllCities, setShowAllCities] = useState(false);
   const [showAllSchedules, setShowAllSchedules] = useState(false);
 
-  const [cardOrder, setCardOrder] = useState<string[]>([]);
-  const [visibleCards, setVisibleCards] = useState<string[]>([]);
+  const [cardOrder, setCardOrder] = useState<string[]>(INITIAL_CARD_IDS);
+  const [visibleCards, setVisibleCards] = useState<string[]>(INITIAL_CARD_IDS);
   const [isCustomizeMenuOpen, setIsCustomizeMenuOpen] = useState(false);
   const [minimizedCards, setMinimizedCards] = useState<string[]>([]);
 
@@ -228,40 +241,23 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     );
 
     // Função para comparar datas (apenas dia)
-    const isSameDay = (date1: Date, date2: Date) => {
-      return (
-        date1.toISOString().split("T")[0] === date2.toISOString().split("T")[0]
-      );
+    const isSameDay = (d1: Date | string, d2: Date | string) => {
+      const date1 = toDate(d1);
+      const date2 = toDate(d2);
+      if (!date1 || !date2) return false;
+      return date1.toISOString().split("T")[0] === date2.toISOString().split("T")[0];
     };
 
     const today = new Date();
 
-    const dailyPayments = collectorPayments.filter((p) => {
-      // Verificar se a data é uma string no formato YYYY-MM-DD ou se já é um objeto Date
-      let paymentDate;
-      if (typeof p.paymentDate === "string") {
-        // Se é string, pode ser no formato YYYY-MM-DD (date do SQL)
-        paymentDate = new Date(p.paymentDate + "T00:00:00");
-      } else {
-        paymentDate = new Date(p.paymentDate);
-      }
-
-      return isSameDay(paymentDate, today);
-    });
-
-    // Função para processar data de visita
-    const processVisitDate = (dateStr: string) => {
-      if (typeof dateStr === "string") {
-        return new Date(dateStr + "T00:00:00");
-      }
-      return new Date(dateStr);
-    };
+    const dailyPayments = collectorPayments.filter((p) =>
+      isSameDay(p.paymentDate, today),
+    );
 
     const todayVisits = visits.filter((v) => {
       if (v.status !== "realizada") return false;
       const dateToCheck = v.dataVisitaRealizada || v.scheduledDate;
-      const visitDate = processVisitDate(dateToCheck);
-      return isSameDay(visitDate, today);
+      return isSameDay(dateToCheck, today);
     });
 
     // Calcular métricas reais
@@ -274,13 +270,13 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         visits: visits.filter((v) => {
           if (v.status !== "realizada") return false;
           const dateToCheck = v.dataVisitaRealizada || v.scheduledDate;
-          const visitDate = processVisitDate(dateToCheck);
-          return visitDate >= startOfWeek;
+          const visitDate = toDate(dateToCheck);
+          return visitDate && visitDate >= startOfWeek;
         }).length,
         payments: collectorPayments
           .filter((p) => {
-            const paymentDate = new Date(p.paymentDate);
-            return paymentDate >= startOfWeek;
+            const paymentDate = toDate(p.paymentDate);
+            return paymentDate && paymentDate >= startOfWeek;
           })
           .reduce((sum, p) => sum + p.paymentAmount, 0),
       },
@@ -288,13 +284,13 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         visits: visits.filter((v) => {
           if (v.status !== "realizada") return false;
           const dateToCheck = v.dataVisitaRealizada || v.scheduledDate;
-          const visitDate = processVisitDate(dateToCheck);
-          return visitDate >= startOfMonth;
+          const visitDate = toDate(dateToCheck);
+          return visitDate && visitDate >= startOfMonth;
         }).length,
         payments: collectorPayments
           .filter((p) => {
-            const paymentDate = processVisitDate(p.paymentDate);
-            return paymentDate >= startOfMonth;
+            const paymentDate = toDate(p.paymentDate);
+            return paymentDate && paymentDate >= startOfMonth;
           })
           .reduce((sum, p) => sum + p.paymentAmount, 0),
       },
@@ -533,12 +529,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     );
   };
 
-  // Salva a aba ativa no localStorage apenas quando gerenciado internamente
-  useEffect(() => {
-    if (!externalActiveTab) {
-      localStorage.setItem("collectorActiveTab", internalActiveTab);
-    }
-  }, [internalActiveTab, externalActiveTab]);
+
 
   const myCollections = useMemo(
     () => getCollectorCollections(user?.id || ""),
@@ -711,15 +702,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       },
     ];
 
-    // Initialize card order and visibility
-    useEffect(() => {
-      if (cardOrder.length === 0) {
-        setCardOrder(dashboardCards.map((c) => c.id));
-      }
-      if (visibleCards.length === 0) {
-        setVisibleCards(dashboardCards.map((c) => c.id));
-      }
-    }, []);
+
 
     const orderedAndVisibleCards = cardOrder
       .map((id) => dashboardCards.find((c) => c.id === id))

@@ -1681,6 +1681,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         };
       });
 
+      // Sort by conversionRate descending before caching and returning
+      result.sort((a, b) => b.conversionRate - a.conversionRate);
+
       // Cache the result
       statsCache.set(cacheKey, result);
 

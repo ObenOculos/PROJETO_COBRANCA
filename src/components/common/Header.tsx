@@ -166,7 +166,7 @@ const Header: React.FC<HeaderProps> = ({
       <div className="lg:hidden absolute top-0 right-0 z-30 p-4">
         <button
           onClick={() => setIsMobileMenuOpen(true)}
-          className="p-2 text-gray-500 bg-white rounded-md"
+          className="p-2 text-gray-500 bg-white rounded-md border border-gray-200 shadow-sm hover:bg-gray-100 hover:text-gray-700 transition-colors"
         >
           <Menu className="h-6 w-6" />
         </button>

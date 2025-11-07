@@ -85,8 +85,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   >(() => {
     const saved = localStorage.getItem("managerCollectionsView");
     return (saved as "table" | "cash-report") || "table";
-  });
-  const [overviewFilter] = useState<"all" | "with-collector">("all");
+  }); 
 
   // Estado para controlar visibilidade dos filtros no mobile
   const [isFilterVisible, setIsFilterVisible] = useState(false);
@@ -134,10 +133,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     };
   }, []);
 
-  // Salva a aba ativa no localStorage sempre que mudar
+  // Salva a aba ativa no localStorage sempre que o estado interno mudar
   useEffect(() => {
-    localStorage.setItem("managerActiveTab", activeTab);
-  }, [activeTab]);
+    // Apenas salva no localStorage se o componente não for controlado externamente
+    if (!onTabChange) {
+      localStorage.setItem("managerActiveTab", internalActiveTab);
+    }
+  }, [internalActiveTab, onTabChange]);
 
   // Salva a visualização de cobranças no localStorage sempre que mudar
   useEffect(() => {
@@ -360,16 +362,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const filteredCollections = baseFilteredCollections;
 
   // Apply overview filter for overview calculations
-  const overviewCollections = useMemo(
-    () =>
-      overviewFilter === "with-collector"
-        ? collections.filter(
-            (collection) =>
-              collection.user_id && collection.user_id.trim() !== "",
-          )
-        : collections,
-    [overviewFilter, collections],
-  );
+  // Since overviewFilter is now a constant ("all"), this simplifies to just returning all collections.
+  const overviewCollections = collections;
 
   // Calculate metrics based on overview filter
   const overviewStats = useMemo(() => {
@@ -525,7 +519,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               {/* Slider container with touch support */}
               <div
                 ref={sliderRef}
-                className="relative overflow-hidden"
+                className="relative overflow-hidden !mt-0"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
@@ -625,7 +619,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         Métricas Operacionais
                       </h4>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3 lg:gap-6">
                       <div
                         onClick={() => setActiveTab("collections")}
                         className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
@@ -664,27 +658,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                         </div>
                         <div className="text-xs text-gray-600">
                           {overviewMetrics.pendingSalesCount} vendas pendentes
-                        </div>
-                      </div>
-                      <div
-                        onClick={() => {
-                          const today = new Date().toISOString().split("T")[0];
-                          setFilters({ ...filters, dueDate: today });
-                          setActiveTab("collections");
-                        }}
-                        className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <h5 className="text-sm font-medium text-gray-900">
-                            Vencimentos Hoje
-                          </h5>
-                          <Calendar className="h-4 w-4 text-gray-600" />
-                        </div>
-                        <div className="text-2xl font-bold text-gray-900 mb-1">
-                          {formatCurrency(overviewMetrics.todayAmount)}
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          {overviewMetrics.todayCollections.length} títulos
                         </div>
                       </div>
                     </div>
