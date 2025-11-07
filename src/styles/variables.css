@@ -155,6 +155,37 @@
   background: var(--color-primary);
 }
 
+/* ===== ESTILOS DE FOCO GLOBAL ===== */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Foco em inputs */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Foco em checkboxes e radio buttons */
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* ===== CLASSES UTILITÁRIAS COM VARIÁVEIS ===== */
 .color-primary {
   color: var(--color-primary);
@@ -212,4 +243,249 @@
 }
 .transition-slow {
   transition: all var(--transition-slow);
+}
+
+/* ===== COMPONENTES CSS REUTILIZÁVEIS ===== */
+
+/* ===== BOTÕES ===== */
+.btn-primary {
+  @apply inline-flex items-center justify-center px-lg py-md bg-primary text-white rounded-lg font-medium shadow-md hover:bg-primary-dark hover:shadow-lg transition-normal active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center px-lg py-md bg-gray-200 text-gray-900 rounded-lg font-medium shadow-sm hover:bg-gray-300 transition-normal active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-success {
+  @apply inline-flex items-center justify-center px-lg py-md bg-success text-white rounded-lg font-medium shadow-md hover:bg-success-light hover:shadow-lg transition-normal active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-danger {
+  @apply inline-flex items-center justify-center px-lg py-md bg-danger text-white rounded-lg font-medium shadow-md hover:bg-danger-light hover:shadow-lg transition-normal active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-warning {
+  @apply inline-flex items-center justify-center px-lg py-md bg-warning text-white rounded-lg font-medium shadow-md hover:bg-warning-light hover:shadow-lg transition-normal active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center px-lg py-md bg-transparent text-primary rounded-lg font-medium hover:bg-primary hover:text-white transition-normal active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed border border-primary;
+}
+
+.btn-sm {
+  @apply px-md py-sm text-sm;
+}
+
+.btn-lg {
+  @apply px-xl py-lg text-lg;
+}
+
+/* ===== CARDS ===== */
+.card {
+  @apply bg-white rounded-xl shadow-md p-lg border border-gray-200 transition-normal hover:shadow-lg;
+}
+
+.card-sm {
+  @apply bg-white rounded-lg shadow-sm p-md border border-gray-100 transition-normal;
+}
+
+.card-lg {
+  @apply bg-white rounded-xl shadow-lg p-2xl border border-gray-200 transition-normal hover:shadow-xl;
+}
+
+.card-hover {
+  @apply cursor-pointer transition-normal hover:shadow-lg hover:border-primary;
+}
+
+/* ===== INPUTS ===== */
+.input-base {
+  @apply w-full px-lg py-md border border-gray-300 rounded-lg text-md text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-normal;
+}
+
+.input-sm {
+  @apply px-md py-sm text-sm;
+}
+
+.input-lg {
+  @apply px-xl py-lg text-lg;
+}
+
+.input-error {
+  @apply border-danger focus:ring-danger;
+}
+
+.input-success {
+  @apply border-success focus:ring-success;
+}
+
+/* ===== LABELS ===== */
+.label-base {
+  @apply block text-sm font-medium text-gray-900 mb-sm;
+}
+
+.label-required::after {
+  content: ' *';
+  @apply text-danger;
+}
+
+/* ===== ALERTAS ===== */
+.alert {
+  @apply p-lg rounded-lg border transition-normal;
+}
+
+.alert-success {
+  @apply bg-success-bg text-success border-success;
+}
+
+.alert-warning {
+  @apply bg-warning-bg text-warning border-warning;
+}
+
+.alert-danger {
+  @apply bg-danger-bg text-danger border-danger;
+}
+
+.alert-info {
+  @apply bg-info-bg text-info border-info;
+}
+
+/* ===== BADGES ===== */
+.badge {
+  @apply inline-flex items-center px-md py-sm rounded-full text-xs font-medium;
+}
+
+.badge-primary {
+  @apply bg-primary text-white;
+}
+
+.badge-secondary {
+  @apply bg-secondary text-white;
+}
+
+.badge-success {
+  @apply bg-success text-white;
+}
+
+.badge-warning {
+  @apply bg-warning text-white;
+}
+
+.badge-danger {
+  @apply bg-danger text-white;
+}
+
+.badge-gray {
+  @apply bg-gray-200 text-gray-900;
+}
+
+/* ===== DIVIDERS ===== */
+.divider {
+  @apply border-t border-gray-200;
+}
+
+.divider-primary {
+  @apply border-t border-primary;
+}
+
+.divider-sm {
+  @apply my-md;
+}
+
+.divider-lg {
+  @apply my-2xl;
+}
+
+/* ===== LOADERS ===== */
+.spinner {
+  @apply inline-block h-md w-md border-2 border-gray-300 border-t-primary rounded-full animate-spin;
+}
+
+.spinner-sm {
+  @apply h-sm w-sm border border-gray-300 border-t-primary;
+}
+
+.spinner-lg {
+  @apply h-lg w-lg border-4 border-gray-300 border-t-primary;
+}
+
+/* ===== TABELAS ===== */
+.table-base {
+  @apply w-full border-collapse;
+}
+
+.table-header {
+  @apply bg-gray-100 text-gray-900 font-semibold text-sm;
+}
+
+.table-row {
+  @apply border-b border-gray-200 hover:bg-gray-50 transition-normal;
+}
+
+.table-cell {
+  @apply px-lg py-md text-md;
+}
+
+/* ===== TEXTOS ===== */
+.text-truncate {
+  @apply truncate;
+}
+
+.text-ellipsis {
+  @apply line-clamp-2;
+}
+
+.text-muted {
+  @apply text-gray-600;
+}
+
+.text-subtle {
+  @apply text-gray-500;
+}
+
+.text-bold {
+  @apply font-bold;
+}
+
+/* ===== FLEXBOX UTILITIES ===== */
+.flex-center {
+  @apply flex items-center justify-center;
+}
+
+.flex-between {
+  @apply flex items-center justify-between;
+}
+
+.flex-col-center {
+  @apply flex flex-col items-center justify-center;
+}
+
+/* ===== GRID UTILITIES ===== */
+.grid-auto {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-lg;
+}
+
+.grid-auto-sm {
+  @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-md;
+}
+
+/* ===== OVERLAY ===== */
+.overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 z-modal-backdrop transition-normal;
+}
+
+.overlay-light {
+  @apply fixed inset-0 bg-black bg-opacity-30 z-modal-backdrop transition-normal;
+}
+
+/* ===== CONTAINER ===== */
+.container-base {
+  @apply max-w-7xl mx-auto px-lg;
+}
+
+.container-sm {
+  @apply max-w-2xl mx-auto px-md;
+}
+
+.container-lg {
+  @apply max-w-full px-2xl;
 }
