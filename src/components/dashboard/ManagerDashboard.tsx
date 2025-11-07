@@ -1,9 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import {
-  DollarSign,
-  FileText,
-  Filter,
-} from "lucide-react";
+import { DollarSign, FileText, Filter } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable } from "./CollectionTable";
 import EnhancedPerformanceChart from "./EnhancedPerformanceChart";
@@ -41,24 +37,15 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   } = useCollection();
 
   const [internalActiveTab, setInternalActiveTab] = useState<
-    |
-    "overview"
-    |
-    "collections"
-    |
-    "performance"
-    |
-    "users"
-    |
-    "stores"
-    |
-    "clients"
-    |
-    "visit-tracking"
-    |
-    "authorization"
-    |
-    "database-upload"
+    | "overview"
+    | "collections"
+    | "performance"
+    | "users"
+    | "stores"
+    | "clients"
+    | "visit-tracking"
+    | "authorization"
+    | "database-upload"
   >(() => {
     const savedTab = localStorage.getItem("managerActiveTab");
     return (savedTab as any) || "overview";
@@ -141,37 +128,24 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-    useEffect(() => {
-
-      const handleClickOutside = (event: MouseEvent) => {
-
-        if (
-
-          mobileMenuRef.current &&
-
-          !mobileMenuRef.current.contains(event.target as Node)
-
-        ) {
-
-          setIsMobileMenuOpen(false);
-
-        }
-
-      };
-
-      if (isMobileMenuOpen) {
-
-        document.addEventListener("mousedown", handleClickOutside);
-
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsMobileMenuOpen(false);
       }
+    };
 
-      return () => {
+    if (isMobileMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
 
-        document.removeEventListener("mousedown", handleClickOutside);
-
-      };
-
-    }, [isMobileMenuOpen]);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isMobileMenuOpen]);
 
   const stats = useMemo(() => getDashboardStats(), [collections]);
   const performance = useMemo(() => getCollectorPerformance(), [collections]);

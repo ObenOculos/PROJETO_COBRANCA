@@ -19,13 +19,17 @@
 html {
   background-color: #ffffff;
   color: #000000;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 body {
   background-color: #ffffff;
   color: #000000;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 /* Dark Mode (Quando <html class="dark"> está presente) */
@@ -43,7 +47,9 @@ html.dark body {
 html,
 body,
 * {
-  transition: background-color 0.3s ease, color 0.3s ease,
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
     border-color 0.3s ease;
 }
 

@@ -182,16 +182,14 @@ const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Logout Button */}
-        <div className="mt-auto p-4 border-t border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg-secondary w-full">
-          <button
-            onClick={logout}
-            className={`w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-dark-bg-tertiary rounded-2xl transition-colors font-medium ${isCollapsed && !isMobile ? "justify-center" : ""}`}
-            title={isCollapsed && !isMobile ? "Sair" : "Sair do Sistema"}
-          >
-            <LogOut className="h-4 w-4" />
-            {(showDesktopText || isMobile) && <span>Sair do Sistema</span>}
-          </button>
-        </div>
+        <button
+          onClick={logout}
+          className="mt-auto p-4 border-t border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg-secondary w-full flex items-center justify-center space-x-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-dark-bg-tertiary transition-colors font-medium cursor-pointer"
+          title={isCollapsed && !isMobile ? "Sair" : "Sair do Sistema"}
+        >
+          <LogOut className="h-4 w-4" />
+          {(showDesktopText || isMobile) && <span>Sair do Sistema</span>}
+        </button>
       </div>
     );
   };
@@ -236,7 +234,7 @@ const Header: React.FC<HeaderProps> = ({
 
       {/* Desktop Sidebar */}
       <aside
-        className={`hidden lg:block bg-white dark:bg-dark-bg shadow-md dark:shadow-xl flex-shrink-0 transition-all duration-300 z-40 ${isCollapsed ? "w-20" : "w-72"}`}
+        className={`hidden lg:block bg-white dark:bg-dark-bg shadow-md dark:shadow-xl flex-shrink-0 transition-all duration-300 z-40 border-r  dark:border-gray-600 ${isCollapsed ? "w-20" : "w-72"}`}
       >
         <SidebarContent />
       </aside>

@@ -148,14 +148,15 @@ const AppContent: React.FC = () => {
 function App() {
   useEffect(() => {
     // 🌙 INICIALIZA O DARK MODE GLOBALMENTE
-    
+
     // 1. Detecta tema salvo no localStorage
     const savedTheme = localStorage.getItem("theme");
-    
+
     // 2. Se não tem salvo, detecta preferência do OS
     if (!savedTheme) {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches;
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)",
+      ).matches;
       const theme = prefersDark ? "dark" : "light";
       localStorage.setItem("theme", theme);
       applyTheme(theme);

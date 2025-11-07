@@ -102,7 +102,7 @@ const LoginForm: React.FC = () => {
                     setLogin(e.target.value);
                     clearError();
                   }}
-                  className={`w-full px-4 py-4 bg-white/50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-300 placeholder-gray-400 backdrop-blur-sm hover:bg-white/70 ${
+                  className={`w-full px-4 py-4 bg-white/50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-300 placeholder-gray-400 backdrop-blur-sm hover:bg-white/70 text-gray-900 ${
                     showValidation && !login.trim()
                       ? "border-red-300"
                       : "border-gray-200"
@@ -137,7 +137,7 @@ const LoginForm: React.FC = () => {
                     setPassword(e.target.value);
                     clearError();
                   }}
-                  className={`w-full px-4 py-4 pr-12 bg-white/50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-300 placeholder-gray-400 backdrop-blur-sm hover:bg-white/70 ${
+                  className={`w-full px-4 py-4 pr-12 bg-white/50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-300 placeholder-gray-400 backdrop-blur-sm hover:bg-white/70 text-gray-900 ${
                     showValidation && !password.trim()
                       ? "border-red-300"
                       : "border-gray-200"

@@ -43,7 +43,9 @@ export function Modal({
           {/* Header */}
           {title && (
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-dark-border">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text">{title}</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
+                {title}
+              </h3>
               <button
                 onClick={onClose}
                 className="text-gray-400 dark:text-dark-text-secondary hover:text-gray-500 dark:hover:text-dark-text focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary rounded-2xl p-1 transition-colors"
@@ -54,7 +56,9 @@ export function Modal({
           )}
 
           {/* Content */}
-          <div className="p-6 text-gray-900 dark:text-dark-text">{children}</div>
+          <div className="p-6 text-gray-900 dark:text-dark-text">
+            {children}
+          </div>
         </div>
       </div>
     </div>

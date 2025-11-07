@@ -75,23 +75,25 @@ const Card: React.FC<CardProps> = ({
 }) => {
   return (
     <div
-      className={`bg-white rounded-2xl dark:border-dark-border dark:bg-dark-bg border border-gray-200 p-4 transition-all duration-300 ease-in-out ${minimized ? "h-20 overflow-hidden" : ""}`}
+      className={`bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 transition-all duration-300 ease-in-out ${minimized ? "h-20 overflow-hidden" : ""}`}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className={`p-2 bg-purple-500 rounded-2xl`}>
             <Icon className="w-4 h-4 text-white" />
           </div>
-          <h3 className="font-semibold text-gray-900">{title}</h3>
+          <h3 className="font-semibold text-gray-900 dark:text-dark-text transition-colors duration-300">
+            {title}
+          </h3>
         </div>
         <button
           onClick={() => onToggleMinimize(cardId)}
-          className="p-1 rounded-md hover:bg-gray-200"
+          className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-dark-bg-secondary transition-colors duration-300"
         >
           {minimized ? (
-            <ChevronDown className="w-4 h-4" />
+            <ChevronDown className="w-4 h-4 text-gray-600 dark:text-dark-text-secondary" />
           ) : (
-            <ChevronUp className="w-4 h-4" />
+            <ChevronUp className="w-4 h-4 text-gray-600 dark:text-dark-text-secondary" />
           )}
         </button>
       </div>
@@ -245,7 +247,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       const date1 = toDate(d1);
       const date2 = toDate(d2);
       if (!date1 || !date2) return false;
-      return date1.toISOString().split("T")[0] === date2.toISOString().split("T")[0];
+      return (
+        date1.toISOString().split("T")[0] === date2.toISOString().split("T")[0]
+      );
     };
 
     const today = new Date();
@@ -360,13 +364,15 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
   // Card Content Components
   const ClientsCardContent = () => (
-    <div className="space-y-2 dark:border-dark-border dark:bg-dark-bg">
+    <div className="space-y-2">
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-1">
           <AlertCircle className="w-3 h-3 text-orange-500" />
-          <span className="text-gray-600">Pendentes</span>
+          <span className="text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+            Pendentes
+          </span>
         </div>
-        <span className="font-medium text-orange-600">
+        <span className="font-medium text-orange-600 dark:text-orange-400 transition-colors duration-300">
           {stats.clientsWithPending}
         </span>
       </div>
@@ -374,15 +380,17 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-1">
           <CheckCircle className="w-3 h-3 text-green-500" />
-          <span className="text-gray-600">Em dia</span>
+          <span className="text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+            Em dia
+          </span>
         </div>
-        <span className="font-medium text-green-600">
+        <span className="font-medium text-green-600 dark:text-green-400 transition-colors duration-300">
           {stats.clients - stats.clientsWithPending}
         </span>
       </div>
 
-      <div className="pt-2 border-t border-gray-100">
-        <div className="text-xs text-gray-500">
+      <div className="pt-2 border-t border-gray-100 dark:border-dark-border transition-colors duration-300">
+        <div className="text-xs text-gray-500 dark:text-dark-text-secondary transition-colors duration-300">
           {stats.pending} vendas pendentes
         </div>
       </div>
@@ -394,21 +402,29 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-1">
           <CheckCircle className="w-3 h-3 text-green-500" />
-          <span className="text-gray-600">Finalizadas</span>
+          <span className="text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+            Finalizadas
+          </span>
         </div>
-        <span className="font-medium text-green-600">{stats.completed}</span>
+        <span className="font-medium text-green-600 dark:text-green-400 transition-colors duration-300">
+          {stats.completed}
+        </span>
       </div>
 
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-1">
           <Clock className="w-3 h-3 text-orange-500" />
-          <span className="text-gray-600">Pendentes</span>
+          <span className="text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+            Pendentes
+          </span>
         </div>
-        <span className="font-medium text-orange-600">{stats.pending}</span>
+        <span className="font-medium text-orange-600 dark:text-orange-400 transition-colors duration-300">
+          {stats.pending}
+        </span>
       </div>
 
-      <div className="pt-2 border-t border-gray-100">
-        <div className="text-xs text-gray-500">
+      <div className="pt-2 border-t border-gray-100 dark:border-dark-border transition-colors duration-300">
+        <div className="text-xs text-gray-500 dark:text-dark-text-secondary transition-colors duration-300">
           {stats.total > 0
             ? ((stats.completed / stats.total) * 100).toFixed(1)
             : 0}
@@ -423,9 +439,11 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-1">
           <Sun className="w-3 h-3 text-yellow-500" />
-          <span className="text-gray-600">Hoje</span>
+          <span className="text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+            Hoje
+          </span>
         </div>
-        <span className="font-medium text-yellow-600">
+        <span className="font-medium text-yellow-600 dark:text-yellow-400 transition-colors duration-300">
           {stats.visitStats.today}
         </span>
       </div>
@@ -433,15 +451,17 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-1">
           <CheckCircle className="w-3 h-3 text-green-500" />
-          <span className="text-gray-600">Realizadas</span>
+          <span className="text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+            Realizadas
+          </span>
         </div>
-        <span className="font-medium text-green-600">
+        <span className="font-medium text-green-600 dark:text-green-400 transition-colors duration-300">
           {stats.visitStats.completed}
         </span>
       </div>
 
-      <div className="pt-2 border-t border-gray-100">
-        <div className="text-xs text-gray-500">
+      <div className="pt-2 border-t border-gray-100 dark:border-dark-border transition-colors duration-300">
+        <div className="text-xs text-gray-500 dark:text-dark-text-secondary transition-colors duration-300">
           {stats.visitStats.scheduled + stats.visitStats.completed} visitas no
           total
         </div>
@@ -464,9 +484,16 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       <>
         <div className="grid grid-cols-2 gap-2 text-sm">
           {visibleCities.map(([city, count]) => (
-            <div key={city} className="bg-gray-50 p-2 rounded-lg text-center">
-              <div className="font-bold text-gray-800">{count}</div>
-              <div className="text-gray-600">{city}</div>
+            <div
+              key={city}
+              className="bg-gray-50 dark:bg-dark-bg-secondary p-2 rounded-lg text-center border border-gray-200 dark:border-dark-border"
+            >
+              <div className="font-bold text-gray-800 dark:text-dark-text">
+                {count}
+              </div>
+              <div className="text-gray-600 dark:text-dark-text-secondary">
+                {city}
+              </div>
             </div>
           ))}
         </div>
@@ -474,7 +501,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           <div className="mt-4 text-center">
             <button
               onClick={() => setShowAllCities(!showAllCities)}
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-500 flex items-center justify-center w-full"
+              className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 flex items-center justify-center w-full"
             >
               {showAllCities ? "Mostrar Menos" : "Mostrar Mais"}
               {showAllCities ? (
@@ -504,9 +531,16 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       <>
         <div className="grid grid-cols-2 gap-2 text-sm">
           {visibleSchedules.map(([city, data]) => (
-            <div key={city} className="bg-gray-50 p-2 rounded-lg text-center">
-              <div className="font-bold text-gray-800">{data.count}</div>
-              <div className="text-gray-600">{city}</div>
+            <div
+              key={city}
+              className="bg-gray-50 dark:bg-dark-bg-secondary p-2 rounded-lg text-center border border-gray-200 dark:border-dark-border"
+            >
+              <div className="font-bold text-gray-800 dark:text-dark-text">
+                {data.count}
+              </div>
+              <div className="text-gray-600 dark:text-dark-text-secondary">
+                {city}
+              </div>
             </div>
           ))}
         </div>
@@ -514,7 +548,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           <div className="mt-4 text-center">
             <button
               onClick={() => setShowAllSchedules(!showAllSchedules)}
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-500 flex items-center justify-center w-full"
+              className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 flex items-center justify-center w-full"
             >
               {showAllSchedules ? "Mostrar Menos" : "Mostrar Mais"}
               {showAllSchedules ? (
@@ -528,8 +562,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       </>
     );
   };
-
-
 
   const myCollections = useMemo(
     () => getCollectorCollections(user?.id || ""),
@@ -702,8 +734,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       },
     ];
 
-
-
     const orderedAndVisibleCards = cardOrder
       .map((id) => dashboardCards.find((c) => c.id === id))
       .filter((c) => c && visibleCards.includes(c.id));
@@ -716,7 +746,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             <div className="flex mb-4">
               <button
                 onClick={() => setIsCustomizeMenuOpen(!isCustomizeMenuOpen)}
-                className="flex items-center gap-2 text-sm font-medium text-gray-600 bg-white px-4 py-2 rounded-2xl border border-gray-200 hover:bg-gray-50"
+                className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-dark-text-secondary bg-white dark:bg-dark-bg px-4 py-2 rounded-2xl border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-secondary transition-colors duration-300"
               >
                 <Settings className="w-4 h-4" />
                 <span>Personalizar</span>
@@ -725,12 +755,12 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
             {/* Customize Menu */}
             {isCustomizeMenuOpen && (
-              <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-4">
-                <h3 className="font-semibold text-gray-900 mb-3">
+              <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 mb-4 transition-colors duration-300">
+                <h3 className="font-semibold text-gray-900 dark:text-dark-text mb-3 transition-colors duration-300">
                   Personalizar Cards
                 </h3>
                 <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-gray-700">
+                  <h4 className="font-medium text-sm text-gray-700 dark:text-dark-text-secondary transition-colors duration-300">
                     Ordem e Visibilidade
                   </h4>
                   {cardOrder.map((cardId, index) => {
@@ -740,7 +770,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                     return (
                       <div
                         key={card.id}
-                        className="flex items-center justify-between p-2 rounded-lg bg-gray-50"
+                        className="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-dark-bg-secondary transition-colors duration-300"
                       >
                         <div className="flex items-center gap-2">
                           <input
@@ -757,7 +787,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                             }}
                             className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                           />
-                          <span className="text-sm font-medium text-gray-800">
+                          <span className="text-sm font-medium text-gray-800 dark:text-dark-text transition-colors duration-300">
                             {card.title}
                           </span>
                         </div>
@@ -773,9 +803,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                               }
                             }}
                             disabled={index === 0}
-                            className="p-1 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300"
                           >
-                            <ChevronUp className="w-4 h-4" />
+                            <ChevronUp className="w-4 h-4 text-gray-600 dark:text-dark-text-secondary" />
                           </button>
                           <button
                             onClick={() => {
@@ -788,9 +818,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                               }
                             }}
                             disabled={index === cardOrder.length - 1}
-                            className="p-1 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300"
                           >
-                            <ChevronDown className="w-4 h-4" />
+                            <ChevronDown className="w-4 h-4 text-gray-600 dark:text-dark-text-secondary" />
                           </button>
                         </div>
                       </div>
@@ -824,19 +854,21 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             </div>
 
             {/* Métricas Gamificadas */}
-            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-200 overflow-hidden">
+            <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border overflow-hidden">
               {/* Header */}
-              <div className="bg-white/80 backdrop-blur-sm p-4 border-b border-indigo-100">
+              <div className="bg-gray-50 dark:bg-dark-bg-secondary p-4 border-b border-gray-200 dark:border-dark-border">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-100 rounded-2xl">
-                      <Target className="w-6 h-6 text-indigo-600" />
+                    <div className="p-2 bg-indigo-100 dark:bg-dark-bg-tertiary rounded-2xl">
+                      <Target className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                     </div>
                     <div>
-                      <h2 className="font-semibold text-gray-900">Metas</h2>
+                      <h2 className="font-semibold text-gray-900 dark:text-dark-text">
+                        Metas
+                      </h2>
                     </div>
                   </div>
-                  <div className="text-sm text-gray-600 bg-white px-4 py-2 rounded-2xl border border-gray-200">
+                  <div className="text-sm text-gray-600 dark:text-dark-text-secondary bg-white dark:bg-dark-bg px-3 py-1 rounded-lg border border-gray-200 dark:border-dark-border">
                     <div className="font-medium">
                       {new Date().toLocaleDateString("pt-BR", {
                         weekday: "short",
@@ -849,12 +881,12 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
               </div>
 
               {/* Content */}
-              <div className="p-3">
+              <div className="p-4">
                 {/* Layout Desktop: Grid 3x2 */}
                 <div className="hidden lg:grid lg:grid-cols-3 lg:gap-4">
                   {/* Coluna Hoje */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-indigo-200">
-                    <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2 justify-center">
+                  <div className="bg-white dark:bg-dark-bg rounded-lg p-4 border border-gray-200 dark:border-dark-border">
+                    <h3 className="font-semibold text-gray-900 dark:text-dark-text mb-4 flex items-center gap-2 justify-center">
                       <Sun className="w-5 h-5 text-yellow-500" />
                       Hoje
                     </h3>
@@ -893,8 +925,8 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                   </div>
 
                   {/* Coluna Esta Semana */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-blue-200">
-                    <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2 justify-center">
+                  <div className="bg-white dark:bg-dark-bg rounded-lg p-4 border border-gray-200 dark:border-dark-border">
+                    <h3 className="font-semibold text-gray-900 dark:text-dark-text mb-4 flex items-center gap-2 justify-center">
                       <CalendarDays className="w-5 h-5 text-blue-500" />
                       Esta Semana
                     </h3>
@@ -933,8 +965,8 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                   </div>
 
                   {/* Coluna Este Mês */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-purple-200">
-                    <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2 justify-center">
+                  <div className="bg-white dark:bg-dark-bg rounded-lg p-4 border border-gray-200 dark:border-dark-border">
+                    <h3 className="font-semibold text-gray-900 dark:text-dark-text mb-4 flex items-center gap-2 justify-center">
                       <CalendarRange className="w-5 h-5 text-purple-500" />
                       Este Mês
                     </h3>
@@ -1004,16 +1036,8 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
                         return (
                           <div key={slide.id} className="w-full flex-shrink-0">
-                            <div
-                              className={`bg-white/70 backdrop-blur-sm rounded-2xl p-2 border ${
-                                slide.color === "yellow"
-                                  ? "border-yellow-200"
-                                  : slide.color === "blue"
-                                    ? "border-blue-200"
-                                    : "border-purple-200"
-                              }`}
-                            >
-                              <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                            <div className="bg-white dark:bg-dark-bg rounded-lg p-3 border border-gray-200 dark:border-dark-border">
+                              <h3 className="font-semibold text-gray-900 dark:text-dark-text mb-3 flex items-center gap-2">
                                 <Icon
                                   className={`w-5 h-5 ${
                                     slide.color === "yellow"
@@ -1065,15 +1089,15 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                   </div>
 
                   {/* Indicadores de navegação */}
-                  <div className="flex justify-center mt-2 space-x-2">
+                  <div className="flex justify-center mt-3 space-x-2">
                     {mobileSlides.map((slide, index) => (
                       <button
                         key={slide.id}
                         onClick={() => goToSlide(index)}
                         className={`h-2 rounded-full transition-all duration-300 ${
                           index === currentSlideIndex
-                            ? "w-8 bg-indigo-600"
-                            : "w-2 bg-gray-300 hover:bg-gray-400"
+                            ? "w-8 bg-indigo-600 dark:bg-indigo-500"
+                            : "w-2 bg-gray-300 dark:bg-dark-bg-tertiary hover:bg-gray-400 dark:hover:bg-dark-border"
                         }`}
                         aria-label={`Ir para ${slide.title}`}
                       />

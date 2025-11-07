@@ -13,7 +13,12 @@ import {
   Calendar,
 } from "lucide-react";
 import { formatCurrency } from "../../utils/formatters";
-import { Collection, CollectorPerformance, DashboardStats, FilterOptions } from "../../types";
+import {
+  Collection,
+  CollectorPerformance,
+  DashboardStats,
+  FilterOptions,
+} from "../../types";
 
 interface OverviewTabProps {
   collections: Collection[];
@@ -21,7 +26,9 @@ interface OverviewTabProps {
   stats: DashboardStats;
   pendingCancellations: any[];
   setActiveTab: (tabId: string) => void;
-  setFilters: (filters: FilterOptions | ((prev: FilterOptions) => FilterOptions)) => void;
+  setFilters: (
+    filters: FilterOptions | ((prev: FilterOptions) => FilterOptions),
+  ) => void;
   filters: FilterOptions;
   scheduledVisits?: any[];
 }
@@ -48,11 +55,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         setCurrentSlide((prevSlide) => (prevSlide + 1) % 3);
       }, 5000);
       return () => {
-        if (autoPlayIntervalRef.current) clearInterval(autoPlayIntervalRef.current);
+        if (autoPlayIntervalRef.current)
+          clearInterval(autoPlayIntervalRef.current);
       };
     }
     return () => {
-      if (autoPlayIntervalRef.current) clearInterval(autoPlayIntervalRef.current);
+      if (autoPlayIntervalRef.current)
+        clearInterval(autoPlayIntervalRef.current);
     };
   }, [isAutoPlaying]);
 
@@ -101,15 +110,30 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   };
 
   const salesMap = useMemo(() => {
-    const map = new Map<string, { isPending: boolean; clientDocument: string; totalValue: number; receivedValue: number; }>();
+    const map = new Map<
+      string,
+      {
+        isPending: boolean;
+        clientDocument: string;
+        totalValue: number;
+        receivedValue: number;
+      }
+    >();
     overviewCollections.forEach((collection) => {
       const saleKey = `${collection.venda_n}-${collection.documento}`;
       if (!map.has(saleKey)) {
-        map.set(saleKey, { isPending: false, clientDocument: collection.documento || "", totalValue: 0, receivedValue: 0 });
+        map.set(saleKey, {
+          isPending: false,
+          clientDocument: collection.documento || "",
+          totalValue: 0,
+          receivedValue: 0,
+        });
       }
       const sale = map.get(saleKey)!;
-      sale.totalValue = Number(sale.totalValue) + Number(collection.valor_original);
-      sale.receivedValue = Number(sale.receivedValue) + Number(collection.valor_recebido);
+      sale.totalValue =
+        Number(sale.totalValue) + Number(collection.valor_original);
+      sale.receivedValue =
+        Number(sale.receivedValue) + Number(collection.valor_recebido);
     });
     map.forEach((sale) => {
       const pendingAmount = sale.totalValue - sale.receivedValue;
@@ -122,14 +146,27 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     const salesArray = Array.from(salesMap.values());
     const pendingSales = salesArray.filter((s) => s.isPending);
     const completedSales = salesArray.filter((s) => !s.isPending);
-    const clientsWithPendingCount = new Set(pendingSales.map((s) => s.clientDocument).filter(Boolean)).size;
+    const clientsWithPendingCount = new Set(
+      pendingSales.map((s) => s.clientDocument).filter(Boolean),
+    ).size;
     const todayCollections = overviewCollections.filter((c) => {
       const today = new Date().toISOString().split("T")[0];
       return c.data_vencimento === today;
     });
-    const todayAmount = todayCollections.reduce((sum, c) => sum + c.valor_original, 0);
-    const storesWithCollections = new Set(overviewCollections.map((c) => c.nome_da_loja).filter(Boolean)).size;
-    const averageEfficiency = performance.length > 0 ? (performance.reduce((acc, p) => acc + p.conversionRate, 0) / performance.length).toFixed(1) : "0.0";
+    const todayAmount = todayCollections.reduce(
+      (sum, c) => sum + c.valor_original,
+      0,
+    );
+    const storesWithCollections = new Set(
+      overviewCollections.map((c) => c.nome_da_loja).filter(Boolean),
+    ).size;
+    const averageEfficiency =
+      performance.length > 0
+        ? (
+            performance.reduce((acc, p) => acc + p.conversionRate, 0) /
+            performance.length
+          ).toFixed(1)
+        : "0.0";
     return {
       pendingSalesCount: pendingSales.length,
       completedSalesCount: completedSales.length,
@@ -142,9 +179,17 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   }, [salesMap, overviewCollections, performance]);
 
   const overviewStats = useMemo(() => {
-    const totalAmount = overviewCollections.reduce((sum, c) => sum + c.valor_original, 0);
-    const receivedAmount = overviewCollections.reduce((sum, c) => sum + c.valor_recebido, 0);
-    const totalReceived = overviewCollections.filter((c) => c.status?.toLowerCase() === "recebido" || c.valor_recebido > 0).length;
+    const totalAmount = overviewCollections.reduce(
+      (sum, c) => sum + c.valor_original,
+      0,
+    );
+    const receivedAmount = overviewCollections.reduce(
+      (sum, c) => sum + c.valor_recebido,
+      0,
+    );
+    const totalReceived = overviewCollections.filter(
+      (c) => c.status?.toLowerCase() === "recebido" || c.valor_recebido > 0,
+    ).length;
     const totalCollections = overviewCollections.length;
     return {
       totalAmount,
@@ -152,16 +197,35 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       totalReceived,
       totalCollections,
       pendingAmount: totalAmount - receivedAmount,
-      conversionRate: totalCollections > 0 ? (totalReceived / totalCollections) * 100 : 0,
+      conversionRate:
+        totalCollections > 0 ? (totalReceived / totalCollections) * 100 : 0,
     };
   }, [overviewCollections]);
 
   const calculateSchedulingMetrics = useMemo(() => {
     if (!scheduledVisits)
       return {
-        today: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
-        week: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
-        month: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
+        today: {
+          total: 0,
+          completed: 0,
+          pending: 0,
+          cancelled: 0,
+          completionRate: 0,
+        },
+        week: {
+          total: 0,
+          completed: 0,
+          pending: 0,
+          cancelled: 0,
+          completionRate: 0,
+        },
+        month: {
+          total: 0,
+          completed: 0,
+          pending: 0,
+          cancelled: 0,
+          completionRate: 0,
+        },
       };
 
     const today = new Date();
@@ -472,7 +536,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 setCurrentSlide(index);
               }}
               className={`w-2 h-2 rounded-full transition-colors touch-manipulation ${
-                currentSlide === index ? "bg-blue-600 dark:bg-blue-500" : "bg-gray-300 dark:bg-dark-bg-tertiary hover:bg-gray-400 dark:hover:bg-dark-border"
+                currentSlide === index
+                  ? "bg-blue-600 dark:bg-blue-500"
+                  : "bg-gray-300 dark:bg-dark-bg-tertiary hover:bg-gray-400 dark:hover:bg-dark-border"
               }`}
             />
           ))}
@@ -480,7 +546,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       </div>
 
       {/* Agendamentos dos Cobradores */}
-
 
       {/* Pending Cancellations Alert */}
       {pendingCancellations.length > 0 && (
@@ -525,7 +590,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               "border-gray-200 dark:border-gray-600",
               "border-orange-200 dark:border-orange-900",
             ];
-            const bgColors = ["bg-blue-50 dark:bg-dark-bg-secondary", "bg-gray-50 dark:bg-dark-bg-secondary", "bg-orange-50 dark:bg-dark-bg-secondary"];
+            const bgColors = [
+              "bg-blue-50 dark:bg-dark-bg-secondary",
+              "bg-gray-50 dark:bg-dark-bg-secondary",
+              "bg-orange-50 dark:bg-dark-bg-secondary",
+            ];
 
             return (
               <div
@@ -551,13 +620,17 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                       <div className="font-semibold text-gray-900 dark:text-dark-text">
                         {collector.totalReceived}
                       </div>
-                      <div className="text-gray-600 dark:text-dark-text-secondary">Pagas</div>
+                      <div className="text-gray-600 dark:text-dark-text-secondary">
+                        Pagas
+                      </div>
                     </div>
                     <div className="text-center p-2 bg-white dark:bg-dark-bg rounded border border-gray-200 dark:border-dark-border">
                       <div className="font-semibold text-gray-900 dark:text-dark-text">
                         {collector.clientCount}
                       </div>
-                      <div className="text-gray-600 dark:text-dark-text-secondary">Clientes</div>
+                      <div className="text-gray-600 dark:text-dark-text-secondary">
+                        Clientes
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -569,14 +642,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         {/* Métricas da Equipe - Simples */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 bg-white dark:bg-dark-bg">
-            <div className="text-sm text-gray-600 dark:text-dark-text-secondary mb-1">Tempo Médio</div>
+            <div className="text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
+              Tempo Médio
+            </div>
             <div className="text-xl font-semibold text-gray-900 dark:text-dark-text">
               {performance.length > 0
                 ? (
-                    performance.reduce(
-                      (acc, p) => acc + p.averageTime,
-                      0,
-                    ) / performance.length
+                    performance.reduce((acc, p) => acc + p.averageTime, 0) /
+                    performance.length
                   ).toFixed(0)
                 : 0}{" "}
               dias
@@ -601,10 +674,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             <div className="text-xl font-semibold text-gray-900 dark:text-dark-text">
               {performance.length > 0
                 ? (
-                    performance.reduce(
-                      (acc, p) => acc + p.conversionRate,
-                      0,
-                    ) / performance.length
+                    performance.reduce((acc, p) => acc + p.conversionRate, 0) /
+                    performance.length
                   ).toFixed(1)
                 : 0}
               %
@@ -648,25 +719,33 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     <div className="font-medium text-gray-900 dark:text-dark-text">
                       {collector.totalAssigned}
                     </div>
-                    <div className="text-gray-600 dark:text-dark-text-secondary">Atribuídas</div>
+                    <div className="text-gray-600 dark:text-dark-text-secondary">
+                      Atribuídas
+                    </div>
                   </div>
                   <div>
                     <div className="font-medium text-gray-900 dark:text-dark-text">
                       {collector.totalReceived}
                     </div>
-                    <div className="text-gray-600 dark:text-dark-text-secondary">Pagas</div>
+                    <div className="text-gray-600 dark:text-dark-text-secondary">
+                      Pagas
+                    </div>
                   </div>
                   <div>
                     <div className="font-medium text-gray-900 dark:text-dark-text">
                       {collector.clientCount}
                     </div>
-                    <div className="text-gray-600 dark:text-dark-text-secondary">Clientes</div>
+                    <div className="text-gray-600 dark:text-dark-text-secondary">
+                      Clientes
+                    </div>
                   </div>
                   <div>
                     <div className="font-medium text-gray-900 dark:text-dark-text">
                       {collector.averageTime.toFixed(0)}d
                     </div>
-                    <div className="text-gray-600 dark:text-dark-text-secondary">Tempo</div>
+                    <div className="text-gray-600 dark:text-dark-text-secondary">
+                      Tempo
+                    </div>
                   </div>
                 </div>
 
@@ -1002,9 +1081,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               <span className="text-sm font-medium text-gray-900 dark:text-dark-text transition-colors duration-300">
                 Exibindo dados de:{" "}
                 {
-                  performance.find(
-                    (p) => p.collectorId === selectedCollector,
-                  )?.collectorName
+                  performance.find((p) => p.collectorId === selectedCollector)
+                    ?.collectorName
                 }
               </span>
             </div>
@@ -1023,9 +1101,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               <span className="ml-1">
                 -{" "}
                 {
-                  performance.find(
-                    (p) => p.collectorId === selectedCollector,
-                  )?.collectorName
+                  performance.find((p) => p.collectorId === selectedCollector)
+                    ?.collectorName
                 }
               </span>
             )}

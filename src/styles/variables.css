@@ -347,7 +347,7 @@ input[type="radio"]:focus-visible {
 }
 
 .label-required::after {
-  content: ' *';
+  content: " *";
   @apply text-danger;
 }
 

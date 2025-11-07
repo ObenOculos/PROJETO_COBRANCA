@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Moon, Sun } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { Moon, Sun } from "lucide-react";
 
 export const DarkModeToggle: React.FC = () => {
   const [isDark, setIsDark] = useState(false);
 
   // Inicializar o tema ao montar o componente
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const shouldBeDark = savedTheme ? savedTheme === 'dark' : prefersDark;
+    const savedTheme = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)",
+    ).matches;
+    const shouldBeDark = savedTheme ? savedTheme === "dark" : prefersDark;
 
     setIsDark(shouldBeDark);
     applyTheme(shouldBeDark);
@@ -17,11 +19,11 @@ export const DarkModeToggle: React.FC = () => {
   const applyTheme = (dark: boolean) => {
     const html = document.documentElement;
     if (dark) {
-      html.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
+      html.classList.add("dark");
+      localStorage.setItem("theme", "dark");
     } else {
-      html.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+      html.classList.remove("dark");
+      localStorage.setItem("theme", "light");
     }
   };
 
@@ -35,7 +37,7 @@ export const DarkModeToggle: React.FC = () => {
     <button
       onClick={toggleTheme}
       className="relative p-md rounded-lg bg-gray-100 dark:bg-dark-bg-secondary hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary transition-normal flex items-center justify-center"
-      title={isDark ? 'Modo claro' : 'Modo escuro'}
+      title={isDark ? "Modo claro" : "Modo escuro"}
       aria-label="Toggle dark mode"
     >
       {isDark ? (
