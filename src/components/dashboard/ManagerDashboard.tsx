@@ -3,6 +3,10 @@ import {
   DollarSign,
   FileText,
   Filter,
+  Calendar,
+  Target,
+  BarChart3,
+  Users,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable } from "./CollectionTable";
@@ -37,6 +41,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     getFilteredCollections,
     getPendingCancellationRequests,
     collections,
+    scheduledVisits,
   } = useCollection();
 
   const [internalActiveTab, setInternalActiveTab] = useState<
@@ -81,7 +86,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   });
 
   const [isFilterVisible, setIsFilterVisible] = useState(false);
-  const [] = useState<string>("all");
+
+  // Estado para seleção de cobrador nos agendamentos
+  const [selectedCollector, setSelectedCollector] = useState<string>("all");
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const [, setPendingAuthorizations] = useState(0);
@@ -140,25 +148,185 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        mobileMenuRef.current &&
-        !mobileMenuRef.current.contains(event.target as Node)
-      ) {
-        setIsMobileMenuOpen(false);
+    useEffect(() => {
+
+      const handleClickOutside = (event: MouseEvent) => {
+
+        if (
+
+          mobileMenuRef.current &&
+
+          !mobileMenuRef.current.contains(event.target as Node)
+
+        ) {
+
+          setIsMobileMenuOpen(false);
+
+        }
+
+      };
+
+      if (isMobileMenuOpen) {
+
+        document.addEventListener("mousedown", handleClickOutside);
+
       }
-    };
-    if (isMobileMenuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isMobileMenuOpen]);
 
+      return () => {
 
-  const stats = useMemo(() => getDashboardStats(), [collections]);
+        document.removeEventListener("mousedown", handleClickOutside);
+
+      };
+
+    }, [isMobileMenuOpen]);
+
+  
+
+    // Calculate scheduling metrics based on real data
+
+    const calculateSchedulingMetrics = useMemo(() => {
+
+      if (!scheduledVisits)
+
+        return {
+
+          today: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
+
+          week: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
+
+          month: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
+
+        };
+
+  
+
+      const today = new Date();
+
+      const todayStr = today.toISOString().split("T")[0];
+
+  
+
+      // Start of week (Monday)
+
+      const startOfWeek = new Date(today);
+
+      const day = startOfWeek.getDay();
+
+      const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+
+      startOfWeek.setDate(diff);
+
+      startOfWeek.setHours(0, 0, 0, 0);
+
+  
+
+      // Start of month
+
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  
+
+      const filterVisitsByCollector = (visits: any[]) => {
+
+        if (selectedCollector === "all") return visits;
+
+        return visits.filter((visit) => visit.collectorId === selectedCollector);
+
+      };
+
+  
+
+      const calculatePeriodMetrics = (filterFn: (visit: any) => boolean) => {
+
+        const periodVisits = filterVisitsByCollector(
+
+          scheduledVisits.filter(filterFn),
+
+        );
+
+  
+
+        const total = periodVisits.length;
+
+        const completed = periodVisits.filter(
+
+          (v) => v.status === "completed",
+
+        ).length;
+
+        const cancelled = periodVisits.filter(
+
+          (v) => v.status === "cancelled",
+
+        ).length;
+
+        const pending = periodVisits.filter(
+
+          (v) => v.status === "scheduled" || v.status === "in_progress",
+
+        ).length;
+
+        const completionRate =
+
+          total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  
+
+        return { total, completed, pending, cancelled, completionRate };
+
+      };
+
+  
+
+      // Today's visits
+
+      const todayMetrics = calculatePeriodMetrics(
+
+        (visit) => visit.scheduledDate === todayStr,
+
+      );
+
+  
+
+      // This week's visits
+
+      const weekMetrics = calculatePeriodMetrics((visit) => {
+
+        const visitDate = new Date(visit.scheduledDate);
+
+        return visitDate >= startOfWeek && visitDate <= today;
+
+      });
+
+  
+
+      // This month's visits
+
+      const monthMetrics = calculatePeriodMetrics((visit) => {
+
+        const visitDate = new Date(visit.scheduledDate);
+
+        return visitDate >= startOfMonth && visitDate <= today;
+
+      });
+
+  
+
+      return {
+
+        today: todayMetrics,
+
+        week: weekMetrics,
+
+        month: monthMetrics,
+
+      };
+
+    }, [scheduledVisits, selectedCollector]);
+
+  
+
+    const stats = useMemo(() => getDashboardStats(), [collections]);
   const performance = useMemo(() => getCollectorPerformance(), [collections]);
   const baseFilteredCollections = useMemo(
     () => getFilteredCollections(filters, "manager"),
@@ -175,15 +343,229 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         return <DatabaseUpload />;
       case "overview":
         return (
-          <OverviewTab
-            collections={overviewCollections}
-            performance={performance}
-            stats={stats}
-            pendingCancellations={pendingCancellations}
-            setActiveTab={setActiveTab}
-            setFilters={setFilters}
-            filters={filters}
-          />
+          <div className="space-y-4 sm:space-y-6">
+            <OverviewTab
+              collections={overviewCollections}
+              performance={performance}
+              stats={stats}
+              pendingCancellations={pendingCancellations}
+              setActiveTab={setActiveTab}
+              setFilters={setFilters}
+              filters={filters}
+            />
+
+            {/* Agendamentos dos Cobradores */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                    Agendamentos dos Cobradores
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Métricas de visitas agendadas
+                  </p>
+                </div>
+
+                {/* Seletor de Cobrador */}
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="collector-select"
+                    className="text-sm font-medium text-gray-700 whitespace-nowrap"
+                  >
+                    Cobrador:
+                  </label>
+                  <select
+                    id="collector-select"
+                    value={selectedCollector}
+                    onChange={(e) => setSelectedCollector(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-0 flex-1 sm:flex-none sm:min-w-[150px]"
+                  >
+                    <option value="all">Todos os Cobradores</option>
+                    {performance.map((collector) => (
+                      <option
+                        key={collector.collectorId}
+                        value={collector.collectorId}
+                      >
+                        {collector.collectorName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+                {/* Agendamentos do Dia */}
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium text-gray-900">Hoje</h4>
+                    <Calendar className="h-4 w-4 text-gray-600" />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Total</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.today.total}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Concluídas</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.today.completed}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Pendentes</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.today.pending}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Canceladas</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.today.cancelled}
+                      </span>
+                    </div>
+                    <div className="pt-3 border-t border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-600">
+                          Taxa de Conclusão
+                        </span>
+                        <span className="font-bold text-gray-900">
+                          {calculateSchedulingMetrics.today.completionRate}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Agendamentos da Semana */}
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium text-gray-900">Esta Semana</h4>
+                    <Target className="h-4 w-4 text-gray-600" />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Total</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.week.total}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Concluídas</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.week.completed}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Pendentes</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.week.pending}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Canceladas</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.week.cancelled}
+                      </span>
+                    </div>
+                    <div className="pt-3 border-t border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-600">
+                          Taxa de Conclusão
+                        </span>
+                        <span className="font-bold text-gray-900">
+                          {calculateSchedulingMetrics.week.completionRate}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Agendamentos do Mês */}
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium text-gray-900">Este Mês</h4>
+                    <BarChart3 className="h-4 w-4 text-gray-600" />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Total</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.month.total}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Concluídas</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.month.completed}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Pendentes</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.month.pending}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Canceladas</span>
+                      <span className="font-semibold text-gray-900">
+                        {calculateSchedulingMetrics.month.cancelled}
+                      </span>
+                    </div>
+                    <div className="pt-3 border-t border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-600">
+                          Taxa de Conclusão
+                        </span>
+                        <span className="font-bold text-gray-900">
+                          {calculateSchedulingMetrics.month.completionRate}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Informação do cobrador selecionado */}
+              {selectedCollector !== "all" && (
+                <div className="mt-6 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-900">
+                      Exibindo dados de:{" "}
+                      {
+                        performance.find(
+                          (p) => p.collectorId === selectedCollector,
+                        )?.collectorName
+                      }
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Ação para ver detalhes */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setActiveTab("visit-tracking")}
+                  className="w-full px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium flex items-center justify-center border border-gray-200"
+                >
+                  <Target className="h-4 w-4 mr-2" />
+                  Ver Todos os Agendamentos
+                  {selectedCollector !== "all" && (
+                    <span className="ml-1">
+                      -{" "}
+                      {
+                        performance.find(
+                          (p) => p.collectorId === selectedCollector,
+                        )?.collectorName
+                      }
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         );
       case "collections":
         return (
