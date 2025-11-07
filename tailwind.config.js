@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  darkMode: 'class', // Ativa dark mode por classe CSS
   theme: {
     extend: {
       /* ===== TIPOGRAFIA ===== */
@@ -51,6 +52,14 @@ export default {
           700: 'var(--color-gray-700)',
           800: 'var(--color-gray-800)',
           900: 'var(--color-gray-900)',
+        },
+        dark: {
+          bg: 'var(--dark-bg)',
+          'bg-secondary': 'var(--dark-bg-secondary)',
+          'bg-tertiary': 'var(--dark-bg-tertiary)',
+          text: 'var(--dark-text)',
+          'text-secondary': 'var(--dark-text-secondary)',
+          border: 'var(--dark-border)',
         },
       },
 

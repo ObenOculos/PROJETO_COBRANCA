@@ -113,7 +113,7 @@ const AppContent: React.FC = () => {
     user?.type === "manager" ? getPendingCancellationRequests() : [];
 
   return (
-    <div className="flex h-screen bg-slate-100">
+    <div className="flex h-screen bg-slate-100 dark:bg-dark-bg-secondary transition-colors duration-300">
       <Header
         tabs={tabs}
         activeTab={
@@ -126,7 +126,7 @@ const AppContent: React.FC = () => {
         }
         pendingCancellations={pendingCancellations.length}
       />
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text transition-colors duration-300">
         {user.type === "manager" ? (
           <ManagerDashboard
             activeTab={managerActiveTab}
@@ -146,6 +146,33 @@ const AppContent: React.FC = () => {
 };
 
 function App() {
+  useEffect(() => {
+    // 🌙 INICIALIZA O DARK MODE GLOBALMENTE
+    
+    // 1. Detecta tema salvo no localStorage
+    const savedTheme = localStorage.getItem("theme");
+    
+    // 2. Se não tem salvo, detecta preferência do OS
+    if (!savedTheme) {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)")
+        .matches;
+      const theme = prefersDark ? "dark" : "light";
+      localStorage.setItem("theme", theme);
+      applyTheme(theme);
+    } else {
+      // 3. Se tem salvo, aplica
+      applyTheme(savedTheme);
+    }
+  }, []);
+
+  const applyTheme = (theme: string) => {
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  };
+
   return (
     <LoadingProvider>
       <AuthProvider>

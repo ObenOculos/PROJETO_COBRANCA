@@ -75,7 +75,7 @@ const Card: React.FC<CardProps> = ({
 }) => {
   return (
     <div
-      className={`bg-white rounded-2xl border border-gray-200 p-4 transition-all duration-300 ease-in-out ${minimized ? "h-20 overflow-hidden" : ""}`}
+      className={`bg-white rounded-2xl dark:border-dark-border dark:bg-dark-bg border border-gray-200 p-4 transition-all duration-300 ease-in-out ${minimized ? "h-20 overflow-hidden" : ""}`}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -360,7 +360,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
   // Card Content Components
   const ClientsCardContent = () => (
-    <div className="space-y-2">
+    <div className="space-y-2 dark:border-dark-border dark:bg-dark-bg">
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-1">
           <AlertCircle className="w-3 h-3 text-orange-500" />

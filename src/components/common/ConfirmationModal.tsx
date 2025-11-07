@@ -40,41 +40,41 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+      className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center p-4 z-50 transition-colors"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
         }
       }}
     >
-      <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden">
+      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl max-w-sm w-full shadow-2xl dark:shadow-2xl overflow-hidden border border-gray-200 dark:border-dark-border">
         {/* Red Header with Icon */}
-        <div className="bg-red-600 p-4 flex items-center justify-between">
+        <div className="bg-red-600 dark:bg-red-700 p-4 flex items-center justify-between">
           <div className="flex items-center">
             <AlertTriangle className="h-6 w-6 text-white mr-3" />
             <h3 className="text-lg font-semibold text-white">{title}</h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-full text-white hover:bg-red-700 transition-colors"
+            className="p-1 rounded-full text-white hover:bg-red-700 dark:hover:bg-red-800 transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="p-6">
-          <p className="text-sm text-gray-700 mb-6">{displayMessage}</p>
+          <p className="text-sm text-gray-700 dark:text-dark-text-secondary mb-6">{displayMessage}</p>
 
           <div className="flex justify-between gap-3 mt-6">
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-dark-border text-gray-700 dark:text-dark-text bg-white dark:bg-dark-bg rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary transition-colors"
             >
               {cancelButtonText}
             </button>
             <button
               onClick={onConfirm}
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors"
+              className="flex-1 px-4 py-2 bg-red-600 dark:bg-red-700 text-white rounded-2xl hover:bg-red-700 dark:hover:bg-red-800 transition-colors"
             >
               {confirmButtonText}
             </button>

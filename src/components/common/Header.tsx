@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LogOut, User, Menu, X, LucideIcon, ChevronsLeft } from "lucide-react";
+import { LogOut, User, Menu, X, LucideIcon, ChevronsLeft, Moon, Sun } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import NotificationDropdown from "./NotificationDropdown";
 
@@ -26,6 +26,7 @@ const Header: React.FC<HeaderProps> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [showDesktopText, setShowDesktopText] = useState(!isCollapsed);
+  const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
     if (isCollapsed) {
@@ -38,6 +39,28 @@ const Header: React.FC<HeaderProps> = ({
     }
   }, [isCollapsed]);
 
+  // Inicializar dark mode
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const shouldBeDark = savedTheme ? savedTheme === 'dark' : prefersDark;
+    setIsDark(shouldBeDark);
+  }, []);
+
+  const toggleDarkMode = () => {
+    const newDark = !isDark;
+    setIsDark(newDark);
+
+    const html = document.documentElement;
+    if (newDark) {
+      html.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      html.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => {
     return (
       <div
@@ -45,14 +68,14 @@ const Header: React.FC<HeaderProps> = ({
       >
         {/* Header */}
         <div
-          className={`p-4 border-b border-gray-100 flex items-center ${isCollapsed && !isMobile ? "justify-center" : "justify-between"}`}
+          className={`p-4 border-b border-gray-100 dark:border-dark-border dark:bg-dark-bg flex items-center ${isCollapsed && !isMobile ? "justify-center" : "justify-between"}`}
         >
           {(showDesktopText || isMobile) && (
             <div className={`flex items-center space-x-3`}>
               <div className="h-8 w-8 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
                 <span className="text-white font-semibold text-sm">SC</span>
               </div>
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
                 Sistema de Cobrança
               </h2>
             </div>
@@ -60,7 +83,7 @@ const Header: React.FC<HeaderProps> = ({
           {!isMobile && (
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-2xl transition-colors"
+              className="p-2 text-gray-400 dark:text-dark-text-secondary hover:text-gray-600 dark:hover:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-secondary rounded-2xl transition-colors"
             >
               <ChevronsLeft
                 className={`h-5 w-5 transition-transform ${isCollapsed ? "rotate-180" : ""}`}
@@ -70,7 +93,7 @@ const Header: React.FC<HeaderProps> = ({
           {isMobile && (
             <button
               onClick={() => setIsMobileMenuOpen(false)}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-2xl transition-colors"
+              className="p-2 text-gray-400 dark:text-dark-text-secondary hover:text-gray-600 dark:hover:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-secondary rounded-2xl transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -79,34 +102,47 @@ const Header: React.FC<HeaderProps> = ({
 
         {/* User Info */}
         {(showDesktopText || isMobile) && (
-          <div className={`p-4 border-b border-gray-100 w-full`}>
+          <div className={`p-4 border-b border-gray-100 dark:border-dark-border w-full`}>
             {isLoading ? (
               <div className="flex items-center justify-between animate-pulse">
-                <div className="h-10 w-10 bg-gray-200 rounded-full"></div>
+                <div className="h-10 w-10 bg-gray-200 dark:bg-dark-bg-secondary rounded-full"></div>
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
-                    <User className="h-5 w-5 text-gray-600" />
+                <div className="flex items-center space-x-3 flex-1">
+                  <div className="h-10 w-10 bg-gray-100 dark:bg-dark-bg-tertiary rounded-full flex items-center justify-center">
+                    <User className="h-5 w-5 text-gray-600 dark:text-dark-text-secondary" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-gray-900 dark:text-dark-text">
                       {user?.name}
                     </p>
-                    <p className="text-xs text-gray-500 capitalize">
+                    <p className="text-xs text-gray-500 dark:text-dark-text-secondary capitalize">
                       {user?.type === "manager" ? "Gerente" : "Cobrador"}
                     </p>
                   </div>
                 </div>
-                <NotificationDropdown />
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={toggleDarkMode}
+                    className="p-2 text-gray-400 dark:text-dark-text-secondary hover:text-gray-600 dark:hover:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary rounded-lg transition-colors"
+                    title={isDark ? "Modo claro" : "Modo escuro"}
+                  >
+                    {isDark ? (
+                      <Sun className="h-5 w-5 text-yellow-500" />
+                    ) : (
+                      <Moon className="h-5 w-5" />
+                    )}
+                  </button>
+                  <NotificationDropdown />
+                </div>
               </div>
             )}
           </div>
         )}
 
         {/* Navigation */}
-        <div className="p-4 flex-1 overflow-y-auto w-full">
+        <div className="p-4 flex-1 overflow-y-auto w-full dark:bg-dark-bg">
           <nav className="space-y-1">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -119,13 +155,13 @@ const Header: React.FC<HeaderProps> = ({
                   }}
                   className={`group w-full flex items-center px-3 py-2 rounded-2xl text-left transition-all duration-200 ${isCollapsed && !isMobile ? "justify-center" : ""} ${
                     activeTab === tab.id
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-gray-700 hover:bg-gray-50"
+                      ? "bg-blue-50 dark:bg-dark-bg-secondary text-blue-700 dark:text-primary"
+                      : "text-gray-700 dark:text-dark-text-secondary hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
                   }`}
                   title={isCollapsed && !isMobile ? tab.name : undefined}
                 >
                   <Icon
-                    className={`h-5 w-5 ${!isCollapsed || isMobile ? "mr-3" : ""} ${activeTab === tab.id ? "text-blue-600" : "text-gray-400"}`}
+                    className={`h-5 w-5 ${!isCollapsed || isMobile ? "mr-3" : ""} ${activeTab === tab.id ? "text-blue-600 dark:text-primary" : "text-gray-400 dark:text-dark-text-secondary"}`}
                   />
                   {(showDesktopText || isMobile) && (
                     <span className={`font-medium`}>{tab.name}</span>
@@ -146,10 +182,10 @@ const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Logout Button */}
-        <div className="mt-auto p-4 border-t border-gray-200 bg-gray-50 w-full">
+        <div className="mt-auto p-4 border-t border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg-secondary w-full">
           <button
             onClick={logout}
-            className={`w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-2xl transition-colors font-medium ${isCollapsed && !isMobile ? "justify-center" : ""}`}
+            className={`w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-dark-bg-tertiary rounded-2xl transition-colors font-medium ${isCollapsed && !isMobile ? "justify-center" : ""}`}
             title={isCollapsed && !isMobile ? "Sair" : "Sair do Sistema"}
           >
             <LogOut className="h-4 w-4" />
@@ -166,7 +202,7 @@ const Header: React.FC<HeaderProps> = ({
       <div className="lg:hidden absolute top-0 right-0 z-30 p-4">
         <button
           onClick={() => setIsMobileMenuOpen(true)}
-          className="p-2 text-gray-500 bg-white rounded-md border border-gray-200 shadow-sm hover:bg-gray-100 hover:text-gray-700 transition-colors"
+          className="p-2 text-gray-500 dark:text-dark-text-secondary bg-white dark:bg-dark-bg rounded-md border border-gray-200 dark:border-dark-border shadow-sm hover:bg-gray-100 dark:hover:bg-dark-bg-secondary hover:text-gray-700 dark:hover:text-dark-text transition-colors"
         >
           <Menu className="h-6 w-6" />
         </button>
@@ -190,7 +226,7 @@ const Header: React.FC<HeaderProps> = ({
 
         {/* Sidebar */}
         <div
-          className={`fixed left-0 top-0 h-full w-72 bg-white shadow-xl transform transition-all duration-300 ease-out flex flex-col ${
+          className={`fixed left-0 top-0 h-full w-72 bg-white dark:bg-dark-bg shadow-xl transform transition-all duration-300 ease-out flex flex-col ${
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -200,7 +236,7 @@ const Header: React.FC<HeaderProps> = ({
 
       {/* Desktop Sidebar */}
       <aside
-        className={`hidden lg:block bg-white shadow-md flex-shrink-0 transition-all duration-300 z-40 ${isCollapsed ? "w-20" : "w-72"}`}
+        className={`hidden lg:block bg-white dark:bg-dark-bg shadow-md dark:shadow-xl flex-shrink-0 transition-all duration-300 z-40 ${isCollapsed ? "w-20" : "w-72"}`}
       >
         <SidebarContent />
       </aside>

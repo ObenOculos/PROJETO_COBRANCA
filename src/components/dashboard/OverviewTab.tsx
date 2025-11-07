@@ -10,6 +10,7 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  Calendar,
 } from "lucide-react";
 import { formatCurrency } from "../../utils/formatters";
 import { Collection, CollectorPerformance, DashboardStats, FilterOptions } from "../../types";
@@ -22,6 +23,7 @@ interface OverviewTabProps {
   setActiveTab: (tabId: string) => void;
   setFilters: (filters: FilterOptions | ((prev: FilterOptions) => FilterOptions)) => void;
   filters: FilterOptions;
+  scheduledVisits?: any[];
 }
 
 export const OverviewTab: React.FC<OverviewTabProps> = ({
@@ -30,6 +32,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   stats,
   pendingCancellations,
   setActiveTab,
+  scheduledVisits,
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
@@ -37,6 +40,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const sliderRef = useRef<HTMLDivElement>(null);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const autoPlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [selectedCollector, setSelectedCollector] = useState<string>("all");
 
   useEffect(() => {
     if (isAutoPlaying) {
@@ -152,6 +156,77 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     };
   }, [overviewCollections]);
 
+  const calculateSchedulingMetrics = useMemo(() => {
+    if (!scheduledVisits)
+      return {
+        today: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
+        week: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
+        month: { total: 0, completed: 0, pending: 0, cancelled: 0, completionRate: 0 },
+      };
+
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+
+    // Start of week (Monday)
+    const startOfWeek = new Date(today);
+    const day = startOfWeek.getDay();
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+    startOfWeek.setDate(diff);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    // Start of month
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    const filterVisitsByCollector = (visits: any[]) => {
+      if (selectedCollector === "all") return visits;
+      return visits.filter((visit) => visit.collectorId === selectedCollector);
+    };
+
+    const calculatePeriodMetrics = (filterFn: (visit: any) => boolean) => {
+      const periodVisits = filterVisitsByCollector(
+        scheduledVisits.filter(filterFn),
+      );
+
+      const total = periodVisits.length;
+      const completed = periodVisits.filter(
+        (v) => v.status === "completed",
+      ).length;
+      const cancelled = periodVisits.filter(
+        (v) => v.status === "cancelled",
+      ).length;
+      const pending = periodVisits.filter(
+        (v) => v.status === "scheduled" || v.status === "in_progress",
+      ).length;
+      const completionRate =
+        total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      return { total, completed, pending, cancelled, completionRate };
+    };
+
+    // Today's visits
+    const todayMetrics = calculatePeriodMetrics(
+      (visit) => visit.scheduledDate === todayStr,
+    );
+
+    // This week's visits
+    const weekMetrics = calculatePeriodMetrics((visit) => {
+      const visitDate = new Date(visit.scheduledDate);
+      return visitDate >= startOfWeek && visitDate <= today;
+    });
+
+    // This month's visits
+    const monthMetrics = calculatePeriodMetrics((visit) => {
+      const visitDate = new Date(visit.scheduledDate);
+      return visitDate >= startOfMonth && visitDate <= today;
+    });
+
+    return {
+      today: todayMetrics,
+      week: weekMetrics,
+      month: monthMetrics,
+    };
+  }, [scheduledVisits, selectedCollector]);
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Métricas Slider */}
@@ -162,15 +237,15 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           <div className="hidden sm:flex items-center gap-1">
             <button
               onClick={prevSlide}
-              className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+              className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-secondary transition-colors"
             >
-              <ChevronLeft className="h-4 w-4 text-gray-600" />
+              <ChevronLeft className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
             </button>
             <button
               onClick={nextSlide}
-              className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+              className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-secondary transition-colors"
             >
-              <ChevronRight className="h-4 w-4 text-gray-600" />
+              <ChevronRight className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
             </button>
           </div>
         </div>
@@ -193,77 +268,77 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             {/* Slide 1: Métricas Financeiras */}
             <div className="w-full flex-shrink-0">
               <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                <DollarSign className="h-4 w-4 text-gray-600" />
-                <h4 className="font-medium text-gray-900 text-sm sm:text-base">
+                <DollarSign className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
+                <h4 className="font-medium text-gray-900 dark:text-dark-text text-sm sm:text-base">
                   Métricas Financeiras
                 </h4>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-4">
                 <div
                   onClick={() => setActiveTab("collections")}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                  className="bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:shadow-sm hover:border-gray-300 dark:hover:border-dark-border transition-all cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-medium text-gray-900">
+                    <h5 className="text-sm font-medium text-gray-900 dark:text-dark-text">
                       Valor Total
                     </h5>
-                    <DollarSign className="h-4 w-4 text-gray-600" />
+                    <DollarSign className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
                   </div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-dark-text mb-1">
                     {formatCurrency(overviewStats.totalAmount)}
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
                     {overviewStats.totalCollections} cobranças
                   </div>
                 </div>
                 <div
                   onClick={() => setActiveTab("collections")}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                  className="bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:shadow-sm hover:border-gray-300 dark:hover:border-dark-border transition-all cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-medium text-gray-900">
+                    <h5 className="text-sm font-medium text-gray-900 dark:text-dark-text">
                       Total em Aberto
                     </h5>
-                    <DollarSign className="h-4 w-4 text-gray-600" />
+                    <DollarSign className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
                   </div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-dark-text mb-1">
                     {formatCurrency(overviewStats.pendingAmount)}
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
                     +12% vs mês anterior
                   </div>
                 </div>
                 <div
                   onClick={() => setActiveTab("collections")}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                  className="bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:shadow-sm hover:border-gray-300 dark:hover:border-dark-border transition-all cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-medium text-gray-900">
+                    <h5 className="text-sm font-medium text-gray-900 dark:text-dark-text">
                       Total Recebido
                     </h5>
-                    <TrendingUp className="h-4 w-4 text-gray-600" />
+                    <TrendingUp className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
                   </div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-dark-text mb-1">
                     {formatCurrency(overviewStats.receivedAmount)}
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
                     +8% vs mês anterior
                   </div>
                 </div>
                 <div
                   onClick={() => setActiveTab("performance")}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                  className="bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:shadow-sm hover:border-gray-300 dark:hover:border-dark-border transition-all cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-medium text-gray-900">
+                    <h5 className="text-sm font-medium text-gray-900 dark:text-dark-text">
                       Taxa de Conversão
                     </h5>
-                    <BarChart3 className="h-4 w-4 text-gray-600" />
+                    <BarChart3 className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
                   </div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-dark-text mb-1">
                     {overviewStats.conversionRate.toFixed(1)}%
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
                     +2.1% vs mês anterior
                   </div>
                 </div>
@@ -273,26 +348,26 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             {/* Slide 2: Métricas Operacionais */}
             <div className="w-full flex-shrink-0">
               <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                <Target className="h-4 w-4 text-gray-600" />
-                <h4 className="font-medium text-gray-900 text-sm sm:text-base">
+                <Target className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
+                <h4 className="font-medium text-gray-900 dark:text-dark-text text-sm sm:text-base">
                   Métricas Operacionais
                 </h4>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3 lg:gap-6">
                 <div
                   onClick={() => setActiveTab("collections")}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                  className="bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:shadow-sm hover:border-gray-300 dark:hover:border-dark-border transition-all cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-medium text-gray-900">
+                    <h5 className="text-sm font-medium text-gray-900 dark:text-dark-text">
                       Vendas Finalizadas
                     </h5>
-                    <CheckCircle className="h-4 w-4 text-gray-600" />
+                    <CheckCircle className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
                   </div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-dark-text mb-1">
                     {overviewMetrics.completedSalesCount}
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
                     {(
                       (overviewMetrics.completedSalesCount /
                         (overviewMetrics.completedSalesCount +
@@ -304,18 +379,18 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 </div>
                 <div
                   onClick={() => setActiveTab("collections")}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                  className="bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:shadow-sm hover:border-gray-300 dark:hover:border-dark-border transition-all cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-medium text-gray-900">
+                    <h5 className="text-sm font-medium text-gray-900 dark:text-dark-text">
                       Clientes com Pendências
                     </h5>
-                    <Users className="h-4 w-4 text-gray-600" />
+                    <Users className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
                   </div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-dark-text mb-1">
                     {overviewMetrics.clientsWithPendingCount}
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
                     {overviewMetrics.pendingSalesCount} vendas pendentes
                   </div>
                 </div>
@@ -325,60 +400,60 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             {/* Slide 3: Ecossistema de Cobrança */}
             <div className="w-full flex-shrink-0">
               <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                <Target className="h-4 w-4 text-gray-600" />
-                <h4 className="font-medium text-gray-900 text-sm sm:text-base">
+                <Target className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
+                <h4 className="font-medium text-gray-900 dark:text-dark-text text-sm sm:text-base">
                   Ecossistema de Cobrança
                 </h4>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
                 <div
                   onClick={() => setActiveTab("users")}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                  className="bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:shadow-sm hover:border-gray-300 dark:hover:border-dark-border transition-all cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-medium text-gray-900">
+                    <h5 className="text-sm font-medium text-gray-900 dark:text-dark-text">
                       Time Ativo
                     </h5>
-                    <Users className="h-4 w-4 text-gray-600" />
+                    <Users className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
                   </div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-dark-text mb-1">
                     {stats.collectorsCount}
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
                     cobradores em campo
                   </div>
                 </div>
                 <div
                   onClick={() => setActiveTab("stores")}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                  className="bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:shadow-sm hover:border-gray-300 dark:hover:border-dark-border transition-all cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-medium text-gray-900">
+                    <h5 className="text-sm font-medium text-gray-900 dark:text-dark-text">
                       Cobertura da Rede
                     </h5>
-                    <Store className="h-4 w-4 text-gray-600" />
+                    <Store className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
                   </div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-dark-text mb-1">
                     {overviewMetrics.storesWithCollections}
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
                     pontos ativos
                   </div>
                 </div>
                 <div
                   onClick={() => setActiveTab("performance")}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer"
+                  className="bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:shadow-sm hover:border-gray-300 dark:hover:border-dark-border transition-all cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-medium text-gray-900">
+                    <h5 className="text-sm font-medium text-gray-900 dark:text-dark-text">
                       Eficiência Média
                     </h5>
-                    <TrendingUp className="h-4 w-4 text-gray-600" />
+                    <TrendingUp className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
                   </div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-dark-text mb-1">
                     {overviewMetrics.averageEfficiency}%
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
                     conversão da equipe
                   </div>
                 </div>
@@ -397,7 +472,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 setCurrentSlide(index);
               }}
               className={`w-2 h-2 rounded-full transition-colors touch-manipulation ${
-                currentSlide === index ? "bg-blue-600" : "bg-gray-300"
+                currentSlide === index ? "bg-blue-600 dark:bg-blue-500" : "bg-gray-300 dark:bg-dark-bg-tertiary hover:bg-gray-400 dark:hover:bg-dark-border"
               }`}
             />
           ))}
@@ -405,24 +480,24 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       </div>
 
       {/* Agendamentos dos Cobradores */}
-      {/* This part is not moved as it's a separate concern on the overview dashboard */}
+
 
       {/* Pending Cancellations Alert */}
       {pendingCancellations.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl sm:rounded-2xl p-4 lg:p-6">
+        <div className="bg-yellow-50 dark:bg-dark-bg-secondary border border-yellow-200 dark:border-yellow-900 rounded-2xl sm:rounded-2xl p-4 lg:p-6">
           <div className="flex items-start">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" />
+            <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5 mr-3 flex-shrink-0" />
             <div className="flex-1">
-              <h3 className="text-base font-semibold text-gray-900 mb-1">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-dark-text mb-1">
                 {pendingCancellations.length} Solicitações de Cancelamento
                 Pendentes
               </h3>
-              <p className="text-sm text-gray-600 mb-3">
+              <p className="text-sm text-gray-600 dark:text-dark-text-secondary mb-3">
                 Existem cancelamentos de visitas aguardando sua aprovação.
               </p>
               <button
                 onClick={() => setActiveTab("visit-tracking")}
-                className="px-4 py-2 bg-yellow-600 text-white rounded-2xl hover:bg-yellow-700 transition-colors text-sm font-medium"
+                className="px-4 py-2 bg-yellow-600 dark:bg-yellow-700 text-white rounded-2xl hover:bg-yellow-700 dark:hover:bg-yellow-800 transition-colors text-sm font-medium"
               >
                 Revisar Solicitações
               </button>
@@ -432,12 +507,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       )}
 
       {/* Performance Overview - Design Minimalista */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white dark:bg-dark-bg rounded-xl shadow-sm border border-gray-200 dark:border-dark-border p-6">
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-1">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-1">
             Performance dos Cobradores
           </h2>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
             Ranking de eficiência da equipe
           </p>
         </div>
@@ -446,43 +521,43 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           {performance.slice(0, 3).map((collector, index) => {
             const borderColors = [
-              "border-blue-200",
-              "border-gray-200",
-              "border-orange-200",
+              "border-blue-200 dark:border-blue-900",
+              "border-gray-200 dark:border-gray-600",
+              "border-orange-200 dark:border-orange-900",
             ];
-            const bgColors = ["bg-blue-50", "bg-gray-50", "bg-orange-50"];
+            const bgColors = ["bg-blue-50 dark:bg-dark-bg-secondary", "bg-gray-50 dark:bg-dark-bg-secondary", "bg-orange-50 dark:bg-dark-bg-secondary"];
 
             return (
               <div
                 key={collector.collectorId}
                 className={`relative border-2 ${borderColors[index]} ${bgColors[index]} rounded-lg p-4 transition-all duration-200 hover:shadow-sm`}
               >
-                <div className="absolute -top-2 -right-2 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center text-xs font-medium text-gray-600">
+                <div className="absolute -top-2 -right-2 w-6 h-6 bg-white dark:bg-dark-bg border border-gray-300 dark:border-dark-border rounded-full flex items-center justify-center text-xs font-medium text-gray-600 dark:text-dark-text-secondary">
                   {index + 1}
                 </div>
 
                 <div className="space-y-3">
                   <div>
-                    <h3 className="font-medium text-gray-900 text-sm truncate">
+                    <h3 className="font-medium text-gray-900 dark:text-dark-text text-sm truncate">
                       {collector.collectorName}
                     </h3>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">
+                    <p className="text-2xl font-bold text-gray-900 dark:text-dark-text mt-1">
                       {collector.conversionRate.toFixed(1)}%
                     </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="text-center p-2 bg-white rounded border">
-                      <div className="font-semibold text-gray-900">
+                    <div className="text-center p-2 bg-white dark:bg-dark-bg rounded border border-gray-200 dark:border-dark-border">
+                      <div className="font-semibold text-gray-900 dark:text-dark-text">
                         {collector.totalReceived}
                       </div>
-                      <div className="text-gray-600">Pagas</div>
+                      <div className="text-gray-600 dark:text-dark-text-secondary">Pagas</div>
                     </div>
-                    <div className="text-center p-2 bg-white rounded border">
-                      <div className="font-semibold text-gray-900">
+                    <div className="text-center p-2 bg-white dark:bg-dark-bg rounded border border-gray-200 dark:border-dark-border">
+                      <div className="font-semibold text-gray-900 dark:text-dark-text">
                         {collector.clientCount}
                       </div>
-                      <div className="text-gray-600">Clientes</div>
+                      <div className="text-gray-600 dark:text-dark-text-secondary">Clientes</div>
                     </div>
                   </div>
                 </div>
@@ -493,9 +568,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
         {/* Métricas da Equipe - Simples */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-600 mb-1">Tempo Médio</div>
-            <div className="text-xl font-semibold text-gray-900">
+          <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 bg-white dark:bg-dark-bg">
+            <div className="text-sm text-gray-600 dark:text-dark-text-secondary mb-1">Tempo Médio</div>
+            <div className="text-xl font-semibold text-gray-900 dark:text-dark-text">
               {performance.length > 0
                 ? (
                     performance.reduce(
@@ -508,22 +583,22 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             </div>
           </div>
 
-          <div className="border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-600 mb-1">
+          <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 bg-white dark:bg-dark-bg">
+            <div className="text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
               Total Recuperado
             </div>
-            <div className="text-xl font-semibold text-gray-900">
+            <div className="text-xl font-semibold text-gray-900 dark:text-dark-text">
               {formatCurrency(
                 performance.reduce((acc, p) => acc + p.receivedAmount, 0),
               )}
             </div>
           </div>
 
-          <div className="border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-600 mb-1">
+          <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 bg-white dark:bg-dark-bg">
+            <div className="text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
               Eficiência Geral
             </div>
-            <div className="text-xl font-semibold text-gray-900">
+            <div className="text-xl font-semibold text-gray-900 dark:text-dark-text">
               {performance.length > 0
                 ? (
                     performance.reduce(
@@ -539,7 +614,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
         {/* Lista Completa */}
         <div className="space-y-4">
-          <h3 className="font-medium text-gray-900">
+          <h3 className="font-medium text-gray-900 dark:text-dark-text">
             Todos os Cobradores
           </h3>
 
@@ -548,21 +623,21 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             {performance.map((collector, index) => (
               <div
                 key={collector.collectorId}
-                className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                className="border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-dark-bg-secondary transition-colors bg-white dark:bg-dark-bg"
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium text-gray-600">
+                    <div className="w-6 h-6 bg-gray-100 dark:bg-dark-bg-secondary rounded-full flex items-center justify-center text-xs font-medium text-gray-600 dark:text-dark-text-secondary">
                       {index + 1}
                     </div>
                     <div>
-                      <h4 className="font-medium text-gray-900 text-sm">
+                      <h4 className="font-medium text-gray-900 dark:text-dark-text text-sm">
                         {collector.collectorName}
                       </h4>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-gray-900">
+                    <div className="font-semibold text-gray-900 dark:text-dark-text">
                       {collector.conversionRate.toFixed(1)}%
                     </div>
                   </div>
@@ -570,36 +645,36 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
                 <div className="grid grid-cols-4 gap-3 text-center text-xs">
                   <div>
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-gray-900 dark:text-dark-text">
                       {collector.totalAssigned}
                     </div>
-                    <div className="text-gray-600">Atribuídas</div>
+                    <div className="text-gray-600 dark:text-dark-text-secondary">Atribuídas</div>
                   </div>
                   <div>
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-gray-900 dark:text-dark-text">
                       {collector.totalReceived}
                     </div>
-                    <div className="text-gray-600">Pagas</div>
+                    <div className="text-gray-600 dark:text-dark-text-secondary">Pagas</div>
                   </div>
                   <div>
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-gray-900 dark:text-dark-text">
                       {collector.clientCount}
                     </div>
-                    <div className="text-gray-600">Clientes</div>
+                    <div className="text-gray-600 dark:text-dark-text-secondary">Clientes</div>
                   </div>
                   <div>
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-gray-900 dark:text-dark-text">
                       {collector.averageTime.toFixed(0)}d
                     </div>
-                    <div className="text-gray-600">Tempo</div>
+                    <div className="text-gray-600 dark:text-dark-text-secondary">Tempo</div>
                   </div>
                 </div>
 
                 {/* Barra de Progresso Simples */}
                 <div className="mt-3">
-                  <div className="w-full bg-gray-200 rounded-full h-1">
+                  <div className="w-full bg-gray-200 dark:bg-dark-bg-tertiary rounded-full h-1">
                     <div
-                      className="bg-gray-900 h-1 rounded-full transition-all duration-300"
+                      className="bg-gray-900 dark:bg-dark-text h-1 rounded-full transition-all duration-300"
                       style={{
                         width: `${Math.min((collector.totalReceived / collector.totalAssigned) * 100, 100)}%`,
                       }}
@@ -612,29 +687,29 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
           {/* Desktop Table - Clean */}
           <div className="hidden lg:block">
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-gray-200 dark:border-dark-border rounded-lg overflow-hidden bg-white dark:bg-dark-bg">
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 dark:bg-dark-bg-secondary">
                   <tr>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                    <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-dark-text text-sm">
                       #
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                    <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-dark-text text-sm">
                       Cobrador
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                    <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-dark-text text-sm">
                       Eficiência
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                    <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-dark-text text-sm">
                       Vendas
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                    <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-dark-text text-sm">
                       Clientes
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                    <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-dark-text text-sm">
                       Valor Recebido
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900 text-sm">
+                    <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-dark-text text-sm">
                       Tempo Médio
                     </th>
                   </tr>
@@ -644,7 +719,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     <tr>
                       <td
                         colSpan={7}
-                        className="py-8 text-center text-gray-500 text-sm"
+                        className="py-8 text-center text-gray-500 dark:text-dark-text-secondary text-sm"
                       >
                         Nenhum cobrador encontrado
                       </td>
@@ -653,56 +728,56 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     performance.map((collector, index) => (
                       <tr
                         key={collector.collectorId}
-                        className="border-t border-gray-100 hover:bg-gray-50 transition-colors"
+                        className="border-t border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-secondary transition-colors"
                       >
                         <td className="py-3 px-4">
-                          <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium text-gray-600">
+                          <div className="w-6 h-6 bg-gray-100 dark:bg-dark-bg-secondary rounded-full flex items-center justify-center text-xs font-medium text-gray-600 dark:text-dark-text-secondary">
                             {index + 1}
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="font-medium text-gray-900 text-sm">
+                          <div className="font-medium text-gray-900 dark:text-dark-text text-sm">
                             {collector.collectorName}
                           </div>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-16 bg-gray-200 rounded-full h-1.5">
+                            <div className="w-16 bg-gray-200 dark:bg-dark-bg-secondary rounded-full h-1.5">
                               <div
-                                className="bg-gray-900 h-1.5 rounded-full"
+                                className="bg-gray-900 dark:bg-dark-text h-1.5 rounded-full"
                                 style={{
                                   width: `${Math.min(collector.conversionRate, 100)}%`,
                                 }}
                               ></div>
                             </div>
-                            <span className="text-sm font-medium text-gray-900 min-w-[40px]">
+                            <span className="text-sm font-medium text-gray-900 dark:text-dark-text min-w-[40px]">
                               {collector.conversionRate.toFixed(1)}%
                             </span>
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="text-sm text-gray-900">
+                          <div className="text-sm text-gray-900 dark:text-dark-text">
                             <span className="font-medium">
                               {collector.totalReceived}
                             </span>
-                            <span className="text-gray-500">
+                            <span className="text-gray-500 dark:text-dark-text-secondary">
                               {" "}
                               / {collector.totalAssigned}
                             </span>
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-gray-900 dark:text-dark-text">
                             {collector.clientCount}
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-gray-900 dark:text-dark-text">
                             {formatCurrency(collector.receivedAmount)}
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-gray-900 dark:text-dark-text">
                             {collector.averageTime.toFixed(0)} dias
                           </div>
                         </td>
@@ -713,6 +788,248 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               </table>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Agendamentos dos Cobradores */}
+      <div className="bg-white dark:bg-dark-bg rounded-xl shadow-sm border border-gray-200 dark:border-dark-border p-6 transition-colors duration-300">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-1 transition-colors duration-300">
+              Agendamentos dos Cobradores
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+              Métricas de visitas agendadas
+            </p>
+          </div>
+
+          {/* Seletor de Cobrador */}
+          <div className="flex items-center gap-2">
+            <label
+              htmlFor="collector-select"
+              className="text-sm font-medium text-gray-700 dark:text-dark-text-secondary whitespace-nowrap transition-colors duration-300"
+            >
+              Cobrador:
+            </label>
+            <select
+              id="collector-select"
+              value={selectedCollector}
+              onChange={(e) => setSelectedCollector(e.target.value)}
+              className="px-3 py-1.5 border border-gray-300 dark:border-dark-border rounded-lg text-sm bg-white dark:bg-dark-bg-secondary text-gray-900 dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-0 flex-1 sm:flex-none sm:min-w-[150px] transition-colors duration-300"
+            >
+              <option value="all">Todos os Cobradores</option>
+              {performance.map((collector) => (
+                <option
+                  key={collector.collectorId}
+                  value={collector.collectorId}
+                >
+                  {collector.collectorName}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+          {/* Agendamentos do Dia */}
+          <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 transition-colors duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-medium text-gray-900 dark:text-dark-text transition-colors duration-300">
+                Hoje
+              </h4>
+              <Calendar className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary transition-colors duration-300" />
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                  Total
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                  {calculateSchedulingMetrics.today.total}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                  Concluídas
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                  {calculateSchedulingMetrics.today.completed}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                  Pendentes
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                  {calculateSchedulingMetrics.today.pending}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                  Canceladas
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                  {calculateSchedulingMetrics.today.cancelled}
+                </span>
+              </div>
+              <div className="pt-3 border-t border-gray-200 dark:border-dark-border transition-colors duration-300">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                    Taxa de Conclusão
+                  </span>
+                  <span className="font-bold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                    {calculateSchedulingMetrics.today.completionRate}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Agendamentos da Semana */}
+          <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 transition-colors duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-medium text-gray-900 dark:text-dark-text transition-colors duration-300">
+                Esta Semana
+              </h4>
+              <Target className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary transition-colors duration-300" />
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                  Total
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                  {calculateSchedulingMetrics.week.total}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                  Concluídas
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                  {calculateSchedulingMetrics.week.completed}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                  Pendentes
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                  {calculateSchedulingMetrics.week.pending}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                  Canceladas
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                  {calculateSchedulingMetrics.week.cancelled}
+                </span>
+              </div>
+              <div className="pt-3 border-t border-gray-200 dark:border-dark-border transition-colors duration-300">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                    Taxa de Conclusão
+                  </span>
+                  <span className="font-bold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                    {calculateSchedulingMetrics.week.completionRate}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Agendamentos do Mês */}
+          <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 transition-colors duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-medium text-gray-900 dark:text-dark-text transition-colors duration-300">
+                Este Mês
+              </h4>
+              <BarChart3 className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary transition-colors duration-300" />
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                  Total
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                  {calculateSchedulingMetrics.month.total}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                  Concluídas
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                  {calculateSchedulingMetrics.month.completed}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                  Pendentes
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                  {calculateSchedulingMetrics.month.pending}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                  Canceladas
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                  {calculateSchedulingMetrics.month.cancelled}
+                </span>
+              </div>
+              <div className="pt-3 border-t border-gray-200 dark:border-dark-border transition-colors duration-300">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+                    Taxa de Conclusão
+                  </span>
+                  <span className="font-bold text-gray-900 dark:text-dark-text transition-colors duration-300">
+                    {calculateSchedulingMetrics.month.completionRate}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Informação do cobrador selecionado */}
+        {selectedCollector !== "all" && (
+          <div className="mt-6 p-3 bg-gray-50 dark:bg-dark-bg-secondary rounded-lg border border-gray-200 dark:border-dark-border transition-colors duration-300">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary transition-colors duration-300" />
+              <span className="text-sm font-medium text-gray-900 dark:text-dark-text transition-colors duration-300">
+                Exibindo dados de:{" "}
+                {
+                  performance.find(
+                    (p) => p.collectorId === selectedCollector,
+                  )?.collectorName
+                }
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Ação para ver detalhes */}
+        <div className="mt-6 pt-4 border-t border-gray-200 dark:border-dark-border transition-colors duration-300">
+          <button
+            onClick={() => setActiveTab("visit-tracking")}
+            className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg-secondary text-gray-700 dark:text-dark-text rounded-lg hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors text-sm font-medium flex items-center justify-center border border-gray-200 dark:border-dark-border"
+          >
+            <Target className="h-4 w-4 mr-2" />
+            Ver Todos os Agendamentos
+            {selectedCollector !== "all" && (
+              <span className="ml-1">
+                -{" "}
+                {
+                  performance.find(
+                    (p) => p.collectorId === selectedCollector,
+                  )?.collectorName
+                }
+              </span>
+            )}
+          </button>
         </div>
       </div>
     </div>
