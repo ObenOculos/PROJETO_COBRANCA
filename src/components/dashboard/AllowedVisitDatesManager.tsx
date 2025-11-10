@@ -130,7 +130,7 @@ const AllowedVisitDatesManager: React.FC = () => {
     };
   }, [modals.calendar]);
 
-  // Resetar bairros quando mudar a cidade
+  // Resetar bairros e paginação quando mudar a cidade
   useEffect(() => {
     setFormSelection(prev => ({
       ...prev,
@@ -142,6 +142,7 @@ const AllowedVisitDatesManager: React.FC = () => {
       neighborhood: false,
       day: false,
     }));
+    setCurrentPage(1);
   }, [formSelection.cities]);
 
   // Resetar cidade quando mudar o filtro de cobrador
@@ -168,14 +169,26 @@ const AllowedVisitDatesManager: React.FC = () => {
 
   useEffect(() => {
     if (collections) {
+      // Cidades dos clientes
+      const citiesFromCollections = collections
+        .map((c) => c.cidade)
+        .filter(Boolean) as string[];
+      
+      // Cidades das datas permitidas
+      const citiesFromAllowedDates = allowedDates
+        .map((d) => d.city)
+        .filter(Boolean);
+      
+      // Combinar ambas as fontes e remover duplicatas
       const uniqueCities = [
-        ...new Set(collections.map((c) => c.cidade).filter(Boolean)),
-      ] as string[];
+        ...new Set([...citiesFromCollections, ...citiesFromAllowedDates]),
+      ];
+      
       // Ordenar cidades em ordem alfabética
       uniqueCities.sort((a, b) => a.localeCompare(b, "pt-BR"));
       setCities(uniqueCities);
     }
-  }, [collections]);
+  }, [collections, allowedDates]);
 
   // Lista de cobradores
   const collectors = useMemo(() => {
@@ -289,23 +302,9 @@ const AllowedVisitDatesManager: React.FC = () => {
 
   // Filtrar datas permitidas pela cidade selecionada
   const filteredAllowedDates = useMemo(() => {
-    let filtered = allowedDates;
-
-    // Filtro por cobrador - filtrar apenas cidades/bairros onde o cobrador tem clientes
-    if (filters.collector !== "all") {
-      const collectorCityNeighborhoods = new Set(
-        collections
-          .filter((c) => c.user_id === filters.collector)
-          .map((c) => `${c.cidade}|${c.bairro}`),
-      );
-
-      filtered = filtered.filter((d) =>
-        collectorCityNeighborhoods.has(`${d.city}|${d.neighborhood}`),
-      );
-    }
-
-    return filtered;
-  }, [allowedDates, filters.collector, collections]);
+    // Não aplicar filtro de cobrador - mostrar TODAS as datas cadastradas
+    return allowedDates;
+  }, [allowedDates]);
 
   // Agrupar datas por cidade
   const groupedByCity = useMemo(() => {
@@ -354,36 +353,8 @@ const AllowedVisitDatesManager: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    // --- Pre-insertion validation for ALL selected cities ---
-    const conflicts: { city: string; days: string[] }[] = [];
-    for (const city of formSelection.cities) {
-      const existingDaysForCity = new Set(
-        allowedDates
-          .filter((d) => d.city === city)
-          .map((d) => d.allowed_date.toString()),
-      );
-      const conflictingDays = formSelection.days.filter((day) =>
-        existingDaysForCity.has(day),
-      );
-      if (conflictingDays.length > 0) {
-        conflicts.push({ city, days: conflictingDays });
-      }
-    }
-
-    if (conflicts.length > 0) {
-      const errorMessage = conflicts
-        .map((c) => `Cidade ${c.city} já possui os dias: ${c.days.join(", ")}`)
-        .join("; ");
-      setError(
-        `Não é possível adicionar. Conflitos encontrados: ${errorMessage}`,
-      );
-      setLoading(false);
-      return;
-    }
-    // --- End validation ---
-
     try {
-      // Create insert data for all combinations of cities, neighborhoods, and days
+      // Create potential insert data for all combinations
       const insertData = formSelection.cities.flatMap((city) =>
         formSelection.neighborhoods.flatMap((neighborhood) =>
           formSelection.days.map((day) => ({
@@ -394,24 +365,55 @@ const AllowedVisitDatesManager: React.FC = () => {
         ),
       );
 
-      // Filter out combinations where the neighborhood doesn't belong to the city
-      const validInsertData = insertData.filter((item) => {
-        return collections.some(
-          (c) => c.cidade === item.city && c.bairro === item.neighborhood,
-        );
-      });
+      // Validação apenas para garantir que há dados para inserir
+      if (insertData.length === 0) {
+        setError("Nenhum dado para adicionar.");
+        setLoading(false);
+        return;
+      }
 
-      if (validInsertData.length === 0) {
+      // --- Correct Pre-insertion validation ---
+      const conflicts: { city: string; neighborhood: string; allowed_date: number }[] = [];
+      const uniqueNewData: { city: string; neighborhood: string; allowed_date: number }[] = [];
+      const existingEntries = new Set(
+        allowedDates.map(d => `${d.city}|${d.neighborhood}|${d.allowed_date}`)
+      );
+      const newEntries = new Set<string>();
+
+      for (const item of insertData) {
+        const key = `${item.city}|${item.neighborhood}|${item.allowed_date}`;
+        if (existingEntries.has(key)) {
+          // Conflict with existing DB data
+          if (!conflicts.find(c => `${c.city}|${c.neighborhood}|${c.allowed_date}` === key)) {
+             conflicts.push(item);
+          }
+        } else if (!newEntries.has(key)) {
+          // Not in DB and not a duplicate in this selection
+          uniqueNewData.push(item);
+          newEntries.add(key);
+        }
+      }
+
+      if (conflicts.length > 0) {
+        const errorMessage = conflicts
+          .map(c => `${c.city} / ${c.neighborhood} / Dia ${c.allowed_date}`)
+          .join(", ");
         setError(
-          "Nenhuma combinação válida de cidade/bairro encontrada. Verifique se os bairros selecionados pertencem às cidades selecionadas.",
+          `Não é possível adicionar. As seguintes configurações já existem: ${errorMessage}`,
         );
+        setLoading(false);
+        return; // Stop entirely if there are any conflicts
+      }
+
+      if (uniqueNewData.length === 0) {
+        setError("Nenhuma nova data para adicionar (as selecionadas já existem).");
         setLoading(false);
         return;
       }
 
       const { data, error } = await supabase
         .from("allowed_visit_dates")
-        .insert(validInsertData)
+        .insert(uniqueNewData)
         .select();
 
       if (error) {
@@ -431,7 +433,8 @@ const AllowedVisitDatesManager: React.FC = () => {
         });
       }
     } catch (err) {
-      setError("Erro ao adicionar datas permitidas");
+      const errorMessage = err instanceof Error ? err.message : "Erro ao adicionar datas permitidas";
+      setError(errorMessage);
     }
 
     setLoading(false);
@@ -572,6 +575,7 @@ const AllowedVisitDatesManager: React.FC = () => {
       return cities;
     }
 
+    // Cidades dos clientes do cobrador
     const collectorCities = new Set(
       collections
         .filter((c) => c.user_id === filters.calendarCollector)
@@ -579,30 +583,37 @@ const AllowedVisitDatesManager: React.FC = () => {
         .filter(Boolean),
     );
 
-    return cities.filter((city) => collectorCities.has(city));
-  }, [filters.calendarCollector, cities, collections]);
+    // Cidades das datas permitidas (independente de ter clientes)
+    const citiesWithAllowedDates = new Set(
+      allowedDates.map((d) => d.city).filter(Boolean),
+    );
+
+    // Combinar ambas as fontes
+    const allRelevantCities = new Set([
+      ...collectorCities,
+      ...citiesWithAllowedDates,
+    ]);
+
+    return cities.filter((city) => allRelevantCities.has(city));
+  }, [filters.calendarCollector, cities, collections, allowedDates]);
 
   // Bairros disponíveis para a cidade selecionada no filtro do calendário
   const calendarNeighborhoods = useMemo(() => {
     if (filters.calendarCity === "all") return [];
 
-    let filteredCollections = collections.filter(
-      (c) => c.cidade === filters.calendarCity,
-    );
+    // Apenas bairros das datas permitidas para esta cidade
+    const neighborhoodsFromAllowedDates = [
+      ...new Set(
+        allowedDates
+          .filter((d) => d.city === filters.calendarCity)
+          .map((d) => d.neighborhood)
+          .filter(Boolean),
+      ),
+    ];
 
-    // Aplicar filtro de cobrador se selecionado
-    if (filters.calendarCollector !== "all") {
-      filteredCollections = filteredCollections.filter(
-        (c) => c.user_id === filters.calendarCollector,
-      );
-    }
-
-    const neighborhoods = [
-      ...new Set(filteredCollections.map((c) => c.bairro).filter(Boolean)),
-    ] as string[];
-    neighborhoods.sort((a, b) => a.localeCompare(b, "pt-BR"));
-    return neighborhoods;
-  }, [filters.calendarCity, filters.calendarCollector, collections]);
+    neighborhoodsFromAllowedDates.sort((a, b) => a.localeCompare(b, "pt-BR"));
+    return neighborhoodsFromAllowedDates;
+  }, [filters.calendarCity, allowedDates]);
 
   // Obter dias permitidos considerando os filtros
   const allowedDaysForCalendar = useMemo(() => {
@@ -615,19 +626,6 @@ const AllowedVisitDatesManager: React.FC = () => {
     if (filters.calendarNeighborhood !== "all") {
       filtered = filtered.filter(
         (d) => d.neighborhood === filters.calendarNeighborhood,
-      );
-    }
-
-    // Se houver filtro de cobrador, filtrar apenas cidades/bairros onde o cobrador tem clientes
-    if (filters.calendarCollector !== "all") {
-      const collectorCityNeighborhoods = new Set(
-        collections
-          .filter((c) => c.user_id === filters.calendarCollector)
-          .map((c) => `${c.cidade}|${c.bairro}`),
-      );
-
-      filtered = filtered.filter((d) =>
-        collectorCityNeighborhoods.has(`${d.city}|${d.neighborhood}`),
       );
     }
 
@@ -930,9 +928,16 @@ const AllowedVisitDatesManager: React.FC = () => {
         ) : (
           (() => {
             const CITIES_PER_PAGE = 10;
-            const sortedCities = Array.from(groupedByCity.entries()).sort(
+            let sortedCities = Array.from(groupedByCity.entries()).sort(
               ([cityA], [cityB]) => cityA.localeCompare(cityB, "pt-BR"),
             );
+
+            if (formSelection.cities.length > 0) {
+              sortedCities = sortedCities.filter(([city]) =>
+                formSelection.cities.includes(city),
+              );
+            }
+
             const totalPages = Math.ceil(sortedCities.length / CITIES_PER_PAGE);
             const paginatedCities = sortedCities.slice(
               (currentPage - 1) * CITIES_PER_PAGE,
