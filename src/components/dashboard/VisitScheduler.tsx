@@ -205,6 +205,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   // Estado para rastrear visitas que caem no domingo
   const [sundayVisits, setSundayVisits] = useState<Set<string>>(new Set());
 
+  // Estado para data geral no modal de confirmação
+  const [generalScheduleDate, setGeneralScheduleDate] = useState<string>("");
+
   // Estado para o modal de notificação de visitas atrasadas
   const [showOverdueNotificationModal, setShowOverdueNotificationModal] =
     useState(false);
@@ -933,6 +936,61 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     }
 
     await proceedWithScheduling();
+  };
+
+  useEffect(() => {
+    if (modalStep === "confirmation") {
+      const dates = Array.from(clientSchedules.values()).map((s) => s.date);
+      if (dates.length > 0) {
+        const dateCounts = dates.reduce(
+          (acc, date) => {
+            if (date) acc[date] = (acc[date] || 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>,
+        );
+
+        if (Object.keys(dateCounts).length > 0) {
+          const mostFrequentDate = Object.keys(dateCounts).reduce((a, b) =>
+            dateCounts[a] > dateCounts[b] ? a : b,
+          );
+          setGeneralScheduleDate(mostFrequentDate);
+        } else {
+          setGeneralScheduleDate(selectedDate);
+        }
+      } else {
+        setGeneralScheduleDate(selectedDate);
+      }
+    }
+  }, [modalStep, clientSchedules, selectedDate]);
+
+  const handleGeneralDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = e.target.value;
+    setGeneralScheduleDate(newDate);
+
+    if (!newDate) return;
+
+    const newSchedules = new Map(clientSchedules);
+    const newSundayVisits = new Set(sundayVisits);
+
+    selectedClients.forEach((clientDoc) => {
+      const currentSchedule = newSchedules.get(clientDoc) || {
+        date: "",
+        time: selectedTime,
+      };
+      newSchedules.set(clientDoc, { ...currentSchedule, date: newDate });
+
+      const [year, month, day] = newDate.split("-").map(Number);
+      const dateObj = new Date(year, month - 1, day);
+      if (dateObj.getDay() === 0) {
+        newSundayVisits.add(clientDoc);
+      } else {
+        newSundayVisits.delete(clientDoc);
+      }
+    });
+
+    setClientSchedules(newSchedules);
+    setSundayVisits(newSundayVisits);
   };
 
   const handleUpdateVisitStatus = async (
@@ -3737,6 +3795,32 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                     ) : (
                       // Etapa de confirmação - Usando os componentes existentes
                       <div className="space-y-6">
+                        <div className="bg-gray-100 border border-gray-200 rounded-2xl p-3 sm:p-4">
+                          <h4 className="font-semibold text-gray-800 mb-2 text-sm sm:text-base flex items-center">
+                            <Calendar className="h-4 w-4 mr-2 text-gray-600" />
+                            Definir Data Geral para Todos
+                          </h4>
+                          <div className="grid grid-cols-1">
+                            <div>
+                              <label
+                                htmlFor="general-date-input"
+                                className="sr-only"
+                              >
+                                Data Geral
+                              </label>
+                              <div className="relative">
+                                <input
+                                  id="general-date-input"
+                                  type="date"
+                                  value={generalScheduleDate}
+                                  onChange={handleGeneralDateChange}
+                                  min={getLocalDate()}
+                                  className="w-full text-sm border border-gray-300 rounded-lg sm:rounded-xl px-3 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                         {/* Lista de Clientes Selecionados - Mesmo conteúdo do componente principal */}
                         {selectedClients.size > 0 && (
                           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 sm:p-4">
