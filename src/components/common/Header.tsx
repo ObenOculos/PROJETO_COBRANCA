@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { LogOut, User, Menu, X, LucideIcon, ChevronsLeft, Moon, Sun } from "lucide-react";
+import {
+  LogOut,
+  User,
+  Menu,
+  X,
+  LucideIcon,
+  ChevronsLeft,
+  Moon,
+  Sun,
+} from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import NotificationDropdown from "./NotificationDropdown";
 
@@ -41,9 +50,11 @@ const Header: React.FC<HeaderProps> = ({
 
   // Inicializar dark mode
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const shouldBeDark = savedTheme ? savedTheme === 'dark' : prefersDark;
+    const savedTheme = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)",
+    ).matches;
+    const shouldBeDark = savedTheme ? savedTheme === "dark" : prefersDark;
     setIsDark(shouldBeDark);
   }, []);
 
@@ -53,11 +64,11 @@ const Header: React.FC<HeaderProps> = ({
 
     const html = document.documentElement;
     if (newDark) {
-      html.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
+      html.classList.add("dark");
+      localStorage.setItem("theme", "dark");
     } else {
-      html.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+      html.classList.remove("dark");
+      localStorage.setItem("theme", "light");
     }
   };
 
@@ -102,7 +113,9 @@ const Header: React.FC<HeaderProps> = ({
 
         {/* User Info */}
         {(showDesktopText || isMobile) && (
-          <div className={`p-4 border-b border-gray-100 dark:border-dark-border w-full`}>
+          <div
+            className={`p-4 border-b border-gray-100 dark:border-dark-border w-full`}
+          >
             {isLoading ? (
               <div className="flex items-center justify-between animate-pulse">
                 <div className="h-10 w-10 bg-gray-200 dark:bg-dark-bg-secondary rounded-full"></div>

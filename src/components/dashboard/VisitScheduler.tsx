@@ -2648,16 +2648,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                         selectedVisitForReschedule.scheduledTime,
                       )}
                     </div>
-                                      <div className="text-sm text-gray-600 mb-4">
-                                        <strong>Endereço:</strong>{" "}
-                                        {[
-                                          selectedVisitForReschedule.clientNeighborhood,
-                                          selectedVisitForReschedule.clientCity,
-                                          selectedVisitForReschedule.clientAddress,
-                                        ]
-                                          .filter(Boolean)
-                                          .join(", ")}
-                                      </div>                  </div>
+                    <div className="text-sm text-gray-600 mb-4">
+                      <strong>Endereço:</strong>{" "}
+                      {[
+                        selectedVisitForReschedule.clientNeighborhood,
+                        selectedVisitForReschedule.clientCity,
+                        selectedVisitForReschedule.clientAddress,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </div>{" "}
+                  </div>
 
                   <div className="space-y-4">
                     <div>
