@@ -300,11 +300,23 @@ const AllowedVisitDatesManager: React.FC = () => {
     filteredNeighborhoods.length > 0;
   const isAllDaysSelected = formSelection.days.length === 31;
 
-  // Filtrar datas permitidas pela cidade selecionada
+  // Filtrar datas permitidas baseado no cobrador selecionado
   const filteredAllowedDates = useMemo(() => {
-    // Não aplicar filtro de cobrador - mostrar TODAS as datas cadastradas
-    return allowedDates;
-  }, [allowedDates]);
+    // Se nenhum cobrador selecionado, mostrar todas as datas
+    if (filters.collector === "all") {
+      return allowedDates;
+    }
+
+    // Filtrar apenas cidades onde o cobrador tem clientes
+    const collectorCities = new Set(
+      collections
+        .filter((c) => c.user_id === filters.collector)
+        .map((c) => c.cidade)
+        .filter(Boolean),
+    );
+
+    return allowedDates.filter((d) => collectorCities.has(d.city));
+  }, [allowedDates, filters.collector, collections]);
 
   // Agrupar datas por cidade
   const groupedByCity = useMemo(() => {
