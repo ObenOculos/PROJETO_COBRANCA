@@ -728,36 +728,34 @@ const AllowedVisitDatesManager: React.FC = () => {
               </button>
 
               {showDayDropdown && selectedCity && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                  <div className="sticky top-0 bg-gray-50 border-b border-gray-200 p-2">
-                    <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 rounded px-2 py-1">
-                      <input
-                        type="checkbox"
-                        checked={isAllDaysSelected}
-                        onChange={handleToggleAllDays}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm font-medium text-gray-700">
-                        Selecionar Todos (31)
-                      </span>
-                    </label>
+                <div className="absolute z-10 w-80 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                  <div className="sticky top-0 bg-white border-b border-gray-200 p-2 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={handleToggleAllDays}
+                      className="px-3 py-1 text-xs font-medium rounded-md transition-colors w-full text-blue-600 bg-blue-50 hover:bg-blue-100"
+                    >
+                      {isAllDaysSelected
+                        ? "Limpar Seleção"
+                        : "Selecionar Todos os 31 Dias"}
+                    </button>
                   </div>
-                  <div className="p-2 grid grid-cols-4 gap-1">
+                  <div className="p-3 grid grid-cols-7 gap-1">
                     {Array.from({ length: 31 }, (_, i) =>
                       (i + 1).toString(),
                     ).map((day) => (
-                      <label
+                      <button
                         key={day}
-                        className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 rounded px-2 py-1"
+                        type="button"
+                        onClick={() => handleToggleDay(day)}
+                        className={`w-9 h-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                          selectedDays.includes(day)
+                            ? "bg-blue-600 text-white hover:bg-blue-700"
+                            : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                        }`}
                       >
-                        <input
-                          type="checkbox"
-                          checked={selectedDays.includes(day)}
-                          onChange={() => handleToggleDay(day)}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">{day}</span>
-                      </label>
+                        {day}
+                      </button>
                     ))}
                   </div>
                 </div>

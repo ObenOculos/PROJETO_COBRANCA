@@ -2009,7 +2009,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                             <div className="text-sm text-gray-600 space-y-1">
                               <div className="flex items-center">
                                 <MapPin className="h-4 w-4 mr-2" />
-                                {visit.clientAddress}
+                                {[
+                                  visit.clientNeighborhood,
+                                  visit.clientCity,
+                                  visit.clientAddress,
+                                ]
+                                  .filter(Boolean)
+                                  .join(", ")}
                               </div>
                               {visit.totalPendingValue && (
                                 <div className="flex items-center">
@@ -2179,7 +2185,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                             </div>
                             <div className="flex items-center">
                               <MapPin className="h-4 w-4 mr-2" />
-                              {visit.clientAddress}
+                              {[
+                                visit.clientNeighborhood,
+                                visit.clientCity,
+                                visit.clientAddress,
+                              ]
+                                .filter(Boolean)
+                                .join(", ")}
                             </div>
                             {visit.totalPendingValue && (
                               <div className="flex items-center">
@@ -2578,11 +2590,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                         selectedVisitForReschedule.scheduledTime,
                       )}
                     </div>
-                    <div className="text-sm text-gray-600 mb-4">
-                      <strong>Endereço:</strong>{" "}
-                      {selectedVisitForReschedule.clientAddress}
-                    </div>
-                  </div>
+                                      <div className="text-sm text-gray-600 mb-4">
+                                        <strong>Endereço:</strong>{" "}
+                                        {[
+                                          selectedVisitForReschedule.clientNeighborhood,
+                                          selectedVisitForReschedule.clientCity,
+                                          selectedVisitForReschedule.clientAddress,
+                                        ]
+                                          .filter(Boolean)
+                                          .join(", ")}
+                                      </div>                  </div>
 
                   <div className="space-y-4">
                     <div>
@@ -2735,7 +2752,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   </p>
                   <p className="text-gray-700 mb-4">
                     <strong>Endereço:</strong>{" "}
-                    {selectedVisitForNotFound.clientAddress}
+                    {[
+                      selectedVisitForNotFound.clientNeighborhood,
+                      selectedVisitForNotFound.clientCity,
+                      selectedVisitForNotFound.clientAddress,
+                    ]
+                      .filter(Boolean)
+                      .join(", ")}
                   </p>
                   <p className="text-gray-700">
                     Tem certeza de que deseja marcar esta visita como{" "}
@@ -3674,8 +3697,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                                         <div className="flex items-center">
                                                           <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
                                                           <span className="truncate">
-                                                            {client.address},{" "}
-                                                            {client.city}
+                                                            {[
+                                                              client.neighborhood,
+                                                              client.city,
+                                                              client.address,
+                                                            ]
+                                                              .filter(Boolean)
+                                                              .join(", ")}
                                                           </span>
                                                         </div>
                                                         <div className="flex items-center">
