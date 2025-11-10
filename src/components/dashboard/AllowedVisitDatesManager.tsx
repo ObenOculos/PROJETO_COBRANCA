@@ -290,6 +290,26 @@ const AllowedVisitDatesManager: React.FC = () => {
     setLoading(true);
     setError(null);
 
+    // Check for days already associated with the selected city
+    const existingDaysForCity = new Set(
+      allowedDates
+        .filter((d) => d.city === selectedCity)
+        .map((d) => d.allowed_date.toString()),
+    );
+
+    const conflictingDays = selectedDays.filter((day) =>
+      existingDaysForCity.has(day),
+    );
+
+    if (conflictingDays.length > 0) {
+      const plural = conflictingDays.length > 1;
+      setError(
+        `Não é possível adicionar, pois o${plural ? "s" : ""} dia${plural ? "s" : ""} ${conflictingDays.join(", ")} já est${plural ? "ão" : "á"} associado${plural ? "s" : ""} à cidade de ${selectedCity}.`,
+      );
+      setLoading(false);
+      return;
+    }
+
     try {
       // Inserir uma entrada para cada combinação de bairro e dia
       const insertData = selectedNeighborhoods.flatMap((neighborhood) =>
