@@ -23,7 +23,6 @@ import { ScheduledVisit } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import VisitScheduler from "./VisitScheduler"; // Import the VisitScheduler component
 import AllowedVisitDatesManager from "./AllowedVisitDatesManager"; // Import the AllowedVisitDatesManager component
-import "../../styles/components.css"; // Import custom components styles
 
 // Helper function to parse YYYY-MM-DD date strings safely
 const parseDateString = (dateString: string): Date | null => {

@@ -1,7 +1,6 @@
 /* Importar estilos customizados */
 @import "./styles/variables.css";
 @import "./styles/layouts.css";
-@import "./styles/components.css";
 
 @tailwind base;
 @tailwind components;
