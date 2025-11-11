@@ -565,7 +565,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
       {/* Filtros Colapsáveis */}
       {showFilters && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 animate-in slide-in-from-top-2">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 animate-in slide-in-from-top-2 duration-200">
           <div className="space-y-4">
             {/* Date Range Mode Toggle */}
             <div>

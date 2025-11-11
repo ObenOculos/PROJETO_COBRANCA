@@ -655,7 +655,7 @@ const EnhancedPerformanceChart: React.FC = () => {
 
       {/* Filtros Colapsáveis */}
       {showFilters && (
-        <div className="relative bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-in slide-in-from-top-2">
+        <div className="relative bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-in slide-in-from-top-2 duration-200">
           {isPending && (
             <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-10 rounded-2xl">
               <div className="flex items-center gap-2 text-gray-600">

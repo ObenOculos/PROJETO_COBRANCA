@@ -641,7 +641,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
             {/* Filtros Colapsáveis */}
             {showFilters && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-200 animate-in slide-in-from-top-2">
+              <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-200 animate-in slide-in-from-top-2 duration-200">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <label
