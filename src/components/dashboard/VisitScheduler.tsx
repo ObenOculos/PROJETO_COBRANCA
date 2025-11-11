@@ -2076,11 +2076,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   .filter(Boolean)
                                   .join(", ")}
                               </div>
-                              {visit.totalPendingValue && (
+                              {(visit.totalPendingValue ?? 0) > 0 && (
                                 <div className="flex items-center">
                                   <DollarSign className="h-4 w-4 mr-2" />
                                   Pendente:{" "}
-                                  {formatCurrency(visit.totalPendingValue)}
+                                  {formatCurrency((visit.totalPendingValue ?? 0))}
                                   {visit.overdueCount &&
                                     visit.overdueCount > 0 && (
                                       <span className="ml-2 text-red-600">
@@ -2262,11 +2262,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 .filter(Boolean)
                                 .join(", ")}
                             </div>
-                            {visit.totalPendingValue && (
+                            {(visit.totalPendingValue ?? 0) > 0 && ( 
                               <div className="flex items-center">
                                 <DollarSign className="h-4 w-4 mr-2" />
                                 Pendente:{" "}
-                                {formatCurrency(visit.totalPendingValue)}
+                                {formatCurrency((visit.totalPendingValue ?? 0))}
                                 {visit.overdueCount &&
                                   visit.overdueCount > 0 && (
                                     <span className="ml-2 text-red-600">
