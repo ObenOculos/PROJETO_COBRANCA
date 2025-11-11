@@ -425,8 +425,8 @@ export const CollectionTable = React.forwardRef<
               sale.totalReceived > 0 && sale.pendingValue > 0
                 ? "parcial"
                 : sale.pendingValue <= 0.01 && sale.totalReceived > 0
-                ? "pago"
-                : "pendente";
+                  ? "pago"
+                  : "pendente";
             return status === targetStatus;
           }),
         );

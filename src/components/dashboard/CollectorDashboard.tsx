@@ -709,7 +709,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
     // Count unique clients with pending sales (this includes partial and fully pending)
     const clientsWithPending = new Set(
-      salesArray.filter((s) => s.isPending).map((s) => s.clientDocument).filter(Boolean),
+      salesArray
+        .filter((s) => s.isPending)
+        .map((s) => s.clientDocument)
+        .filter(Boolean),
     ).size;
 
     // Calcular métricas de visitas
