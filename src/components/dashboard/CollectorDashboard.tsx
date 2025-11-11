@@ -500,8 +500,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
       <div className="pt-2 border-t border-gray-100 dark:border-dark-border transition-colors duration-300">
         <div className="text-xs text-gray-500 dark:text-dark-text-secondary transition-colors duration-300">
-          {stats.visitStats.scheduled + stats.visitStats.completed} visitas no
-          total
+          {stats.visitStats.scheduled +
+            stats.visitStats.completed +
+            stats.visitStats.rescheduled}{" "}
+          visitas no total
         </div>
       </div>
     </div>
