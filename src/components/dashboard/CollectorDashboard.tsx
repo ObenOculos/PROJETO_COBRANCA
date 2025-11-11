@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Target,
   Clock,
@@ -23,7 +23,7 @@ import {
   Settings,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
-import { CollectionTable } from "./CollectionTable";
+import { CollectionTable, CollectionTableRef } from "./CollectionTable";
 import RouteMap from "./RouteMap";
 import VisitScheduler from "./VisitScheduler";
 import RadialApprovalChart from "./RadialApprovalChart";
@@ -104,6 +104,7 @@ const Card: React.FC<CardProps> = ({
 
 const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   activeTab: externalActiveTab,
+  onTabChange,
 }) => {
   const { user } = useAuth();
   const {
@@ -114,6 +115,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     salePayments,
     monthlyGoals,
   } = useCollection();
+  const collectionTableRef = useRef<CollectionTableRef>(null);
 
   // Usa a aba externa se fornecida, senão gerencia internamente
   const internalActiveTab: "overview" | "collections" | "route" | "visits" =
@@ -480,13 +482,21 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       ? sortedCities
       : sortedCities.slice(0, 4);
 
+    const handleCityClick = (city: string) => {
+      collectionTableRef.current?.filterByCity(city);
+      if (onTabChange) {
+        onTabChange("collections");
+      }
+    };
+
     return (
       <>
         <div className="grid grid-cols-2 gap-2 text-sm">
           {visibleCities.map(([city, count]) => (
-            <div
+            <button
               key={city}
-              className="bg-gray-50 dark:bg-dark-bg-secondary p-2 rounded-lg text-center border border-gray-200 dark:border-dark-border"
+              onClick={() => handleCityClick(city)}
+              className="bg-gray-50 dark:bg-dark-bg-secondary p-2 rounded-lg text-center border border-gray-200 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors"
             >
               <div className="font-bold text-gray-800 dark:text-dark-text">
                 {count}
@@ -494,7 +504,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
               <div className="text-gray-600 dark:text-dark-text-secondary">
                 {city}
               </div>
-            </div>
+            </button>
           ))}
         </div>
         {sortedCities.length > 10 && (
@@ -1120,6 +1130,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
               />
             )}
             <CollectionTable
+              ref={collectionTableRef}
               collections={filteredCollections}
               userType="collector"
               showGrouped={true}
