@@ -5,6 +5,7 @@ import {
   Clock,
   MapPin,
   DollarSign,
+  MessageSquare,
   AlertTriangle,
   CheckCircle,
   X,
@@ -2094,8 +2095,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 </div>
                               )}
                               {visit.notes && (
-                                <div className="text-gray-500 italic whitespace-pre-line">
-                                  {visit.notes}
+                                <div className="bg-white border border-gray-200 rounded-2xl p-3 mb-3">
+                                  <div className="flex items-start">
+                                    <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                      <div className="text-sm font-medium text-gray-700 mb-1">
+                                        Observações da visita:
+                                      </div>
+                                      <div className="text-sm text-gray-600 italic whitespace-pre-line">
+                                        {visit.notes}
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
                               )}
                             </div>
