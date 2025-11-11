@@ -391,6 +391,18 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         </span>
       </div>
 
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-1">
+          <Users className="w-3 h-3 text-blue-500" />
+          <span className="text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+            Total de Clientes
+          </span>
+        </div>
+        <span className="font-medium text-blue-600 dark:text-blue-400 transition-colors duration-300">
+          {stats.clients}
+        </span>
+      </div>
+
       <div className="pt-2 border-t border-gray-100 dark:border-dark-border transition-colors duration-300">
         <div className="text-xs text-gray-500 dark:text-dark-text-secondary transition-colors duration-300">
           {stats.pending} vendas pendentes
@@ -410,6 +422,18 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         </div>
         <span className="font-medium text-green-600 dark:text-green-400 transition-colors duration-300">
           {stats.completed}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-1">
+          <AlertCircle className="w-3 h-3 text-yellow-500" />
+          <span className="text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+            Parciais
+          </span>
+        </div>
+        <span className="font-medium text-yellow-600 dark:text-yellow-400 transition-colors duration-300">
+          {stats.partial}
         </span>
       </div>
 
@@ -462,6 +486,18 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         </span>
       </div>
 
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-1">
+          <Calendar className="w-3 h-3 text-blue-500" />
+          <span className="text-gray-600 dark:text-dark-text-secondary transition-colors duration-300">
+            Agendadas
+          </span>
+        </div>
+        <span className="font-medium text-blue-600 dark:text-blue-400 transition-colors duration-300">
+          {stats.visitStats.scheduled}
+        </span>
+      </div>
+
       <div className="pt-2 border-t border-gray-100 dark:border-dark-border transition-colors duration-300">
         <div className="text-xs text-gray-500 dark:text-dark-text-secondary transition-colors duration-300">
           {stats.visitStats.scheduled + stats.visitStats.completed} visitas no
@@ -483,7 +519,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       : sortedCities.slice(0, 4);
 
     const handleCityClick = (city: string) => {
-      collectionTableRef.current?.filterByCity(city);
+      setFilters((prevFilters) => ({ ...prevFilters, city: city }));
       if (onTabChange) {
         onTabChange("collections");
       }
@@ -554,7 +590,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             </div>
           ))}
         </div>
-        {sortedSchedules.length > 10 && (
+        {sortedSchedules.length > 4 && (
           <div className="mt-4 text-center">
             <button
               onClick={() => setShowAllSchedules(!showAllSchedules)}
@@ -661,12 +697,17 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
   const stats = useMemo(() => {
     const salesArray = Array.from(salesMap.values());
-    const pendingSales = salesArray.filter((s) => s.isPending);
     const completedSales = salesArray.filter((s) => !s.isPending);
+    const partialSales = salesArray.filter(
+      (s) => s.isPending && s.receivedValue > 0,
+    );
+    const fullyPendingSales = salesArray.filter(
+      (s) => s.isPending && s.receivedValue <= 0,
+    );
 
-    // Count unique clients with pending sales
+    // Count unique clients with pending sales (this includes partial and fully pending)
     const clientsWithPending = new Set(
-      pendingSales.map((s) => s.clientDocument).filter(Boolean),
+      salesArray.filter((s) => s.isPending).map((s) => s.clientDocument).filter(Boolean),
     ).size;
 
     // Calcular métricas de visitas
@@ -686,12 +727,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       }).length,
       scheduled: myVisits.filter((v) => v.status === "agendada").length,
       completed: myVisits.filter((v) => v.status === "realizada").length,
+      rescheduled: myVisits.filter((v) => v.status === "reagendada").length,
     };
 
     return {
       total: salesMap.size,
       clients: clientGroups.length,
-      pending: pendingSales.length,
+      pending: fullyPendingSales.length,
+      partial: partialSales.length,
       completed: completedSales.length,
       clientsWithPending: clientsWithPending,
       visits: visitStats.scheduled,

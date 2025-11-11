@@ -45,8 +45,6 @@ interface CollectionTableProps {
 
 export interface CollectionTableRef {
   openSaleDetails: (saleNumber: number, clientDocument: string) => void;
-  filterByCity: (city: string) => void;
-  clearCityFilter: () => void;
 }
 
 export const CollectionTable = React.forwardRef<
@@ -73,7 +71,6 @@ export const CollectionTable = React.forwardRef<
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isClientModalOpen, setIsClientModalOpen] = useState(false);
     const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
-    const [cityFilter, setCityFilter] = useState<string | null>(null);
 
     // State for delete confirmation modal
     const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -107,13 +104,6 @@ export const CollectionTable = React.forwardRef<
             }
           }
         }
-      },
-      filterByCity: (city: string) => {
-        setCityFilter(city);
-        setCurrentPage(1); // Reset to first page on new filter
-      },
-      clearCityFilter: () => {
-        setCityFilter(null);
       },
     }));
 
@@ -377,12 +367,8 @@ export const CollectionTable = React.forwardRef<
         );
       });
 
-      if (cityFilter) {
-        groups = groups.filter((group) => group.city === cityFilter);
-      }
-
       return groups;
-    }, [showGrouped, clientGroups, collections, cityFilter]);
+    }, [showGrouped, clientGroups, collections]);
 
     // Paginação para grupos de clientes
     const paginatedClientGroups = useMemo(() => {
@@ -428,12 +414,6 @@ export const CollectionTable = React.forwardRef<
 
       // Early return if no filtering or sorting needed
       let filteredGroups = [...clientGroups];
-
-      if (cityFilter) {
-        filteredGroups = filteredGroups.filter(
-          (group) => group.city === cityFilter,
-        );
-      }
 
       // Optimize status filtering
       if (userType === "collector" && statusFilter) {
@@ -495,7 +475,6 @@ export const CollectionTable = React.forwardRef<
       statusFilter,
       sortField,
       sortDirection,
-      cityFilter,
     ]);
 
     // Paginação para sales agrupadas por cliente
@@ -544,20 +523,6 @@ export const CollectionTable = React.forwardRef<
                         {filteredClientGroups.length !== 1 ? "s" : ""} com
                         cobranças
                       </p>
-                      {cityFilter && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            <MapPin className="h-3 w-3 mr-1.5" />
-                            {cityFilter}
-                          </span>
-                          <button
-                            onClick={() => setCityFilter(null)}
-                            className="text-xs text-red-500 hover:text-red-700"
-                          >
-                            Limpar
-                          </button>
-                        </div>
-                      )}
                     </div>
 
                     {/* Botão de Filtro para Cobrador */}
