@@ -155,18 +155,18 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
 
   return (
     <div
-      id="teste_teste"
-      className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+      className="!mt-0 fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm grid place-items-center z-50"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
         }
       }}
     >
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-auto transform transition-all duration-300 ease-in-out animate-in slide-in-from-bottom-4 max-h-[90vh] overflow-y-auto">
-        <form onSubmit={handleSubmit}>
-          <div className="flex justify-between items-center p-6 border-b border-gray-200">
-            <div>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-auto transform transition-all duration-300 ease-in-out max-h-[90vh] flex flex-col">
+        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+          {/* Static Header */}
+          <div className="relative flex-shrink-0 p-6 border-b border-gray-200">
+            <div className="text-center">
               <h3 className="text-2xl font-bold text-gray-800">
                 Editar Metas Mensais
               </h3>
@@ -177,22 +177,22 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
               aria-label="Fechar"
             >
               <X className="w-6 h-6" />
             </button>
           </div>
 
-          {/* Content */}
-          <div className="p-6 space-y-6">
+          {/* Scrollable Content */}
+          <div className="flex-grow overflow-y-auto custom-scrollbar p-6 space-y-6">
             {/* Período */}
             <div>
               <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-blue-500" />
                 Período
               </h4>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label
                     htmlFor="month"
@@ -292,8 +292,8 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="bg-gray-50 px-8 py-6 rounded-b-3xl border-t border-gray-100">
+          {/* Static Footer */}          
+          <div className="relative flex-shrink-0 bg-gray-50 px-8 py-6 border-t border-gray-100 rounded-b-3xl">
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"

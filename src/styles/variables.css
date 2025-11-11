@@ -110,7 +110,7 @@
   /* ===== SCROLLBAR ===== */
   --scrollbar-width: 8px;
   --scrollbar-height: 8px;
-  --scrollbar-track-bg: #f1f5f9;
+  --scrollbar-track-bg: transparent;
   --scrollbar-thumb-bg: #cbd5e1;
   --scrollbar-thumb-hover-bg: #94a3b8;
   --scrollbar-border-radius: 4px;
@@ -161,11 +161,20 @@
 *::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb-bg);
   border-radius: var(--scrollbar-border-radius);
-  border: 2px solid var(--scrollbar-track-bg);
+  border: none;
 }
 
 *::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover-bg);
+}
+
+*::-webkit-scrollbar-button:start:decrement,
+*::-webkit-scrollbar-button:end:increment {
+  display: none;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Scrollbar para elementos específicos com cores personalizadas */
