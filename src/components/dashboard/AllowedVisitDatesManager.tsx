@@ -88,22 +88,14 @@ const AllowedVisitDatesManager: React.FC = () => {
       }
     };
 
-    if (
-      dropdownsOpen.city ||
-      dropdownsOpen.day ||
-      modals.calendar
-    ) {
+    if (dropdownsOpen.city || dropdownsOpen.day || modals.calendar) {
       document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [
-    dropdownsOpen.city,
-    dropdownsOpen.day,
-    modals.calendar,
-  ]);
+  }, [dropdownsOpen.city, dropdownsOpen.day, modals.calendar]);
 
   // Gerenciar scroll da página quando modal abre/fecha
   useEffect(() => {
@@ -146,7 +138,7 @@ const AllowedVisitDatesManager: React.FC = () => {
           .select("*")
           .order("city", { ascending: true })
           .order("allowed_date", { ascending: true });
-        
+
         if (error) {
           console.error("Erro ao buscar datas permitidas:", error);
           setError(error.message);
@@ -156,7 +148,9 @@ const AllowedVisitDatesManager: React.FC = () => {
       } catch (err) {
         console.error("Erro ao buscar datas permitidas:", err);
         const errorMessage =
-          err instanceof Error ? err.message : "Erro ao buscar datas permitidas";
+          err instanceof Error
+            ? err.message
+            : "Erro ao buscar datas permitidas";
         setError(errorMessage);
       }
       setLoading(false);
@@ -212,7 +206,6 @@ const AllowedVisitDatesManager: React.FC = () => {
     return cities.filter((city) => collectorCities.has(city));
   }, [filters.collector, cities, collections]);
 
-
   const handleToggleCity = (city: string) => {
     setFormSelection((prev) => {
       if (prev.cities.includes(city)) {
@@ -230,8 +223,6 @@ const AllowedVisitDatesManager: React.FC = () => {
       setFormSelection((prev) => ({ ...prev, cities: [...filteredCities] }));
     }
   };
-
-
 
   const handleToggleDay = (day: string) => {
     setFormSelection((prev) => {
@@ -306,13 +297,8 @@ const AllowedVisitDatesManager: React.FC = () => {
   };
 
   const handleAddAllowedDate = async () => {
-    if (
-      formSelection.cities.length === 0 ||
-      formSelection.days.length === 0
-    ) {
-      setError(
-        "Por favor, selecione ao menos uma cidade e um dia do mês.",
-      );
+    if (formSelection.cities.length === 0 || formSelection.days.length === 0) {
+      setError("Por favor, selecione ao menos uma cidade e um dia do mês.");
       return;
     }
 
@@ -356,10 +342,8 @@ const AllowedVisitDatesManager: React.FC = () => {
       }[] = [];
       const existingEntries = new Set(
         allowedDates
-          .filter(d => d.collector_id === filters.collector) // Filtrar por cobrador
-          .map(
-            (d) => `${d.city}|${d.allowed_date}`,
-          ),
+          .filter((d) => d.collector_id === filters.collector) // Filtrar por cobrador
+          .map((d) => `${d.city}|${d.allowed_date}`),
       );
       const newEntries = new Set<string>();
 
@@ -367,11 +351,7 @@ const AllowedVisitDatesManager: React.FC = () => {
         const key = `${item.city}|${item.allowed_date}`;
         if (existingEntries.has(key)) {
           // Conflict with existing DB data
-          if (
-            !conflicts.find(
-              (c) => `${c.city}|${c.allowed_date}` === key,
-            )
-          ) {
+          if (!conflicts.find((c) => `${c.city}|${c.allowed_date}` === key)) {
             conflicts.push(item);
           }
         } else if (!newEntries.has(key)) {
@@ -478,7 +458,11 @@ const AllowedVisitDatesManager: React.FC = () => {
       } else {
         setAllowedDates(
           allowedDates.filter(
-            (d) => !(d.city === modals.cityToDelete && d.collector_id === filters.collector),
+            (d) =>
+              !(
+                d.city === modals.cityToDelete &&
+                d.collector_id === filters.collector
+              ),
           ),
         );
         // Invalidar o cache
@@ -760,7 +744,10 @@ const AllowedVisitDatesManager: React.FC = () => {
                 onClick={() =>
                   setDropdownsOpen((prev) => ({ ...prev, day: !prev.day }))
                 }
-                disabled={filters.collector === "all" || formSelection.cities.length === 0}
+                disabled={
+                  filters.collector === "all" ||
+                  formSelection.cities.length === 0
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed bg-white text-left transition-colors appearance-none cursor-pointer text-gray-900 text-sm"
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
@@ -779,39 +766,41 @@ const AllowedVisitDatesManager: React.FC = () => {
                 </span>
               </button>
 
-              {dropdownsOpen.day && filters.collector !== "all" && formSelection.cities.length > 0 && (
-                <div className="absolute z-10 w-80 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
-                  <div className="sticky top-0 bg-white border-b border-gray-200 p-2 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={handleToggleAllDays}
-                      className="px-3 py-1 text-xs font-medium rounded-md transition-colors w-full text-blue-600 bg-blue-50 hover:bg-blue-100"
-                    >
-                      {isAllDaysSelected
-                        ? "Limpar Seleção"
-                        : "Selecionar Todos os 31 Dias"}
-                    </button>
-                  </div>
-                  <div className="p-3 grid grid-cols-7 gap-1">
-                    {Array.from({ length: 31 }, (_, i) =>
-                      (i + 1).toString(),
-                    ).map((day) => (
+              {dropdownsOpen.day &&
+                filters.collector !== "all" &&
+                formSelection.cities.length > 0 && (
+                  <div className="absolute z-10 w-80 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                    <div className="sticky top-0 bg-white border-b border-gray-200 p-2 flex justify-center">
                       <button
-                        key={day}
                         type="button"
-                        onClick={() => handleToggleDay(day)}
-                        className={`w-9 h-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                          formSelection.days.includes(day)
-                            ? "bg-blue-600 text-white hover:bg-blue-700"
-                            : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                        }`}
+                        onClick={handleToggleAllDays}
+                        className="px-3 py-1 text-xs font-medium rounded-md transition-colors w-full text-blue-600 bg-blue-50 hover:bg-blue-100"
                       >
-                        {day}
+                        {isAllDaysSelected
+                          ? "Limpar Seleção"
+                          : "Selecionar Todos os 31 Dias"}
                       </button>
-                    ))}
+                    </div>
+                    <div className="p-3 grid grid-cols-7 gap-1">
+                      {Array.from({ length: 31 }, (_, i) =>
+                        (i + 1).toString(),
+                      ).map((day) => (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => handleToggleDay(day)}
+                          className={`w-9 h-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                            formSelection.days.includes(day)
+                              ? "bg-blue-600 text-white hover:bg-blue-700"
+                              : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
           </div>
           <div className="md:col-span-1">
@@ -950,10 +939,12 @@ const AllowedVisitDatesManager: React.FC = () => {
                               <tbody className="bg-white divide-y divide-gray-200">
                                 <tr className="hover:bg-gray-50">
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    Dias {dates
+                                    Dias{" "}
+                                    {dates
                                       .map((d) => d.allowed_date)
                                       .sort((a, b) => a - b)
-                                      .join(", ")} de cada mês
+                                      .join(", ")}{" "}
+                                    de cada mês
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                                     <button

@@ -137,7 +137,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
   // Estados para Modal de Conflitos de Visitas
   const [showConflictModal, setShowConflictModal] = useState(false);
-  const [conflictData, setConflictData] = useState<Array<{clientName: string; date: string}>>([]);
+  const [conflictData, setConflictData] = useState<
+    Array<{ clientName: string; date: string }>
+  >([]);
   const [filters, setFilters] = useState({
     city: [] as string[],
     neighborhood: [] as string[],
@@ -847,8 +849,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   );
 
   // Validação: Detectar conflitos de visitas (mesmo cliente, mesma data)
-  const checkVisitConflicts = (): { hasConflicts: boolean; conflicts: Array<{clientName: string; date: string}> } => {
-    const conflicts: Array<{clientName: string; date: string}> = [];
+  const checkVisitConflicts = (): {
+    hasConflicts: boolean;
+    conflicts: Array<{ clientName: string; date: string }>;
+  } => {
+    const conflicts: Array<{ clientName: string; date: string }> = [];
     const selectedClientsData = getSelectedClientsData();
 
     for (const client of selectedClientsData) {
@@ -860,7 +865,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         (visit) =>
           visit.clientDocument === client.document &&
           visit.scheduledDate === visitDate &&
-          (visit.status === "agendada" || visit.status === "cancelamento_solicitado")
+          (visit.status === "agendada" ||
+            visit.status === "cancelamento_solicitado"),
       );
 
       if (existingVisits.length > 0) {
@@ -890,7 +896,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     // Criar a data e verificar se o dia retornado é o mesmo que foi solicitado
     // Isso detecta datas inválidas como 31 de fevereiro
     const date = new Date(year, month - 1, day);
-    return date.getDate() === day && date.getMonth() === month - 1 && date.getFullYear() === year;
+    return (
+      date.getDate() === day &&
+      date.getMonth() === month - 1 &&
+      date.getFullYear() === year
+    );
   };
 
   // Função auxiliar para processar agendamento com conflito já confirmado
@@ -1004,22 +1014,23 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           }
         } catch (error) {
           console.error(`Erro ao agendar visita para ${client.client}:`, error);
-          
+
           // ========== TRATAMENTO DE ERRO MELHORADO ==========
           let errorMessage = `Erro ao agendar visita para ${client.client}`;
-          
+
           if (error instanceof Error) {
             if (error.message.includes("network")) {
               errorMessage += ": Problema de conexão. Verifique sua internet.";
             } else if (error.message.includes("unauthorized")) {
               errorMessage += ": Você não tem permissão para agendar visitas.";
             } else if (error.message.includes("conflict")) {
-              errorMessage += ": Conflito detectado. Esta visita pode já estar agendada.";
+              errorMessage +=
+                ": Conflito detectado. Esta visita pode já estar agendada.";
             } else {
               errorMessage += `: ${error.message}`;
             }
           }
-          
+
           triggerNotification(errorMessage, "error");
           errorCount++;
         }
@@ -1053,7 +1064,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       }
     } catch (error) {
       console.error("Erro crítico ao agendar visitas:", error);
-      
+
       let errorMessage = "❌ Erro ao agendar visitas";
       if (error instanceof Error) {
         errorMessage += `: ${error.message}`;
@@ -3973,13 +3984,15 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                           {/* Sugestões de datas permitidas */}
                           {(() => {
                             const suggestedDates = new Map<string, number>(); // date -> count
-                            const selectedClientsData = getSelectedClientsData();
+                            const selectedClientsData =
+                              getSelectedClientsData();
 
                             // Coletar TODAS as datas permitidas configuradas para os clientes
                             selectedClientsData.forEach((client) => {
-                              const clientAllowedDates = allowedVisitDates.filter(
-                                (d) => d.city === client.city
-                              );
+                              const clientAllowedDates =
+                                allowedVisitDates.filter(
+                                  (d) => d.city === client.city,
+                                );
 
                               clientAllowedDates.forEach((config) => {
                                 // Calcular as próximas 3 ocorrências do dia permitido
@@ -3993,7 +4006,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   const date = new Date(
                                     currentYear,
                                     currentMonth,
-                                    config.allowed_date
+                                    config.allowed_date,
                                   );
                                   if (date.getDate() === config.allowed_date) {
                                     const dateStr = date
@@ -4001,7 +4014,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                       .split("T")[0];
                                     suggestedDates.set(
                                       dateStr,
-                                      (suggestedDates.get(dateStr) || 0) + 1
+                                      (suggestedDates.get(dateStr) || 0) + 1,
                                     );
                                   }
                                 }
@@ -4010,7 +4023,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 const nextMonthDate = new Date(
                                   currentYear,
                                   currentMonth + 1,
-                                  config.allowed_date
+                                  config.allowed_date,
                                 );
                                 if (
                                   nextMonthDate.getDate() ===
@@ -4021,7 +4034,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                     .split("T")[0];
                                   suggestedDates.set(
                                     dateStr,
-                                    (suggestedDates.get(dateStr) || 0) + 1
+                                    (suggestedDates.get(dateStr) || 0) + 1,
                                   );
                                 }
 
@@ -4029,7 +4042,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 const nextNextMonthDate = new Date(
                                   currentYear,
                                   currentMonth + 2,
-                                  config.allowed_date
+                                  config.allowed_date,
                                 );
                                 if (
                                   nextNextMonthDate.getDate() ===
@@ -4040,17 +4053,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                     .split("T")[0];
                                   suggestedDates.set(
                                     dateStr,
-                                    (suggestedDates.get(dateStr) || 0) + 1
+                                    (suggestedDates.get(dateStr) || 0) + 1,
                                   );
                                 }
                               });
                             });
 
                             if (suggestedDates.size > 0) {
-                              const sortedDates = Array.from(suggestedDates)
-                                .sort(([dateA], [dateB]) =>
-                                  dateA.localeCompare(dateB)
-                                );
+                              const sortedDates = Array.from(
+                                suggestedDates,
+                              ).sort(([dateA], [dateB]) =>
+                                dateA.localeCompare(dateB),
+                              );
 
                               return (
                                 <div className="mt-3 pt-3 border-t border-gray-300">
@@ -4066,7 +4080,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                       const dateObj = new Date(
                                         year,
                                         month - 1,
-                                        day
+                                        day,
                                       );
                                       const isSunday = dateObj.getDay() === 0;
 
@@ -4094,11 +4108,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                             </span>
                                           )}
                                           {count > 1 && (
-                                            <span className={`ml-1 inline-flex items-center justify-center w-5 h-5 text-[10px] sm:text-xs rounded-full ${
-                                              isSunday
-                                                ? "bg-yellow-300 text-yellow-900"
-                                                : "bg-blue-200 text-blue-700"
-                                            }`}>
+                                            <span
+                                              className={`ml-1 inline-flex items-center justify-center w-5 h-5 text-[10px] sm:text-xs rounded-full ${
+                                                isSunday
+                                                  ? "bg-yellow-300 text-yellow-900"
+                                                  : "bg-blue-200 text-blue-700"
+                                              }`}
+                                            >
                                               {count}
                                             </span>
                                           )}

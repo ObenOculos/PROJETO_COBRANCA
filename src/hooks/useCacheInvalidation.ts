@@ -68,7 +68,9 @@ export function useRealtimeCacheInvalidation() {
   }, []);
 
   const invalidateAllowedVisitDates = useCallback(() => {
-    console.log("Invalidating allowed visit dates cache due to real-time update");
+    console.log(
+      "Invalidating allowed visit dates cache due to real-time update",
+    );
     dataCache.invalidatePrefix("allowed-visit-dates");
   }, []);
 
