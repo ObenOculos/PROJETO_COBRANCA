@@ -8,6 +8,7 @@ import {
   ChevronRight,
   X,
 } from "lucide-react";
+import { dataCache } from "../../utils/cache";
 
 const AllowedVisitDatesManager: React.FC = () => {
   const { collections, users } = useCollection();
@@ -19,14 +20,12 @@ const AllowedVisitDatesManager: React.FC = () => {
   // Estados de seleção do formulário (consolidados)
   const [formSelection, setFormSelection] = useState({
     cities: [] as string[],
-    neighborhoods: [] as string[],
     days: [] as string[],
   });
 
   // Estados de UI dos dropdowns (consolidados)
   const [dropdownsOpen, setDropdownsOpen] = useState({
     city: false,
-    neighborhood: false,
     day: false,
   });
 
@@ -34,7 +33,6 @@ const AllowedVisitDatesManager: React.FC = () => {
   const [filters, setFilters] = useState({
     collector: "all" as string,
     calendarCity: "all" as string,
-    calendarNeighborhood: "all" as string,
     calendarCollector: "all" as string,
   });
 
@@ -54,7 +52,6 @@ const AllowedVisitDatesManager: React.FC = () => {
 
   // Refs
   const cityDropdownRef = useRef<HTMLDivElement>(null);
-  const neighborhoodDropdownRef = useRef<HTMLDivElement>(null);
   const dayDropdownRef = useRef<HTMLDivElement>(null);
   const calendarModalRef = useRef<HTMLDivElement>(null);
 
@@ -66,12 +63,6 @@ const AllowedVisitDatesManager: React.FC = () => {
         !cityDropdownRef.current.contains(event.target as Node)
       ) {
         setDropdownsOpen((prev) => ({ ...prev, city: false }));
-      }
-      if (
-        neighborhoodDropdownRef.current &&
-        !neighborhoodDropdownRef.current.contains(event.target as Node)
-      ) {
-        setDropdownsOpen((prev) => ({ ...prev, neighborhood: false }));
       }
       if (
         dayDropdownRef.current &&
@@ -92,7 +83,6 @@ const AllowedVisitDatesManager: React.FC = () => {
         setFilters((prev) => ({
           ...prev,
           calendarCity: "all",
-          calendarNeighborhood: "all",
           calendarCollector: "all",
         }));
       }
@@ -100,7 +90,6 @@ const AllowedVisitDatesManager: React.FC = () => {
 
     if (
       dropdownsOpen.city ||
-      dropdownsOpen.neighborhood ||
       dropdownsOpen.day ||
       modals.calendar
     ) {
@@ -112,7 +101,6 @@ const AllowedVisitDatesManager: React.FC = () => {
     };
   }, [
     dropdownsOpen.city,
-    dropdownsOpen.neighborhood,
     dropdownsOpen.day,
     modals.calendar,
   ]);
@@ -134,12 +122,10 @@ const AllowedVisitDatesManager: React.FC = () => {
   useEffect(() => {
     setFormSelection((prev) => ({
       ...prev,
-      neighborhoods: [],
       days: [],
     }));
     setDropdownsOpen((prev) => ({
       ...prev,
-      neighborhood: false,
       day: false,
     }));
     setCurrentPage(1);
@@ -153,13 +139,25 @@ const AllowedVisitDatesManager: React.FC = () => {
   useEffect(() => {
     const fetchAllowedDates = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("allowed_visit_dates")
-        .select("*");
-      if (error) {
-        setError(error.message);
-      } else {
-        setAllowedDates(data || []);
+      setError(null);
+      try {
+        const { data, error } = await supabase
+          .from("allowed_visit_dates")
+          .select("*")
+          .order("city", { ascending: true })
+          .order("allowed_date", { ascending: true });
+        
+        if (error) {
+          console.error("Erro ao buscar datas permitidas:", error);
+          setError(error.message);
+        } else {
+          setAllowedDates(data || []);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar datas permitidas:", err);
+        const errorMessage =
+          err instanceof Error ? err.message : "Erro ao buscar datas permitidas";
+        setError(errorMessage);
       }
       setLoading(false);
     };
@@ -214,28 +212,6 @@ const AllowedVisitDatesManager: React.FC = () => {
     return cities.filter((city) => collectorCities.has(city));
   }, [filters.collector, cities, collections]);
 
-  const filteredNeighborhoods = useMemo(() => {
-    if (formSelection.cities.length > 0) {
-      let filteredCollections = collections.filter(
-        (c) => c.cidade && formSelection.cities.includes(c.cidade),
-      );
-
-      // Aplicar filtro de cobrador se selecionado
-      if (filters.collector !== "all") {
-        filteredCollections = filteredCollections.filter(
-          (c) => c.user_id === filters.collector,
-        );
-      }
-
-      const neighborhoods = [
-        ...new Set(filteredCollections.map((c) => c.bairro).filter(Boolean)),
-      ] as string[];
-      // Ordenar bairros em ordem alfabética
-      neighborhoods.sort((a, b) => a.localeCompare(b, "pt-BR"));
-      return neighborhoods;
-    }
-    return [];
-  }, [formSelection.cities, collections, filters.collector]);
 
   const handleToggleCity = (city: string) => {
     setFormSelection((prev) => {
@@ -255,32 +231,7 @@ const AllowedVisitDatesManager: React.FC = () => {
     }
   };
 
-  const handleToggleNeighborhood = (neighborhood: string) => {
-    setFormSelection((prev) => {
-      if (prev.neighborhoods.includes(neighborhood)) {
-        return {
-          ...prev,
-          neighborhoods: prev.neighborhoods.filter((n) => n !== neighborhood),
-        };
-      } else {
-        return {
-          ...prev,
-          neighborhoods: [...prev.neighborhoods, neighborhood],
-        };
-      }
-    });
-  };
 
-  const handleToggleAllNeighborhoods = () => {
-    if (formSelection.neighborhoods.length === filteredNeighborhoods.length) {
-      setFormSelection((prev) => ({ ...prev, neighborhoods: [] }));
-    } else {
-      setFormSelection((prev) => ({
-        ...prev,
-        neighborhoods: [...filteredNeighborhoods],
-      }));
-    }
-  };
 
   const handleToggleDay = (day: string) => {
     setFormSelection((prev) => {
@@ -304,9 +255,6 @@ const AllowedVisitDatesManager: React.FC = () => {
   const isAllCitiesSelected =
     formSelection.cities.length === filteredCities.length &&
     filteredCities.length > 0;
-  const isAllNeighborhoodsSelected =
-    formSelection.neighborhoods.length === filteredNeighborhoods.length &&
-    filteredNeighborhoods.length > 0;
   const isAllDaysSelected = formSelection.days.length === 31;
 
   // Filtrar datas permitidas baseado no cobrador selecionado
@@ -339,8 +287,6 @@ const AllowedVisitDatesManager: React.FC = () => {
     // Ordenar as datas dentro de cada grupo
     groups.forEach((dates) => {
       dates.sort((a, b) => {
-        if (a.neighborhood !== b.neighborhood)
-          return a.neighborhood.localeCompare(b.neighborhood);
         return Number(a.allowed_date) - Number(b.allowed_date);
       });
     });
@@ -362,11 +308,18 @@ const AllowedVisitDatesManager: React.FC = () => {
   const handleAddAllowedDate = async () => {
     if (
       formSelection.cities.length === 0 ||
-      formSelection.neighborhoods.length === 0 ||
       formSelection.days.length === 0
     ) {
       setError(
-        "Por favor, selecione ao menos uma cidade, um bairro e um dia do mês.",
+        "Por favor, selecione ao menos uma cidade e um dia do mês.",
+      );
+      return;
+    }
+
+    // Validar se um cobrador foi selecionado
+    if (filters.collector === "all") {
+      setError(
+        "Por favor, selecione um cobrador antes de adicionar as datas permitidas.",
       );
       return;
     }
@@ -375,15 +328,13 @@ const AllowedVisitDatesManager: React.FC = () => {
     setError(null);
 
     try {
-      // Create potential insert data for all combinations
+      // Create potential insert data for all combinations com collector_id
       const insertData = formSelection.cities.flatMap((city) =>
-        formSelection.neighborhoods.flatMap((neighborhood) =>
-          formSelection.days.map((day) => ({
-            city: city,
-            neighborhood: neighborhood,
-            allowed_date: parseInt(day),
-          })),
-        ),
+        formSelection.days.map((day) => ({
+          city: city,
+          allowed_date: parseInt(day),
+          collector_id: filters.collector, // Adicionar collector_id
+        })),
       );
 
       // Validação apenas para garantir que há dados para inserir
@@ -393,31 +344,32 @@ const AllowedVisitDatesManager: React.FC = () => {
         return;
       }
 
-      // --- Correct Pre-insertion validation ---
+      // --- Pre-insertion validation ---
       const conflicts: {
         city: string;
-        neighborhood: string;
         allowed_date: number;
       }[] = [];
       const uniqueNewData: {
         city: string;
-        neighborhood: string;
         allowed_date: number;
+        collector_id: string;
       }[] = [];
       const existingEntries = new Set(
-        allowedDates.map(
-          (d) => `${d.city}|${d.neighborhood}|${d.allowed_date}`,
-        ),
+        allowedDates
+          .filter(d => d.collector_id === filters.collector) // Filtrar por cobrador
+          .map(
+            (d) => `${d.city}|${d.allowed_date}`,
+          ),
       );
       const newEntries = new Set<string>();
 
       for (const item of insertData) {
-        const key = `${item.city}|${item.neighborhood}|${item.allowed_date}`;
+        const key = `${item.city}|${item.allowed_date}`;
         if (existingEntries.has(key)) {
           // Conflict with existing DB data
           if (
             !conflicts.find(
-              (c) => `${c.city}|${c.neighborhood}|${c.allowed_date}` === key,
+              (c) => `${c.city}|${c.allowed_date}` === key,
             )
           ) {
             conflicts.push(item);
@@ -431,7 +383,7 @@ const AllowedVisitDatesManager: React.FC = () => {
 
       if (conflicts.length > 0) {
         const errorMessage = conflicts
-          .map((c) => `${c.city} / ${c.neighborhood} / Dia ${c.allowed_date}`)
+          .map((c) => `${c.city} / Dia ${c.allowed_date}`)
           .join(", ");
         setError(
           `Não é possível adicionar. As seguintes configurações já existem: ${errorMessage}`,
@@ -457,15 +409,15 @@ const AllowedVisitDatesManager: React.FC = () => {
         setError(error.message);
       } else if (data) {
         setAllowedDates([...allowedDates, ...data]);
+        // Invalidar o cache para forçar refresh em outras partes da aplicação
+        dataCache.invalidatePrefix("allowed-visit-dates");
         // Limpar seleção após adicionar
         setFormSelection({
           cities: [],
-          neighborhoods: [],
           days: [],
         });
         setDropdownsOpen({
           city: false,
-          neighborhood: false,
           day: false,
         });
       }
@@ -493,6 +445,8 @@ const AllowedVisitDatesManager: React.FC = () => {
       setError(error.message);
     } else {
       setAllowedDates(allowedDates.filter((d) => !ids.includes(d.id)));
+      // Invalidar o cache
+      dataCache.invalidatePrefix("allowed-visit-dates");
     }
 
     setLoading(false);
@@ -516,14 +470,19 @@ const AllowedVisitDatesManager: React.FC = () => {
       const { error } = await supabase
         .from("allowed_visit_dates")
         .delete()
-        .eq("city", modals.cityToDelete);
+        .eq("city", modals.cityToDelete)
+        .eq("collector_id", filters.collector); // Filtrar por cobrador
 
       if (error) {
         setError(error.message);
       } else {
         setAllowedDates(
-          allowedDates.filter((d) => d.city !== modals.cityToDelete),
+          allowedDates.filter(
+            (d) => !(d.city === modals.cityToDelete && d.collector_id === filters.collector),
+          ),
         );
+        // Invalidar o cache
+        dataCache.invalidatePrefix("allowed-visit-dates");
         // Fechar o accordion da cidade após deletar
         setExpandedCities((prev) => {
           const newSet = new Set(prev);
@@ -578,7 +537,6 @@ const AllowedVisitDatesManager: React.FC = () => {
     setFilters((prev) => ({
       ...prev,
       calendarCity: "all",
-      calendarNeighborhood: "all",
       calendarCollector: "all",
     }));
     setModals((prev) => ({ ...prev, calendar: true }));
@@ -589,7 +547,6 @@ const AllowedVisitDatesManager: React.FC = () => {
     setFilters((prev) => ({
       ...prev,
       calendarCity: "all",
-      calendarNeighborhood: "all",
       calendarCollector: "all",
     }));
   };
@@ -639,23 +596,10 @@ const AllowedVisitDatesManager: React.FC = () => {
     return cities.filter((city) => allRelevantCities.has(city));
   }, [filters.calendarCollector, cities, collections, allowedDates]);
 
-  // Bairros disponíveis para a cidade selecionada no filtro do calendário
-  const calendarNeighborhoods = useMemo(() => {
-    if (filters.calendarCity === "all") return [];
-
-    // Apenas bairros das datas permitidas para esta cidade
-    const neighborhoodsFromAllowedDates = [
-      ...new Set(
-        allowedDates
-          .filter((d) => d.city === filters.calendarCity)
-          .map((d) => d.neighborhood)
-          .filter(Boolean),
-      ),
-    ];
-
-    neighborhoodsFromAllowedDates.sort((a, b) => a.localeCompare(b, "pt-BR"));
-    return neighborhoodsFromAllowedDates;
-  }, [filters.calendarCity, allowedDates]);
+  // Bairros disponíveis para a cidade selecionada no filtro do calendário (REMOVIDO - não usamos mais neighborhoods)
+  // const calendarNeighborhoods = useMemo(() => {
+  //   return [];
+  // }, []);
 
   // Obter dias permitidos considerando os filtros
   const allowedDaysForCalendar = useMemo(() => {
@@ -665,32 +609,19 @@ const AllowedVisitDatesManager: React.FC = () => {
       filtered = filtered.filter((d) => d.city === filters.calendarCity);
     }
 
-    if (filters.calendarNeighborhood !== "all") {
-      filtered = filtered.filter(
-        (d) => d.neighborhood === filters.calendarNeighborhood,
-      );
-    }
-
-    // Criar um mapa: dia -> array de cidades/bairros
-    const daysMap = new Map<
-      number,
-      Array<{ city: string; neighborhood: string }>
-    >();
+    // Criar um mapa: dia -> array de cidades
+    const daysMap = new Map<number, Set<string>>();
 
     filtered.forEach((d) => {
       if (!daysMap.has(d.allowed_date)) {
-        daysMap.set(d.allowed_date, []);
+        daysMap.set(d.allowed_date, new Set());
       }
-      daysMap.get(d.allowed_date)!.push({
-        city: d.city,
-        neighborhood: d.neighborhood,
-      });
+      daysMap.get(d.allowed_date)!.add(d.city);
     });
 
     return daysMap;
   }, [
     filters.calendarCity,
-    filters.calendarNeighborhood,
     filters.calendarCollector,
     allowedDates,
     collections,
@@ -716,7 +647,7 @@ const AllowedVisitDatesManager: React.FC = () => {
       )}
 
       <div className="bg-gray-50 border border-gray-200 rounded-lg shadow-sm p-5 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div className="md:col-span-1">
             <label
               htmlFor="collector-filter"
@@ -812,84 +743,6 @@ const AllowedVisitDatesManager: React.FC = () => {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-          <div className="md:col-span-1">
-            <label
-              htmlFor="neighborhood-select"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Bairros
-            </label>
-            <div className="relative" ref={neighborhoodDropdownRef}>
-              <button
-                id="neighborhood-select"
-                type="button"
-                onClick={() =>
-                  setDropdownsOpen((prev) => ({
-                    ...prev,
-                    neighborhood: !prev.neighborhood,
-                  }))
-                }
-                disabled={formSelection.cities.length === 0}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed bg-white text-left transition-colors appearance-none cursor-pointer text-gray-900 text-sm"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                  backgroundPosition: "right 0.5rem center",
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: "1.5em 1.5em",
-                  paddingRight: "2.5rem",
-                }}
-              >
-                <span className="truncate block text-gray-900 text-sm">
-                  {formSelection.neighborhoods.length === 0
-                    ? "Selecione os bairros"
-                    : formSelection.neighborhoods.length === 1
-                      ? formSelection.neighborhoods[0]
-                      : `${formSelection.neighborhoods.length} bairros selecionados`}
-                </span>
-              </button>
-
-              {dropdownsOpen.neighborhood &&
-                formSelection.cities.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    <div className="sticky top-0 bg-gray-50 border-b border-gray-200 p-2">
-                      <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 rounded px-2 py-1">
-                        <input
-                          type="checkbox"
-                          checked={isAllNeighborhoodsSelected}
-                          onChange={handleToggleAllNeighborhoods}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">
-                          Selecionar Todos ({filteredNeighborhoods.length})
-                        </span>
-                      </label>
-                    </div>
-                    <div className="p-2 space-y-1">
-                      {filteredNeighborhoods.map((neighborhood) => (
-                        <label
-                          key={neighborhood}
-                          className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 rounded px-2 py-1"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formSelection.neighborhoods.includes(
-                              neighborhood,
-                            )}
-                            onChange={() =>
-                              handleToggleNeighborhood(neighborhood)
-                            }
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-700">
-                            {neighborhood}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
             </div>
           </div>
           <div className="md:col-span-1">
@@ -1086,10 +939,7 @@ const AllowedVisitDatesManager: React.FC = () => {
                               <thead className="bg-gray-50">
                                 <tr>
                                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Bairro
-                                  </th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Dia do Mês
+                                    Dias do Mês
                                   </th>
                                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Ações
@@ -1097,64 +947,27 @@ const AllowedVisitDatesManager: React.FC = () => {
                                 </tr>
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-200">
-                                {(() => {
-                                  const groupedByNeighborhood = dates.reduce(
-                                    (acc, date) => {
-                                      if (!acc[date.neighborhood]) {
-                                        acc[date.neighborhood] = {
-                                          dates: [],
-                                          ids: [],
-                                        };
+                                <tr className="hover:bg-gray-50">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    Dias {dates
+                                      .map((d) => d.allowed_date)
+                                      .sort((a, b) => a - b)
+                                      .join(", ")} de cada mês
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteNeighborhoodDates(
+                                          dates.map((d) => d.id),
+                                        )
                                       }
-                                      acc[date.neighborhood].dates.push(
-                                        date.allowed_date,
-                                      );
-                                      acc[date.neighborhood].ids.push(date.id);
-                                      return acc;
-                                    },
-                                    {} as Record<
-                                      string,
-                                      { dates: number[]; ids: string[] }
-                                    >,
-                                  );
-
-                                  return Object.entries(groupedByNeighborhood)
-                                    .sort(([neighborhoodA], [neighborhoodB]) =>
-                                      neighborhoodA.localeCompare(
-                                        neighborhoodB,
-                                      ),
-                                    )
-                                    .map(([neighborhood, data]) => {
-                                      data.dates.sort((a, b) => a - b);
-                                      return (
-                                        <tr
-                                          key={neighborhood}
-                                          className="hover:bg-gray-50"
-                                        >
-                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {neighborhood}
-                                          </td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            Dias {data.dates.join(", ")} de cada
-                                            mês
-                                          </td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                            <button
-                                              onClick={() =>
-                                                handleDeleteNeighborhoodDates(
-                                                  data.ids,
-                                                )
-                                              }
-                                              disabled={loading}
-                                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                                            >
-                                              Excluir
-                                            </button>
-                                          </td>
-                                        </tr>
-                                      );
-                                    });
-                                })()}
+                                      disabled={loading}
+                                      className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                                    >
+                                      Excluir
+                                    </button>
+                                  </td>
+                                </tr>
                               </tbody>
                             </table>
                           </div>
@@ -1287,7 +1100,7 @@ const AllowedVisitDatesManager: React.FC = () => {
             <div className="p-6">
               {/* Filtros */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 md:p-4 mb-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-3 md:gap-4">
                   <div>
                     <label
                       htmlFor="calendar-collector-filter"
@@ -1303,7 +1116,6 @@ const AllowedVisitDatesManager: React.FC = () => {
                           ...prev,
                           calendarCollector: e.target.value,
                           calendarCity: "all",
-                          calendarNeighborhood: "all",
                         }));
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
@@ -1331,7 +1143,6 @@ const AllowedVisitDatesManager: React.FC = () => {
                         setFilters((prev) => ({
                           ...prev,
                           calendarCity: e.target.value,
-                          calendarNeighborhood: "all",
                         }));
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
@@ -1344,40 +1155,11 @@ const AllowedVisitDatesManager: React.FC = () => {
                       ))}
                     </select>
                   </div>
-
-                  <div>
-                    <label
-                      htmlFor="calendar-neighborhood-filter"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Filtrar por Bairro
-                    </label>
-                    <select
-                      id="calendar-neighborhood-filter"
-                      value={filters.calendarNeighborhood}
-                      onChange={(e) =>
-                        setFilters((prev) => ({
-                          ...prev,
-                          calendarNeighborhood: e.target.value,
-                        }))
-                      }
-                      disabled={filters.calendarCity === "all"}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      <option value="all">Todos os bairros</option>
-                      {calendarNeighborhoods.map((neighborhood) => (
-                        <option key={neighborhood} value={neighborhood}>
-                          {neighborhood}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
                 </div>
 
                 {/* Info sobre filtros ativos */}
                 {(filters.calendarCollector !== "all" ||
-                  filters.calendarCity !== "all" ||
-                  filters.calendarNeighborhood !== "all") && (
+                  filters.calendarCity !== "all") && (
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-blue-600">
                     <CalendarIcon className="w-4 h-4" />
                     <span>
@@ -1390,9 +1172,6 @@ const AllowedVisitDatesManager: React.FC = () => {
                           : null,
                         filters.calendarCity !== "all"
                           ? filters.calendarCity
-                          : null,
-                        filters.calendarNeighborhood !== "all"
-                          ? filters.calendarNeighborhood
                           : null,
                       ]
                         .filter(Boolean)
@@ -1458,20 +1237,17 @@ const AllowedVisitDatesManager: React.FC = () => {
                     // Days of the month
                     for (let day = 1; day <= daysInMonth; day++) {
                       const dayInfo = allowedDaysForCalendar.get(day);
-                      const isAllowed = dayInfo && dayInfo.length > 0;
+                      const isAllowed = dayInfo && dayInfo.size > 0;
                       const isToday =
                         currentMonth.getMonth() === new Date().getMonth() &&
                         currentMonth.getFullYear() ===
                           new Date().getFullYear() &&
                         day === new Date().getDate();
 
-                      // Criar tooltip com as cidades/bairros
+                      // Criar tooltip com as cidades
                       let tooltipText = `Dia ${day}`;
                       if (isAllowed && dayInfo) {
-                        const uniqueLocations = new Set(
-                          dayInfo.map((d) => `${d.city} - ${d.neighborhood}`),
-                        );
-                        tooltipText = `Dia ${day}\n${Array.from(uniqueLocations).join("\n")}`;
+                        tooltipText = `Dia ${day}\n${Array.from(dayInfo).join("\n")}`;
                       }
 
                       days.push(
@@ -1487,9 +1263,9 @@ const AllowedVisitDatesManager: React.FC = () => {
                           title={tooltipText}
                         >
                           {day}
-                          {isAllowed && dayInfo && dayInfo.length > 1 && (
+                          {isAllowed && dayInfo && dayInfo.size > 1 && (
                             <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-bold">
-                              {dayInfo.length}
+                              {dayInfo.size}
                             </span>
                           )}
                         </div>,

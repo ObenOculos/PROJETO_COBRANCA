@@ -18,28 +18,36 @@ export type Database = {
         Row: {
           allowed_date: number | null
           city: string
+          collector_id: string | null
           created_at: string | null
           id: string
-          neighborhood: string
           updated_at: string | null
         }
         Insert: {
           allowed_date?: number | null
           city: string
+          collector_id?: string | null
           created_at?: string | null
           id?: string
-          neighborhood: string
           updated_at?: string | null
         }
         Update: {
           allowed_date?: number | null
           city?: string
+          collector_id?: string | null
           created_at?: string | null
           id?: string
-          neighborhood?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_allowed_visit_dates_collector_id"
+            columns: ["collector_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       apelidos_temporario: {
         Row: {

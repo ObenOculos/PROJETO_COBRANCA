@@ -93,9 +93,9 @@ export interface ScheduledVisit {
 export interface AllowedVisitDate {
   allowed_date: number; // Day of month (1-31)
   city: string;
+  collector_id?: string | null; // ID do cobrador associado
   created_at: string | null;
   id: string;
-  neighborhood: string;
   updated_at: string | null;
 }
 

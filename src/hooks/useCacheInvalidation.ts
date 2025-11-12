@@ -67,6 +67,11 @@ export function useRealtimeCacheInvalidation() {
     statsCache.invalidatePrefix("visit-stats");
   }, []);
 
+  const invalidateAllowedVisitDates = useCallback(() => {
+    console.log("Invalidating allowed visit dates cache due to real-time update");
+    dataCache.invalidatePrefix("allowed-visit-dates");
+  }, []);
+
   const invalidateAll = useCallback(() => {
     console.log("Invalidating all cache due to major update");
     dataCache.clear();
@@ -79,6 +84,7 @@ export function useRealtimeCacheInvalidation() {
     invalidatePayments,
     invalidateUsers,
     invalidateVisits,
+    invalidateAllowedVisitDates,
     invalidateAll,
   };
 }
