@@ -33,6 +33,7 @@ import {
 } from "../../utils/formatters";
 import ClientDetailModal from "./ClientDetailModal";
 import { DateValidationModal } from "../common/DateValidationModal";
+import ConfirmationModal from "../common/ConfirmationModal";
 import { getNextAllowedVisitDate } from "../../utils/visitScheduling";
 
 interface VisitSchedulerProps {
@@ -133,6 +134,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const [selectedClientForModal, setSelectedClientForModal] =
     useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
+
+  // Estados para Modal de Conflitos de Visitas
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictData, setConflictData] = useState<Array<{clientName: string; date: string}>>([]);
   const [filters, setFilters] = useState({
     city: [] as string[],
     neighborhood: [] as string[],
@@ -841,10 +846,102 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     selectedDateVisits.length / visitsPerPage,
   );
 
+  // Validação: Detectar conflitos de visitas (mesmo cliente, mesma data)
+  const checkVisitConflicts = (): { hasConflicts: boolean; conflicts: Array<{clientName: string; date: string}> } => {
+    const conflicts: Array<{clientName: string; date: string}> = [];
+    const selectedClientsData = getSelectedClientsData();
+
+    for (const client of selectedClientsData) {
+      const clientSchedule = clientSchedules.get(client.document);
+      const visitDate = clientSchedule?.date || selectedDate;
+
+      // Procurar por visitas agendadas para este cliente na mesma data
+      const existingVisits = scheduledVisits.filter(
+        (visit) =>
+          visit.clientDocument === client.document &&
+          visit.scheduledDate === visitDate &&
+          (visit.status === "agendada" || visit.status === "cancelamento_solicitado")
+      );
+
+      if (existingVisits.length > 0) {
+        conflicts.push({
+          clientName: client.client,
+          date: visitDate,
+        });
+      }
+    }
+
+    return {
+      hasConflicts: conflicts.length > 0,
+      conflicts,
+    };
+  };
+
+  // Validação: Verificar se a data é válida (ex: 31 de fevereiro)
+  const isValidDate = (dateString: string): boolean => {
+    if (!dateString) return false;
+
+    const [year, month, day] = dateString.split("-").map(Number);
+
+    // Verificar se os valores estão no intervalo válido
+    if (month < 1 || month > 12) return false;
+    if (day < 1 || day > 31) return false;
+
+    // Criar a data e verificar se o dia retornado é o mesmo que foi solicitado
+    // Isso detecta datas inválidas como 31 de fevereiro
+    const date = new Date(year, month - 1, day);
+    return date.getDate() === day && date.getMonth() === month - 1 && date.getFullYear() === year;
+  };
+
+  // Função auxiliar para processar agendamento com conflito já confirmado
+  const continueWithScheduling = async () => {
+    await executeScheduling();
+  };
+
   const proceedWithScheduling = async () => {
     try {
-      setLoading(true);
+      // ========== VALIDAÇÃO 1: CONFLITOS DE VISITAS ==========
+      const conflictCheck = checkVisitConflicts();
+      if (conflictCheck.hasConflicts) {
+        // Armazenar dados do conflito e mostrar modal
+        setConflictData(conflictCheck.conflicts);
+        setShowConflictModal(true);
+        return;
+      }
+
+      // Se não há conflitos, prosseguir direto
+      await executeScheduling();
+    } catch (error) {
+      console.error("Erro ao iniciar agendamento:", error);
+      triggerNotification("❌ Erro ao iniciar agendamento", "error");
+    }
+  };
+
+  const executeScheduling = async () => {
+    try {
+      // ========== VALIDAÇÃO 2: DATAS INVÁLIDAS ==========
       const selectedClientsData = getSelectedClientsData();
+      const invalidDates: string[] = [];
+
+      for (const client of selectedClientsData) {
+        const clientSchedule = clientSchedules.get(client.document);
+        const visitDate = clientSchedule?.date || selectedDate;
+
+        if (!isValidDate(visitDate)) {
+          invalidDates.push(`${client.client}: ${visitDate}`);
+        }
+      }
+
+      if (invalidDates.length > 0) {
+        const invalidList = invalidDates.join("\n");
+        triggerNotification(
+          `❌ Erro: As seguintes datas são inválidas:\n${invalidList}`,
+          "error",
+        );
+        return;
+      }
+
+      setLoading(true);
       let successCount = 0;
       let errorCount = 0;
 
@@ -852,6 +949,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         try {
           const clientData = getClientDataForVisit(client.document);
           if (!clientData) {
+            triggerNotification(
+              `⚠️ Dados do cliente ${client.client} não encontrados`,
+              "error",
+            );
             errorCount++;
             continue;
           }
@@ -860,6 +961,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           const clientSchedule = clientSchedules.get(client.document);
           const visitDate = clientSchedule?.date || selectedDate;
           const visitTime = clientSchedule?.time || selectedTime;
+
+          // ========== VALIDAÇÃO: HORA VÁLIDA ==========
+          if (!visitTime || visitTime.length !== 5) {
+            triggerNotification(
+              `⚠️ Horário inválido para ${client.client}: ${visitTime}`,
+              "error",
+            );
+            errorCount++;
+            continue;
+          }
 
           const visitData: Omit<ScheduledVisit, "id" | "createdAt"> = {
             collectorId: effectiveCollectorId!,
@@ -893,6 +1004,23 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           }
         } catch (error) {
           console.error(`Erro ao agendar visita para ${client.client}:`, error);
+          
+          // ========== TRATAMENTO DE ERRO MELHORADO ==========
+          let errorMessage = `Erro ao agendar visita para ${client.client}`;
+          
+          if (error instanceof Error) {
+            if (error.message.includes("network")) {
+              errorMessage += ": Problema de conexão. Verifique sua internet.";
+            } else if (error.message.includes("unauthorized")) {
+              errorMessage += ": Você não tem permissão para agendar visitas.";
+            } else if (error.message.includes("conflict")) {
+              errorMessage += ": Conflito detectado. Esta visita pode já estar agendada.";
+            } else {
+              errorMessage += `: ${error.message}`;
+            }
+          }
+          
+          triggerNotification(errorMessage, "error");
           errorCount++;
         }
       }
@@ -908,7 +1036,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       // Mostrar resultado
       if (successCount > 0) {
         triggerNotification(
-          `${successCount} visita${successCount !== 1 ? "s" : ""} agendada${successCount !== 1 ? "s" : ""} com sucesso!`,
+          `✅ ${successCount} visita${successCount !== 1 ? "s" : ""} agendada${successCount !== 1 ? "s" : ""} com sucesso!`,
           "success",
         );
 
@@ -918,13 +1046,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         }
       }
       if (errorCount > 0) {
-        alert(
-          `${errorCount} visita${errorCount !== 1 ? "s" : ""} não puderam ser agendada${errorCount !== 1 ? "s" : ""}.`,
+        triggerNotification(
+          `⚠️ ${errorCount} visita${errorCount !== 1 ? "s" : ""} não pode${errorCount !== 1 ? "m" : ""} ser agendada${errorCount !== 1 ? "s" : ""}. Verifique os detalhes acima.`,
+          "error",
         );
       }
     } catch (error) {
-      console.error("Erro ao agendar visitas:", error);
-      alert("Erro ao agendar visitas. Tente novamente.");
+      console.error("Erro crítico ao agendar visitas:", error);
+      
+      let errorMessage = "❌ Erro ao agendar visitas";
+      if (error instanceof Error) {
+        errorMessage += `: ${error.message}`;
+      }
+      triggerNotification(errorMessage, "error");
     } finally {
       setLoading(false);
     }
@@ -3921,30 +4055,56 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                               return (
                                 <div className="mt-3 pt-3 border-t border-gray-300">
                                   <p className="text-xs sm:text-sm text-gray-700 mb-2 font-medium">
-                                    💡 Todas as datas permitidas configuradas:
+                                    Datas permitidas:
                                   </p>
                                   <div className="flex flex-wrap gap-2">
-                                    {sortedDates.map(([date, count]) => (
-                                      <button
-                                        key={date}
-                                        onClick={() =>
-                                          handleGeneralDateChange({
-                                            target: {
-                                              value: date,
-                                            },
-                                          } as React.ChangeEvent<HTMLInputElement>)
-                                        }
-                                        className="px-3 py-1.5 text-xs sm:text-sm bg-white border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors font-medium relative"
-                                        title={`${count} cliente${count !== 1 ? "s" : ""} com esta data`}
-                                      >
-                                        {formatSafeDate(date)}
-                                        {count > 1 && (
-                                          <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-[10px] sm:text-xs bg-blue-200 text-blue-700 rounded-full">
-                                            {count}
-                                          </span>
-                                        )}
-                                      </button>
-                                    ))}
+                                    {sortedDates.map(([date, count]) => {
+                                      // Verificar se é domingo
+                                      const [year, month, day] = date
+                                        .split("-")
+                                        .map(Number);
+                                      const dateObj = new Date(
+                                        year,
+                                        month - 1,
+                                        day
+                                      );
+                                      const isSunday = dateObj.getDay() === 0;
+
+                                      return (
+                                        <button
+                                          key={date}
+                                          onClick={() =>
+                                            handleGeneralDateChange({
+                                              target: {
+                                                value: date,
+                                              },
+                                            } as React.ChangeEvent<HTMLInputElement>)
+                                          }
+                                          className={`px-3 py-1.5 text-xs sm:text-sm rounded-lg transition-colors font-medium relative ${
+                                            isSunday
+                                              ? "bg-yellow-100 border border-yellow-400 text-yellow-800 hover:bg-yellow-200"
+                                              : "bg-white border border-blue-300 text-blue-700 hover:bg-blue-50"
+                                          }`}
+                                          title={`${count} cliente${count !== 1 ? "s" : ""} com esta data${isSunday ? " (Domingo!)" : ""}`}
+                                        >
+                                          {formatSafeDate(date)}
+                                          {isSunday && (
+                                            <span className="ml-1 text-yellow-600">
+                                              ⚠️
+                                            </span>
+                                          )}
+                                          {count > 1 && (
+                                            <span className={`ml-1 inline-flex items-center justify-center w-5 h-5 text-[10px] sm:text-xs rounded-full ${
+                                              isSunday
+                                                ? "bg-yellow-300 text-yellow-900"
+                                                : "bg-blue-200 text-blue-700"
+                                            }`}>
+                                              {count}
+                                            </span>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               );
@@ -4400,6 +4560,40 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           isOpen={showDateValidationModal}
           onClose={() => setShowDateValidationModal(false)}
           message={dateValidationMessage}
+        />
+
+        {/* Modal de Conflito de Visitas */}
+        <ConfirmationModal
+          isOpen={showConflictModal}
+          onClose={() => {
+            setShowConflictModal(false);
+            setConflictData([]);
+          }}
+          onConfirm={continueWithScheduling}
+          title="⚠️ Conflito Detectado!"
+          message={
+            <div>
+              <p className="mb-3">
+                As seguintes visitas <strong>já estão agendadas</strong>:
+              </p>
+              <ul className="space-y-2 mb-4">
+                {conflictData.map((conflict, idx) => (
+                  <li key={idx} className="flex items-center text-sm">
+                    <span className="mr-2">•</span>
+                    <strong>{conflict.clientName}</strong>
+                    <span className="ml-1 text-gray-600">
+                      em {formatSafeDate(conflict.date)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-sm">
+                Deseja continuar mesmo assim? Isso criará visitas duplicadas.
+              </p>
+            </div>
+          }
+          confirmButtonText="Continuar Mesmo Assim"
+          cancelButtonText="Cancelar"
         />
       </div>
 

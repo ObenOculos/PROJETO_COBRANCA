@@ -6,7 +6,7 @@ interface ConfirmationModalProps {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  message?: string; // Make message optional if clientName/Document are used
+  message?: string | React.ReactNode; // Make message optional if clientName/Document are used
   clientName?: string;
   clientDocument?: string;
   confirmButtonText?: string;
@@ -63,9 +63,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         </div>
 
         <div className="p-6">
-          <p className="text-sm text-gray-700 dark:text-dark-text-secondary mb-6">
+          <div className="text-sm text-gray-700 dark:text-dark-text-secondary mb-6">
             {displayMessage}
-          </p>
+          </div>
 
           <div className="flex justify-between gap-3 mt-6">
             <button
