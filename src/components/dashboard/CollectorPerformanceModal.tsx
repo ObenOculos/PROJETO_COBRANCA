@@ -227,7 +227,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
   };
 
   return (
-    <div   
+    <div
       className="!mt-0 fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm grid place-items-center z-50"
       onClick={onClose}
     >
@@ -440,7 +440,8 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                                   <span
                                     className={`text-xs px-2 py-1 rounded-full ${getPerformanceColor(history.overallPerformance)}`}
                                   >
-                                    {history.overallPerformance.toFixed(1)}% geral
+                                    {history.overallPerformance.toFixed(1)}%
+                                    geral
                                   </span>
                                 </div>
                               </div>
@@ -586,16 +587,17 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                     )}
 
                     {/* Show Less Button */}
-                    {itemsToShow > 6 && itemsToShow >= filteredHistory.length && (
-                      <div className="text-center mt-2">
-                        <button
-                          onClick={() => setItemsToShow(6)}
-                          className="px-4 py-2 text-sm text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                        >
-                          Mostrar menos
-                        </button>
-                      </div>
-                    )}
+                    {itemsToShow > 6 &&
+                      itemsToShow >= filteredHistory.length && (
+                        <div className="text-center mt-2">
+                          <button
+                            onClick={() => setItemsToShow(6)}
+                            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                          >
+                            Mostrar menos
+                          </button>
+                        </div>
+                      )}
                   </>
                 )}
               </div>

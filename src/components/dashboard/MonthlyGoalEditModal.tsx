@@ -292,7 +292,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
             </div>
           </div>
 
-          {/* Static Footer */}          
+          {/* Static Footer */}
           <div className="relative flex-shrink-0 bg-gray-50 px-8 py-6 border-t border-gray-100 rounded-b-3xl">
             <div className="flex flex-col sm:flex-row gap-3">
               <button
