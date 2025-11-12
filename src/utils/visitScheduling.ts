@@ -3,21 +3,20 @@ import { AllowedVisitDate } from "../types";
 /**
  * Calcula a próxima data permitida para visita baseado nas configurações de allowed_visit_dates
  * @param city - Cidade do cliente
- * @param neighborhood - Bairro do cliente
+ * @param _neighborhood - DEPRECATED - mantido por compatibilidade (não é mais usado)
  * @param allowedDates - Lista de datas permitidas configuradas
  * @param startDate - Data de início para calcular (opcional, padrão é hoje)
  * @returns Data no formato YYYY-MM-DD ou null se não houver data configurada
  */
 export const getNextAllowedVisitDate = (
   city: string,
-  neighborhood: string,
+  _neighborhood: string,
   allowedDates: AllowedVisitDate[],
   startDate?: Date,
 ): string | null => {
-  // Buscar TODOS os dias permitidos para esta cidade/bairro
-  const configs = allowedDates.filter(
-    (d) => d.city === city && d.neighborhood === neighborhood,
-  );
+  // Buscar TODOS os dias permitidos para esta cidade
+  // Nota: neighborhood é ignorado pois foi removido do schema de allowed_visit_dates
+  const configs = allowedDates.filter((d) => d.city === city);
 
   if (configs.length === 0) {
     return null; // Sem configuração, retorna null
@@ -100,28 +99,30 @@ const formatDateToYYYYMMDD = (date: Date): string => {
 };
 
 /**
- * Verifica se existe configuração de data permitida para uma cidade/bairro
+ * Verifica se existe configuração de data permitida para uma cidade
+ * @param city - Cidade do cliente
+ * @param _neighborhood - DEPRECATED - mantido por compatibilidade (não é mais usado)
+ * @param allowedDates - Lista de datas permitidas configuradas
  */
 export const hasAllowedVisitDate = (
   city: string,
-  neighborhood: string,
+  _neighborhood: string,
   allowedDates: AllowedVisitDate[],
 ): boolean => {
-  return allowedDates.some(
-    (d) => d.city === city && d.neighborhood === neighborhood,
-  );
+  return allowedDates.some((d) => d.city === city);
 };
 
 /**
- * Obtém o dia do mês configurado para uma cidade/bairro
+ * Obtém o dia do mês configurado para uma cidade
+ * @param city - Cidade do cliente
+ * @param _neighborhood - DEPRECATED - mantido por compatibilidade (não é mais usado)
+ * @param allowedDates - Lista de datas permitidas configuradas
  */
 export const getAllowedDayOfMonth = (
   city: string,
-  neighborhood: string,
+  _neighborhood: string,
   allowedDates: AllowedVisitDate[],
 ): number | null => {
-  const config = allowedDates.find(
-    (d) => d.city === city && d.neighborhood === neighborhood,
-  );
+  const config = allowedDates.find((d) => d.city === city);
   return config ? config.allowed_date : null;
 };

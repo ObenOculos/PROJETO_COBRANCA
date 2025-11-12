@@ -3295,28 +3295,31 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   <Eye className="h-3 w-3 mr-1 flex-shrink-0" />
                                   Status da Visita
                                 </label>
-                                <select
-                                  value={filters.visitStatus}
-                                  onChange={(e) =>
-                                    handleFilterChange(
-                                      "visitStatus",
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="w-full px-2.5 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-xl sm:rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm"
-                                >
-                                  <option value="">Todos os status</option>
-                                  <option value="recent">
-                                    Recente (&lt; 30 dias)
-                                  </option>
-                                  <option value="low">30-59 dias</option>
-                                  <option value="medium">60-89 dias</option>
-                                  <option value="high">90-119 dias</option>
-                                  <option value="critical">120+ dias</option>
-                                  <option value="never-visited">
-                                    Nunca visitado
-                                  </option>
-                                </select>
+                                <div className="relative">
+                                  <Eye className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400 pointer-events-none" />
+                                  <select
+                                    value={filters.visitStatus}
+                                    onChange={(e) =>
+                                      handleFilterChange(
+                                        "visitStatus",
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="w-full pl-7 sm:pl-8 pr-2 sm:pr-3 py-1.5 sm:py-2 border border-gray-300 rounded-xl sm:rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm bg-white appearance-none"
+                                  >
+                                    <option value="">Todos os status</option>
+                                    <option value="recent">
+                                      Recente (&lt; 30 dias)
+                                    </option>
+                                    <option value="low">30-59 dias</option>
+                                    <option value="medium">60-89 dias</option>
+                                    <option value="high">90-119 dias</option>
+                                    <option value="critical">120+ dias</option>
+                                    <option value="never-visited">
+                                      Nunca visitado
+                                    </option>
+                                  </select>
+                                </div>
                               </div>
                               <div>
                                 <label className="flex items-center text-xs sm:text-sm font-medium text-gray-700 mb-1">
@@ -3832,6 +3835,122 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                               </div>
                             </div>
                           </div>
+
+                          {/* Sugestões de datas permitidas */}
+                          {(() => {
+                            const suggestedDates = new Map<string, number>(); // date -> count
+                            const selectedClientsData = getSelectedClientsData();
+
+                            // Coletar TODAS as datas permitidas configuradas para os clientes
+                            selectedClientsData.forEach((client) => {
+                              const clientAllowedDates = allowedVisitDates.filter(
+                                (d) => d.city === client.city
+                              );
+
+                              clientAllowedDates.forEach((config) => {
+                                // Calcular as próximas 3 ocorrências do dia permitido
+                                const today = new Date();
+                                const currentYear = today.getFullYear();
+                                const currentMonth = today.getMonth();
+                                const currentDay = today.getDate();
+
+                                // Mês atual
+                                if (config.allowed_date >= currentDay) {
+                                  const date = new Date(
+                                    currentYear,
+                                    currentMonth,
+                                    config.allowed_date
+                                  );
+                                  if (date.getDate() === config.allowed_date) {
+                                    const dateStr = date
+                                      .toISOString()
+                                      .split("T")[0];
+                                    suggestedDates.set(
+                                      dateStr,
+                                      (suggestedDates.get(dateStr) || 0) + 1
+                                    );
+                                  }
+                                }
+
+                                // Próximo mês
+                                const nextMonthDate = new Date(
+                                  currentYear,
+                                  currentMonth + 1,
+                                  config.allowed_date
+                                );
+                                if (
+                                  nextMonthDate.getDate() ===
+                                  config.allowed_date
+                                ) {
+                                  const dateStr = nextMonthDate
+                                    .toISOString()
+                                    .split("T")[0];
+                                  suggestedDates.set(
+                                    dateStr,
+                                    (suggestedDates.get(dateStr) || 0) + 1
+                                  );
+                                }
+
+                                // Mês seguinte ao próximo
+                                const nextNextMonthDate = new Date(
+                                  currentYear,
+                                  currentMonth + 2,
+                                  config.allowed_date
+                                );
+                                if (
+                                  nextNextMonthDate.getDate() ===
+                                  config.allowed_date
+                                ) {
+                                  const dateStr = nextNextMonthDate
+                                    .toISOString()
+                                    .split("T")[0];
+                                  suggestedDates.set(
+                                    dateStr,
+                                    (suggestedDates.get(dateStr) || 0) + 1
+                                  );
+                                }
+                              });
+                            });
+
+                            if (suggestedDates.size > 0) {
+                              const sortedDates = Array.from(suggestedDates)
+                                .sort(([dateA], [dateB]) =>
+                                  dateA.localeCompare(dateB)
+                                );
+
+                              return (
+                                <div className="mt-3 pt-3 border-t border-gray-300">
+                                  <p className="text-xs sm:text-sm text-gray-700 mb-2 font-medium">
+                                    💡 Todas as datas permitidas configuradas:
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {sortedDates.map(([date, count]) => (
+                                      <button
+                                        key={date}
+                                        onClick={() =>
+                                          handleGeneralDateChange({
+                                            target: {
+                                              value: date,
+                                            },
+                                          } as React.ChangeEvent<HTMLInputElement>)
+                                        }
+                                        className="px-3 py-1.5 text-xs sm:text-sm bg-white border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors font-medium relative"
+                                        title={`${count} cliente${count !== 1 ? "s" : ""} com esta data`}
+                                      >
+                                        {formatSafeDate(date)}
+                                        {count > 1 && (
+                                          <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-[10px] sm:text-xs bg-blue-200 text-blue-700 rounded-full">
+                                            {count}
+                                          </span>
+                                        )}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                         {/* Lista de Clientes Selecionados - Mesmo conteúdo do componente principal */}
                         {selectedClients.size > 0 && (
