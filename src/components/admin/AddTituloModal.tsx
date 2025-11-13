@@ -27,7 +27,7 @@ const AddTituloModal: React.FC<AddTituloModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(["basic"])
+    new Set(["basic"]),
   );
 
   const toggleSection = (sectionId: string) => {
@@ -174,12 +174,7 @@ const AddTituloModal: React.FC<AddTituloModalProps> = ({
   ];
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Adicionar Título"
-      size="lg"
-    >
+    <Modal isOpen={isOpen} onClose={onClose} title="Adicionar Título" size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">
