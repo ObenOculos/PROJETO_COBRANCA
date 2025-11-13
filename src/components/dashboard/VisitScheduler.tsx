@@ -1472,7 +1472,26 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
   const handleOpenRescheduleModal = (visit: ScheduledVisit) => {
     setSelectedVisitForReschedule(visit);
-    setRescheduleDate(getLocalDate());
+    
+    // Buscar dados do cliente para obter cidade e bairro
+    const clientData = getClientDataForVisit(visit.clientDocument);
+    
+    let suggestedDate = getLocalDate();
+    
+    // Verificar se existe data permitida configurada para esta cidade
+    if (clientData) {
+      const allowedDate = getNextAllowedVisitDate(
+        clientData.city,
+        clientData.neighborhood,
+        allowedVisitDates,
+      );
+      
+      if (allowedDate) {
+        suggestedDate = allowedDate;
+      }
+    }
+    
+    setRescheduleDate(suggestedDate);
 
     // Para visitas de hoje, usar hora atual + 1 hora; para outras visitas, manter o horário original
     const isToday = visit.scheduledDate === getLocalDate();
@@ -2821,19 +2840,50 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Nova Data *
                       </label>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <input
-                          id="reschedule-date"
-                          name="reschedule-date"
-                          type="date"
-                          value={rescheduleDate}
-                          onChange={(e) => setRescheduleDate(e.target.value)}
-                          min={getLocalDate()}
-                          className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          required
-                        />
-                      </div>
+                      {(() => {
+                        const clientData = selectedVisitForReschedule
+                          ? getClientDataForVisit(
+                              selectedVisitForReschedule.clientDocument,
+                            )
+                          : null;
+                        const hasAllowedDate =
+                          clientData &&
+                          allowedVisitDates.some(
+                            (d) => d.city === clientData.city,
+                          );
+                        const allowedDays = clientData
+                          ? allowedVisitDates
+                              .filter((d) => d.city === clientData.city)
+                              .map((d) => d.allowed_date)
+                              .sort((a, b) => a - b)
+                          : [];
+
+                        return (
+                          <>
+                            {hasAllowedDate && (
+                              <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 flex items-start">
+                                <Info className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
+                                <span>
+                                  <strong>Data(s) permitida(s) para {clientData?.city}:</strong> dia(s) {allowedDays.join(", ")} de cada mês
+                                </span>
+                              </div>
+                            )}
+                            <div className="relative">
+                              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                              <input
+                                id="reschedule-date"
+                                name="reschedule-date"
+                                type="date"
+                                value={rescheduleDate}
+                                onChange={(e) => setRescheduleDate(e.target.value)}
+                                min={getLocalDate()}
+                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                required
+                              />
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
 
                     <div>
