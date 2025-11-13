@@ -1487,12 +1487,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
   const handleOpenRescheduleModal = (visit: ScheduledVisit) => {
     setSelectedVisitForReschedule(visit);
-    
+
     // Buscar dados do cliente para obter cidade e bairro
     const clientData = getClientDataForVisit(visit.clientDocument);
-    
+
     let suggestedDate = getLocalDate();
-    
+
     // Verificar se existe data permitida configurada para esta cidade
     if (clientData) {
       const allowedDate = getNextAllowedVisitDate(
@@ -1500,12 +1500,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         clientData.neighborhood,
         allowedVisitDates,
       );
-      
+
       if (allowedDate) {
         suggestedDate = allowedDate;
       }
     }
-    
+
     setRescheduleDate(suggestedDate);
 
     // Para visitas de hoje, usar hora atual + 1 hora; para outras visitas, manter o horário original
@@ -2879,7 +2879,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                               <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 flex items-start">
                                 <Info className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
                                 <span>
-                                  <strong>Data(s) permitida(s) para {clientData?.city}:</strong> dia(s) {allowedDays.join(", ")} de cada mês
+                                  <strong>
+                                    Data(s) permitida(s) para {clientData?.city}
+                                    :
+                                  </strong>{" "}
+                                  dia(s) {allowedDays.join(", ")} de cada mês
                                 </span>
                               </div>
                             )}
@@ -2890,7 +2894,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 name="reschedule-date"
                                 type="date"
                                 value={rescheduleDate}
-                                onChange={(e) => setRescheduleDate(e.target.value)}
+                                onChange={(e) =>
+                                  setRescheduleDate(e.target.value)
+                                }
                                 min={getLocalDate()}
                                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 required
