@@ -345,6 +345,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     };
   }, [showScheduleModal]);
 
+  // Adicionado para buscar visitas ao navegar entre os meses
+  useEffect(() => {
+    const debounceFetch = setTimeout(() => {
+      if (user) {
+        // Força a busca de visitas para o mês/ano que está sendo visualizado
+        // Assumindo que fetchScheduledVisits pode ser otimizado no futuro para aceitar um range
+        fetchScheduledVisits(false);
+      }
+    }, 500); // Debounce de 500ms para evitar buscas excessivas
+
+    return () => {
+      clearTimeout(debounceFetch);
+    };
+  }, [currentMonth, user, fetchScheduledVisits]);
+
   const availableClients = React.useMemo(() => {
     if (!effectiveCollectorId) return [];
 
@@ -563,7 +578,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         return dateA.getTime() - dateB.getTime();
       });
 
-    const allVisits = visits.sort((a, b) => {
+    const allVisits = [...visits].sort((a, b) => {
       const dateA = new Date(
         `${a.scheduledDate} ${a.scheduledTime || "00:00"}`,
       );

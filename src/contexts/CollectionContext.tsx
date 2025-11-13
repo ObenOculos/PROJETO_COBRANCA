@@ -87,28 +87,43 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // 2. If offline, do not proceed to fetch from network
       if (!isOnline) {
         console.log("🚫 Offline, não buscando visitas agendadas do servidor.");
-        // If there was no cache, the state will be an empty array, which is correct.
-        // If there was cache, it's already set.
         return;
       }
 
       // 3. If online, fetch fresh data
       try {
-        console.log("Buscando visitas agendadas...");
+        console.log("Buscando TODAS as visitas agendadas com paginação...");
 
-        const { data, error: supabaseError } = await supabase
-          .from("scheduled_visits")
-          .select("*")
-          .order("scheduled_date", { ascending: true });
+        let allVisits: any[] = [];
+        let from = 0;
+        const pageSize = 1000;
+        let hasMore = true;
 
-        if (supabaseError) {
-          // If fetch fails, we just log it but DON'T clear the state.
-          // The user will see stale data from cache, which is the desired offline behavior.
-          console.error("Erro ao buscar visitas agendadas:", supabaseError);
-          return; // Exit without clearing state
+        while (hasMore) {
+          const { data: pageData, error: pageError } = await supabase
+            .from("scheduled_visits")
+            .select("*")
+            .range(from, from + pageSize - 1)
+            .order("scheduled_date", { ascending: true });
+
+          if (pageError) {
+            console.error("Erro ao carregar página de visitas:", pageError);
+            throw pageError;
+          }
+
+          if (pageData && pageData.length > 0) {
+            allVisits = allVisits.concat(pageData);
+            if (pageData.length < pageSize) {
+              hasMore = false;
+            } else {
+              from += pageSize;
+            }
+          } else {
+            hasMore = false;
+          }
         }
 
-        const transformedVisits: ScheduledVisit[] = (data || []).map(
+        const transformedVisits: ScheduledVisit[] = (allVisits || []).map(
           (visit) => ({
             id: visit.id,
             collectorId: visit.collector_id,
@@ -142,7 +157,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         // Cache the fresh data
         dataCache.set(cacheKey, transformedVisits);
 
-        console.log("Visitas agendadas carregadas:", transformedVisits.length);
+        console.log(
+          "TODAS as visitas agendadas carregadas:",
+          transformedVisits.length,
+        );
       } catch (err) {
         // Also log error here and do not clear state
         console.error("Erro ao carregar visitas agendadas:", err);
