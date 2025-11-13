@@ -9,7 +9,9 @@ import {
   Info,
   FileText,
   RefreshCcw,
+  PlusCircle,
 } from "lucide-react"; // Importar ícones
+import AddTituloModal from "./AddTituloModal";
 
 interface FileData {
   [key: string]: string;
@@ -72,6 +74,14 @@ const DatabaseUpload: React.FC = () => {
   );
   const [needsRefresh, setNeedsRefresh] = useState<boolean>(false);
   const [modalTitle, setModalTitle] = useState<string>("");
+  const [showAddTituloModal, setShowAddTituloModal] = useState<boolean>(false);
+
+  const handleAddSuccess = () => {
+    // Maybe show a success message
+    setUploadStatus("✅ Título adicionado com sucesso!");
+    // Refresh data
+    refreshData();
+  };
 
   const handleStatusFileChange = (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -744,9 +754,18 @@ const DatabaseUpload: React.FC = () => {
 
   return (
     <div className="bg-white rounded-2xl sm:rounded-2xl shadow-sm p-4 sm:p-6 border border-gray-200 space-y-6">
-      <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center-title">
-        Upload de Dados do Banco
-      </h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center-title">
+          Upload de Dados do Banco
+        </h2>
+        <button
+          onClick={() => setShowAddTituloModal(true)}
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <PlusCircle className="h-5 w-5 mr-2" />
+          Adicionar Título
+        </button>
+      </div>
       <p className="text-sm text-gray-600 mt-1 hidden sm:block">
         Utilize esta seção para atualizar informações existentes ou adicionar
         novos registros à tabela BANCO_DADOS.
@@ -1132,6 +1151,11 @@ const DatabaseUpload: React.FC = () => {
           </p>
         </div>
       </Modal>
+      <AddTituloModal
+        isOpen={showAddTituloModal}
+        onClose={() => setShowAddTituloModal(false)}
+        onSuccess={handleAddSuccess}
+      />
     </div>
   );
 };
