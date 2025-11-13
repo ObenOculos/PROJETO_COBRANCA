@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import * as XLSX from "xlsx";
 import { supabase } from "../../lib/supabase";
 import { Modal } from "../Modal"; // Importar o componente Modal
 import { useCollection } from "../../contexts/CollectionContext";
@@ -10,6 +11,7 @@ import {
   FileText,
   RefreshCcw,
   PlusCircle,
+  Download,
 } from "lucide-react"; // Importar ícones
 import AddTituloModal from "./AddTituloModal";
 
@@ -153,6 +155,184 @@ const DatabaseUpload: React.FC = () => {
       console.error("❌ Erro de conexão:", error);
       setDebugInfo(`❌ Erro: ${(error as Error).message}`);
       return false;
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    setLoading(true);
+    setUploadStatus("🔄 Gerando arquivo Excel...");
+    try {
+      const BATCH_SIZE = 1000;
+      let allData: any[] = [];
+      let from = 0;
+      let hasMore = true;
+
+      // Fetch all data in batches
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("BANCO_DADOS")
+          .select("*")
+          .range(from, from + BATCH_SIZE - 1);
+
+        if (error) {
+          throw error;
+        }
+
+        if (data && data.length > 0) {
+          allData = allData.concat(data);
+          from += data.length;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      if (allData.length === 0) {
+        setUploadStatus("ℹ️ Nenhum dado para exportar.");
+        setLoading(false);
+        return;
+      }
+
+      // Define headers in the desired order
+      const headers = [
+        "nome_da_loja",
+        "data_lancamento",
+        "data_vencimento",
+        "valor_original",
+        "valor_reajustado",
+        "multa",
+        "juros_por_dia",
+        "multa_aplicada",
+        "juros_aplicado",
+        "valor_recebido",
+        "data_de_recebimento",
+        "dias_em_atraso",
+        "dias_carencia",
+        "desconto",
+        "acrescimo",
+        "multa_paga",
+        "juros_pago",
+        "tipo_de_cobranca",
+        "numero_titulo",
+        "parcela",
+        "id_parcela",
+        "status",
+        "cliente",
+        "documento",
+        "endereco",
+        "numero",
+        "bairro",
+        "complemento",
+        "cep",
+        "cidade",
+        "estado",
+        "obs",
+        "codigo_externo",
+        "descricao",
+        "venda_n",
+        "convenio",
+        "telefone",
+        "celular",
+        "celular1",
+        "celular2",
+        "email",
+        "user_id",
+        "situacao",
+        "apelido",
+      ];
+
+      // Create worksheet data, starting with headers
+      const wsData = [headers];
+
+      // Add rows
+      allData.forEach((row) => {
+        const rowData = headers.map((header) => row[header] ?? "");
+        wsData.push(rowData);
+      });
+
+      // Create worksheet and workbook
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "BANCO_DADOS");
+
+      // Trigger download
+      XLSX.writeFile(wb, "export_banco_dados.xlsx");
+
+      setUploadStatus("✅ Arquivo Excel gerado com sucesso!");
+    } catch (error) {
+      const errorMsg = (error as Error).message;
+      setUploadStatus(`❌ Erro ao gerar Excel: ${errorMsg}`);
+      console.error("❌ Erro ao gerar Excel:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    setLoading(true);
+    setUploadStatus("🔄 Gerando modelo CSV...");
+    try {
+      const headers = [
+        "nome_da_loja",
+        "data_lancamento",
+        "data_vencimento",
+        "valor_original",
+        "valor_reajustado",
+        "multa",
+        "juros_por_dia",
+        "multa_aplicada",
+        "juros_aplicado",
+        "valor_recebido",
+        "data_de_recebimento",
+        "dias_em_atraso",
+        "dias_carencia",
+        "desconto",
+        "acrescimo",
+        "multa_paga",
+        "juros_pago",
+        "tipo_de_cobranca",
+        "numero_titulo",
+        "parcela",
+        "id_parcela",
+        "status",
+        "cliente",
+        "documento",
+        "endereco",
+        "numero",
+        "bairro",
+        "complemento",
+        "cep",
+        "cidade",
+        "estado",
+        "obs",
+        "codigo_externo",
+        "descricao",
+        "venda_n",
+        "convenio",
+        "telefone",
+        "celular",
+        "celular1",
+        "celular2",
+        "email",
+        "user_id",
+        "situacao",
+        "apelido",
+      ];
+
+      // Create worksheet with only headers
+      const ws = XLSX.utils.aoa_to_sheet([headers]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Template");
+
+      // Trigger download as CSV
+      XLSX.writeFile(wb, "template_banco_dados.csv");
+
+      setUploadStatus("✅ Modelo CSV gerado com sucesso!");
+    } catch (error) {
+      const errorMsg = (error as Error).message;
+      setUploadStatus(`❌ Erro ao gerar modelo CSV: ${errorMsg}`);
+      console.error("❌ Erro ao gerar modelo CSV:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -754,17 +934,37 @@ const DatabaseUpload: React.FC = () => {
 
   return (
     <div className="bg-white rounded-2xl sm:rounded-2xl shadow-sm p-4 sm:p-6 border border-gray-200 space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center-title">
           Upload de Dados do Banco
         </h2>
-        <button
-          onClick={() => setShowAddTituloModal(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          <PlusCircle className="h-5 w-5 mr-2" />
-          Adicionar Título
-        </button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 order-last sm:order-first">
+            <button
+              onClick={handleDownloadExcel}
+              disabled={loading}
+              className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              <Download className="h-5 w-5 mr-2" />
+              <span>Baixar Banco de Dados</span>
+            </button>
+            <button
+              onClick={handleDownloadTemplate}
+              disabled={loading}
+              className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              <FileText className="h-5 w-5 mr-2" />
+              <span>Baixar Modelo CSV</span>
+            </button>
+          </div>
+          <button
+            onClick={() => setShowAddTituloModal(true)}
+            className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 order-first sm:order-last"
+          >
+            <PlusCircle className="h-5 w-5 mr-2" />
+            <span>Adicionar Título</span>
+          </button>
+        </div>
       </div>
       <p className="text-sm text-gray-600 mt-1 hidden sm:block">
         Utilize esta seção para atualizar informações existentes ou adicionar
@@ -772,7 +972,7 @@ const DatabaseUpload: React.FC = () => {
       </p>
 
       {/* Botão de teste de conexão */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex items-center justify-between">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h3 className="text-sm font-medium text-yellow-800 flex items-center">
           <Info className="h-4 w-4 mr-2" />
           🔧 Debug e Teste
@@ -780,7 +980,7 @@ const DatabaseUpload: React.FC = () => {
         <button
           onClick={testSupabaseConnection}
           disabled={loading}
-          className="inline-flex items-center px-3 py-2 border border-yellow-300 text-sm font-medium rounded-md text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50"
+          className="inline-flex items-center justify-center px-3 py-2 border border-yellow-300 text-sm font-medium rounded-md text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50 w-full sm:w-auto"
         >
           <RefreshCcw className="h-4 w-4 mr-2" /> Testar Conexão com Supabase
         </button>
@@ -961,26 +1161,6 @@ const DatabaseUpload: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Instruções de uso */}
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start">
-        <Info className="h-5 w-5 mr-3 text-blue-700 flex-shrink-0" />
-        <div>
-          <h3 className="text-sm font-medium text-blue-800 mb-2">Como usar:</h3>
-          <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
-            <li>
-              Primeiro, teste a conexão com o Supabase usando o botão de teste
-            </li>
-            <li>
-              Certifique-se de que as variáveis de ambiente do Supabase estão
-              configuradas
-            </li>
-            <li>Prepare seu arquivo CSV com o formato correto</li>
-            <li>Selecione o arquivo e clique em upload</li>
-            <li>Acompanhe o status da operação e as informações de debug</li>
-          </ol>
         </div>
       </div>
 
