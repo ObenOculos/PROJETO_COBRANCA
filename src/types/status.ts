@@ -1,15 +1,15 @@
 // Status universais do sistema - simplificados
 export enum CollectionStatus {
-  PENDENTE = "pendente",
-  PAGO = "pago",
-  PARCIAL = "parcial",
+  PENDENTE = "Em atraso",
+  PAGO = "Pago",
+  PARCIAL = "Pago Parcial",
 }
 
 // Labels amigáveis para exibição
 export const STATUS_LABELS: Record<CollectionStatus, string> = {
-  [CollectionStatus.PENDENTE]: "Pendente",
+  [CollectionStatus.PENDENTE]: "Em atraso",
   [CollectionStatus.PAGO]: "Pago",
-  [CollectionStatus.PARCIAL]: "Parcial",
+  [CollectionStatus.PARCIAL]: "Pago Parcial",
 };
 
 // Cores para cada status

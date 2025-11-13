@@ -3,6 +3,7 @@ import { Modal } from "../Modal";
 import { supabase } from "../../lib/supabase";
 import { Database } from "../../types/database.types";
 import { ChevronDown } from "lucide-react";
+import { CollectionStatus } from "../../types/status";
 
 type BancoDadosInsert = Database["public"]["Tables"]["BANCO_DADOS"]["Insert"];
 
@@ -337,7 +338,11 @@ const formFields: Record<
   },
   nome_da_loja: { label: "Nome da Loja", type: "text" },
   cidade: { label: "Cidade", type: "text" },
-  status: { label: "Status", type: "text", placeholder: "Ex: PENDENTE" },
+  status: {
+    label: "Status",
+    type: "select",
+    options: Object.values(CollectionStatus),
+  },
   situacao: {
     label: "Situação",
     type: "select",
