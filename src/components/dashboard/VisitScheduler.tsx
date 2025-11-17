@@ -2984,11 +2984,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                     {[
                       "Visitado e o cliente pagou tudo.",
                       "Visitado, mas cliente pagou parcialmente.",
+                      "Visitado, mas cliente agendou pagamento.",
                       "Visitado, mas cliente não estava em casa.",
-                      "Visitado, mas cliente contestou a dívida - (SPC).",
+                      "Visitado, mas cliente solicitou revisão.",                      
                       "Visitado, mas cliente devolveu os óculos.",
                       "Visitado, mas cliente faleceu.",
-                      "Visitado, mas cliente solicitou revisão.",
+                      "Visitado, mas cliente contestou a dívida - (SPC).",                      
                     ].map((note, index) => (
                       <button
                         key={index}
