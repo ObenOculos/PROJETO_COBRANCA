@@ -2964,6 +2964,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           createPortal(
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
+
                 <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                     <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
@@ -2982,9 +2983,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2">
                     {[
                       "Visitado e o cliente pagou tudo.",
-                      "Visitado, mas cliente pagou parcialmente",
-                      "Visitado, mas cliente mudou de endereço",
-                      "Visitado, mas cliente contestou a dívida",
+                      "Visitado, mas cliente pagou parcialmente.",
+                      "Visitado, mas cliente não estava em casa.",
+                      "Visitado, mas cliente contestou a dívida - (SPC).",
+                      "Visitado, mas cliente devolveu os óculos.",
+                      "Visitado, mas cliente faleceu.",
+                      "Visitado, mas cliente solicitou revisão.",
                     ].map((note, index) => (
                       <button
                         key={index}
