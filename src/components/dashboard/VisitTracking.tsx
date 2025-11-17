@@ -1716,7 +1716,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           }}
         >
           <div
-            className="rounded-2xl shadow-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto minimal-scrollbar pr-4"
+            className="rounded-2xl max-w-4xl w-full max-h-[95vh] overflow-y-auto minimal-scrollbar pr-4"
             onClick={(e) => e.stopPropagation()}
           >
             <VisitScheduler

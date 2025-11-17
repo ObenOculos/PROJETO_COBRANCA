@@ -183,6 +183,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [selectedVisitForReschedule, setSelectedVisitForReschedule] =
     useState<ScheduledVisit | null>(null);
+  const [rescheduleNote, setRescheduleNote] = useState<string>("");
 
   // Estados para novos modais
   const [showCompletedModal, setShowCompletedModal] = useState(false);
@@ -1226,27 +1227,43 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       pendingValue: clientData.totalPendingValue,
     };
 
-    // Abrir modal do cliente imediatamente
-    setSelectedClientForModal(clientGroup);
-    setShowClientModal(true);
+    let shouldUpdateStatus = true; // Flag to control status update
 
-    // Atualizar status da visita em background
-    setTimeout(async () => {
-      try {
-        await updateVisitStatus(
-          selectedVisitForCompletion.id,
-          "realizada",
-          selectedNote,
-        );
-        triggerNotification(
-          `Visita marcada como ${getStatusLabel(selectedVisitForCompletion)}`,
-          "success",
-        );
-      } catch (error) {
-        console.error("Erro ao atualizar status da visita:", error);
-        // Não mostrar alert para não interromper o fluxo do usuário
-      }
-    }, 100);
+    // Abrir modal do cliente imediatamente
+    if (
+      selectedNote === "Visitado e o cliente pagou tudo." ||
+      selectedNote === "Visitado, mas cliente pagou parcialmente."
+    ) {
+      setSelectedClientForModal(clientGroup);
+      setShowClientModal(true);
+    } else if (
+      selectedNote === "Visitado, mas cliente agendou pagamento." ||
+      selectedNote === "Visitado, mas cliente não estava em casa."
+    ) {
+      setRescheduleNote(selectedNote); // Store the note for reschedule
+      handleOpenRescheduleModal(selectedVisitForCompletion);
+      shouldUpdateStatus = false; // Prevent immediate status update
+    }
+
+    // Atualizar status da visita em background (conditionally)
+    if (shouldUpdateStatus) {
+      setTimeout(async () => {
+        try {
+          await updateVisitStatus(
+            selectedVisitForCompletion.id,
+            "realizada",
+            selectedNote,
+          );
+          triggerNotification(
+            `Visita marcada como ${getStatusLabel(selectedVisitForCompletion)}`,
+            "success",
+          );
+        } catch (error) {
+          console.error("Erro ao atualizar status da visita:", error);
+          // Não mostrar alert para não interromper o fluxo do usuário
+        }
+      }, 100);
+    }
 
     setSelectedVisitForCompletion(null);
   };
@@ -1565,6 +1582,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       );
 
       triggerNotification("Visita reagendada com sucesso!", "success");
+
+      // Atualizar status da visita para "realizada" após o reagendamento
+      await updateVisitStatus(
+        selectedVisitForReschedule.id,
+        "realizada",
+        rescheduleNote,
+      );
+      setRescheduleNote(""); // Clear the stored note
 
       // Refresh dos dados para atualizar outras abas
       await refreshData();
@@ -3023,7 +3048,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
             document.body,
           )}
 
-        {/* Modal de Confirmação para "Não Localizado" - Renderizado via Portal */}
+        {/* Modal de Confirmação para "Não Localizado" */}
         {showNotFoundConfirmModal &&
           selectedVisitForNotFound &&
           createPortal(
