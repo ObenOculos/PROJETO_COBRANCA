@@ -360,12 +360,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     };
   }, [currentMonth, user, fetchScheduledVisits]);
 
-  const availableClients = React.useMemo(() => {
+  const baseFilteredClients = React.useMemo(() => {
     if (!effectiveCollectorId) return [];
 
     const clientGroups = getClientGroups(effectiveCollectorId);
 
-    // Obter visitas ativas (agendadas) do cobrador
     const activeVisits = getVisitsByCollector(effectiveCollectorId).filter(
       (visit) => visit.status === "agendada",
     );
@@ -373,16 +372,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       activeVisits.map((visit) => visit.clientDocument),
     );
 
-    // Filtrar clientes que não têm visitas ativas E que têm pendências
     const availableClientGroups = clientGroups.filter(
       (client) =>
-        !activeClientDocuments.has(client.document) && client.pendingValue > 0, // Apenas clientes com valor pendente
+        !activeClientDocuments.has(client.document) && client.pendingValue > 0,
     );
 
-    // Aplicar filtros
     let filteredClients = availableClientGroups;
 
-    // Filtro de busca por texto
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       filteredClients = filteredClients.filter((client) => {
@@ -397,21 +393,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       });
     }
 
-    // Filtro por cidade
-    if (filters.city.length > 0) {
-      filteredClients = filteredClients.filter((client) =>
-        filters.city.includes(client.city),
-      );
-    }
-
-    // Filtro por bairro
-    if (filters.neighborhood.length > 0) {
-      filteredClients = filteredClients.filter((client) =>
-        filters.neighborhood.includes(client.neighborhood),
-      );
-    }
-
-    // Filtro por valor pendente mínimo
     if (filters.minValue) {
       const minValue = parseFloat(filters.minValue);
       if (!isNaN(minValue)) {
@@ -421,7 +402,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       }
     }
 
-    // Filtro por valor pendente máximo
     if (filters.maxValue) {
       const maxValue = parseFloat(filters.maxValue);
       if (!isNaN(maxValue)) {
@@ -431,10 +411,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       }
     }
 
-    // Filtro por status de visita
     if (filters.visitStatus) {
       filteredClients = filteredClients.filter((client) => {
-        // Get visit status for this client using the same logic as in the component
         const clientVisits = scheduledVisits
           .filter(
             (visit) =>
@@ -442,7 +420,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
               visit.status === "realizada",
           )
           .sort((a, b) => {
-            // Ordenar por created_at (mais recente primeiro)
             return (
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
             );
@@ -454,7 +431,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           today,
         );
 
-        // Match filter with status type
         switch (filters.visitStatus) {
           case "recent":
             return daysSinceLastVisit < 30;
@@ -474,7 +450,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       });
     }
 
-    // Filtro por período de vencimento
     if (filters.dueDateStart || filters.dueDateEnd) {
       const startDate = filters.dueDateStart
         ? new Date(filters.dueDateStart)
@@ -503,11 +478,39 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       });
     }
 
-    // Aplicar ordenação
-    if (sortField) {
-      filteredClients.sort((a, b) => {
-        let result = 0;
+    return filteredClients;
+  }, [
+    effectiveCollectorId,
+    getClientGroups,
+    getVisitsByCollector,
+    searchTerm,
+    filters.minValue,
+    filters.maxValue,
+    filters.visitStatus,
+    filters.dueDateStart,
+    filters.dueDateEnd,
+    scheduledVisits,
+  ]);
 
+  const availableClients = React.useMemo(() => {
+    let filteredClients = baseFilteredClients;
+
+    if (filters.city.length > 0) {
+      filteredClients = filteredClients.filter((client) =>
+        filters.city.includes(client.city),
+      );
+    }
+
+    if (filters.neighborhood.length > 0) {
+      filteredClients = filteredClients.filter((client) =>
+        filters.neighborhood.includes(client.neighborhood),
+      );
+    }
+
+    if (sortField) {
+      const sortedClients = [...filteredClients];
+      sortedClients.sort((a, b) => {
+        let result = 0;
         switch (sortField) {
           case "cliente":
             result = a.client.localeCompare(b.client);
@@ -521,19 +524,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           default:
             result = 0;
         }
-
         return sortDirection === "asc" ? result : -result;
       });
+      return sortedClients;
     }
 
     return filteredClients;
   }, [
-    user,
-    searchTerm,
-    filters,
-    getClientGroups,
-    getVisitsByCollector,
-    scheduledVisits,
+    baseFilteredClients,
+    filters.city,
+    filters.neighborhood,
     sortField,
     sortDirection,
   ]);
@@ -678,24 +678,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
   // Obter lista de cidades únicas (apenas de clientes com pendências)
   const availableCities = React.useMemo(() => {
-    if (!effectiveCollectorId) return [];
-
-    const clientGroups = getClientGroups(effectiveCollectorId);
-    // Filtrar apenas clientes com pendências
-    const clientsWithPending = clientGroups.filter(
-      (client) => client.pendingValue > 0,
-    );
-    const cities = [
-      ...new Set(clientsWithPending.map((client) => client.city)),
-    ];
+    const cities = [...new Set(baseFilteredClients.map((client) => client.city))];
     return cities.sort();
-  }, [user, getClientGroups]);
+  }, [baseFilteredClients]);
 
   const availableNeighborhoods = React.useMemo(() => {
-    if (!effectiveCollectorId) return [];
-
-    const clientGroups = getClientGroups(effectiveCollectorId);
-    let clients = clientGroups.filter((client) => client.pendingValue > 0);
+    let clients = baseFilteredClients;
 
     if (filters.city.length > 0) {
       clients = clients.filter((client) => filters.city.includes(client.city));
@@ -705,7 +693,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       ...new Set(clients.map((client) => client.neighborhood)),
     ];
     return neighborhoods.sort();
-  }, [user, getClientGroups, filters.city]);
+  }, [baseFilteredClients, filters.city]);
 
   // Funções do calendário
   const getDaysInMonth = (date: Date) => {
