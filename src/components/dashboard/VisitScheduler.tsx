@@ -183,7 +183,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [selectedVisitForReschedule, setSelectedVisitForReschedule] =
     useState<ScheduledVisit | null>(null);
-  const [rescheduleNote, setRescheduleNote] = useState<string>("");
 
   // Estados para novos modais
   const [showCompletedModal, setShowCompletedModal] = useState(false);
@@ -1240,7 +1239,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       selectedNote === "Visitado, mas cliente agendou pagamento." ||
       selectedNote === "Visitado, mas cliente não estava em casa."
     ) {
-      setRescheduleNote(selectedNote); // Store the note for reschedule
       handleOpenRescheduleModal(selectedVisitForCompletion);
       shouldUpdateStatus = false; // Prevent immediate status update
     }
@@ -1582,14 +1580,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       );
 
       triggerNotification("Visita reagendada com sucesso!", "success");
-
-      // Atualizar status da visita para "realizada" após o reagendamento
-      await updateVisitStatus(
-        selectedVisitForReschedule.id,
-        "realizada",
-        rescheduleNote,
-      );
-      setRescheduleNote(""); // Clear the stored note
 
       // Refresh dos dados para atualizar outras abas
       await refreshData();
