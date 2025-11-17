@@ -7,10 +7,7 @@ export const DarkModeToggle: React.FC = () => {
   // Inicializar o tema ao montar o componente
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)",
-    ).matches;
-    const shouldBeDark = savedTheme ? savedTheme === "dark" : prefersDark;
+    const shouldBeDark = savedTheme === "dark";
 
     setIsDark(shouldBeDark);
     applyTheme(shouldBeDark);
