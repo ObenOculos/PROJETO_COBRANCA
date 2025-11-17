@@ -255,16 +255,8 @@ const AllowedVisitDatesManager: React.FC = () => {
       return allowedDates;
     }
 
-    // Filtrar apenas cidades onde o cobrador tem clientes
-    const collectorCities = new Set(
-      collections
-        .filter((c) => c.user_id === filters.collector)
-        .map((c) => c.cidade)
-        .filter(Boolean),
-    );
-
-    return allowedDates.filter((d) => collectorCities.has(d.city));
-  }, [allowedDates, filters.collector, collections]);
+    return allowedDates.filter((d) => d.collector_id === filters.collector);
+  }, [allowedDates, filters.collector]);
 
   // Agrupar datas por cidade
   const groupedByCity = useMemo(() => {
@@ -589,6 +581,12 @@ const AllowedVisitDatesManager: React.FC = () => {
   const allowedDaysForCalendar = useMemo(() => {
     let filtered = allowedDates;
 
+    if (filters.calendarCollector !== "all") {
+      filtered = filtered.filter(
+        (d) => d.collector_id === filters.calendarCollector,
+      );
+    }
+
     if (filters.calendarCity !== "all") {
       filtered = filtered.filter((d) => d.city === filters.calendarCity);
     }
@@ -604,12 +602,7 @@ const AllowedVisitDatesManager: React.FC = () => {
     });
 
     return daysMap;
-  }, [
-    filters.calendarCity,
-    filters.calendarCollector,
-    allowedDates,
-    collections,
-  ]);
+  }, [filters.calendarCity, filters.calendarCollector, allowedDates]);
 
   return (
     <div>
