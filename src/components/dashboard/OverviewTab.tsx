@@ -19,6 +19,7 @@ import {
   DashboardStats,
   FilterOptions,
 } from "../../types";
+import { useCollection } from "../../contexts/CollectionContext";
 
 interface OverviewTabProps {
   collections: Collection[];
@@ -39,6 +40,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   stats,
   pendingCancellations,
   setActiveTab,
+  setFilters,
   scheduledVisits,
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -48,7 +50,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const autoPlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedCollector, setSelectedCollector] = useState<string>("all");
-
+  const { getClientGroups } = useCollection();
+  const [] = useState(false);
+  const [] = useState(false);
+  
   useEffect(() => {
     if (isAutoPlaying) {
       autoPlayIntervalRef.current = setInterval(() => {
@@ -253,13 +258,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
       const total = periodVisits.length;
       const completed = periodVisits.filter(
-        (v) => v.status === "completed",
+        (v) => v.status === "realizada",
       ).length;
       const cancelled = periodVisits.filter(
-        (v) => v.status === "cancelled",
+        (v) => v.status === "cancelada",
       ).length;
       const pending = periodVisits.filter(
-        (v) => v.status === "scheduled" || v.status === "in_progress",
+        (v) => v.status === "agendada" || v.status === "in_progress",
       ).length;
       const completionRate =
         total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -290,6 +295,168 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       month: monthMetrics,
     };
   }, [scheduledVisits, selectedCollector]);
+
+  const schedulesByCity = useMemo(() => {
+    const filteredVisits =
+      selectedCollector === "all"
+        ? scheduledVisits
+        : scheduledVisits?.filter(
+            (v) => v.collectorId === selectedCollector,
+          );
+
+    const scheduled = filteredVisits?.filter((v) => v.status === "agendada");
+
+    return (scheduled || []).reduce(
+      (acc, visit) => {
+        const city = visit.clientCity || "Sem cidade";
+        if (!acc[city]) {
+          acc[city] = { count: 0, dates: new Set<string>() };
+        }
+        acc[city].count++;
+        acc[city].dates.add(visit.scheduledDate);
+        return acc;
+      },
+      {} as Record<string, { count: number; dates: Set<string> }>,
+    );
+  }, [scheduledVisits, selectedCollector]);
+
+  const clientsByCity = useMemo(() => {
+    const clientGroups = getClientGroups(
+      selectedCollector === "all" ? undefined : selectedCollector,
+    );
+    return clientGroups.reduce(
+      (acc, group) => {
+        const city = group.city || "Sem cidade";
+        acc[city] = (acc[city] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+  }, [getClientGroups, selectedCollector]);
+
+  const SchedulesByCityCardContent = () => {
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
+    const sortedSchedules = useMemo(() => {
+      type ScheduleData = { count: number; dates: Set<string> };
+      const entries = Object.entries(schedulesByCity) as [string, ScheduleData][];
+      return entries.sort(
+        ([, dataA], [, dataB]) => dataA.count - dataB.count,
+      );
+    }, [schedulesByCity]);
+
+    const totalPages = Math.ceil(sortedSchedules.length / itemsPerPage);
+    const paginatedSchedules = sortedSchedules.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage,
+    );
+
+    return (
+      <>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          {paginatedSchedules.map(([city, data]: [string, { count: number }]) => (
+            <div
+              key={city}
+              className="bg-gray-50 dark:bg-dark-bg-secondary p-2 rounded-lg text-center border border-gray-200 dark:border-dark-border"
+            >
+              <div className="font-bold text-gray-800 dark:text-dark-text">
+                {data.count}
+              </div>
+              <div className="text-gray-600 dark:text-dark-text-secondary">
+                {city}
+              </div>
+            </div>
+          ))}
+        </div>
+        {totalPages > 1 && (
+          <div className="mt-4 flex items-center justify-center space-x-2">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-2 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <span className="text-xs text-gray-700">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-2 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+            >
+              Próxima
+            </button>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const ClientsByCityCardContent = () => {
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
+    const sortedCities = useMemo(() => {
+      return Object.entries(clientsByCity).sort(
+        ([, countA], [, countB]) => countB - countA,
+      );
+    }, [clientsByCity]);
+
+    const totalPages = Math.ceil(sortedCities.length / itemsPerPage);
+    const paginatedCities = sortedCities.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage,
+    );
+
+    const handleCityClick = (city: string) => {
+      setFilters((prevFilters) => ({ ...prevFilters, city: city }));
+      setActiveTab("collections");
+    };
+
+    return (
+      <>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          {paginatedCities.map(([city, count]) => (
+            <button
+              key={city}
+              onClick={() => handleCityClick(city)}
+              className="bg-gray-50 dark:bg-dark-bg-secondary p-2 rounded-lg text-center border border-gray-200 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors"
+            >
+              <div className="font-bold text-gray-800 dark:text-dark-text">
+                {count}
+              </div>
+              <div className="text-gray-600 dark:text-dark-text-secondary">
+                {city}
+              </div>
+            </button>
+          ))}
+        </div>
+        {totalPages > 1 && (
+          <div className="mt-4 flex items-center justify-center space-x-2">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-2 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <span className="text-xs text-gray-700">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-2 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+            >
+              Próxima
+            </button>
+          </div>
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -637,50 +804,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               </div>
             );
           })}
-        </div>
-
-        {/* Métricas da Equipe - Simples */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 bg-white dark:bg-dark-bg">
-            <div className="text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
-              Tempo Médio
-            </div>
-            <div className="text-xl font-semibold text-gray-900 dark:text-dark-text">
-              {performance.length > 0
-                ? (
-                    performance.reduce((acc, p) => acc + p.averageTime, 0) /
-                    performance.length
-                  ).toFixed(0)
-                : 0}{" "}
-              dias
-            </div>
-          </div>
-
-          <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 bg-white dark:bg-dark-bg">
-            <div className="text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
-              Total Recuperado
-            </div>
-            <div className="text-xl font-semibold text-gray-900 dark:text-dark-text">
-              {formatCurrency(
-                performance.reduce((acc, p) => acc + p.receivedAmount, 0),
-              )}
-            </div>
-          </div>
-
-          <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 bg-white dark:bg-dark-bg">
-            <div className="text-sm text-gray-600 dark:text-dark-text-secondary mb-1">
-              Eficiência Geral
-            </div>
-            <div className="text-xl font-semibold text-gray-900 dark:text-dark-text">
-              {performance.length > 0
-                ? (
-                    performance.reduce((acc, p) => acc + p.conversionRate, 0) /
-                    performance.length
-                  ).toFixed(1)
-                : 0}
-              %
-            </div>
-          </div>
         </div>
 
         {/* Lista Completa */}
@@ -1070,6 +1193,22 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Schedules and Clients by City */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 mt-6">
+          <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 transition-colors duration-300">
+            <h4 className="font-medium text-gray-900 dark:text-dark-text transition-colors duration-300 mb-4">
+              Agendamentos por Cidade
+            </h4>
+            <SchedulesByCityCardContent />
+          </div>
+          <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 transition-colors duration-300">
+            <h4 className="font-medium text-gray-900 dark:text-dark-text transition-colors duration-300 mb-4">
+              Clientes por Cidade
+            </h4>
+            <ClientsByCityCardContent />
           </div>
         </div>
 
