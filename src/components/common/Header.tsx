@@ -51,11 +51,20 @@ const Header: React.FC<HeaderProps> = ({
   // Inicializar dark mode
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)",
-    ).matches;
-    const shouldBeDark = savedTheme ? savedTheme === "dark" : prefersDark;
+    let shouldBeDark = false; // Default to light mode
+
+    if (savedTheme) {
+      shouldBeDark = savedTheme === "dark";
+    }
+
     setIsDark(shouldBeDark);
+
+    const html = document.documentElement;
+    if (shouldBeDark) {
+      html.classList.add("dark");
+    } else {
+      html.classList.remove("dark");
+    }
   }, []);
 
   const toggleDarkMode = () => {
