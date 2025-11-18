@@ -54,11 +54,11 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<
-    "visits" | "cancellations" | "history" | "scheduledDates"
+    "visits" | "cancellations" | "scheduledDates"
   >("visits");
   const [selectedCollector, setSelectedCollector] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [clientSearchFilter, setClientSearchFilter] = useState<string>("");
+  const [searchFilter, setSearchFilter] = useState<string>("");
 
   // Calculate first and last day of the current month for default filters
   const today = new Date();
@@ -356,16 +356,18 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       }
 
       // Filtro por busca de cliente
-      if (clientSearchFilter.trim()) {
-        const searchTerm = clientSearchFilter.toLowerCase().trim();
+      if (searchFilter.trim()) {
+        const searchTerm = searchFilter.toLowerCase().trim();
         const clientName = visit.clientName?.toLowerCase() || "";
         const clientDocument = visit.clientDocument?.toLowerCase() || "";
         const clientAddress = visit.clientAddress?.toLowerCase() || "";
+        const visitNotes = visit.notes?.toLowerCase() || "";
 
         if (
           !clientName.includes(searchTerm) &&
           !clientDocument.includes(searchTerm) &&
-          !clientAddress.includes(searchTerm)
+          !clientAddress.includes(searchTerm) &&
+          !visitNotes.includes(searchTerm)
         ) {
           return false;
         }
@@ -380,7 +382,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     dateFromFilter,
     dateToFilter,
     overdueFilter,
-    clientSearchFilter,
+    searchFilter,
   ]);
 
   // Agrupa visitas por cobrador com filtros avançados
@@ -421,7 +423,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     setStatusFilter("all");
     setDateFromFilter("");
     setDateToFilter("");
-    setClientSearchFilter("");
+    setSearchFilter("");
     setOverdueFilter("all");
   };
 
@@ -440,7 +442,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     if (statusFilter !== "all") count++;
     if (dateFromFilter) count++;
     if (dateToFilter) count++;
-    if (clientSearchFilter.trim()) count++;
+    if (searchFilter.trim()) count++;
     if (overdueFilter !== "all") count++;
     return count;
   };
@@ -634,20 +636,20 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             {/* Busca sempre visível */}
             <div>
               <label
-                htmlFor="client-search-input"
+                htmlFor="search-input"
                 className="block text-sm font-medium text-gray-700 mb-2"
               >
-                Buscar Cliente
+                Buscar
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
-                  id="client-search-input"
-                  name="clientSearch"
+                  id="search-input"
+                  name="search"
                   type="text"
-                  value={clientSearchFilter}
-                  onChange={(e) => setClientSearchFilter(e.target.value)}
-                  placeholder="Nome, documento ou endereço..."
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  placeholder="Nome, documento, endereço ou observações..."
                   className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -1232,277 +1234,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     </div>
   );
 
-  const renderHistoryTab = () => {
-    // Obter histórico de todas as visitas finalizadas dos últimos 30 dias
-    const getHistoryVisits = () => {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      thirtyDaysAgo.setHours(0, 0, 0, 0);
 
-      return scheduledVisits.filter((visit) => {
-        // Incluir visitas finalizadas (não agendadas)
-        if (visit.status === "agendada") return false;
-
-        try {
-          const updatedDate = visit.updatedAt
-            ? parseDateString(visit.updatedAt.split("T")[0]) // Assuming updatedAt is ISO string
-            : parseDateString(visit.createdAt.split("T")[0]); // Assuming createdAt is ISO string
-
-          if (!updatedDate) return false; // Handle invalid date
-
-          return updatedDate >= thirtyDaysAgo;
-        } catch {
-          return false;
-        }
-      });
-    };
-
-    // Agrupar por cobrador
-    const getHistoryByCollector = () => {
-      const historyVisits = getHistoryVisits();
-      const grouped: { [key: string]: ScheduledVisit[] } = {};
-
-      historyVisits.forEach((visit) => {
-        if (!grouped[visit.collectorId]) {
-          grouped[visit.collectorId] = [];
-        }
-        grouped[visit.collectorId].push(visit);
-      });
-
-      // Ordenar as visitas dentro de cada grupo por data de atualização (mais recentes primeiro)
-      Object.keys(grouped).forEach((collectorId) => {
-        grouped[collectorId].sort((a, b) => {
-          const dateA = parseDateString(
-            (a.updatedAt || a.createdAt).split("T")[0],
-          );
-          const dateB = parseDateString(
-            (b.updatedAt || b.createdAt).split("T")[0],
-          );
-
-          if (!dateA || !dateB) return 0; // Handle invalid dates
-
-          return dateB.getTime() - dateA.getTime();
-        });
-      });
-
-      return grouped;
-    };
-
-    const historyGrouped = getHistoryByCollector();
-    const totalHistoryVisits = Object.values(historyGrouped).reduce(
-      (sum, visits) => sum + visits.length,
-      0,
-    );
-
-    return (
-      <div className="space-y-4">
-        {totalHistoryVisits === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
-            <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Nenhuma visita finalizada
-            </h3>
-            <p className="text-gray-600">
-              O histórico dos últimos 30 dias aparecerá aqui conforme as visitas
-              forem finalizadas
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Histórico dos últimos 30 dias ({totalHistoryVisits}{" "}
-                {totalHistoryVisits === 1 ? "visita" : "visitas"})
-              </h3>
-            </div>
-
-            {Object.entries(historyGrouped).map(([collectorId, visits]) => {
-              const collectorName = getCollectorName(collectorId);
-              const isExpanded = expandedCollectors.has(
-                `history_${collectorId}`,
-              );
-
-              return (
-                <div
-                  key={`history_${collectorId}`}
-                  className="bg-white rounded-2xl shadow-sm border border-gray-200"
-                >
-                  {/* Header do cobrador */}
-                  <div
-                    className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => {
-                      const newExpanded = new Set(expandedCollectors);
-                      const key = `history_${collectorId}`;
-                      if (newExpanded.has(key)) {
-                        newExpanded.delete(key);
-                      } else {
-                        newExpanded.add(key);
-                      }
-                      setExpandedCollectors(newExpanded);
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="h-12 w-12 rounded-full flex items-center justify-center mr-4 bg-gray-100">
-                          <User className="h-6 w-6 text-gray-600" />
-                        </div>
-                        <div>
-                          <h4 className="text-lg font-semibold text-gray-900">
-                            {collectorName}
-                          </h4>
-                          <p className="text-sm text-gray-600">
-                            {visits.length}{" "}
-                            {visits.length === 1 ? "visita" : "visitas"}{" "}
-                            finalizadas
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-gray-900">
-                          {visits.length}
-                        </div>
-                        <div className="text-sm text-gray-600">Histórico</div>
-                      </div>
-                      {isExpanded ? (
-                        <ChevronUp className="h-5 w-5 text-gray-600 ml-4" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 text-gray-600 ml-4" />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Lista de visitas do histórico */}
-                  {isExpanded && (
-                    <div className="p-6 pt-0 space-y-4">
-                      {visits.map((visit) => {
-                        const isCancellation =
-                          visit.cancellationApprovedBy ||
-                          visit.cancellationRejectedBy;
-
-                        return (
-                          <div
-                            key={visit.id}
-                            className="p-4 rounded-2xl border border-gray-200 bg-gray-50 transition-all duration-200 hover:shadow-md"
-                          >
-                            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
-                              <div className="flex-1">
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 mb-3">
-                                  <div className="font-semibold text-gray-900 mb-1 sm:mb-0">
-                                    {visit.clientName}
-                                  </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {getStatusBadge(visit.status)}
-                                    {isCancellation &&
-                                      visit.status === "cancelada" && (
-                                        <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">
-                                          Cancelamento Aprovado
-                                        </span>
-                                      )}
-                                    {isCancellation &&
-                                      visit.status === "agendada" &&
-                                      visit.cancellationRejectedBy && (
-                                        <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
-                                          Cancelamento Rejeitado
-                                        </span>
-                                      )}
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600 mb-3">
-                                  <div className="flex items-center">
-                                    <MapPin className="h-4 w-4 mr-2" />
-                                    {visit.clientAddress}
-                                    {visit.clientNeighborhood &&
-                                      `, ${visit.clientNeighborhood}`}
-                                    {visit.clientCity &&
-                                      `, ${visit.clientCity}`}
-                                  </div>
-
-                                  <div className="space-y-2">
-                                    {visit.totalPendingValue && (
-                                      <div className="flex items-center">
-                                        <DollarSign className="h-4 w-4 mr-2" />
-                                        Pendente:{" "}
-                                        {formatCurrency(
-                                          visit.totalPendingValue,
-                                        )}
-                                      </div>
-                                    )}
-                                    {visit.updatedAt && (
-                                      <div className="flex items-center">
-                                        <Clock className="h-4 w-4 mr-2" />
-                                        Finalizada em:{" "}
-                                        {formatSafeDate(
-                                          visit.updatedAt.split("T")[0],
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {visit.notes && (
-                                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 mb-3">
-                                    <div className="flex items-start">
-                                      <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
-                                      <div>
-                                        <div className="text-sm font-medium text-gray-700 mb-1">
-                                          Observações da visita:
-                                        </div>
-                                        <div className="text-sm text-gray-600 italic whitespace-pre-line">
-                                          {visit.notes}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                                {visit.cancellationRequestReason && (
-                                  <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3 mb-3">
-                                    <div className="flex items-start">
-                                      <MessageSquare className="h-4 w-4 text-orange-600 mr-2 flex-shrink-0 mt-0.5" />
-                                      <div>
-                                        <div className="text-sm font-medium text-orange-800 mb-1">
-                                          Motivo da solicitação de cancelamento:
-                                        </div>
-                                        <div className="text-sm text-orange-700 italic">
-                                          "{visit.cancellationRequestReason}"
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {visit.cancellationRejectedBy &&
-                                  visit.cancellationRejectionReason && (
-                                    <div className="bg-red-50 border border-red-200 rounded-2xl p-3 mb-3">
-                                      <div className="flex items-start">
-                                        <XCircle className="h-4 w-4 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
-                                        <div>
-                                          <div className="text-sm font-medium text-red-700 mb-1">
-                                            Motivo da rejeição do cancelamento:
-                                          </div>
-                                          <div className="text-sm text-red-600 italic">
-                                            "{visit.cancellationRejectionReason}
-                                            "
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   // Calculate overview statistics
   const overviewStats = useMemo(() => {
@@ -1600,18 +1332,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 </span>
               )}
             </button>
-            <button
-              onClick={() => setActiveTab("history")}
-              className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-2xl text-sm font-medium transition-colors ${
-                activeTab === "history"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-              title="Histórico"
-            >
-              <Clock className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Histórico</span>
-            </button>
+
             {user?.type === "manager" && (
               <button
                 onClick={() => setActiveTab("scheduledDates")}
@@ -1678,7 +1399,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           <div className="p-6">
             {activeTab === "visits" && renderVisitsTab()}
             {activeTab === "cancellations" && renderCancellationsTab()}
-            {activeTab === "history" && renderHistoryTab()}
+
             {activeTab === "scheduledDates" && <AllowedVisitDatesManager />}
           </div>
         </div>
