@@ -81,7 +81,9 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const [expandedCollectors, setExpandedCollectors] = useState<Set<string>>(
     new Set(),
   );
-  const [collectorPages, setCollectorPages] = useState<Record<string, number>>({});
+  const [collectorPages, setCollectorPages] = useState<Record<string, number>>(
+    {},
+  );
   const [visitsPerPage, setVisitsPerPage] = useState(5);
   const [overdueFilter, setOverdueFilter] = useState<string>("all"); // 'all', 'overdue', 'not_overdue'
 
@@ -1029,9 +1031,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                             <span className="hidden sm:inline">
                                               Aprovar
                                             </span>
-                                            <span className="sm:hidden">
-                                              ✓
-                                            </span>
+                                            <span className="sm:hidden">✓</span>
                                           </button>
                                           <button
                                             onClick={() =>
@@ -1046,9 +1046,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                             <span className="hidden sm:inline">
                                               Rejeitar
                                             </span>
-                                            <span className="sm:hidden">
-                                              ✕
-                                            </span>
+                                            <span className="sm:hidden">✕</span>
                                           </button>
                                         </div>
                                       )}
@@ -1234,8 +1232,6 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     </div>
   );
 
-
-
   // Calculate overview statistics
   const overviewStats = useMemo(() => {
     try {
@@ -1249,7 +1245,9 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       const canceladas = filteredVisitsFlat.filter(
         (v) => v.status === "cancelada",
       ).length;
-      const atrasadas = filteredVisitsFlat.filter((v) => isVisitOverdue(v)).length;
+      const atrasadas = filteredVisitsFlat.filter((v) =>
+        isVisitOverdue(v),
+      ).length;
       const pendingRequests = getPendingCancellationRequests().length;
 
       return {

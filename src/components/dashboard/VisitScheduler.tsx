@@ -678,7 +678,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
   // Obter lista de cidades únicas (apenas de clientes com pendências)
   const availableCities = React.useMemo(() => {
-    const cities = [...new Set(baseFilteredClients.map((client) => client.city))];
+    const cities = [
+      ...new Set(baseFilteredClients.map((client) => client.city)),
+    ];
     return cities.sort();
   }, [baseFilteredClients]);
 
@@ -2967,7 +2969,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           createPortal(
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
-
                 <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                     <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
@@ -2989,10 +2990,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       "Visitado, mas cliente pagou parcialmente.",
                       "Visitado, mas cliente agendou pagamento.",
                       "Visitado, mas cliente não estava em casa.",
-                      "Visitado, mas cliente solicitou revisão.",                      
+                      "Visitado, mas cliente solicitou revisão.",
                       "Visitado, mas cliente devolveu os óculos.",
                       "Visitado, mas cliente faleceu.",
-                      "Visitado, mas cliente contestou a dívida - (SPC).",                      
+                      "Visitado, mas cliente contestou a dívida - (SPC).",
                     ].map((note, index) => (
                       <button
                         key={index}
@@ -3564,7 +3565,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 />
                               </div>
                               <div>
-                                <label htmlFor="vencimentoate" className="flex items-center text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                <label
+                                  htmlFor="vencimentoate"
+                                  className="flex items-center text-xs sm:text-sm font-medium text-gray-700 mb-1"
+                                >
                                   <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
                                   Vencimento Até
                                 </label>
@@ -3648,7 +3652,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                           <div>
-                                            <label htmlFor={`visit-date-${client.document}`} className="block text-xs font-medium text-gray-600 mb-1">
+                                            <label
+                                              htmlFor={`visit-date-${client.document}`}
+                                              className="block text-xs font-medium text-gray-600 mb-1"
+                                            >
                                               Data da Visita
                                             </label>
                                             <div className="relative">
@@ -3671,7 +3678,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                             </div>
                                           </div>
                                           <div>
-                                            <label htmlFor={`visit-time-${client.document}`} className="block text-xs font-medium text-gray-600 mb-1">
+                                            <label
+                                              htmlFor={`visit-time-${client.document}`}
+                                              className="block text-xs font-medium text-gray-600 mb-1"
+                                            >
                                               Horário
                                             </label>
                                             <div className="relative">
@@ -4156,60 +4166,64 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                     Datas permitidas:
                                   </p>
                                   <div className="flex flex-wrap gap-2">
-                                    {sortedDates.map(([date, clientWithDateCount]) => {
-                                      // Verificar se é domingo
-                                      const [year, month, day] = date
-                                        .split("-")
-                                        .map(Number);
-                                      const dateObj = new Date(
-                                        year,
-                                        month - 1,
-                                        day,
-                                      );
-                                      const isSunday = dateObj.getDay() === 0;
+                                    {sortedDates.map(
+                                      ([date, clientWithDateCount]) => {
+                                        // Verificar se é domingo
+                                        const [year, month, day] = date
+                                          .split("-")
+                                          .map(Number);
+                                        const dateObj = new Date(
+                                          year,
+                                          month - 1,
+                                          day,
+                                        );
+                                        const isSunday = dateObj.getDay() === 0;
 
-                                      // Contar visitas já agendadas para esta data
-                                      const visitsOnThisDate = allVisits.filter(
-                                        (visit) => visit.scheduledDate === date,
-                                      ).length;
+                                        // Contar visitas já agendadas para esta data
+                                        const visitsOnThisDate =
+                                          allVisits.filter(
+                                            (visit) =>
+                                              visit.scheduledDate === date,
+                                          ).length;
 
-                                      return (
-                                        <button
-                                          key={date}
-                                          onClick={() =>
-                                            handleGeneralDateChange({
-                                              target: {
-                                                value: date,
-                                              },
-                                            } as React.ChangeEvent<HTMLInputElement>)
-                                          }
-                                          className={`px-3 py-1.5 text-xs sm:text-sm rounded-lg transition-colors font-medium relative ${
-                                            isSunday
-                                              ? "bg-yellow-100 border border-yellow-400 text-yellow-800 hover:bg-yellow-200"
-                                              : "bg-white border border-blue-300 text-blue-700 hover:bg-blue-50"
-                                          }`}
-                                          title={`${clientWithDateCount} cliente${clientWithDateCount !== 1 ? "s" : ""} com esta data permitida. ${visitsOnThisDate} visita${visitsOnThisDate !== 1 ? "s" : ""} já agendada${visitsOnThisDate !== 1 ? "s" : ""}.${isSunday ? " (Domingo!)" : ""}`}
-                                        >
-                                          {formatSafeDate(date)}
-                                          {isSunday && (
-                                            <span className="ml-1 text-yellow-600">
-                                              ⚠️
-                                            </span>
-                                          )}
-                                          {visitsOnThisDate > 0 && (
-                                            <span
-                                              className={`ml-1 inline-flex items-center justify-center w-5 h-5 text-[10px] sm:text-xs rounded-full ${
-                                                isSunday
-                                                  ? "bg-yellow-300 text-yellow-900"
-                                                  : "bg-blue-200 text-blue-700"
-                                              }`}
-                                            >
-                                              {visitsOnThisDate}
-                                            </span>
-                                          )}
-                                        </button>
-                                      );
-                                    })}
+                                        return (
+                                          <button
+                                            key={date}
+                                            onClick={() =>
+                                              handleGeneralDateChange({
+                                                target: {
+                                                  value: date,
+                                                },
+                                              } as React.ChangeEvent<HTMLInputElement>)
+                                            }
+                                            className={`px-3 py-1.5 text-xs sm:text-sm rounded-lg transition-colors font-medium relative ${
+                                              isSunday
+                                                ? "bg-yellow-100 border border-yellow-400 text-yellow-800 hover:bg-yellow-200"
+                                                : "bg-white border border-blue-300 text-blue-700 hover:bg-blue-50"
+                                            }`}
+                                            title={`${clientWithDateCount} cliente${clientWithDateCount !== 1 ? "s" : ""} com esta data permitida. ${visitsOnThisDate} visita${visitsOnThisDate !== 1 ? "s" : ""} já agendada${visitsOnThisDate !== 1 ? "s" : ""}.${isSunday ? " (Domingo!)" : ""}`}
+                                          >
+                                            {formatSafeDate(date)}
+                                            {isSunday && (
+                                              <span className="ml-1 text-yellow-600">
+                                                ⚠️
+                                              </span>
+                                            )}
+                                            {visitsOnThisDate > 0 && (
+                                              <span
+                                                className={`ml-1 inline-flex items-center justify-center w-5 h-5 text-[10px] sm:text-xs rounded-full ${
+                                                  isSunday
+                                                    ? "bg-yellow-300 text-yellow-900"
+                                                    : "bg-blue-200 text-blue-700"
+                                                }`}
+                                              >
+                                                {visitsOnThisDate}
+                                              </span>
+                                            )}
+                                          </button>
+                                        );
+                                      },
+                                    )}
                                   </div>
                                 </div>
                               );
