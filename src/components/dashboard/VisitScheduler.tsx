@@ -2097,6 +2097,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                           </p>
                         </div>
                       </div>
+              
 
                       {/* Busca e Filtros */}
                       {selectedDateVisits.length > 1 && (
@@ -2166,6 +2167,34 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                     </div>
                   </div>
                 </div>
+
+                
+            {/* Paginação Minimalista */}
+            {selectedDateVisits.length > visitsPerPage && (
+              <div className="flex items-center justify-center mt-6 mb-4">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 text-gray-500 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <span className="text-sm font-medium text-gray-700 mx-4">
+                  Página {currentPage} de {totalSelectedDatePages}
+                </span>
+                <button
+                  onClick={() =>
+                    setCurrentPage(
+                      Math.min(totalSelectedDatePages, currentPage + 1),
+                    )
+                  }
+                  disabled={currentPage === totalSelectedDatePages}
+                  className="p-2 text-gray-500 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </div>
+            )}
 
                 {selectedDateVisits.length === 0 ? (
                   <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
@@ -2566,51 +2595,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
               </div>
             )}
 
-            {/* Paginação no final da página */}
-            {selectedDateVisits.length > visitsPerPage && (
-              <div className="relative flex items-center justify-center mt-8 pt-6 border-t border-blue-100">
-                <div className="flex items-center space-x-4 bg-white rounded-xl border border-blue-200 shadow-sm px-6 py-3">
-                  <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
-                  >
-                    <ChevronLeft className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
-                  </button>
-
-                  <div className="flex items-center space-x-2">
-                    {Array.from(
-                      { length: totalSelectedDatePages },
-                      (_, i) => i + 1,
-                    ).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-10 h-10 rounded-lg font-medium text-sm transition-colors ${
-                          currentPage === page
-                            ? "bg-blue-600 text-white shadow-sm"
-                            : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      setCurrentPage(
-                        Math.min(totalSelectedDatePages, currentPage + 1),
-                      )
-                    }
-                    disabled={currentPage === totalSelectedDatePages}
-                    className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-colors group"
-                  >
-                    <ChevronRight className="h-5 w-5 text-gray-600 group-hover:text-blue-600" />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -2822,15 +2806,15 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           selectedVisitForReschedule &&
           createPortal(
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
-                <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
+              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 max-h-[90vh] flex flex-col">
+                <div className="px-4 lg:px-6 py-4 border-b border-gray-200 flex-shrink-0">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                     <RefreshCw className="h-5 w-5 mr-2 text-blue-600" />
                     Reagendar Visita
                   </h3>
                 </div>
 
-                <div className="px-4 lg:px-6 py-4">
+                <div className="px-4 lg:px-6 py-4 overflow-y-auto">
                   <div className="mb-4">
                     <div className="text-sm text-gray-600 mb-2">
                       <strong>Cliente:</strong>{" "}
@@ -2932,7 +2916,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   </div>
                 </div>
 
-                <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
+                <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3 flex-shrink-0">
                   <button
                     onClick={handleCloseRescheduleModal}
                     className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
