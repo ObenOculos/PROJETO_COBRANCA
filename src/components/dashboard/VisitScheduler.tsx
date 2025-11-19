@@ -2930,16 +2930,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       </div>
                     </div>
                   </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 mt-4">
-                    <div className="flex items-start">
-                      <Calendar className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
-                      <div className="text-sm text-blue-700">
-                        <strong>Dica:</strong> Certifique-se de escolher um
-                        horário que permita o deslocamento entre visitas.
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
