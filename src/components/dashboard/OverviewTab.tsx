@@ -53,7 +53,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const { getClientGroups } = useCollection();
   const [] = useState(false);
   const [] = useState(false);
-  
+
   useEffect(() => {
     if (isAutoPlaying) {
       autoPlayIntervalRef.current = setInterval(() => {
@@ -300,9 +300,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     const filteredVisits =
       selectedCollector === "all"
         ? scheduledVisits
-        : scheduledVisits?.filter(
-            (v) => v.collectorId === selectedCollector,
-          );
+        : scheduledVisits?.filter((v) => v.collectorId === selectedCollector);
 
     const scheduled = filteredVisits?.filter((v) => v.status === "agendada");
 
@@ -340,10 +338,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
     const sortedSchedules = useMemo(() => {
       type ScheduleData = { count: number; dates: Set<string> };
-      const entries = Object.entries(schedulesByCity) as [string, ScheduleData][];
-      return entries.sort(
-        ([, dataA], [, dataB]) => dataA.count - dataB.count,
-      );
+      const entries = Object.entries(schedulesByCity) as [
+        string,
+        ScheduleData,
+      ][];
+      return entries.sort(([, dataA], [, dataB]) => dataA.count - dataB.count);
     }, [schedulesByCity]);
 
     const totalPages = Math.ceil(sortedSchedules.length / itemsPerPage);
@@ -355,19 +354,21 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     return (
       <>
         <div className="grid grid-cols-2 gap-2 text-sm">
-          {paginatedSchedules.map(([city, data]: [string, { count: number }]) => (
-            <div
-              key={city}
-              className="bg-gray-50 dark:bg-dark-bg-secondary p-2 rounded-lg text-center border border-gray-200 dark:border-dark-border"
-            >
-              <div className="font-bold text-gray-800 dark:text-dark-text">
-                {data.count}
+          {paginatedSchedules.map(
+            ([city, data]: [string, { count: number }]) => (
+              <div
+                key={city}
+                className="bg-gray-50 dark:bg-dark-bg-secondary p-2 rounded-lg text-center border border-gray-200 dark:border-dark-border"
+              >
+                <div className="font-bold text-gray-800 dark:text-dark-text">
+                  {data.count}
+                </div>
+                <div className="text-gray-600 dark:text-dark-text-secondary">
+                  {city}
+                </div>
               </div>
-              <div className="text-gray-600 dark:text-dark-text-secondary">
-                {city}
-              </div>
-            </div>
-          ))}
+            ),
+          )}
         </div>
         {totalPages > 1 && (
           <div className="mt-4 flex items-center justify-center space-x-2">
