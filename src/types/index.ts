@@ -181,6 +181,8 @@ export interface ClientGroup {
   number: string;
   neighborhood: string;
   city: string;
+  complemento?: string;
+  cep?: string;
   state: string;
   sales: SaleGroup[];
   totalValue: number;

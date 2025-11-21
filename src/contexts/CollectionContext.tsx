@@ -1436,6 +1436,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               neighborhood: collection.bairro || "",
               city: collection.cidade || "",
               state: collection.estado || "",
+              complemento: collection.complemento || undefined,
+              cep: collection.cep || undefined,
               sales: [],
               totalValue: 0,
               totalReceived: 0,

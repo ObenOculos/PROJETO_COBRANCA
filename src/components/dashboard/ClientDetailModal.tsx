@@ -765,10 +765,15 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                           {clientGroup.address || "Endereço não informado"},{" "}
                           {clientGroup.number || "s/n"}
                         </p>
+                        {clientGroup.complemento && (
+                          <p>{clientGroup.complemento}</p>
+                        )}
                         <p>
-                          {clientGroup.neighborhood || "Bairro não informado"}
+                          {clientGroup.neighborhood || "Bairro não informado"} -{" "}
+                          {clientGroup.city || "Cidade não informada"}/
+                          {clientGroup.state || ""}
                         </p>
-                        <p>{clientGroup.city || "Cidade não informada"}</p>
+                        {clientGroup.cep && <p>{clientGroup.cep}</p>}
                       </div>
                     </div>
                   </div>
