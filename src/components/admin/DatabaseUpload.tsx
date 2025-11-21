@@ -554,28 +554,37 @@ const DatabaseUpload: React.FC = () => {
       const data_de_recebimento =
         row.data_de_recebimento || row["data_de_recebimento"];
       const valor_recebido = row.valor_recebido || row["valor_recebido"];
+      const desconto = row.desconto || row["desconto"];
 
       if (!idParcela) continue; // Segurança, embora já filtrado
-
-      if (!status && !situacao && !data_de_recebimento && !valor_recebido) {
-        updates.push({
-          id_parcela: idParcela,
-          status: "error",
-          error:
-            "Pelo menos um dos campos (status, situacao, data_de_recebimento, valor_recebido) deve ser fornecido",
-        });
-        continue;
-      }
 
       try {
         const updateObj: any = {};
         if (status) updateObj.status = status;
         if (data_de_recebimento)
           updateObj.data_de_recebimento = data_de_recebimento;
-        if (valor_recebido) {
-          const valor = Number(valor_recebido.replace(",", "."));
-          if (!isNaN(valor)) {
-            updateObj.valor_recebido = valor;
+        if (valor_recebido !== undefined && valor_recebido !== null) {
+          if (valor_recebido.trim() === "") {
+            updateObj.valor_recebido = null;
+          } else {
+            const valor = Number(
+              valor_recebido.replace(/[^\d,]/g, "").replace(",", "."),
+            );
+            if (!isNaN(valor)) {
+              updateObj.valor_recebido = valor;
+            }
+          }
+        }
+        if (desconto !== undefined && desconto !== null) {
+          if (desconto.trim() === "") {
+            updateObj.desconto = null;
+          } else {
+            const valor = Number(
+              desconto.replace(/[^\d,]/g, "").replace(",", "."),
+            );
+            if (!isNaN(valor)) {
+              updateObj.desconto = valor;
+            }
           }
         }
 
@@ -1040,7 +1049,8 @@ const DatabaseUpload: React.FC = () => {
             </div>
             <p className="text-gray-500 mt-3 text-sm">
               Envie um arquivo CSV para atualizar o status, situação, data de
-              recebimento ou valor recebido de múltiplas parcelas de uma só vez.
+              recebimento, valor recebido ou desconto de múltiplas parcelas de
+              uma só vez.
             </p>
           </div>
 

@@ -2097,7 +2097,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                           </p>
                         </div>
                       </div>
-              
 
                       {/* Busca e Filtros */}
                       {selectedDateVisits.length > 1 && (
@@ -2168,33 +2167,34 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   </div>
                 </div>
 
-                
-            {/* Paginação Minimalista */}
-            {selectedDateVisits.length > visitsPerPage && (
-              <div className="flex items-center justify-center mt-6 mb-4">
-                <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="p-2 text-gray-500 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <span className="text-sm font-medium text-gray-700 mx-4">
-                  Página {currentPage} de {totalSelectedDatePages}
-                </span>
-                <button
-                  onClick={() =>
-                    setCurrentPage(
-                      Math.min(totalSelectedDatePages, currentPage + 1),
-                    )
-                  }
-                  disabled={currentPage === totalSelectedDatePages}
-                  className="p-2 text-gray-500 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
-            )}
+                {/* Paginação Minimalista */}
+                {selectedDateVisits.length > visitsPerPage && (
+                  <div className="flex items-center justify-center mt-6 mb-4">
+                    <button
+                      onClick={() =>
+                        setCurrentPage(Math.max(1, currentPage - 1))
+                      }
+                      disabled={currentPage === 1}
+                      className="p-2 text-gray-500 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <span className="text-sm font-medium text-gray-700 mx-4">
+                      Página {currentPage} de {totalSelectedDatePages}
+                    </span>
+                    <button
+                      onClick={() =>
+                        setCurrentPage(
+                          Math.min(totalSelectedDatePages, currentPage + 1),
+                        )
+                      }
+                      disabled={currentPage === totalSelectedDatePages}
+                      className="p-2 text-gray-500 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
 
                 {selectedDateVisits.length === 0 ? (
                   <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
@@ -2594,7 +2594,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                 </div>
               </div>
             )}
-
           </div>
         </div>
 
