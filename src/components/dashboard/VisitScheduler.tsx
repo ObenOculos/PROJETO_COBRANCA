@@ -223,6 +223,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     Record<string, ScheduledVisit[]>
   >({});
 
+  // NEW STATE: To track if the overdue modal has been shown.
+  const [hasOverdueModalBeenShown, setHasOverdueModalBeenShown] = useState(false);
+
   // Estados para filtro das visitas do dia selecionado
   const [visitsSortBy, setVisitsSortBy] = useState<"name" | "city" | "value">(
     "name",
@@ -593,7 +596,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
   // Detectar e agrupar visitas atrasadas
   React.useEffect(() => {
-    if (!user || !allVisits) return;
+    // Only proceed if the modal hasn't been shown yet
+    if (!user || !allVisits || hasOverdueModalBeenShown) return;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -619,11 +623,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
     setOverdueVisitsByDate(groupedByDate);
 
-    // Mostrar modal se houver visitas atrasadas
+    // Mostrar modal se houver visitas atrasadas e ainda não foi mostrado
     if (Object.keys(groupedByDate).length > 0) {
       setShowOverdueNotificationModal(true);
+      setHasOverdueModalBeenShown(true); // Mark as shown
     }
-  }, [user, allVisits]);
+  }, [user, allVisits, hasOverdueModalBeenShown]);
 
   const handleScheduleVisit = async () => {
     return handleScheduleMultipleVisits();
