@@ -2174,7 +2174,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
                 {/* Paginação Minimalista */}
                 {selectedDateVisits.length > visitsPerPage && (
-                  <div className="flex items-center justify-center mt-6 mb-4">
+                  <div className="flex items-center justify-center mt-6 mb-4 border-blue-300 bg-blue-50 rounded-2xl shadow-sm w-fit mx-auto">
                     <button
                       onClick={() =>
                         setCurrentPage(Math.max(1, currentPage - 1))
