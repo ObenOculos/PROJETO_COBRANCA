@@ -11,6 +11,7 @@ import {
   MapPin,
   Phone,
   MessageCircle,
+  Clock,
 } from "lucide-react";
 import { ClientGroup } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
@@ -142,9 +143,73 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   userType,
   onClose,
 }) => {
-  const { getSalesByClient, calculateSaleBalance, refreshCollections } =
-    useCollection();
+  const {
+    getSalesByClient,
+    calculateSaleBalance,
+    refreshCollections,
+    scheduledVisits,
+    users,
+  } = useCollection();
   const { user } = useAuth();
+
+  const getCollectorName = (collectorId: string) => {
+    const collector = users?.find((u) => u.id === collectorId);
+    return collector?.name || "Cobrador não identificado";
+  };
+
+  const formatVisitDate = (dateString: string) => {
+    try {
+      const [year, month, day] = dateString.split("-");
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      return date.toLocaleDateString("pt-BR");
+    } catch {
+      return dateString;
+    }
+  };
+
+  const getStatusVisitBadge = (status: string) => {
+    const config = {
+      realizada: {
+        bg: "bg-green-100",
+        text: "text-green-800",
+        label: "Realizada",
+      },
+      cancelada: {
+        bg: "bg-gray-100",
+        text: "text-gray-800",
+        label: "Cancelada",
+      },
+      nao_encontrado: {
+        bg: "bg-yellow-100",
+        text: "text-yellow-800",
+        label: "Não Encontrado",
+      },
+    };
+
+    const statusConfig =
+      config[status as keyof typeof config] || config["realizada"];
+
+    return (
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-semibold ${statusConfig.bg} ${statusConfig.text}`}
+      >
+        {statusConfig.label}
+      </span>
+    );
+  };
+
+  const clientVisits = React.useMemo(() => {
+    if (!clientGroup?.document || !scheduledVisits) return [];
+
+    return scheduledVisits
+      .filter((visit) => visit.clientDocument === clientGroup.document)
+      .filter((visit) => visit.status === "realizada" && visit.notes) // Apenas visitas realizadas com observações
+      .sort((a, b) => {
+        const dateA = new Date(a.updatedAt || a.createdAt);
+        const dateB = new Date(b.updatedAt || b.createdAt);
+        return dateB.getTime() - dateA.getTime(); // Mais recentes primeiro
+      });
+  }, [clientGroup.document, scheduledVisits]);
 
   const [isGeneralPaymentModalOpen, setIsGeneralPaymentModalOpen] =
     useState(false);
@@ -709,6 +774,66 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   </div>
                 </div>
               </div>
+              {/* Visit History */}
+              {clientVisits.length > 0 && (
+                <div className="mt-8 space-y-4 lg:col-span-2">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <Clock className="h-5 w-5 mr-2 text-blue-600" />
+                    Histórico de Acompanhamento
+                  </h3>
+                  <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                    {clientVisits.map((visit) => (
+                      <div
+                        key={visit.id}
+                        className="bg-gray-50 p-4 rounded-2xl border border-gray-200"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              {getStatusVisitBadge(visit.status)}
+                              <span className="text-xs text-gray-500">
+                                {formatVisitDate(visit.scheduledDate)}
+                                {visit.scheduledTime &&
+                                  ` às ${visit.scheduledTime}`}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center text-sm text-gray-600 mb-2">
+                              <User className="h-4 w-4 mr-1" />
+                              <span className="font-medium">
+                                {getCollectorName(visit.collectorId)}
+                              </span>
+                            </div>
+
+                            {visit.notes && (
+                              <div className="bg-white p-3 rounded-2xl border border-gray-200">
+                                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+                                  {visit.notes}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center text-xs text-gray-400">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {visit.updatedAt ? (
+                              <>
+                                Finalizada em{" "}
+                                {formatVisitDate(visit.updatedAt.split("T")[0])}
+                              </>
+                            ) : (
+                              <>
+                                Registrada em{" "}
+                                {formatVisitDate(visit.createdAt.split("T")[0])}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="overflow-y-auto max-h-[60vh]">
