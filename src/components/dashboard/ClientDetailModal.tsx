@@ -8,6 +8,9 @@ import {
   CreditCard,
   Info,
   Receipt,
+  MapPin,
+  Phone,
+  MessageCircle,
 } from "lucide-react";
 import { ClientGroup } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
@@ -632,56 +635,79 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           {/* Sales and Collections or Client Data */}
           {showClientData ? (
             <div className="overflow-y-auto max-h-[60vh] p-4 lg:p-6">
-              <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-2">
-                Dados de Cadastro do Cliente
-              </h3>
-              <div className="bg-gray-200 p-4 space-y-3 rounded-lg text-xs sm:text-sm text-gray-700">
-                {Object.entries(clientGroup)
-                  .filter(([key]) =>
-                    [
-                      "client",
-                      "apelido",
-                      "document",
-                      "address",
-                      "number",
-                      "neighborhood",
-                      "city",
-                      "phone",
-                      "mobile",
-                    ].includes(key),
-                  )
-                  .map(([key, value]) => {
-                    const labelMap: { [key: string]: string } = {
-                      client: "Nome do Cliente",
-                      apelido: "Apelido",
-                      document: "Documento",
-                      address: "Endereço",
-                      number: "Número",
-                      neighborhood: "Bairro",
-                      city: "Cidade",
-                      phone: "Telefone",
-                      mobile: "Celular",
-                    };
-                    return (
-                      <div
-                        key={key}
-                        className="flex justify-between items-center border-b pb-2 last:border-b-0 last:pb-0"
-                      >
-                        <span className="font-medium capitalize">
-                          {labelMap[key] ||
-                            key.replace(/([A-Z])/g, " $1").trim()}
-                          :
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Client Info */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <User className="h-5 w-5 mr-2 text-blue-600" />
+                    Informações do Cliente
+                  </h3>
+                  <div className="bg-gray-50 p-4 rounded-2xl space-y-3 text-sm border border-gray-200">
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-600">Nome:</span>
+                      <span className="font-semibold text-gray-900 text-right">
+                        {clientGroup.client || "-"}
+                      </span>
+                    </div>
+                    {clientGroup.apelido && (
+                      <div className="flex justify-between">
+                        <span className="font-medium text-gray-600">
+                          Apelido:
                         </span>
-                        <span className="text-right">
-                          {value
-                            ? typeof value === "object" && value !== null
-                              ? JSON.stringify(value)
-                              : String(value)
-                            : "-"}
+                        <span className="font-semibold text-gray-900 text-right">
+                          {clientGroup.apelido}
                         </span>
                       </div>
-                    );
-                  })}
+                    )}
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-600">
+                        Documento:
+                      </span>
+                      <span className="font-semibold text-gray-900 text-right">
+                        {clientGroup.document || "-"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact and Address */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <MapPin className="h-5 w-5 mr-2 text-blue-600" />
+                    Contato e Endereço
+                  </h3>
+                  <div className="bg-gray-50 p-4 rounded-2xl space-y-4 text-sm border border-gray-200">
+                    {(clientGroup.phone || clientGroup.mobile) && (
+                      <div className="space-y-2">
+                        {clientGroup.phone && (
+                          <div className="flex items-center">
+                            <Phone className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+                            <span>{clientGroup.phone}</span>
+                          </div>
+                        )}
+                        {clientGroup.mobile && (
+                          <div className="flex items-center">
+                            <MessageCircle className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+                            <span>{clientGroup.mobile}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex items-start">
+                      <MapPin className="h-4 w-4 text-gray-400 mr-2 mt-1 flex-shrink-0" />
+                      <div className="text-gray-800">
+                        <p>
+                          {clientGroup.address || "Endereço não informado"},{" "}
+                          {clientGroup.number || "s/n"}
+                        </p>
+                        <p>
+                          {clientGroup.neighborhood || "Bairro não informado"}
+                        </p>
+                        <p>{clientGroup.city || "Cidade não informada"}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
