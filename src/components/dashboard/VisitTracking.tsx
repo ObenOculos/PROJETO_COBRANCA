@@ -16,8 +16,10 @@ import {
   ChevronUp,
   Search,
   Star, // Add Star icon
+  FileDown,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
+import * as XLSX from "xlsx";
 import { useAuth } from "../../contexts/AuthContext";
 import { ScheduledVisit } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
@@ -460,6 +462,18 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     setExpandedCollectors(newExpanded);
   };
 
+  const getStatusLabel = (status: ScheduledVisit["status"]) => {
+    const statusConfig = {
+      agendada: "Agendada",
+      realizada: "Realizada",
+      cancelada: "Cancelada",
+      nao_encontrado: "Não Encontrado",
+      cancelamento_solicitado: "Cancelamento Solicitado",
+      pending_sync: "Pendente",
+    };
+    return statusConfig[status] || "Agendada";
+  };
+
   const getStatusBadge = (status: ScheduledVisit["status"]) => {
     const statusConfig = {
       agendada: { bg: "bg-blue-100", text: "text-blue-800", label: "Agendada" },
@@ -601,6 +615,44 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
   const [showFilters, setShowFilters] = useState(false);
 
+  const handleExportToExcel = () => {
+    const dataToExport = filteredVisitsFlat.map((visit) => ({
+      Cobrador: getCollectorName(visit.collectorId),
+      Cliente: visit.clientName,
+      Documento: visit.clientDocument,
+      Endereço: `${visit.clientAddress}, ${visit.clientNeighborhood}, ${visit.clientCity}`,
+      "Data Agendada": formatSafeDate(visit.scheduledDate),
+      "Hora Agendada": visit.scheduledTime || "N/A",
+      Status: getStatusLabel(visit.status),
+      "Valor Pendente": visit.totalPendingValue
+        ? formatCurrency(visit.totalPendingValue)
+        : "N/A",
+      Atrasada: isVisitOverdue(visit) ? "Sim" : "Não",
+      "Dias de Atraso": isVisitOverdue(visit)
+        ? getOverdueDays(visit.scheduledDate)
+        : 0,
+      Observações: visit.notes,
+      "Motivo Cancelamento": visit.cancellationRequestReason,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Visitas");
+
+    // Auto-dimensionar colunas
+    const cols = Object.keys(dataToExport[0] || {});
+    const colWidths = cols.map((col) => {
+      const maxLength = Math.max(
+        ...dataToExport.map((row) => ((row as any)[col] ? String((row as any)[col]).length : 0)),
+        col.length, // Include header length
+      );
+      return { wch: maxLength + 2 }; // Add extra padding
+    });
+    worksheet["!cols"] = colWidths;
+
+    XLSX.writeFile(workbook, "relatorio_visitas.xlsx");
+  };
+
   const renderVisitsTab = () => {
     const groupedVisits = getVisitsByCollectorGrouped();
     const activeFiltersCount = getActiveFiltersCount();
@@ -632,6 +684,14 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     Limpar
                   </button>
                 )}
+                <button
+                  onClick={handleExportToExcel}
+                  className="px-3 py-1.5 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
+                  title="Exportar para Excel"
+                >
+                  <FileDown className="h-4 w-4" />
+                  <span className="hidden sm:inline">Exportar</span>
+                </button>
               </div>
             </div>
 
