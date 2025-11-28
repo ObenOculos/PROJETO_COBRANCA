@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import AddressHistoryViewer from "./AddressHistoryViewer";
 import {
   X,
   ChevronDown,
@@ -8,7 +9,6 @@ import {
   CreditCard,
   Info,
   Receipt,
-  MapPin,
   Phone,
   MessageCircle,
   Clock,
@@ -151,6 +151,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     users,
   } = useCollection();
   const { user } = useAuth();
+
+
+
+
 
   const getCollectorName = (collectorId: string) => {
     const collector = users?.find((u) => u.id === collectorId);
@@ -585,9 +589,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       setAuthError("");
       setAuthToken("");
       setAuthRequestSent(false);
-      setIsRequestingAuth(false);
     }
   };
+
+
 
   return (
     <>
@@ -628,6 +633,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           </div>
 
           {/* Action Buttons */}
+
+
           {userType === "collector" && (
             <div className="mt-4 px-4 lg:px-6 py-0 grid grid-cols-2 sm:grid-cols-4 gap-3">
               <button
@@ -701,13 +708,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           {showClientData ? (
             <div className="overflow-y-auto max-h-[60vh] p-4 lg:p-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Client Info */}
+                {/* Column 1: Basic and Contact Info */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                     <User className="h-5 w-5 mr-2 text-blue-600" />
-                    Informações do Cliente
+                    Informações Básicas e de Contato
                   </h3>
                   <div className="bg-gray-50 p-4 rounded-2xl space-y-3 text-sm border border-gray-200">
+                    {/* Client Info */}
                     <div className="flex justify-between">
                       <span className="font-medium text-gray-600">Nome:</span>
                       <span className="font-semibold text-gray-900 text-right">
@@ -732,52 +740,33 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                         {clientGroup.document || "-"}
                       </span>
                     </div>
-                  </div>
-                </div>
 
-                {/* Contact and Address */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                    <MapPin className="h-5 w-5 mr-2 text-blue-600" />
-                    Contato e Endereço
-                  </h3>
-                  <div className="bg-gray-50 p-4 rounded-2xl space-y-4 text-sm border border-gray-200">
-                    {(clientGroup.phone || clientGroup.mobile) && (
-                      <div className="space-y-2">
+                    {/* Contacts */}
+                    <div className="pt-4 mt-4 border-t border-gray-200">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-2">Contatos</h4>
+                        <div className="space-y-2">
                         {clientGroup.phone && (
-                          <div className="flex items-center">
-                            <Phone className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+                          <div className="flex items-center text-sm">
+                            <Phone className="h-4 w-4 text-gray-400 mr-2" />
                             <span>{clientGroup.phone}</span>
                           </div>
                         )}
                         {clientGroup.mobile && (
-                          <div className="flex items-center">
-                            <MessageCircle className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+                          <div className="flex items-center text-sm">
+                            <MessageCircle className="h-4 w-4 text-gray-400 mr-2" />
                             <span>{clientGroup.mobile}</span>
                           </div>
                         )}
-                      </div>
-                    )}
-                    <div className="flex items-start">
-                      <MapPin className="h-4 w-4 text-gray-400 mr-2 mt-1 flex-shrink-0" />
-                      <div className="text-gray-800">
-                        <p>
-                          {clientGroup.address || "Endereço não informado"},{" "}
-                          {clientGroup.number || "s/n"}
-                        </p>
-                        {clientGroup.complemento && (
-                          <p>{clientGroup.complemento}</p>
+                        {!clientGroup.phone && !clientGroup.mobile && (
+                            <p className="text-xs text-gray-500">Nenhum telefone cadastrado.</p>
                         )}
-                        <p>
-                          {clientGroup.neighborhood || "Bairro não informado"} -{" "}
-                          {clientGroup.city || "Cidade não informada"}/
-                          {clientGroup.state || ""}
-                        </p>
-                        {clientGroup.cep && <p>{clientGroup.cep}</p>}
-                      </div>
+                        </div>
                     </div>
                   </div>
                 </div>
+
+                {/* Column 2: Address History */}
+                <AddressHistoryViewer clientDocument={clientGroup.document} />
               </div>
               {/* Visit History */}
               {clientVisits.length > 0 && (
@@ -1221,6 +1210,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           </div>
         </div>
       )}
+
+
 
       {/* General Payment Modal */}
       {isGeneralPaymentModalOpen && (

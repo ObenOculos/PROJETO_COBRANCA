@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useImperativeHandle } from "react";
+import React, { useState, useMemo, useImperativeHandle, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { supabase } from "../../lib/supabase";
 import {
   Eye,
   CheckCircle,
@@ -63,6 +64,34 @@ export const CollectionTable = React.forwardRef<
     ref,
   ) => {
     const { getClientGroups, loading, deleteSalesFromClient } = useCollection();
+    const [currentAddresses, setCurrentAddresses] = useState<Map<string, any>>(new Map());
+
+    // Fetch all current addresses once
+    useEffect(() => {
+      const fetchAllCurrentAddresses = async () => {
+        // Since this component is complex, let's make sure we don't run this unnecessarily.
+        if (userType !== 'manager') return;
+
+        const { data, error } = await supabase
+          .from('enderecos_historico')
+          .select('cliente_documento, logradouro, numero, bairro, cidade, estado, cep')
+          .eq('is_atual', true);
+
+        if (error) {
+          console.error('Failed to fetch addresses:', error);
+          return;
+        }
+
+        const addressMap = new Map();
+        for (const address of data) {
+          addressMap.set(address.cliente_documento, address);
+        }
+        setCurrentAddresses(addressMap);
+      };
+
+      fetchAllCurrentAddresses();
+    }, [userType]); // Refetch if userType changes, though it's unlikely.
+
     const [selectedCollection, setSelectedCollection] =
       useState<Collection | null>(null);
     const [selectedClientGroup, setSelectedClientGroup] =
@@ -248,18 +277,21 @@ export const CollectionTable = React.forwardRef<
           if (!key) return;
 
           if (!groupsMap.has(key)) {
+            const historicalAddress = currentAddresses.get(collection.documento || "");
+
             groupsMap.set(key, {
               clientId: key,
               client: collection.cliente || "Cliente não informado",
               document: collection.documento || "",
               phone: collection.telefone || "",
               mobile: collection.celular || "",
-              address:
-                `${collection.endereco || ""}, ${collection.numero || ""}`.trim(),
-              number: collection.numero || "",
-              neighborhood: collection.bairro || "",
-              city: collection.cidade || "",
-              state: collection.estado || "",
+              address: historicalAddress
+                ? `${historicalAddress.logradouro || ""}, ${historicalAddress.numero || ""}`.trim()
+                : `${collection.endereco || ""}, ${collection.numero || ""}`.trim(),
+              number: historicalAddress ? (historicalAddress.numero || "") : (collection.numero || ""),
+              neighborhood: historicalAddress ? (historicalAddress.bairro || "") : (collection.bairro || ""),
+              city: historicalAddress ? (historicalAddress.cidade || "") : (collection.cidade || ""),
+              state: historicalAddress ? (historicalAddress.estado || "") : (collection.estado || ""),
               totalValue: 0,
               totalReceived: 0,
               totalDiscount: 0,
@@ -350,7 +382,7 @@ export const CollectionTable = React.forwardRef<
       } else {
         return getClientGroups(collectorId);
       }
-    }, [userType, collections, getClientGroups, collectorId]);
+    }, [userType, collections, getClientGroups, collectorId, currentAddresses]);
 
     const filteredClientGroups = useMemo(() => {
       if (!showGrouped || collections.length === 0) return [];

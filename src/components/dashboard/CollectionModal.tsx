@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { supabase } from "../../lib/supabase";
 import {
   X,
   Phone,
@@ -29,6 +30,32 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
   onClose,
 }) => {
   const { updateCollection, addAttempt } = useCollection();
+  const [currentAddress, setCurrentAddress] = useState<any>(null);
+  const [addressLoading, setAddressLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAddress = async () => {
+      if (!collection.documento) return;
+      setAddressLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('enderecos_historico')
+          .select('*')
+          .eq('cliente_documento', collection.documento)
+          .eq('is_atual', true)
+          .limit(1)
+          .single();
+
+        if (error && error.code !== 'PGRST116') throw error;
+        setCurrentAddress(data);
+      } catch (err) {
+        console.error("Error fetching current address for collection modal", err);
+      } finally {
+        setAddressLoading(false);
+      }
+    };
+    fetchAddress();
+  }, [collection.documento]);
   const [activeTab, setActiveTab] = useState<"details" | "attempts" | "action">(
     "details",
   );
@@ -327,19 +354,25 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
 
                   <div className="flex items-start">
                     <MapPin className="h-4 w-4 text-gray-400 mr-2 mt-1" />
-                    <div>
-                      <p>
-                        {collection.endereco}, {collection.numero}
-                      </p>
-                      {collection.complemento && (
-                        <p>{collection.complemento}</p>
-                      )}
-                      <p>
-                        {collection.bairro} - {collection.cidade}/
-                        {collection.estado}
-                      </p>
-                      <p>{collection.cep}</p>
-                    </div>
+                    {addressLoading ? (
+                      <div className="animate-pulse">Carregando...</div>
+                    ) : (
+                      <div>
+                        <p>
+                          {currentAddress?.logradouro || collection.endereco},{" "}
+                          {currentAddress?.numero || collection.numero}
+                        </p>
+                        {collection.complemento && !currentAddress && (
+                          <p>{collection.complemento}</p>
+                        )}
+                        <p>
+                          {currentAddress?.bairro || collection.bairro} -{" "}
+                          {currentAddress?.cidade || collection.cidade}/
+                          {currentAddress?.estado || collection.estado}
+                        </p>
+                        <p>{currentAddress?.cep || collection.cep}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

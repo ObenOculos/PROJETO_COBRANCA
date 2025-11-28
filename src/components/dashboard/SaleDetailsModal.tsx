@@ -1,9 +1,9 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import AddressHistoryViewer from "./AddressHistoryViewer";
 import {
   X,
   Phone,
   MessageCircle,
-  MapPin,
   DollarSign,
   Calendar,
   Store,
@@ -20,6 +20,7 @@ import {
 } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
 
+
 interface SaleDetailsModalProps {
   collections: Collection[];
   onClose: () => void;
@@ -30,9 +31,11 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
   onClose,
 }) => {
   const { scheduledVisits, users, salePayments } = useCollection();
+  const [activeTab, setActiveTab] = useState("installments");
+
 
   // Desabilitar scroll do body quando o modal estiver aberto
-  React.useEffect(() => {
+  useEffect(() => {
     document.body.style.overflow = "hidden";
 
     return () => {
@@ -82,6 +85,10 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
       ),
     };
   }, [collections]);
+
+
+
+
 
   const salePaymentHistory = useMemo(() => {
     if (!saleData || !salePayments) return [];
@@ -325,72 +332,46 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
 
             {/* Contact Info */}
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <Phone className="h-5 w-5 mr-2 text-blue-600" />
-                Contato e Endereço
-              </h3>
-
-              <div className="bg-gray-50 p-4 rounded-2xl space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 mb-2">
-                    Cliente:
-                  </p>
-                  <p className="font-semibold text-gray-900">
-                    {saleData.cliente}
-                  </p>
-                  <p className="text-sm text-gray-600">{saleData.documento}</p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-gray-600 mb-2">
-                    Apelido:
-                  </p>
-                  <p className="font-semibold text-gray-900">
-                    {saleData.apelido}
-                  </p>
-                </div>
-
-                {(saleData.telefone || saleData.celular) && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 mb-2">
-                      Contatos:
-                    </p>
-                    <div className="space-y-2">
-                      {saleData.telefone && (
-                        <div className="flex items-center">
-                          <Phone className="h-4 w-4 text-gray-400 mr-2" />
-                          <span className="text-sm">{saleData.telefone}</span>
-                        </div>
-                      )}
-                      {saleData.celular && (
-                        <div className="flex items-center">
-                          <MessageCircle className="h-4 w-4 text-gray-400 mr-2" />
-                          <span className="text-sm">{saleData.celular}</span>
-                        </div>
-                      )}
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <User className="h-5 w-5 mr-2 text-blue-600" />
+                    Informações do Cliente
+                </h3>
+                <div className="bg-gray-50 p-4 rounded-2xl space-y-4">
+                    <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Cliente:</p>
+                        <p className="font-semibold text-gray-900">{saleData.cliente}</p>
+                        <p className="text-sm text-gray-600">{saleData.documento}</p>
                     </div>
-                  </div>
-                )}
 
-                <div>
-                  <p className="text-sm font-medium text-gray-600 mb-2">
-                    Endereço:
-                  </p>
-                  <div className="flex items-start">
-                    <MapPin className="h-4 w-4 text-gray-400 mr-2 mt-1 flex-shrink-0" />
-                    <div className="text-sm">
-                      <p>
-                        {saleData.endereco}, {saleData.numero}
-                      </p>
-                      {saleData.complemento && <p>{saleData.complemento}</p>}
-                      <p>
-                        {saleData.bairro} - {saleData.cidade}/{saleData.estado}
-                      </p>
-                      <p>{saleData.cep}</p>
-                    </div>
-                  </div>
+                    {saleData.apelido && (
+                        <div>
+                            <p className="text-sm font-medium text-gray-600 mb-1">Apelido:</p>
+                            <p className="font-semibold text-gray-900">{saleData.apelido}</p>
+                        </div>
+                    )}
+
+                    {(saleData.telefone || saleData.celular) && (
+                        <div>
+                            <p className="text-sm font-medium text-gray-600 mb-1">Contatos:</p>
+                            <div className="space-y-1">
+                                {saleData.telefone && (
+                                <div className="flex items-center text-sm">
+                                    <Phone className="h-4 w-4 text-gray-400 mr-2" />
+                                    <span>{saleData.telefone}</span>
+                                </div>
+                                )}
+                                {saleData.celular && (
+                                <div className="flex items-center text-sm">
+                                    <MessageCircle className="h-4 w-4 text-gray-400 mr-2" />
+                                    <span>{saleData.celular}</span>
+                                </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
-              </div>
+
+                {saleData.documento && <AddressHistoryViewer clientDocument={saleData.documento} />}
             </div>
           </div>
 
@@ -631,6 +612,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
           )}
         </div>
       </div>
+
     </div>
   );
 };
