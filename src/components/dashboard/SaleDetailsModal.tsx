@@ -375,241 +375,195 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
             </div>
           </div>
 
-          {/* Installments Details */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-              <FileText className="h-5 w-5 mr-2 text-blue-600" />
-              Detalhes das Parcelas
-            </h3>
 
-            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        ID
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Parcela
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Vencimento
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Valor Original
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Valor Recebido
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Desconto
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Pendente
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {saleData.collections.map((collection, index) => {
-                      const discount = collection.desconto || 0;
-                      const pending = Math.max(
-                        0,
-                        collection.valor_original -
-                          collection.valor_recebido -
-                          discount,
-                      );
-                      const dbStatus =
-                        collection.status?.toLowerCase() || "pendente";
-
-                      let status = "pendente";
-                      if (
-                        dbStatus === "pago" ||
-                        dbStatus === "pago com desconto" ||
-                        pending <= 0.01
-                      ) {
-                        status = "pago";
-                      } else if (
-                        collection.valor_recebido > 0 ||
-                        discount > 0
-                      ) {
-                        status = "parcial";
-                      }
-
-                      return (
-                        <tr
-                          key={collection.id_parcela}
-                          className={
-                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                          }
-                        >
-                          <td className="px-4 py-3 text-sm font-medium text-gray-500">
-                            {collection.id_parcela}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                            {collection.parcela}° Parcela
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {formatDate(collection.data_vencimento || "")}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                            {formatCurrency(collection.valor_original)}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-green-600">
-                            {formatCurrency(collection.valor_recebido)}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-blue-600">
-                            {formatCurrency(discount)}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-orange-600">
-                            {formatCurrency(pending)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                status === "pago"
-                                  ? "bg-green-100 text-green-800"
-                                  : status === "parcial"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-red-100 text-red-800"
-                              }`}
-                            >
-                              {getStatusLabel(status)}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <div className="border-b border-gray-200 mb-4">
+            <nav className="-mb-px flex space-x-6" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('installments')}
+                className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'installments'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Parcelas
+              </button>
+              <button
+                onClick={() => setActiveTab('payments')}
+                className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'payments'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Pagamentos
+              </button>
+              <button
+                onClick={() => setActiveTab('visits')}
+                className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'visits'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Acompanhamento
+              </button>
+            </nav>
           </div>
 
-          {/* Payment History */}
-          {salePaymentHistory.length > 0 && (
-            <div className="mt-8 space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <DollarSign className="h-5 w-5 mr-2 text-blue-600" />
-                Histórico de Pagamentos
-              </h3>
-              <div className="space-y-3">
-                {salePaymentHistory.map((payment) => (
-                  <div
-                    key={payment.id}
-                    className="bg-gray-50 p-4 rounded-2xl border border-gray-200"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="font-semibold text-gray-800">
-                            {formatCurrency(payment.paymentAmount)}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            - {payment.paymentMethod}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center text-xs text-gray-400">
-                        <Calendar className="h-3 w-3 mr-1" />
-                        {formatDate(payment.paymentDate)}
-                      </div>
-                    </div>
+          {/* Tab Content */}
+          <div>
+            {activeTab === 'installments' && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <FileText className="h-5 w-5 mr-2 text-blue-600" />
+                  Detalhes das Parcelas
+                </h3>
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parcela</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimento</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Original</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Recebido</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Desconto</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pendente</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {saleData.collections.map((collection, index) => {
+                          const discount = collection.desconto || 0;
+                          const pending = Math.max(0, collection.valor_original - collection.valor_recebido - discount);
+                          const dbStatus = collection.status?.toLowerCase() || "pendente";
+                          let status = "pendente";
+                          if (dbStatus === "pago" || dbStatus === "pago com desconto" || pending <= 0.01) {
+                            status = "pago";
+                          } else if (collection.valor_recebido > 0 || discount > 0) {
+                            status = "parcial";
+                          }
+                          return (
+                            <tr key={collection.id_parcela} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-500">{collection.id_parcela}</td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">{collection.parcela}° Parcela</td>
+                              <td className="px-4 py-3 text-sm text-gray-600">{formatDate(collection.data_vencimento || "")}</td>
+                              <td className="px-4 py-3 text-sm font-semibold text-gray-900">{formatCurrency(collection.valor_original)}</td>
+                              <td className="px-4 py-3 text-sm font-semibold text-green-600">{formatCurrency(collection.valor_recebido)}</td>
+                              <td className="px-4 py-3 text-sm font-semibold text-blue-600">{formatCurrency(discount)}</td>
+                              <td className="px-4 py-3 text-sm font-semibold text-orange-600">{formatCurrency(pending)}</td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${status === "pago" ? "bg-green-100 text-green-800" : status === "parcial" ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}`}>
+                                  {getStatusLabel(status)}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Visit History */}
-          {clientVisits.length > 0 && (
-            <div className="mt-8 space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <Clock className="h-5 w-5 mr-2 text-blue-600" />
-                Histórico de Acompanhamento
-              </h3>
-              <div className="space-y-3">
-                {clientVisits.map((visit) => (
-                  <div
-                    key={visit.id}
-                    className="bg-gray-50 p-4 rounded-2xl border border-gray-200"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          {getStatusVisitBadge(visit.status)}
-                          <span className="text-xs text-gray-500">
-                            {formatVisitDate(visit.scheduledDate)}
-                            {visit.scheduledTime &&
-                              ` às ${visit.scheduledTime}`}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center text-sm text-gray-600 mb-2">
-                          <User className="h-4 w-4 mr-1" />
-                          <span className="font-medium">
-                            {getCollectorName(visit.collectorId)}
-                          </span>
-                        </div>
-
-                        {visit.notes && (
-                          <div className="bg-white p-3 rounded-2xl border border-gray-200">
-                            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-                              {visit.notes}
-                            </p>
+            {activeTab === 'payments' && (
+              <div className="space-y-6">
+                {salePaymentHistory.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                      <DollarSign className="h-5 w-5 mr-2 text-blue-600" />
+                      Histórico de Pagamentos
+                    </h3>
+                    <div className="space-y-3">
+                      {salePaymentHistory.map((payment) => (
+                        <div key={payment.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="font-semibold text-gray-800">{formatCurrency(payment.paymentAmount)}</span>
+                                <span className="text-xs text-gray-500">- {payment.paymentMethod}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center text-xs text-gray-400">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {formatDate(payment.paymentDate)}
+                            </div>
                           </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center text-xs text-gray-400">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {visit.updatedAt ? (
-                          <>
-                            Finalizada em{" "}
-                            {formatVisitDate(visit.updatedAt.split("T")[0])}
-                          </>
-                        ) : (
-                          <>
-                            Registrada em{" "}
-                            {formatVisitDate(visit.createdAt.split("T")[0])}
-                          </>
-                        )}
-                      </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Observa{/* Payment Notes */}
-          {salePaymentHistory.some((p) => p.notes) && (
-            <div className="mt-8 space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <FileText className="h-5 w-5 mr-2 text-blue-600" />
-                Observações de Pagamentos
-              </h3>
-              {salePaymentHistory.map(
-                (payment) =>
-                  payment.notes && (
-                    <div
-                      key={payment.id}
-                      className="bg-blue-50 p-4 rounded-2xl border border-blue-200"
-                    >
-                      <p className="text-sm text-gray-700 whitespace-pre-line">
-                        {payment.notes}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-2 text-right">
-                        Registrado em {formatDate(payment.paymentDate)}
-                      </p>
+                )}
+                {salePaymentHistory.some((p) => p.notes) && (
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                            <FileText className="h-5 w-5 mr-2 text-blue-600" />
+                            Observações de Pagamentos
+                        </h3>
+                        {salePaymentHistory.map((payment) =>
+                            payment.notes && (
+                            <div key={payment.id} className="bg-blue-50 p-4 rounded-2xl border border-blue-200">
+                                <p className="text-sm text-gray-700 whitespace-pre-line">{payment.notes}</p>
+                                <p className="text-xs text-gray-500 mt-2 text-right">Registrado em {formatDate(payment.paymentDate)}</p>
+                            </div>
+                            )
+                        )}
                     </div>
-                  ),
-              )}
-            </div>
-          )}
+                )}
+                {salePaymentHistory.length === 0 && (
+                    <p className="text-sm text-gray-500">Nenhum pagamento registrado para esta venda.</p>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'visits' && (
+              <div className="space-y-4">
+                {clientVisits.length > 0 ? (
+                  <>
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                      <Clock className="h-5 w-5 mr-2 text-blue-600" />
+                      Histórico de Acompanhamento
+                    </h3>
+                    <div className="space-y-3">
+                      {clientVisits.map((visit) => (
+                        <div key={visit.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                {getStatusVisitBadge(visit.status)}
+                                <span className="text-xs text-gray-500">
+                                  {formatVisitDate(visit.scheduledDate)}
+                                  {visit.scheduledTime && ` às ${visit.scheduledTime}`}
+                                </span>
+                              </div>
+                              <div className="flex items-center text-sm text-gray-600 mb-2">
+                                <User className="h-4 w-4 mr-1" />
+                                <span className="font-medium">{getCollectorName(visit.collectorId)}</span>
+                              </div>
+                              {visit.notes && (
+                                <div className="bg-white p-3 rounded-2xl border border-gray-200">
+                                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{visit.notes}</p>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center text-xs text-gray-400">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {visit.updatedAt ? `Finalizada em ${formatVisitDate(visit.updatedAt.split("T")[0])}` : `Registrada em ${formatVisitDate(visit.createdAt.split("T")[0])}`}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">Nenhuma visita com observações encontrada para este cliente.</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
