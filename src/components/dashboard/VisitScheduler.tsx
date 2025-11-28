@@ -224,7 +224,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   >({});
 
   // NEW STATE: To track if the overdue modal has been shown.
-  const [hasOverdueModalBeenShown, setHasOverdueModalBeenShown] = useState(false);
+  const [hasOverdueModalBeenShown, setHasOverdueModalBeenShown] =
+    useState(false);
 
   // Estados para filtro das visitas do dia selecionado
   const [visitsSortBy, setVisitsSortBy] = useState<"name" | "city" | "value">(

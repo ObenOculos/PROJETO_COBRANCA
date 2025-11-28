@@ -1,4 +1,9 @@
-import React, { useState, useMemo, useImperativeHandle, useEffect } from "react";
+import React, {
+  useState,
+  useMemo,
+  useImperativeHandle,
+  useEffect,
+} from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
 import {
@@ -64,21 +69,25 @@ export const CollectionTable = React.forwardRef<
     ref,
   ) => {
     const { getClientGroups, loading, deleteSalesFromClient } = useCollection();
-    const [currentAddresses, setCurrentAddresses] = useState<Map<string, any>>(new Map());
+    const [currentAddresses, setCurrentAddresses] = useState<Map<string, any>>(
+      new Map(),
+    );
 
     // Fetch all current addresses once
     useEffect(() => {
       const fetchAllCurrentAddresses = async () => {
         // Since this component is complex, let's make sure we don't run this unnecessarily.
-        if (userType !== 'manager') return;
+        if (userType !== "manager") return;
 
         const { data, error } = await supabase
-          .from('enderecos_historico')
-          .select('cliente_documento, logradouro, numero, bairro, cidade, estado, cep')
-          .eq('is_atual', true);
+          .from("enderecos_historico")
+          .select(
+            "cliente_documento, logradouro, numero, bairro, cidade, estado, cep",
+          )
+          .eq("is_atual", true);
 
         if (error) {
-          console.error('Failed to fetch addresses:', error);
+          console.error("Failed to fetch addresses:", error);
           return;
         }
 
@@ -277,7 +286,9 @@ export const CollectionTable = React.forwardRef<
           if (!key) return;
 
           if (!groupsMap.has(key)) {
-            const historicalAddress = currentAddresses.get(collection.documento || "");
+            const historicalAddress = currentAddresses.get(
+              collection.documento || "",
+            );
 
             groupsMap.set(key, {
               clientId: key,
@@ -288,10 +299,18 @@ export const CollectionTable = React.forwardRef<
               address: historicalAddress
                 ? `${historicalAddress.logradouro || ""}, ${historicalAddress.numero || ""}`.trim()
                 : `${collection.endereco || ""}, ${collection.numero || ""}`.trim(),
-              number: historicalAddress ? (historicalAddress.numero || "") : (collection.numero || ""),
-              neighborhood: historicalAddress ? (historicalAddress.bairro || "") : (collection.bairro || ""),
-              city: historicalAddress ? (historicalAddress.cidade || "") : (collection.cidade || ""),
-              state: historicalAddress ? (historicalAddress.estado || "") : (collection.estado || ""),
+              number: historicalAddress
+                ? historicalAddress.numero || ""
+                : collection.numero || "",
+              neighborhood: historicalAddress
+                ? historicalAddress.bairro || ""
+                : collection.bairro || "",
+              city: historicalAddress
+                ? historicalAddress.cidade || ""
+                : collection.cidade || "",
+              state: historicalAddress
+                ? historicalAddress.estado || ""
+                : collection.estado || "",
               totalValue: 0,
               totalReceived: 0,
               totalDiscount: 0,

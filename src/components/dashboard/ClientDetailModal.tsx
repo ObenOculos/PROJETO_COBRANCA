@@ -152,10 +152,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   } = useCollection();
   const { user } = useAuth();
 
-
-
-
-
   const getCollectorName = (collectorId: string) => {
     const collector = users?.find((u) => u.id === collectorId);
     return collector?.name || "Cobrador não identificado";
@@ -592,8 +588,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     }
   };
 
-
-
   return (
     <>
       <div
@@ -633,7 +627,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           </div>
 
           {/* Action Buttons */}
-
 
           {userType === "collector" && (
             <div className="mt-4 px-4 lg:px-6 py-0 grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -743,8 +736,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
                     {/* Contacts */}
                     <div className="pt-4 mt-4 border-t border-gray-200">
-                        <h4 className="text-sm font-semibold text-gray-700 mb-2">Contatos</h4>
-                        <div className="space-y-2">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                        Contatos
+                      </h4>
+                      <div className="space-y-2">
                         {clientGroup.phone && (
                           <div className="flex items-center text-sm">
                             <Phone className="h-4 w-4 text-gray-400 mr-2" />
@@ -758,9 +753,11 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                           </div>
                         )}
                         {!clientGroup.phone && !clientGroup.mobile && (
-                            <p className="text-xs text-gray-500">Nenhum telefone cadastrado.</p>
+                          <p className="text-xs text-gray-500">
+                            Nenhum telefone cadastrado.
+                          </p>
                         )}
-                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1210,8 +1207,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           </div>
         </div>
       )}
-
-
 
       {/* General Payment Modal */}
       {isGeneralPaymentModalOpen && (

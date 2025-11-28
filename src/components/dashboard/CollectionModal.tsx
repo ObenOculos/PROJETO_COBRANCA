@@ -39,17 +39,20 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
       setAddressLoading(true);
       try {
         const { data, error } = await supabase
-          .from('enderecos_historico')
-          .select('*')
-          .eq('cliente_documento', collection.documento)
-          .eq('is_atual', true)
+          .from("enderecos_historico")
+          .select("*")
+          .eq("cliente_documento", collection.documento)
+          .eq("is_atual", true)
           .limit(1)
           .single();
 
-        if (error && error.code !== 'PGRST116') throw error;
+        if (error && error.code !== "PGRST116") throw error;
         setCurrentAddress(data);
       } catch (err) {
-        console.error("Error fetching current address for collection modal", err);
+        console.error(
+          "Error fetching current address for collection modal",
+          err,
+        );
       } finally {
         setAddressLoading(false);
       }

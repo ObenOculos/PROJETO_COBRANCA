@@ -643,7 +643,9 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     const cols = Object.keys(dataToExport[0] || {});
     const colWidths = cols.map((col) => {
       const maxLength = Math.max(
-        ...dataToExport.map((row) => ((row as any)[col] ? String((row as any)[col]).length : 0)),
+        ...dataToExport.map((row) =>
+          (row as any)[col] ? String((row as any)[col]).length : 0,
+        ),
         col.length, // Include header length
       );
       return { wch: maxLength + 2 }; // Add extra padding
