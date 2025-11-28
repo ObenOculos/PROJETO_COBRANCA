@@ -94,27 +94,27 @@ const UpdateAddressModal: React.FC<UpdateAddressModalProps> = ({ isOpen, onClose
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="logradouro" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Endereço (Rua)</label>
-            <input type="text" name="logradouro" value={formData.logradouro} onChange={handleChange} className={inputClass} />
+            <input type="text" id="logradouro" name="logradouro" value={formData.logradouro} onChange={handleChange} className={inputClass} />
           </div>
           <div>
             <label htmlFor="numero" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Número</label>
-            <input type="text" name="numero" value={formData.numero} onChange={handleChange} className={inputClass} />
+            <input type="text" id="numero" name="numero" value={formData.numero} onChange={handleChange} className={inputClass} />
           </div>
           <div>
             <label htmlFor="bairro" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Bairro</label>
-            <input type="text" name="bairro" value={formData.bairro} onChange={handleChange} className={inputClass} />
+            <input type="text" id="bairro" name="bairro" value={formData.bairro} onChange={handleChange} className={inputClass} />
           </div>
           <div>
             <label htmlFor="cidade" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cidade</label>
-            <input type="text" name="cidade" value={formData.cidade} onChange={handleChange} className={inputClass} />
+            <input type="text" id="cidade" name="cidade" value={formData.cidade} onChange={handleChange} className={inputClass} />
           </div>
           <div>
             <label htmlFor="estado" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Estado</label>
-            <input type="text" name="estado" value={formData.estado} onChange={handleChange} className={inputClass} />
+            <input type="text" id="estado" name="estado" value={formData.estado} onChange={handleChange} className={inputClass} />
           </div>
           <div>
             <label htmlFor="cep" className="block text-sm font-medium text-gray-700 dark:text-gray-300">CEP</label>
-            <input type="text" name="cep" value={formData.cep} onChange={handleChange} className={inputClass} />
+            <input type="text" id="cep" name="cep" value={formData.cep} onChange={handleChange} className={inputClass} />
           </div>
         </div>
 
