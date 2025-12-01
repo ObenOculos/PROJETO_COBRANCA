@@ -233,34 +233,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   );
   const [visitsSortOrder, setVisitsSortOrder] = useState<"asc" | "desc">("asc");
 
-  // Estados para swipe (mobile)
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-  // Swipe handlers
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
-
-    if (isLeftSwipe && currentPage < totalSelectedDatePages) {
-      setCurrentPage((prev) => prev + 1);
-    }
-    if (isRightSwipe && currentPage > 1) {
-      setCurrentPage((prev) => prev - 1);
-    }
-  };
 
   // Listen for visits scheduled by a manager to refresh data
   useEffect(() => {
@@ -2219,9 +2192,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                 ) : (
                   <div
                     className="space-y-3"
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
                   >
                     {paginatedSelectedDateVisits.map((visit) => (
                       <div
@@ -2316,21 +2286,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                     )}
                                 </div>
                               )}
-                              {visit.notes && (
-                                <div className="bg-white border border-gray-200 rounded-2xl p-3 mb-3">
-                                  <div className="flex items-start">
-                                    <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
-                                    <div>
-                                      <div className="text-sm font-medium text-gray-700 mb-1">
-                                        Observações da visita:
-                                      </div>
-                                      <div className="text-sm text-gray-600 italic whitespace-pre-line">
-                                        {visit.notes}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
                             </div>
                           </div>
 
@@ -2415,6 +2370,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                               </div>
                             )}
                         </div>
+                        {visit.notes && (
+                          <div className="mt-3 bg-white border border-gray-200 rounded-2xl p-3">
+                            <div className="flex items-start">
+                              <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <div className="text-sm font-medium text-gray-700 mb-1">
+                                  Observações da visita:
+                                </div>
+                                <div className="text-sm text-gray-600 italic whitespace-pre-line">
+                                  {visit.notes}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
