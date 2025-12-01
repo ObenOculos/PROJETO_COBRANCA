@@ -1194,33 +1194,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     // Primeiro fechar o modal atual
     setShowCompletedModal(false);
 
-    // Preparar dados do cliente
-    const clientData = getClientDataForVisit(
-      selectedVisitForCompletion.clientDocument,
+    // Buscar o ClientGroup completo para garantir que todos os dados estão disponíveis para o modal
+    const allClientGroups = getClientGroups();
+    const clientGroup = allClientGroups.find(
+      (cg) => cg.document === selectedVisitForCompletion.clientDocument,
     );
-    if (!clientData) {
-      alert("Erro: dados do cliente não encontrados");
+
+    if (!clientGroup) {
+      alert("Erro: dados do cliente não encontrados.");
       setSelectedVisitForCompletion(null);
       return;
     }
-
-    // Criar um ClientGroup mock para o modal de pagamento
-    const clientGroup = {
-      clientId: clientData.document,
-      client: clientData.name,
-      document: clientData.document,
-      phone: clientData.phone,
-      mobile: clientData.mobile,
-      address: clientData.address,
-      number: "",
-      neighborhood: clientData.neighborhood,
-      city: clientData.city,
-      state: "",
-      sales: [],
-      totalValue: clientData.totalPendingValue,
-      totalReceived: 0,
-      pendingValue: clientData.totalPendingValue,
-    };
 
     let shouldUpdateStatus = true; // Flag to control status update
 
@@ -1229,7 +1213,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       selectedNote === "Visitado e o cliente pagou tudo." ||
       selectedNote === "Visitado, mas cliente pagou parcialmente."
     ) {
-      setSelectedClientForModal(clientGroup);
+      setSelectedClientForModal(clientGroup); // Passar o objeto ClientGroup completo
       setShowClientModal(true);
     } else if (
       selectedNote === "Visitado, mas cliente agendou pagamento." ||
@@ -1588,10 +1572,29 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   };
 
   const handleOpenClientModal = (visit: ScheduledVisit) => {
-    const clientData = getClientDataForVisit(visit.clientDocument);
-    if (clientData) {
-      setSelectedClientForModal(clientData);
+    // Busca o ClientGroup completo para garantir que todos os dados (incluindo apelido, vendas, etc.)
+    // estejam disponíveis para o ClientDetailModal.
+    const allClientGroups = getClientGroups(); // Busca todos os grupos de clientes, sem filtro.
+    const clientGroup = allClientGroups.find(
+      (cg) => cg.document === visit.clientDocument,
+    );
+
+    if (clientGroup) {
+      setSelectedClientForModal(clientGroup);
       setShowClientModal(true);
+    } else {
+      // Fallback para o método antigo caso o grupo completo não seja encontrado.
+      // Isso evita que o modal quebre completamente, embora possa mostrar dados incompletos.
+      console.warn(
+        "ClientGroup completo não encontrado para o documento:",
+        visit.clientDocument,
+        ". Usando fallback getClientDataForVisit().",
+      );
+      const partialData = getClientDataForVisit(visit.clientDocument);
+      if (partialData) {
+        setSelectedClientForModal(partialData);
+        setShowClientModal(true);
+      }
     }
   };
 
