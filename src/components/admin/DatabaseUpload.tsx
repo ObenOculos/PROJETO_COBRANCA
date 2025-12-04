@@ -772,6 +772,12 @@ const DatabaseUpload: React.FC = () => {
       }
 
       if (onProgress) onProgress(100, "Inserção concluída.");
+      
+      // ✅ Registrar endereços no histórico após sucesso
+      if (rowsToInsert.length > 0) {
+        await insertAddressHistoryForNewClients(rowsToInsert);
+      }
+      
       return {
         success: true,
         insertedRows: rowsToInsert,
@@ -781,6 +787,124 @@ const DatabaseUpload: React.FC = () => {
     } catch (error) {
       console.error("❌ Exceção ao inserir dados:", error);
       return { success: false, error: (error as Error).message };
+    }
+  };
+
+  // Função para inserir endereço inicial no histórico
+  const insertAddressHistoryForNewClients = async (
+    data: FileData[],
+  ): Promise<void> => {
+    try {
+      // Extrair clientes únicos com endereço
+      const uniqueClients = new Map<
+        string,
+        {
+          documento: string;
+          logradouro: string;
+          numero: string;
+          bairro: string;
+          cep: string;
+          cidade: string;
+          estado: string;
+          complemento: string;
+        }
+      >();
+
+      data.forEach((row) => {
+        const documento = row.documento || row["documento"];
+        if (documento && !uniqueClients.has(documento)) {
+          uniqueClients.set(documento, {
+            documento,
+            logradouro: row.endereco || row["endereco"] || "",
+            numero: row.numero || row["numero"] || "",
+            bairro: row.bairro || row["bairro"] || "",
+            cep: row.cep || row["cep"] || "",
+            cidade: row.cidade || row["cidade"] || "",
+            estado: row.estado || row["estado"] || "",
+            complemento: row.complemento || row["complemento"] || "",
+          });
+        }
+      });
+
+      if (uniqueClients.size === 0) {
+        console.log("ℹ️ Nenhum cliente com documento para registrar endereço.");
+        return;
+      }
+
+      console.log(
+        `📍 Registrando endereços iniciais para ${uniqueClients.size} cliente(s)...`,
+      );
+
+      // Verificar quais documentos já têm registros no histórico
+      const documents = Array.from(uniqueClients.keys());
+      const CHUNK_SIZE = 500;
+      const existingDocuments = new Set<string>();
+
+      for (let i = 0; i < documents.length; i += CHUNK_SIZE) {
+        const chunk = documents.slice(i, i + CHUNK_SIZE);
+        const { data: existingRecords, error } = await supabase
+          .from("enderecos_historico")
+          .select("cliente_documento")
+          .in("cliente_documento", chunk);
+
+        if (error) {
+          console.warn(
+            "⚠️ Erro ao verificar endereços existentes:",
+            error.message,
+          );
+          continue;
+        }
+
+        existingRecords?.forEach((rec) =>
+          existingDocuments.add(rec.cliente_documento),
+        );
+      }
+
+      // Filtrar apenas clientes que não têm histórico
+      const clientsToInsert = Array.from(uniqueClients.values()).filter(
+        (client) => !existingDocuments.has(client.documento),
+      );
+
+      if (clientsToInsert.length === 0) {
+        console.log(
+          "ℹ️ Todos os clientes já possuem registros no histórico de endereços.",
+        );
+        return;
+      }
+
+      // Preparar dados para inserção
+      const addressRecords = clientsToInsert.map((client) => ({
+        cliente_documento: client.documento,
+        logradouro: client.logradouro,
+        numero: client.numero,
+        bairro: client.bairro,
+        cep: client.cep,
+        cidade: client.cidade,
+        estado: client.estado,
+        complemento: client.complemento,
+        created_at: new Date().toISOString(),
+      }));
+
+      // Inserir em chunks para evitar erros
+      for (let i = 0; i < addressRecords.length; i += CHUNK_SIZE) {
+        const chunk = addressRecords.slice(i, i + CHUNK_SIZE);
+        const { error } = await supabase
+          .from("enderecos_historico")
+          .insert(chunk);
+
+        if (error) {
+          console.error(
+            `❌ Erro ao inserir endereços (chunk ${i / CHUNK_SIZE + 1}):`,
+            error,
+          );
+        } else {
+          console.log(
+            `✅ ${chunk.length} endereço(s) registrado(s) no histórico.`,
+          );
+        }
+      }
+    } catch (error) {
+      console.error("❌ Erro ao processar histórico de endereços:", error);
     }
   };
 
