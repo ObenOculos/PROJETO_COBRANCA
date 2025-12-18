@@ -774,7 +774,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         title: "Visitas",
         icon: Calendar,
       },
+    ];
 
+    // Cards separados para evitar conflito com o slider
+    const cityCards = [
       {
         id: "schedulesByCity",
         Component: SchedulesByCityCardContent,
@@ -791,6 +794,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
     const orderedAndVisibleCards = cardOrder
       .map((id) => dashboardCards.find((c) => c.id === id))
+      .filter((c) => c && visibleCards.includes(c.id));
+
+    const orderedAndVisibleCityCards = cardOrder
+      .map((id) => cityCards.find((c) => c.id === id))
       .filter((c) => c && visibleCards.includes(c.id));
 
     switch (activeTab) {
@@ -819,7 +826,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                     Ordem e Visibilidade
                   </h4>
                   {cardOrder.map((cardId, index) => {
-                    const card = dashboardCards.find((c) => c.id === cardId);
+                    const card = [...dashboardCards, ...cityCards].find((c) => c.id === cardId);
                     if (!card) return null;
 
                     return (
@@ -907,6 +914,31 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                 );
               })}
             </div>
+
+            {/* City Cards Section - Separated to avoid slider conflicts */}
+            {orderedAndVisibleCityCards.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {orderedAndVisibleCityCards.map((card) => {
+                  if (!card) return null;
+                  const { Component, ...rest } = card;
+                  return (
+                    <div
+                      key={card.id}
+                      className="transition duration-300 hover:scale-105"
+                    >
+                      <Card
+                        {...rest}
+                        cardId={card.id}
+                        minimized={minimizedCards.includes(card.id)}
+                        onToggleMinimize={handleToggleMinimize}
+                      >
+                        <Component />
+                      </Card>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Métricas Gamificadas */}
             <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border overflow-hidden">

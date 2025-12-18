@@ -51,8 +51,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const autoPlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedCollector, setSelectedCollector] = useState<string>("all");
   const { getClientGroups } = useCollection();
-  const [] = useState(false);
-  const [] = useState(false);
+  const [schedulesPage, setSchedulesPage] = useState(1);
+  const [clientsPage, setClientsPage] = useState(1);
+
+  // Reset pagination when collector changes
+  useEffect(() => {
+    setSchedulesPage(1);
+    setClientsPage(1);
+  }, [selectedCollector]);
 
   useEffect(() => {
     if (isAutoPlaying) {
@@ -333,9 +339,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   }, [getClientGroups, selectedCollector]);
 
   const SchedulesByCityCardContent = () => {
-    const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
-
     const sortedSchedules = useMemo(() => {
       type ScheduleData = { count: number; dates: Set<string> };
       const entries = Object.entries(schedulesByCity) as [
@@ -347,8 +351,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
     const totalPages = Math.ceil(sortedSchedules.length / itemsPerPage);
     const paginatedSchedules = sortedSchedules.slice(
-      (currentPage - 1) * itemsPerPage,
-      currentPage * itemsPerPage,
+      (schedulesPage - 1) * itemsPerPage,
+      schedulesPage * itemsPerPage,
     );
 
     return (
@@ -373,18 +377,18 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         {totalPages > 1 && (
           <div className="mt-4 flex items-center justify-center space-x-2">
             <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
+              onClick={() => setSchedulesPage((p) => Math.max(1, p - 1))}
+              disabled={schedulesPage === 1}
               className="px-2 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
             >
               Anterior
             </button>
             <span className="text-xs text-gray-700">
-              {currentPage} / {totalPages}
+              {schedulesPage} / {totalPages}
             </span>
             <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
+              onClick={() => setSchedulesPage((p) => Math.min(totalPages, p + 1))}
+              disabled={schedulesPage === totalPages}
               className="px-2 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
             >
               Próxima
@@ -396,7 +400,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   };
 
   const ClientsByCityCardContent = () => {
-    const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
     const sortedCities = useMemo(() => {
@@ -407,8 +410,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
     const totalPages = Math.ceil(sortedCities.length / itemsPerPage);
     const paginatedCities = sortedCities.slice(
-      (currentPage - 1) * itemsPerPage,
-      currentPage * itemsPerPage,
+      (clientsPage - 1) * itemsPerPage,
+      clientsPage * itemsPerPage,
     );
 
     const handleCityClick = (city: string) => {
@@ -437,18 +440,18 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         {totalPages > 1 && (
           <div className="mt-4 flex items-center justify-center space-x-2">
             <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
+              onClick={() => setClientsPage((p) => Math.max(1, p - 1))}
+              disabled={clientsPage === 1}
               className="px-2 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
             >
               Anterior
             </button>
             <span className="text-xs text-gray-700">
-              {currentPage} / {totalPages}
+              {clientsPage} / {totalPages}
             </span>
             <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
+              onClick={() => setClientsPage((p) => Math.min(totalPages, p + 1))}
+              disabled={clientsPage === totalPages}
               className="px-2 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
             >
               Próxima
@@ -1199,13 +1202,23 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
         {/* Schedules and Clients by City */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 mt-6">
-          <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 transition-colors duration-300">
+          <div 
+            className="border border-gray-200 dark:border-dark-border rounded-lg p-4 transition-colors duration-300"
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
             <h4 className="font-medium text-gray-900 dark:text-dark-text transition-colors duration-300 mb-4">
               Agendamentos por Cidade
             </h4>
             <SchedulesByCityCardContent />
           </div>
-          <div className="border border-gray-200 dark:border-dark-border rounded-lg p-4 transition-colors duration-300">
+          <div 
+            className="border border-gray-200 dark:border-dark-border rounded-lg p-4 transition-colors duration-300"
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
             <h4 className="font-medium text-gray-900 dark:text-dark-text transition-colors duration-300 mb-4">
               Clientes por Cidade
             </h4>
