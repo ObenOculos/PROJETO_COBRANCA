@@ -16,7 +16,7 @@
 
 /* Light Mode (Padrão) */
 html {
-  background-color: #F0EEE9;
+  background-color: #f0eee9;
   color: #121212;
   transition:
     background-color 0.3s ease,
@@ -24,7 +24,7 @@ html {
 }
 
 body {
-  background-color: #F0EEE9;
+  background-color: #f0eee9;
   color: #121212;
   transition:
     background-color 0.3s ease,

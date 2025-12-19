@@ -387,7 +387,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               {schedulesPage} / {totalPages}
             </span>
             <button
-              onClick={() => setSchedulesPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() =>
+                setSchedulesPage((p) => Math.min(totalPages, p + 1))
+              }
               disabled={schedulesPage === totalPages}
               className="px-2 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
             >
@@ -1202,7 +1204,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
         {/* Schedules and Clients by City */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 mt-6">
-          <div 
+          <div
             className="border border-gray-200 dark:border-dark-border rounded-lg p-4 transition-colors duration-300"
             onTouchStart={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
@@ -1213,7 +1215,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             </h4>
             <SchedulesByCityCardContent />
           </div>
-          <div 
+          <div
             className="border border-gray-200 dark:border-dark-border rounded-lg p-4 transition-colors duration-300"
             onTouchStart={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}

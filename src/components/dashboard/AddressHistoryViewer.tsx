@@ -46,31 +46,37 @@ const AddressHistoryViewer: React.FC<AddressHistoryViewerProps> = ({
   // Determine which address to show as "current"
   // Priority: 1. Latest from history (if exists) 2. Initial data (from BANCO_DADOS)
   const latestHistory = addressHistory?.[0] || null;
-  
-  // Use historical address if available, otherwise fallback to BANCO_DADOS data
-  const displayAddress = latestHistory ? {
-    logradouro: latestHistory.logradouro,
-    numero: latestHistory.numero,
-    complemento: latestHistory.complemento,
-    bairro: latestHistory.bairro,
-    cidade: latestHistory.cidade,
-    estado: latestHistory.estado,
-    cep: latestHistory.cep,
-    source: 'Histórico',
-    date: latestHistory.created_at
-  } : initialData ? {
-    logradouro: initialData.address,
-    numero: initialData.number,
-    complemento: initialData.complemento,
-    bairro: initialData.neighborhood,
-    cidade: initialData.city,
-    estado: initialData.state,
-    cep: initialData.cep,
-    source: 'Cadastro Original',
-    date: null // Original data doesn't have a specific update date in this context
-  } : null;
 
-  const historicalAddresses = latestHistory ? addressHistory.slice(1) : addressHistory;
+  // Use historical address if available, otherwise fallback to BANCO_DADOS data
+  const displayAddress = latestHistory
+    ? {
+        logradouro: latestHistory.logradouro,
+        numero: latestHistory.numero,
+        complemento: latestHistory.complemento,
+        bairro: latestHistory.bairro,
+        cidade: latestHistory.cidade,
+        estado: latestHistory.estado,
+        cep: latestHistory.cep,
+        source: "Histórico",
+        date: latestHistory.created_at,
+      }
+    : initialData
+      ? {
+          logradouro: initialData.address,
+          numero: initialData.number,
+          complemento: initialData.complemento,
+          bairro: initialData.neighborhood,
+          cidade: initialData.city,
+          estado: initialData.state,
+          cep: initialData.cep,
+          source: "Cadastro Original",
+          date: null, // Original data doesn't have a specific update date in this context
+        }
+      : null;
+
+  const historicalAddresses = latestHistory
+    ? addressHistory.slice(1)
+    : addressHistory;
 
   return (
     <>
@@ -112,9 +118,11 @@ const AddressHistoryViewer: React.FC<AddressHistoryViewerProps> = ({
                   <p className="text-xs">{displayAddress.cep}</p>
                 )}
                 <p className="text-xs text-gray-400 mt-1">
-                  ({displayAddress.source === 'Histórico' ? 
-                    `Atualizado em: ${new Date(displayAddress.date).toLocaleDateString("pt-BR")}` : 
-                    'Endereço Original do Cadastro'})
+                  (
+                  {displayAddress.source === "Histórico"
+                    ? `Atualizado em: ${new Date(displayAddress.date).toLocaleDateString("pt-BR")}`
+                    : "Endereço Original do Cadastro"}
+                  )
                 </p>
               </div>
             ) : (

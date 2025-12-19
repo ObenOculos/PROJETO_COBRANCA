@@ -233,8 +233,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   );
   const [visitsSortOrder, setVisitsSortOrder] = useState<"asc" | "desc">("asc");
 
-
-
   // Listen for visits scheduled by a manager to refresh data
   useEffect(() => {
     const handleVisitScheduled = async () => {
@@ -2192,206 +2190,223 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                 ) : (
                   <div className="space-y-3">
                     {paginatedSelectedDateVisits.map((visit) => {
-                                            // Obter apelido dos dados atuais do cliente
-                                            const clientData = getClientDataForVisit(visit.clientDocument);
-                                            const displayApelido = clientData?.apelido;
-                                            const displayComplemento = clientData?.complemento;
-                                                                                        const displayPendingValue = clientData?.totalPendingValue ?? visit.totalPendingValue ?? 0;
-                                                                                        const displayOverdueCount = clientData?.overdueCount ?? visit.overdueCount ?? 0;
-                                                                                        const addressUpdateDays = clientData?.addressUpdateDays;
-                                                                  
-                                                                                        return (
-                                                                                          <div
-                                                                                            key={visit.id}
-                                                                                            className={`border rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow ${
-                                                                                              visit.isOverdue
-                                                                                                ? "bg-red-50 border-red-200"
-                                                                                                : "border-gray-200"
-                                                                                            }`}
-                                                                                          >
-                                                                                            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
-                                                                                              <div className="flex-1">
-                                                                                                <div className="flex flex-wrap items-center gap-2 mb-2">
-                                                                                                  <button
-                                                                                                    onClick={() => handleOpenClientModal(visit)}
-                                                                                                    className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left"
-                                                                                                  >
-                                                                                                    {visit.clientName}
-                                                                                                    {displayApelido && (
-                                                                                                      <span className="text-sm font-normal text-gray-500 ml-2">
-                                                                                                        ({displayApelido})
-                                                                                                      </span>
-                                                                                                    )}
-                                                                                                  </button>
-                                                                                                  <span
-                                                                                                    className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit)}`}
-                                                                                                  >
-                                                                                                    {getStatusLabel(visit)}
-                                                                                                  </span>
-                                                                                                  {visit.isOverdue && (
-                                                                                                    <>
-                                                                                                      <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 font-medium flex items-center">
-                                                                                                        <AlertTriangle className="h-3 w-3 mr-1" />
-                                                                                                        Atrasada
-                                                                                                      </span>
-                                                                                                      {visit.overdueDays > 0 && (
-                                                                                                        <span className="text-xs text-red-600 font-medium">
-                                                                                                          ({visit.overdueDays}{" "}
-                                                                                                          {visit.overdueDays === 1
-                                                                                                            ? "dia"
-                                                                                                            : "dias"}{" "}
-                                                                                                          de atraso)
-                                                                                                        </span>
-                                                                                                      )}
-                                                                                                    </>
-                                                                                                  )}
-                                                                                                  {visit.scheduled_by_manager_id && (
-                                                                                                    <div className="flex items-center text-yellow-600">
-                                                                                                      <Star className="h-4 w-4 mr-1" />
-                                                                                                      <span className="text-xs font-medium">
-                                                                                                        Agendado pelo gerente
-                                                                                                      </span>
-                                                                                                    </div>
-                                                                                                  )}
-                                                                                                </div>
-                                                                  
-                                                                                                <div className="text-sm text-gray-600 space-y-1">
-                                                                                                  <div className="flex items-center">
-                                                                                                    <MapPin className="h-4 w-4 mr-2" />
-                                                                                                    {[
-                                                                                                      visit.clientAddress,
-                                                                                                      visit.clientNeighborhood,
-                                                                                                      visit.clientCity,
-                                                                                                    ]
-                                                                                                                                          .filter(Boolean)
-                                                                                                                                          .join(", ")}
-                                                                                                                                        {addressUpdateDays !== undefined &&
-                                                                                                                                          addressUpdateDays <= 60 && (
-                                                                                                                                            <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 uppercase tracking-wide">
-                                                                                                                                              Novo ({addressUpdateDays} dias)
-                                                                                                                                            </span>
-                                                                                                                                          )}
-                                                                                                                                      </div>                                                                                                  {displayComplemento && (
-                                                                                                    <div className="flex items-center pl-6">
-                                                                                                      {displayComplemento}
-                                                                                                    </div>
-                                                                                                  )}                                                      {displayPendingValue > 0 && (
-                                                        <div className="flex items-center">
-                                                          <DollarSign className="h-4 w-4 mr-2" />
-                                                          Pendente:{" "}
-                                                          {formatCurrency(displayPendingValue)}
-                                                          {displayOverdueCount > 0 && (
-                                                            <span className="ml-2 text-red-600">
-                                                              <AlertTriangle className="h-4 w-4 inline mr-1" />
-                                                              {displayOverdueCount}{" "}
-                                                              {displayOverdueCount === 1
-                                                                ? "título"
-                                                                : "títulos"}{" "}
-                                                              em atraso
-                                                            </span>
-                                                          )}
-                                                        </div>
-                                                      )}                              </div>
+                      // Obter apelido dos dados atuais do cliente
+                      const clientData = getClientDataForVisit(
+                        visit.clientDocument,
+                      );
+                      const displayApelido = clientData?.apelido;
+                      const displayComplemento = clientData?.complemento;
+                      const displayPendingValue =
+                        clientData?.totalPendingValue ??
+                        visit.totalPendingValue ??
+                        0;
+                      const displayOverdueCount =
+                        clientData?.overdueCount ?? visit.overdueCount ?? 0;
+                      const addressUpdateDays = clientData?.addressUpdateDays;
+                      const displayAddress =
+                        clientData?.address || visit.clientAddress;
+                      const displayNeighborhood =
+                        clientData?.neighborhood || visit.clientNeighborhood;
+                      const displayCity = clientData?.city || visit.clientCity;
+
+                      return (
+                        <div
+                          key={visit.id}
+                          className={`border rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow ${
+                            visit.isOverdue
+                              ? "bg-red-50 border-red-200"
+                              : "border-gray-200"
+                          }`}
+                        >
+                          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
+                            <div className="flex-1">
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <button
+                                  onClick={() => handleOpenClientModal(visit)}
+                                  className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left"
+                                >
+                                  {visit.clientName}
+                                  {displayApelido && (
+                                    <span className="text-sm font-normal text-gray-500 ml-2">
+                                      ({displayApelido})
+                                    </span>
+                                  )}
+                                </button>
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit)}`}
+                                >
+                                  {getStatusLabel(visit)}
+                                </span>
+                                {visit.isOverdue && (
+                                  <>
+                                    <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 font-medium flex items-center">
+                                      <AlertTriangle className="h-3 w-3 mr-1" />
+                                      Atrasada
+                                    </span>
+                                    {visit.overdueDays > 0 && (
+                                      <span className="text-xs text-red-600 font-medium">
+                                        ({visit.overdueDays}{" "}
+                                        {visit.overdueDays === 1
+                                          ? "dia"
+                                          : "dias"}{" "}
+                                        de atraso)
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                                {visit.scheduled_by_manager_id && (
+                                  <div className="flex items-center text-yellow-600">
+                                    <Star className="h-4 w-4 mr-1" />
+                                    <span className="text-xs font-medium">
+                                      Agendado pelo gerente
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="text-sm text-gray-600 space-y-1">
+                                <div className="flex items-center">
+                                  <MapPin className="h-4 w-4 mr-2" />
+                                  {[
+                                    displayAddress,
+                                    displayNeighborhood,
+                                    displayCity,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(", ")}
+                                  {addressUpdateDays !== undefined &&
+                                    addressUpdateDays <= 30 && (
+                                      <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 uppercase tracking-wide">
+                                        Novo ({addressUpdateDays} dias)
+                                      </span>
+                                    )}
+                                </div>{" "}
+                                {displayComplemento && (
+                                  <div className="flex items-center pl-6">
+                                    {displayComplemento}
+                                  </div>
+                                )}{" "}
+                                {displayPendingValue > 0 && (
+                                  <div className="flex items-center">
+                                    <DollarSign className="h-4 w-4 mr-2" />
+                                    Pendente:{" "}
+                                    {formatCurrency(displayPendingValue)}
+                                    {displayOverdueCount > 0 && (
+                                      <span className="ml-2 text-red-600">
+                                        <AlertTriangle className="h-4 w-4 inline mr-1" />
+                                        {displayOverdueCount}{" "}
+                                        {displayOverdueCount === 1
+                                          ? "título"
+                                          : "títulos"}{" "}
+                                        em atraso
+                                      </span>
+                                    )}
+                                  </div>
+                                )}{" "}
+                              </div>
                             </div>
 
                             {visit.status === "agendada" && (
-                            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
-                              <button
-                                onClick={() => handleMarkAsCompleted(visit)}
-                                className="px-3 py-2 bg-green-500 text-white rounded-2xl text-sm hover:bg-green-700 transition-colors flex items-center justify-center"
-                              >
-                                Realizada
-                              </button>
-                              <button
-                                onClick={() => handleMarkAsNotFound(visit)}
-                                className="px-3 py-2 bg-orange-500 text-white rounded-2xl text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
-                              >
-                                Não Localizado
-                              </button>
-                              <button
-                                onClick={() => handleOpenRescheduleModal(visit)}
-                                className="px-3 py-2 bg-blue-500 text-white rounded-2xl text-sm hover:bg-blue-700 transition-colors flex items-center justify-center"
-                              >
-                                <RefreshCw className="h-4 w-4 mr-1" />
-                                Reagendar
-                              </button>
-                              {!visit.cancellationRejectedBy && (
+                              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
+                                <button
+                                  onClick={() => handleMarkAsCompleted(visit)}
+                                  className="px-3 py-2 bg-green-500 text-white rounded-2xl text-sm hover:bg-green-700 transition-colors flex items-center justify-center"
+                                >
+                                  Realizada
+                                </button>
+                                <button
+                                  onClick={() => handleMarkAsNotFound(visit)}
+                                  className="px-3 py-2 bg-orange-500 text-white rounded-2xl text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
+                                >
+                                  Não Localizado
+                                </button>
                                 <button
                                   onClick={() =>
-                                    handleRequestCancellation(visit)
+                                    handleOpenRescheduleModal(visit)
                                   }
-                                  className="px-3 py-2 bg-red-500 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
+                                  className="px-3 py-2 bg-blue-500 text-white rounded-2xl text-sm hover:bg-blue-700 transition-colors flex items-center justify-center"
                                 >
-                                  Cancelar Visita
+                                  <RefreshCw className="h-4 w-4 mr-1" />
+                                  Reagendar
                                 </button>
-                              )}
-                            </div>
-                          )}
-                          {visit.status === "cancelamento_solicitado" && (
-                            <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-2xl">
-                              <div className="font-medium">
-                                Cancelamento Solicitado
+                                {!visit.cancellationRejectedBy && (
+                                  <button
+                                    onClick={() =>
+                                      handleRequestCancellation(visit)
+                                    }
+                                    className="px-3 py-2 bg-red-500 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
+                                  >
+                                    Cancelar Visita
+                                  </button>
+                                )}
                               </div>
-                              <div className="text-xs mt-1">
-                                Aguardando aprovação do gerente
-                              </div>
-                              {visit.cancellationRequestReason && (
-                                <div className="text-xs mt-1 italic">
-                                  Motivo: {visit.cancellationRequestReason}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {visit.cancellationRejectedBy &&
-                            visit.status === "agendada" && (
-                              <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-2xl">
+                            )}
+                            {visit.status === "cancelamento_solicitado" && (
+                              <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-2xl">
                                 <div className="font-medium">
-                                  Cancelamento Rejeitado pelo Gerente
+                                  Cancelamento Solicitado
                                 </div>
                                 <div className="text-xs mt-1">
-                                  A visita permanece agendada
+                                  Aguardando aprovação do gerente
                                 </div>
-                                {visit.cancellationRejectionReason && (
+                                {visit.cancellationRequestReason && (
                                   <div className="text-xs mt-1 italic">
-                                    Motivo da rejeição:{" "}
-                                    {visit.cancellationRejectionReason}
-                                  </div>
-                                )}
-                                {visit.cancellationRejectedAt && (
-                                  <div className="text-xs mt-1 text-gray-600">
-                                    Rejeitado em:{" "}
-                                    {new Date(
-                                      visit.cancellationRejectedAt,
-                                    ).toLocaleDateString("pt-BR")}{" "}
-                                    às{" "}
-                                    {new Date(
-                                      visit.cancellationRejectedAt,
-                                    ).toLocaleTimeString("pt-BR", {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    })}
+                                    Motivo: {visit.cancellationRequestReason}
                                   </div>
                                 )}
                               </div>
                             )}
-                        </div>
-                        {visit.notes && (
-                          <div className="mt-3 bg-white border border-gray-200 rounded-2xl p-3">
-                            <div className="flex items-start">
-                              <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
-                              <div>
-                                <div className="text-sm font-medium text-gray-700 mb-1">
-                                  Observações da visita:
+                            {visit.cancellationRejectedBy &&
+                              visit.status === "agendada" && (
+                                <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-2xl">
+                                  <div className="font-medium">
+                                    Cancelamento Rejeitado pelo Gerente
+                                  </div>
+                                  <div className="text-xs mt-1">
+                                    A visita permanece agendada
+                                  </div>
+                                  {visit.cancellationRejectionReason && (
+                                    <div className="text-xs mt-1 italic">
+                                      Motivo da rejeição:{" "}
+                                      {visit.cancellationRejectionReason}
+                                    </div>
+                                  )}
+                                  {visit.cancellationRejectedAt && (
+                                    <div className="text-xs mt-1 text-gray-600">
+                                      Rejeitado em:{" "}
+                                      {new Date(
+                                        visit.cancellationRejectedAt,
+                                      ).toLocaleDateString("pt-BR")}{" "}
+                                      às{" "}
+                                      {new Date(
+                                        visit.cancellationRejectedAt,
+                                      ).toLocaleTimeString("pt-BR", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </div>
+                                  )}
                                 </div>
-                                <div className="text-sm text-gray-600 italic whitespace-pre-line">
-                                  {visit.notes}
+                              )}
+                          </div>
+                          {visit.notes && (
+                            <div className="mt-3 bg-white border border-gray-200 rounded-2xl p-3">
+                              <div className="flex items-start">
+                                <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700 mb-1">
+                                    Observações da visita:
+                                  </div>
+                                  <div className="text-sm text-gray-600 italic whitespace-pre-line">
+                                    {visit.notes}
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    ) ; } )}
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

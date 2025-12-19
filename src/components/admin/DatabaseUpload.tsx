@@ -772,12 +772,12 @@ const DatabaseUpload: React.FC = () => {
       }
 
       if (onProgress) onProgress(100, "Inserção concluída.");
-      
+
       // ✅ Registrar endereços no histórico após sucesso
       if (rowsToInsert.length > 0) {
         await insertAddressHistoryForNewClients(rowsToInsert);
       }
-      
+
       return {
         success: true,
         insertedRows: rowsToInsert,

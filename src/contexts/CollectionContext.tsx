@@ -68,7 +68,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     AllowedVisitDate[]
   >([]);
   const [activeAddressHistory, setActiveAddressHistory] = useState<
-    { cliente_documento: string; created_at: string }[]
+    {
+      cliente_documento: string;
+      created_at: string;
+      logradouro?: string;
+      numero?: string;
+      bairro?: string;
+      cidade?: string;
+      estado?: string;
+      cep?: string;
+      complemento?: string;
+    }[]
   >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -237,7 +247,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     try {
       const { data, error } = await supabase
         .from("enderecos_historico")
-        .select("cliente_documento, created_at")
+        .select(
+          "cliente_documento, created_at, logradouro, numero, bairro, cidade, estado, cep, complemento",
+        )
         .eq("is_atual", true);
 
       if (error) {
@@ -2948,23 +2960,49 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     if (addressHistory?.created_at) {
       const updateDate = new Date(addressHistory.created_at);
       const today = new Date();
-      
+
       // Reset time for accurate day calculation
-      const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const updateDateMidnight = new Date(updateDate.getFullYear(), updateDate.getMonth(), updateDate.getDate());
-      
-      const diffTime = Math.abs(todayMidnight.getTime() - updateDateMidnight.getTime());
+      const todayMidnight = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+      );
+      const updateDateMidnight = new Date(
+        updateDate.getFullYear(),
+        updateDate.getMonth(),
+        updateDate.getDate(),
+      );
+
+      const diffTime = Math.abs(
+        todayMidnight.getTime() - updateDateMidnight.getTime(),
+      );
       addressUpdateDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     }
+
+    const currentAddress = addressHistory
+      ? `${addressHistory.logradouro || ""}, ${addressHistory.numero || "s/n"}`
+      : clientGroup.address;
+
+    const currentNeighborhood = addressHistory
+      ? addressHistory.bairro || ""
+      : clientGroup.neighborhood;
+
+    const currentCity = addressHistory
+      ? addressHistory.cidade || ""
+      : clientGroup.city;
+
+    const currentComplemento = addressHistory
+      ? addressHistory.complemento || ""
+      : clientGroup.complemento;
 
     return {
       name: clientGroup.client,
       document: clientGroup.document,
       apelido: clientGroup.apelido,
-      address: clientGroup.address,
-      neighborhood: clientGroup.neighborhood,
-      city: clientGroup.city,
-      complemento: clientGroup.complemento,
+      address: currentAddress,
+      neighborhood: currentNeighborhood,
+      city: currentCity,
+      complemento: currentComplemento,
       phone: clientGroup.phone,
       mobile: clientGroup.mobile,
       totalPendingValue: totalPending,

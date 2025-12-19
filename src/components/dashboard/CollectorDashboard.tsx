@@ -826,7 +826,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
                     Ordem e Visibilidade
                   </h4>
                   {cardOrder.map((cardId, index) => {
-                    const card = [...dashboardCards, ...cityCards].find((c) => c.id === cardId);
+                    const card = [...dashboardCards, ...cityCards].find(
+                      (c) => c.id === cardId,
+                    );
                     if (!card) return null;
 
                     return (

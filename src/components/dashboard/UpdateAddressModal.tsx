@@ -52,12 +52,14 @@ const UpdateAddressModal: React.FC<UpdateAddressModalProps> = ({
           });
         } else {
           if (historyError) {
-             console.error("History fetch error:", historyError);
+            console.error("History fetch error:", historyError);
           }
           // Se não houver histórico, buscar do BANCO_DADOS
           const { data: originalData, error: originalError } = await supabase
             .from("BANCO_DADOS")
-            .select("endereco, numero, complemento, bairro, cidade, estado, cep")
+            .select(
+              "endereco, numero, complemento, bairro, cidade, estado, cep",
+            )
             .eq("documento", clientDocumento)
             .not("endereco", "is", null)
             .order("data_lancamento", { ascending: false })
@@ -75,7 +77,7 @@ const UpdateAddressModal: React.FC<UpdateAddressModalProps> = ({
               cep: originalData.cep || "",
             });
           } else if (originalError && originalError.code !== "PGRST116") {
-             console.error("Original address fetch error:", originalError);
+            console.error("Original address fetch error:", originalError);
           }
         }
         setIsLoading(false);
