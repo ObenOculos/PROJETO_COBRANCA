@@ -18,6 +18,7 @@ const UpdateAddressModal: React.FC<UpdateAddressModalProps> = ({
   const [formData, setFormData] = useState({
     logradouro: "",
     numero: "",
+    complemento: "",
     bairro: "",
     cidade: "",
     estado: "",
@@ -30,27 +31,52 @@ const UpdateAddressModal: React.FC<UpdateAddressModalProps> = ({
     if (isOpen && clientDocumento) {
       const fetchCurrentAddress = async () => {
         setIsLoading(true);
-        const { data, error } = await supabase
+        // Tentar buscar do histórico primeiro
+        const { data: historyData, error: historyError } = await supabase
           .from("enderecos_historico")
           .select("*")
           .eq("cliente_documento", clientDocumento)
           .eq("is_atual", true)
           .limit(1)
-          .single();
+          .maybeSingle();
 
-        if (data) {
+        if (historyData) {
           setFormData({
-            logradouro: data.logradouro || "",
-            numero: data.numero || "",
-            bairro: data.bairro || "",
-            cidade: data.cidade || "",
-            estado: data.estado || "",
-            cep: data.cep || "",
+            logradouro: historyData.logradouro || "",
+            numero: historyData.numero || "",
+            complemento: historyData.complemento || "",
+            bairro: historyData.bairro || "",
+            cidade: historyData.cidade || "",
+            estado: historyData.estado || "",
+            cep: historyData.cep || "",
           });
-        } else if (error && error.code !== "PGRST116") {
-          // Ignore 'single row not found'
-          setError("Falha ao buscar o endereço atual.");
-          console.error("Address fetch error:", error);
+        } else {
+          if (historyError) {
+             console.error("History fetch error:", historyError);
+          }
+          // Se não houver histórico, buscar do BANCO_DADOS
+          const { data: originalData, error: originalError } = await supabase
+            .from("BANCO_DADOS")
+            .select("endereco, numero, complemento, bairro, cidade, estado, cep")
+            .eq("documento", clientDocumento)
+            .not("endereco", "is", null)
+            .order("data_lancamento", { ascending: false })
+            .limit(1)
+            .single();
+
+          if (originalData) {
+            setFormData({
+              logradouro: originalData.endereco || "",
+              numero: originalData.numero || "",
+              complemento: originalData.complemento || "",
+              bairro: originalData.bairro || "",
+              cidade: originalData.cidade || "",
+              estado: originalData.estado || "",
+              cep: originalData.cep || "",
+            });
+          } else if (originalError && originalError.code !== "PGRST116") {
+             console.error("Original address fetch error:", originalError);
+          }
         }
         setIsLoading(false);
       };
@@ -76,6 +102,7 @@ const UpdateAddressModal: React.FC<UpdateAddressModalProps> = ({
       p_cidade: formData.cidade,
       p_estado: formData.estado,
       p_cep: formData.cep,
+      p_complemento: formData.complemento,
     });
 
     setIsLoading(false);
@@ -127,6 +154,22 @@ const UpdateAddressModal: React.FC<UpdateAddressModalProps> = ({
               id="numero"
               name="numero"
               value={formData.numero}
+              onChange={handleChange}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="complemento"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Complemento
+            </label>
+            <input
+              type="text"
+              id="complemento"
+              name="complemento"
+              value={formData.complemento}
               onChange={handleChange}
               className={inputClass}
             />
