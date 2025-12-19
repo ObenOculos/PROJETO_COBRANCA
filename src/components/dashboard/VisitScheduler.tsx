@@ -2190,106 +2190,111 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                     </p>
                   </div>
                 ) : (
-                  <div
-                    className="space-y-3"
-                  >
-                    {paginatedSelectedDateVisits.map((visit) => (
-                      <div
-                        key={visit.id}
-                        className={`border rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow ${
-                          visit.isOverdue
-                            ? "border-red-300 bg-red-50"
-                            : "border-blue-300 bg-blue-50"
-                        }`}
-                      >
-                        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
-                          <div className="flex-1">
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <button
-                                onClick={() => handleOpenClientModal(visit)}
-                                className={`font-semibold hover:underline ${
-                                  visit.isOverdue
-                                    ? "text-red-600 hover:text-red-800"
-                                    : "text-blue-600 hover:text-blue-800"
-                                }`}
-                              >
-                                {visit.clientName}
-                              </button>
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs ${
-                                  visit.isOverdue
-                                    ? "bg-red-100 text-red-800"
-                                    : getStatusColor(visit)
-                                }`}
-                              >
-                                {visit.isOverdue
-                                  ? "Atrasada"
-                                  : getStatusLabel(visit)}
-                              </span>
-                              <span
-                                className={`text-sm font-medium ${
-                                  visit.isOverdue
-                                    ? "text-red-600"
-                                    : "text-blue-600"
-                                }`}
-                              >
-                                {visit.scheduledTime || "00:00"}
-                              </span>
-                              {visit.isOverdue && (
-                                <>
-                                  <AlertTriangle className="h-4 w-4 text-red-600" />
-                                  {visit.overdueDays > 0 && (
-                                    <span className="text-xs text-red-600 font-medium">
-                                      ({visit.overdueDays}{" "}
-                                      {visit.overdueDays === 1 ? "dia" : "dias"}{" "}
-                                      de atraso)
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                              {visit.scheduled_by_manager_id && (
-                                <div className="flex items-center text-yellow-600">
-                                  <Star className="h-4 w-4 mr-1" />
-                                  <span className="text-xs font-medium">
-                                    Agendado pelo gerente
-                                  </span>
-                                </div>
-                              )}
+                  <div className="space-y-3">
+                    {paginatedSelectedDateVisits.map((visit) => {
+                                            // Obter apelido dos dados atuais do cliente
+                                            const clientData = getClientDataForVisit(visit.clientDocument);
+                                            const displayApelido = clientData?.apelido;
+                                            const displayComplemento = clientData?.complemento;
+                                                                                        const displayPendingValue = clientData?.totalPendingValue ?? visit.totalPendingValue ?? 0;
+                                                                                        const displayOverdueCount = clientData?.overdueCount ?? visit.overdueCount ?? 0;
+                                                                                        const addressUpdateDays = clientData?.addressUpdateDays;
+                                                                  
+                                                                                        return (
+                                                                                          <div
+                                                                                            key={visit.id}
+                                                                                            className={`border rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow ${
+                                                                                              visit.isOverdue
+                                                                                                ? "bg-red-50 border-red-200"
+                                                                                                : "border-gray-200"
+                                                                                            }`}
+                                                                                          >
+                                                                                            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
+                                                                                              <div className="flex-1">
+                                                                                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                                                                  <button
+                                                                                                    onClick={() => handleOpenClientModal(visit)}
+                                                                                                    className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left"
+                                                                                                  >
+                                                                                                    {visit.clientName}
+                                                                                                    {displayApelido && (
+                                                                                                      <span className="text-sm font-normal text-gray-500 ml-2">
+                                                                                                        ({displayApelido})
+                                                                                                      </span>
+                                                                                                    )}
+                                                                                                  </button>
+                                                                                                  <span
+                                                                                                    className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit)}`}
+                                                                                                  >
+                                                                                                    {getStatusLabel(visit)}
+                                                                                                  </span>
+                                                                                                  {visit.isOverdue && (
+                                                                                                    <>
+                                                                                                      <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 font-medium flex items-center">
+                                                                                                        <AlertTriangle className="h-3 w-3 mr-1" />
+                                                                                                        Atrasada
+                                                                                                      </span>
+                                                                                                      {visit.overdueDays > 0 && (
+                                                                                                        <span className="text-xs text-red-600 font-medium">
+                                                                                                          ({visit.overdueDays}{" "}
+                                                                                                          {visit.overdueDays === 1
+                                                                                                            ? "dia"
+                                                                                                            : "dias"}{" "}
+                                                                                                          de atraso)
+                                                                                                        </span>
+                                                                                                      )}
+                                                                                                    </>
+                                                                                                  )}
+                                                                                                  {visit.scheduled_by_manager_id && (
+                                                                                                    <div className="flex items-center text-yellow-600">
+                                                                                                      <Star className="h-4 w-4 mr-1" />
+                                                                                                      <span className="text-xs font-medium">
+                                                                                                        Agendado pelo gerente
+                                                                                                      </span>
+                                                                                                    </div>
+                                                                                                  )}
+                                                                                                </div>
+                                                                  
+                                                                                                <div className="text-sm text-gray-600 space-y-1">
+                                                                                                  <div className="flex items-center">
+                                                                                                    <MapPin className="h-4 w-4 mr-2" />
+                                                                                                    {[
+                                                                                                      visit.clientAddress,
+                                                                                                      visit.clientNeighborhood,
+                                                                                                      visit.clientCity,
+                                                                                                    ]
+                                                                                                                                          .filter(Boolean)
+                                                                                                                                          .join(", ")}
+                                                                                                                                        {addressUpdateDays !== undefined &&
+                                                                                                                                          addressUpdateDays <= 60 && (
+                                                                                                                                            <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 uppercase tracking-wide">
+                                                                                                                                              Novo ({addressUpdateDays} dias)
+                                                                                                                                            </span>
+                                                                                                                                          )}
+                                                                                                                                      </div>                                                                                                  {displayComplemento && (
+                                                                                                    <div className="flex items-center pl-6">
+                                                                                                      {displayComplemento}
+                                                                                                    </div>
+                                                                                                  )}                                                      {displayPendingValue > 0 && (
+                                                        <div className="flex items-center">
+                                                          <DollarSign className="h-4 w-4 mr-2" />
+                                                          Pendente:{" "}
+                                                          {formatCurrency(displayPendingValue)}
+                                                          {displayOverdueCount > 0 && (
+                                                            <span className="ml-2 text-red-600">
+                                                              <AlertTriangle className="h-4 w-4 inline mr-1" />
+                                                              {displayOverdueCount}{" "}
+                                                              {displayOverdueCount === 1
+                                                                ? "título"
+                                                                : "títulos"}{" "}
+                                                              em atraso
+                                                            </span>
+                                                          )}
+                                                        </div>
+                                                      )}                              </div>
                             </div>
 
-                            <div className="text-sm text-gray-600 space-y-1">
-                              <div className="flex items-center">
-                                <MapPin className="h-4 w-4 mr-2" />
-                                {[
-                                  visit.clientNeighborhood,
-                                  visit.clientCity,
-                                  visit.clientAddress,
-                                ]
-                                  .filter(Boolean)
-                                  .join(", ")}
-                              </div>
-                              {(visit.totalPendingValue ?? 0) > 0 && (
-                                <div className="flex items-center">
-                                  <DollarSign className="h-4 w-4 mr-2" />
-                                  Pendente:{" "}
-                                  {formatCurrency(visit.totalPendingValue ?? 0)}
-                                  {visit.overdueCount &&
-                                    visit.overdueCount > 0 && (
-                                      <span className="ml-2 text-red-600">
-                                        <AlertTriangle className="h-4 w-4 inline mr-1" />
-                                        {visit.overdueCount}{" "}
-                                        {visit.overdueCount === 1
-                                          ? "título"
-                                          : "títulos"}{" "}
-                                        em atraso
-                                      </span>
-                                    )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {visit.status === "agendada" && (
+                            {visit.status === "agendada" && (
                             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
                               <button
                                 onClick={() => handleMarkAsCompleted(visit)}
@@ -2386,7 +2391,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                           </div>
                         )}
                       </div>
-                    ))}
+                    ) ; } )}
                   </div>
                 )}
               </div>

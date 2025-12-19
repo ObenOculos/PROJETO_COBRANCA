@@ -343,13 +343,16 @@ export interface CollectionContextType {
   getClientDataForVisit: (clientDocument: string) => {
     name: string;
     document: string;
+    apelido?: string;
     address: string;
     neighborhood: string;
     city: string;
+    complemento?: string;
     phone?: string;
     mobile?: string;
     totalPendingValue: number;
     overdueCount: number;
+    addressUpdateDays?: number;
   } | null;
   rescheduleVisit: (
     visitId: string,

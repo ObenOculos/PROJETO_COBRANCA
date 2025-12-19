@@ -67,6 +67,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [allowedVisitDates, setAllowedVisitDates] = useState<
     AllowedVisitDate[]
   >([]);
+  const [activeAddressHistory, setActiveAddressHistory] = useState<
+    { cliente_documento: string; created_at: string }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -226,6 +229,28 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   }, [isOnline, setAllowedVisitDates, dataCache, supabase]);
 
+  // Fetch active address history for "New" badge
+  const fetchActiveAddressHistory = React.useCallback(async () => {
+    // If offline, skip
+    if (!isOnline) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("enderecos_historico")
+        .select("cliente_documento, created_at")
+        .eq("is_atual", true);
+
+      if (error) {
+        console.error("Erro ao buscar histórico de endereços:", error);
+        return;
+      }
+
+      setActiveAddressHistory(data || []);
+    } catch (err) {
+      console.error("Erro ao carregar histórico de endereços:", err);
+    }
+  }, [isOnline]);
+
   // Cache invalidation hooks
   const {
     invalidateCollections,
@@ -268,6 +293,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             fetchScheduledVisits(),
             fetchMonthlyGoals(),
             fetchAllowedVisitDates(),
+            fetchActiveAddressHistory(),
           ]);
 
           // Now fetch collections
@@ -1744,6 +1770,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         fetchSalePayments(false), // Force fetch
         fetchScheduledVisits(false), // Force fetch
         fetchMonthlyGoals(false), // Force fetch monthly goals
+        fetchActiveAddressHistory(),
       ]);
     } finally {
       setGlobalLoading(false);
@@ -2913,16 +2940,36 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
     }, 0);
 
+    const addressHistory = activeAddressHistory.find(
+      (h) => h.cliente_documento === clientDocument,
+    );
+    let addressUpdateDays: number | undefined;
+
+    if (addressHistory?.created_at) {
+      const updateDate = new Date(addressHistory.created_at);
+      const today = new Date();
+      
+      // Reset time for accurate day calculation
+      const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const updateDateMidnight = new Date(updateDate.getFullYear(), updateDate.getMonth(), updateDate.getDate());
+      
+      const diffTime = Math.abs(todayMidnight.getTime() - updateDateMidnight.getTime());
+      addressUpdateDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    }
+
     return {
       name: clientGroup.client,
       document: clientGroup.document,
-      address: `${clientGroup.address}, ${clientGroup.number}`,
+      apelido: clientGroup.apelido,
+      address: clientGroup.address,
       neighborhood: clientGroup.neighborhood,
       city: clientGroup.city,
+      complemento: clientGroup.complemento,
       phone: clientGroup.phone,
       mobile: clientGroup.mobile,
       totalPendingValue: totalPending,
       overdueCount: overdueCount,
+      addressUpdateDays,
     };
   };
 

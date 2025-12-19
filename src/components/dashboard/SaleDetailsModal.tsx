@@ -253,13 +253,13 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
           {/* Sale Information */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             {/* Basic Info */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                 <Store className="h-5 w-5 mr-2 text-blue-600" />
                 Informações da Venda
               </h3>
 
-              <div className="bg-gray-50 p-4 rounded-2xl space-y-3">
+              <div className="bg-gray-50 p-4 rounded-2xl space-y-4 text-sm border border-gray-200">
                 <div className="flex justify-between">
                   <span className="text-sm font-medium text-gray-600">
                     Loja:
@@ -325,12 +325,12 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
             </div>
 
             {/* Contact Info */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                 <User className="h-5 w-5 mr-2 text-blue-600" />
                 Informações do Cliente
               </h3>
-              <div className="bg-gray-50 p-4 rounded-2xl space-y-4">
+              <div className="bg-gray-50 p-4 rounded-2xl space-y-4 text-sm border border-gray-200">
                 <div>
                   <p className="text-sm font-medium text-gray-600 mb-1">
                     Cliente:
@@ -376,7 +376,20 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
               </div>
 
               {saleData.documento && (
-                <AddressHistoryViewer clientDocument={saleData.documento} />
+                <AddressHistoryViewer
+                  clientDocument={saleData.documento}
+                  initialData={
+                    {
+                      address: saleData.endereco || "",
+                      number: saleData.numero || "",
+                      complemento: saleData.complemento || "",
+                      neighborhood: saleData.bairro || "",
+                      city: saleData.cidade || "",
+                      state: saleData.estado || "",
+                      cep: saleData.cep || "",
+                    } as any
+                  }
+                />
               )}
             </div>
           </div>

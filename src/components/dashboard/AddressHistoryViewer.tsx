@@ -2,13 +2,16 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
 import UpdateAddressModal from "./UpdateAddressModal";
 import { MapPin } from "lucide-react";
+import { ClientGroup } from "../../types";
 
 interface AddressHistoryViewerProps {
   clientDocument: string;
+  initialData?: ClientGroup;
 }
 
 const AddressHistoryViewer: React.FC<AddressHistoryViewerProps> = ({
   clientDocument,
+  initialData,
 }) => {
   const [addressHistory, setAddressHistory] = useState<any[]>([]);
   const [addressLoading, setAddressLoading] = useState(true);
@@ -40,8 +43,34 @@ const AddressHistoryViewer: React.FC<AddressHistoryViewerProps> = ({
     fetchAddress();
   }, [fetchAddress]);
 
-  const currentAddress = addressHistory?.[0] || null;
-  const historicalAddresses = addressHistory?.slice(1) || [];
+  // Determine which address to show as "current"
+  // Priority: 1. Latest from history (if exists) 2. Initial data (from BANCO_DADOS)
+  const latestHistory = addressHistory?.[0] || null;
+  
+  // Use historical address if available, otherwise fallback to BANCO_DADOS data
+  const displayAddress = latestHistory ? {
+    logradouro: latestHistory.logradouro,
+    numero: latestHistory.numero,
+    complemento: latestHistory.complemento,
+    bairro: latestHistory.bairro,
+    cidade: latestHistory.cidade,
+    estado: latestHistory.estado,
+    cep: latestHistory.cep,
+    source: 'Histórico',
+    date: latestHistory.created_at
+  } : initialData ? {
+    logradouro: initialData.address,
+    numero: initialData.number,
+    complemento: initialData.complemento,
+    bairro: initialData.neighborhood,
+    cidade: initialData.city,
+    estado: initialData.state,
+    cep: initialData.cep,
+    source: 'Cadastro Original',
+    date: null // Original data doesn't have a specific update date in this context
+  } : null;
+
+  const historicalAddresses = latestHistory ? addressHistory.slice(1) : addressHistory;
 
   return (
     <>
@@ -61,30 +90,31 @@ const AddressHistoryViewer: React.FC<AddressHistoryViewerProps> = ({
         <div className="bg-gray-50 p-4 rounded-2xl space-y-4 text-sm border border-gray-200">
           <div className="flex items-start">
             <MapPin className="h-4 w-4 text-gray-400 mr-2 mt-1 flex-shrink-0" />
-            {addressLoading ? (
+            {addressLoading && !displayAddress ? (
               <div className="text-gray-800 animate-pulse">
                 Carregando endereço...
               </div>
-            ) : currentAddress ? (
+            ) : displayAddress ? (
               <div className="text-gray-800">
                 <p className="font-semibold">
-                  {currentAddress.logradouro || "Endereço não informado"},{" "}
-                  {currentAddress.numero || "s/n"}
+                  {displayAddress.logradouro || "Endereço não informado"},{" "}
+                  {displayAddress.numero || "s/n"}
                 </p>
+                {displayAddress.complemento && (
+                  <p className="text-xs">{displayAddress.complemento}</p>
+                )}
                 <p className="text-xs">
-                  {currentAddress.bairro || "Bairro não informado"} -{" "}
-                  {currentAddress.cidade || "Cidade não informada"}/
-                  {currentAddress.estado || ""}
+                  {displayAddress.bairro || "Bairro não informado"} -{" "}
+                  {displayAddress.cidade || "Cidade não informada"}/
+                  {displayAddress.estado || ""}
                 </p>
-                {currentAddress.cep && (
-                  <p className="text-xs">{currentAddress.cep}</p>
+                {displayAddress.cep && (
+                  <p className="text-xs">{displayAddress.cep}</p>
                 )}
                 <p className="text-xs text-gray-400 mt-1">
-                  (Atualizado em:{" "}
-                  {new Date(currentAddress.created_at).toLocaleDateString(
-                    "pt-BR",
-                  )}
-                  )
+                  ({displayAddress.source === 'Histórico' ? 
+                    `Atualizado em: ${new Date(displayAddress.date).toLocaleDateString("pt-BR")}` : 
+                    'Endereço Original do Cadastro'})
                 </p>
               </div>
             ) : (
@@ -111,6 +141,7 @@ const AddressHistoryViewer: React.FC<AddressHistoryViewerProps> = ({
                     <p>
                       {addr.logradouro}, {addr.numero}
                     </p>
+                    {addr.complemento && <p>{addr.complemento}</p>}
                     <p>
                       {addr.bairro} - {addr.cidade}/{addr.estado}
                     </p>

@@ -763,7 +763,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 </div>
 
                 {/* Column 2: Address History */}
-                <AddressHistoryViewer clientDocument={clientGroup.document} />
+                <AddressHistoryViewer
+                  clientDocument={clientGroup.document}
+                  initialData={clientGroup}
+                />
               </div>
               {/* Visit History */}
               {clientVisits.length > 0 && (
