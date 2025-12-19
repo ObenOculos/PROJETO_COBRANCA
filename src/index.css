@@ -12,39 +12,29 @@
   font-style: normal;
 }
 
-/* ======================== DARK MODE GLOBAL ======================== */
-
-/* Light Mode (Padrão) */
-html {
-  background-color: #f0eee9;
+/* ======================== GLOBAL BACKGROUND & DARK MODE ======================== */
+html,
+body,
+main {
+  background-color: #f6fafd !important;
   color: #121212;
   transition:
     background-color 0.3s ease,
     color 0.3s ease;
 }
 
-body {
-  background-color: #f0eee9;
-  color: #121212;
-  transition:
-    background-color 0.3s ease,
-    color 0.3s ease;
-}
-
-/* Dark Mode (Quando <html class="dark"> está presente) */
-html.dark {
-  background-color: var(--dark-bg, #1a1a1a);
-  color: var(--dark-text, #e0e0e0);
-}
-
-html.dark body {
-  background-color: var(--dark-bg, #1a1a1a);
-  color: var(--dark-text, #e0e0e0);
+/* Dark Mode Support */
+html.dark,
+html.dark body,
+html.dark main {
+  background-color: var(--dark-bg, #0f172a) !important;
+  color: var(--dark-text, #f1f5f9);
 }
 
 /* Todos os elementos com transição suave */
 html,
 body,
+main,
 * {
   transition:
     background-color 0.3s ease,

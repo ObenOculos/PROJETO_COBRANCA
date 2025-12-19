@@ -113,7 +113,7 @@ const AppContent: React.FC = () => {
     user?.type === "manager" ? getPendingCancellationRequests() : [];
 
   return (
-    <div className="flex h-screen bg-slate-100 dark:bg-dark-bg-secondary transition-colors duration-300">
+    <div className="flex h-screen transition-colors duration-300">
       <Header
         tabs={tabs}
         activeTab={
@@ -126,7 +126,7 @@ const AppContent: React.FC = () => {
         }
         pendingCancellations={pendingCancellations.length}
       />
-      <main className="flex-1 overflow-y-auto bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text transition-colors duration-300">
+      <main className="flex-1 overflow-y-auto text-gray-900 dark:text-dark-text transition-colors duration-300">
         {user.type === "manager" ? (
           <ManagerDashboard
             activeTab={managerActiveTab}

@@ -30,7 +30,7 @@ const GlobalLoading: React.FC<GlobalLoadingProps> = ({
 
   return (
     <div
-      className={`fixed inset-0 bg-white flex items-center justify-center z-50 transition-opacity duration-200 ${
+      className={`fixed inset-0 bg-[#f6fafd] dark:bg-dark-bg flex items-center justify-center z-50 transition-opacity duration-200 ${
         isVisible ? "opacity-100" : "opacity-0"
       }`}
     >

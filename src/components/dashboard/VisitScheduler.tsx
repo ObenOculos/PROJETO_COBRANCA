@@ -2212,7 +2212,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       return (
                         <div
                           key={visit.id}
-                          className={`border rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow ${
+                          className={`border bg-white rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow ${
                             visit.isOverdue
                               ? "bg-red-50 border-red-200"
                               : "border-gray-200"
