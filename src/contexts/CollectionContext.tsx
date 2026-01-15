@@ -150,6 +150,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             updatedAt: visit.updated_at,
             dataVisitaRealizada: visit.data_visita_realizada,
             clientAddress: visit.client_address,
+            clientNumber: visit.client_number,
             clientNeighborhood: visit.client_neighborhood,
             clientCity: visit.client_city,
             totalPendingValue: visit.total_pending_value,
@@ -2983,6 +2984,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       ? `${addressHistory.logradouro || ""}, ${addressHistory.numero || "s/n"}`
       : clientGroup.address;
 
+    const currentNumber = addressHistory
+      ? addressHistory.numero || "s/n"
+      : clientGroup.number || "s/n";
+
     const currentNeighborhood = addressHistory
       ? addressHistory.bairro || ""
       : clientGroup.neighborhood;
@@ -3000,6 +3005,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       document: clientGroup.document,
       apelido: clientGroup.apelido,
       address: currentAddress,
+      number: currentNumber,
       neighborhood: currentNeighborhood,
       city: currentCity,
       complemento: currentComplemento,

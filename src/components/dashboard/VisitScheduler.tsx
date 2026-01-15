@@ -232,6 +232,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     "name",
   );
   const [visitsSortOrder, setVisitsSortOrder] = useState<"asc" | "desc">("asc");
+  const [cityFilter, setCityFilter] = useState<string>("");
+  const [citySelectValue, setCitySelectValue] = useState<string>("");
 
   // Listen for visits scheduled by a manager to refresh data
   useEffect(() => {
@@ -793,8 +795,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       overdueDays: daysDiff,
     }));
 
+    // Aplicar filtro por cidade
+    const filteredVisits = cityFilter
+      ? visitsWithOverdueFlag.filter((visit) => visit.clientCity === cityFilter)
+      : visitsWithOverdueFlag;
+
     // Ordenar visitas
-    return [...visitsWithOverdueFlag].sort((a, b) => {
+    return [...filteredVisits].sort((a, b) => {
       let comparison = 0;
 
       switch (visitsSortBy) {
@@ -817,7 +824,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
       return visitsSortOrder === "asc" ? comparison : -comparison;
     });
-  }, [selectedCalendarDate, allVisits, visitsSortBy, visitsSortOrder]);
+  }, [selectedCalendarDate, allVisits, visitsSortBy, visitsSortOrder, cityFilter]);
 
   // Paginação para visitas do dia selecionado
   const paginatedSelectedDateVisits = useMemo(() => {
@@ -2082,7 +2089,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       {selectedDateVisits.length > 1 && (
                         <div className="bg-white/70 backdrop-blur-sm rounded-lg border border-white/50 px-3 py-2 shadow-sm">
                           {/* Botões de Ordenação com Ícones */}
-                          <div className="flex items-center gap-2 justify-center">
+                          <div className="flex items-center gap-2 justify-center mb-2">
                             <button
                               onClick={() => {
                                 setVisitsSortBy("name");
@@ -2140,6 +2147,49 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                             >
                               <MapPinIcon className="h-4 w-4" />
                             </button>
+                          </div>
+                          {/* Filtro por cidade */}
+                          <div className="flex items-center gap-2 mt-2">
+                            <div className="relative">
+                              <MapPinIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                              <select
+                                id="city-filter"
+                                className="flex items-center gap-1 pl-8 pr-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-300"
+                                value={citySelectValue}
+                                onChange={e => {
+                                  const value = e.target.value;
+                                  if (value === "sort-asc") {
+                                    setVisitsSortBy("city");
+                                    setVisitsSortOrder("asc");
+                                    setCityFilter("");
+                                    setCitySelectValue("sort-asc");
+                                  } else if (value === "sort-desc") {
+                                    setVisitsSortBy("city");
+                                    setVisitsSortOrder("desc");
+                                    setCityFilter("");
+                                    setCitySelectValue("sort-desc");
+                                  } else if (value === "") {
+                                    setCityFilter("");
+                                    setCitySelectValue("");
+                                  } else {
+                                    setCityFilter(value);
+                                    setCitySelectValue(value);
+                                  }
+                                }}
+                              >
+                                <option value="">Todas as cidades</option>
+                                <optgroup label="Ordenar por cidade">
+                                  <option value="sort-asc">A-Z</option>
+                                  <option value="sort-desc">Z-A</option>
+                                </optgroup>
+                                {Array.from(new Set(getVisitsForDate(selectedCalendarDate || new Date()).map(v => v.clientCity || "")))
+                                  .filter(city => city)
+                                  .sort()
+                                  .map(city => (
+                                    <option key={city} value={city}>{city}</option>
+                                  ))}
+                              </select>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -2269,6 +2319,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   <MapPin className="h-4 w-4 mr-2" />
                                   {[
                                     displayAddress,
+                                    (clientData?.number || visit.clientNumber),
                                     displayNeighborhood,
                                     displayCity,
                                   ]

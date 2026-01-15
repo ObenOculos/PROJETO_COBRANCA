@@ -620,7 +620,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       Cobrador: getCollectorName(visit.collectorId),
       Cliente: visit.clientName,
       Documento: visit.clientDocument,
-      Endereço: `${visit.clientAddress}, ${visit.clientNeighborhood}, ${visit.clientCity}`,
+      Endereço: `${visit.clientAddress}${visit.clientNumber ? `, ${visit.clientNumber}` : ""}, ${visit.clientNeighborhood}, ${visit.clientCity}`,
       "Data Agendada": formatSafeDate(visit.scheduledDate),
       "Hora Agendada": visit.scheduledTime || "N/A",
       Status: getStatusLabel(visit.status),
@@ -1010,6 +1010,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                             <div className="flex items-center">
                                               <MapPin className="h-4 w-4 mr-2" />
                                               {visit.clientAddress}
+                                              {visit.clientNumber && `, ${visit.clientNumber}`}
                                               {visit.clientNeighborhood &&
                                                 `, ${visit.clientNeighborhood}`}
                                               {visit.clientCity &&
@@ -1225,6 +1226,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       <div className="flex items-center">
                         <MapPin className="h-4 w-4 mr-2" />
                         {request.clientAddress}
+                        {request.clientNumber && `, ${request.clientNumber}`}
                       </div>
                     </div>
 

@@ -74,6 +74,7 @@ export interface ScheduledVisit {
   dataVisitaRealizada?: string; // Data em que a visita foi efetivamente realizada (YYYY-MM-DD)
   // Dados do cliente para facilitar exibição
   clientAddress?: string;
+  clientNumber?: string;
   clientNeighborhood?: string;
   clientCity?: string;
   totalPendingValue?: number;
@@ -345,6 +346,7 @@ export interface CollectionContextType {
     document: string;
     apelido?: string;
     address: string;
+    number: string;
     neighborhood: string;
     city: string;
     complemento?: string;
