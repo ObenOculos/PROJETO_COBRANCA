@@ -700,6 +700,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       if (updates.obs !== undefined) dbUpdates.obs = updates.obs;
       if (updates.user_id !== undefined) dbUpdates.user_id = updates.user_id;
       if (updates.desconto !== undefined) dbUpdates.desconto = updates.desconto; // Added this line
+      if (updates.situacao !== undefined) dbUpdates.situacao = updates.situacao;
 
       const { error: supabaseError } = await supabase
         .from("BANCO_DADOS")

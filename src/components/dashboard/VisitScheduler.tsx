@@ -4,6 +4,7 @@ import {
   Calendar,
   Clock,
   MapPin,
+  Home,
   DollarSign,
   MessageSquare,
   AlertTriangle,
@@ -228,12 +229,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     useState(false);
 
   // Estados para filtro das visitas do dia selecionado
-  const [visitsSortBy, setVisitsSortBy] = useState<"name" | "city" | "value">(
+  const [visitsSortBy, setVisitsSortBy] = useState<"name" | "city" | "value" | "address">(
     "name",
   );
   const [visitsSortOrder, setVisitsSortOrder] = useState<"asc" | "desc">("asc");
-  const [cityFilter, setCityFilter] = useState<string>("");
-  const [citySelectValue, setCitySelectValue] = useState<string>("");
 
   // Listen for visits scheduled by a manager to refresh data
   useEffect(() => {
@@ -795,23 +794,22 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       overdueDays: daysDiff,
     }));
 
-    // Aplicar filtro por cidade
-    const filteredVisits = cityFilter
-      ? visitsWithOverdueFlag.filter((visit) => visit.clientCity === cityFilter)
-      : visitsWithOverdueFlag;
-
     // Ordenar visitas
-    return [...filteredVisits].sort((a, b) => {
+    return [...visitsWithOverdueFlag].sort((a, b) => {
       let comparison = 0;
-
       switch (visitsSortBy) {
         case "name":
           comparison = a.clientName.localeCompare(b.clientName);
           break;
         case "city":
-          const aCity = a.clientAddress?.split(",").pop()?.trim() || "";
-          const bCity = b.clientAddress?.split(",").pop()?.trim() || "";
+          const aCity = (a.clientCity || "").toLocaleLowerCase();
+          const bCity = (b.clientCity || "").toLocaleLowerCase();
           comparison = aCity.localeCompare(bCity);
+          break;
+        case "address":
+          const aAddress = (a.clientAddress || "").toLocaleLowerCase();
+          const bAddress = (b.clientAddress || "").toLocaleLowerCase();
+          comparison = aAddress.localeCompare(bAddress);
           break;
         case "value":
           const aValue = a.totalPendingValue || 0;
@@ -821,10 +819,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         default:
           comparison = 0;
       }
-
       return visitsSortOrder === "asc" ? comparison : -comparison;
     });
-  }, [selectedCalendarDate, allVisits, visitsSortBy, visitsSortOrder, cityFilter]);
+  }, [selectedCalendarDate, allVisits, visitsSortBy, visitsSortOrder]);
 
   // Paginação para visitas do dia selecionado
   const paginatedSelectedDateVisits = useMemo(() => {
@@ -2130,6 +2127,25 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                             </button>
                             <button
                               onClick={() => {
+                                setVisitsSortBy("address");
+                                setVisitsSortOrder(
+                                  visitsSortBy === "address" &&
+                                    visitsSortOrder === "asc"
+                                    ? "desc"
+                                    : "asc",
+                                );
+                              }}
+                              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                visitsSortBy === "address"
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              }`}
+                              title="Ordenar por Endereço"
+                            >
+                              <Home className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => {
                                 setVisitsSortBy("city");
                                 setVisitsSortOrder(
                                   visitsSortBy === "city" &&
@@ -2147,49 +2163,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                             >
                               <MapPinIcon className="h-4 w-4" />
                             </button>
-                          </div>
-                          {/* Filtro por cidade */}
-                          <div className="flex items-center gap-2 mt-2">
-                            <div className="relative">
-                              <MapPinIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                              <select
-                                id="city-filter"
-                                className="flex items-center gap-1 pl-8 pr-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-300"
-                                value={citySelectValue}
-                                onChange={e => {
-                                  const value = e.target.value;
-                                  if (value === "sort-asc") {
-                                    setVisitsSortBy("city");
-                                    setVisitsSortOrder("asc");
-                                    setCityFilter("");
-                                    setCitySelectValue("sort-asc");
-                                  } else if (value === "sort-desc") {
-                                    setVisitsSortBy("city");
-                                    setVisitsSortOrder("desc");
-                                    setCityFilter("");
-                                    setCitySelectValue("sort-desc");
-                                  } else if (value === "") {
-                                    setCityFilter("");
-                                    setCitySelectValue("");
-                                  } else {
-                                    setCityFilter(value);
-                                    setCitySelectValue(value);
-                                  }
-                                }}
-                              >
-                                <option value="">Todas as cidades</option>
-                                <optgroup label="Ordenar por cidade">
-                                  <option value="sort-asc">A-Z</option>
-                                  <option value="sort-desc">Z-A</option>
-                                </optgroup>
-                                {Array.from(new Set(getVisitsForDate(selectedCalendarDate || new Date()).map(v => v.clientCity || "")))
-                                  .filter(city => city)
-                                  .sort()
-                                  .map(city => (
-                                    <option key={city} value={city}>{city}</option>
-                                  ))}
-                              </select>
-                            </div>
                           </div>
                         </div>
                       )}
@@ -2314,46 +2287,58 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 )}
                               </div>
 
-                              <div className="text-sm text-gray-600 space-y-1">
-                                <div className="flex items-center">
-                                  <MapPin className="h-4 w-4 mr-2" />
-                                  {[
-                                    displayAddress,
-                                    (clientData?.number || visit.clientNumber),
-                                    displayNeighborhood,
-                                    displayCity,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(", ")}
-                                  {addressUpdateDays !== undefined &&
-                                    addressUpdateDays <= 30 && (
-                                      <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 uppercase tracking-wide">
-                                        Novo ({addressUpdateDays} dias)
-                                      </span>
+                              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm text-gray-700 bg-gray-50 rounded-xl p-3 mb-2">
+                                {displayAddress && (
+                                  <div className="flex items-center gap-2">
+                                    <Home className="h-4 w-4 text-blue-500" />
+                                    <span className="font-medium">Endereço:</span>
+                                    <span className="truncate">{displayAddress}</span>
+                                    {addressUpdateDays !== undefined && addressUpdateDays <= 30 && (
+                                      <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 uppercase tracking-wide">Novo ({addressUpdateDays} dias)</span>
                                     )}
-                                </div>{" "}
+                                  </div>
+                                )}
+                                {(clientData?.number || visit.clientNumber) && (
+                                  <div className="flex items-center gap-2">
+                                    <Info className="h-4 w-4 text-blue-400" />
+                                    <span className="font-medium">Número:</span>
+                                    <span>{clientData?.number || visit.clientNumber}</span>
+                                  </div>
+                                )}
                                 {displayComplemento && (
-                                  <div className="flex items-center pl-6">
-                                    {displayComplemento}
+                                  <div className="flex items-center gap-2">
+                                    <Star className="h-4 w-4 text-yellow-500" />
+                                    <span className="font-medium">Complemento:</span>
+                                    <span>{displayComplemento}</span>
                                   </div>
-                                )}{" "}
+                                )}
+                                {displayNeighborhood && (
+                                  <div className="flex items-center gap-2">
+                                    <Users className="h-4 w-4 text-purple-400" />
+                                    <span className="font-medium">Bairro:</span>
+                                    <span>{displayNeighborhood}</span>
+                                  </div>
+                                )}
+                                {displayCity && (
+                                  <div className="flex items-center gap-2">
+                                    <MapPinIcon className="h-4 w-4 text-pink-500" />
+                                    <span className="font-medium">Cidade:</span>
+                                    <span>{displayCity}</span>
+                                  </div>
+                                )}
                                 {displayPendingValue > 0 && (
-                                  <div className="flex items-center">
-                                    <DollarSign className="h-4 w-4 mr-2" />
-                                    Pendente:{" "}
-                                    {formatCurrency(displayPendingValue)}
+                                  <div className="flex items-center gap-2 col-span-2">
+                                    <DollarSign className="h-4 w-4 text-green-500" />
+                                    <span className="font-medium">Valor:</span>
+                                    <span>{formatCurrency(displayPendingValue)}</span>
                                     {displayOverdueCount > 0 && (
-                                      <span className="ml-2 text-red-600">
-                                        <AlertTriangle className="h-4 w-4 inline mr-1" />
-                                        {displayOverdueCount}{" "}
-                                        {displayOverdueCount === 1
-                                          ? "título"
-                                          : "títulos"}{" "}
-                                        em atraso
+                                      <span className="ml-2 text-red-600 flex items-center gap-1">
+                                        <AlertTriangle className="h-4 w-4" />
+                                        {displayOverdueCount} {displayOverdueCount === 1 ? "título" : "títulos"} em atraso
                                       </span>
                                     )}
                                   </div>
-                                )}{" "}
+                                )}
                               </div>
                             </div>
 
