@@ -6,7 +6,6 @@ import {
   MapPin,
   Home,
   DollarSign,
-  MessageSquare,
   AlertTriangle,
   CheckCircle,
   X,
@@ -23,7 +22,7 @@ import {
   MapPinIcon,
   ArrowUpDown,
   Info,
-  Star, // Add Star icon
+  Star,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -63,13 +62,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   } = useCollection();
   const { user } = useAuth();
 
-  const effectiveCollectorId = collectorId || user?.id;
+  const [selectedCollectorId, setSelectedCollectorId] = useState<string | null>(collectorId || null);
+  const isManager = user?.type === 'manager';
+
+  const effectiveCollectorId = selectedCollectorId || collectorId || user?.id;
 
   const collectorName = useMemo(() => {
-    if (!collectorId) return null;
-    const collector = users.find((u) => u.id === collectorId);
+    if (!effectiveCollectorId) return null;
+    const collector = users.find((u) => u.id === effectiveCollectorId);
     return collector?.name || null;
-  }, [collectorId, users]);
+  }, [effectiveCollectorId, users]);
 
   const getLocalDate = () => {
     const today = new Date();
@@ -937,6 +939,28 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         return;
       }
 
+      // ========== VALIDAÇÃO 3: DATAS NO PASSADO ==========
+      const today = getLocalDate();
+      const pastDates: string[] = [];
+
+      for (const client of selectedClientsData) {
+        const clientSchedule = clientSchedules.get(client.document);
+        const visitDate = clientSchedule?.date || selectedDate;
+
+        if (visitDate < today) {
+          pastDates.push(`${client.client}: ${visitDate}`);
+        }
+      }
+
+      if (pastDates.length > 0) {
+        const pastList = pastDates.join("\n");
+        triggerNotification(
+          `❌ Erro: Não é possível agendar visitas para datas passadas:\n${pastList}`,
+          "error",
+        );
+        return;
+      }
+
       setLoading(true);
       let successCount = 0;
       let errorCount = 0;
@@ -1295,7 +1319,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
     switch (visit.status) {
       case "agendada":
-        return "Agendada";
+        return visit.scheduled_by_manager_id ? "Agend. Gerente" : "Agendada";
       case "realizada":
         return "Realizada";
       case "cancelada":
@@ -1312,6 +1336,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   };
 
   const getStatusColor = (visit: ScheduledVisit) => {
+    // Verificar se é uma visita agendada pelo gerente
+    if (visit.status === "agendada" && visit.scheduled_by_manager_id) {
+      return "bg-yellow-100 text-yellow-800";
+    }
+
     // Verificar se é uma visita reagendada
     if (visit.status === "agendada" && (visit.rescheduleCount || 0) > 0) {
       return "bg-purple-100 text-purple-800";
@@ -1508,22 +1537,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       );
       setShowDateValidationModal(true);
       return;
-    }
-
-    // Validar se a hora não está no passado para hoje
-    if (rescheduleDate === today) {
-      const now = new Date();
-      const [hours, minutes] = rescheduleTime.split(":").map(Number);
-      const selectedDateTime = new Date();
-      selectedDateTime.setHours(hours, minutes, 0, 0);
-
-      if (selectedDateTime <= now) {
-        setDateValidationMessage(
-          "Não é possível agendar visitas para horários passados",
-        );
-        setShowDateValidationModal(true);
-        return;
-      }
     }
 
     try {
@@ -1856,6 +1869,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         {/* Filtro e Listagem */}
         <div className="p-0 lg:p-0">
           <div className="space-y-6">
+            {isManager && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Selecione o Cobrador:</label>
+                <select
+                  value={selectedCollectorId || ''}
+                  onChange={(e) => setSelectedCollectorId(e.target.value || null)}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Selecione um cobrador...</option>
+                  {users.filter(u => u.type === 'collector').map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {/* Calendário de Visitas */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="relative p-2 sm:p-4 bg-gray-50 border-b">
@@ -2086,7 +2114,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       {selectedDateVisits.length > 1 && (
                         <div className="bg-white/70 backdrop-blur-sm rounded-lg border border-white/50 px-3 py-2 shadow-sm">
                           {/* Botões de Ordenação com Ícones */}
-                          <div className="flex items-center gap-2 justify-center mb-2">
+                          <div className="flex items-center gap-2 justify-center">
                             <button
                               onClick={() => {
                                 setVisitsSortBy("name");
@@ -2231,215 +2259,190 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       const displayNeighborhood =
                         clientData?.neighborhood || visit.clientNeighborhood;
                       const displayCity = clientData?.city || visit.clientCity;
+                      const displayNumber = clientData?.number || visit.clientNumber;
 
                       return (
                         <div
                           key={visit.id}
-                          className={`border bg-white rounded-2xl p-3 lg:p-4 hover:shadow-md transition-shadow ${
+                          className={`bg-white rounded-2xl shadow-sm border overflow-hidden ${
                             visit.isOverdue
-                              ? "bg-red-50 border-red-200"
+                              ? "border-red-300 bg-red-50"
                               : "border-gray-200"
                           }`}
                         >
-                          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
-                            <div className="flex-1">
-                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                          {/* Card Header */}
+                          <div className="px-5 py-4 border-b border-gray-100">
+                            <div className="flex justify-between items-start">
+                              <div>
                                 <button
                                   onClick={() => handleOpenClientModal(visit)}
-                                  className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left"
+                                  className="text-base font-bold text-gray-800 hover:text-blue-600 hover:underline text-left"
                                 >
                                   {visit.clientName}
-                                  {displayApelido && (
-                                    <span className="text-sm font-normal text-gray-500 ml-2">
-                                      ({displayApelido})
-                                    </span>
-                                  )}
                                 </button>
-                                <span
-                                  className={`px-2 py-1 rounded-full text-xs ${getStatusColor(visit)}`}
-                                >
-                                  {getStatusLabel(visit)}
-                                </span>
-                                {visit.isOverdue && (
-                                  <>
-                                    <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 font-medium flex items-center">
-                                      <AlertTriangle className="h-3 w-3 mr-1" />
-                                      Atrasada
-                                    </span>
-                                    {visit.overdueDays > 0 && (
-                                      <span className="text-xs text-red-600 font-medium">
-                                        ({visit.overdueDays}{" "}
-                                        {visit.overdueDays === 1
-                                          ? "dia"
-                                          : "dias"}{" "}
-                                        de atraso)
-                                      </span>
-                                    )}
-                                  </>
-                                )}
-                                {visit.scheduled_by_manager_id && (
-                                  <div className="flex items-center text-yellow-600">
-                                    <Star className="h-4 w-4 mr-1" />
-                                    <span className="text-xs font-medium">
-                                      Agendado pelo gerente
-                                    </span>
-                                  </div>
+                                {displayApelido && (
+                                  <p className="text-sm text-gray-500">
+                                    ({displayApelido})
+                                  </p>
                                 )}
                               </div>
-
-                              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm text-gray-700 bg-gray-50 rounded-xl p-3 mb-2">
-                                {displayAddress && (
-                                  <div className="flex items-center gap-2">
-                                    <Home className="h-4 w-4 text-blue-500" />
-                                    <span className="font-medium">Endereço:</span>
-                                    <span className="truncate">{displayAddress}</span>
-                                    {addressUpdateDays !== undefined && addressUpdateDays <= 30 && (
-                                      <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 uppercase tracking-wide">Novo ({addressUpdateDays} dias)</span>
-                                    )}
-                                  </div>
-                                )}
-                                {(clientData?.number || visit.clientNumber) && (
-                                  <div className="flex items-center gap-2">
-                                    <Info className="h-4 w-4 text-blue-400" />
-                                    <span className="font-medium">Número:</span>
-                                    <span>{clientData?.number || visit.clientNumber}</span>
-                                  </div>
-                                )}
-                                {displayComplemento && (
-                                  <div className="flex items-center gap-2">
-                                    <Star className="h-4 w-4 text-yellow-500" />
-                                    <span className="font-medium">Complemento:</span>
-                                    <span>{displayComplemento}</span>
-                                  </div>
-                                )}
-                                {displayNeighborhood && (
-                                  <div className="flex items-center gap-2">
-                                    <Users className="h-4 w-4 text-purple-400" />
-                                    <span className="font-medium">Bairro:</span>
-                                    <span>{displayNeighborhood}</span>
-                                  </div>
-                                )}
-                                {displayCity && (
-                                  <div className="flex items-center gap-2">
-                                    <MapPinIcon className="h-4 w-4 text-pink-500" />
-                                    <span className="font-medium">Cidade:</span>
-                                    <span>{displayCity}</span>
-                                  </div>
-                                )}
-                                {displayPendingValue > 0 && (
-                                  <div className="flex items-center gap-2 col-span-2">
-                                    <DollarSign className="h-4 w-4 text-green-500" />
-                                    <span className="font-medium">Valor:</span>
-                                    <span>{formatCurrency(displayPendingValue)}</span>
-                                    {displayOverdueCount > 0 && (
-                                      <span className="ml-2 text-red-600 flex items-center gap-1">
-                                        <AlertTriangle className="h-4 w-4" />
-                                        {displayOverdueCount} {displayOverdueCount === 1 ? "título" : "títulos"} em atraso
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
+                              <span
+                                className={`px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${getStatusColor(
+                                  visit,
+                                )}`}
+                              >
+                                {getStatusLabel(visit)}
+                                {visit.isOverdue &&
+                                  ` (${visit.overdueDays}d atraso)`}
+                              </span>
                             </div>
+                          </div>
 
-                            {visit.status === "agendada" && (
-                              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4">
-                                <button
-                                  onClick={() => handleMarkAsCompleted(visit)}
-                                  className="px-3 py-2 bg-green-500 text-white rounded-2xl text-sm hover:bg-green-700 transition-colors flex items-center justify-center"
-                                >
-                                  Realizada
-                                </button>
-                                <button
-                                  onClick={() => handleMarkAsNotFound(visit)}
-                                  className="px-3 py-2 bg-orange-500 text-white rounded-2xl text-sm hover:bg-orange-700 transition-colors flex items-center justify-center"
-                                >
-                                  Não Localizado
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleOpenRescheduleModal(visit)
-                                  }
-                                  className="px-3 py-2 bg-blue-500 text-white rounded-2xl text-sm hover:bg-blue-700 transition-colors flex items-center justify-center"
-                                >
-                                  <RefreshCw className="h-4 w-4 mr-1" />
-                                  Reagendar
-                                </button>
-                                {!visit.cancellationRejectedBy && (
-                                  <button
-                                    onClick={() =>
-                                      handleRequestCancellation(visit)
-                                    }
-                                    className="px-3 py-2 bg-red-500 text-white rounded-2xl text-sm hover:bg-red-700 transition-colors flex items-center justify-center"
-                                  >
-                                    Cancelar Visita
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                            {visit.status === "cancelamento_solicitado" && (
-                              <div className="lg:ml-4 text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded-2xl">
-                                <div className="font-medium">
-                                  Cancelamento Solicitado
-                                </div>
-                                <div className="text-xs mt-1">
-                                  Aguardando aprovação do gerente
-                                </div>
-                                {visit.cancellationRequestReason && (
-                                  <div className="text-xs mt-1 italic">
-                                    Motivo: {visit.cancellationRequestReason}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            {visit.cancellationRejectedBy &&
-                              visit.status === "agendada" && (
-                                <div className="lg:ml-4 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-2xl">
-                                  <div className="font-medium">
-                                    Cancelamento Rejeitado pelo Gerente
-                                  </div>
-                                  <div className="text-xs mt-1">
-                                    A visita permanece agendada
-                                  </div>
-                                  {visit.cancellationRejectionReason && (
-                                    <div className="text-xs mt-1 italic">
-                                      Motivo da rejeição:{" "}
-                                      {visit.cancellationRejectionReason}
-                                    </div>
+                          {/* Card Body */}
+                          <div className="p-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 mb-2">
+                              {/* Address */}
+                              <div className="flex items-start gap-3">
+                                <MapPin className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                                <div>
+                                  <p className="text-xs text-gray-500">
+                                    Endereço
+                                  </p>
+                                  <p className="text-sm font-medium text-gray-800">
+                                    {displayAddress}
+                                  </p>
+                                  {addressUpdateDays !== undefined && addressUpdateDays <= 30 && (
+                                    <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 uppercase tracking-wide">Novo ({addressUpdateDays} dias)</span>
                                   )}
-                                  {visit.cancellationRejectedAt && (
-                                    <div className="text-xs mt-1 text-gray-600">
-                                      Rejeitado em:{" "}
-                                      {new Date(
-                                        visit.cancellationRejectedAt,
-                                      ).toLocaleDateString("pt-BR")}{" "}
-                                      às{" "}
-                                      {new Date(
-                                        visit.cancellationRejectedAt,
-                                      ).toLocaleTimeString("pt-BR", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })}
-                                    </div>
-                                  )}
+                                </div>
+                              </div>
+                              {/* Neighborhood */}
+                              <div className="flex items-start gap-3">
+                                <MapPinIcon className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                                <div>
+                                  <p className="text-xs text-gray-500">
+                                    Bairro
+                                  </p>
+                                  <p className="text-sm font-medium text-gray-800">
+                                    {displayNeighborhood}
+                                  </p>
+                                </div>
+                              </div>
+                              {/* City */}
+                              <div className="flex items-start gap-3">
+                                <Home className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                                <div>
+                                  <p className="text-xs text-gray-500">
+                                    Cidade
+                                  </p>
+                                  <p className="text-sm font-medium text-gray-800">
+                                    {displayCity}
+                                  </p>
+                                </div>
+                              </div>
+                              {/* Number */}
+                              {displayNumber && (
+                                <div className="flex items-start gap-3">
+                                  <Info className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <p className="text-xs text-gray-500">
+                                      Número
+                                    </p>
+                                    <p className="text-sm font-medium text-gray-800">
+                                      {displayNumber}
+                                    </p>
+                                  </div>
                                 </div>
                               )}
-                          </div>
-                          {visit.notes && (
-                            <div className="mt-3 bg-white border border-gray-200 rounded-2xl p-3">
-                              <div className="flex items-start">
-                                <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
+                              {/* Complement */}
+                              {displayComplemento && (
+                                <div className="flex items-start gap-3">
+                                  <Star className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <p className="text-xs text-gray-500">
+                                      Complemento
+                                    </p>
+                                    <p className="text-sm font-medium text-gray-800">
+                                      {displayComplemento}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                              {/* Value */}
+                              <div className="flex items-start gap-3">
+                                <DollarSign className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
                                 <div>
-                                  <div className="text-sm font-medium text-gray-700 mb-1">
-                                    Observações da visita:
-                                  </div>
-                                  <div className="text-sm text-gray-600 italic whitespace-pre-line">
-                                    {visit.notes}
-                                  </div>
+                                  <p className="text-xs text-gray-500">
+                                    Valor Pendente
+                                  </p>
+                                  <p className="text-sm font-medium text-gray-800">
+                                    {formatCurrency(displayPendingValue)}
+                                  </p>
+                                  {displayOverdueCount > 0 && (
+                                    <div className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-xs font-medium">
+                                      <AlertTriangle className="h-3 w-3" />
+                                      {displayOverdueCount} título(s) em atraso
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
-                          )}
+
+                            {/* Divider */}
+                            <div className="h-px bg-gray-200 my-5" />
+
+                            {/* Actions */}
+                            <div className="flex flex-wrap gap-2">
+                              {visit.status === "agendada" && (
+                                <>
+                                  <button
+                                    onClick={() =>
+                                      handleMarkAsCompleted(visit)
+                                    }
+                                    className="flex-1 justify-center text-center px-4 py-2.5 text-sm font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
+                                  >
+                                    Realizado
+                                  </button>
+                                  <button
+                                    onClick={() => handleMarkAsNotFound(visit)}
+                                    className="flex-1 justify-center text-center px-4 py-2.5 text-sm font-semibold text-white bg-orange-500 rounded-lg hover:bg-orange-600 transition-colors"
+                                  >
+                                    Não Localizado
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      handleOpenRescheduleModal(visit)
+                                    }
+                                    className="flex-1 justify-center text-center px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                                  >
+                                    Reagendar
+                                  </button>
+                                </>
+                              )}
+                              {visit.status === "agendada" && (
+                                <button
+                                  onClick={() =>
+                                    handleRequestCancellation(visit)
+                                  }
+                                  className="flex-1 justify-center text-center px-4 py-2.5 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                                >
+                                  Cancelar Visita
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Observations */}
+                            {visit.notes && (
+                              <div className="mt-5 pt-4 border-t border-gray-100">
+                                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                                  Observações
+                                </p>
+                                <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md italic whitespace-pre-line">
+                                  {visit.notes}
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
