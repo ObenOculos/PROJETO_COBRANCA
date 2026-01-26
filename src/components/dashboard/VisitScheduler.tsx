@@ -45,6 +45,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   onClose,
   collectorId,
 }) => {
+  console.log('🔄 VisitScheduler render triggered');
   const {
     getClientGroups,
     scheduleVisit,
@@ -138,6 +139,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
 
+  // Estado para armazenar dados dos clientes para evitar chamadas assíncronas no render
+  const [clientDataMap, setClientDataMap] = useState<Map<string, any>>(new Map());
+
   // Estados para Modal de Conflitos de Visitas
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [conflictData, setConflictData] = useState<
@@ -186,6 +190,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [selectedVisitForReschedule, setSelectedVisitForReschedule] =
     useState<ScheduledVisit | null>(null);
+  const [rescheduleClientData, setRescheduleClientData] = useState<any>(null);
 
   // Estados para novos modais
   const [showCompletedModal, setShowCompletedModal] = useState(false);
@@ -836,6 +841,52 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     selectedDateVisits.length / visitsPerPage,
   );
 
+  // Fetch client data for visits
+  useEffect(() => {
+    console.log('🔄 useEffect triggered for client data fetch, selectedDateVisits length:', selectedDateVisits.length);
+    
+    const fetchClientData = async () => {
+      const newDataNeeded: string[] = [];
+      
+      // Check which client data we don't have yet
+      for (const visit of selectedDateVisits) {
+        if (!clientDataMap.has(visit.clientDocument)) {
+          newDataNeeded.push(visit.clientDocument);
+        }
+      }
+
+      console.log('📋 Clients needing data:', newDataNeeded.length, newDataNeeded);
+
+      // Only fetch if we have new clients to load
+      if (newDataNeeded.length > 0) {
+        console.log('🚀 Starting fetch for', newDataNeeded.length, 'clients');
+        const updatedMap = new Map(clientDataMap); // Copy existing map
+        
+        for (const clientDocument of newDataNeeded) {
+          try {
+            console.log('📡 Fetching data for client:', clientDocument);
+            const data = await getClientDataForVisit(clientDocument);
+            if (data) {
+              updatedMap.set(clientDocument, data);
+              console.log('✅ Data loaded for client:', clientDocument);
+            }
+          } catch (error) {
+            console.error('❌ Error fetching client data:', error);
+          }
+        }
+        
+        console.log('💾 Updating clientDataMap with', updatedMap.size, 'total clients');
+        setClientDataMap(updatedMap);
+      } else {
+        console.log('✨ No new data needed, all clients already cached');
+      }
+    };
+
+    if (selectedDateVisits.length > 0) {
+      fetchClientData();
+    }
+  }, [selectedDateVisits, getClientDataForVisit]);
+
   // Validação: Detectar conflitos de visitas (mesmo cliente, mesma data)
   const checkVisitConflicts = (): {
     hasConflicts: boolean;
@@ -967,7 +1018,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
       for (const client of selectedClientsData) {
         try {
-          const clientData = getClientDataForVisit(client.document);
+          const clientData = await getClientDataForVisit(client.document);
           if (!clientData) {
             triggerNotification(
               `⚠️ Dados do cliente ${client.client} não encontrados`,
@@ -1271,11 +1322,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   };
 
   // Função para quando cliente fez pagamento
-  const handleClientMadePayment = () => {
+  const handleClientMadePayment = async () => {
     setShowPaymentQuestionModal(false);
     if (selectedVisitForPayment) {
       // Buscar dados do cliente para abrir modal de pagamento
-      const clientData = getClientDataForVisit(
+      const clientData = await getClientDataForVisit(
         selectedVisitForPayment.clientDocument,
       );
       if (clientData) {
@@ -1484,11 +1535,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     setCancellationReason("");
   };
 
-  const handleOpenRescheduleModal = (visit: ScheduledVisit) => {
+  const handleOpenRescheduleModal = async (visit: ScheduledVisit) => {
     setSelectedVisitForReschedule(visit);
 
     // Buscar dados do cliente para obter cidade e bairro
-    const clientData = getClientDataForVisit(visit.clientDocument);
+    const clientData = await getClientDataForVisit(visit.clientDocument);
+    setRescheduleClientData(clientData);
 
     let suggestedDate = getLocalDate();
 
@@ -1559,7 +1611,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     }
   };
 
-  const handleOpenClientModal = (visit: ScheduledVisit) => {
+  const handleOpenClientModal = async (visit: ScheduledVisit) => {
     // Busca o ClientGroup completo para garantir que todos os dados (incluindo apelido, vendas, etc.)
     // estejam disponíveis para o ClientDetailModal.
     const allClientGroups = getClientGroups(); // Busca todos os grupos de clientes, sem filtro.
@@ -1578,7 +1630,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         visit.clientDocument,
         ". Usando fallback getClientDataForVisit().",
       );
-      const partialData = getClientDataForVisit(visit.clientDocument);
+      const partialData = await getClientDataForVisit(visit.clientDocument);
       if (partialData) {
         setSelectedClientForModal(partialData);
         setShowClientModal(true);
@@ -2241,10 +2293,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                 ) : (
                   <div className="space-y-3">
                     {paginatedSelectedDateVisits.map((visit) => {
-                      // Obter apelido dos dados atuais do cliente
-                      const clientData = getClientDataForVisit(
-                        visit.clientDocument,
-                      );
+                      // Obter dados do cliente do mapa
+                      const clientData = clientDataMap.get(visit.clientDocument);
                       const displayApelido = clientData?.apelido;
                       const displayComplemento = clientData?.complemento;
                       const displayPendingValue =
@@ -2280,6 +2330,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 >
                                   {visit.clientName}
                                 </button>
+                                {/* Badge Novo */}
+                                {(() => {
+                                  // Verifica se o clientData tem created_at e se é "novo" (menos de 30 dias)
+                                  if (clientData?.created_at) {
+                                    const createdAt = new Date(clientData.created_at);
+                                    const now = new Date();
+                                    const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                                    if (diffDays <= 30) {
+                                      return (
+                                        <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 uppercase tracking-wide align-middle">Novo</span>
+                                      );
+                                    }
+                                  }
+                                  return null;
+                                })()}
                                 {displayApelido && (
                                   <p className="text-sm text-gray-500">
                                     ({displayApelido})
@@ -2882,11 +2947,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                         Nova Data *
                       </label>
                       {(() => {
-                        const clientData = selectedVisitForReschedule
-                          ? getClientDataForVisit(
-                              selectedVisitForReschedule.clientDocument,
-                            )
-                          : null;
+                        const clientData = rescheduleClientData;
                         const hasAllowedDate =
                           clientData &&
                           allowedVisitDates.some(

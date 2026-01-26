@@ -80,6 +80,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       complemento?: string;
     }[]
   >([]);
+  const [clientDataCache, setClientDataCache] = useState<Map<string, any>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -2836,7 +2837,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     });
   };
 
-  const getClientDataForVisit = (clientDocument: string) => {
+  const getClientDataForVisit = React.useCallback(async (clientDocument: string) => {
+    console.log('🔍 getClientDataForVisit called for:', clientDocument);
+    
+    // Check cache first
+    const cachedData = clientDataCache.get(clientDocument);
+    if (cachedData) {
+      console.log('💾 Cache hit for client:', clientDocument);
+      return cachedData;
+    }
+
+    console.log('🌐 Cache miss, fetching data for client:', clientDocument);
+
     const clientGroups = getClientGroups();
     const clientGroup = clientGroups.find(
       (group) => group.document === clientDocument,
@@ -3001,7 +3013,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       ? addressHistory.complemento || ""
       : clientGroup.complemento;
 
-    return {
+    // Fetch created_at from clientes table
+    const { data: clienteData } = await supabase
+      .from('clientes')
+      .select('created_at')
+      .eq('documento', clientDocument)
+      .single();
+
+    const result = {
       name: clientGroup.client,
       document: clientGroup.document,
       apelido: clientGroup.apelido,
@@ -3015,7 +3034,22 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       totalPendingValue: totalPending,
       overdueCount: overdueCount,
       addressUpdateDays,
+      created_at: clienteData?.created_at,
     };
+
+    // Cache the result
+    setClientDataCache(prev => new Map(prev).set(clientDocument, result));
+
+    return result;
+  }, [getClientGroups, getSalesByClient, activeAddressHistory]);
+
+  // Function to clear client data cache for a specific client
+  const invalidateClientDataCache = (clientDocument: string) => {
+    setClientDataCache(prev => {
+      const newCache = new Map(prev);
+      newCache.delete(clientDocument);
+      return newCache;
+    });
   };
 
   // Função para atualizar visitas agendadas após processamento de pagamentos
@@ -3025,7 +3059,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       console.log("Cliente:", clientDocument);
 
       // Buscar dados atualizados do cliente
-      const clientData = getClientDataForVisit(clientDocument);
+      const clientData = await getClientDataForVisit(clientDocument);
       console.log("Dados do cliente recalculados:", clientData);
 
       if (!clientData) {
@@ -3101,6 +3135,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
         // Invalidate cache
         invalidateVisits();
+        invalidateClientDataCache(clientDocument);
       }
 
       console.log(

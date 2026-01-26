@@ -341,7 +341,7 @@ export interface CollectionContextType {
   getCancellationHistory: (days?: number) => ScheduledVisit[];
   getVisitsByDate: (date: string, collectorId?: string) => ScheduledVisit[];
   getVisitsByCollector: (collectorId: string) => ScheduledVisit[];
-  getClientDataForVisit: (clientDocument: string) => {
+  getClientDataForVisit: (clientDocument: string) => Promise<{
     name: string;
     document: string;
     apelido?: string;
@@ -355,7 +355,8 @@ export interface CollectionContextType {
     totalPendingValue: number;
     overdueCount: number;
     addressUpdateDays?: number;
-  } | null;
+    created_at?: string;
+  } | null>;
   rescheduleVisit: (
     visitId: string,
     newDate: string,
