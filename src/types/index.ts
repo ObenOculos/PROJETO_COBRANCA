@@ -369,6 +369,9 @@ export interface CollectionContextType {
     clientDocument: string,
     saleNumbers: number[],
   ) => Promise<void>;
+  // NOVOS CAMPOS PARA OTIMIZAÇÃO:
+  prefetchClientsData: (clientDocuments: string[]) => Promise<void>;
+  clientDataCache: Map<string, any>;
 }
 
 // Sale payment types

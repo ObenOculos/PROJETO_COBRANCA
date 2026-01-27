@@ -45,7 +45,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   onClose,
   collectorId,
 }) => {
-  console.log('🔄 VisitScheduler render triggered');
   const {
     getClientGroups,
     scheduleVisit,
@@ -60,6 +59,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     users, // Get users from context
     fetchScheduledVisits, // Add fetchScheduledVisits
     allowedVisitDates, // Add allowedVisitDates
+    clientDataCache,      // NOVO: Cache de dados dos clientes
+    prefetchClientsData,  // NOVO: Função de pré-carregamento
   } = useCollection();
   const { user } = useAuth();
 
@@ -138,9 +139,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const [selectedClientForModal, setSelectedClientForModal] =
     useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
-
-  // Estado para armazenar dados dos clientes para evitar chamadas assíncronas no render
-  const [clientDataMap, setClientDataMap] = useState<Map<string, any>>(new Map());
+  const [isLoadingClients, setIsLoadingClients] = useState(false); // NOVO: Indicador de carregamento
 
   // Estados para Modal de Conflitos de Visitas
   const [showConflictModal, setShowConflictModal] = useState(false);
@@ -155,6 +154,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     visitStatus: "",
     dueDateStart: "",
     dueDateEnd: "",
+    onlyNew: false,
   });
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [showNeighborhoodDropdown, setShowNeighborhoodDropdown] =
@@ -490,6 +490,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       );
     }
 
+    if (filters.onlyNew) {
+      filteredClients = filteredClients.filter((client) => {
+        const clientData = clientDataCache.get(client.document);
+        if (clientData?.created_at) {
+          const createdAt = new Date(clientData.created_at);
+          const now = new Date();
+          const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+          return diffDays <= 30;
+        }
+        return false;
+      });
+    }
+
     if (sortField) {
       const sortedClients = [...filteredClients];
       sortedClients.sort((a, b) => {
@@ -517,6 +530,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     baseFilteredClients,
     filters.city,
     filters.neighborhood,
+    filters.onlyNew,
     sortField,
     sortDirection,
   ]);
@@ -648,6 +662,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       visitStatus: "",
       dueDateStart: "",
       dueDateEnd: "",
+      onlyNew: false,
     });
     setSearchTerm("");
     setSelectedClients(new Set());
@@ -841,51 +856,20 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     selectedDateVisits.length / visitsPerPage,
   );
 
-  // Fetch client data for visits
+  // Pré-carregar dados dos clientes quando selectedDateVisits mudar
   useEffect(() => {
-    console.log('🔄 useEffect triggered for client data fetch, selectedDateVisits length:', selectedDateVisits.length);
-    
-    const fetchClientData = async () => {
-      const newDataNeeded: string[] = [];
-      
-      // Check which client data we don't have yet
-      for (const visit of selectedDateVisits) {
-        if (!clientDataMap.has(visit.clientDocument)) {
-          newDataNeeded.push(visit.clientDocument);
-        }
-      }
-
-      console.log('📋 Clients needing data:', newDataNeeded.length, newDataNeeded);
-
-      // Only fetch if we have new clients to load
-      if (newDataNeeded.length > 0) {
-        console.log('🚀 Starting fetch for', newDataNeeded.length, 'clients');
-        const updatedMap = new Map(clientDataMap); // Copy existing map
-        
-        for (const clientDocument of newDataNeeded) {
-          try {
-            console.log('📡 Fetching data for client:', clientDocument);
-            const data = await getClientDataForVisit(clientDocument);
-            if (data) {
-              updatedMap.set(clientDocument, data);
-              console.log('✅ Data loaded for client:', clientDocument);
-            }
-          } catch (error) {
-            console.error('❌ Error fetching client data:', error);
-          }
-        }
-        
-        console.log('💾 Updating clientDataMap with', updatedMap.size, 'total clients');
-        setClientDataMap(updatedMap);
-      } else {
-        console.log('✨ No new data needed, all clients already cached');
-      }
-    };
-
     if (selectedDateVisits.length > 0) {
-      fetchClientData();
+      const uniqueClients = [...new Set(selectedDateVisits.map(v => v.clientDocument))];
+      const missingClients = uniqueClients.filter(doc => !clientDataCache.has(doc));
+
+      if (missingClients.length > 0) {
+        setIsLoadingClients(true);
+        prefetchClientsData(missingClients).finally(() => {
+          setIsLoadingClients(false);
+        });
+      }
     }
-  }, [selectedDateVisits, getClientDataForVisit]);
+  }, [selectedDateVisits, clientDataCache, prefetchClientsData]);
 
   // Validação: Detectar conflitos de visitas (mesmo cliente, mesma data)
   const checkVisitConflicts = (): {
@@ -2292,9 +2276,15 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   </div>
                 ) : (
                   <div className="space-y-3">
+                    {isLoadingClients && (
+                      <div className="flex justify-center items-center py-4">
+                        <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                        <span className="ml-2 text-sm text-gray-600">Carregando detalhes...</span>
+                      </div>
+                    )}
                     {paginatedSelectedDateVisits.map((visit) => {
-                      // Obter dados do cliente do mapa
-                      const clientData = clientDataMap.get(visit.clientDocument);
+                      // Obter dados do cliente do cache
+                      const clientData = clientDataCache.get(visit.clientDocument);
                       const displayApelido = clientData?.apelido;
                       const displayComplemento = clientData?.complemento;
                       const displayPendingValue =
@@ -2322,31 +2312,54 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                         >
                           {/* Card Header */}
                           <div className="px-5 py-4 border-b border-gray-100">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <button
-                                  onClick={() => handleOpenClientModal(visit)}
-                                  className="text-base font-bold text-gray-800 hover:text-blue-600 hover:underline text-left"
-                                >
-                                  {visit.clientName}
-                                </button>
-                                {/* Badge Novo */}
-                                {(() => {
-                                  // Verifica se o clientData tem created_at e se é "novo" (menos de 30 dias)
-                                  if (clientData?.created_at) {
-                                    const createdAt = new Date(clientData.created_at);
-                                    const now = new Date();
-                                    const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
-                                    if (diffDays <= 30) {
-                                      return (
-                                        <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 uppercase tracking-wide align-middle">Novo</span>
-                                      );
+                            {/* Badge Novo - Mobile (seu próprio espaço) */}
+                            {(() => {
+                              // Verifica se o clientData tem created_at e se é "novo" (menos de 30 dias)
+                              if (clientData?.created_at) {
+                                const createdAt = new Date(clientData.created_at);
+                                const now = new Date();
+                                const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                                if (diffDays <= 30) {
+                                  return (
+                                    <div className="flex justify-center mb-2 sm:hidden">
+                                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 uppercase tracking-wide align-middle">
+                                        Novo
+                                      </span>
+                                    </div>
+                                  );
+                                }
+                              }
+                              return null;
+                            })()}
+                            <div className="flex gap-x-2 gap-y-2 mb-2 justify-between items-start">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:flex-wrap gap-1 sm:gap-2">
+                                  <button
+                                    onClick={() => handleOpenClientModal(visit)}
+                                    className="text-base font-bold text-gray-800 hover:text-blue-600 hover:underline text-left truncate"
+                                  >
+                                    {visit.clientName}
+                                  </button>
+                                  {/* Badge Novo - Desktop (ao lado) */}
+                                  {(() => {
+                                    // Verifica se o clientData tem created_at e se é "novo" (menos de 30 dias)
+                                    if (clientData?.created_at) {
+                                      const createdAt = new Date(clientData.created_at);
+                                      const now = new Date();
+                                      const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                                      if (diffDays <= 30) {
+                                        return (
+                                          <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 uppercase tracking-wide align-middle">
+                                            Novo
+                                          </span>
+                                        );
+                                      }
                                     }
-                                  }
-                                  return null;
-                                })()}
+                                    return null;
+                                  })()}
+                                </div>
                                 {displayApelido && (
-                                  <p className="text-sm text-gray-500">
+                                  <p className="text-sm text-gray-500 mt-1">
                                     ({displayApelido})
                                   </p>
                                 )}
@@ -2377,7 +2390,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                     {displayAddress}
                                   </p>
                                   {addressUpdateDays !== undefined && addressUpdateDays <= 30 && (
-                                    <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 uppercase tracking-wide">Novo ({addressUpdateDays} dias)</span>
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 uppercase tracking-wide">Novo ({addressUpdateDays} dias)</span>
                                   )}
                                 </div>
                               </div>
@@ -2452,9 +2465,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 </div>
                               </div>
                             </div>
-
-                            {/* Divider */}
-                            <div className="h-px bg-gray-200 my-5" />
 
                             {/* Actions */}
                             <div className="flex flex-wrap gap-2">
@@ -3658,6 +3668,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 />
                               </div>
                             </div>
+                            <div>
+                              <label className="flex items-center text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                <input
+                                  type="checkbox"
+                                  checked={filters.onlyNew}
+                                  onChange={(e) => setFilters({...filters, onlyNew: e.target.checked})}
+                                  className="mr-2"
+                                />
+                                Apenas clientes novos (últimos 30 dias)
+                              </label>
+                            </div>
                             <div className="flex flex-col items-center gap-2 mt-3 sm:mt-4">
                               <button
                                 onClick={clearAllFilters}
@@ -4044,10 +4065,26 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                                   )
                                                 }
                                               >
-                                                <div
-                                                  className={`absolute top-2 sm:top-3 right-2 sm:right-3 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border ${status.color}`}
-                                                >
-                                                  {status.days}
+                                                <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex items-center gap-1">
+                                                  {(() => {
+                                                    const clientData = clientDataCache.get(client.document);
+                                                    if (clientData?.created_at) {
+                                                      const createdAt = new Date(clientData.created_at);
+                                                      const now = new Date();
+                                                      const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                                                      if (diffDays <= 30) {
+                                                        return (
+                                                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border bg-blue-100 text-blue-800 border-blue-200 uppercase tracking-wide">
+                                                            Novo
+                                                          </span>
+                                                        );
+                                                      }
+                                                    }
+                                                    return null;
+                                                  })()}
+                                                  <div className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border ${status.color}`}>
+                                                    {status.days}
+                                                  </div>
                                                 </div>
                                                 <div className="p-2.5 sm:p-4 bg-white border-1 rounded-xl sm:rounded-2xl">
                                                   <div className="flex items-start">
