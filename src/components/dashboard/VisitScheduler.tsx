@@ -2378,7 +2378,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
                           {/* Card Body */}
                           <div className="p-5">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 mb-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 mb-4">
                               {/* Address */}
                               <div className="flex items-start gap-3">
                                 <MapPin className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
