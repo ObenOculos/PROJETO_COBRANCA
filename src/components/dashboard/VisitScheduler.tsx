@@ -64,8 +64,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   } = useCollection();
   const { user } = useAuth();
 
-  const [selectedCollectorId, setSelectedCollectorId] = useState<string | null>(collectorId || null);
-  const isManager = user?.type === 'manager';
+  const [selectedCollectorId] = useState<string | null>(collectorId || null); 
 
   const effectiveCollectorId = selectedCollectorId || collectorId || user?.id;
 
@@ -1905,21 +1904,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         {/* Filtro e Listagem */}
         <div className="p-0 lg:p-0">
           <div className="space-y-6">
-            {isManager && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Selecione o Cobrador:</label>
-                <select
-                  value={selectedCollectorId || ''}
-                  onChange={(e) => setSelectedCollectorId(e.target.value || null)}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Selecione um cobrador...</option>
-                  {users.filter(u => u.type === 'collector').map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
             {/* Calendário de Visitas */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="relative p-2 sm:p-4 bg-gray-50 border-b">
@@ -2206,7 +2190,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                               }`}
                               title="Ordenar por Endereço"
                             >
-                              <Home className="h-4 w-4" />
+                              <MapPinIcon className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => {
@@ -2225,7 +2209,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                               }`}
                               title="Ordenar por Cidade"
                             >
-                              <MapPinIcon className="h-4 w-4" />
+                              <Home className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
@@ -3388,7 +3372,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                     </button>
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto transform-gpu">
                   <div className="bg-gray-50 px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
                     {/* Content from the schedule tab */}
                     {modalStep === "selection" ? (
