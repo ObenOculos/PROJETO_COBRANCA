@@ -35,6 +35,7 @@ import ClientDetailModal from "./ClientDetailModal";
 import { DateValidationModal } from "../common/DateValidationModal";
 import ConfirmationModal from "../common/ConfirmationModal";
 import { getNextAllowedVisitDate } from "../../utils/visitScheduling";
+import { PAYABLE_STATUSES } from "../../types/status";
 
 interface VisitSchedulerProps {
   onClose?: () => void;
@@ -446,17 +447,52 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
       filteredClients = filteredClients.filter((client) => {
         return client.sales.some((sale) => {
-          return sale.installments.some((installment) => {
-            if (!installment.data_vencimento) return false;
+          return sale.installments.some((installment: any) => {
+            if (
+              !installment.data_vencimento ||
+              !PAYABLE_STATUSES.includes(installment.status)
+            ) {
+              return false;
+            }
 
-            const dueDate = new Date(installment.data_vencimento);
+            const dateStr = installment.data_vencimento;
+            // Corrigido: Lógica robusta para parsear datas (DD/MM/YYYY e YYYY-MM-DD)
+            const parts = dateStr.split(/[\/\-]/);
+            let dueDate: Date | null = null;
 
+            if (parts.length === 3) {
+              // Heurística para diferenciar DD/MM/YYYY de YYYY-MM-DD
+              if (parts[0].length === 4) {
+                // Formato YYYY-MM-DD
+                dueDate = new Date(
+                  parseInt(parts[0]),
+                  parseInt(parts[1]) - 1,
+                  parseInt(parts[2]),
+                );
+              } else {
+                // Formato DD/MM/YYYY
+                dueDate = new Date(
+                  parseInt(parts[2]),
+                  parseInt(parts[1]) - 1,
+                  parseInt(parts[0]),
+                );
+              }
+            }
+
+            // Se a data for inválida, pular esta parcela
+            if (!dueDate || isNaN(dueDate.getTime())) {
+              return false;
+            }
+
+            // A comparação de datas já considera o fuso horário local,
+            // e os objetos `startDate` e `endDate` já estão com a hora zerada ou no fim do dia.
             if (startDate && dueDate < startDate) {
               return false;
             }
             if (endDate && dueDate > endDate) {
               return false;
             }
+
             return true;
           });
         });
