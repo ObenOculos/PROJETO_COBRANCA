@@ -870,6 +870,18 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     }
   }, [selectedDateVisits, clientDataCache, prefetchClientsData]);
 
+  // Pré-carregar dados dos clientes quando a lista de clientes disponíveis mudar
+  useEffect(() => {
+    if (availableClients.length > 0) {
+      const uniqueClients = [...new Set(availableClients.map(c => c.document))];
+      const missingClients = uniqueClients.filter(doc => !clientDataCache.has(doc));
+
+      if (missingClients.length > 0) {
+        prefetchClientsData(missingClients);
+      }
+    }
+  }, [availableClients, clientDataCache, prefetchClientsData]);
+
   // Validação: Detectar conflitos de visitas (mesmo cliente, mesma data)
   const checkVisitConflicts = (): {
     hasConflicts: boolean;
@@ -2306,7 +2318,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 if (diffDays <= 30) {
                                   return (
                                     <div className="flex justify-center mb-2 sm:hidden">
-                                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 uppercase tracking-wide align-middle">
+                                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 tracking-wide align-middle">
                                         Novo
                                       </span>
                                     </div>
@@ -2333,7 +2345,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                       const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
                                       if (diffDays <= 30) {
                                         return (
-                                          <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 uppercase tracking-wide align-middle">
+                                          <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 tracking-wide align-middle">
                                             Novo
                                           </span>
                                         );
@@ -2374,7 +2386,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                     {displayAddress}
                                   </p>
                                   {addressUpdateDays !== undefined && addressUpdateDays <= 30 && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 uppercase tracking-wide">Novo ({addressUpdateDays} dias)</span>
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 tracking-wide">Novo ({addressUpdateDays} dias)</span>
                                   )}
                                 </div>
                               </div>
@@ -4058,7 +4070,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                                       const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
                                                       if (diffDays <= 30) {
                                                         return (
-                                                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border bg-blue-100 text-blue-800 border-blue-200 uppercase tracking-wide">
+                                                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border bg-blue-100 text-blue-800 border-blue-200 tracking-wide">
                                                             Novo
                                                           </span>
                                                         );
