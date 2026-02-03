@@ -104,7 +104,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   >(new Map());
   const [notes, setNotes] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  // const [activeTab, setActiveTab] = useState<"schedule" | "list">("schedule");
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [modalStep, setModalStep] = useState<"selection" | "confirmation">(
     "selection",
@@ -1814,7 +1813,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       .filter(
         (visit) =>
           visit.clientDocument === client.document &&
-          visit.status === "realizada",
+          (visit.status === "realizada" || visit.status === "nao_encontrado"),
       )
       .sort((a, b) => {
         // Ordenar por created_at (mais recente primeiro)

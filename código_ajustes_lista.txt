@@ -1,0 +1,101 @@
+# Instruções de Reparo - VisitScheduler e CollectionContext
+
+## CollectionContext.tsx
+
+### 1. Corrigir dependências do useCallback - `fetchScheduledVisits` (linha 185)
+**Motivo:** Setters de useState (`setScheduledVisits`), objetos importados (`dataCache`) e instâncias estáveis (`supabase`) não precisam estar no array de dependências. Incluí-los causa re-criações desnecessárias da função callback, impactando performance.
+
+**Atual:**
+```typescript
+[isOnline, setScheduledVisits, dataCache, supabase]
+```
+**Corrigir para:**
+```typescript
+[isOnline]
+```
+
+### 2. Corrigir dependências do useCallback - `fetchAllowedVisitDates` (linha 243)
+**Motivo:** Mesmo problema do item 1. Dependências desnecessárias causam re-renders extras e podem degradar a performance do componente.
+
+**Atual:**
+```typescript
+[isOnline, setAllowedVisitDates, dataCache, supabase]
+```
+**Corrigir para:**
+```typescript
+[isOnline]
+```
+
+### 3. Padronizar nomenclatura (linha 167)
+**Motivo:** O projeto usa camelCase para propriedades. Manter snake_case aqui quebra a consistência e dificulta manutenção.
+
+**Atual:**
+```typescript
+scheduled_by_manager_id: visit.scheduled_by_manager_id,
+```
+**Corrigir para:**
+```typescript
+scheduledByManagerId: visit.scheduled_by_manager_id,
+```
+
+---
+
+## VisitScheduler.tsx
+
+### 4. Remover estado não utilizado (linha 124)
+**Motivo:** Este estado é declarado mas nunca usado. Estados não utilizados ocupam memória desnecessariamente e confundem outros desenvolvedores.
+
+**Remover:**
+```typescript
+const [, setClientsCurrentPage] = useState(1);
+```
+**Remover também as referências nas linhas 4713 e 4714**
+
+### 5. Remover estado não utilizado (linha 96)
+**Motivo:** O `selectedTime` não é utilizado no componente. O gerenciamento de horário é feito via `clientSchedules`. Estado desnecessário aumenta a complexidade do componente sem agregar valor.
+
+**Remover:**
+```typescript
+const [selectedTime] = useState<string>(getDefaultTime());
+```
+
+### 6. Remover estado não utilizado (linha 141)
+**Motivo:** Flag de loading que não está sendo atualizada nem lida em lugar algum. Remove ruído do código.
+
+**Remover:**
+```typescript
+const [isLoadingClients, setIsLoadingClients] = useState(false);
+```
+
+### 7. Remover código comentado (linha 107)
+**Motivo:** Código comentado deve ser removido. Se foi desativado, provavelmente não é mais necessário. Caso seja necessário no futuro, pode ser recuperado do histórico do Git.
+
+**Remover:**
+```typescript
+// const [activeTab, setActiveTab] = useState<"schedule" | "list">("schedule");
+```
+
+### 8. Remover import não utilizado (linha 37)
+**Motivo:** Imports não utilizados aumentam o bundle size e confundem a análise de dependências. Ferramentas de build podem não tree-shake corretamente.
+
+**Remover:**
+```typescript
+import { getNextAllowedVisitDate } from "../../utils/visitScheduling";
+```
+
+### 9. Verificar uso de recursos do contexto (linhas 62-63)
+**Motivo:** Recursos importados do contexto mas não utilizados geram re-renders desnecessários quando esses valores mudam no contexto pai.
+
+**Verificar se estão sendo usados:**
+```typescript
+clientDataCache,
+prefetchClientsData,
+```
+**Se não estiverem sendo usados, remover da desestruturação**
+
+---
+
+## Prioridade
+- **Alta:** Itens 1, 2 (melhoram performance)
+- **Média:** Itens 3, 4, 5, 6, 7, 8 (limpeza de código)
+- **Baixa:** Item 9 (verificação)

@@ -182,7 +182,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         console.error("Erro ao carregar visitas agendadas:", err);
       }
     },
-    [isOnline, setScheduledVisits, dataCache, supabase],
+    [isOnline],
   );
 
   const getVisitsByCollector = (collectorId: string) => {
@@ -240,7 +240,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     } catch (err) {
       console.error("Erro ao carregar datas permitidas:", err);
     }
-  }, [isOnline, setAllowedVisitDates, dataCache, supabase]);
+  }, [isOnline]);
 
   // Fetch active address history for "New" badge
   const fetchActiveAddressHistory = React.useCallback(async () => {
@@ -2821,8 +2821,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         updateData.notes = notes;
       }
 
-      // Se o status for "realizada", sempre definir a data atual como data da visita realizada
-      if (status === "realizada") {
+      // Se o status for "realizada" ou "nao_encontrado", sempre definir a data atual como data da visita realizada
+      if (status === "realizada" || status === "nao_encontrado") {
         updateData.data_visita_realizada = new Date()
           .toISOString()
           .split("T")[0];
@@ -2867,8 +2867,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
                 status,
                 notes: notes || visit.notes,
                 updatedAt: new Date().toISOString(),
-                // Se o status for "realizada", definir a data atual como data da visita realizada
-                ...(status === "realizada" && {
+                // Se o status for "realizada" ou "nao_encontrado", definir a data atual como data da visita realizada
+                ...((status === "realizada" || status === "nao_encontrado") && {
                   dataVisitaRealizada: new Date().toISOString().split("T")[0],
                 }),
               }
