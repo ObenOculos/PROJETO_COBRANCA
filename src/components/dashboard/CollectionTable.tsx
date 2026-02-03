@@ -70,12 +70,7 @@ export const CollectionTable = React.forwardRef<
     },
     ref,
   ) => {
-    const {
-      collections: allCollections,
-      getClientGroups,
-      loading,
-      deleteSalesFromClient,
-    } = useCollection();
+    const { getClientGroups, loading, deleteSalesFromClient } = useCollection();
     const [currentAddresses, setCurrentAddresses] = useState<Map<string, any>>(
       new Map(),
     );
@@ -269,9 +264,9 @@ export const CollectionTable = React.forwardRef<
     };
 
     const handleExportXLSX = () => {
-      // The report should include ALL collections from the context.
-      const reportData = allCollections.map((c) => ({
-        // Re-ordered and new column added
+      // The report should now reflect the currently applied filters.
+      // It will use the 'collections' prop, which is the filtered data.
+      const reportData = collections.map((c) => ({
         Cliente: c.cliente,
         Documento: c.documento,
         Cobrador: c.nome_da_loja,
@@ -289,7 +284,7 @@ export const CollectionTable = React.forwardRef<
       // Create a worksheet from the formatted data
       const worksheet = XLSX.utils.json_to_sheet(reportData);
 
-      // Set column widths for better readability (matching the new order)
+      // Update column widths to match new order
       worksheet["!cols"] = [
         { wch: 35 }, // Cliente
         { wch: 18 }, // Documento
@@ -310,11 +305,11 @@ export const CollectionTable = React.forwardRef<
       XLSX.utils.book_append_sheet(
         workbook,
         worksheet,
-        "Relatório de Cobranças",
+        "Relatório de Cobranças Filtrado",
       );
 
       // Generate and trigger the download of the XLSX file
-      XLSX.writeFile(workbook, "Relatorio_Cobrancas_Completo.xlsx");
+      XLSX.writeFile(workbook, "Relatorio_Cobrancas_Filtrado.xlsx");
     };
 
     const getStatusIcon = (status: string | null) => {
