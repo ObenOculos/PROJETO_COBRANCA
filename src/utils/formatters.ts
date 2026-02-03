@@ -244,3 +244,48 @@ export const calculateDaysSinceLastVisit = (
     return 999; // Fallback to never visited on error
   }
 };
+
+export const parseAndFormatDate = (
+  dateStr: string | null | undefined,
+): string => {
+  if (!dateStr) return "N/A";
+
+  const str = dateStr.trim();
+  let date: Date | null = null;
+
+  // Handles YYYY-MM-DD that might come from a date picker or ISO string
+  if (str.includes("-")) {
+    const parts = str.split("T")[0].split("-");
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+        date = new Date(Date.UTC(year, month, day));
+      }
+    }
+  }
+  // Handles DD/MM/YYYY
+  else if (str.includes("/")) {
+    const parts = str.split("/");
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+      const year = parseInt(parts[2], 10);
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+        // To avoid timezone issues, create date as UTC
+        date = new Date(Date.UTC(year, month, day));
+      }
+    }
+  }
+
+  if (date && !isNaN(date.getTime())) {
+    // Use UTC methods to format if created as UTC
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const year = date.getUTCFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  return "Data Inválida";
+};

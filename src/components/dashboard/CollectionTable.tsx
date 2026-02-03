@@ -4,6 +4,7 @@ import React, {
   useImperativeHandle,
   useEffect,
 } from "react";
+import * as XLSX from "xlsx";
 import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
 import {
@@ -30,9 +31,10 @@ import {
   Minimize2,
   EyeIcon,
   Trash2,
+  FileDown,
 } from "lucide-react";
 import { Collection, ClientGroup, SaleGroup } from "../../types";
-import { formatCurrency } from "../../utils/formatters";
+import { formatCurrency, parseAndFormatDate } from "../../utils/formatters";
 import CollectionModal from "./CollectionModal";
 import ClientDetailModal from "./ClientDetailModal";
 import SaleDetailsModal from "./SaleDetailsModal";
@@ -68,7 +70,12 @@ export const CollectionTable = React.forwardRef<
     },
     ref,
   ) => {
-    const { getClientGroups, loading, deleteSalesFromClient } = useCollection();
+    const {
+      collections: allCollections,
+      getClientGroups,
+      loading,
+      deleteSalesFromClient,
+    } = useCollection();
     const [currentAddresses, setCurrentAddresses] = useState<Map<string, any>>(
       new Map(),
     );
@@ -259,6 +266,55 @@ export const CollectionTable = React.forwardRef<
     const handleCloseClientModal = () => {
       setSelectedClientGroup(null);
       setIsClientModalOpen(false);
+    };
+
+    const handleExportXLSX = () => {
+      // The report should include ALL collections from the context.
+      const reportData = allCollections.map((c) => ({
+        // Re-ordered and new column added
+        Cliente: c.cliente,
+        Documento: c.documento,
+        Cobrador: c.nome_da_loja,
+        "Venda Nº": c.venda_n,
+        "Parcela Nº": c.parcela,
+        "Data de Lançamento": parseAndFormatDate(c.data_lancamento),
+        "Data Vencimento": parseAndFormatDate(c.data_vencimento),
+        "Data Recebimento": parseAndFormatDate(c.data_de_recebimento),
+        "Dias em Atraso": c.dias_em_atraso,
+        "Valor Original": c.valor_original,
+        "Valor Recebido": c.valor_recebido,
+        Status: c.status,
+      }));
+
+      // Create a worksheet from the formatted data
+      const worksheet = XLSX.utils.json_to_sheet(reportData);
+
+      // Set column widths for better readability (matching the new order)
+      worksheet["!cols"] = [
+        { wch: 35 }, // Cliente
+        { wch: 18 }, // Documento
+        { wch: 25 }, // Cobrador
+        { wch: 10 }, // Venda Nº
+        { wch: 12 }, // Parcela Nº
+        { wch: 18 }, // Data de Lançamento
+        { wch: 18 }, // Data Vencimento
+        { wch: 18 }, // Data Recebimento
+        { wch: 15 }, // Dias em Atraso
+        { wch: 15 }, // Valor Original
+        { wch: 15 }, // Valor Recebido
+        { wch: 12 }, // Status
+      ];
+
+      // Create a new workbook and append the worksheet
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        "Relatório de Cobranças",
+      );
+
+      // Generate and trigger the download of the XLSX file
+      XLSX.writeFile(workbook, "Relatorio_Cobrancas_Completo.xlsx");
     };
 
     const getStatusIcon = (status: string | null) => {
@@ -563,7 +619,7 @@ export const CollectionTable = React.forwardRef<
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <div id="teste_nome_mudar">
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="flex-1">
                       <h2 className="text-lg font-semibold text-gray-900">
                         {userType === "manager"
                           ? "Clientes e Cobranças"
@@ -575,6 +631,17 @@ export const CollectionTable = React.forwardRef<
                         cobranças
                       </p>
                     </div>
+
+                    {userType === "manager" && (
+                      <button
+                        onClick={handleExportXLSX}
+                        className="ml-4 flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-all duration-200"
+                        title="Exportar para Excel"
+                      >
+                        <FileDown className="h-4 w-4" />
+                        <span>Exportar</span>
+                      </button>
+                    )}
 
                     {/* Botão de Filtro para Cobrador */}
                     {userType === "collector" && onToggleFilterBar && (
@@ -933,6 +1000,15 @@ export const CollectionTable = React.forwardRef<
                 </div>
                 {/* Global Actions - e.g., Expand/Collapse, maybe Filter for Manager */}
                 <div className="flex items-center gap-2">
+                  {userType === "manager" && (
+                    <button
+                      onClick={handleExportXLSX}
+                      className="flex items-center gap-2 p-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-all duration-200"
+                      title="Exportar para Excel"
+                    >
+                      <FileDown className="h-4 w-4" />
+                    </button>
+                  )}
                   {/* Filter Button for Collector (if not already in a dedicated filter bar) */}
                   {userType === "collector" && (
                     <button
