@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   Calendar,
@@ -63,6 +63,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     prefetchClientsData,  // NOVO: Função de pré-carregamento
   } = useCollection();
   const { user } = useAuth();
+
+  // ✅ CORREÇÃO: Refs para prevenir execuções duplicadas
+  const prefetchInProgressRef = useRef(false);
+  const prefetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [selectedCollectorId] = useState<string | null>(collectorId || null); 
 
@@ -854,32 +858,58 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     selectedDateVisits.length / visitsPerPage,
   );
 
-  // Pré-carregar dados dos clientes quando selectedDateVisits mudar
+  // ✅ CORREÇÃO: Pré-carregar dados dos clientes com proteção contra duplicação
   useEffect(() => {
-    if (selectedDateVisits.length > 0) {
-      const uniqueClients = [...new Set(selectedDateVisits.map(v => v.clientDocument))];
-      const missingClients = uniqueClients.filter(doc => !clientDataCache.has(doc));
+    // Limpar timeout anterior
+    if (prefetchTimeoutRef.current) {
+      clearTimeout(prefetchTimeoutRef.current);
+    }
+
+    // Prevenir execução duplicada
+    if (prefetchInProgressRef.current) {
+      console.log("⏸️ Pré-carregamento já em andamento, pulando...");
+      return;
+    }
+
+    // ✅ Debounce de 300ms para evitar chamadas rápidas
+    prefetchTimeoutRef.current = setTimeout(() => {
+      // Coletar todos os documentos únicos de ambas as fontes
+      const clientsFromVisits = selectedDateVisits.length > 0
+        ? selectedDateVisits.map(v => v.clientDocument)
+        : [];
+
+      const clientsFromAvailable = availableClients.length > 0
+        ? availableClients.map(c => c.document)
+        : [];
+
+      // Combinar e remover duplicatas
+      const allUniqueClients = [...new Set([...clientsFromVisits, ...clientsFromAvailable])];
+
+      // Filtrar apenas os que não estão no cache
+      const missingClients = allUniqueClients.filter(doc => !clientDataCache.has(doc));
 
       if (missingClients.length > 0) {
+        console.log(`🔄 Pré-carregando ${missingClients.length} clientes únicos...`);
+
+        // ✅ Bloquear novas execuções
+        prefetchInProgressRef.current = true;
         setIsLoadingClients(true);
+
         prefetchClientsData(missingClients).finally(() => {
           setIsLoadingClients(false);
+          // ✅ Liberar para novas execuções
+          prefetchInProgressRef.current = false;
         });
       }
-    }
-  }, [selectedDateVisits, clientDataCache, prefetchClientsData]);
+    }, 300); // Debounce de 300ms
 
-  // Pré-carregar dados dos clientes quando a lista de clientes disponíveis mudar
-  useEffect(() => {
-    if (availableClients.length > 0) {
-      const uniqueClients = [...new Set(availableClients.map(c => c.document))];
-      const missingClients = uniqueClients.filter(doc => !clientDataCache.has(doc));
-
-      if (missingClients.length > 0) {
-        prefetchClientsData(missingClients);
+    // Cleanup: limpar timeout ao desmontar ou quando dependências mudarem
+    return () => {
+      if (prefetchTimeoutRef.current) {
+        clearTimeout(prefetchTimeoutRef.current);
       }
-    }
-  }, [availableClients, clientDataCache, prefetchClientsData]);
+    };
+  }, [selectedDateVisits, availableClients, clientDataCache, prefetchClientsData]);
 
   // Validação: Detectar conflitos de visitas (mesmo cliente, mesma data)
   const checkVisitConflicts = (): {

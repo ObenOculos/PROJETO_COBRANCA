@@ -1,101 +1,440 @@
-# Instruções de Reparo - VisitScheduler e CollectionContext
+# 🚀 Guia de Implementação - Correção de Renderização Dupla
 
-## CollectionContext.tsx
+## 📋 Checklist de Implementação
 
-### 1. Corrigir dependências do useCallback - `fetchScheduledVisits` (linha 185)
-**Motivo:** Setters de useState (`setScheduledVisits`), objetos importados (`dataCache`) e instâncias estáveis (`supabase`) não precisam estar no array de dependências. Incluí-los causa re-criações desnecessárias da função callback, impactando performance.
+### Passo 1: Verificar se o problema é do React.StrictMode
 
-**Atual:**
-```typescript
-[isOnline, setScheduledVisits, dataCache, supabase]
-```
-**Corrigir para:**
-```typescript
-[isOnline]
-```
+**Arquivo:** `src/main.tsx` ou `src/index.tsx`
 
-### 2. Corrigir dependências do useCallback - `fetchAllowedVisitDates` (linha 243)
-**Motivo:** Mesmo problema do item 1. Dependências desnecessárias causam re-renders extras e podem degradar a performance do componente.
-
-**Atual:**
-```typescript
-[isOnline, setAllowedVisitDates, dataCache, supabase]
-```
-**Corrigir para:**
-```typescript
-[isOnline]
+**Procure por:**
+```tsx
+<React.StrictMode>
+  <App />
+</React.StrictMode>
 ```
 
-### 3. Padronizar nomenclatura (linha 167)
-**Motivo:** O projeto usa camelCase para propriedades. Manter snake_case aqui quebra a consistência e dificulta manutenção.
-
-**Atual:**
-```typescript
-scheduled_by_manager_id: visit.scheduled_by_manager_id,
+**Teste temporário:**
+```tsx
+// Comente ou remova o StrictMode apenas para testar
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  // <React.StrictMode>
+    <App />
+  // </React.StrictMode>
+);
 ```
-**Corrigir para:**
-```typescript
-scheduledByManagerId: visit.scheduled_by_manager_id,
+
+**Execute a aplicação e verifique:**
+- Se as duplicações sumirem → O problema era o StrictMode (comportamento normal em dev)
+- Se persistir → Continue com os próximos passos
+
+---
+
+### Passo 2: Modificar CollectionContext.tsx
+
+**Arquivo:** `src/contexts/CollectionContext.tsx`
+
+#### 2.1 Adicionar imports necessários
+No topo do arquivo, certifique-se de ter:
+```tsx
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useRef, // ← Adicionar se não existir
+} from "react";
+```
+
+#### 2.2 Adicionar estados e refs de controle
+
+Dentro do componente `CollectionProvider`, logo após os outros estados:
+
+```tsx
+export const CollectionProvider: React.FC<CollectionProviderProps> = ({
+  children,
+}) => {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const { setLoading: setGlobalLoading } = useLoading();
+  const { isOnline, addToOfflineQueue } = useOffline();
+  
+  // ... todos os estados existentes (collections, users, etc.) ...
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // ✅ ADICIONAR ESTAS LINHAS:
+  const [isDataLoading, setIsDataLoading] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
+```
+
+#### 2.3 Modificar o useEffect principal
+
+**Localizar:** O useEffect que começa na linha ~290
+
+**SUBSTITUIR:**
+```tsx
+useEffect(() => {
+  let realtimeChannel: any = null;
+
+  // Wait for AuthContext to finish loading before making any decisions
+  if (isAuthLoading) {
+    console.log("Aguardando autenticação carregar...");
+    return;
+  }
+
+  if (user) {
+    console.log("Usuário logado, carregando dados...");
+    setGlobalLoading(true, "Carregando dados do sistema...");
+```
+
+**POR:**
+```tsx
+useEffect(() => {
+  let realtimeChannel: any = null;
+
+  // ✅ NOVO: Prevenir múltiplas execuções
+  if (isAuthLoading || isDataLoading) {
+    console.log("⏸️ Aguardando autenticação ou dados já carregando...");
+    return;
+  }
+
+  // ✅ NOVO: Carregar apenas uma vez por sessão
+  if (hasLoadedOnceRef.current && user) {
+    console.log("✅ Dados já foram carregados nesta sessão");
+    return;
+  }
+
+  if (user) {
+    console.log("Usuário logado, carregando dados...");
+    setIsDataLoading(true); // ✅ Bloquear novos carregamentos
+    hasLoadedOnceRef.current = true; // ✅ Marcar como carregado
+    setGlobalLoading(true, "Carregando dados do sistema...");
+```
+
+#### 2.4 Atualizar o finally do fetchData
+
+**Localizar:** O bloco `.finally()` do fetchData (linha ~336)
+
+**SUBSTITUIR:**
+```tsx
+.finally(() => {
+  clearTimeout(timeoutId);
+  setGlobalLoading(false);
+  setLoading(false);
+});
+```
+
+**POR:**
+```tsx
+.finally(() => {
+  clearTimeout(timeoutId);
+  setGlobalLoading(false);
+  setLoading(false);
+  setIsDataLoading(false); // ✅ Liberar flag de carregamento
+});
+```
+
+#### 2.5 Atualizar o timeout handler
+
+**Localizar:** O setTimeout que define o timeout de 20 segundos (linha ~323)
+
+**SUBSTITUIR:**
+```tsx
+const timeoutId = setTimeout(() => {
+  console.warn(
+    "Tempo limite excedido ao carregar dados. Liberando o estado de carregamento.",
+  );
+  setGlobalLoading(false);
+  setLoading(false);
+}, 20000);
+```
+
+**POR:**
+```tsx
+const timeoutId = setTimeout(() => {
+  console.warn(
+    "Tempo limite excedido ao carregar dados. Liberando o estado de carregamento.",
+  );
+  setGlobalLoading(false);
+  setLoading(false);
+  setIsDataLoading(false); // ✅ Liberar flag mesmo em timeout
+}, 20000);
 ```
 
 ---
 
-## VisitScheduler.tsx
+### Passo 3: Modificar VisitScheduler.tsx
 
-### 4. Remover estado não utilizado (linha 124)
-**Motivo:** Este estado é declarado mas nunca usado. Estados não utilizados ocupam memória desnecessariamente e confundem outros desenvolvedores.
+**Arquivo:** `src/components/collection/VisitScheduler.tsx`
 
-**Remover:**
-```typescript
-const [, setClientsCurrentPage] = useState(1);
-```
-**Remover também as referências nas linhas 4713 e 4714**
+#### 3.1 Adicionar imports necessários
 
-### 5. Remover estado não utilizado (linha 96)
-**Motivo:** O `selectedTime` não é utilizado no componente. O gerenciamento de horário é feito via `clientSchedules`. Estado desnecessário aumenta a complexidade do componente sem agregar valor.
-
-**Remover:**
-```typescript
-const [selectedTime] = useState<string>(getDefaultTime());
+No topo do arquivo:
+```tsx
+import React, { useState, useMemo, useEffect, useRef } from "react";
+//                                           ^^^^^^ ← Certifique-se de importar useRef
 ```
 
-### 6. Remover estado não utilizado (linha 141)
-**Motivo:** Flag de loading que não está sendo atualizada nem lida em lugar algum. Remove ruído do código.
+#### 3.2 Adicionar refs de controle
 
-**Remover:**
-```typescript
-const [isLoadingClients, setIsLoadingClients] = useState(false);
+Dentro do componente `VisitScheduler`, logo após os hooks do useCollection:
+
+```tsx
+const VisitScheduler: React.FC<VisitSchedulerProps> = ({
+  onClose,
+  collectorId,
+}) => {
+  const {
+    // ... hooks existentes ...
+    clientDataCache,
+    prefetchClientsData,
+  } = useCollection();
+  const { user } = useAuth();
+
+  // ✅ ADICIONAR ESTAS LINHAS:
+  const prefetchInProgressRef = useRef(false);
+  const prefetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ... resto dos estados ...
 ```
 
-### 7. Remover código comentado (linha 107)
-**Motivo:** Código comentado deve ser removido. Se foi desativado, provavelmente não é mais necessário. Caso seja necessário no futuro, pode ser recuperado do histórico do Git.
+#### 3.3 Modificar o useEffect de pré-carregamento
 
-**Remover:**
-```typescript
-// const [activeTab, setActiveTab] = useState<"schedule" | "list">("schedule");
+**Localizar:** O useEffect que começa na linha ~858
+
+**SUBSTITUIR TODO O BLOCO:**
+```tsx
+useEffect(() => {
+  // Coletar todos os documentos únicos de ambas as fontes
+  const clientsFromVisits = selectedDateVisits.length > 0
+    ? selectedDateVisits.map(v => v.clientDocument)
+    : [];
+
+  const clientsFromAvailable = availableClients.length > 0
+    ? availableClients.map(c => c.document)
+    : [];
+
+  // Combinar e remover duplicatas
+  const allUniqueClients = [...new Set([...clientsFromVisits, ...clientsFromAvailable])];
+
+  // Filtrar apenas os que não estão no cache
+  const missingClients = allUniqueClients.filter(doc => !clientDataCache.has(doc));
+
+  if (missingClients.length > 0) {
+    console.log(`🔄 Pré-carregando ${missingClients.length} clientes únicos...`);
+    setIsLoadingClients(true);
+    prefetchClientsData(missingClients).finally(() => {
+      setIsLoadingClients(false);
+    });
+  }
+}, [selectedDateVisits, availableClients]);
 ```
 
-### 8. Remover import não utilizado (linha 37)
-**Motivo:** Imports não utilizados aumentam o bundle size e confundem a análise de dependências. Ferramentas de build podem não tree-shake corretamente.
+**POR:**
+```tsx
+useEffect(() => {
+  // ✅ Limpar timeout anterior
+  if (prefetchTimeoutRef.current) {
+    clearTimeout(prefetchTimeoutRef.current);
+  }
 
-**Remover:**
-```typescript
-import { getNextAllowedVisitDate } from "../../utils/visitScheduling";
+  // ✅ Prevenir execução duplicada
+  if (prefetchInProgressRef.current) {
+    console.log("⏸️ Pré-carregamento já em andamento, pulando...");
+    return;
+  }
+
+  // ✅ Debounce de 300ms para evitar chamadas rápidas
+  prefetchTimeoutRef.current = setTimeout(() => {
+    // Coletar todos os documentos únicos de ambas as fontes
+    const clientsFromVisits = selectedDateVisits.length > 0
+      ? selectedDateVisits.map(v => v.clientDocument)
+      : [];
+
+    const clientsFromAvailable = availableClients.length > 0
+      ? availableClients.map(c => c.document)
+      : [];
+
+    // Combinar e remover duplicatas
+    const allUniqueClients = [...new Set([...clientsFromVisits, ...clientsFromAvailable])];
+
+    // Filtrar apenas os que não estão no cache
+    const missingClients = allUniqueClients.filter(doc => !clientDataCache.has(doc));
+
+    if (missingClients.length > 0) {
+      console.log(`🔄 Pré-carregando ${missingClients.length} clientes únicos...`);
+      
+      // ✅ Bloquear novas execuções
+      prefetchInProgressRef.current = true;
+      setIsLoadingClients(true);
+      
+      prefetchClientsData(missingClients).finally(() => {
+        setIsLoadingClients(false);
+        // ✅ Liberar para novas execuções
+        prefetchInProgressRef.current = false;
+      });
+    }
+  }, 300); // Debounce de 300ms
+
+  // ✅ Cleanup: limpar timeout ao desmontar ou quando dependências mudarem
+  return () => {
+    if (prefetchTimeoutRef.current) {
+      clearTimeout(prefetchTimeoutRef.current);
+    }
+  };
+}, [selectedDateVisits, availableClients, clientDataCache, prefetchClientsData]);
 ```
-
-### 9. Verificar uso de recursos do contexto (linhas 62-63)
-**Motivo:** Recursos importados do contexto mas não utilizados geram re-renders desnecessários quando esses valores mudam no contexto pai.
-
-**Verificar se estão sendo usados:**
-```typescript
-clientDataCache,
-prefetchClientsData,
-```
-**Se não estiverem sendo usados, remover da desestruturação**
 
 ---
 
-## Prioridade
-- **Alta:** Itens 1, 2 (melhoram performance)
-- **Média:** Itens 3, 4, 5, 6, 7, 8 (limpeza de código)
-- **Baixa:** Item 9 (verificação)
+### Passo 4: Testar a implementação
+
+#### 4.1 Limpar cache e reiniciar
+
+```bash
+# No terminal do projeto
+npm run dev
+# ou
+yarn dev
+```
+
+#### 4.2 Abrir o DevTools do navegador
+
+- Pressione F12
+- Vá para a aba "Console"
+- Limpe os logs (ícone de lixeira)
+
+#### 4.3 Fazer login e verificar os logs
+
+**Comportamento ESPERADO (correto):**
+```
+✅ Usuário logado, carregando dados...
+✅ Buscando usuários...
+✅ Buscando pagamentos de venda da tabela sale_payments...
+✅ Buscando TODAS as visitas agendadas com paginação...
+✅ 🔄 Pré-carregando 455 clientes únicos...
+```
+
+**Comportamento ERRADO (duplicado):**
+```
+❌ Usuário logado, carregando dados...
+❌ Usuário logado, carregando dados...  ← DUPLICADO
+❌ Buscando usuários...
+❌ Buscando usuários...  ← DUPLICADO
+❌ 🔄 Pré-carregando 455 clientes únicos...
+❌ 🔄 Pré-carregando 455 clientes únicos...  ← DUPLICADO
+```
+
+---
+
+## 🔧 Solução de Problemas
+
+### Problema: Ainda está duplicando
+
+**Possíveis causas:**
+
+1. **StrictMode ainda está ativo**
+   - Verifique `src/main.tsx` ou `src/index.tsx`
+   - Em desenvolvimento, o StrictMode causa duplicação intencional
+
+2. **Múltiplos providers aninhados**
+   - Verifique se `CollectionProvider` não está sendo renderizado 2x
+   - Procure no `App.tsx` ou arquivo de rotas
+
+3. **Hot Module Replacement (HMR)**
+   - Durante desenvolvimento, HMR pode causar re-renderizações
+   - Teste com build de produção: `npm run build && npm run preview`
+
+### Problema: Erro de TypeScript
+
+Se aparecer erro de tipo no `useRef`:
+```tsx
+// Adicione o tipo explícito:
+const hasLoadedOnceRef = useRef<boolean>(false);
+const prefetchInProgressRef = useRef<boolean>(false);
+const prefetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+```
+
+### Problema: Dados não carregam
+
+Se os dados pararem de carregar:
+```tsx
+// Adicione um botão de reset no DevTools:
+// No CollectionContext, exponha esta função:
+const resetLoadingFlag = () => {
+  hasLoadedOnceRef.current = false;
+  setIsDataLoading(false);
+};
+
+// Use-a no console: window.resetCollectionLoading()
+```
+
+---
+
+## 📊 Métricas de Sucesso
+
+Após implementar as correções, você deve observar:
+
+| Métrica | Antes | Depois |
+|---------|-------|--------|
+| Carregamentos duplicados | 2x | 1x |
+| Requisições ao banco | ~14 | ~7 |
+| Tempo de carregamento inicial | ~4-6s | ~2-3s |
+| Logs no console | Duplicados | Limpos |
+
+---
+
+## 🎯 Próximos Passos (Opcional)
+
+### Otimização adicional 1: Memoizar dependências
+
+```tsx
+// No VisitScheduler, memoizar a lista de clientes:
+const clientsToFetch = useMemo(() => {
+  const clientsFromVisits = selectedDateVisits.map(v => v.clientDocument);
+  const clientsFromAvailable = availableClients.map(c => c.document);
+  const allUnique = [...new Set([...clientsFromVisits, ...clientsFromAvailable])];
+  return allUnique.filter(doc => !clientDataCache.has(doc));
+}, [selectedDateVisits, availableClients, clientDataCache]);
+```
+
+### Otimização adicional 2: Logging condicional
+
+```tsx
+// Adicionar logging apenas em desenvolvimento:
+const isDev = import.meta.env.DEV;
+
+if (isDev) {
+  console.log(`🔄 Pré-carregando ${missingClients.length} clientes únicos...`);
+}
+```
+
+### Otimização adicional 3: Implementar retry logic
+
+```tsx
+// No CollectionContext, adicionar retry automático em falhas:
+const fetchDataWithRetry = async (maxRetries = 3) => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await fetchData();
+      break;
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      console.warn(`Tentativa ${i + 1} falhou, tentando novamente...`);
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+    }
+  }
+};
+```
+
+---
+
+## ✅ Conclusão
+
+Após seguir este guia, seu aplicativo deve:
+- ✅ Carregar dados apenas uma vez por sessão
+- ✅ Evitar requisições duplicadas ao banco
+- ✅ Ter melhor performance geral
+- ✅ Logs mais limpos e organizados
+
+Se tiver dúvidas ou problemas, verifique os arquivos de exemplo fornecidos.

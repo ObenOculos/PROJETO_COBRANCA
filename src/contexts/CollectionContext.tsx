@@ -2474,14 +2474,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       console.log(`🔄 Pré-carregando dados de ${clientsToFetch.length} clientes em batch...`);
 
-      // ⭐ ADICIONAR: Testar buscando TODOS os documentos da tabela
-      const { data: allClientes } = await supabase
-        .from('clientes')
-        .select('documento, created_at')
-        .limit(20);
-
-      console.log('📋 Primeiros 20 CPFs na tabela clientes:', allClientes?.map(c => c.documento));
-
       // ⭐ SOLUÇÃO ROBUSTA: Tentar .in() primeiro, se falhar usar OR
       let clientesData: any[] | null = null;
       let error: any = null;
