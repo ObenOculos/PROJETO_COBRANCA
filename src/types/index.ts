@@ -435,6 +435,8 @@ export interface FilterOptions {
   search?: string;
   dateFrom?: string;
   dateTo?: string;
+  launchDateFrom?: string;
+  launchDateTo?: string;
   minAmount?: number;
   maxAmount?: number;
   overdueOnly?: boolean;

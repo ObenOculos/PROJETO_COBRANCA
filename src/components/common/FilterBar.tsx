@@ -320,6 +320,52 @@ const FilterBar: React.FC<FilterBarProps> = ({
               </div>
             </div>
 
+            <div
+              className="sm:col-span-2 lg:col-span-1"
+              role="group"
+              aria-labelledby="launch-date-range-label"
+            >
+              <label
+                id="launch-date-range-label"
+                htmlFor="launch-date-from-input"
+                className="block text-xs font-medium text-gray-700 mb-1"
+              >
+                Período de Lançamento
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  id="launch-date-from-input"
+                  name="launchDateFrom"
+                  type="date"
+                  aria-label="Data de início do lançamento"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  defaultValue={filters.launchDateFrom || ""}
+                  onBlur={(e) =>
+                    onFilterChange({
+                      ...filters,
+                      launchDateFrom: e.target.value || undefined,
+                    })
+                  }
+                  placeholder="De"
+                />
+                <input
+                  id="launch-date-to-input"
+                  name="launchDateTo"
+                  type="date"
+                  aria-label="Data de término do lançamento"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  defaultValue={filters.launchDateTo || ""}
+                  onBlur={(e) =>
+                    onFilterChange({
+                      ...filters,
+                      launchDateTo: e.target.value || undefined,
+                    })
+                  }
+                  placeholder="Até"
+                />
+              </div>
+            </div>
+
             {/* Amount Range Filter */}
             <div
               className="sm:col-span-2 lg:col-span-1"

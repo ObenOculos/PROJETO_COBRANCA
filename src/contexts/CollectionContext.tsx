@@ -1403,6 +1403,53 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       });
     }
 
+    // Filtro por período de data de lançamento (launchDateFrom/launchDateTo)
+    if (filters.launchDateFrom || filters.launchDateTo) {
+      const toYYYYMMDD = (dateStr: string): string | null => {
+        if (!dateStr || typeof dateStr !== "string") return null;
+
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr.substring(0, 10))) {
+          return dateStr.substring(0, 10);
+        }
+
+        const parts = dateStr.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+        if (parts) {
+          const [, day, month, year] = parts;
+          return `${year}-${month}-${day}`;
+        }
+
+        try {
+          const d = new Date(dateStr);
+          if (!isNaN(d.getTime())) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            return `${year}-${month}-${day}`;
+          }
+        } catch (e) {
+          // Ignore errors from invalid date strings
+        }
+
+        return null;
+      };
+
+      filtered = filtered.filter((c) => {
+        if (!c.data_lancamento) return false;
+
+        const comparableLaunchDate = toYYYYMMDD(c.data_lancamento);
+        if (!comparableLaunchDate) return false;
+
+        let matches = true;
+        if (filters.launchDateFrom) {
+          matches = matches && comparableLaunchDate >= filters.launchDateFrom;
+        }
+        if (filters.launchDateTo) {
+          matches = matches && comparableLaunchDate <= filters.launchDateTo;
+        }
+        return matches;
+      });
+    }
+
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       filtered = filtered.filter(
