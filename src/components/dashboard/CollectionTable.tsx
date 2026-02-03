@@ -866,8 +866,8 @@ export const CollectionTable = React.forwardRef<
 
                         <div className="flex-1 min-w-0 overflow-hidden">
                           <h3 className="text-base font-medium text-gray-900">
-                            {isMobile && clientGroup.client.length > 20
-                              ? `${clientGroup.client.slice(0, 20)}...`
+                            {isMobile && clientGroup.client.length > 25
+                              ? `${clientGroup.client.slice(0, 25)}...`
                               : clientGroup.client}
                           </h3>
                           <p className="text-sm text-gray-500 truncate">
@@ -1223,7 +1223,7 @@ export const CollectionTable = React.forwardRef<
                           expandAll();
                         }
                       }}
-                      className={`p-2 rounded-2xl transition-colors ${
+                      className={`p-2 rounded-2xl transition-colors responsive-hide-sm ${
                         paginatedSalesGroups.every((group) =>
                           expandedClients.has(group.document),
                         )
@@ -1434,8 +1434,8 @@ export const CollectionTable = React.forwardRef<
 
                         <div className="flex-1 min-w-0 overflow-hidden">
                           <h3 className="text-base font-semibold text-gray-800">
-                            {isMobile && clientGroup.client.length > 20
-                              ? `${clientGroup.client.slice(0, 20)}...`
+                            {isMobile && clientGroup.client.length > 25
+                              ? `${clientGroup.client.slice(0, 25)}...`
                               : clientGroup.client}
                           </h3>
                           <p className="text-sm text-gray-500 truncate font-mono">
