@@ -959,6 +959,67 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
+  const bulkDeleteClients = async (clientDocuments: string[]) => {
+    try {
+      setGlobalLoading(true, `Deletando ${clientDocuments.length} clientes...`);
+      setLoading(true);
+
+      if (!isOnline) {
+        throw new Error("Não é possível deletar clientes offline.");
+      }
+
+      // 1. Delete from BANCO_DADOS (collections)
+      const { error: collectionsError } = await supabase
+        .from("BANCO_DADOS")
+        .delete()
+        .in("documento", clientDocuments);
+
+      if (collectionsError) throw collectionsError;
+
+      // 2. Delete from sale_payments
+      const { error: paymentsError } = await supabase
+        .from("sale_payments")
+        .delete()
+        .in("client_document", clientDocuments);
+      if (paymentsError)
+        console.warn(
+          `Aviso: Erro ao deletar pagamentos:`,
+          paymentsError.message,
+        );
+
+      // 3. Delete from scheduled_visits
+      const { error: visitsError } = await supabase
+        .from("scheduled_visits")
+        .delete()
+        .in("client_document", clientDocuments);
+      if (visitsError)
+        console.warn(`Aviso: Erro ao deletar visitas:`, visitsError.message);
+
+      // 4. Delete from authorization_history
+      const { error: authHistoryError } = await supabase
+        .from("authorization_history")
+        .delete()
+        .in("client_document", clientDocuments);
+      if (authHistoryError)
+        console.warn(
+          `Aviso: Erro ao deletar histórico de autorização:`,
+          authHistoryError.message,
+        );
+
+      console.log(
+        `✅ ${clientDocuments.length} clientes e dados relacionados deletados.`,
+      );
+      await refreshData();
+    } catch (err) {
+      console.error(`Erro ao deletar clientes em massa:`, err);
+      setError(err instanceof Error ? err.message : "Erro ao deletar clientes");
+      throw err;
+    } finally {
+      setLoading(false);
+      setGlobalLoading(false);
+    }
+  };
+
   const deleteClient = async (clientDocument: string) => {
     try {
       setGlobalLoading(true, `Deletando cliente ${clientDocument}...`);
@@ -3612,9 +3673,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     getVisitsByCollector,
     getClientDataForVisit,
     rescheduleVisit,
-    updateScheduledVisitsAfterPayment,
-    deleteClient,
-    deleteSalesFromClient,
+      deleteSalesFromClient,
+      bulkDeleteClients,
+      deleteClient,
+      updateScheduledVisitsAfterPayment,
+      // NOVOS CAMPOS PARA OTIMIZAÇÃO:
     prefetchClientsData,
     clientDataCache,
   };
