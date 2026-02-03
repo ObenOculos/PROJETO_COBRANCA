@@ -325,9 +325,7 @@ export const CollectionTable = React.forwardRef<
       XLSX.writeFile(workbook, "Relatorio_Cobrancas_Filtrado.xlsx");
     };
 
-    const handleToggleSelectAll = (
-      paginatedGroups: { document: string }[],
-    ) => {
+    const handleToggleSelectAll = (paginatedGroups: { document: string }[]) => {
       if (selectedClients.size === paginatedGroups.length) {
         setSelectedClients(new Set());
       } else {
@@ -657,182 +655,182 @@ export const CollectionTable = React.forwardRef<
       return (
         <>
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                        <div className="px-4 py-4 border-b border-gray-200">
-                          {isDeleteMode ? (
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                              <div className="flex items-center gap-4">
-                                <input
-                                  type="checkbox"
-                                  className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                  checked={
-                                    selectedClients.size > 0 &&
-                                    selectedClients.size === paginatedClientGroups.length
-                                  }
-                                  onChange={() =>
-                                    handleToggleSelectAll(paginatedClientGroups)
-                                  }
-                                />
-                                <h2 className="text-lg font-semibold text-red-700">
-                                  {selectedClients.size > 0
-                                    ? `${selectedClients.size} cliente(s) selecionado(s)`
-                                    : "Selecione os clientes para deletar"}
-                                </h2>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => setShowBulkDeleteModal(true)}
-                                  disabled={selectedClients.size === 0}
-                                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 transition-all duration-200"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  <span>Deletar Selecionados</span>
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setIsDeleteMode(false);
-                                    setSelectedClients(new Set());
-                                  }}
-                                  className="p-3 rounded-lg text-gray-700 bg-gray-200 hover:bg-gray-300 transition-all duration-200"
-                                  title="Sair do modo de exclusão"
-                                >
-                                  <XCircle className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                              <div id="teste_nome_mudar">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <h2 className="text-lg font-semibold text-gray-900">
-                                      {userType === "manager"
-                                        ? "Clientes e Cobranças"
-                                        : "Meus Clientes"}
-                                    </h2>
-                                    <p className="text-sm text-gray-600 mt-1">
-                                      {filteredClientGroups.length} cliente
-                                      {filteredClientGroups.length !== 1 ? "s" : ""} com
-                                      cobranças
-                                    </p>
-                                  </div>
-            
-                                  {userType === "manager" && (
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        onClick={handleExportXLSX}
-                                        className="ml-4 flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-all duration-200"
-                                        title="Exportar para Excel"
-                                      >
-                                        <FileDown className="h-4 w-4" />
-                                        <span>Exportar</span>
-                                      </button>
-                                      <button
-                                        onClick={() => setShowActivationModal(true)}
-                                        className="flex items-center gap-2 p-3 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-all duration-200"
-                                        title="Ativar modo de exclusão em massa"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </button>
-                                    </div>
-                                  )}
-            
-                                  {/* Botão de Filtro para Cobrador */}
-                                  {userType === "collector" && onToggleFilterBar && (
-                                    <button
-                                      id="toggle-filters-header"
-                                      name="toggleFiltersHeader"
-                                      onClick={onToggleFilterBar}
-                                      className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                        showFilterBar
-                                          ? "bg-blue-100 text-blue-700"
-                                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                      }`}
-                                      title={
-                                        showFilterBar
-                                          ? "Ocultar Filtros"
-                                          : "Mostrar Filtros"
-                                      }
-                                    >
-                                      <Filter className="h-3.5 w-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-            
-                              <div className="flex items-center justify-between gap-4">
-                                {/* Controles de Ordenação para Cobrador */}
-                                {userType === "collector" && (
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      id="sort-by-cliente"
-                                      name="sortByCliente"
-                                      onClick={() => handleSort("cliente")}
-                                      className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                        sortField === "cliente"
-                                          ? "bg-blue-100 text-blue-700"
-                                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                      }`}
-                                      title="Ordenar por Nome"
-                                    >
-                                      <User className="h-3.5 w-3.5" />
-                                      {getSortIcon("cliente")}
-                                    </button>
-                                    <button
-                                      id="sort-by-valor"
-                                      name="sortByValor"
-                                      onClick={() => handleSort("valor")}
-                                      className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                        sortField === "valor"
-                                          ? "bg-blue-100 text-blue-700"
-                                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                      }`}
-                                      title="Ordenar por Valor"
-                                    >
-                                      <DollarSign className="h-3.5 w-3.5" />
-                                      {getSortIcon("valor")}
-                                    </button>
-                                    <button
-                                      id="sort-by-cidade"
-                                      name="sortByCidade"
-                                      onClick={() => handleSort("cidade")}
-                                      className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                        sortField === "cidade"
-                                          ? "bg-blue-100 text-blue-700"
-                                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                      }`}
-                                      title="Ordenar por Cidade"
-                                    >
-                                      <MapPin className="h-3.5 w-3.5" />
-                                      {getSortIcon("cidade")}
-                                    </button>
-                                  </div>
-                                )}
-            
-                                <div className="flex items-center gap-2">
-                                  {/* Selector de items por página */}
-                                  <div className="flex items-center gap-2">
-                                    <Eye className="h-4 w-4 text-gray-600" />
-                                    <select
-                                      id="items-per-page"
-                                      name="itemsPerPage"
-                                      value={itemsPerPage}
-                                      onChange={(e) => {
-                                        setItemsPerPage(Number(e.target.value));
-                                        setCurrentPage(1);
-                                      }}
-                                      className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    >
-                                      <option value={10}>10</option>
-                                      <option value={20}>20</option>
-                                      <option value={50}>50</option>
-                                      <option value={100}>100</option>
-                                    </select>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
+            <div className="px-4 py-4 border-b border-gray-200">
+              {isDeleteMode ? (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="checkbox"
+                      className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={
+                        selectedClients.size > 0 &&
+                        selectedClients.size === paginatedClientGroups.length
+                      }
+                      onChange={() =>
+                        handleToggleSelectAll(paginatedClientGroups)
+                      }
+                    />
+                    <h2 className="text-lg font-semibold text-red-700">
+                      {selectedClients.size > 0
+                        ? `${selectedClients.size} cliente(s) selecionado(s)`
+                        : "Selecione os clientes para deletar"}
+                    </h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowBulkDeleteModal(true)}
+                      disabled={selectedClients.size === 0}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 transition-all duration-200"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span>Deletar Selecionados</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsDeleteMode(false);
+                        setSelectedClients(new Set());
+                      }}
+                      className="p-3 rounded-lg text-gray-700 bg-gray-200 hover:bg-gray-300 transition-all duration-200"
+                      title="Sair do modo de exclusão"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                  <div id="teste_nome_mudar">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h2 className="text-lg font-semibold text-gray-900">
+                          {userType === "manager"
+                            ? "Clientes e Cobranças"
+                            : "Meus Clientes"}
+                        </h2>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {filteredClientGroups.length} cliente
+                          {filteredClientGroups.length !== 1 ? "s" : ""} com
+                          cobranças
+                        </p>
+                      </div>
+
+                      {userType === "manager" && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={handleExportXLSX}
+                            className="ml-4 flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-all duration-200"
+                            title="Exportar para Excel"
+                          >
+                            <FileDown className="h-4 w-4" />
+                            <span>Exportar</span>
+                          </button>
+                          <button
+                            onClick={() => setShowActivationModal(true)}
+                            className="flex items-center gap-2 p-3 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-all duration-200"
+                            title="Ativar modo de exclusão em massa"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
+                      )}
+
+                      {/* Botão de Filtro para Cobrador */}
+                      {userType === "collector" && onToggleFilterBar && (
+                        <button
+                          id="toggle-filters-header"
+                          name="toggleFiltersHeader"
+                          onClick={onToggleFilterBar}
+                          className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            showFilterBar
+                              ? "bg-blue-100 text-blue-700"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                          }`}
+                          title={
+                            showFilterBar
+                              ? "Ocultar Filtros"
+                              : "Mostrar Filtros"
+                          }
+                        >
+                          <Filter className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    {/* Controles de Ordenação para Cobrador */}
+                    {userType === "collector" && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          id="sort-by-cliente"
+                          name="sortByCliente"
+                          onClick={() => handleSort("cliente")}
+                          className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            sortField === "cliente"
+                              ? "bg-blue-100 text-blue-700"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                          }`}
+                          title="Ordenar por Nome"
+                        >
+                          <User className="h-3.5 w-3.5" />
+                          {getSortIcon("cliente")}
+                        </button>
+                        <button
+                          id="sort-by-valor"
+                          name="sortByValor"
+                          onClick={() => handleSort("valor")}
+                          className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            sortField === "valor"
+                              ? "bg-blue-100 text-blue-700"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                          }`}
+                          title="Ordenar por Valor"
+                        >
+                          <DollarSign className="h-3.5 w-3.5" />
+                          {getSortIcon("valor")}
+                        </button>
+                        <button
+                          id="sort-by-cidade"
+                          name="sortByCidade"
+                          onClick={() => handleSort("cidade")}
+                          className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            sortField === "cidade"
+                              ? "bg-blue-100 text-blue-700"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                          }`}
+                          title="Ordenar por Cidade"
+                        >
+                          <MapPin className="h-3.5 w-3.5" />
+                          {getSortIcon("cidade")}
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      {/* Selector de items por página */}
+                      <div className="flex items-center gap-2">
+                        <Eye className="h-4 w-4 text-gray-600" />
+                        <select
+                          id="items-per-page"
+                          name="itemsPerPage"
+                          value={itemsPerPage}
+                          onChange={(e) => {
+                            setItemsPerPage(Number(e.target.value));
+                            setCurrentPage(1);
+                          }}
+                          className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value={10}>10</option>
+                          <option value={20}>20</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="divide-y divide-gray-200">
               {paginatedClientGroups.map((clientGroup) => (
@@ -932,7 +930,6 @@ export const CollectionTable = React.forwardRef<
               </div>
             )}
           </div>
-
           {/* Controles de Paginação */}
           {totalPages > 1 && (
             <div className="bg-gray-800 px-4 sm:px-6 py-4 rounded-2xl mt-4">
@@ -1040,7 +1037,6 @@ export const CollectionTable = React.forwardRef<
               </div>
             </div>
           )}
-
           {/* Collection Modal - Renderizado via Portal */}
           {isModalOpen &&
             selectedCollection &&
@@ -1052,7 +1048,6 @@ export const CollectionTable = React.forwardRef<
               />,
               document.body,
             )}
-
           {/* Client Detail Modal - Renderizado via Portal */}
           {isClientModalOpen &&
             selectedClientGroup &&
@@ -1064,7 +1059,6 @@ export const CollectionTable = React.forwardRef<
               />,
               document.body,
             )}
-
           {/* Sale Details Modal - Renderizado via Portal */}
           {isSaleModalOpen &&
             selectedSale.length > 0 &&
@@ -1078,7 +1072,6 @@ export const CollectionTable = React.forwardRef<
               />,
               document.body,
             )}
-
           {/* Confirmation Modal for Delete Client */}
           {clientToDelete && (
             <DeleteSalesModal
@@ -1086,36 +1079,36 @@ export const CollectionTable = React.forwardRef<
               onClose={handleCancelDelete}
               onConfirm={handleConfirmDeleteSales}
               clientGroup={clientToDelete}
-                    />
-                  )}
-            
-                  {/* Modal de ativação do modo de exclusão */}
-                  <ConfirmationModal
-                    isOpen={showActivationModal}
-                    onClose={() => setShowActivationModal(false)}
-                    onConfirm={() => {
-                      setIsDeleteMode(true);
-                      setShowActivationModal(false);
-                    }}
-                    title="Ativar Modo de Exclusão em Massa?"
-                    message="Ao ativar esta função, você poderá selecionar e deletar múltiplos clientes e todos os seus dados associados de uma só vez. Deseja continuar?"
-                    confirmButtonText="Ativar"
-                    cancelButtonText="Cancelar"
-                    isDestructive={true}
-                  />
-            
-                  {/* Modal de confirmação da exclusão em massa */}
-                  <ConfirmationModal
-                    isOpen={showBulkDeleteModal}
-                    onClose={() => setShowBulkDeleteModal(false)}
-                    onConfirm={handleBulkDeleteConfirm}
-                    title={`Deletar ${selectedClients.size} Clientes?`}
-                    message={`Você tem certeza que deseja deletar permanentemente ${selectedClients.size} clientes e todos os seus dados? Esta ação não pode ser desfeita.`}
-                    confirmButtonText="Sim, Deletar"
-                    cancelButtonText="Cancelar"
-                    isDestructive={true}
-                  />                </>
-              );    }
+            />
+          )}
+          {/* Modal de ativação do modo de exclusão */}
+          <ConfirmationModal
+            isOpen={showActivationModal}
+            onClose={() => setShowActivationModal(false)}
+            onConfirm={() => {
+              setIsDeleteMode(true);
+              setShowActivationModal(false);
+            }}
+            title="Ativar Modo de Exclusão em Massa?"
+            message="Ao ativar esta função, você poderá selecionar e deletar múltiplos clientes e todos os seus dados associados de uma só vez. Deseja continuar?"
+            confirmButtonText="Ativar"
+            cancelButtonText="Cancelar"
+            isDestructive={true}
+          />
+          {/* Modal de confirmação da exclusão em massa */}
+          <ConfirmationModal
+            isOpen={showBulkDeleteModal}
+            onClose={() => setShowBulkDeleteModal(false)}
+            onConfirm={handleBulkDeleteConfirm}
+            title={`Deletar ${selectedClients.size} Clientes?`}
+            message={`Você tem certeza que deseja deletar permanentemente ${selectedClients.size} clientes e todos os seus dados? Esta ação não pode ser desfeita.`}
+            confirmButtonText="Sim, Deletar"
+            cancelButtonText="Cancelar"
+            isDestructive={true}
+          />{" "}
+        </>
+      );
+    }
 
     // Fallback to simple list view
     return (
@@ -1861,35 +1854,36 @@ export const CollectionTable = React.forwardRef<
             onClose={handleCancelDelete}
             onConfirm={handleConfirmDeleteSales}
             clientGroup={clientToDelete}
-                  />
-                )}
-          
-                {/* Modal de ativação do modo de exclusão */}
-                <ConfirmationModal
-                  isOpen={showActivationModal}
-                  onClose={() => setShowActivationModal(false)}
-                  onConfirm={() => {
-                    setIsDeleteMode(true);
-                    setShowActivationModal(false);
-                  }}
-                  title="Ativar Modo de Exclusão em Massa?"
-                              message="Ao ativar esta função, você poderá selecionar e deletar múltiplos clientes e todos os seus dados associados de uma só vez. Deseja continuar?"
-                                          confirmButtonText="Ativar"
-                                          cancelButtonText="Cancelar"
-                  isDestructive={true}
-                />
-          
-                {/* Modal de confirmação da exclusão em massa */}
-                <ConfirmationModal
-                  isOpen={showBulkDeleteModal}
-                  onClose={() => setShowBulkDeleteModal(false)}
-                  onConfirm={handleBulkDeleteConfirm}
-                  title={`Deletar ${selectedClients.size} Clientes?`}
-                              message={`Você tem certeza que deseja deletar permanentemente ${selectedClients.size} clientes e todos os seus dados? Esta ação não pode ser desfeita.`}
-                                          confirmButtonText="Sim, Deletar"
-                                          cancelButtonText="Cancelar"
-                  isDestructive={true}
-                />
-              </>
-            );  },
+          />
+        )}
+
+        {/* Modal de ativação do modo de exclusão */}
+        <ConfirmationModal
+          isOpen={showActivationModal}
+          onClose={() => setShowActivationModal(false)}
+          onConfirm={() => {
+            setIsDeleteMode(true);
+            setShowActivationModal(false);
+          }}
+          title="Ativar Modo de Exclusão em Massa?"
+          message="Ao ativar esta função, você poderá selecionar e deletar múltiplos clientes e todos os seus dados associados de uma só vez. Deseja continuar?"
+          confirmButtonText="Ativar"
+          cancelButtonText="Cancelar"
+          isDestructive={true}
+        />
+
+        {/* Modal de confirmação da exclusão em massa */}
+        <ConfirmationModal
+          isOpen={showBulkDeleteModal}
+          onClose={() => setShowBulkDeleteModal(false)}
+          onConfirm={handleBulkDeleteConfirm}
+          title={`Deletar ${selectedClients.size} Clientes?`}
+          message={`Você tem certeza que deseja deletar permanentemente ${selectedClients.size} clientes e todos os seus dados? Esta ação não pode ser desfeita.`}
+          confirmButtonText="Sim, Deletar"
+          cancelButtonText="Cancelar"
+          isDestructive={true}
+        />
+      </>
+    );
+  },
 );

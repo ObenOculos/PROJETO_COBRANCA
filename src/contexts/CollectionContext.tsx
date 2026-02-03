@@ -80,10 +80,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       complemento?: string;
     }[]
   >([]);
-  const [clientDataCache, setClientDataCache] = useState<Map<string, any>>(new Map());
+  const [clientDataCache, setClientDataCache] = useState<Map<string, any>>(
+    new Map(),
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
 
   // Scheduled Visits Functions (Moved to earlier declaration)
   const fetchScheduledVisits = React.useCallback(
@@ -2568,241 +2569,264 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     [collections, calculateSaleBalance, getSalePayments],
   );
   // NOVO: Função para pré-carregar dados dos clientes em batch
-  const prefetchClientsData = React.useCallback(async (clientDocuments: string[]) => {
-    try {
-      // Filtrar apenas clientes que não estão no cache
-      const clientsToFetch = clientDocuments.filter(
-        doc => !clientDataCache.get(doc)
-      );
-
-      if (clientsToFetch.length === 0) {
-        console.log('✅ Todos os clientes já estão em cache');
-        return;
-      }
-
-      console.log(`🔄 Pré-carregando dados de ${clientsToFetch.length} clientes em batch...`);
-
-      // ⭐ SOLUÇÃO ROBUSTA: Tentar .in() primeiro, se falhar usar OR
-      let clientesData: any[] | null = null;
-      let error: any = null;
-
+  const prefetchClientsData = React.useCallback(
+    async (clientDocuments: string[]) => {
       try {
-        // Tentar com .in() primeiro
-        const result = await supabase
-          .from('clientes')
-          .select('documento, created_at')  // Removido 'apelido' - não existe nesta tabela
-          .in('documento', clientsToFetch);
+        // Filtrar apenas clientes que não estão no cache
+        const clientsToFetch = clientDocuments.filter(
+          (doc) => !clientDataCache.get(doc),
+        );
 
-        clientesData = result.data;
-        error = result.error;
-
-        if (error) {
-          console.warn('⚠️ .in() falhou, tentando com OR query:', error.message);
-          
-          // Fallback: usar OR com eq
-          let query = supabase
-            .from('clientes')
-            .select('documento, created_at');  // Removido 'apelido' - não existe nesta tabela
-
-          // Construir query com OR manualmente
-          const orConditions = clientsToFetch.map(doc => `documento.eq.${doc}`).join(',');
-          const fallbackResult = await query.or(orConditions);
-
-          clientesData = fallbackResult.data;
-          error = fallbackResult.error;
+        if (clientsToFetch.length === 0) {
+          console.log("✅ Todos os clientes já estão em cache");
+          return;
         }
-      } catch (queryError) {
-        console.error('❌ Erro na query:', queryError);
-        error = queryError;
-      }
 
-      if (error) {
-        console.error('❌ Erro ao pré-carregar clientes:', error);
-        return;
-      }
+        console.log(
+          `🔄 Pré-carregando dados de ${clientsToFetch.length} clientes em batch...`,
+        );
 
-      // Criar um Map para acesso rápido - documento -> dados do cliente
-      const clientesMap = new Map(
-        (clientesData || []).map(c => [c.documento, c])
-      );
-
-      // Função auxiliar para calcular dias de atraso
-      const calculateOverdueDays = (dueDateStr: string): number => {
-        if (!dueDateStr) return 0;
+        // ⭐ SOLUÇÃO ROBUSTA: Tentar .in() primeiro, se falhar usar OR
+        let clientesData: any[] | null = null;
+        let error: any = null;
 
         try {
-          let dueDate: Date;
-          const cleanDateStr = dueDateStr.trim();
+          // Tentar com .in() primeiro
+          const result = await supabase
+            .from("clientes")
+            .select("documento, created_at") // Removido 'apelido' - não existe nesta tabela
+            .in("documento", clientsToFetch);
 
-          if (cleanDateStr.includes("/")) {
-            const parts = cleanDateStr.split("/");
-            if (parts.length === 3) {
-              const [day, month, year] = parts;
-              const dayNum = parseInt(day, 10);
-              const monthNum = parseInt(month, 10);
-              const yearNum = parseInt(year, 10);
+          clientesData = result.data;
+          error = result.error;
 
-              if (
-                dayNum >= 1 &&
-                dayNum <= 31 &&
-                monthNum >= 1 &&
-                monthNum <= 12 &&
-                yearNum >= 1900
-              ) {
-                dueDate = new Date(yearNum, monthNum - 1, dayNum);
+          if (error) {
+            console.warn(
+              "⚠️ .in() falhou, tentando com OR query:",
+              error.message,
+            );
+
+            // Fallback: usar OR com eq
+            let query = supabase
+              .from("clientes")
+              .select("documento, created_at"); // Removido 'apelido' - não existe nesta tabela
+
+            // Construir query com OR manualmente
+            const orConditions = clientsToFetch
+              .map((doc) => `documento.eq.${doc}`)
+              .join(",");
+            const fallbackResult = await query.or(orConditions);
+
+            clientesData = fallbackResult.data;
+            error = fallbackResult.error;
+          }
+        } catch (queryError) {
+          console.error("❌ Erro na query:", queryError);
+          error = queryError;
+        }
+
+        if (error) {
+          console.error("❌ Erro ao pré-carregar clientes:", error);
+          return;
+        }
+
+        // Criar um Map para acesso rápido - documento -> dados do cliente
+        const clientesMap = new Map(
+          (clientesData || []).map((c) => [c.documento, c]),
+        );
+
+        // Função auxiliar para calcular dias de atraso
+        const calculateOverdueDays = (dueDateStr: string): number => {
+          if (!dueDateStr) return 0;
+
+          try {
+            let dueDate: Date;
+            const cleanDateStr = dueDateStr.trim();
+
+            if (cleanDateStr.includes("/")) {
+              const parts = cleanDateStr.split("/");
+              if (parts.length === 3) {
+                const [day, month, year] = parts;
+                const dayNum = parseInt(day, 10);
+                const monthNum = parseInt(month, 10);
+                const yearNum = parseInt(year, 10);
+
+                if (
+                  dayNum >= 1 &&
+                  dayNum <= 31 &&
+                  monthNum >= 1 &&
+                  monthNum <= 12 &&
+                  yearNum >= 1900
+                ) {
+                  dueDate = new Date(yearNum, monthNum - 1, dayNum);
+                } else {
+                  return 0;
+                }
               } else {
                 return 0;
               }
-            } else {
-              return 0;
-            }
-          } else if (cleanDateStr.includes("-")) {
-            const parts = cleanDateStr.split("-");
-            if (parts.length === 3) {
-              if (parts[0].length === 4) {
-                dueDate = new Date(cleanDateStr);
+            } else if (cleanDateStr.includes("-")) {
+              const parts = cleanDateStr.split("-");
+              if (parts.length === 3) {
+                if (parts[0].length === 4) {
+                  dueDate = new Date(cleanDateStr);
+                } else {
+                  const [month, day, year] = parts;
+                  dueDate = new Date(
+                    parseInt(year, 10),
+                    parseInt(month, 10) - 1,
+                    parseInt(day, 10),
+                  );
+                }
               } else {
-                const [month, day, year] = parts;
-                dueDate = new Date(
-                  parseInt(year, 10),
-                  parseInt(month, 10) - 1,
-                  parseInt(day, 10),
-                );
+                dueDate = new Date(cleanDateStr);
               }
             } else {
               dueDate = new Date(cleanDateStr);
             }
-          } else {
-            dueDate = new Date(cleanDateStr);
-          }
 
-          if (isNaN(dueDate.getTime())) {
+            if (isNaN(dueDate.getTime())) {
+              return 0;
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            dueDate.setHours(0, 0, 0, 0);
+
+            const diffTime = today.getTime() - dueDate.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            return Math.max(0, diffDays);
+          } catch (error) {
+            console.error(
+              "Erro ao calcular dias em atraso:",
+              error,
+              dueDateStr,
+            );
             return 0;
           }
-
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          dueDate.setHours(0, 0, 0, 0);
-
-          const diffTime = today.getTime() - dueDate.getTime();
-          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-          return Math.max(0, diffDays);
-        } catch (error) {
-          console.error("Erro ao calcular dias em atraso:", error, dueDateStr);
-          return 0;
-        }
-      };
-
-      // Processar todos os clientes em paralelo
-      const updatedCache = new Map(clientDataCache);
-
-      await Promise.all(clientsToFetch.map(async (doc) => {
-        // ⭐ Agora os documentos já vêm formatados da query
-        const clienteInfo = clientesMap.get(doc);
-        const clientGroups = getClientGroups();
-        const clientGroup = clientGroups.find(g => g.document === doc);
-
-        if (!clientGroup) return;
-
-        const clientSales = getSalesByClient(doc);
-        const totalPending = clientSales.reduce(
-          (sum, sale) => sum + sale.pendingValue,
-          0,
-        );
-
-        const overdueCount = clientSales.reduce((sum, sale) => {
-          return (
-            sum +
-            sale.installments.filter((inst) => {
-              const pending =
-                (inst.valor_original || 0) - (inst.valor_recebido || 0);
-              if (pending <= 0) return false;
-
-              if (
-                inst.dias_em_atraso !== null &&
-                inst.dias_em_atraso !== undefined &&
-                inst.dias_em_atraso > 0
-              ) {
-                return true;
-              }
-
-              const overdueDays = calculateOverdueDays(inst.data_vencimento || "");
-              return overdueDays > 0;
-            }).length
-          );
-        }, 0);
-
-        const addressHistory = activeAddressHistory.find(
-          h => h.cliente_documento === doc,
-        );
-
-        let addressUpdateDays: number | undefined;
-        if (addressHistory?.created_at) {
-          const updateDate = new Date(addressHistory.created_at);
-          const today = new Date();
-          const todayMidnight = new Date(
-            today.getFullYear(),
-            today.getMonth(),
-            today.getDate(),
-          );
-          const updateDateMidnight = new Date(
-            updateDate.getFullYear(),
-            updateDate.getMonth(),
-            updateDate.getDate(),
-          );
-          const diffTime = Math.abs(
-            todayMidnight.getTime() - updateDateMidnight.getTime(),
-          );
-          addressUpdateDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        }
-
-        const currentAddress = addressHistory
-          ? `${addressHistory.logradouro || ""}, ${addressHistory.numero || "s/n"}`
-          : clientGroup.address;
-
-        const currentNumber = addressHistory
-          ? addressHistory.numero || "s/n"
-          : clientGroup.number || "s/n";
-
-        const currentNeighborhood = addressHistory
-          ? addressHistory.bairro || ""
-          : clientGroup.neighborhood;
-
-        const currentCity = addressHistory
-          ? addressHistory.cidade || ""
-          : clientGroup.city;
-
-        const currentComplemento = addressHistory
-          ? addressHistory.complemento || ""
-          : clientGroup.complemento;
-
-        const result = {
-          name: clientGroup.client,
-          document: clientGroup.document,
-          apelido: clientGroup.apelido,  // Removido clienteInfo?.apelido || - não vem do Supabase
-          address: currentAddress,
-          number: currentNumber,
-          neighborhood: currentNeighborhood,
-          city: currentCity,
-          complemento: currentComplemento,
-          phone: clientGroup.phone,
-          mobile: clientGroup.mobile,
-          totalPendingValue: totalPending,
-          overdueCount: overdueCount,
-          addressUpdateDays,
-          created_at: clienteInfo?.created_at,
         };
 
-        updatedCache.set(doc, result);
-      }));
+        // Processar todos os clientes em paralelo
+        const updatedCache = new Map(clientDataCache);
 
-      setClientDataCache(updatedCache);
+        await Promise.all(
+          clientsToFetch.map(async (doc) => {
+            // ⭐ Agora os documentos já vêm formatados da query
+            const clienteInfo = clientesMap.get(doc);
+            const clientGroups = getClientGroups();
+            const clientGroup = clientGroups.find((g) => g.document === doc);
 
-    } catch (error) {
-      console.error('❌ Erro ao pré-carregar dados dos clientes:', error);
-    }
-  }, [clientDataCache, activeAddressHistory, getClientGroups, getSalesByClient, supabase]);
+            if (!clientGroup) return;
+
+            const clientSales = getSalesByClient(doc);
+            const totalPending = clientSales.reduce(
+              (sum, sale) => sum + sale.pendingValue,
+              0,
+            );
+
+            const overdueCount = clientSales.reduce((sum, sale) => {
+              return (
+                sum +
+                sale.installments.filter((inst) => {
+                  const pending =
+                    (inst.valor_original || 0) - (inst.valor_recebido || 0);
+                  if (pending <= 0) return false;
+
+                  if (
+                    inst.dias_em_atraso !== null &&
+                    inst.dias_em_atraso !== undefined &&
+                    inst.dias_em_atraso > 0
+                  ) {
+                    return true;
+                  }
+
+                  const overdueDays = calculateOverdueDays(
+                    inst.data_vencimento || "",
+                  );
+                  return overdueDays > 0;
+                }).length
+              );
+            }, 0);
+
+            const addressHistory = activeAddressHistory.find(
+              (h) => h.cliente_documento === doc,
+            );
+
+            let addressUpdateDays: number | undefined;
+            if (addressHistory?.created_at) {
+              const updateDate = new Date(addressHistory.created_at);
+              const today = new Date();
+              const todayMidnight = new Date(
+                today.getFullYear(),
+                today.getMonth(),
+                today.getDate(),
+              );
+              const updateDateMidnight = new Date(
+                updateDate.getFullYear(),
+                updateDate.getMonth(),
+                updateDate.getDate(),
+              );
+              const diffTime = Math.abs(
+                todayMidnight.getTime() - updateDateMidnight.getTime(),
+              );
+              addressUpdateDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            }
+
+            const currentAddress = addressHistory
+              ? `${addressHistory.logradouro || ""}, ${addressHistory.numero || "s/n"}`
+              : clientGroup.address;
+
+            const currentNumber = addressHistory
+              ? addressHistory.numero || "s/n"
+              : clientGroup.number || "s/n";
+
+            const currentNeighborhood = addressHistory
+              ? addressHistory.bairro || ""
+              : clientGroup.neighborhood;
+
+            const currentCity = addressHistory
+              ? addressHistory.cidade || ""
+              : clientGroup.city;
+
+            const currentComplemento = addressHistory
+              ? addressHistory.complemento || ""
+              : clientGroup.complemento;
+
+            const result = {
+              name: clientGroup.client,
+              document: clientGroup.document,
+              apelido: clientGroup.apelido, // Removido clienteInfo?.apelido || - não vem do Supabase
+              address: currentAddress,
+              number: currentNumber,
+              neighborhood: currentNeighborhood,
+              city: currentCity,
+              complemento: currentComplemento,
+              phone: clientGroup.phone,
+              mobile: clientGroup.mobile,
+              totalPendingValue: totalPending,
+              overdueCount: overdueCount,
+              addressUpdateDays,
+              created_at: clienteInfo?.created_at,
+            };
+
+            updatedCache.set(doc, result);
+          }),
+        );
+
+        setClientDataCache(updatedCache);
+      } catch (error) {
+        console.error("❌ Erro ao pré-carregar dados dos clientes:", error);
+      }
+    },
+    [
+      clientDataCache,
+      activeAddressHistory,
+      getClientGroups,
+      getSalesByClient,
+      supabase,
+    ],
+  );
 
   const scheduleVisit = async (
     visitData: Omit<ScheduledVisit, "id" | "createdAt" | "updatedAt">,
@@ -3182,215 +3206,223 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     });
   };
 
-  const getClientDataForVisit = React.useCallback(async (clientDocument: string) => {
-    console.log('🔍 getClientDataForVisit called for:', clientDocument);
-    
-    // Check cache first
-    const cachedData = clientDataCache.get(clientDocument);
-    if (cachedData) {
-      console.log('💾 Cache hit for client:', clientDocument);
-      return cachedData;
-    }
+  const getClientDataForVisit = React.useCallback(
+    async (clientDocument: string) => {
+      console.log("🔍 getClientDataForVisit called for:", clientDocument);
 
-    console.log('🌐 Cache miss, fetching data for client:', clientDocument);
+      // Check cache first
+      const cachedData = clientDataCache.get(clientDocument);
+      if (cachedData) {
+        console.log("💾 Cache hit for client:", clientDocument);
+        return cachedData;
+      }
 
-    const clientGroups = getClientGroups();
-    const clientGroup = clientGroups.find(
-      (group) => group.document === clientDocument,
-    );
+      console.log("🌐 Cache miss, fetching data for client:", clientDocument);
 
-    if (!clientGroup) return null;
+      const clientGroups = getClientGroups();
+      const clientGroup = clientGroups.find(
+        (group) => group.document === clientDocument,
+      );
 
-    const clientSales = getSalesByClient(clientDocument);
-    const totalPending = clientSales.reduce(
-      (sum, sale) => sum + sale.pendingValue,
-      0,
-    );
+      if (!clientGroup) return null;
 
-    // Calcular dias em atraso considerando formato brasileiro DD/MM/YYYY
-    const calculateOverdueDays = (dueDateStr: string): number => {
-      if (!dueDateStr) return 0;
+      const clientSales = getSalesByClient(clientDocument);
+      const totalPending = clientSales.reduce(
+        (sum, sale) => sum + sale.pendingValue,
+        0,
+      );
 
-      try {
-        let dueDate: Date;
+      // Calcular dias em atraso considerando formato brasileiro DD/MM/YYYY
+      const calculateOverdueDays = (dueDateStr: string): number => {
+        if (!dueDateStr) return 0;
 
-        // Limpar a string de data
-        const cleanDateStr = dueDateStr.trim();
+        try {
+          let dueDate: Date;
 
-        // Verificar se a data está no formato DD/MM/YYYY (brasileiro)
-        if (cleanDateStr.includes("/")) {
-          const parts = cleanDateStr.split("/");
-          if (parts.length === 3) {
-            const [day, month, year] = parts;
-            // Converter para números e validar
-            const dayNum = parseInt(day, 10);
-            const monthNum = parseInt(month, 10);
-            const yearNum = parseInt(year, 10);
+          // Limpar a string de data
+          const cleanDateStr = dueDateStr.trim();
 
-            if (
-              dayNum >= 1 &&
-              dayNum <= 31 &&
-              monthNum >= 1 &&
-              monthNum <= 12 &&
-              yearNum >= 1900
-            ) {
-              dueDate = new Date(yearNum, monthNum - 1, dayNum);
+          // Verificar se a data está no formato DD/MM/YYYY (brasileiro)
+          if (cleanDateStr.includes("/")) {
+            const parts = cleanDateStr.split("/");
+            if (parts.length === 3) {
+              const [day, month, year] = parts;
+              // Converter para números e validar
+              const dayNum = parseInt(day, 10);
+              const monthNum = parseInt(month, 10);
+              const yearNum = parseInt(year, 10);
+
+              if (
+                dayNum >= 1 &&
+                dayNum <= 31 &&
+                monthNum >= 1 &&
+                monthNum <= 12 &&
+                yearNum >= 1900
+              ) {
+                dueDate = new Date(yearNum, monthNum - 1, dayNum);
+              } else {
+                console.warn("Data brasileira inválida:", cleanDateStr);
+                return 0;
+              }
             } else {
-              console.warn("Data brasileira inválida:", cleanDateStr);
+              console.warn(
+                "Formato de data brasileiro inválido:",
+                cleanDateStr,
+              );
               return 0;
             }
-          } else {
-            console.warn("Formato de data brasileiro inválido:", cleanDateStr);
-            return 0;
-          }
-        } else if (cleanDateStr.includes("-")) {
-          // Formato ISO (YYYY-MM-DD) ou americano (MM-DD-YYYY)
-          const parts = cleanDateStr.split("-");
-          if (parts.length === 3) {
-            // Assumir formato ISO se o primeiro elemento tem 4 dígitos
-            if (parts[0].length === 4) {
-              dueDate = new Date(cleanDateStr);
+          } else if (cleanDateStr.includes("-")) {
+            // Formato ISO (YYYY-MM-DD) ou americano (MM-DD-YYYY)
+            const parts = cleanDateStr.split("-");
+            if (parts.length === 3) {
+              // Assumir formato ISO se o primeiro elemento tem 4 dígitos
+              if (parts[0].length === 4) {
+                dueDate = new Date(cleanDateStr);
+              } else {
+                // Formato americano MM-DD-YYYY
+                const [month, day, year] = parts;
+                dueDate = new Date(
+                  parseInt(year, 10),
+                  parseInt(month, 10) - 1,
+                  parseInt(day, 10),
+                );
+              }
             } else {
-              // Formato americano MM-DD-YYYY
-              const [month, day, year] = parts;
-              dueDate = new Date(
-                parseInt(year, 10),
-                parseInt(month, 10) - 1,
-                parseInt(day, 10),
-              );
+              dueDate = new Date(cleanDateStr);
             }
           } else {
+            // Tentar parseamento direto
             dueDate = new Date(cleanDateStr);
           }
-        } else {
-          // Tentar parseamento direto
-          dueDate = new Date(cleanDateStr);
-        }
 
-        // Verificar se a data é válida
-        if (isNaN(dueDate.getTime())) {
-          console.warn("Data inválida após parsing:", cleanDateStr);
-          return 0;
-        }
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        dueDate.setHours(0, 0, 0, 0);
-
-        const diffTime = today.getTime() - dueDate.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-        return Math.max(0, diffDays);
-      } catch (error) {
-        console.error("Erro ao calcular dias em atraso:", error, dueDateStr);
-        return 0;
-      }
-    };
-
-    const overdueCount = clientSales.reduce((sum, sale) => {
-      return (
-        sum +
-        sale.installments.filter((inst) => {
-          const pending =
-            (inst.valor_original || 0) - (inst.valor_recebido || 0);
-          if (pending <= 0) return false;
-
-          // Primeiro, tentar usar o campo dias_em_atraso se existir e for válido
-          if (
-            inst.dias_em_atraso !== null &&
-            inst.dias_em_atraso !== undefined &&
-            inst.dias_em_atraso > 0
-          ) {
-            return true;
+          // Verificar se a data é válida
+          if (isNaN(dueDate.getTime())) {
+            console.warn("Data inválida após parsing:", cleanDateStr);
+            return 0;
           }
 
-          // Caso contrário, calcular baseado na data_vencimento
-          const overdueDays = calculateOverdueDays(inst.data_vencimento || "");
-          return overdueDays > 0;
-        }).length
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          dueDate.setHours(0, 0, 0, 0);
+
+          const diffTime = today.getTime() - dueDate.getTime();
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+          return Math.max(0, diffDays);
+        } catch (error) {
+          console.error("Erro ao calcular dias em atraso:", error, dueDateStr);
+          return 0;
+        }
+      };
+
+      const overdueCount = clientSales.reduce((sum, sale) => {
+        return (
+          sum +
+          sale.installments.filter((inst) => {
+            const pending =
+              (inst.valor_original || 0) - (inst.valor_recebido || 0);
+            if (pending <= 0) return false;
+
+            // Primeiro, tentar usar o campo dias_em_atraso se existir e for válido
+            if (
+              inst.dias_em_atraso !== null &&
+              inst.dias_em_atraso !== undefined &&
+              inst.dias_em_atraso > 0
+            ) {
+              return true;
+            }
+
+            // Caso contrário, calcular baseado na data_vencimento
+            const overdueDays = calculateOverdueDays(
+              inst.data_vencimento || "",
+            );
+            return overdueDays > 0;
+          }).length
+        );
+      }, 0);
+
+      const addressHistory = activeAddressHistory.find(
+        (h) => h.cliente_documento === clientDocument,
       );
-    }, 0);
+      let addressUpdateDays: number | undefined;
 
-    const addressHistory = activeAddressHistory.find(
-      (h) => h.cliente_documento === clientDocument,
-    );
-    let addressUpdateDays: number | undefined;
+      if (addressHistory?.created_at) {
+        const updateDate = new Date(addressHistory.created_at);
+        const today = new Date();
 
-    if (addressHistory?.created_at) {
-      const updateDate = new Date(addressHistory.created_at);
-      const today = new Date();
+        // Reset time for accurate day calculation
+        const todayMidnight = new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate(),
+        );
+        const updateDateMidnight = new Date(
+          updateDate.getFullYear(),
+          updateDate.getMonth(),
+          updateDate.getDate(),
+        );
 
-      // Reset time for accurate day calculation
-      const todayMidnight = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate(),
-      );
-      const updateDateMidnight = new Date(
-        updateDate.getFullYear(),
-        updateDate.getMonth(),
-        updateDate.getDate(),
-      );
+        const diffTime = Math.abs(
+          todayMidnight.getTime() - updateDateMidnight.getTime(),
+        );
+        addressUpdateDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      }
 
-      const diffTime = Math.abs(
-        todayMidnight.getTime() - updateDateMidnight.getTime(),
-      );
-      addressUpdateDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    }
+      const currentAddress = addressHistory
+        ? `${addressHistory.logradouro || ""}, ${addressHistory.numero || "s/n"}`
+        : clientGroup.address;
 
-    const currentAddress = addressHistory
-      ? `${addressHistory.logradouro || ""}, ${addressHistory.numero || "s/n"}`
-      : clientGroup.address;
+      const currentNumber = addressHistory
+        ? addressHistory.numero || "s/n"
+        : clientGroup.number || "s/n";
 
-    const currentNumber = addressHistory
-      ? addressHistory.numero || "s/n"
-      : clientGroup.number || "s/n";
+      const currentNeighborhood = addressHistory
+        ? addressHistory.bairro || ""
+        : clientGroup.neighborhood;
 
-    const currentNeighborhood = addressHistory
-      ? addressHistory.bairro || ""
-      : clientGroup.neighborhood;
+      const currentCity = addressHistory
+        ? addressHistory.cidade || ""
+        : clientGroup.city;
 
-    const currentCity = addressHistory
-      ? addressHistory.cidade || ""
-      : clientGroup.city;
+      const currentComplemento = addressHistory
+        ? addressHistory.complemento || ""
+        : clientGroup.complemento;
 
-    const currentComplemento = addressHistory
-      ? addressHistory.complemento || ""
-      : clientGroup.complemento;
+      // Fetch created_at from clientes table
+      const { data: clienteData } = await supabase
+        .from("clientes")
+        .select("created_at")
+        .eq("documento", clientDocument)
+        .single();
 
-    // Fetch created_at from clientes table
-    const { data: clienteData } = await supabase
-      .from('clientes')
-      .select('created_at')
-      .eq('documento', clientDocument)
-      .single();
+      const result = {
+        name: clientGroup.client,
+        document: clientGroup.document,
+        apelido: clientGroup.apelido,
+        address: currentAddress,
+        number: currentNumber,
+        neighborhood: currentNeighborhood,
+        city: currentCity,
+        complemento: currentComplemento,
+        phone: clientGroup.phone,
+        mobile: clientGroup.mobile,
+        totalPendingValue: totalPending,
+        overdueCount: overdueCount,
+        addressUpdateDays,
+        created_at: clienteData?.created_at,
+      };
 
-    const result = {
-      name: clientGroup.client,
-      document: clientGroup.document,
-      apelido: clientGroup.apelido,
-      address: currentAddress,
-      number: currentNumber,
-      neighborhood: currentNeighborhood,
-      city: currentCity,
-      complemento: currentComplemento,
-      phone: clientGroup.phone,
-      mobile: clientGroup.mobile,
-      totalPendingValue: totalPending,
-      overdueCount: overdueCount,
-      addressUpdateDays,
-      created_at: clienteData?.created_at,
-    };
+      // Cache the result
+      setClientDataCache((prev) => new Map(prev).set(clientDocument, result));
 
-    // Cache the result
-    setClientDataCache(prev => new Map(prev).set(clientDocument, result));
-
-    return result;
-  }, [getClientGroups, getSalesByClient, activeAddressHistory]);
+      return result;
+    },
+    [getClientGroups, getSalesByClient, activeAddressHistory],
+  );
 
   // Function to clear client data cache for a specific client
   const invalidateClientDataCache = (clientDocument: string) => {
-    setClientDataCache(prev => {
+    setClientDataCache((prev) => {
       const newCache = new Map(prev);
       newCache.delete(clientDocument);
       return newCache;
@@ -3673,11 +3705,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     getVisitsByCollector,
     getClientDataForVisit,
     rescheduleVisit,
-      deleteSalesFromClient,
-      bulkDeleteClients,
-      deleteClient,
-      updateScheduledVisitsAfterPayment,
-      // NOVOS CAMPOS PARA OTIMIZAÇÃO:
+    deleteSalesFromClient,
+    bulkDeleteClients,
+    deleteClient,
+    updateScheduledVisitsAfterPayment,
+    // NOVOS CAMPOS PARA OTIMIZAÇÃO:
     prefetchClientsData,
     clientDataCache,
   };

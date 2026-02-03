@@ -60,8 +60,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     users, // Get users from context
     fetchScheduledVisits, // Add fetchScheduledVisits
     allowedVisitDates, // Add allowedVisitDates
-    clientDataCache,      // NOVO: Cache de dados dos clientes
-    prefetchClientsData,  // NOVO: Função de pré-carregamento
+    clientDataCache, // NOVO: Cache de dados dos clientes
+    prefetchClientsData, // NOVO: Função de pré-carregamento
   } = useCollection();
   const { user } = useAuth();
 
@@ -69,7 +69,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const prefetchInProgressRef = useRef(false);
   const prefetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [selectedCollectorId] = useState<string | null>(collectorId || null); 
+  const [selectedCollectorId] = useState<string | null>(collectorId || null);
 
   const effectiveCollectorId = selectedCollectorId || collectorId || user?.id;
 
@@ -239,9 +239,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     useState(false);
 
   // Estados para filtro das visitas do dia selecionado
-  const [visitsSortBy, setVisitsSortBy] = useState<"name" | "city" | "value" | "address">(
-    "name",
-  );
+  const [visitsSortBy, setVisitsSortBy] = useState<
+    "name" | "city" | "value" | "address"
+  >("name");
   const [visitsSortOrder, setVisitsSortOrder] = useState<"asc" | "desc">("asc");
 
   // Listen for visits scheduled by a manager to refresh data
@@ -534,7 +534,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         if (clientData?.created_at) {
           const createdAt = new Date(clientData.created_at);
           const now = new Date();
-          const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+          const diffDays = Math.floor(
+            (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24),
+          );
           return diffDays <= 30;
         }
         return false;
@@ -910,22 +912,30 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     // ✅ Debounce de 300ms para evitar chamadas rápidas
     prefetchTimeoutRef.current = setTimeout(() => {
       // Coletar todos os documentos únicos de ambas as fontes
-      const clientsFromVisits = selectedDateVisits.length > 0
-        ? selectedDateVisits.map(v => v.clientDocument)
-        : [];
+      const clientsFromVisits =
+        selectedDateVisits.length > 0
+          ? selectedDateVisits.map((v) => v.clientDocument)
+          : [];
 
-      const clientsFromAvailable = availableClients.length > 0
-        ? availableClients.map(c => c.document)
-        : [];
+      const clientsFromAvailable =
+        availableClients.length > 0
+          ? availableClients.map((c) => c.document)
+          : [];
 
       // Combinar e remover duplicatas
-      const allUniqueClients = [...new Set([...clientsFromVisits, ...clientsFromAvailable])];
+      const allUniqueClients = [
+        ...new Set([...clientsFromVisits, ...clientsFromAvailable]),
+      ];
 
       // Filtrar apenas os que não estão no cache
-      const missingClients = allUniqueClients.filter(doc => !clientDataCache.has(doc));
+      const missingClients = allUniqueClients.filter(
+        (doc) => !clientDataCache.has(doc),
+      );
 
       if (missingClients.length > 0) {
-        console.log(`🔄 Pré-carregando ${missingClients.length} clientes únicos...`);
+        console.log(
+          `🔄 Pré-carregando ${missingClients.length} clientes únicos...`,
+        );
 
         // ✅ Bloquear novas execuções
         prefetchInProgressRef.current = true;
@@ -945,7 +955,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         clearTimeout(prefetchTimeoutRef.current);
       }
     };
-  }, [selectedDateVisits, availableClients, clientDataCache, prefetchClientsData]);
+  }, [
+    selectedDateVisits,
+    availableClients,
+    clientDataCache,
+    prefetchClientsData,
+  ]);
 
   // Validação: Detectar conflitos de visitas (mesmo cliente, mesma data)
   const checkVisitConflicts = (): {
@@ -2340,12 +2355,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                     {isLoadingClients && (
                       <div className="flex justify-center items-center py-4">
                         <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                        <span className="ml-2 text-sm text-gray-600">Carregando detalhes...</span>
+                        <span className="ml-2 text-sm text-gray-600">
+                          Carregando detalhes...
+                        </span>
                       </div>
                     )}
                     {paginatedSelectedDateVisits.map((visit) => {
                       // Obter dados do cliente do cache
-                      const clientData = clientDataCache.get(visit.clientDocument);
+                      const clientData = clientDataCache.get(
+                        visit.clientDocument,
+                      );
                       const displayApelido = clientData?.apelido;
                       const displayComplemento = clientData?.complemento;
                       const displayPendingValue =
@@ -2360,7 +2379,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       const displayNeighborhood =
                         clientData?.neighborhood || visit.clientNeighborhood;
                       const displayCity = clientData?.city || visit.clientCity;
-                      const displayNumber = clientData?.number || visit.clientNumber;
+                      const displayNumber =
+                        clientData?.number || visit.clientNumber;
 
                       return (
                         <div
@@ -2377,9 +2397,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                             {(() => {
                               // Verifica se o clientData tem created_at e se é "novo" (menos de 30 dias)
                               if (clientData?.created_at) {
-                                const createdAt = new Date(clientData.created_at);
+                                const createdAt = new Date(
+                                  clientData.created_at,
+                                );
                                 const now = new Date();
-                                const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                                const diffDays = Math.floor(
+                                  (now.getTime() - createdAt.getTime()) /
+                                    (1000 * 60 * 60 * 24),
+                                );
                                 if (diffDays <= 30) {
                                   return (
                                     <div className="flex justify-center mb-2 sm:hidden">
@@ -2405,9 +2430,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   {(() => {
                                     // Verifica se o clientData tem created_at e se é "novo" (menos de 30 dias)
                                     if (clientData?.created_at) {
-                                      const createdAt = new Date(clientData.created_at);
+                                      const createdAt = new Date(
+                                        clientData.created_at,
+                                      );
                                       const now = new Date();
-                                      const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                                      const diffDays = Math.floor(
+                                        (now.getTime() - createdAt.getTime()) /
+                                          (1000 * 60 * 60 * 24),
+                                      );
                                       if (diffDays <= 30) {
                                         return (
                                           <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 tracking-wide align-middle">
@@ -2450,9 +2480,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   <p className="text-sm font-medium text-gray-800">
                                     {displayAddress}
                                   </p>
-                                  {addressUpdateDays !== undefined && addressUpdateDays <= 30 && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 tracking-wide">Novo ({addressUpdateDays} dias)</span>
-                                  )}
+                                  {addressUpdateDays !== undefined &&
+                                    addressUpdateDays <= 30 && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 tracking-wide">
+                                        Novo ({addressUpdateDays} dias)
+                                      </span>
+                                    )}
                                 </div>
                               </div>
                               {/* Neighborhood */}
@@ -2532,9 +2565,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                               {visit.status === "agendada" && (
                                 <>
                                   <button
-                                    onClick={() =>
-                                      handleMarkAsCompleted(visit)
-                                    }
+                                    onClick={() => handleMarkAsCompleted(visit)}
                                     className="flex-1 justify-center text-center px-4 py-2.5 text-sm font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
                                   >
                                     Realizado
@@ -3734,7 +3765,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                 <input
                                   type="checkbox"
                                   checked={filters.onlyNew}
-                                  onChange={(e) => setFilters({...filters, onlyNew: e.target.checked})}
+                                  onChange={(e) =>
+                                    setFilters({
+                                      ...filters,
+                                      onlyNew: e.target.checked,
+                                    })
+                                  }
                                   className="mr-2"
                                 />
                                 Apenas clientes novos (últimos 30 dias)
@@ -4128,11 +4164,27 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                               >
                                                 <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex items-center gap-1">
                                                   {(() => {
-                                                    const clientData = clientDataCache.get(client.document);
-                                                    if (clientData?.created_at) {
-                                                      const createdAt = new Date(clientData.created_at);
+                                                    const clientData =
+                                                      clientDataCache.get(
+                                                        client.document,
+                                                      );
+                                                    if (
+                                                      clientData?.created_at
+                                                    ) {
+                                                      const createdAt =
+                                                        new Date(
+                                                          clientData.created_at,
+                                                        );
                                                       const now = new Date();
-                                                      const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                                                      const diffDays =
+                                                        Math.floor(
+                                                          (now.getTime() -
+                                                            createdAt.getTime()) /
+                                                            (1000 *
+                                                              60 *
+                                                              60 *
+                                                              24),
+                                                        );
                                                       if (diffDays <= 30) {
                                                         return (
                                                           <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border bg-blue-100 text-blue-800 border-blue-200 tracking-wide">
@@ -4143,7 +4195,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                                     }
                                                     return null;
                                                   })()}
-                                                  <div className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border ${status.color}`}>
+                                                  <div
+                                                    className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium border ${status.color}`}
+                                                  >
                                                     {status.days}
                                                   </div>
                                                 </div>

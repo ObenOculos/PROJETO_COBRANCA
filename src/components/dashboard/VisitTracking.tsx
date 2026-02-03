@@ -1010,7 +1010,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                             <div className="flex items-center">
                                               <MapPin className="h-4 w-4 mr-2" />
                                               {visit.clientAddress}
-                                              {visit.clientNumber && `, ${visit.clientNumber}`}
+                                              {visit.clientNumber &&
+                                                `, ${visit.clientNumber}`}
                                               {visit.clientNeighborhood &&
                                                 `, ${visit.clientNeighborhood}`}
                                               {visit.clientCity &&
