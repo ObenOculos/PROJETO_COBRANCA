@@ -501,6 +501,21 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       });
     }
 
+    if (filters.onlyNew) {
+      filteredClients = filteredClients.filter((client) => {
+        const clientData = clientDataCache.get(client.document);
+        if (clientData?.created_at) {
+          const createdAt = new Date(clientData.created_at);
+          const now = new Date();
+          const diffDays = Math.floor(
+            (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24),
+          );
+          return diffDays <= 30;
+        }
+        return false;
+      });
+    }
+
     return filteredClients;
   }, [
     effectiveCollectorId,
@@ -512,7 +527,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     filters.visitStatus,
     filters.dueDateStart,
     filters.dueDateEnd,
+    filters.onlyNew,
     scheduledVisits,
+    clientDataCache,
   ]);
 
   const availableClients = React.useMemo(() => {
@@ -528,21 +545,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       filteredClients = filteredClients.filter((client) =>
         filters.neighborhood.includes(client.neighborhood),
       );
-    }
-
-    if (filters.onlyNew) {
-      filteredClients = filteredClients.filter((client) => {
-        const clientData = clientDataCache.get(client.document);
-        if (clientData?.created_at) {
-          const createdAt = new Date(clientData.created_at);
-          const now = new Date();
-          const diffDays = Math.floor(
-            (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24),
-          );
-          return diffDays <= 30;
-        }
-        return false;
-      });
     }
 
     if (sortField) {
@@ -720,10 +722,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
   // Obter lista de cidades únicas (apenas de clientes com pendências)
   const availableCities = React.useMemo(() => {
-    const cities = [
-      ...new Set(baseFilteredClients.map((client) => client.city)),
-    ];
-    return cities.sort();
+    const countMap = new Map<string, number>();
+    for (const client of baseFilteredClients) {
+      countMap.set(client.city, (countMap.get(client.city) ?? 0) + 1);
+    }
+    return [...countMap.entries()]
+      .map(([city, count]) => ({ city, count }))
+      .sort((a, b) => a.city.localeCompare(b.city));
   }, [baseFilteredClients]);
 
   const availableNeighborhoods = React.useMemo(() => {
@@ -733,10 +738,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       clients = clients.filter((client) => filters.city.includes(client.city));
     }
 
-    const neighborhoods = [
-      ...new Set(clients.map((client) => client.neighborhood)),
-    ];
-    return neighborhoods.sort();
+    const countMap = new Map<string, number>();
+    for (const client of clients) {
+      countMap.set(
+        client.neighborhood,
+        (countMap.get(client.neighborhood) ?? 0) + 1,
+      );
+    }
+    return [...countMap.entries()]
+      .map(([neighborhood, count]) => ({ neighborhood, count }))
+      .sort((a, b) => a.neighborhood.localeCompare(b.neighborhood));
   }, [baseFilteredClients, filters.city]);
 
   // Funções do calendário
@@ -3578,23 +3589,28 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   </button>
                                   {showCityDropdown && (
                                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl sm:rounded-2xl shadow-lg max-h-60 overflow-y-auto">
-                                      {availableCities.map((city) => (
+                                      {availableCities.map(({ city, count }) => (
                                         <label
                                           key={city}
-                                          className="flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                          className="flex items-center justify-between px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                         >
-                                          <input
-                                            id={`city-filter-${city}`}
-                                            type="checkbox"
-                                            checked={filters.city.includes(
-                                              city,
-                                            )}
-                                            onChange={() =>
-                                              handleCityFilterChange(city)
-                                            }
-                                            className="mr-2"
-                                          />
-                                          {city}
+                                          <div className="flex items-center">
+                                            <input
+                                              id={`city-filter-${city}`}
+                                              type="checkbox"
+                                              checked={filters.city.includes(
+                                                city,
+                                              )}
+                                              onChange={() =>
+                                                handleCityFilterChange(city)
+                                              }
+                                              className="mr-2"
+                                            />
+                                            {city}
+                                          </div>
+                                          <span className="ml-3 text-xs text-gray-400 font-medium">
+                                            {count}
+                                          </span>
                                         </label>
                                       ))}
                                     </div>
@@ -3622,25 +3638,30 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   {showNeighborhoodDropdown && (
                                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl sm:rounded-2xl shadow-lg max-h-60 overflow-y-auto">
                                       {availableNeighborhoods.map(
-                                        (neighborhood) => (
+                                        ({ neighborhood, count }) => (
                                           <label
                                             key={neighborhood}
-                                            className="flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                            className="flex items-center justify-between px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                           >
-                                            <input
-                                              id={`neighborhood-filter-${neighborhood}`}
-                                              type="checkbox"
-                                              checked={filters.neighborhood.includes(
-                                                neighborhood,
-                                              )}
-                                              onChange={() =>
-                                                handleNeighborhoodFilterChange(
+                                            <div className="flex items-center">
+                                              <input
+                                                id={`neighborhood-filter-${neighborhood}`}
+                                                type="checkbox"
+                                                checked={filters.neighborhood.includes(
                                                   neighborhood,
-                                                )
-                                              }
-                                              className="mr-2"
-                                            />
-                                            {neighborhood}
+                                                )}
+                                                onChange={() =>
+                                                  handleNeighborhoodFilterChange(
+                                                    neighborhood,
+                                                  )
+                                                }
+                                                className="mr-2"
+                                              />
+                                              {neighborhood}
+                                            </div>
+                                            <span className="ml-3 text-xs text-gray-400 font-medium">
+                                              {count}
+                                            </span>
                                           </label>
                                         ),
                                       )}

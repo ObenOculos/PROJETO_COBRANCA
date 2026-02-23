@@ -1,327 +1,185 @@
-Vou analisar os arquivos para entender o que precisa ser ajustado no "Acompanhamento de Visitas".
+ALTERAÇÃO: Contagem de clientes nos dropdowns Cidade e Bairro
+Arquivo: src/components/dashboard/VisitScheduler.tsx
+================================================================================
 
-Deixa eu examinar os componentes:Perfeito! Analisando os dois componentes, aqui está **exatamente o que precisa ser ajustado** para suportar agendamento por bairro:
+COMPORTAMENTO ESPERADO
+----------------------
+- Cada opção do dropdown mostra: "Nome da Cidade (12)"
+- A contagem reflete os filtros ativos no momento (busca, valor, status visita, vencimento)
+- Cidade: conta clientes de baseFilteredClients (ignora filtro de cidade/bairro)
+- Bairro: conta clientes já filtrados por cidade (comportamento atual de availableNeighborhoods)
 
-## 📋 Ajustes Necessários no `AllowedVisitDatesManager.tsx`
 
-### 1. **Estados (adicionar)**
-```typescript
-// Linha ~18, adicionar junto com cities:
-const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
+================================================================================
+PASSO 1 — Substituir availableCities (linha 720)
+================================================================================
 
-// Linha ~22, adicionar no formSelection:
-const formSelection = useState({
-  cities: [] as string[],
-  neighborhoods: [] as string[], // ← NOVO
-  days: [] as string[],
-});
+Trocar o memo atual por um que retorna objetos com contagem.
+A base é baseFilteredClients — todos os outros filtros já foram aplicados lá,
+exceto cidade e bairro (que ficam em availableClients). Isso garante que a
+contagem se adapta a busca, valor, status de visita e vencimento.
 
-// Linha ~28, adicionar no dropdownsOpen:
-const dropdownsOpen = useState({
-  city: false,
-  neighborhood: false, // ← NOVO
-  day: false,
-});
-
-// Linha ~35, adicionar no filters:
-const filters = useState({
-  collector: "all" as string,
-  calendarCity: "all" as string,
-  calendarNeighborhood: "all" as string, // ← NOVO
-  calendarCollector: "all" as string,
-});
-```
-
-### 2. **Refs (adicionar)**
-```typescript
-// Linha ~54, adicionar:
-const neighborhoodDropdownRef = useRef<HTMLDivElement>(null);
-```
-
-### 3. **UseEffect para Carregar Bairros**
-```typescript
-// Adicionar após o useEffect que carrega cidades (linha ~162):
-useEffect(() => {
-  if (collections && formSelection.cities.length > 0) {
-    // Buscar bairros das cidades selecionadas
-    const neighborhoodsFromCollections = collections
-      .filter((c) => formSelection.cities.includes(c.cidade))
-      .map((c) => c.bairro)
-      .filter(Boolean) as string[];
-
-    // Bairros das datas permitidas
-    const neighborhoodsFromAllowedDates = allowedDates
-      .filter((d) => formSelection.cities.includes(d.city))
-      .map((d) => d.neighborhood)
-      .filter(Boolean) as string[];
-
-    const uniqueNeighborhoods = [
-      ...new Set([...neighborhoodsFromCollections, ...neighborhoodsFromAllowedDates]),
+  // ANTES
+  const availableCities = React.useMemo(() => {
+    const cities = [
+      ...new Set(baseFilteredClients.map((client) => client.city)),
     ];
+    return cities.sort();
+  }, [baseFilteredClients]);
 
-    uniqueNeighborhoods.sort((a, b) => a.localeCompare(b, "pt-BR"));
-    setNeighborhoods(uniqueNeighborhoods);
-  } else {
-    setNeighborhoods([]);
-  }
-}, [collections, allowedDates, formSelection.cities]);
-```
-
-### 4. **Query no Supabase (modificar)**
-```typescript
-// Linha ~136, modificar para incluir neighborhood:
-const { data, error } = await supabase
-  .from("allowed_visit_dates")
-  .select("*")
-  .order("city", { ascending: true })
-  .order("neighborhood", { ascending: true }) // ← ADICIONAR
-  .order("allowed_date", { ascending: true });
-```
-
-### 5. **Função handleSubmit (modificar)**
-```typescript
-// Modificar para incluir neighborhood ao salvar:
-const handleSubmit = async () => {
-  // ... validações existentes ...
-  
-  const insertData = formSelection.cities.flatMap((city) =>
-    formSelection.days.flatMap((day) => {
-      // Se houver bairros selecionados, criar para cada bairro
-      if (formSelection.neighborhoods.length > 0) {
-        return formSelection.neighborhoods.map((neighborhood) => ({
-          city,
-          neighborhood, // ← NOVO
-          allowed_date: parseInt(day),
-          collector_id: filters.collector === "all" ? null : filters.collector,
-        }));
-      } else {
-        // Sem bairro selecionado = cidade inteira
-        return {
-          city,
-          neighborhood: null, // ← NOVO
-          allowed_date: parseInt(day),
-          collector_id: filters.collector === "all" ? null : filters.collector,
-        };
-      }
-    })
-  );
-
-  // ... resto da função ...
-};
-```
-
-### 6. **Dropdown de Bairros na UI (adicionar)**
-```typescript
-// Adicionar após o dropdown de cidades (linha ~XXX):
-{/* Dropdown de Bairros */}
-{formSelection.cities.length > 0 && (
-  <div ref={neighborhoodDropdownRef}>
-    <label className="block text-sm font-medium text-gray-700 mb-2">
-      Bairros (Opcional)
-    </label>
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() =>
-          setDropdownsOpen((prev) => ({
-            ...prev,
-            neighborhood: !prev.neighborhood,
-          }))
-        }
-        className="w-full px-4 py-2 text-left border border-gray-300 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        {formSelection.neighborhoods.length > 0
-          ? `${formSelection.neighborhoods.length} bairro(s) selecionado(s)`
-          : "Selecione bairros (ou deixe vazio para cidade inteira)"}
-      </button>
-
-      {dropdownsOpen.neighborhood && (
-        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-          {neighborhoods.map((neighborhood) => (
-            <label
-              key={neighborhood}
-              className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
-            >
-              <input
-                type="checkbox"
-                checked={formSelection.neighborhoods.includes(neighborhood)}
-                onChange={() => handleToggleNeighborhood(neighborhood)}
-                className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <span className="text-sm">{neighborhood}</span>
-            </label>
-          ))}
-        </div>
-      )}
-    </div>
-  </div>
-)}
-```
-
-### 7. **Função handleToggleNeighborhood (adicionar)**
-```typescript
-const handleToggleNeighborhood = (neighborhood: string) => {
-  setFormSelection((prev) => {
-    if (prev.neighborhoods.includes(neighborhood)) {
-      return {
-        ...prev,
-        neighborhoods: prev.neighborhoods.filter((n) => n !== neighborhood),
-      };
-    } else {
-      return {
-        ...prev,
-        neighborhoods: [...prev.neighborhoods, neighborhood],
-      };
+  // DEPOIS
+  const availableCities = React.useMemo(() => {
+    const countMap = new Map<string, number>();
+    for (const client of baseFilteredClients) {
+      countMap.set(client.city, (countMap.get(client.city) ?? 0) + 1);
     }
-  });
-};
-```
+    return [...countMap.entries()]
+      .map(([city, count]) => ({ city, count }))
+      .sort((a, b) => a.city.localeCompare(b.city));
+  }, [baseFilteredClients]);
 
-### 8. **Agrupamento por Cidade E Bairro (modificar)**
-```typescript
-// Modificar o useMemo que agrupa as datas (linha ~XXX):
-const groupedByCity = useMemo(() => {
-  const groups = new Map<string, Map<string | null, AllowedVisitDate[]>>();
 
-  filteredAllowedDates.forEach((date) => {
-    const city = date.city;
-    const neighborhood = date.neighborhood || null;
+================================================================================
+PASSO 2 — Substituir availableNeighborhoods (linha 727)
+================================================================================
 
-    if (!groups.has(city)) {
-      groups.set(city, new Map());
+Mesma lógica: retornar objetos com contagem.
+Já filtra por cidade selecionada (comportamento atual mantido).
+
+  // ANTES
+  const availableNeighborhoods = React.useMemo(() => {
+    let clients = baseFilteredClients;
+    if (filters.city.length > 0) {
+      clients = clients.filter((client) => filters.city.includes(client.city));
     }
+    const neighborhoods = [
+      ...new Set(clients.map((client) => client.neighborhood)),
+    ];
+    return neighborhoods.sort();
+  }, [baseFilteredClients, filters.city]);
 
-    const cityGroup = groups.get(city)!;
-    if (!cityGroup.has(neighborhood)) {
-      cityGroup.set(neighborhood, []);
+  // DEPOIS
+  const availableNeighborhoods = React.useMemo(() => {
+    let clients = baseFilteredClients;
+    if (filters.city.length > 0) {
+      clients = clients.filter((client) => filters.city.includes(client.city));
     }
+    const countMap = new Map<string, number>();
+    for (const client of clients) {
+      countMap.set(client.neighborhood, (countMap.get(client.neighborhood) ?? 0) + 1);
+    }
+    return [...countMap.entries()]
+      .map(([neighborhood, count]) => ({ neighborhood, count }))
+      .sort((a, b) => a.neighborhood.localeCompare(b.neighborhood));
+  }, [baseFilteredClients, filters.city]);
 
-    cityGroup.get(neighborhood)!.push(date);
-  });
 
-  return groups;
-}, [filteredAllowedDates]);
-```
+================================================================================
+PASSO 3 — Atualizar o render do dropdown Cidade (linha 3578)
+================================================================================
 
-### 9. **Renderização da Tabela (modificar)**
-```typescript
-// Modificar para mostrar hierarquia Cidade → Bairro → Dias:
-{Array.from(groupedByCity.entries()).map(([city, neighborhoodsMap]) => (
-  <div key={city} className="border-b last:border-b-0">
-    <div
-      className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50"
-      onClick={() => toggleCityExpansion(city)}
+  // ANTES
+  {availableCities.map((city) => (
+    <label
+      key={city}
+      className="flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
     >
-      <div className="flex items-center gap-2">
-        <ChevronDown
-          className={`h-4 w-4 transition-transform ${
-            expandedCities.has(city) ? "rotate-180" : ""
-          }`}
+      <input
+        id={`city-filter-${city}`}
+        type="checkbox"
+        checked={filters.city.includes(city)}
+        onChange={() => handleCityFilterChange(city)}
+        className="mr-2"
+      />
+      {city}
+    </label>
+  ))}
+
+  // DEPOIS
+  {availableCities.map(({ city, count }) => (
+    <label
+      key={city}
+      className="flex items-center justify-between px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+    >
+      <div className="flex items-center">
+        <input
+          id={`city-filter-${city}`}
+          type="checkbox"
+          checked={filters.city.includes(city)}
+          onChange={() => handleCityFilterChange(city)}
+          className="mr-2"
         />
-        <span className="font-medium">{city}</span>
-        <span className="text-xs text-gray-500">
-          ({Array.from(neighborhoodsMap.values()).reduce((sum, arr) => sum + arr.length, 0)} configurações)
-        </span>
+        {city}
       </div>
-    </div>
+      <span className="ml-3 text-xs text-gray-400 font-medium">{count}</span>
+    </label>
+  ))}
 
-    {expandedCities.has(city) && (
-      <div className="pl-8 pb-4">
-        {Array.from(neighborhoodsMap.entries()).map(([neighborhood, dates]) => (
-          <div key={neighborhood || 'cidade-inteira'} className="mb-3">
-            <div className="text-sm font-medium text-gray-700 mb-2">
-              {neighborhood ? `📍 ${neighborhood}` : "🏙️ Cidade Inteira"}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {dates.map((date) => (
-                <span
-                  key={date.id}
-                  className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
-                >
-                  Dia {date.allowed_date}
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
-))}
-```
 
-### 10. **Filtros do Calendário (adicionar)**
-```typescript
-// Linha ~1117, adicionar filtro de bairro:
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-2">
-    Filtrar por Bairro
-  </label>
-  <select
-    value={filters.calendarNeighborhood}
-    onChange={(e) => {
-      setFilters((prev) => ({
-        ...prev,
-        calendarNeighborhood: e.target.value,
-      }));
-    }}
-    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-    disabled={filters.calendarCity === "all"}
-  >
-    <option value="all">Todos os bairros</option>
-    {calendarNeighborhoods.map((neighborhood) => (
-      <option key={neighborhood} value={neighborhood}>
+================================================================================
+PASSO 4 — Atualizar o render do dropdown Bairro (linha 3621)
+================================================================================
+
+  // ANTES
+  {availableNeighborhoods.map((neighborhood) => (
+    <label
+      key={neighborhood}
+      className="flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+    >
+      <input
+        id={`neighborhood-filter-${neighborhood}`}
+        type="checkbox"
+        checked={filters.neighborhood.includes(neighborhood)}
+        onChange={() => handleNeighborhoodFilterChange(neighborhood)}
+        className="mr-2"
+      />
+      {neighborhood}
+    </label>
+  ))}
+
+  // DEPOIS
+  {availableNeighborhoods.map(({ neighborhood, count }) => (
+    <label
+      key={neighborhood}
+      className="flex items-center justify-between px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+    >
+      <div className="flex items-center">
+        <input
+          id={`neighborhood-filter-${neighborhood}`}
+          type="checkbox"
+          checked={filters.neighborhood.includes(neighborhood)}
+          onChange={() => handleNeighborhoodFilterChange(neighborhood)}
+          className="mr-2"
+        />
         {neighborhood}
-      </option>
-    ))}
-  </select>
-</div>
-```
+      </div>
+      <span className="ml-3 text-xs text-gray-400 font-medium">{count}</span>
+    </label>
+  ))}
 
-### 11. **Tooltip do Calendário (modificar)**
-```typescript
-// Linha ~1233, modificar para incluir bairro:
-let tooltipText = `Dia ${day}`;
-if (isAllowed && dayInfo) {
-  const citiesWithNeighborhoods = Array.from(dayInfo).map((entry) => {
-    const [city, neighborhood] = entry.split('|');
-    return neighborhood ? `${city} - ${neighborhood}` : city;
-  });
-  tooltipText = `Dia ${day}\n${citiesWithNeighborhoods.join("\n")}`;
-}
-```
 
----
+================================================================================
+CHECKLIST
+================================================================================
 
-## 📋 Ajustes no `database_types.ts`
+[ ] availableCities memo     → retorna { city, count }[]
+[ ] availableNeighborhoods   → retorna { neighborhood, count }[]
+[ ] Render cidade            → destructure { city, count }, layout justify-between
+[ ] Render bairro            → destructure { neighborhood, count }, layout justify-between
 
-```typescript
-export interface AllowedVisitDate {
-  id: string;
-  city: string;
-  neighborhood?: string | null; // ← ADICIONAR
-  allowed_date: number;
-  collector_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
-```
 
----
+================================================================================
+NOTA SOBRE A CONTAGEM
+================================================================================
 
-## 🎯 Resumo das Modificações
+A contagem usa baseFilteredClients como base — que já aplica:
+  - searchTerm (busca por nome/documento/endereço)
+  - filters.minValue / maxValue
+  - filters.visitStatus
+  - filters.dueDateStart / dueDateEnd
 
-| Componente | O que muda |
-|------------|------------|
-| **Estados** | Adicionar `neighborhoods`, `formSelection.neighborhoods`, `dropdownsOpen.neighborhood`, `filters.calendarNeighborhood` |
-| **Refs** | Adicionar `neighborhoodDropdownRef` |
-| **UseEffects** | Carregar bairros baseado nas cidades selecionadas |
-| **Queries** | Incluir `neighborhood` no SELECT e ORDER BY |
-| **Formulário** | Adicionar dropdown de bairros (opcional, após selecionar cidade) |
-| **Submit** | Salvar com `neighborhood` preenchido ou NULL |
-| **Agrupamento** | Agrupar por Cidade → Bairro → Dias |
-| **Renderização** | Mostrar hierarquia visual: Cidade > Bairro > Dias |
-| **Calendário** | Filtro adicional por bairro + tooltip mostrando cidade-bairro |
-| **Delete** | Permitir deletar cidade inteira OU bairros específicos |
+Não aplica filtro de cidade/bairro propositalmente:
+  - Se aplicasse, cidades não selecionadas mostrariam 0 e sumiriam
+  - Bairro já respeita a cidade selecionada (comportamento correto mantido)
 
-Essa estrutura mantém **100% de retrocompatibilidade** enquanto adiciona a granularidade necessária! 🚀
+Isso é o comportamento padrão de filtros multi-seleção (ex: e-commerces).
