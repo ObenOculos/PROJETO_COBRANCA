@@ -398,22 +398,24 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     }
 
     if (filters.visitStatus) {
+      const today = new Date();
       filteredClients = filteredClients.filter((client) => {
         const clientVisits = scheduledVisits
           .filter(
             (visit) =>
               visit.clientDocument === client.document &&
-              visit.status === "realizada",
+              (visit.status === "realizada" || visit.status === "nao_encontrado"),
           )
           .sort((a, b) => {
-            return (
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            );
+            const dateA = a.dataVisitaRealizada || a.createdAt;
+            const dateB = b.dataVisitaRealizada || b.createdAt;
+            return new Date(dateB).getTime() - new Date(dateA).getTime();
           });
 
-        const today = new Date();
         const daysSinceLastVisit = calculateDaysSinceLastVisit(
-          clientVisits.length > 0 ? clientVisits[0].createdAt : "",
+          clientVisits.length > 0
+            ? (clientVisits[0].dataVisitaRealizada || clientVisits[0].createdAt)
+            : "",
           today,
         );
 
@@ -1897,15 +1899,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           (visit.status === "realizada" || visit.status === "nao_encontrado"),
       )
       .sort((a, b) => {
-        // Ordenar por created_at (mais recente primeiro)
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+        const dateA = a.dataVisitaRealizada || a.createdAt;
+        const dateB = b.dataVisitaRealizada || b.createdAt;
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
       });
 
     const today = new Date();
     const daysSinceLastVisit = calculateDaysSinceLastVisit(
-      clientVisits.length > 0 ? clientVisits[0].createdAt : "",
+      clientVisits.length > 0
+        ? (clientVisits[0].dataVisitaRealizada || clientVisits[0].createdAt)
+        : "",
       today,
     );
 
