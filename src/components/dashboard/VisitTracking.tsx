@@ -470,6 +470,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       nao_encontrado: "Não Encontrado",
       cancelamento_solicitado: "Cancelamento Solicitado",
       pending_sync: "Pendente",
+      reagendada: "Reagendada",
     };
     return statusConfig[status] || "Agendada";
   };
@@ -501,6 +502,11 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
         bg: "bg-gray-100",
         text: "text-gray-800",
         label: "Pendente",
+      },
+      reagendada: {
+        bg: "bg-orange-100",
+        text: "text-orange-800",
+        label: "Reagendada",
       },
     };
 
@@ -765,6 +771,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       <option value="realizada">Realizada</option>
                       <option value="cancelada">Cancelada</option>
                       <option value="nao_encontrado">Não Encontrado</option>
+                      <option value="reagendada">Reagendada</option>
                     </select>
                   </div>
 

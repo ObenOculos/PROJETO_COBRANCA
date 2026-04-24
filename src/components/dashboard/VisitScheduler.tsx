@@ -67,7 +67,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
   // ✅ CORREÇÃO: Refs para prevenir execuções duplicadas
   const prefetchInProgressRef = useRef(false);
-  const prefetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const prefetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [selectedCollectorId] = useState<string | null>(collectorId || null);
 
@@ -1450,6 +1450,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   };
 
   const getStatusLabel = (visit: ScheduledVisit) => {
+    // Verificar se é uma visita reagendada (tem rescheduledTo)
+    if (visit.rescheduledTo) {
+      return `Reagendada (${visit.rescheduleCount || 0}x)`;
+    }
+
     // Verificar se é uma visita reagendada
     if (visit.status === "agendada" && (visit.rescheduleCount || 0) > 0) {
       const count = visit.rescheduleCount || 0;
@@ -1469,12 +1474,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         return "Cancelamento Solicitado";
       case "pending_sync":
         return "Pendente";
+      case "reagendada":
+        return "Reagendada";
       default:
         return visit.status;
     }
   };
 
   const getStatusColor = (visit: ScheduledVisit) => {
+    // Verificar se é uma visita reagendada (tem rescheduledTo)
+    if (visit.rescheduledTo) {
+      return "bg-orange-100 text-orange-800";
+    }
+
     // Verificar se é uma visita agendada pelo gerente
     if (visit.status === "agendada" && visit.scheduled_by_manager_id) {
       return "bg-yellow-100 text-yellow-800";
@@ -1498,6 +1510,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         return "bg-yellow-100 text-yellow-800 border border-yellow-300";
       case "pending_sync":
         return "bg-gray-100 text-gray-800 border border-gray-300";
+      case "reagendada":
+        return "bg-orange-100 text-orange-800";
       default:
         return "bg-gray-100 text-gray-800";
     }

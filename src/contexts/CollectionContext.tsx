@@ -166,6 +166,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             cancellationRejectedAt: visit.cancellation_rejected_at,
             cancellationRejectionReason: visit.cancellation_rejection_reason,
             scheduled_by_manager_id: visit.scheduled_by_manager_id, // Add this line
+            rescheduleCount: visit.reschedule_count,
+            rescheduledTo: visit.rescheduled_to,
           }),
         );
 
@@ -2911,6 +2913,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         cancellationRejectedAt: data.cancellation_rejected_at,
         cancellationRejectionReason: data.cancellation_rejection_reason,
         rescheduleCount: data.reschedule_count, // Include rescheduleCount
+        rescheduledTo: data.rescheduled_to,
       };
 
       // Update local state
@@ -3610,40 +3613,101 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         updatedNotes = `${formattedExistingNotes}\n${rescheduleNote}`;
       }
 
-      // Tentar atualizar no Supabase
-      const updateData = {
-        scheduled_date: newDate,
-        scheduled_time: newTime || null,
+      // Em vez de atualizar a visita existente, vamos:
+      // 1. Marcar a visita original como "reagendada"
+      // 2. Criar uma nova visita com a nova data
+
+      // Primeiro, atualizar a visita original para status "reagendada"
+      const originalUpdateData = {
+        status: "reagendada",
+        rescheduled_to: newDate, // Campo adicionado na migração
         notes: updatedNotes,
         updated_at: new Date().toISOString(),
-        reschedule_count: newRescheduleCount, // Use the freshly incremented count
+        reschedule_count: newRescheduleCount,
       };
 
-      const { error } = await supabase
+      const { error: originalError } = await supabase
         .from("scheduled_visits")
-        .update(updateData)
+        .update(originalUpdateData)
         .eq("id", visitId);
 
-      if (error) {
-        console.error("Erro ao reagendar visita no Supabase:", error);
-        // Continuar com atualização local mesmo se falhar no Supabase
+      if (originalError) {
+        console.error("Erro ao marcar visita original como reagendada:", originalError);
+        throw originalError;
       }
 
-      // Atualizar estado local
-      setScheduledVisits((prev) =>
-        prev.map((visit) =>
+      // Agora, criar uma nova visita com a nova data
+      const newVisitData = {
+        collector_id: currentVisit.collectorId,
+        client_document: currentVisit.clientDocument,
+        client_name: currentVisit.clientName,
+        scheduled_date: newDate,
+        scheduled_time: newTime || null,
+        status: "agendada",
+        notes: `Visita reagendada de ${fromDateTime}${reason ? `. Motivo: ${reason}` : ""}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        reschedule_count: 0, // Nova visita começa com 0
+        scheduled_by_manager_id: currentVisit.scheduled_by_manager_id,
+        // Copiar dados do cliente
+        client_address: currentVisit.clientAddress,
+        client_number: currentVisit.clientNumber,
+        client_neighborhood: currentVisit.clientNeighborhood,
+        client_city: currentVisit.clientCity,
+        total_pending_value: currentVisit.totalPendingValue,
+        overdue_count: currentVisit.overdueCount,
+      };
+
+      const { data: newVisit, error: newVisitError } = await supabase
+        .from("scheduled_visits")
+        .insert(newVisitData)
+        .select()
+        .single();
+
+      if (newVisitError) {
+        console.error("Erro ao criar nova visita reagendada:", newVisitError);
+        throw newVisitError;
+      }
+
+      // Atualizar estado local: marcar original como reagendada e adicionar nova
+      setScheduledVisits((prev) => {
+        const updated = prev.map((visit) =>
           visit.id === visitId
             ? {
                 ...visit,
-                scheduledDate: newDate,
-                scheduledTime: newTime || visit.scheduledTime,
+                status: "reagendada" as const,
+                rescheduledTo: newDate,
                 notes: updatedNotes,
                 updatedAt: new Date().toISOString(),
-                rescheduleCount: newRescheduleCount, // Use the freshly incremented count
+                rescheduleCount: newRescheduleCount,
               }
             : visit,
-        ),
-      );
+        );
+        // Adicionar a nova visita
+        updated.push({
+          id: newVisit.id,
+          collectorId: newVisit.collector_id,
+          clientDocument: newVisit.client_document,
+          clientName: newVisit.client_name,
+          scheduledDate: newVisit.scheduled_date,
+          scheduledTime: newVisit.scheduled_time,
+          status: newVisit.status,
+          notes: newVisit.notes,
+          createdAt: newVisit.created_at,
+          updatedAt: newVisit.updated_at,
+          rescheduleCount: newVisit.reschedule_count,
+          scheduled_by_manager_id: newVisit.scheduled_by_manager_id,
+          clientAddress: newVisit.client_address,
+          clientNumber: newVisit.client_number,
+          clientNeighborhood: newVisit.client_neighborhood,
+          clientCity: newVisit.client_city,
+          totalPendingValue: newVisit.total_pending_value,
+          overdueCount: newVisit.overdue_count,
+        });
+        console.log("Estado local atualizado. Visitas:", updated.length);
+        console.log("Estado local atualizado. Visitas:", updated.length);
+        return updated;
+      });
 
       // Invalidate cache
       invalidateVisits();

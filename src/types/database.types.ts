@@ -517,6 +517,7 @@ export type Database = {
           notes: string | null
           overdue_count: number | null
           reschedule_count: number | null
+          rescheduled_to: string | null
           scheduled_by_manager_id: string | null
           scheduled_date: string
           scheduled_time: string | null
@@ -544,6 +545,7 @@ export type Database = {
           notes?: string | null
           overdue_count?: number | null
           reschedule_count?: number | null
+          rescheduled_to?: string | null
           scheduled_by_manager_id?: string | null
           scheduled_date: string
           scheduled_time?: string | null
@@ -571,6 +573,7 @@ export type Database = {
           notes?: string | null
           overdue_count?: number | null
           reschedule_count?: number | null
+          rescheduled_to?: string | null
           scheduled_by_manager_id?: string | null
           scheduled_date?: string
           scheduled_time?: string | null

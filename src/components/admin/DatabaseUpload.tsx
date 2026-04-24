@@ -55,6 +55,24 @@ const validateSituacao = (value: string | undefined | null): string | null => {
   return null;
 };
 
+const parseNullableNumber = (value: string | undefined | null): number | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const trimmedValue = value.toString().trim();
+  if (trimmedValue === "") {
+    return null;
+  }
+
+  const normalizedValue = trimmedValue
+    .replace(/[^\d,.-]/g, "")
+    .replace(/,/g, ".");
+  const parsedNumber = Number(normalizedValue);
+
+  return Number.isNaN(parsedNumber) ? null : parsedNumber;
+};
+
 const DatabaseUpload: React.FC = () => {
   const { refreshData } = useCollection();
   const [statusFile, setStatusFile] = useState<File | null>(null);
@@ -553,6 +571,12 @@ const DatabaseUpload: React.FC = () => {
       const situacao = row.situacao || row["situacao"];
       const data_de_recebimento =
         row.data_de_recebimento || row["data_de_recebimento"];
+      const valor_reajustado =
+        row.valor_reajustado || row["valor_reajustado"];
+      const multa = row.multa || row["multa"];
+      const juros_por_dia = row.juros_por_dia || row["juros_por_dia"];
+      const multa_aplicada = row.multa_aplicada || row["multa_aplicada"];
+      const juros_aplicado = row.juros_aplicado || row["juros_aplicado"];
       const valor_recebido = row.valor_recebido || row["valor_recebido"];
       const desconto = row.desconto || row["desconto"];
 
@@ -563,26 +587,69 @@ const DatabaseUpload: React.FC = () => {
         if (status) updateObj.status = status;
         if (data_de_recebimento)
           updateObj.data_de_recebimento = data_de_recebimento;
+
+        const parsedValorReajustado = parseNullableNumber(valor_reajustado);
+        if (valor_reajustado !== undefined && valor_reajustado !== null) {
+          if (valor_reajustado.toString().trim() === "") {
+            updateObj.valor_reajustado = null;
+          } else if (parsedValorReajustado !== null) {
+            updateObj.valor_reajustado = parsedValorReajustado;
+          }
+        }
+
+        const parsedMulta = parseNullableNumber(multa);
+        if (multa !== undefined && multa !== null) {
+          if (multa.toString().trim() === "") {
+            updateObj.multa = null;
+          } else if (parsedMulta !== null) {
+            updateObj.multa = parsedMulta;
+          }
+        }
+
+        const parsedJurosPorDia = parseNullableNumber(juros_por_dia);
+        if (juros_por_dia !== undefined && juros_por_dia !== null) {
+          if (juros_por_dia.toString().trim() === "") {
+            updateObj.juros_por_dia = null;
+          } else if (parsedJurosPorDia !== null) {
+            updateObj.juros_por_dia = parsedJurosPorDia;
+          }
+        }
+
+        const parsedMultaAplicada = parseNullableNumber(multa_aplicada);
+        if (multa_aplicada !== undefined && multa_aplicada !== null) {
+          if (multa_aplicada.toString().trim() === "") {
+            updateObj.multa_aplicada = null;
+          } else if (parsedMultaAplicada !== null) {
+            updateObj.multa_aplicada = parsedMultaAplicada;
+          }
+        }
+
+        const parsedJurosAplicado = parseNullableNumber(juros_aplicado);
+        if (juros_aplicado !== undefined && juros_aplicado !== null) {
+          if (juros_aplicado.toString().trim() === "") {
+            updateObj.juros_aplicado = null;
+          } else if (parsedJurosAplicado !== null) {
+            updateObj.juros_aplicado = parsedJurosAplicado;
+          }
+        }
+
         if (valor_recebido !== undefined && valor_recebido !== null) {
-          if (valor_recebido.trim() === "") {
+          if (valor_recebido.toString().trim() === "") {
             updateObj.valor_recebido = null;
           } else {
-            const valor = Number(
-              valor_recebido.replace(/[^\d,]/g, "").replace(",", "."),
-            );
-            if (!isNaN(valor)) {
+            const valor = parseNullableNumber(valor_recebido);
+            if (valor !== null) {
               updateObj.valor_recebido = valor;
             }
           }
         }
+
         if (desconto !== undefined && desconto !== null) {
-          if (desconto.trim() === "") {
+          if (desconto.toString().trim() === "") {
             updateObj.desconto = null;
           } else {
-            const valor = Number(
-              desconto.replace(/[^\d,]/g, "").replace(",", "."),
-            );
-            if (!isNaN(valor)) {
+            const valor = parseNullableNumber(desconto);
+            if (valor !== null) {
               updateObj.desconto = valor;
             }
           }

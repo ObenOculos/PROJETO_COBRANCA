@@ -67,7 +67,8 @@ export interface ScheduledVisit {
     | "cancelada"
     | "nao_encontrado"
     | "cancelamento_solicitado"
-    | "pending_sync";
+    | "pending_sync"
+    | "reagendada";
   notes?: string;
   createdAt: string;
   updatedAt?: string;
@@ -89,6 +90,7 @@ export interface ScheduledVisit {
   cancellationRejectionReason?: string;
   rescheduleCount?: number;
   scheduled_by_manager_id?: string; // Added for manager scheduling
+  rescheduledTo?: string; // Data para onde foi reagendada (YYYY-MM-DD)
 }
 
 export interface AllowedVisitDate {
