@@ -124,7 +124,6 @@ export const ClientAssignment = React.memo(() => {
   const [filterDateTo, setFilterDateTo] = useState<string>("");
   const [includeWithoutDate, setIncludeWithoutDate] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [showInternalOnly, setShowInternalOnly] = useState(false); // Novo filtro rápido para cobrança interna
 
   // Modal states
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -302,12 +301,6 @@ export const ClientAssignment = React.memo(() => {
         onClear: () => setSearchTerm(""),
       });
     }
-    if (showInternalOnly) {
-      chips.push({
-        label: "Apenas Cobrança Interna",
-        onClear: () => setShowInternalOnly(false),
-      });
-    }
     if (filterCollector) {
       const collector = collectors.find((c) => c.id === filterCollector);
       chips.push({
@@ -380,16 +373,11 @@ export const ClientAssignment = React.memo(() => {
     filterDateFrom,
     filterDateTo,
     includeWithoutDate,
-    showInternalOnly,
     collectors,
   ]);
 
   const filteredClients = useMemo(() => {
     const filtered = clientsData.filter((client) => {
-      // Filtro rápido para cobrança interna
-      const matchesInternalOnly = !showInternalOnly ||
-        client.collections.some((c) => c.situacao === "Cobrança Interna");
-
       const matchesSearch =
         client.cliente?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.documento?.includes(searchTerm) ||
@@ -490,7 +478,6 @@ export const ClientAssignment = React.memo(() => {
       })();
 
       return (
-        matchesInternalOnly &&
         matchesSearch &&
         matchesCollector &&
         matchesStatus &&
@@ -515,7 +502,6 @@ export const ClientAssignment = React.memo(() => {
     filterDateFrom,
     filterDateTo,
     includeWithoutDate,
-    showInternalOnly,
   ]);
 
   useEffect(() => {
@@ -1074,20 +1060,6 @@ export const ClientAssignment = React.memo(() => {
               />
             </div>
 
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="internalOnly"
-                checked={showInternalOnly}
-                onChange={(e) => setShowInternalOnly(e.target.checked)}
-                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-              />
-              <label htmlFor="internalOnly" className="flex items-center text-sm font-medium text-gray-700">
-                <Building2 className="h-4 w-4 mr-1 text-purple-600" />
-                Apenas Cobrança Interna
-              </label>
-            </div>
-
             <div>
               <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                 <Users className="h-4 w-4 mr-1" />
@@ -1216,7 +1188,6 @@ export const ClientAssignment = React.memo(() => {
                   setFilterDateFrom("");
                   setFilterDateTo("");
                   setIncludeWithoutDate(false);
-                  setShowInternalOnly(false);
                   setCurrentPage(1);
                 }}
                 className="w-full px-4 py-2 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition-colors text-sm font-medium"

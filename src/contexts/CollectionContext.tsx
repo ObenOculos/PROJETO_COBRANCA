@@ -33,6 +33,7 @@ import {
   userCache,
   collectionsCache,
 } from "../utils/cache";
+import { calculateOverdueDays } from "../utils/formatters";
 import {
   useRealtimeCacheInvalidation,
   useOfflineSyncCacheInvalidation,
@@ -1731,9 +1732,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const totalPending = collections.filter(
         (c) => c.status?.toLowerCase() === "pendente",
       ).length;
-      const totalOverdue = collections.filter(
-        (c) => c.dias_em_atraso && c.dias_em_atraso > 0,
-      ).length;
+      const totalOverdue = collections.filter((c) => {
+        const isPending = (c.valor_original || 0) - (c.valor_recebido || 0) > 0.01;
+        return isPending && calculateOverdueDays(c.data_vencimento) > 0;
+      }).length;
       const totalReceived = collections.filter(
         (c) => c.status?.toLowerCase() === "recebido" || c.valor_recebido > 0,
       ).length;
@@ -2677,78 +2679,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         const clientesMap = new Map(
           (clientesData || []).map((c) => [c.documento, c]),
         );
-
-        // Função auxiliar para calcular dias de atraso
-        const calculateOverdueDays = (dueDateStr: string): number => {
-          if (!dueDateStr) return 0;
-
-          try {
-            let dueDate: Date;
-            const cleanDateStr = dueDateStr.trim();
-
-            if (cleanDateStr.includes("/")) {
-              const parts = cleanDateStr.split("/");
-              if (parts.length === 3) {
-                const [day, month, year] = parts;
-                const dayNum = parseInt(day, 10);
-                const monthNum = parseInt(month, 10);
-                const yearNum = parseInt(year, 10);
-
-                if (
-                  dayNum >= 1 &&
-                  dayNum <= 31 &&
-                  monthNum >= 1 &&
-                  monthNum <= 12 &&
-                  yearNum >= 1900
-                ) {
-                  dueDate = new Date(yearNum, monthNum - 1, dayNum);
-                } else {
-                  return 0;
-                }
-              } else {
-                return 0;
-              }
-            } else if (cleanDateStr.includes("-")) {
-              const parts = cleanDateStr.split("-");
-              if (parts.length === 3) {
-                if (parts[0].length === 4) {
-                  dueDate = new Date(cleanDateStr);
-                } else {
-                  const [month, day, year] = parts;
-                  dueDate = new Date(
-                    parseInt(year, 10),
-                    parseInt(month, 10) - 1,
-                    parseInt(day, 10),
-                  );
-                }
-              } else {
-                dueDate = new Date(cleanDateStr);
-              }
-            } else {
-              dueDate = new Date(cleanDateStr);
-            }
-
-            if (isNaN(dueDate.getTime())) {
-              return 0;
-            }
-
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            dueDate.setHours(0, 0, 0, 0);
-
-            const diffTime = today.getTime() - dueDate.getTime();
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-            return Math.max(0, diffDays);
-          } catch (error) {
-            console.error(
-              "Erro ao calcular dias em atraso:",
-              error,
-              dueDateStr,
-            );
-            return 0;
-          }
-        };
 
         const newEntries = new Map();
         const clientGroups = getClientGroups();

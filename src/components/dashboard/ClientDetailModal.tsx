@@ -14,7 +14,7 @@ import {
   Clock,
 } from "lucide-react";
 import { ClientGroup, UserType } from "../../types";
-import { formatCurrency } from "../../utils/formatters";
+import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
@@ -928,8 +928,12 @@ const handleEditPaymentClick = () => {
                                     installment.status
                                       ?.toLowerCase()
                                       .includes("pago") || false;
-                                  const isOverdue =
-                                    (installment.dias_em_atraso ?? 0) > 0;
+                                  const actualAtraso = !isPaid
+                                    ? calculateOverdueDays(
+                                        installment.data_vencimento,
+                                      )
+                                    : 0;
+                                  const isOverdue = actualAtraso > 0;
 
                                   // Usar valor_original se valor_reajustado for 0
                                   const installmentValue =
@@ -946,9 +950,7 @@ const handleEditPaymentClick = () => {
                                       <div className="flex items-center gap-2 min-w-0 flex-1">
                                         <InstallmentStatusDot
                                           status={installment.status}
-                                          daysOverdue={
-                                            installment.dias_em_atraso
-                                          }
+                                          daysOverdue={actualAtraso}
                                         />
                                         <div className="min-w-0">
                                           <div className="flex items-center gap-2">
@@ -958,7 +960,7 @@ const handleEditPaymentClick = () => {
                                             {isOverdue && !isPaid && (
                                               <span className="text-xs text-red-600 font-medium">
                                                 {formatDaysOverdue(
-                                                  installment.dias_em_atraso,
+                                                  actualAtraso,
                                                 )}
                                               </span>
                                             )}

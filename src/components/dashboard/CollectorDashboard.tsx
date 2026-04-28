@@ -31,7 +31,7 @@ import RadialApprovalChart from "./RadialApprovalChart";
 import TabTransition from "../common/TabTransition";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { formatCurrency } from "../../utils/formatters";
+import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import { FilterOptions } from "../../types";
 
 import LogContactModal from "./LogContactModal";
@@ -119,7 +119,11 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       let maxAtraso = 0;
       group.sales.forEach((sale: any) => {
         sale.installments.forEach((inst: any) => {
-          if (inst.dias_em_atraso && inst.dias_em_atraso > maxAtraso) maxAtraso = inst.dias_em_atraso;
+          const isPending = (inst.valor_original || 0) - (inst.valor_recebido || 0) > 0.01;
+          if (isPending) {
+            const calculatedAtraso = calculateOverdueDays(inst.data_vencimento);
+            if (calculatedAtraso > maxAtraso) maxAtraso = calculatedAtraso;
+          }
         });
       });
 
@@ -157,8 +161,12 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     
     let critical = 0, high = 0;
     myCollections.forEach(c => {
-      if ((c.dias_em_atraso || 0) > 90) critical++;
-      else if ((c.dias_em_atraso || 0) > 60) high++;
+      const isPending = (c.valor_original || 0) - (c.valor_recebido || 0) > 0.01;
+      if (isPending) {
+        const actualAtraso = calculateOverdueDays(c.data_vencimento);
+        if (actualAtraso > 90) critical++;
+        else if (actualAtraso > 60) high++;
+      }
     });
 
     return { totalClients: filteredClientGroups.length, totalPending, totalReceived, progress: Math.min((totalReceived / targetValue) * 100, 100), targetValue, critical, high };
@@ -262,13 +270,15 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               {paginatedClients.length > 0 ? (
                 paginatedClients.map((group) => {
                   let maxAtraso = 0;
-                    group.sales?.forEach((sale: any) => {
-                      sale?.installments?.forEach((inst: any) => {
-                        if (inst?.dias_em_atraso && inst.dias_em_atraso > maxAtraso) {
-                          maxAtraso = inst.dias_em_atraso;
-                        }
-                      });
+                  group.sales?.forEach((sale: any) => {
+                    sale?.installments?.forEach((inst: any) => {
+                      const isPending = (inst.valor_original || 0) - (inst.valor_recebido || 0) > 0.01;
+                      if (isPending) {
+                        const calculatedAtraso = calculateOverdueDays(inst.data_vencimento);
+                        if (calculatedAtraso > maxAtraso) maxAtraso = calculatedAtraso;
+                      }
                     });
+                  });
                   const lastContact = lastContacts[group.document];
                   return (
                     <tr key={group.clientId} className="group hover:bg-gray-50/80 dark:hover:bg-dark-bg-secondary transition-colors cursor-pointer">

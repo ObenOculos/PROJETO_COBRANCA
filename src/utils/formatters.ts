@@ -245,6 +245,65 @@ export const calculateDaysSinceLastVisit = (
   }
 };
 
+export const calculateOverdueDays = (dueDateStr: string | null | undefined): number => {
+  if (!dueDateStr) return 0;
+
+  try {
+    let dueDate: Date;
+    const cleanDateStr = dueDateStr.toString().trim();
+
+    // Formato brasileiro DD/MM/YYYY
+    if (cleanDateStr.includes("/")) {
+      const parts = cleanDateStr.split("/");
+      if (parts.length === 3) {
+        const [day, month, year] = parts.map(Number);
+        if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+          dueDate = new Date(year, month - 1, day);
+        } else {
+          return 0;
+        }
+      } else {
+        return 0;
+      }
+    } 
+    // Formato ISO YYYY-MM-DD
+    else if (cleanDateStr.includes("-")) {
+      const parts = cleanDateStr.split("-");
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          // ISO format YYYY-MM-DD
+          const [y, m, d] = parts.map(Number);
+          dueDate = new Date(y, m - 1, d);
+        } else {
+          // MM-DD-YYYY or other
+          const [m, d, y] = parts.map(Number);
+          dueDate = new Date(y, m - 1, d);
+        }
+      } else {
+        dueDate = new Date(cleanDateStr);
+      }
+    } else {
+      dueDate = new Date(cleanDateStr);
+    }
+
+    if (isNaN(dueDate.getTime())) {
+      return 0;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    dueDate.setHours(0, 0, 0, 0);
+
+    const diffTime = today.getTime() - dueDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    return Math.max(0, diffDays);
+  } catch (error) {
+    console.error("Erro ao calcular dias em atraso:", error, dueDateStr);
+    return 0;
+  }
+};
+
 export const parseAndFormatDate = (
   dateStr: string | null | undefined,
 ): string => {

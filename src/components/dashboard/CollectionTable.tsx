@@ -35,7 +35,11 @@ import {
   XCircle,
 } from "lucide-react";
 import { Collection, ClientGroup, SaleGroup, UserType } from "../../types";
-import { formatCurrency, parseAndFormatDate } from "../../utils/formatters";
+import {
+  formatCurrency,
+  parseAndFormatDate,
+  calculateOverdueDays,
+} from "../../utils/formatters";
 import CollectionModal from "./CollectionModal";
 import ClientDetailModal from "./ClientDetailModal";
 import SaleDetailsModal from "./SaleDetailsModal";
@@ -288,7 +292,11 @@ export const CollectionTable = React.forwardRef<
         "Data de Lançamento": parseAndFormatDate(c.data_lancamento),
         "Data Vencimento": parseAndFormatDate(c.data_vencimento),
         "Data Recebimento": parseAndFormatDate(c.data_de_recebimento),
-        "Dias em Atraso": c.dias_em_atraso,
+        "Dias em Atraso":
+          c.status?.toLowerCase().includes("pago") ||
+          c.valor_recebido >= c.valor_original
+            ? 0
+            : calculateOverdueDays(c.data_vencimento),
         "Valor Original": c.valor_original,
         "Valor Recebido": c.valor_recebido,
         Status: c.status,
