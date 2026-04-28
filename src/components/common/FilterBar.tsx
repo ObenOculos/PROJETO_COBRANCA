@@ -1,14 +1,15 @@
 import React from "react";
 import { Search, Filter, X } from "lucide-react";
-import { FilterOptions } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { getAllStatuses } from "../../utils/formatters";
 
+import { FilterOptions, UserType } from "../../types";
+
 interface FilterBarProps {
   filters: FilterOptions;
   onFilterChange: (filters: FilterOptions) => void;
-  userType: "manager" | "collector";
+  userType: UserType;
 }
 
 const FilterBar: React.FC<FilterBarProps> = ({
@@ -41,11 +42,13 @@ const FilterBar: React.FC<FilterBarProps> = ({
   }, [filters.search]);
 
   const availableStores = getAvailableStores();
-  const collectors = users.filter((u) => u.type === "collector");
+  const collectors = users.filter(
+    (u) => u.type === "collector" || u.type === "internal_collector",
+  );
 
   // Para cobradores, buscar apenas as lojas dos seus clientes
   const getCollectorStores = () => {
-    if (userType !== "collector" || !user) return availableStores;
+    if (userType === "manager" || !user) return availableStores;
     const myCollections = getCollectorCollections(user.id);
     const stores = Array.from(
       new Set(myCollections.map((c) => c.nome_da_loja).filter(Boolean)),
@@ -61,7 +64,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
   // Para cobradores, buscar apenas as cidades e bairros dos seus clientes
   const getCollectorCities = React.useCallback(() => {
-    if (userType !== "collector" || !user) return [];
+    if (userType === "manager" || !user) return [];
     const myCollections = getCollectorCollections(user.id);
     const cities = Array.from(
       new Set(myCollections.map((c) => c.cidade).filter(Boolean)),
@@ -70,7 +73,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   }, [userType, user, getCollectorCollections]);
 
   const getCollectorNeighborhoods = React.useCallback(() => {
-    if (userType !== "collector" || !user) return [];
+    if (userType === "manager" || !user) return [];
     const myCollections = getCollectorCollections(user.id);
     const neighborhoods = Array.from(
       new Set(myCollections.map((c) => c.bairro).filter(Boolean)),
@@ -485,7 +488,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
             )}
 
             {/* Location Filters for Collectors */}
-            {userType === "collector" && (
+            {(userType === "collector" || userType === "internal_collector") && (
               <>
                 <div
                   className="sm:col-span-2 lg:col-span-1"
@@ -547,7 +550,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
               Filtros Específicos
             </h3>
             {/* Visits Only Filter - Only show for collectors */}
-            {userType === "collector" && (
+            {(userType === "collector" || userType === "internal_collector") && (
               <div
                 className="sm:col-span-2 lg:col-span-3"
                 role="group"

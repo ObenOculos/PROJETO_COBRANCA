@@ -140,7 +140,11 @@ const Header: React.FC<HeaderProps> = ({
                       {user?.name}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-dark-text-secondary capitalize">
-                      {user?.type === "manager" ? "Gerente" : "Cobrador"}
+                      {user?.type === "manager"
+                        ? "Gerente"
+                        : user?.type === "internal_collector"
+                        ? "Cobrança Interna"
+                        : "Cobrador"}
                     </p>
                   </div>
                 </div>

@@ -10,7 +10,7 @@ import {
   Plus,
   Save,
 } from "lucide-react";
-import { Collection } from "../../types";
+import { Collection, UserType } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import {
   formatCurrency,
@@ -20,7 +20,7 @@ import {
 
 interface CollectionModalProps {
   collection: Collection;
-  userType: "manager" | "collector";
+  userType: UserType;
   onClose: () => void;
 }
 
@@ -165,7 +165,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
   const tabs = [
     { id: "details", name: "Detalhes", icon: DollarSign },
     { id: "attempts", name: "Tentativas", icon: Phone },
-    ...(userType === "collector"
+    ...(userType !== "manager"
       ? [{ id: "action", name: "Ações", icon: CheckCircle }]
       : []),
   ];
@@ -393,7 +393,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                   placeholder="Adicione observações sobre este cliente..."
                   disabled={userType === "manager"}
                 />
-                {userType === "collector" && (
+                {userType !== "manager" && (
                   <button
                     onClick={handleUpdateObservations}
                     className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors"
@@ -421,7 +421,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
             </div>
           )}
 
-          {activeTab === "action" && userType === "collector" && (
+          {activeTab === "action" && userType !== "manager" && (
             <div className="space-y-6">
               {/* Status Update */}
               <div className="space-y-4">

@@ -346,7 +346,13 @@ const formFields: Record<
   situacao: {
     label: "Situação",
     type: "select",
-    options: ["", "Em mãos", "Em tratamento"],
+    options: [
+      "",
+      "Em mãos",
+      "Em tratamento",
+      "Cobrança Interna",
+      "Aguardando Interno",
+    ],
   },
   apelido: { label: "Apelido", type: "text" },
   bairro: { label: "Bairro", type: "text" },

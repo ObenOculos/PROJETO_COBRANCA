@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import { PaymentDistribution, ScheduledVisit } from "../types";
+import { ScheduledVisit } from "../types";
 
 // Variável de controle de sincronização no escopo do módulo
 let isSyncing = false;
@@ -202,7 +202,10 @@ export const useOffline = () => {
       updateData.notes = visitData.notes;
     }
 
-    if (visitData.status === "realizada") {
+    if (
+      visitData.status === "realizada" ||
+      visitData.status === "nao_encontrado"
+    ) {
       updateData.data_visita_realizada = new Date().toISOString().split("T")[0];
     }
 
@@ -221,6 +224,56 @@ export const useOffline = () => {
       throw new Error(
         `Erro ao sincronizar atualização de status de visita: ${error.message}`,
       );
+    }
+
+    if (visitData.status === "nao_encontrado") {
+      const {
+        data: scheduledVisit,
+        error: visitFetchError,
+      } = await supabase
+        .from("scheduled_visits")
+        .select("client_document")
+        .eq("id", visitData.visitId)
+        .single();
+
+      if (visitFetchError) {
+        throw new Error(
+          `Erro ao buscar visita para transferência interna: ${visitFetchError.message}`,
+        );
+      }
+
+      const clientDocument = scheduledVisit?.client_document;
+      if (clientDocument) {
+        const {
+          error: internalUsersError,
+        } = await supabase
+          .from("users")
+          .select("id")
+          .eq("type", "internal_collector")
+          .limit(1);
+
+        if (internalUsersError) {
+          console.warn(
+            "Erro ao buscar usuário de cobrança interna:",
+            internalUsersError,
+          );
+        }
+
+        const collectionUpdate: any = {
+          situacao: "Cobrança Interna",
+        };
+
+        const { error: collectionError } = await supabase
+          .from("BANCO_DADOS")
+          .update(collectionUpdate)
+          .eq("documento", clientDocument);
+
+        if (collectionError) {
+          throw new Error(
+            `Erro ao transferir cobranças para Cobrança Interna: ${collectionError.message}`,
+          );
+        }
+      }
     }
   };
 

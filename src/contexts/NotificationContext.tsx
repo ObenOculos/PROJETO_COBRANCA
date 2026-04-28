@@ -20,7 +20,7 @@ export interface Notification {
   read: boolean;
   priority: "low" | "medium" | "high";
   relatedId?: string;
-  targetUserType?: "manager" | "collector" | "all"; // Novo campo para direcionamento
+  targetUserType?: "manager" | "collector" | "internal_collector" | "all"; // Novo campo para direcionamento
 }
 
 interface NotificationContextType {
@@ -119,7 +119,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           : collections.filter((c) => c.user_id === user.id);
 
       // For collectors: Check overdue visits
-      if (user.type === "collector") {
+      if (user.type !== "manager") {
         const overdueVisits = userCollections.filter((c) => {
           if (c.status === "received") return false;
 

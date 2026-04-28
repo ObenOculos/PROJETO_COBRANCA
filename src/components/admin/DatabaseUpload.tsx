@@ -35,7 +35,12 @@ interface InsertResult {
 }
 
 // Valores válidos para a coluna situacao
-const VALID_SITUACAO_VALUES = ["Em mãos", "Em tratamento"];
+const VALID_SITUACAO_VALUES = [
+  "Em mãos",
+  "Em tratamento",
+  "Cobrança Interna",
+  "Aguardando Interno",
+];
 
 // Função para validar e normalizar o valor de situacao
 const validateSituacao = (value: string | undefined | null): string | null => {

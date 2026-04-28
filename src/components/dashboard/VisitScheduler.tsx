@@ -211,6 +211,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     useState<ScheduledVisit | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
+  const [customObservation, setCustomObservation] = useState("");
+  const [showCustomObservationInput, setShowCustomObservationInput] = useState(false);
+  const [showDateValidationModal, setShowDateValidationModal] = useState(false);
+  const [dateValidationMessage, setDateValidationMessage] = useState("");
   const [showTimeWarningModal, setShowTimeWarningModal] = useState(false);
   const [timeWarningData, setTimeWarningData] = useState<{
     clientDocument: string;
@@ -218,8 +222,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     suggestedTime: string;
     previousTime: string;
   } | null>(null);
-  const [showDateValidationModal, setShowDateValidationModal] = useState(false);
-  const [dateValidationMessage, setDateValidationMessage] = useState("");
 
   // Estado para rastrear visitas que caem no domingo
   const [sundayVisits, setSundayVisits] = useState<Set<string>>(new Set());
@@ -909,6 +911,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     selectedDateVisits.length / visitsPerPage,
   );
 
+  // ✅ CORREÇÃO: Memoizar a lista de documentos para evitar re-execuções desnecessárias
+  const clientsToPrefetch = useMemo(() => {
+    const fromVisits = selectedDateVisits.map((v) => v.clientDocument);
+    const fromAvailable = availableClients.map((c) => c.document);
+    return JSON.stringify([...new Set([...fromVisits, ...fromAvailable])]);
+  }, [selectedDateVisits, availableClients]);
+
   // ✅ CORREÇÃO: Pré-carregar dados dos clientes com proteção contra duplicação
   useEffect(() => {
     // Limpar timeout anterior
@@ -918,38 +927,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
     // Prevenir execução duplicada
     if (prefetchInProgressRef.current) {
-      console.log("⏸️ Pré-carregamento já em andamento, pulando...");
       return;
     }
 
     // ✅ Debounce de 300ms para evitar chamadas rápidas
     prefetchTimeoutRef.current = setTimeout(() => {
-      // Coletar todos os documentos únicos de ambas as fontes
-      const clientsFromVisits =
-        selectedDateVisits.length > 0
-          ? selectedDateVisits.map((v) => v.clientDocument)
-          : [];
-
-      const clientsFromAvailable =
-        availableClients.length > 0
-          ? availableClients.map((c) => c.document)
-          : [];
-
-      // Combinar e remover duplicatas
-      const allUniqueClients = [
-        ...new Set([...clientsFromVisits, ...clientsFromAvailable]),
-      ];
+      const allUniqueClients = JSON.parse(clientsToPrefetch);
 
       // Filtrar apenas os que não estão no cache
       const missingClients = allUniqueClients.filter(
-        (doc) => !clientDataCache.has(doc),
+        (doc: string) => !clientDataCache.has(doc),
       );
 
       if (missingClients.length > 0) {
-        console.log(
-          `🔄 Pré-carregando ${missingClients.length} clientes únicos...`,
-        );
-
         // ✅ Bloquear novas execuções
         prefetchInProgressRef.current = true;
         setIsLoadingClients(true);
@@ -968,12 +958,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         clearTimeout(prefetchTimeoutRef.current);
       }
     };
-  }, [
-    selectedDateVisits,
-    availableClients,
-    clientDataCache,
-    prefetchClientsData,
-  ]);
+  }, [clientsToPrefetch, prefetchClientsData]);
 
   // Validação: Detectar conflitos de visitas (mesmo cliente, mesma data)
   const checkVisitConflicts = (): {
@@ -1323,6 +1308,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const handleMarkAsCompleted = (visit: ScheduledVisit) => {
     setSelectedVisitForCompletion(visit);
     setShowCompletedModal(true);
+    setCustomObservation("");
+    setShowCustomObservationInput(false);
   };
 
   // Função para confirmar conclusão com observação
@@ -1382,6 +1369,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     }
 
     setSelectedVisitForCompletion(null);
+    setCustomObservation("");
+    setShowCustomObservationInput(false);
   };
 
   // Função para abrir modal de confirmação "Não Localizado"
@@ -2952,7 +2941,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           createPortal(
             <ClientDetailModal
               clientGroup={selectedClientForModal}
-              userType="collector"
+              userType={user?.type || "collector"}
               onClose={handleCloseClientModal}
             />,
             document.body,
@@ -3170,8 +3159,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           selectedVisitForCompletion &&
           createPortal(
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
-                <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
+              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 max-h-[90vh] flex flex-col">
+                <div className="px-4 lg:px-6 py-4 border-b border-gray-200 flex-shrink-0">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                     <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
                     Marcar Visita como Realizada
@@ -3181,12 +3170,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   </p>
                 </div>
 
-                <div className="px-4 lg:px-6 py-4">
+                <div className="px-4 lg:px-6 py-4 overflow-y-auto flex-1">
                   <p className="text-sm text-gray-700 mb-4">
                     Selecione uma observação sobre como foi a visita:
                   </p>
 
-                  <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2">
+                  <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2 mb-4">
                     {[
                       "Visitado e o cliente pagou tudo.",
                       "Visitado, mas cliente pagou parcialmente.",
@@ -3211,18 +3200,74 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       </button>
                     ))}
                   </div>
+
+                  {/* Botão "Outro" separado na parte inferior */}
+                  <div className="border-t border-gray-200 pt-4">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowCustomObservationInput(true);
+                      }}
+                      className="w-full text-left px-4 py-3 bg-blue-50 hover:bg-blue-100 hover:border-blue-300 border border-blue-200 rounded-2xl transition-colors text-sm text-blue-700 font-medium"
+                    >
+                      Outro (digitar observação personalizada)
+                    </button>
+                  </div>
+
+                  {showCustomObservationInput && (
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Digite sua observação personalizada:
+                      </label>
+                      <textarea
+                        value={customObservation}
+                        onChange={(e) => setCustomObservation(e.target.value)}
+                        placeholder="Descreva o que aconteceu na visita..."
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
+                        autoFocus
+                      />
+                    </div>
+                  )}
                 </div>
 
-                <div className="px-4 lg:px-6 py-4 border-t border-gray-200">
-                  <button
-                    onClick={() => {
-                      setShowCompletedModal(false);
-                      setSelectedVisitForCompletion(null);
-                    }}
-                    className="w-full px-4 py-2 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors"
-                  >
-                    Cancelar
-                  </button>
+                <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex-shrink-0">
+                  {showCustomObservationInput ? (
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        onClick={() => {
+                          setShowCustomObservationInput(false);
+                          setCustomObservation("");
+                        }}
+                        className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors"
+                      >
+                        Voltar
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (customObservation.trim()) {
+                            handleConfirmCompletion(customObservation.trim());
+                          }
+                        }}
+                        disabled={!customObservation.trim()}
+                        className="flex-1 px-4 py-2 bg-green-500 text-white rounded-2xl hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Confirmar Observação
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setShowCompletedModal(false);
+                        setSelectedVisitForCompletion(null);
+                      }}
+                      className="w-full px-4 py-2 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  )}
                 </div>
               </div>
             </div>,

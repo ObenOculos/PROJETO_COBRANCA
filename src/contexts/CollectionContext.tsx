@@ -9,6 +9,7 @@ import {
   CollectionContextType,
   Collection,
   User,
+  UserType,
   MonthlyGoal,
   CollectionAttempt,
   DashboardStats,
@@ -83,6 +84,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [clientDataCache, setClientDataCache] = useState<Map<string, any>>(
     new Map(),
   );
+
+  // ✅ CORREÇÃO: Ref para mirror do cache para evitar dependências circulares em callbacks
+  const clientDataCacheRef = React.useRef(clientDataCache);
+  React.useEffect(() => {
+    clientDataCacheRef.current = clientDataCache;
+  }, [clientDataCache]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -677,7 +684,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         name: user.name,
         login: user.login,
         password: user.password,
-        type: user.type as "manager" | "collector",
+        type: user.type as UserType,
         createdAt: user.created_at || new Date().toISOString(),
       }));
 
@@ -1159,13 +1166,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   const getFilteredCollections = (
     filters: FilterOptions,
-    userType: "manager" | "collector",
+    userType: UserType,
     collectorId?: string,
   ): Collection[] => {
     let filtered = collections;
 
     // Filtrar por cobrador se o usuário for cobrador
-    if (userType === "collector" && collectorId) {
+    if (userType !== "manager" && collectorId) {
       // Obter lojas atribuídas a este cobrador
       const assignedStores: string[] = [];
       filtered = filtered.filter(
@@ -1528,7 +1535,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
 
     // Apply visitsOnly filter - show only clients with scheduled visits
-    if (filters.visitsOnly && userType === "collector" && collectorId) {
+    if (filters.visitsOnly && userType !== "manager" && collectorId) {
       const collectorVisits = getVisitsByCollector(collectorId).filter(
         (visit) => visit.status === "agendada",
       );
@@ -1558,12 +1565,28 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         let filteredCollections = collections;
 
         if (collectorId) {
+          const user = users.find((u) => u.id === collectorId);
+          const isInternal = user?.type === "internal_collector";
           const assignedStores: string[] = [];
-          filteredCollections = collections.filter(
-            (c) =>
+
+          filteredCollections = collections.filter((c) => {
+            const isAssigned =
               c.user_id === collectorId ||
-              assignedStores.includes(c.nome_da_loja || ""),
-          );
+              assignedStores.includes(c.nome_da_loja || "");
+
+            // Se for cobrador interno, vê o que está atribuído a ele
+            if (isInternal) {
+              return isAssigned;
+            }
+
+            // Se for cobrador externo, vê o que está atribuído a ele, 
+            // EXCETO se a situação indicar que foi transferido para o interno
+            const isInternalStatus = 
+              c.situacao === "Cobrança Interna" || 
+              c.situacao === "Aguardando Interno";
+
+            return isAssigned && !isInternalStatus;
+          });
         }
 
         const clientMap = new Map<string, ClientGroup>();
@@ -1866,12 +1889,23 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   );
 
   const getCollectorCollections = (collectorId: string): Collection[] => {
+    const user = users.find((u) => u.id === collectorId);
+    const isInternal = user?.type === "internal_collector";
     const assignedStores: string[] = [];
-    return collections.filter(
-      (c) =>
+
+    return collections.filter((c) => {
+      const isAssigned =
         c.user_id === collectorId ||
-        assignedStores.includes(c.nome_da_loja || ""),
-    );
+        assignedStores.includes(c.nome_da_loja || "");
+
+      if (isInternal) return isAssigned;
+
+      const isInternalStatus =
+        c.situacao === "Cobrança Interna" ||
+        c.situacao === "Aguardando Interno";
+
+      return isAssigned && !isInternalStatus;
+    });
   };
 
   const getAvailableStores = (): string[] => {
@@ -2574,13 +2608,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const prefetchClientsData = React.useCallback(
     async (clientDocuments: string[]) => {
       try {
-        // Filtrar apenas clientes que não estão no cache
+        // Filtrar apenas clientes que não estão no cache (usando o REF para ter o valor mais atualizado sem loop)
         const clientsToFetch = clientDocuments.filter(
-          (doc) => !clientDataCache.get(doc),
+          (doc) => !clientDataCacheRef.current.has(doc),
         );
 
         if (clientsToFetch.length === 0) {
-          console.log("✅ Todos os clientes já estão em cache");
           return;
         }
 
@@ -2596,7 +2629,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           // Tentar com .in() primeiro
           const result = await supabase
             .from("clientes")
-            .select("documento, created_at") // Removido 'apelido' - não existe nesta tabela
+            .select("documento, created_at")
             .in("documento", clientsToFetch);
 
           clientesData = result.data;
@@ -2611,7 +2644,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             // Fallback: usar OR com eq
             let query = supabase
               .from("clientes")
-              .select("documento, created_at"); // Removido 'apelido' - não existe nesta tabela
+              .select("documento, created_at");
 
             // Construir query com OR manualmente
             const orConditions = clientsToFetch
@@ -2629,6 +2662,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
         if (error) {
           console.error("❌ Erro ao pré-carregar clientes:", error);
+          // Mesmo com erro, marcar para evitar loop
+          setClientDataCache((prev) => {
+            const next = new Map(prev);
+            clientsToFetch.forEach((doc) => {
+              if (!next.has(doc)) next.set(doc, { error: true });
+            });
+            return next;
+          });
           return;
         }
 
@@ -2709,120 +2750,123 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           }
         };
 
-        // Processar todos os clientes em paralelo
-        const updatedCache = new Map(clientDataCache);
+        const newEntries = new Map();
+        const clientGroups = getClientGroups();
 
-        await Promise.all(
-          clientsToFetch.map(async (doc) => {
-            // ⭐ Agora os documentos já vêm formatados da query
-            const clienteInfo = clientesMap.get(doc);
-            const clientGroups = getClientGroups();
-            const clientGroup = clientGroups.find((g) => g.document === doc);
+        clientsToFetch.forEach((doc) => {
+          const clienteInfo = clientesMap.get(doc);
+          const clientGroup = clientGroups.find((g) => g.document === doc);
 
-            if (!clientGroup) return;
+          if (!clientGroup) {
+            newEntries.set(doc, { empty: true });
+            return;
+          }
 
-            const clientSales = getSalesByClient(doc);
-            const totalPending = clientSales.reduce(
-              (sum, sale) => sum + sale.pendingValue,
-              0,
+          const clientSales = getSalesByClient(doc);
+          const totalPending = clientSales.reduce(
+            (sum, sale) => sum + sale.pendingValue,
+            0,
+          );
+
+          const overdueCount = clientSales.reduce((sum, sale) => {
+            return (
+              sum +
+              sale.installments.filter((inst) => {
+                const pending =
+                  (inst.valor_original || 0) - (inst.valor_recebido || 0);
+                if (pending <= 0) return false;
+
+                if (
+                  inst.dias_em_atraso !== null &&
+                  inst.dias_em_atraso !== undefined &&
+                  inst.dias_em_atraso > 0
+                ) {
+                  return true;
+                }
+
+                const overdueDays = calculateOverdueDays(
+                  inst.data_vencimento || "",
+                );
+                return overdueDays > 0;
+              }).length
             );
+          }, 0);
 
-            const overdueCount = clientSales.reduce((sum, sale) => {
-              return (
-                sum +
-                sale.installments.filter((inst) => {
-                  const pending =
-                    (inst.valor_original || 0) - (inst.valor_recebido || 0);
-                  if (pending <= 0) return false;
+          const addressHistory = activeAddressHistory.find(
+            (h) => h.cliente_documento === doc,
+          );
 
-                  if (
-                    inst.dias_em_atraso !== null &&
-                    inst.dias_em_atraso !== undefined &&
-                    inst.dias_em_atraso > 0
-                  ) {
-                    return true;
-                  }
-
-                  const overdueDays = calculateOverdueDays(
-                    inst.data_vencimento || "",
-                  );
-                  return overdueDays > 0;
-                }).length
-              );
-            }, 0);
-
-            const addressHistory = activeAddressHistory.find(
-              (h) => h.cliente_documento === doc,
+          let addressUpdateDays: number | undefined;
+          if (addressHistory?.created_at) {
+            const updateDate = new Date(addressHistory.created_at);
+            const today = new Date();
+            const todayMidnight = new Date(
+              today.getFullYear(),
+              today.getMonth(),
+              today.getDate(),
             );
+            const updateDateMidnight = new Date(
+              updateDate.getFullYear(),
+              updateDate.getMonth(),
+              updateDate.getDate(),
+            );
+            const diffTime = Math.abs(
+              todayMidnight.getTime() - updateDateMidnight.getTime(),
+            );
+            addressUpdateDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          }
 
-            let addressUpdateDays: number | undefined;
-            if (addressHistory?.created_at) {
-              const updateDate = new Date(addressHistory.created_at);
-              const today = new Date();
-              const todayMidnight = new Date(
-                today.getFullYear(),
-                today.getMonth(),
-                today.getDate(),
-              );
-              const updateDateMidnight = new Date(
-                updateDate.getFullYear(),
-                updateDate.getMonth(),
-                updateDate.getDate(),
-              );
-              const diffTime = Math.abs(
-                todayMidnight.getTime() - updateDateMidnight.getTime(),
-              );
-              addressUpdateDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            }
+          const currentAddress = addressHistory
+            ? `${addressHistory.logradouro || ""}, ${addressHistory.numero || "s/n"}`
+            : clientGroup.address;
 
-            const currentAddress = addressHistory
-              ? `${addressHistory.logradouro || ""}, ${addressHistory.numero || "s/n"}`
-              : clientGroup.address;
+          const currentNumber = addressHistory
+            ? addressHistory.numero || "s/n"
+            : clientGroup.number || "s/n";
 
-            const currentNumber = addressHistory
-              ? addressHistory.numero || "s/n"
-              : clientGroup.number || "s/n";
+          const currentNeighborhood = addressHistory
+            ? addressHistory.bairro || ""
+            : clientGroup.neighborhood;
 
-            const currentNeighborhood = addressHistory
-              ? addressHistory.bairro || ""
-              : clientGroup.neighborhood;
+          const currentCity = addressHistory
+            ? addressHistory.cidade || ""
+            : clientGroup.city;
 
-            const currentCity = addressHistory
-              ? addressHistory.cidade || ""
-              : clientGroup.city;
+          const currentComplemento = addressHistory
+            ? addressHistory.complemento || ""
+            : clientGroup.complemento;
 
-            const currentComplemento = addressHistory
-              ? addressHistory.complemento || ""
-              : clientGroup.complemento;
+          const result = {
+            name: clientGroup.client,
+            document: clientGroup.document,
+            apelido: clientGroup.apelido,
+            address: currentAddress,
+            number: currentNumber,
+            neighborhood: currentNeighborhood,
+            city: currentCity,
+            complemento: currentComplemento,
+            phone: clientGroup.phone,
+            mobile: clientGroup.mobile,
+            totalPendingValue: totalPending,
+            overdueCount: overdueCount,
+            addressUpdateDays,
+            created_at: clienteInfo?.created_at,
+          };
 
-            const result = {
-              name: clientGroup.client,
-              document: clientGroup.document,
-              apelido: clientGroup.apelido, // Removido clienteInfo?.apelido || - não vem do Supabase
-              address: currentAddress,
-              number: currentNumber,
-              neighborhood: currentNeighborhood,
-              city: currentCity,
-              complemento: currentComplemento,
-              phone: clientGroup.phone,
-              mobile: clientGroup.mobile,
-              totalPendingValue: totalPending,
-              overdueCount: overdueCount,
-              addressUpdateDays,
-              created_at: clienteInfo?.created_at,
-            };
+          newEntries.set(doc, result);
+        });
 
-            updatedCache.set(doc, result);
-          }),
-        );
-
-        setClientDataCache(updatedCache);
+        // Atualizar cache usando atualização funcional para evitar dependência direta
+        setClientDataCache((prev) => {
+          const next = new Map(prev);
+          newEntries.forEach((v, k) => next.set(k, v));
+          return next;
+        });
       } catch (error) {
         console.error("❌ Erro ao pré-carregar dados dos clientes:", error);
       }
     },
     [
-      clientDataCache,
       activeAddressHistory,
       getClientGroups,
       getSalesByClient,
@@ -2938,6 +2982,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     try {
       console.log("Atualizando status da visita:", visitId, status);
 
+      const currentVisit = scheduledVisits.find((visit) => visit.id === visitId);
+      const clientDocument = currentVisit?.clientDocument;
+      const isTransferToInternal = status === "nao_encontrado";
+      // Para múltiplos internos, não atribuir automaticamente - deixar para o gerente decidir
+      // const internalCollectorId = isTransferToInternal
+      //   ? users.find((u) => u.type === "internal_collector")?.id || null
+      //   : null;
+
       // Tentar atualizar no Supabase
       const updateData: any = {
         status,
@@ -2982,6 +3034,33 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             type: "UPDATE_VISIT_STATUS",
             data: { visitId, status, notes },
           });
+        } else if (isTransferToInternal && clientDocument) {
+          const collectionUpdate: any = {
+            situacao: "Aguardando Interno",
+            user_id: null, // Remove do cobrador externo para que volte à "fila" geral de atribuição
+          };
+          // Não atribuir automaticamente a um internal_collector específico
+          // Deixar para o gerente decidir qual interno ficará responsável
+          // if (internalCollectorId) {
+          //   collectionUpdate.user_id = internalCollectorId;
+          // }
+
+          const { error: collectionError } = await supabase
+            .from("BANCO_DADOS")
+            .update(collectionUpdate)
+            .eq("documento", clientDocument);
+
+          if (collectionError) {
+            console.error(
+              "Erro ao transferir cobranças para Cobrança Interna:",
+              collectionError,
+            );
+          } else {
+            console.log(
+              "Cobranças transferidas para Cobrança Interna para",
+              clientDocument,
+            );
+          }
         }
       }
 
@@ -3002,6 +3081,21 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             : visit,
         ),
       );
+
+      if (isTransferToInternal && clientDocument) {
+        setCollections((prev) =>
+          prev.map((collection) =>
+            collection.documento === clientDocument
+              ? {
+                  ...collection,
+                  situacao: "Cobrança Interna",
+                  // Não definir user_id automaticamente - deixar para o gerente atribuir
+                  // user_id: internalCollectorId || collection.user_id,
+                }
+              : collection,
+          ),
+        );
+      }
 
       // Invalidate cache
       invalidateVisits();

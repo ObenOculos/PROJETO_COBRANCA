@@ -13,7 +13,7 @@ import {
   MessageCircle,
   Clock,
 } from "lucide-react";
-import { ClientGroup } from "../../types";
+import { ClientGroup, UserType } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -24,7 +24,7 @@ import GeneralPaymentEditModal from "./GeneralPaymentEditModal";
 
 interface ClientDetailModalProps {
   clientGroup: ClientGroup;
-  userType: "manager" | "collector";
+  userType: UserType;
   onClose: () => void;
 }
 
@@ -575,23 +575,17 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     }
   };
 
-  const handleEditPaymentClick = () => {
-    if ((userType as "manager" | "collector") === "manager") {
-      // Gerente pode editar diretamente
-      setIsGeneralEditModalOpen(true);
-    } else {
-      // Cobrador precisa solicitar autorização
-      setShowAuthModal(true);
-      setAuthError("");
-      setAuthToken("");
-      setAuthRequestSent(false);
-    }
-  };
+const handleEditPaymentClick = () => {
+  setShowAuthModal(true);
+  setAuthError("");
+  setAuthToken("");
+  setAuthRequestSent(false);
+};
 
   return (
     <>
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[100] backdrop-blur-sm"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             onClose();
@@ -628,7 +622,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
           {/* Action Buttons */}
 
-          {userType === "collector" && (
+          {(userType === "collector" || userType === "internal_collector" || userType === "manager") && (
             <div className="mt-4 px-4 lg:px-6 py-0 grid grid-cols-2 sm:grid-cols-4 gap-3">
               <button
                 id="view-client-data"
@@ -682,7 +676,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   onClick={handleEditPaymentClick}
                   className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 transition-colors text-sm font-medium shadow-sm"
                   title={
-                    (userType as "manager" | "collector") === "manager"
+                    userType === "manager"
                       ? "Editar valores recebidos"
                       : "Solicitar autorização para editar pagamentos"
                   }
@@ -1027,7 +1021,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
       {/* Authorization Modal */}
       {showAuthModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-4">
               Autorização Necessária
@@ -1233,7 +1227,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
       {/* Rejection Modal */}
       {showRejectionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="text-center">
               <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">

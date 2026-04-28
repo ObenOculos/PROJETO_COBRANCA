@@ -34,7 +34,7 @@ import {
   FileDown,
   XCircle,
 } from "lucide-react";
-import { Collection, ClientGroup, SaleGroup } from "../../types";
+import { Collection, ClientGroup, SaleGroup, UserType } from "../../types";
 import { formatCurrency, parseAndFormatDate } from "../../utils/formatters";
 import CollectionModal from "./CollectionModal";
 import ClientDetailModal from "./ClientDetailModal";
@@ -46,7 +46,7 @@ import DeleteSalesModal from "./DeleteSalesModal";
 
 interface CollectionTableProps {
   collections: Collection[];
-  userType: "manager" | "collector";
+  userType: UserType;
   showGrouped?: boolean;
   collectorId?: string;
   showFilterBar?: boolean;
@@ -523,7 +523,7 @@ export const CollectionTable = React.forwardRef<
 
       // Apply sorting before pagination - only if needed
       let sortedGroups = filteredClientGroups;
-      if (userType === "collector" && sortField) {
+      if (userType !== "manager" && sortField) {
         sortedGroups = [...filteredClientGroups].sort((a, b) => {
           let result = 0;
           switch (sortField) {
@@ -563,7 +563,7 @@ export const CollectionTable = React.forwardRef<
       let filteredGroups = [...clientGroups];
 
       // Optimize status filtering
-      if (userType === "collector" && statusFilter) {
+      if (userType !== "manager" && statusFilter) {
         const targetStatus = statusFilter.toLowerCase();
         filteredGroups = filteredGroups.filter((group) =>
           group.sales.some((sale) => {
@@ -735,7 +735,7 @@ export const CollectionTable = React.forwardRef<
                       )}
 
                       {/* Botão de Filtro para Cobrador */}
-                      {userType === "collector" && onToggleFilterBar && (
+                      {userType !== "manager" && onToggleFilterBar && (
                         <button
                           id="toggle-filters-header"
                           name="toggleFiltersHeader"
@@ -759,7 +759,7 @@ export const CollectionTable = React.forwardRef<
 
                   <div className="flex items-center justify-between gap-4">
                     {/* Controles de Ordenação para Cobrador */}
-                    {userType === "collector" && (
+                    {userType !== "manager" && (
                       <div className="flex items-center gap-2">
                         <button
                           id="sort-by-cliente"
@@ -1190,7 +1190,7 @@ export const CollectionTable = React.forwardRef<
                         </button>
                       </div>
                     )}
-                    {userType === "collector" && (
+                    {userType !== "manager" && (
                       <button
                         id="toggle-filters"
                         name="toggleFilters"
@@ -1358,7 +1358,7 @@ export const CollectionTable = React.forwardRef<
                 )}
               </div>{" "}
               {/* Expanded Filters (Conditional) */}
-              {userType === "collector" && showFilters && (
+              {userType !== "manager" && showFilters && (
                 <div className="flex items-center gap-3 py-2 border-t border-gray-100">
                   <Filter className="h-4 w-4 text-blue-600" />
                   <select
@@ -1650,7 +1650,7 @@ export const CollectionTable = React.forwardRef<
                                   <Eye className="h-4 w-4 mr-2" />
                                   <span>Detalhes</span>
                                 </button>
-                                {userType === "collector" && (
+                                {userType !== "manager" && (
                                   <button
                                     id={`manage-payments-${sale.saleNumber}`}
                                     name={`managePayments${sale.saleNumber}`}
@@ -1695,11 +1695,11 @@ export const CollectionTable = React.forwardRef<
                   Nenhum cliente com vendas encontrado
                 </h3>
                 <p className="text-gray-600 max-w-md mx-auto">
-                  {userType === "collector" && statusFilter
+                  {userType !== "manager" && statusFilter
                     ? "Tente ajustar os filtros para ver mais resultados."
                     : "Não há clientes com vendas disponíveis no momento."}
                 </p>
-                {userType === "collector" && statusFilter && (
+                {userType !== "manager" && statusFilter && (
                   <button
                     id="clear-all-filters"
                     name="clearAllFilters"

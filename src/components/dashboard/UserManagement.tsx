@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Plus, Edit, Trash2, User, Shield, MoreVertical } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
-import { User as UserType } from "../../types";
+import { User as UserType, UserType as UserRoleType } from "../../types";
 
 const UserManagement: React.FC = () => {
   const { users, addUser, updateUser, deleteUser } = useCollection();
@@ -17,7 +17,7 @@ const UserManagement: React.FC = () => {
     name: "",
     login: "",
     password: "",
-    type: "collector" as "manager" | "collector",
+    type: "collector" as UserRoleType,
   });
 
   const handleOpenModal = (user?: UserType) => {
@@ -159,10 +159,16 @@ const UserManagement: React.FC = () => {
                     >
                       {user.type === "manager" ? (
                         <Shield className="h-3 w-3 mr-1" />
+                      ) : user.type === "internal_collector" ? (
+                        <User className="h-3 w-3 mr-1" />
                       ) : (
                         <User className="h-3 w-3 mr-1" />
                       )}
-                      {user.type === "manager" ? "Gerente" : "Cobrador"}
+                      {user.type === "manager"
+                        ? "Gerente"
+                        : user.type === "internal_collector"
+                        ? "Cobrança Interna"
+                        : "Cobrador"}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -297,12 +303,13 @@ const UserManagement: React.FC = () => {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      type: e.target.value as "manager" | "collector",
+                      type: e.target.value as UserRoleType,
                     })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="collector">Cobrador</option>
+                  <option value="internal_collector">Cobrança Interna</option>
                   <option value="manager">Gerente</option>
                 </select>
               </div>

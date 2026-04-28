@@ -1,10 +1,12 @@
 // User types
+export type UserType = "manager" | "collector" | "internal_collector";
+
 export interface User {
   id: string;
   name: string;
   login: string;
   password: string;
-  type: "manager" | "collector";
+  type: UserType;
   createdAt: string;
 }
 
@@ -283,7 +285,7 @@ export interface CollectionContextType {
   getClientGroups: (collectorId?: string) => ClientGroup[];
   getFilteredCollections: (
     filters: FilterOptions,
-    userType: "manager" | "collector",
+    userType: UserType,
     collectorId?: string,
   ) => Collection[];
   getAvailableStores: () => string[];

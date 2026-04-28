@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  Building2,
 } from "lucide-react";
 import { formatCurrency } from "../../utils/formatters";
 import {
@@ -48,7 +49,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const [touchEnd, setTouchEnd] = useState(0);
   const sliderRef = useRef<HTMLDivElement>(null);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const autoPlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoPlayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [selectedCollector, setSelectedCollector] = useState<string>("all");
   const { getClientGroups } = useCollection();
   const [schedulesPage, setSchedulesPage] = useState(1);
@@ -178,6 +179,22 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             performance.length
           ).toFixed(1)
         : "0.0";
+
+    // Estatísticas de cobrança interna
+    const internalCollections = overviewCollections.filter(
+      (c) => c.situacao === "Cobrança Interna",
+    );
+    const internalClientsCount = new Set(
+      internalCollections.map((c) => c.documento).filter(Boolean),
+    ).size;
+    const internalCollectorsCount = new Set(
+      internalCollections.map((c) => c.user_id).filter(Boolean),
+    ).size;
+    const internalAmount = internalCollections.reduce(
+      (sum, c) => sum + c.valor_original,
+      0,
+    );
+
     return {
       pendingSalesCount: pendingSales.length,
       completedSalesCount: completedSales.length,
@@ -186,6 +203,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       todayAmount,
       storesWithCollections,
       averageEfficiency,
+      internalClientsCount,
+      internalCollectorsCount,
+      internalAmount,
     };
   }, [salesMap, overviewCollections, performance]);
 
@@ -642,7 +662,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                   Ecossistema de Cobrança
                 </h4>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
                 <div
                   onClick={() => setActiveTab("users")}
                   className="bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:shadow-sm hover:border-gray-300 dark:hover:border-dark-border transition-all cursor-pointer"
@@ -658,6 +678,23 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                   </div>
                   <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
                     cobradores em campo
+                  </div>
+                </div>
+                <div
+                  onClick={() => setActiveTab("clients")}
+                  className="bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:shadow-sm hover:border-gray-300 dark:hover:border-dark-border transition-all cursor-pointer"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h5 className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                      Cobrança Interna
+                    </h5>
+                    <Building2 className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-dark-text mb-1">
+                    {overviewMetrics.internalClientsCount}
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
+                    clientes em cobrança interna
                   </div>
                 </div>
                 <div
@@ -692,6 +729,23 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                   </div>
                   <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
                     conversão da equipe
+                  </div>
+                </div>
+                <div
+                  onClick={() => setActiveTab("clients")}
+                  className="bg-white dark:bg-dark-bg border border-purple-200 dark:border-purple-900 rounded-lg p-4 hover:shadow-sm hover:border-purple-300 dark:hover:border-purple-800 transition-all cursor-pointer"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h5 className="text-sm font-medium text-gray-900 dark:text-dark-text">
+                      Cobrança Interna
+                    </h5>
+                    <Store className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-purple-600 mb-1">
+                    {overviewMetrics.internalClientsCount}
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
+                    clientes | {overviewMetrics.internalCollectorsCount} cobrador(es)
                   </div>
                 </div>
               </div>

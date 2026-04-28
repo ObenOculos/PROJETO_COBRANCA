@@ -14,6 +14,7 @@ import {
   HandCoins,
   Briefcase,
   CircleSlash,
+  Building2,
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
 import { Collection } from "../types";
@@ -56,6 +57,30 @@ const getSituacaoIndicator = (collections: Collection[]) => {
     };
   }
 
+  // Verificar se tem alguma parcela "Cobrança Interna"
+  const hasCobrancaInterna = collections.some(
+    (c) => c.situacao === "Cobrança Interna",
+  );
+  if (hasCobrancaInterna) {
+    return {
+      icon: Building2,
+      label: "Cobrança Interna",
+      className: "bg-purple-100 text-purple-800",
+    };
+  }
+
+  // Verificar se tem alguma parcela "Aguardando Interno"
+  const hasAguardandoInterno = collections.some(
+    (c) => c.situacao === "Aguardando Interno",
+  );
+  if (hasAguardandoInterno) {
+    return {
+      icon: AlertCircle,
+      label: "Aguardando Interno",
+      className: "bg-orange-100 text-orange-800",
+    };
+  }
+
   // Verificar se todas as parcelas têm situação vazia
   const allEmpty = collections.every(
     (c) => !c.situacao || c.situacao.trim() === "",
@@ -63,7 +88,7 @@ const getSituacaoIndicator = (collections: Collection[]) => {
   if (allEmpty) {
     return {
       icon: CircleSlash,
-      label: "Vazia",
+      label: "Vazio",
       className: "bg-gray-100 text-gray-600",
     };
   }
@@ -99,6 +124,7 @@ export const ClientAssignment = React.memo(() => {
   const [filterDateTo, setFilterDateTo] = useState<string>("");
   const [includeWithoutDate, setIncludeWithoutDate] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showInternalOnly, setShowInternalOnly] = useState(false); // Novo filtro rápido para cobrança interna
 
   // Modal states
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -131,7 +157,9 @@ export const ClientAssignment = React.memo(() => {
   // Limite para operações em massa
   const MAX_BATCH_SIZE = 100;
 
-  const collectors = users.filter((user) => user.type === "collector");
+  const collectors = users.filter(
+    (user) => user.type === "collector" || user.type === "internal_collector",
+  );
 
   // Função utilitária para parsear e normalizar datas
   const parseAndNormalizeDate = (
@@ -274,6 +302,12 @@ export const ClientAssignment = React.memo(() => {
         onClear: () => setSearchTerm(""),
       });
     }
+    if (showInternalOnly) {
+      chips.push({
+        label: "Apenas Cobrança Interna",
+        onClear: () => setShowInternalOnly(false),
+      });
+    }
     if (filterCollector) {
       const collector = collectors.find((c) => c.id === filterCollector);
       chips.push({
@@ -309,7 +343,7 @@ export const ClientAssignment = React.memo(() => {
     }
     if (filterSituacao) {
       const situacaoLabel =
-        filterSituacao === "empty" ? "Vazia" : filterSituacao;
+        filterSituacao === "empty" ? "Vazio" : filterSituacao;
       chips.push({
         label: `Situação: ${situacaoLabel}`,
         onClear: () => setFilterSituacao(""),
@@ -346,11 +380,16 @@ export const ClientAssignment = React.memo(() => {
     filterDateFrom,
     filterDateTo,
     includeWithoutDate,
+    showInternalOnly,
     collectors,
   ]);
 
   const filteredClients = useMemo(() => {
     const filtered = clientsData.filter((client) => {
+      // Filtro rápido para cobrança interna
+      const matchesInternalOnly = !showInternalOnly ||
+        client.collections.some((c) => c.situacao === "Cobrança Interna");
+
       const matchesSearch =
         client.cliente?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.documento?.includes(searchTerm) ||
@@ -451,6 +490,7 @@ export const ClientAssignment = React.memo(() => {
       })();
 
       return (
+        matchesInternalOnly &&
         matchesSearch &&
         matchesCollector &&
         matchesStatus &&
@@ -475,6 +515,7 @@ export const ClientAssignment = React.memo(() => {
     filterDateFrom,
     filterDateTo,
     includeWithoutDate,
+    showInternalOnly,
   ]);
 
   useEffect(() => {
@@ -1033,6 +1074,20 @@ export const ClientAssignment = React.memo(() => {
               />
             </div>
 
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="internalOnly"
+                checked={showInternalOnly}
+                onChange={(e) => setShowInternalOnly(e.target.checked)}
+                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+              />
+              <label htmlFor="internalOnly" className="flex items-center text-sm font-medium text-gray-700">
+                <Building2 className="h-4 w-4 mr-1 text-purple-600" />
+                Apenas Cobrança Interna
+              </label>
+            </div>
+
             <div>
               <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                 <Users className="h-4 w-4 mr-1" />
@@ -1142,7 +1197,9 @@ export const ClientAssignment = React.memo(() => {
                 <option value="">Todas as situações</option>
                 <option value="Em mãos">Em mãos</option>
                 <option value="Em tratamento">Em tratamento</option>
-                <option value="empty">Vazia</option>
+                <option value="Aguardando Interno">Aguardando Interno</option>
+                <option value="Cobrança Interna">Cobrança Interna</option>
+                <option value="empty">Vazio</option>
               </select>
             </div>
 
@@ -1159,6 +1216,7 @@ export const ClientAssignment = React.memo(() => {
                   setFilterDateFrom("");
                   setFilterDateTo("");
                   setIncludeWithoutDate(false);
+                  setShowInternalOnly(false);
                   setCurrentPage(1);
                 }}
                 className="w-full px-4 py-2 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition-colors text-sm font-medium"
@@ -1293,7 +1351,9 @@ export const ClientAssignment = React.memo(() => {
                     <option value="">Selecione um status</option>
                     <option value="Em mãos">Em mãos</option>
                     <option value="Em tratamento">Em tratamento</option>
-                    <option value="empty">Vazia</option>
+                    <option value="Aguardando Interno">Aguardando Interno</option>
+                    <option value="Cobrança Interna">Cobrança Interna</option>
+                    <option value="empty">Vazio</option>
                   </select>
                   <button
                     onClick={handleAssignStatusClick}
@@ -1776,7 +1836,7 @@ export const ClientAssignment = React.memo(() => {
             <p className="text-gray-700">
               Você está prestes a atribuir o status{" "}
               <span className="font-semibold">
-                {selectedStatus === "empty" ? "Vazia" : selectedStatus}
+                {selectedStatus === "empty" ? "Vazio" : selectedStatus}
               </span>{" "}
               para todas as parcelas de{" "}
               <span className="font-semibold">

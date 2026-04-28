@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { AuthContextType, User } from "../types";
+import { AuthContextType, User, UserType } from "../types";
 import { supabase } from "../lib/supabase";
 import { useLoading } from "./LoadingContext";
 import {
@@ -180,7 +180,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         name: foundUser.name,
         login: foundUser.login,
         password: foundUser.password,
-        type: foundUser.type as "manager" | "collector",
+        type: foundUser.type as UserType,
         createdAt: foundUser.created_at || new Date().toISOString(),
       };
 
@@ -291,7 +291,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           name: foundUser.name,
           login: foundUser.login,
           password: foundUser.password,
-          type: foundUser.type as "manager" | "collector",
+          type: foundUser.type as UserType,
           createdAt: foundUser.created_at || new Date().toISOString(),
         };
 
