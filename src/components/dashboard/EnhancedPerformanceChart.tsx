@@ -1,19 +1,18 @@
 import React, { useState, useMemo, useTransition } from "react";
 import {
   Users,
-  Award,
   Filter,
   Download,
-  FileText,
   Eye,
   Target,
   Calendar,
-  X,
-  ChevronUp,
-  ChevronDown,
   Trophy,
   BarChart3,
-  Loader,
+  CheckCircle,
+  AlertTriangle,
+  ShoppingCart,
+  Clock,
+  Search,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
@@ -25,14 +24,11 @@ interface EnhancedCollectorPerformance {
   collectorId: string;
   collectorName: string;
   totalSales: number;
-  completedSales: number;
   pendingSales: number;
   clientsWithPending: number;
   totalAmount: number;
   receivedAmount: number;
-  conversionRate: number;
-  averageTicket: number;
-  efficiency: number;
+  pendingAmount: number;
   clientsCount: number;
   visitsPerformance: number;
   paymentsPerformance: number;
@@ -40,9 +36,16 @@ interface EnhancedCollectorPerformance {
   currentMonthVisitsGoal: number;
   currentMonthPaymentsActual: number;
   currentMonthPaymentsGoal: number;
-  totalAssignedClients: number; // New
-  visitedClientsInSelectedMonths: number; // New
-  clientVisitEfficiency: number; // New
+  totalAssignedClients: number;
+  visitedClientsInSelectedMonths: number;
+  pendingVisits: number;
+  visitsRealizadas: number;
+  visitsNaoEncontrado: number;
+  visitsAgendadas: number;
+  visitsCancelamentoSolicitado: number;
+  visitsCanceladas: number;
+  visitsAtrasadas: number;
+  visitsReagendadas: number;
 }
 
 const EnhancedPerformanceChart: React.FC = () => {
@@ -54,1111 +57,522 @@ const EnhancedPerformanceChart: React.FC = () => {
     scheduledVisits,
     refreshData,
   } = useCollection();
-  const currentMonth = new Date().getMonth(); // 0-indexed
+  
+  const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
   const [showFilters, setShowFilters] = useState(false);
-  const [isPending, startTransition] = useTransition();
-  const [selectedMonths, setSelectedMonths] = useState<number[]>([
-    currentMonth,
-  ]);
+    const [, startTransition] = useTransition();
+  const [selectedMonths, setSelectedMonths] = useState<number[]>([currentMonth]);
   const [selectedYears, setSelectedYears] = useState<number[]>([currentYear]);
-  const [sortBy, setSortBy] = useState<
-    "conversionRate" | "receivedAmount" | "totalSales"
-  >("conversionRate");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [filterMinRate, setFilterMinRate] = useState<string>("");
-  const [selectedCollector, setSelectedCollector] =
-    useState<EnhancedCollectorPerformance | null>(null);
+  const [sortBy, setSortBy] = useState<"receivedAmount" | "totalSales" | "clientsCount" | "pendingSales">("receivedAmount");
+    const [sortOrder] = useState<"asc" | "desc">("desc");
+  const [selectedCollector, setSelectedCollector] = useState<EnhancedCollectorPerformance | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
-  const [selectedCollectorForGoals, setSelectedCollectorForGoals] =
-    useState<User | null>(null);
+  const [selectedCollectorForGoals, setSelectedCollectorForGoals] = useState<User | null>(null);
 
-  const monthsDisplay = [
-    "Jan",
-    "Fev",
-    "Mar",
-    "Abr",
-    "Mai",
-    "Jun",
-    "Jul",
-    "Ago",
-    "Set",
-    "Out",
-    "Nov",
-    "Dez",
-  ];
-
+  const monthsDisplay = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
-  // Função auxiliar para converter números em extenso
-  const numeroParaExtenso = (num: number): string => {
-    const unidades = [
-      "",
-      "um",
-      "dois",
-      "três",
-      "quatro",
-      "cinco",
-      "seis",
-      "sete",
-      "oito",
-      "nove",
-    ];
-    const dezenas = [
-      "",
-      "",
-      "vinte",
-      "trinta",
-      "quarenta",
-      "cinquenta",
-      "sessenta",
-      "setenta",
-      "oitenta",
-      "noventa",
-    ];
-    const dezenasEspeciais = [
-      "dez",
-      "onze",
-      "doze",
-      "treze",
-      "quatorze",
-      "quinze",
-      "dezesseis",
-      "dezessete",
-      "dezoito",
-      "dezenove",
-    ];
-    const centenas = [
-      "",
-      "cento",
-      "duzentos",
-      "trezentos",
-      "quatrocentos",
-      "quinhentos",
-      "seiscentos",
-      "setecentos",
-      "oitocentos",
-      "novecentos",
-    ];
-
-    if (num === 0) return "zero";
-    if (num === 100) return "cem";
-    if (num === 1000) return "mil";
-
-    const partes = [];
-
-    // Centenas
-    const c = Math.floor(num / 100);
-    if (c > 0) {
-      partes.push(centenas[c]);
-    }
-
-    // Dezenas e unidades
-    const resto = num % 100;
-    if (resto >= 10 && resto <= 19) {
-      partes.push(dezenasEspeciais[resto - 10]);
-    } else {
-      const d = Math.floor(resto / 10);
-      const u = resto % 10;
-      if (d > 0) partes.push(dezenas[d]);
-      if (u > 0) partes.push(unidades[u]);
-    }
-
-    return partes.join(" e ");
-  };
-
-  // Função para formatar valores grandes em mobile
-  const formatMobileCurrency = (value: number) => {
-    const isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
-
-    if (!isMobile) {
-      return formatCurrency(value, false);
-    }
-
-    const intValue = Math.floor(value);
-
-    if (intValue === 0) {
-      return "R$ 0";
-    }
-
-    // Determinar a escala e formatar
-    let mainValue = "";
-    let extensoParts = [];
-
-    if (intValue >= 1000000) {
-      // Milhões
-      const milhoes = Math.floor(intValue / 1000000);
-      const resto = intValue % 1000000;
-      mainValue = `R$ ${milhoes}M`;
-
-      if (resto > 0) {
-        const milRestantes = Math.floor(resto / 1000);
-        const unidadesRestantes = resto % 1000;
-
-        if (milRestantes > 0) {
-          const milExtenso = numeroParaExtenso(milRestantes);
-          extensoParts.push(`${milExtenso} mil`);
-        }
-
-        if (unidadesRestantes > 0) {
-          const unidadesExtenso = numeroParaExtenso(unidadesRestantes);
-          extensoParts.push(`${unidadesExtenso} reais`);
-        } else if (extensoParts.length > 0) {
-          extensoParts.push("reais");
-        }
-      }
-    } else if (intValue >= 10000) {
-      // Dezenas de milhares
-      const mil = Math.floor(intValue / 1000);
-      const resto = intValue % 1000;
-      mainValue = `R$ ${mil} mil`;
-
-      if (resto > 0) {
-        const restoExtenso = numeroParaExtenso(resto);
-        extensoParts.push(`${restoExtenso} reais`);
-      }
-    } else if (intValue >= 1000) {
-      // Milhares
-      const mil = Math.floor(intValue / 1000);
-      const resto = intValue % 1000;
-      mainValue = `R$ ${mil} mil`;
-
-      if (resto > 0) {
-        const restoExtenso = numeroParaExtenso(resto);
-        extensoParts.push(`${restoExtenso} reais`);
-      }
-    } else {
-      // Menos de mil
-      return `R$ ${intValue}`;
-    }
-
-    const extensoText = extensoParts.join(" e ");
-
-    return (
-      <div className="flex flex-col items-start">
-        <span className="text-2xl font-semibold">{mainValue}</span>
-        {extensoText && (
-          <span className="text-xs text-blue-200 opacity-90">
-            {extensoText}
-          </span>
-        )}
-      </div>
-    );
-  };
-
-  // Calculate enhanced performance data
   const enhancedPerformance = useMemo((): EnhancedCollectorPerformance[] => {
     const collectors = users.filter((u) => u.type === "collector");
 
-    const isDateInSelectedMonths = (date: Date) => {
-      const dateMonth = date.getUTCMonth(); // 0-indexed
-      const dateYear = date.getUTCFullYear();
+    const parseDateSafely = (dateStr: string | null | undefined): Date | null => {
+      if (!dateStr) return null;
+      try {
+        const cleanDateStr = dateStr.toString().trim().split("T")[0].split(" ")[0];
+        if (cleanDateStr.includes("-")) {
+          const parts = cleanDateStr.split("-");
+          if (parts.length === 3) {
+            const [y, m, d] = parts.map(Number);
+            return new Date(y, m - 1, d);
+          }
+        } else if (cleanDateStr.includes("/")) {
+          const parts = cleanDateStr.split("/");
+          if (parts.length === 3) {
+            const [d, m, y] = parts.map(Number);
+            return new Date(y, m - 1, d);
+          }
+        }
+        const fallback = new Date(dateStr);
+        return isNaN(fallback.getTime()) ? null : fallback;
+      } catch (e) {
+        return null;
+      }
+    };
 
-      const monthMatches =
-        selectedMonths.length === 0 || selectedMonths.includes(dateMonth);
-      const yearMatches =
-        selectedYears.length === 0 || selectedYears.includes(dateYear);
-
+    const isDateInSelectedMonths = (date: Date | null) => {
+      if (!date) return false;
+      const dateMonth = date.getMonth();
+      const dateYear = date.getFullYear();
+      const monthMatches = selectedMonths.length === 0 || selectedMonths.includes(dateMonth);
+      const yearMatches = selectedYears.length === 0 || selectedYears.includes(dateYear);
       return monthMatches && yearMatches;
     };
 
     return collectors.map((collector) => {
-      const collectorCollections = collections.filter(
-        (c) => c.user_id === collector.id,
-      );
+      const filteredCollections = collections.filter((c) => {
+        if (c.user_id !== collector.id) return false;
+        const dateVenc = parseDateSafely(c.data_vencimento);
+        const dateLanc = parseDateSafely(c.data_lancamento);
+        return isDateInSelectedMonths(dateVenc) || isDateInSelectedMonths(dateLanc);
+      });
 
-      // Simplified - Group by sale to count correctly
-      const salesMap = new Map<
-        string,
-        {
-          totalValue: number;
-          receivedValue: number;
-          isPending: boolean;
-          clientDocument: string;
-        }
-      >();
+      const receivedAmount = salePayments
+        .filter((p) => {
+          if (p.collectorId !== collector.id || !p.paymentDate) return false;
+          const paymentDate = parseDateSafely(p.paymentDate);
+          return isDateInSelectedMonths(paymentDate);
+        })
+        .reduce((sum, p) => sum + p.paymentAmount, 0);
 
-      collectorCollections.forEach((collection) => {
+      const totalAmount = filteredCollections.reduce((sum, c) => sum + Number(c.valor_original || 0), 0);
+      const receivedFromFiltered = filteredCollections.reduce((sum, c) => sum + Number(c.valor_recebido || 0), 0);
+      const pendingAmount = Math.max(0, totalAmount - receivedFromFiltered);
+
+      const salesMap = new Map<string, { clientDocument: string; isPending: boolean }>();
+      filteredCollections.forEach((collection) => {
         const saleKey = `${collection.venda_n}-${collection.documento}`;
         if (!salesMap.has(saleKey)) {
-          salesMap.set(saleKey, {
-            totalValue: 0,
-            receivedValue: 0,
-            isPending: false,
-            clientDocument: collection.documento || "",
-          });
+          salesMap.set(saleKey, { clientDocument: collection.documento || "", isPending: false });
         }
-
-        const sale = salesMap.get(saleKey)!;
-        sale.totalValue =
-          Number(sale.totalValue) + Number(collection.valor_original);
-        sale.receivedValue =
-          Number(sale.receivedValue) + Number(collection.valor_recebido);
+        const isPending = Number(collection.valor_original) - Number(collection.valor_recebido) > 0.01;
+        if (isPending) salesMap.get(saleKey)!.isPending = true;
       });
-
-      // Determine if each sale is pending
-      salesMap.forEach((sale) => {
-        const pendingValue = Math.max(0, sale.totalValue - sale.receivedValue);
-        sale.isPending = pendingValue > 0.01;
-      });
-
       const salesArray = Array.from(salesMap.values());
       const totalSales = salesArray.length;
-      const completedSales = salesArray.filter((s) => !s.isPending).length;
       const pendingSales = salesArray.filter((s) => s.isPending).length;
-      const clientsWithPending = new Set(
-        salesArray
-          .filter((s) => s.isPending)
-          .map((s) => s.clientDocument)
-          .filter(Boolean),
-      ).size;
-      const totalAmount = salesArray.reduce((sum, s) => sum + s.totalValue, 0);
-      const receivedAmount = salesArray.reduce(
-        (sum, s) => sum + s.receivedValue,
-        0,
-      );
-      const conversionRate =
-        totalSales > 0 ? (completedSales / totalSales) * 100 : 0;
-      const averageTicket = totalSales > 0 ? totalAmount / totalSales : 0;
-      const efficiency =
-        totalAmount > 0 ? (receivedAmount / totalAmount) * 100 : 0;
-      const clientsCount = new Set(salesArray.map((s) => s.clientDocument))
-        .size;
+      const clientsWithPending = new Set(salesArray.filter((s) => s.isPending).map((s) => s.clientDocument).filter(Boolean)).size;
+      const clientsCount = new Set(salesArray.map((s) => s.clientDocument)).size;
 
-      // Goal performance calculation
       const currentMonthGoals = monthlyGoals.filter((g) => {
-        const goalDate = new Date(g.month + "T00:00:00");
-        return (
-          selectedMonths.includes(goalDate.getUTCMonth()) &&
-          selectedYears.includes(goalDate.getUTCFullYear()) &&
-          g.user_id === collector.id
-        );
+        const goalDate = parseDateSafely(g.month + "-01");
+        return isDateInSelectedMonths(goalDate) && g.user_id === collector.id;
       });
 
-      const currentMonthVisitsGoal = currentMonthGoals.reduce(
-        (sum, goal) => sum + (goal.visits_goal ?? 0),
-        0,
-      );
-      const currentMonthPaymentsGoal = currentMonthGoals.reduce(
-        (sum, goal) => sum + (goal.payments_goal ?? 0),
-        0,
-      );
+      const currentMonthVisitsGoal = currentMonthGoals.reduce((sum, goal) => sum + (goal.visits_goal ?? 0), 0);
+      const currentMonthPaymentsGoal = currentMonthGoals.reduce((sum, goal) => sum + (goal.payments_goal ?? 0), 0);
 
-      const currentMonthVisitsActual = scheduledVisits.filter((v) => {
-        if (v.collectorId !== collector.id || v.status !== "realizada") {
-          return false;
+      const collectorVisits = scheduledVisits.filter((v) => v.collectorId === collector.id);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      let visitsRealizadas = 0;
+      let visitsNaoEncontrado = 0;
+      let visitsAgendadas = 0;
+      let visitsCancelamentoSolicitado = 0;
+      let visitsCanceladas = 0;
+      let visitsAtrasadas = 0;
+      let visitsReagendadas = 0;
+
+      collectorVisits.forEach((v) => {
+        const visitDate = parseDateSafely(v.dataVisitaRealizada || v.scheduledDate);
+        if (!isDateInSelectedMonths(visitDate)) return;
+
+        if (v.status === "realizada") visitsRealizadas++;
+        if (v.status === "nao_encontrado") visitsNaoEncontrado++;
+        if (v.status === "cancelada") visitsCanceladas++;
+        if (v.status === "agendada") visitsAgendadas++;
+        if (v.status === "cancelamento_solicitado") visitsCancelamentoSolicitado++;
+        if (v.status === "reagendada" || (v.rescheduleCount && v.rescheduleCount > 0)) visitsReagendadas++;
+
+        if ((v.status === "agendada" || v.status === "cancelamento_solicitado" || v.status === "pending_sync") && visitDate && visitDate < today) {
+          visitsAtrasadas++;
         }
-        const dateStr = v.dataVisitaRealizada || v.scheduledDate;
-        if (!dateStr) return false;
+      });
 
-        // Fix: Use UTC parsing to avoid timezone issues
-        const visitDate = new Date(dateStr + "T00:00:00");
-        return isDateInSelectedMonths(visitDate);
-      }).length; // Closing for scheduledVisits.filter
+      const currentMonthVisitsActual = visitsRealizadas;
+      const pendingVisits = visitsAgendadas + visitsCancelamentoSolicitado;
 
-      const currentMonthPaymentsActual = salePayments
-        .filter((p) => {
-          if (p.collectorId !== collector.id || !p.paymentDate) {
-            return false;
-          }
-          const paymentDate = new Date(p.paymentDate + "T00:00:00");
-          return isDateInSelectedMonths(paymentDate);
-        }) // Closing for salePayments.filter
-        .reduce((sum, p) => sum + p.paymentAmount, 0); // Closing for reduce
+      const visitsPerformance = currentMonthVisitsGoal > 0 ? (currentMonthVisitsActual / currentMonthVisitsGoal) * 100 : 0;
+      const paymentsPerformance = currentMonthPaymentsGoal > 0 ? (receivedAmount / currentMonthPaymentsGoal) * 100 : 0;
 
-      const visitsPerformance =
-        currentMonthVisitsGoal > 0
-          ? (currentMonthVisitsActual / currentMonthVisitsGoal) * 100
-          : 0;
-      const paymentsPerformance =
-        currentMonthPaymentsGoal > 0
-          ? (currentMonthPaymentsActual / currentMonthPaymentsGoal) * 100
-          : 0;
-
-      // New: Calculate client visit efficiency
-      const allAssignedClients = new Set(
-        collections
-          .filter((c) => c.user_id === collector.id)
-          .map((c) => c.documento)
-          .filter(Boolean),
-      ).size;
-
-      const visitedClients = new Set(
-        scheduledVisits
-          .filter(
-            (v) =>
-              v.collectorId === collector.id &&
-              v.status === "realizada" &&
-              isDateInSelectedMonths(
-                new Date(v.dataVisitaRealizada + "T00:00:00"),
-              ),
-          )
-          .map((v) => v.clientDocument)
-          .filter(Boolean),
-      ).size;
-
-      const clientVisitEfficiency =
-        allAssignedClients > 0
-          ? (visitedClients / allAssignedClients) * 100
-          : 0;
+      const allAssignedClients = new Set(collections.filter((c) => c.user_id === collector.id).map((c) => c.documento).filter(Boolean)).size;
+      const visitedClients = new Set(scheduledVisits.filter(v => v.collectorId === collector.id && v.status === "realizada" && isDateInSelectedMonths(parseDateSafely(v.dataVisitaRealizada || v.scheduledDate))).map(v => v.clientDocument).filter(Boolean)).size;
 
       return {
         collectorId: collector.id,
         collectorName: collector.name,
         totalSales,
-        completedSales,
         pendingSales,
         clientsWithPending,
         totalAmount,
         receivedAmount,
-        conversionRate,
-        averageTicket,
-        efficiency,
+        pendingAmount,
         clientsCount,
         visitsPerformance,
         paymentsPerformance,
         currentMonthVisitsActual,
         currentMonthVisitsGoal,
-        currentMonthPaymentsActual,
+        currentMonthPaymentsActual: receivedAmount,
         currentMonthPaymentsGoal,
-        totalAssignedClients: allAssignedClients, // New
-        visitedClientsInSelectedMonths: visitedClients, // New
-        clientVisitEfficiency, // New
+        totalAssignedClients: allAssignedClients,
+        visitedClientsInSelectedMonths: visitedClients,
+        pendingVisits,
+        visitsRealizadas,
+        visitsNaoEncontrado,
+        visitsAgendadas,
+        visitsCancelamentoSolicitado,
+        visitsCanceladas,
+        visitsAtrasadas,
+        visitsReagendadas,
       };
     });
-  }, [
-    collections,
-    users,
-    monthlyGoals,
-    salePayments,
-    scheduledVisits,
-    selectedMonths,
-    selectedYears,
-  ]);
+  }, [collections, users, monthlyGoals, salePayments, scheduledVisits, selectedMonths, selectedYears]);
 
-  // Filter and sort performance data
   const filteredAndSortedPerformance = useMemo(() => {
-    let filtered = enhancedPerformance;
-
-    // Apply filter
-    if (filterMinRate) {
-      const minRate = parseFloat(filterMinRate);
-      filtered = filtered.filter((p) => p.conversionRate >= minRate);
-    }
-
-    // Apply sorting
+    let filtered = [...enhancedPerformance];
     filtered.sort((a, b) => {
       const aValue = a[sortBy];
       const bValue = b[sortBy];
       return sortOrder === "desc" ? bValue - aValue : aValue - bValue;
     });
-
     return filtered;
-  }, [enhancedPerformance, sortBy, sortOrder, filterMinRate]);
+  }, [enhancedPerformance, sortBy, sortOrder]);
 
-  // Calculate team statistics
   const teamStats = useMemo(() => {
-    const totalSales = enhancedPerformance.reduce(
-      (sum, p) => sum + p.totalSales,
-      0,
-    );
-    const totalReceived = enhancedPerformance.reduce(
-      (sum, p) => sum + p.receivedAmount,
-      0,
-    );
-    const totalAmount = enhancedPerformance.reduce(
-      (sum, p) => sum + p.totalAmount,
-      0,
-    );
-    const avgConversionRate =
-      enhancedPerformance.length > 0
-        ? enhancedPerformance.reduce((sum, p) => sum + p.conversionRate, 0) /
-          enhancedPerformance.length
-        : 0;
-    const topPerformer =
-      enhancedPerformance.length > 0
-        ? enhancedPerformance.reduce((top, current) =>
-            current.conversionRate > top.conversionRate ? current : top,
-          )
-        : null;
+    const totalReceived = enhancedPerformance.reduce((sum, p) => sum + p.receivedAmount, 0);
+    const totalVisitsActual = enhancedPerformance.reduce((sum, p) => sum + p.currentMonthVisitsActual, 0);
+    const totalVisitsGoal = enhancedPerformance.reduce((sum, p) => sum + p.currentMonthVisitsGoal, 0);
+    const totalPendingVisits = enhancedPerformance.reduce((sum, p) => sum + p.pendingVisits, 0);
+    const totalVisitsNaoEncontrado = enhancedPerformance.reduce((sum, p) => sum + p.visitsNaoEncontrado, 0);
+    const totalVisitsAtrasadas = enhancedPerformance.reduce((sum, p) => sum + p.visitsAtrasadas, 0);
 
-    return {
-      totalSales,
-      totalReceived,
-      totalAmount,
-      avgConversionRate,
-      topPerformer,
-      teamEfficiency: totalAmount > 0 ? (totalReceived / totalAmount) * 100 : 0,
-    };
+    return { totalReceived, totalVisitsActual, totalVisitsGoal, totalPendingVisits, totalVisitsNaoEncontrado, totalVisitsAtrasadas };
   }, [enhancedPerformance]);
 
   const exportPerformanceData = () => {
-    // Headers with better formatting
-    const headers = [
-      "Cobrador",
-      "Total de Vendas",
-      "Vendas Finalizadas",
-      "Vendas Pendentes",
-      "Clientes com Pendências",
-      "Taxa de Conversão (%)",
-      "Valor Total (R$)",
-      "Valor Recebido (R$)",
-      "Valor Pendente (R$)",
-      "Eficiência (%)",
-      "Ticket Médio (R$)",
-      "Total de Clientes",
-      "Ranking Taxa",
-      "Ranking Valor",
-    ];
-
-    // Data rows with proper formatting
-    const rows = filteredAndSortedPerformance.map((p) => {
-      const pendingAmount = p.totalAmount - p.receivedAmount;
-      const conversionRanking =
-        enhancedPerformance
-          .sort((a, b) => b.conversionRate - a.conversionRate)
-          .findIndex((collector) => collector.collectorId === p.collectorId) +
-        1;
-      const valueRanking =
-        enhancedPerformance
-          .sort((a, b) => b.receivedAmount - a.receivedAmount)
-          .findIndex((collector) => collector.collectorId === p.collectorId) +
-        1;
-
-      return [
-        p.collectorName,
-        p.totalSales.toString(),
-        p.completedSales.toString(),
-        p.pendingSales.toString(),
-        p.clientsWithPending.toString(),
-        p.conversionRate.toFixed(1),
-        p.totalAmount.toFixed(2),
-        p.receivedAmount.toFixed(2),
-        pendingAmount.toFixed(2),
-        p.efficiency.toFixed(1),
-        p.averageTicket.toFixed(2),
-        p.clientsCount.toString(),
-        conversionRanking.toString(),
-        valueRanking.toString(),
-      ];
-    });
-
-    // Create CSV content with proper encoding
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) =>
-        row
-          .map((cell) => {
-            // Escape quotes and wrap in quotes if contains comma, quote, or newline
-            const escaped = cell.toString().replace(/"/g, '""');
-            return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
-          })
-          .join(","),
-      ),
-    ].join("\n");
-
-    // Add BOM for proper UTF-8 encoding in Excel
-    const BOM = "\uFEFF";
-    const blob = new Blob([BOM + csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-
+    const headers = ["Cobrador", "Vendas", "Clientes", "Total (R$)", "Recebido (R$)", "Pendente (R$)", "Visitas OK", "Visitas Pend"];
+    const rows = filteredAndSortedPerformance.map((p) => [
+      p.collectorName, p.totalSales.toString(), p.clientsCount.toString(), p.totalAmount.toFixed(2),
+      p.receivedAmount.toFixed(2), p.pendingAmount.toFixed(2), p.currentMonthVisitsActual.toString(), p.pendingVisits.toString()
+    ]);
+    const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell.toString().replace(/"/g, '""')}"`).join(","))].join("\n");
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `desempenho-cobradores-${new Date().toISOString().split("T")[0]}.csv`;
+    link.href = URL.createObjectURL(new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" }));
+    link.download = `ranking-${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
-    URL.revokeObjectURL(link.href);
   };
 
-  const activeFilterCount =
-    selectedMonths.length + selectedYears.length + (filterMinRate ? 1 : 0);
-  const hasActiveFilters = activeFilterCount > 0;
+  const hasActiveFilters = selectedMonths.length > 0 || selectedYears.length > 0;
 
   return (
-    <div className="space-y-4">
-      {/* Header Simplificado */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Dashboard Header */}
+      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-dark-border">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-              <FileText className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
-              Análise de Desempenho
+            <h2 className="text-2xl font-black text-gray-900 dark:text-dark-text tracking-tight flex items-center gap-2">
+              <BarChart3 className="w-6 h-6 text-blue-600" />
+              Ranking de Performance
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Ranking de vendas por cobrador
+            <p className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary mt-1 uppercase tracking-wider">
+              Análise detalhada por cobrador e período
             </p>
           </div>
-
-          {/* Ações Principais */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="relative flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wider transition-all border ${
+                showFilters || hasActiveFilters
+                  ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 dark:shadow-none"
+                  : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
+              }`}
             >
               <Filter className="w-4 h-4" />
-              {hasActiveFilters && (
-                <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white ring-2 ring-white">
-                  {activeFilterCount}
-                </span>
-              )}
+              Filtros {hasActiveFilters && `(${selectedMonths.length + selectedYears.length})`}
             </button>
-
             <button
               onClick={exportPerformanceData}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
-              title="Exportar"
+              className="p-2.5 bg-gray-50 dark:bg-dark-bg text-gray-500 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-xl hover:bg-gray-100 dark:hover:bg-dark-bg/50 transition-all"
+              title="Exportar CSV"
             >
-              <Download className="h-5 w-5" />
+              <Download className="w-5 h-5" />
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Card Principal - Taxa de Conversão Média */}
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-blue-100 text-sm font-medium">
-              Taxa de Conversão Média
-            </p>
-            <p className="text-4xl font-bold mt-1">
-              {teamStats.avgConversionRate.toFixed(1)}%
-            </p>
-            <p className="text-blue-100 text-sm mt-2">
-              {enhancedPerformance.length} cobradores ativos
-            </p>
-          </div>
-          <Award className="h-16 w-16 text-blue-200 opacity-50" />
-        </div>
-
-        {/* Métricas secundárias */}
-        <div className="grid grid-cols-[1fr_1.5fr_1fr] gap-4 mt-6 pt-6 border-t border-blue-400">
-          <div>
-            <p className="text-blue-100 text-xs">Vendas</p>
-            <p className="text-2xl font-semibold">{teamStats.totalSales}</p>
-          </div>
-          <div>
-            <p className="text-blue-100 text-xs">Recebido</p>
-            <div className="text-2xl font-semibold">
-              {formatMobileCurrency(teamStats.totalReceived)}
-            </div>
-          </div>
-          <div>
-            <p className="text-blue-100 text-xs">Eficiência</p>
-            <p className="text-2xl font-semibold">
-              {teamStats.teamEfficiency.toFixed(0)}%
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Filtros Colapsáveis */}
-      {showFilters && (
-        <div className="relative bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-in slide-in-from-top-2 duration-200">
-          {isPending && (
-            <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-10 rounded-2xl">
-              <div className="flex items-center gap-2 text-gray-600">
-                <Loader className="animate-spin h-6 w-6 text-blue-600" />
-                <span className="font-medium">Calculando...</span>
+        {/* Filters Section */}
+        {showFilters && (
+          <div className="mt-6 p-6 bg-gray-50 dark:bg-dark-bg rounded-2xl border border-gray-100 dark:border-dark-border animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {/* Month Select */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em]">Meses</label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {monthsDisplay.map((month, idx) => (
+                    <button
+                      key={month}
+                      onClick={() => startTransition(() => {
+                        setSelectedMonths(prev => prev.includes(idx) ? prev.filter(m => m !== idx) : [...prev, idx]);
+                      })}
+                      className={`py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                        selectedMonths.includes(idx)
+                          ? "bg-blue-600 text-white shadow-md"
+                          : "bg-white dark:bg-dark-bg-secondary text-gray-500 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:border-blue-400"
+                      }`}
+                    >
+                      {month}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-          <div className={`space-y-6 ${isPending ? "opacity-50" : ""}`}>
-            {/* Filtro de Meses */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Calendar className="w-4 h-4 text-gray-500" />
-                <label className="text-sm font-semibold text-gray-700">
-                  Meses ({selectedMonths.length} selecionado
-                  {selectedMonths.length !== 1 ? "s" : ""})
-                </label>
-              </div>
-              <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
-                {monthsDisplay.map((month, index) => (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      startTransition(() => {
-                        if (selectedMonths.includes(index)) {
-                          setSelectedMonths(
-                            selectedMonths.filter((m) => m !== index),
-                          );
-                        } else {
-                          setSelectedMonths([...selectedMonths, index]);
-                        }
-                      });
-                    }}
-                    className={`
-                      px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-2
-                      ${
-                        selectedMonths.includes(index)
-                          ? "bg-blue-500 text-white border-blue-500 shadow-md"
-                          : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
-                      }
-                    `}
-                  >
-                    {month}
-                  </button>
-                ))}
-              </div>
-              {selectedMonths.length > 0 && (
-                <button
-                  onClick={() => startTransition(() => setSelectedMonths([]))}
-                  className="mt-2 text-xs text-gray-500 hover:text-gray-700 flex items-center gap-2"
-                >
-                  <X className="w-3 h-3" />
-                  Limpar meses
-                </button>
-              )}
-            </div>
 
-            {/* Filtro de Anos */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
-                Anos ({selectedYears.length} selecionado
-                {selectedYears.length !== 1 ? "s" : ""})
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {years.map((year) => (
-                  <button
-                    key={year}
-                    onClick={() => {
-                      startTransition(() => {
-                        if (selectedYears.includes(year)) {
-                          setSelectedYears(
-                            selectedYears.filter((y) => y !== year),
-                          );
-                        } else {
-                          setSelectedYears([...selectedYears, year]);
-                        }
-                      });
-                    }}
-                    className={`
-                      px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border-2
-                      ${
+              {/* Year Select */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em]">Anos</label>
+                <div className="flex flex-wrap gap-2">
+                  {years.map(year => (
+                    <button
+                      key={year}
+                      onClick={() => startTransition(() => {
+                        setSelectedYears(prev => prev.includes(year) ? prev.filter(y => y !== year) : [...prev, year]);
+                      })}
+                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
                         selectedYears.includes(year)
-                          ? "bg-green-500 text-white border-green-500 shadow-md transform scale-102"
-                          : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
-                      }
-                    `}
-                  >
-                    {year}
-                  </button>
-                ))}
+                          ? "bg-green-600 text-white shadow-md"
+                          : "bg-white dark:bg-dark-bg-secondary text-gray-500 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:border-green-400"
+                      }`}
+                    >
+                      {year}
+                    </button>
+                  ))}
+                </div>
               </div>
-              {selectedYears.length > 0 && (
-                <button
-                  onClick={() => startTransition(() => setSelectedYears([]))}
-                  className="mt-2 text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
-                >
-                  <X className="w-3 h-3" />
-                  Limpar anos
-                </button>
-              )}
-            </div>
 
-            {/* Linha divisória */}
-            <div className="border-t border-gray-200"></div>
-
-            {/* Controles de Ordenação e Taxa */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Ordenar Por
-                </label>
+              {/* Sorting */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em]">Ordenação</label>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
+                  className="w-full px-4 py-2.5 bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="conversionRate">Taxa de Conversão</option>
-                  <option value="receivedAmount">Valor Recebido</option>
-                  <option value="totalSales">Total de Vendas</option>
+                  <option value="receivedAmount">VALOR RECEBIDO</option>
+                  <option value="totalSales">TOTAL DE VENDAS</option>
+                  <option value="clientsCount">TOTAL DE CLIENTES</option>
+                  <option value="pendingSales">TOTAL DE PENDÊNCIAS</option>
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Taxa Mínima (%)
-                </label>
-                <input
-                  type="number"
-                  value={filterMinRate}
-                  onChange={(e) =>
-                    startTransition(() => setFilterMinRate(e.target.value))
-                  }
-                  placeholder="Ex: 5.5"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50"
-                />
               </div>
             </div>
 
-            {/* Botões de Ação */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-dark-border flex justify-end gap-3">
               <button
-                onClick={() => {
-                  startTransition(() => {
-                    setSelectedMonths([]);
-                    setSelectedYears([]);
-                    setFilterMinRate("");
-                    setSortBy("conversionRate");
-                    setSortOrder("desc");
-                  });
-                }}
-                disabled={!hasActiveFilters}
-                className={`
-                  flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-200 border-2
-                  ${
-                    hasActiveFilters
-                      ? "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-                      : "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
-                  }
-                `}
+                onClick={() => startTransition(() => { setSelectedMonths([]); setSelectedYears([]); setShowFilters(false); })}
+                className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 dark:hover:text-dark-text"
               >
-                Limpar Filtros
+                Limpar Todos
               </button>
-
               <button
                 onClick={() => setShowFilters(false)}
-                className="flex-1 sm:hidden px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium border-2 border-blue-600"
+                className="px-6 py-2 bg-blue-600 text-white text-xs font-bold uppercase tracking-widest rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-100 dark:shadow-none transition-all"
               >
                 Aplicar Filtros
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* o nome exato */}
-      {!showFilters && hasActiveFilters && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-blue-800">
-              <Filter className="w-4 h-4" />
-              <span className="font-medium">Filtros ativos:</span>
-              <div className="flex gap-1">
-                {selectedMonths.length > 0 && (
-                  <span className="bg-blue-200 px-2 py-1 rounded-lg text-xs">
-                    {selectedMonths.map((m) => monthsDisplay[m]).join(", ")}
-                  </span>
-                )}
-                {selectedYears.length > 0 && (
-                  <span className="bg-green-200 px-2 py-1 rounded-lg text-xs">
-                    {selectedYears.join(", ")}
-                  </span>
-                )}
-                {filterMinRate && (
-                  <span className="bg-purple-200 px-2 py-1 rounded-lg text-xs">
-                    Taxa ≥ {filterMinRate}%
-                  </span>
-                )}
-              </div>
+      {/* Summary Card: Visitas do Período */}
+      <div className="relative overflow-hidden bg-white dark:bg-dark-bg-secondary rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-dark-border">
+        {/* Decorative background element */}
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-blue-500/5 dark:bg-blue-400/5 rounded-full blur-3xl pointer-events-none"></div>
+        
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+              <Calendar className="w-5 h-5 text-blue-600" />
             </div>
-            <button
-              onClick={() => {
-                setSelectedMonths([]);
-                setSelectedYears([]);
-                setFilterMinRate("");
-                setSortBy("conversionRate");
-                setSortOrder("desc");
-              }}
-              className="text-blue-600 hover:text-blue-800 transition-colors"
-              title="Limpar todos os filtros"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div>
+              <h3 className="text-sm font-black text-gray-800 dark:text-dark-text uppercase tracking-wider">Visitas do Período</h3>
+              <p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">Visão consolidada da equipe</p>
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Ranking de Cobradores - Design Responsivo com Melhor Affordance */}
-      <div className="space-y-4 sm:space-y-6">
-        {/* Header responsivo */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-gray-200">
-          <div>
-            <h3 className="text-lg sm:text-xl font-bold text-gray-900">
-              Ranking de Cobradores
-            </h3>
-            <p className="text-xs sm:text-sm text-gray-600 mt-1">
-              Performance dos cobradores no período selecionado
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-            <span className="text-xs text-gray-500 font-medium hidden sm:inline">
-              ORDENAR POR:
-            </span>
-            <button
-              onClick={() =>
-                setSortOrder(sortOrder === "desc" ? "asc" : "desc")
-              }
-              className="flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 sm:py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 shadow-sm hover:shadow-md w-full sm:w-auto"
-            >
-              <span className="text-sm font-medium text-gray-700">
-                {sortOrder === "desc"
-                  ? "Maior Performance"
-                  : "Menor Performance"}
+          {teamStats.totalVisitsGoal > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-black text-blue-600">
+                {((teamStats.totalVisitsActual / teamStats.totalVisitsGoal) * 100).toFixed(0)}%
               </span>
-              <div className="flex flex-col">
-                <ChevronUp
-                  className={`h-3 w-3 ${sortOrder === "asc" ? "text-blue-600" : "text-gray-400"}`}
-                />
-                <ChevronDown
-                  className={`h-3 w-3 ${sortOrder === "desc" ? "text-blue-600" : "text-gray-400"}`}
-                />
-              </div>
-            </button>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">da Meta</span>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-2xl border border-gray-100 dark:border-dark-border group hover:border-green-200 dark:hover:border-green-900/30 transition-all">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Realizadas</label>
+            </div>
+            <p className="text-2xl font-black text-gray-800 dark:text-dark-text group-hover:text-green-600 transition-colors">{teamStats.totalVisitsActual}</p>
+          </div>
+          <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-2xl border border-gray-100 dark:border-dark-border group hover:border-amber-200 dark:hover:border-amber-900/30 transition-all">
+            <div className="flex items-center gap-2 mb-2">
+              <Search className="w-3.5 h-3.5 text-amber-500" />
+              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Não Loc.</label>
+            </div>
+            <p className="text-2xl font-black text-gray-800 dark:text-dark-text group-hover:text-amber-600 transition-colors">{teamStats.totalVisitsNaoEncontrado}</p>
+          </div>
+          <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-2xl border border-gray-100 dark:border-dark-border group hover:border-blue-200 dark:hover:border-blue-900/30 transition-all">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="w-3.5 h-3.5 text-blue-500" />
+              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Agendadas</label>
+            </div>
+            <p className="text-2xl font-black text-gray-800 dark:text-dark-text group-hover:text-blue-600 transition-colors">{teamStats.totalPendingVisits}</p>
+          </div>
+          <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-2xl border border-gray-100 dark:border-dark-border group hover:border-rose-200 dark:hover:border-rose-900/30 transition-all">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Atrasadas</label>
+            </div>
+            <p className="text-2xl font-black text-gray-800 dark:text-dark-text group-hover:text-rose-600 transition-colors">{teamStats.totalVisitsAtrasadas}</p>
           </div>
         </div>
 
-        {/* Grid responsivo - Mobile first */}
-        <div className="space-y-4 sm:space-y-0 sm:grid sm:gap-4 md:gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2">
-          {filteredAndSortedPerformance.map((collector, index) => {
-            const isTopPerformer = index === 0 && sortOrder === "desc";
-            const rankingPosition = index + 1;
-
-            return (
-              <div
-                key={collector.collectorId}
-                className={`group relative bg-white rounded-xl sm:rounded-2xl border-2 p-4 sm:p-6 transition-all duration-300 hover:shadow-lg sm:hover:-translate-y-1 cursor-pointer ${
-                  isTopPerformer
-                    ? "border-blue-400 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-md"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                {/* Badge de Posição adaptado para mobile */}
-                <div className="flex items-start justify-between mb-3 sm:mb-4">
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <div
-                      className={`relative w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-base sm:text-lg font-bold shadow-sm ${
-                        rankingPosition === 1
-                          ? "bg-gradient-to-r from-yellow-400 to-orange-400 text-white"
-                          : rankingPosition === 2
-                            ? "bg-gradient-to-r from-gray-400 to-gray-500 text-white"
-                            : rankingPosition === 3
-                              ? "bg-gradient-to-r from-orange-400 to-red-400 text-white"
-                              : "bg-gray-100 text-gray-600 border-2 border-gray-300"
-                      }`}
-                    >
-                      {rankingPosition <= 3 && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center">
-                          <Trophy className="h-2.5 w-2.5 text-yellow-600" />
-                        </div>
-                      )}
-                      {rankingPosition}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-gray-900 text-base sm:text-lg truncate">
-                        {collector.collectorName}
-                      </h4>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="flex items-center gap-1">
-                          <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500 flex-shrink-0" />
-                          <span className="text-xs sm:text-sm text-gray-600 font-medium">
-                            {collector.totalSales} vendas
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  {isTopPerformer && (
-                    <div className="absolute -top-2 -right-2 w-6 h-6 sm:w-8 sm:h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-lg">
-                      <Award className="h-3 w-3 sm:h-5 sm:w-5 text-white" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Métricas adaptadas para mobile */}
-                <div className="space-y-3 sm:space-y-4">
-                  {/* Meta de Visitas - Layout mobile otimizado */}
-                  <div className="bg-white/80 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-gray-100">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                        <span className="text-xs sm:text-sm font-semibold text-gray-700 truncate">
-                          Visitas do Mês
-                        </span>
-                      </div>
-                      <span className="text-xs sm:text-sm font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded-md sm:rounded-lg whitespace-nowrap ml-2">
-                        {collector.currentMonthVisitsActual} /{" "}
-                        {collector.currentMonthVisitsGoal}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 shadow-inner">
-                      <div
-                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 sm:h-3 rounded-full shadow-sm transition-all duration-500"
-                        style={{
-                          width: `${Math.min(100, collector.visitsPerformance)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="text-right mt-1">
-                      <span className="text-xs font-medium text-gray-600">
-                        {collector.visitsPerformance.toFixed(1)}% concluído
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Meta de Pagamentos - Layout mobile otimizado */}
-                  <div className="bg-white/80 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-gray-100">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
-                        <span className="text-xs sm:text-sm font-semibold text-gray-700 truncate">
-                          Pagamentos do Mês
-                        </span>
-                      </div>
-                    </div>
-                    {/* Valores em linha separada no mobile */}
-                    <div className="mb-2">
-                      <span className="text-xs sm:text-sm font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded-md sm:rounded-lg block sm:inline w-fit">
-                        {formatCurrency(collector.currentMonthPaymentsActual)} /{" "}
-                        {formatCurrency(collector.currentMonthPaymentsGoal)}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 shadow-inner">
-                      <div
-                        className="bg-gradient-to-r from-green-500 to-green-600 h-2 sm:h-3 rounded-full shadow-sm transition-all duration-500"
-                        style={{
-                          width: `${Math.min(100, collector.paymentsPerformance)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="text-right mt-1">
-                      <span className="text-xs font-medium text-gray-600">
-                        {collector.paymentsPerformance.toFixed(1)}% da meta
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Estatísticas em grid responsivo */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-gray-100">
-                    <div className="text-center bg-gray-50 rounded-lg p-2 sm:p-3 flex flex-col justify-center">
-                      <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                        Finalizadas
-                      </p>
-                      <p className="text-sm sm:text-lg font-bold text-gray-800 mt-1">
-                        {collector.completedSales}
-                        <span className="text-xs sm:text-sm text-gray-500 font-normal">
-                          /{collector.totalSales}
-                        </span>
-                      </p>
-                    </div>
-                    <div className="text-center bg-gray-50 rounded-lg p-2 sm:p-3 flex flex-col justify-center">
-                      <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                        Ticket Médio
-                      </p>
-                      <p
-                        className="text-sm sm:text-lg font-bold text-gray-800 mt-1 truncate"
-                        title={formatCurrency(collector.averageTicket)}
-                      >
-                        {formatCurrency(collector.averageTicket)}
-                      </p>
-                    </div>
-                    {/* Aproveitamento simplificado */}
-                    <div className="col-span-2 sm:col-span-1 text-center bg-gray-50 rounded-lg p-2 sm:p-3 flex flex-col justify-center">
-                      <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                        <span className="hidden sm:inline">Aproveitamento</span>
-                        <span
-                          className="inline sm:hidden"
-                          title="Aproveitamento"
-                        >
-                          Aprov.
-                        </span>
-                      </p>
-                      <p className="text-sm sm:text-lg font-bold text-gray-800 mt-1">
-                        {collector.clientVisitEfficiency.toFixed(1)}%
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {collector.visitedClientsInSelectedMonths} de{" "}
-                        {collector.totalAssignedClients} clientes
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Botões de Ação otimizados para mobile */}
-                <div className="mt-4 sm:mt-6 flex flex-col sm:grid sm:grid-cols-2 gap-2 sm:gap-3">
-                  <button
-                    onClick={() => {
-                      setSelectedCollector(collector);
-                      setIsModalOpen(true);
-                    }}
-                    className="group flex items-center justify-center gap-2 px-4 py-3 sm:py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg font-medium text-sm transform active:scale-95 sm:hover:scale-105 w-full order-1"
-                  >
-                    <Eye
-                      size={18}
-                      className="group-hover:scale-110 transition-transform flex-shrink-0"
-                    />
-                    <span>Ver Detalhes</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      const user = users.find(
-                        (u) => u.id === collector.collectorId,
-                      );
-                      if (user) {
-                        setSelectedCollectorForGoals(user);
-                        setIsGoalModalOpen(true);
-                      }
-                    }}
-                    className="group flex items-center justify-center gap-2 px-4 py-3 sm:py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg font-medium text-sm transform active:scale-95 sm:hover:scale-105 w-full order-2"
-                  >
-                    <Target
-                      size={18}
-                      className="group-hover:scale-110 transition-transform flex-shrink-0"
-                    />
-                    <span>Definir Metas</span>
-                  </button>
-                </div>
-
-                {/* Indicador de hover adaptado */}
-                <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Estado vazio responsivo */}
-        {filteredAndSortedPerformance.length === 0 && (
-          <div className="text-center py-8 sm:py-12 px-4">
-            <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <BarChart3 className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" />
+        {teamStats.totalVisitsGoal > 0 && (
+          <div className="mt-6">
+            <div className="w-full bg-gray-100 dark:bg-dark-bg h-2 rounded-full overflow-hidden border border-gray-50 dark:border-dark-border">
+              <div 
+                className="bg-blue-600 h-full rounded-full transition-all duration-1000 ease-out shadow-lg shadow-blue-200"
+                style={{ width: `${Math.min(100, (teamStats.totalVisitsActual / teamStats.totalVisitsGoal) * 100)}%` }}
+              />
             </div>
-            <h4 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">
-              Nenhum cobrador encontrado
-            </h4>
-            <p className="text-sm sm:text-base text-gray-500">
-              Ajuste os filtros para visualizar os cobradores
-            </p>
           </div>
         )}
       </div>
 
+      {/* Collector Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {filteredAndSortedPerformance.map((collector, index) => {
+          const isTop3 = index < 3 && sortOrder === "desc";
+          const rank = index + 1;
+          
+          return (
+            <div 
+              key={collector.collectorId}
+              className="group relative bg-white dark:bg-dark-bg-secondary rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-dark-border hover:shadow-xl transition-all duration-300"
+            >
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <div className={`relative w-12 h-12 flex items-center justify-center rounded-2xl text-lg font-black transition-all ${
+                    isTop3 
+                      ? rank === 1 ? "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400" 
+                      : rank === 2 ? "bg-gray-100 text-gray-600 dark:bg-gray-700/30 dark:text-gray-400"
+                      : "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
+                    : "bg-gray-50 text-gray-400 dark:bg-dark-bg dark:text-dark-text-secondary"
+                  }`}>
+                    {rank}
+                    {isTop3 && <Trophy className="absolute -top-1 -right-1 w-3.5 h-3.5 animate-bounce-slow" />}
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-gray-800 dark:text-dark-text group-hover:text-blue-600 transition-colors uppercase tracking-tight">
+                      {collector.collectorName}
+                    </h4>
+                    <div className="flex items-center gap-4 mt-1">
+                      <div className="flex items-center gap-1.5">
+                        <ShoppingCart className="w-3 h-3 text-gray-400" />
+                        <span className="text-[10px] font-bold text-gray-500 dark:text-dark-text-secondary uppercase">{collector.totalSales} Vendas</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Users className="w-3 h-3 text-gray-400" />
+                        <span className="text-[10px] font-bold text-gray-500 dark:text-dark-text-secondary uppercase">{collector.clientsCount} Clientes</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {collector.pendingSales > 0 && (
+                  <div className="px-2 py-1 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-rose-100 dark:border-rose-900/30">
+                    {collector.pendingSales} Pendências
+                  </div>
+                )}
+              </div>
+
+              {/* Metric Groups */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-xl border border-gray-100 dark:border-dark-border">
+                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Volume Financeiro</label>
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[10px] font-bold text-green-600 uppercase">Recebido</span>
+                      <span className="text-base font-black text-gray-800 dark:text-dark-text">{formatCurrency(collector.receivedAmount)}</span>
+                    </div>
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[10px] font-bold text-amber-600 uppercase">A Receber</span>
+                      <span className="text-sm font-bold text-gray-500 dark:text-dark-text-secondary">{formatCurrency(collector.pendingAmount)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-xl border border-gray-100 dark:border-dark-border">
+                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Visitas no Período</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-blue-600 uppercase">Realizadas</span>
+                      <span className="text-base font-black text-gray-800 dark:text-dark-text">{collector.visitsRealizadas}</span>
+                    </div>
+                    <div className="flex flex-col text-right">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase">Atrasadas</span>
+                      <span className={`text-base font-black ${collector.visitsAtrasadas > 0 ? "text-rose-500" : "text-gray-300 dark:text-gray-700"}`}>
+                        {collector.visitsAtrasadas}
+                      </span>
+                    </div>
+                  </div>
+                  {collector.currentMonthVisitsGoal > 0 && (
+                    <div className="mt-2 w-full bg-gray-200 dark:bg-dark-bg-secondary h-1 rounded-full overflow-hidden">
+                      <div className="bg-blue-600 h-full transition-all duration-500" style={{ width: `${Math.min(100, (collector.visitsRealizadas / collector.currentMonthVisitsGoal) * 100)}%` }} />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => { setSelectedCollector(collector); setIsModalOpen(true); }}
+                  className="flex items-center justify-center gap-2 py-3 bg-gray-900 dark:bg-dark-bg text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-black dark:hover:bg-dark-bg/50 transition-all group/btn"
+                >
+                  <Eye className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" />
+                  Detalhes
+                </button>
+                <button
+                  onClick={() => {
+                    const user = users.find(u => u.id === collector.collectorId);
+                    if (user) { setSelectedCollectorForGoals(user); setIsGoalModalOpen(true); }
+                  }}
+                  className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-blue-700 shadow-lg shadow-blue-100 dark:shadow-none transition-all group/btn"
+                >
+                  <Target className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" />
+                  Metas
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Empty State */}
       {filteredAndSortedPerformance.length === 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
-          <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Nenhum cobrador encontrado
-          </h3>
-          <p className="text-gray-600">
-            Não há cobradores que atendam aos filtros selecionados.
-          </p>
+        <div className="flex flex-col items-center justify-center p-20 text-center bg-white dark:bg-dark-bg-secondary rounded-3xl border-2 border-dashed border-gray-100 dark:border-dark-border">
+          <div className="p-6 bg-gray-50 dark:bg-dark-bg rounded-full mb-4">
+            <Users className="w-12 h-12 text-gray-300" />
+          </div>
+          <h3 className="text-lg font-black text-gray-800 dark:text-dark-text uppercase tracking-tight">Nenhum cobrador encontrado</h3>
+          <p className="text-sm text-gray-500 dark:text-dark-text-secondary mt-2 max-w-xs">Ajuste os filtros de período acima para visualizar o ranking de desempenho.</p>
         </div>
       )}
 
+      {/* Modals */}
       <CollectorPerformanceModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         collector={selectedCollector}
+        selectedMonths={selectedMonths}
+        selectedYears={selectedYears}
       />
       <MonthlyGoalEditModal
         isOpen={isGoalModalOpen}
-        onClose={() => {
-          setIsGoalModalOpen(false);
-          refreshData(); // Trigger data refresh
-        }}
+        onClose={() => { setIsGoalModalOpen(false); refreshData(); }}
         collector={selectedCollectorForGoals}
       />
     </div>
