@@ -211,6 +211,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     useState<ScheduledVisit | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
+  const [isRescheduling, setIsRescheduling] = useState(false);
   const [customObservation, setCustomObservation] = useState("");
   const [showCustomObservationInput, setShowCustomObservationInput] = useState(false);
   const [showDateValidationModal, setShowDateValidationModal] = useState(false);
@@ -1660,13 +1661,16 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   };
 
   const handleCloseRescheduleModal = () => {
+    if (isRescheduling) return;
     setShowRescheduleModal(false);
     setSelectedVisitForReschedule(null);
     setRescheduleDate("");
     setRescheduleTime("");
+    setIsRescheduling(false);
   };
 
   const handleConfirmReschedule = async () => {
+    if (isRescheduling) return;
     if (!selectedVisitForReschedule || !rescheduleDate || !rescheduleTime) {
       alert("Por favor, selecione uma nova data e horário");
       return;
@@ -1682,8 +1686,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       return;
     }
 
+    setIsRescheduling(true);
     try {
-      // Usar a nova função rescheduleVisit
       await rescheduleVisit(
         selectedVisitForReschedule.id,
         rescheduleDate,
@@ -1691,14 +1695,15 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       );
 
       triggerNotification("Visita reagendada com sucesso!", "success");
+      handleCloseRescheduleModal();
 
       // Refresh dos dados para atualizar outras abas
       await refreshData();
-
-      handleCloseRescheduleModal();
     } catch (error) {
       console.error("Erro ao reagendar visita:", error);
       alert("Erro ao reagendar visita. Tente novamente.");
+    } finally {
+      setIsRescheduling(false);
     }
   };
 
@@ -3136,17 +3141,22 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                 <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3 flex-shrink-0">
                   <button
                     onClick={handleCloseRescheduleModal}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
+                    disabled={isRescheduling}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleConfirmReschedule}
-                    disabled={!rescheduleDate || !rescheduleTime}
+                    disabled={!rescheduleDate || !rescheduleTime || isRescheduling}
                     className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                   >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Reagendar
+                    {isRescheduling ? (
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                    )}
+                    {isRescheduling ? "Reagendando..." : "Reagendar"}
                   </button>
                 </div>
               </div>
@@ -4490,7 +4500,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                         const visitsOnThisDate =
                                           allVisits.filter(
                                             (visit) =>
-                                              visit.scheduledDate === date,
+                                              visit.scheduledDate === date &&
+                                              visit.status !== "reagendada" &&
+                                              visit.status !== "cancelada",
                                           ).length;
 
                                         return (

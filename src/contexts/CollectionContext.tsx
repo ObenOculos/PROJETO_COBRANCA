@@ -3585,6 +3585,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         throw new Error("Visita não encontrada no estado local");
       }
 
+      // Prevenir reagendamento duplicado se a visita já foi reagendada
+      if (currentVisit.status === "reagendada") {
+        throw new Error("Esta visita já foi reagendada");
+      }
+
       // Montar nota com informações do reagendamento
       const formatBrazilianDate = (date: string, time?: string) => {
         const [year, month, day] = date.split("-");
@@ -3728,7 +3733,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           totalPendingValue: newVisit.total_pending_value,
           overdueCount: newVisit.overdue_count,
         });
-        console.log("Estado local atualizado. Visitas:", updated.length);
         console.log("Estado local atualizado. Visitas:", updated.length);
         return updated;
       });

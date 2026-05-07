@@ -1307,7 +1307,9 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   // Calculate overview statistics
   const overviewStats = useMemo(() => {
     try {
-      const totalVisits = filteredVisitsFlat.length;
+      const totalVisits = filteredVisitsFlat.filter(
+        (v) => v.status !== "reagendada",
+      ).length;
       const agendadas = filteredVisitsFlat.filter(
         (v) => v.status === "agendada",
       ).length;
