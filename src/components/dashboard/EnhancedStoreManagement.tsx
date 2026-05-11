@@ -233,150 +233,95 @@ const EnhancedStoreManagement: React.FC = () => {
     const stats: StoreStats[] = [];
 
     availableStores.forEach((storeName) => {
-      // Get collections for this store first to see who's actually working on it
-      let storeCollections = collections.filter(
-        (c) => c.nome_da_loja === storeName,
-      );
+      const toYYYYMMDD = (dateStr: string | null | undefined): string | null => {
+        if (!dateStr) return null;
+        if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.substring(0, 10);
+        const parts = dateStr.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/);
+        if (parts) return `${parts[3]}-${parts[2]}-${parts[1]}`;
+        try {
+          const d = new Date(dateStr);
+          if (!isNaN(d.getTime())) return d.toISOString().substring(0, 10);
+        } catch (_) { /* noop */ }
+        return null;
+      };
 
-      // Aplicar filtro de período (por data de lançamento/venda)
-      if (dateFrom || dateTo) {
-        storeCollections = storeCollections.filter((c) => {
-          if (!c.data_lancamento) return false;
-          const launchDate = c.data_lancamento.split("T")[0];
-          if (dateFrom && launchDate < dateFrom) return false;
-          if (dateTo && launchDate > dateTo) return false;
-          return true;
-        });
-      }
-
-      if (storeCollections.length === 0) return;
-
-      // Determine the predominant city for this store
-      const cityCounts = new Map<string, number>();
-      storeCollections.forEach((c) => {
-        if (c.cidade) {
-          cityCounts.set(c.cidade, (cityCounts.get(c.cidade) || 0) + 1);
-        }
-      });
-      const storeCity =
-        Array.from(cityCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ||
-        "Não informada";
-
-      // Find who is actually working on this store (from collections)
-      const workingCollectors = new Set(
-        storeCollections.map((c) => c.user_id).filter(Boolean),
-      );
-
-      // Determine the assigned collector from actual worker
-      let assignedCollector = "";
-      if (workingCollectors.size === 1) {
-        assignedCollector = Array.from(workingCollectors)[0] || "";
-      } else if (!assignedCollector && workingCollectors.size > 1) {
-        // Multiple collectors working, show the one with most collections
-        const collectorCounts = new Map<string, number>();
-        storeCollections.forEach((c) => {
-          if (c.user_id) {
-            collectorCounts.set(
-              c.user_id,
-              (collectorCounts.get(c.user_id) || 0) + 1,
-            );
-          }
-        });
-        const mostActiveCollector = Array.from(collectorCounts.entries()).sort(
-          (a, b) => b[1] - a[1],
-        )[0];
-        if (mostActiveCollector) {
-          assignedCollector = mostActiveCollector[0];
-        }
-      }
-
-      const collectorName =
-        collectors.find((c) => c.id === assignedCollector)?.name ||
-        "Não atribuído";
-      const isFormalAssignment = false;
-
-      // Simplified - Group by sale
-      const salesMap = new Map<
-        string,
-        {
-          totalValue: number;
-          receivedValue: number;
-          clientDocument: string;
-          clientName: string;
-          isPending: boolean;
-        }
-      >();
-
-      storeCollections.forEach((collection) => {
-        const saleKey = `${collection.venda_n}-${collection.documento}`;
-        if (!salesMap.has(saleKey)) {
-          salesMap.set(saleKey, {
-            totalValue: 0,
-            receivedValue: 0,
-            clientDocument: collection.documento || "",
-            clientName: collection.cliente || "",
-            isPending: false,
-          });
-        }
-
-        const sale = salesMap.get(saleKey)!;
-        sale.totalValue =
-          Number(sale.totalValue) + Number(collection.valor_original);
-        sale.receivedValue =
-          Number(sale.receivedValue) + Number(collection.valor_recebido);
+      // Fichas dessa loja no período — usa data_lancamento ou data_vencimento como fallback
+      const periodCollections = collections.filter(c => {
+        if (c.nome_da_loja !== storeName) return false;
+        const raw = c.data_lancamento || c.data_vencimento;
+        const recordDate = toYYYYMMDD(raw);
+        if (!recordDate) return false;
+        if (dateFrom && recordDate < dateFrom) return false;
+        if (dateTo && recordDate > dateTo) return false;
+        return true;
       });
 
-      // Determine if each sale is pending
-      salesMap.forEach((sale) => {
-        const pendingAmount = sale.totalValue - sale.receivedValue;
-        sale.isPending = pendingAmount > 0.01;
+      if (periodCollections.length === 0) return;
+
+      const salesMap = new Map<string, {
+        totalValue: number;
+        paidValue: number;
+        discountValue: number;
+        clientDocument: string;
+      }>();
+
+      periodCollections.forEach(c => {
+        const key = `${c.venda_n}:::${c.documento}`;
+        if (!salesMap.has(key)) {
+          salesMap.set(key, { totalValue: 0, paidValue: 0, discountValue: 0, clientDocument: c.documento || "" });
+        }
+        const s = salesMap.get(key)!;
+        s.totalValue += Number(c.valor_original || 0);
+        s.paidValue += Number(c.valor_recebido || 0);
+        s.discountValue += Number(c.desconto || 0);
       });
 
       const salesArray = Array.from(salesMap.values());
-      const completedSales = salesArray.filter((s) => !s.isPending).length;
-      const pendingSales = salesArray.filter((s) => s.isPending).length;
-      const clientsWithPending = new Set(
-        salesArray
-          .filter((s) => s.isPending)
-          .map((s) => s.clientDocument || s.clientName)
-          .filter(Boolean),
-      ).size;
 
-      const totalCollections = salesArray.length;
+      // TOTAL: soma original das fichas do período
       const totalAmount = salesArray.reduce((sum, s) => sum + s.totalValue, 0);
-      const receivedAmount = salesArray.reduce(
-        (sum, s) => sum + s.receivedValue,
-        0,
-      );
-      const pendingAmount = totalAmount - receivedAmount;
-      const conversionRate =
-        salesArray.length > 0 ? (completedSales / salesArray.length) * 100 : 0;
-      const efficiency =
-        totalAmount > 0 ? (receivedAmount / totalAmount) * 100 : 0;
-      const averageTicket =
-        salesArray.length > 0 ? totalAmount / salesArray.length : 0;
-      const clientsCount = new Set(
-        salesArray.map((s) => s.clientDocument || s.clientName).filter(Boolean),
-      ).size;
+      const totalDiscount = salesArray.reduce((sum, s) => sum + s.discountValue, 0);
+
+      // PENDENTE: saldo devedor atual das fichas do período
+      const pendingAmount = Math.max(0, salesArray.reduce((sum, s) => sum + (s.totalValue - s.paidValue - s.discountValue), 0));
+
+      // PAGO: derivado de Total - Pendente - Desconto → garante Total = Pago + Pendente + Desconto
+      const receivedAmount = Math.max(0, totalAmount - pendingAmount - totalDiscount);
+
+      const completedSales = salesArray.filter(s => (s.totalValue - s.paidValue - s.discountValue) <= 0.01).length;
+      const conversionRate = salesArray.length > 0 ? (completedSales / salesArray.length) * 100 : 0;
+
+      const allStoreCollections = collections.filter(c => c.nome_da_loja === storeName);
+      const cityCounts = new Map<string, number>();
+      allStoreCollections.forEach(c => { if (c.cidade) cityCounts.set(c.cidade, (cityCounts.get(c.cidade) || 0) + 1); });
+      const storeCity = Array.from(cityCounts.entries()).sort((a,b) => b[1]-a[1])[0]?.[0] || "Não informada";
+
+      let assignedCollector = "";
+      const workingCollectors = new Map<string, number>();
+      allStoreCollections.forEach(c => { if (c.user_id) workingCollectors.set(c.user_id, (workingCollectors.get(c.user_id) || 0) + 1); });
+      const sortedCollectors = Array.from(workingCollectors.entries()).sort((a, b) => b[1] - a[1]);
+      if (sortedCollectors.length > 0) assignedCollector = sortedCollectors[0][0];
+
+      const collectorName = collectors.find((c) => c.id === assignedCollector)?.name || "Não atribuído";
 
       stats.push({
         storeName,
         city: storeCity,
         assignedCollector,
         collectorName,
-        isFormalAssignment,
-        totalCollections,
+        isFormalAssignment: false,
+        totalCollections: salesArray.length,
         totalSales: salesArray.length,
         completedSales,
-        pendingSales,
-        clientsWithPending,
+        pendingSales: salesArray.length - completedSales,
+        clientsWithPending: salesArray.filter(s => (s.totalValue - s.paidValue - s.discountValue) > 0.01).length,
         totalAmount,
         receivedAmount,
         pendingAmount,
         conversionRate,
-        efficiency,
-        averageTicket,
-        clientsCount,
+        efficiency: totalAmount > 0 ? (receivedAmount / totalAmount) * 100 : 0,
+        averageTicket: salesArray.length > 0 ? totalAmount / salesArray.length : 0,
+        clientsCount: new Set(salesArray.map((s) => s.clientDocument)).size,
       });
     });
 
@@ -1097,7 +1042,6 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                 <tbody className="divide-y divide-gray-50">
                   {cityBreakdown.map((item) => {
                     const pending = item.totalAmount - item.receivedAmount;
-                    const rowStatus = pending <= 0.01 ? "success" : "warning";
                     
                     return (
                       <tr key={item.city} className="group hover:bg-blue-50/30 transition-colors">
