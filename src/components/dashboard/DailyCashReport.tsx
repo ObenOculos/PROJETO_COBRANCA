@@ -9,11 +9,23 @@ import {
   RefreshCw,
   ChevronDown,
   FileSpreadsheet,
+  TrendingUp,
+  User,
+  Store,
+  CreditCard,
+  Award,
+  Activity,
+  Receipt,
+  Wallet,
+  ArrowRight
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Collection } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
+import { useAuth } from "../../contexts/AuthContext";
+import ClientDetailModal from "./ClientDetailModal";
+import { ClientGroup } from "../../types";
 
 interface DailyCashReportProps {
   collections: Collection[];
@@ -38,7 +50,11 @@ interface DailyReportData {
     store: string;
     totalOriginalValue: number;
     totalReceivedValue: number;
+    totalPaidOnDebt: number;
     totalPendingValue: number;
+    totalDiscount: number;
+    totalDebt: number;
+    remainingDebt: number;
     receivedDate: string;
     collector: string;
     paymentMethod: string;
@@ -129,7 +145,10 @@ const getQuickDateRanges = () => {
 };
 
 const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
-  const { users, salePayments, refreshData } = useCollection();
+  const { users, salePayments, refreshData, getClientGroups } = useCollection();
+  const { user } = useAuth();
+  
+  const [selectedClientForModal, setSelectedClientForModal] = useState<ClientGroup | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(getCurrentDateBR());
   const [endDate, setEndDate] = useState<string>(getCurrentDateBR());
   const [showDetails, setShowDetails] = useState(false);
@@ -229,6 +248,14 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       .filter((u) => u.type === "collector")
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [users]);
+
+  const handleOpenClientModal = (document: string) => {
+    const groups = getClientGroups();
+    const group = groups.find((g) => g.document === document);
+    if (group) {
+      setSelectedClientForModal(group);
+    }
+  };
 
   const reportData = useMemo((): DailyReportData => {
     // Usar dados da tabela sale_payments em vez de collections
@@ -405,33 +432,49 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     filteredPayments.forEach((payment) => {
       const saleKey = `${payment.id}`;
 
-      // Buscar dados da collection para obter valores originais e loja
-      // Tentar match específico primeiro, se falhar (ex: venda 0), buscar qualquer registro do cliente
-      let relatedCollection = collections.find(
+      // 1. Tentar encontrar a parcela específica que foi paga
+      let specificInstallment = collections.find(
         (c) =>
           c.documento === payment.clientDocument &&
-          c.venda_n === payment.saleNumber,
+          c.venda_n === payment.saleNumber &&
+          c.id_parcela.toString() === payment.distribution_details?.[0]?.installmentId?.toString()
       );
 
-      if (!relatedCollection) {
-        relatedCollection = collections.find(
-          (c) => c.documento === payment.clientDocument,
-        );
-      }
+      // 2. Se não achou a específica (ex: venda 0 ou ajuste manual), buscar qualquer registro do cliente para pegar Nome/Loja
+      const anyClientRecord = collections.find(c => c.documento === payment.clientDocument);
+
+      // 3. CALCULAR DÍVIDA TOTAL DO CLIENTE (para esta venda específica ou geral se venda 0)
+      // Buscamos todas as parcelas desse cliente para ter o quadro completo
+      const clientInstallments = collections.filter(c => 
+        c.documento === payment.clientDocument && 
+        (payment.saleNumber && payment.saleNumber !== 0 ? c.venda_n === payment.saleNumber : true)
+      );
+
+      const totalDebtValue = clientInstallments.reduce((sum, c) => sum + (c.valor_original || 0), 0);
+      const totalAlreadyPaidValue = clientInstallments.reduce((sum, c) => sum + (c.valor_recebido || 0), 0);
+      const totalDiscountValue = clientInstallments.reduce((sum, c) => sum + (c.desconto || 0), 0);
+      
+      // O pendente da dívida é o total original menos tudo que já foi recebido E descontos aplicados
+      const currentRemainingDebt = Math.max(0, totalDebtValue - (totalAlreadyPaidValue + totalDiscountValue));
 
       if (!salesPaymentMap.has(saleKey)) {
         salesPaymentMap.set(saleKey, {
           saleKey,
           client:
-            payment.clientName || // Prioritize clientName from salePayment
-            relatedCollection?.cliente ||
+            payment.clientName ||
+            anyClientRecord?.cliente ||
             payment.clientDocument ||
             "Cliente não informado",
-          clientDocument: payment.clientDocument || relatedCollection?.documento || "",
+          clientDocument: payment.clientDocument || anyClientRecord?.documento || "",
           saleNumber: payment.saleNumber?.toString() || "",
-          store: relatedCollection?.nome_da_loja || "",
-          totalOriginalValue: 0,
+          store: anyClientRecord?.nome_da_loja || "",
+          totalOriginalValue: specificInstallment?.valor_original || 0,
           totalReceivedValue: payment.paymentAmount,
+          totalPaidOnDebt: totalAlreadyPaidValue,
+          totalPendingValue: Math.max(0, (specificInstallment?.valor_original || 0) - (specificInstallment?.valor_recebido || 0)),
+          totalDiscount: totalDiscountValue,
+          totalDebt: totalDebtValue,
+          remainingDebt: currentRemainingDebt,
           receivedDate: payment.paymentDate || selectedDate,
           collector:
             payment.collectorName ||
@@ -524,85 +567,104 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   };
 
   const handleExportExcel = () => {
-    // 1. Sheet: Resumo Geral
-    const summaryData = [
-      ["RELATÓRIO DO CAIXA", reportData.date],
+    // 1. Preparar Aba de Resumo
+    const summaryHeader = [
+      ["RELATÓRIO DE CAIXA - FOCCO BRASIL"],
+      [`Período: ${reportData.date}`],
+      [`Data de Extração: ${new Date().toLocaleString("pt-BR")}`],
       [""],
-      ["Métricas Gerais"],
-      ["Total Recebido", reportData.totalReceived],
-      ["Total de Vendas", reportData.totalTransactions],
+      ["MÉTRICAS GERAIS"],
+      ["Total Arrecadado", reportData.totalReceived],
+      ["Total de Descontos", reportData.payments.reduce((sum, p) => sum + p.totalDiscount, 0)],
+      ["Quantidade de Vendas", reportData.totalTransactions],
       ["Cobradores Ativos", reportData.collectorSummary.length],
-      [
-        "Ticket Médio",
-        reportData.totalTransactions > 0
-          ? reportData.totalReceived / reportData.totalTransactions
-          : 0,
-      ],
+      ["Ticket Médio", reportData.totalTransactions > 0 ? reportData.totalReceived / reportData.totalTransactions : 0],
       [""],
-      ["Resumo por Cobrador"],
-      [
-        "Cobrador",
-        "Valor Recebido",
-        "Vendas",
-        "Clientes",
-        "Números das Vendas",
-      ],
+      ["DESEMPENHO POR COBRADOR"],
+      ["Cobrador", "Valor Recebido", "Qtd Vendas", "% Participação", "Ticket Médio"]
     ];
 
-    reportData.collectorSummary.forEach((c) => {
-      summaryData.push([
+    const collectorRows = reportData.collectorSummary
+      .sort((a, b) => b.receivedAmount - a.receivedAmount)
+      .map(c => [
         c.collectorName,
         c.receivedAmount,
         c.transactionCount,
-        c.clients.length,
-        c.saleNumbers.join(", "),
+        reportData.totalReceived > 0 ? (c.receivedAmount / reportData.totalReceived) : 0,
+        c.transactionCount > 0 ? c.receivedAmount / c.transactionCount : 0
       ]);
-    });
 
-    const summaryWS = XLSX.utils.aoa_to_sheet(summaryData);
+    const summaryWS = XLSX.utils.aoa_to_sheet([...summaryHeader, ...collectorRows]);
 
-    // 2. Sheet: Detalhes
-    const detailsData = [
-      [
-        "Cliente",
-        "Documento (CPF/CNPJ)",
-        "Venda",
-        "Parcelas",
-        "Loja",
-        "Forma Pagamento",
-        "Valor Devido",
-        "Valor Recebido",
-        "Valor Pendente",
-        "Cobrador",
-      ],
+    // Configurar larguras das colunas do Resumo
+    summaryWS["!cols"] = [
+      { wch: 30 }, // Cobrador
+      { wch: 15 }, // Valor
+      { wch: 12 }, // Vendas
+      { wch: 15 }, // %
+      { wch: 15 }  // Ticket
     ];
 
-    reportData.payments.forEach((p) => {
-      detailsData.push([
-        p.client,
-        p.clientDocument,
-        p.saleNumber,
-        p.installments.length,
-        p.store,
-        p.paymentMethod,
-        p.totalOriginalValue,
-        p.totalReceivedValue,
-        p.totalPendingValue,
-        p.collector,
-      ]);
-    });
+    // 2. Preparar Aba de Transações Detalhadas
+    const detailsHeader = [
+      ["LISTAGEM DETALHADA DE RECEBIMENTOS"],
+      [""],
+      [
+        "Cliente", 
+        "CPF/CNPJ", 
+        "Venda", 
+        "Loja", 
+        "Cobrador", 
+        "Forma Pagamento", 
+        "Valor Recebido (Hoje)", 
+        "Total Pago (Histórico)",
+        "Desconto",
+        "Total da Dívida", 
+        "Pendente Atual",
+        "Data Pagamento"
+      ]
+    ];
 
-    const detailsWS = XLSX.utils.aoa_to_sheet(detailsData);
+    const detailRows = reportData.payments.map(p => [
+      p.client,
+      p.clientDocument,
+      p.saleNumber ? `#${p.saleNumber}` : "-",
+      p.store,
+      p.collector,
+      p.paymentMethod,
+      p.totalReceivedValue,
+      p.totalPaidOnDebt,
+      p.totalDiscount,
+      p.totalDebt,
+      p.remainingDebt,
+      p.receivedDate
+    ]);
 
-    // Create workbook
+    const detailsWS = XLSX.utils.aoa_to_sheet([...detailsHeader, ...detailRows]);
+
+    // Configurar larguras das colunas de Detalhes
+    detailsWS["!cols"] = [
+      { wch: 35 }, // Cliente
+      { wch: 18 }, // CPF
+      { wch: 10 }, // Venda
+      { wch: 15 }, // Loja
+      { wch: 20 }, // Cobrador
+      { wch: 15 }, // Forma
+      { wch: 18 }, // Recebido Hoje
+      { wch: 18 }, // Total Pago Histórico
+      { wch: 12 }, // Desconto
+      { wch: 15 }, // Total Dívida
+      { wch: 15 }, // Pendente
+      { wch: 15 }  // Data
+    ];
+
+    // Criar o Workbook e Salvar
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, summaryWS, "Resumo");
+    XLSX.utils.book_append_sheet(wb, summaryWS, "Resumo Executivo");
     XLSX.utils.book_append_sheet(wb, detailsWS, "Transações");
 
-    // Save file
-    const exportDate =
-      dateRangeMode === "single" ? selectedDate : `${selectedDate}_${endDate}`;
-    XLSX.writeFile(wb, `relatorio-caixa-${exportDate}.xlsx`);
+    const filenameDate = dateRangeMode === "single" ? selectedDate : `${selectedDate}_a_${endDate}`;
+    XLSX.writeFile(wb, `Relatorio_Caixa_${filenameDate}.xlsx`);
     setShowExportOptions(false);
   };
 
@@ -757,7 +819,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
             {/* Quick Date Range Buttons */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs font-black uppercase text-gray-400 tracking-wider mb-2">
                 Ações Rápidas
               </label>
               <div className="flex flex-wrap gap-2">
@@ -769,7 +831,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                         key as keyof ReturnType<typeof getQuickDateRanges>,
                       )
                     }
-                    className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-2xl hover:bg-blue-100 hover:text-blue-700 transition-colors whitespace-nowrap"
+                    className="px-4 py-2 text-xs font-bold bg-gray-50 text-gray-600 rounded-full hover:bg-blue-50 hover:text-blue-600 border border-gray-100 transition-all duration-200 whitespace-nowrap active:scale-95 shadow-sm"
                   >
                     {range.label}
                   </button>
@@ -908,39 +970,53 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         </div>
       )}
 
-      {/* Card Principal - Informação mais importante primeiro */}
-      <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl shadow-lg p-6">
-        <div className="flex items-center justify-between">
+      {/* Card Principal - Dashboard Style */}
+      <div className="bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-700 text-white rounded-[2rem] shadow-xl p-8 relative overflow-hidden group">
+        {/* Padrão decorativo de fundo */}
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-3xl transition-transform duration-1000 group-hover:scale-110" />
+        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-teal-400/20 rounded-full blur-2xl" />
+
+        <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-8">
           <div>
-            <p className="text-green-100 text-sm font-medium">Total Recebido</p>
-            <p className="text-4xl font-bold mt-1">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-md">
+                <TrendingUp className="h-4 w-4 text-emerald-100" />
+              </div>
+              <p className="text-emerald-100 text-sm font-black uppercase tracking-widest">Arrecadação Total</p>
+            </div>
+            <p className="text-5xl font-black mt-1 tracking-tight">
               {formatCurrency(reportData.totalReceived)}
             </p>
             {reportData.totalTransactions > 0 && (
-              <p className="text-green-100 text-sm mt-2">
-                Ticket médio:{" "}
-                {formatCurrency(
-                  reportData.totalReceived / reportData.totalTransactions,
-                )}
-              </p>
+              <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm border border-white/10">
+                <Activity className="h-3.5 w-3.5 text-emerald-200" />
+                <p className="text-emerald-100 text-xs font-bold">
+                  Ticket médio: <span className="text-white">{formatCurrency(reportData.totalReceived / reportData.totalTransactions)}</span>
+                </p>
+              </div>
             )}
           </div>
-          <DollarSign className="h-16 w-16 text-green-200 opacity-50" />
-        </div>
 
-        {/* Métricas secundárias */}
-        <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-green-400">
-          <div>
-            <p className="text-green-100 text-xs">Vendas</p>
-            <p className="text-2xl font-semibold">
-              {reportData.totalTransactions}
-            </p>
-          </div>
-          <div>
-            <p className="text-green-100 text-xs">Cobradores</p>
-            <p className="text-2xl font-semibold">
-              {reportData.collectorSummary.length}
-            </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-inner">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-1.5 bg-emerald-400/30 rounded-lg">
+                  <Receipt className="h-4 w-4 text-white" />
+                </div>
+                <p className="text-emerald-50) text-[10px] font-black uppercase tracking-wider">Vendas</p>
+              </div>
+              <p className="text-2xl font-black">{reportData.totalTransactions}</p>
+            </div>
+            
+            <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-inner">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-1.5 bg-teal-400/30 rounded-lg">
+                  <User className="h-4 w-4 text-white" />
+                </div>
+                <p className="text-emerald-50) text-[10px] font-black uppercase tracking-wider">Cobradores</p>
+              </div>
+              <p className="text-2xl font-black">{reportData.collectorSummary.length}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -962,48 +1038,85 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
           {/* Cards de Cobradores */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {reportData.collectorSummary.map((collector) => (
-              <div
-                key={collector.collectorId}
-                className="bg-white rounded-2xl border border-gray-200 p-4 hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h4 className="font-medium text-gray-900">
-                      {collector.collectorName}
-                    </h4>
-                    <p className="text-sm text-gray-500">
-                      {collector.transactionCount} vendas
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-green-600">
-                      {formatCurrency(collector.receivedAmount)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Ticket:{" "}
-                      {formatCurrency(
-                        collector.transactionCount > 0
-                          ? collector.receivedAmount /
-                              collector.transactionCount
-                          : 0,
-                      )}
-                    </p>
-                  </div>
-                </div>
+            {reportData.collectorSummary
+              .sort((a, b) => b.receivedAmount - a.receivedAmount)
+              .map((collector, index) => {
+                const percentage = reportData.totalReceived > 0 
+                  ? (collector.receivedAmount / reportData.totalReceived) * 100 
+                  : 0;
+                
+                return (
+                  <div
+                    key={collector.collectorId}
+                    className="bg-white rounded-[1.5rem] border border-gray-100 p-5 hover:shadow-xl transition-all duration-300 group animate-in fade-in slide-in-from-bottom-2"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-12 w-12 rounded-full flex items-center justify-center font-black text-lg shadow-sm border-2 ${
+                          index === 0 ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-blue-50 border-blue-100 text-blue-700"
+                        }`}>
+                          {collector.collectorName.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="font-bold text-gray-900 leading-tight">
+                              {collector.collectorName}
+                            </h4>
+                            {index === 0 && <Award className="h-4 w-4 text-amber-500 fill-amber-500" />}
+                          </div>
+                          <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                            {collector.transactionCount} Transações
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-black text-gray-900">
+                          {formatCurrency(collector.receivedAmount)}
+                        </p>
+                        <p className="text-[10px] font-bold text-gray-400">
+                          {percentage.toFixed(1)}% do total
+                        </p>
+                      </div>
+                    </div>
 
-                {collector.saleNumbers.length > 0 && showDetails && (
-                  <div className="pt-3 border-t border-gray-100">
-                    <p className="text-xs text-gray-600 mb-1">
-                      Vendas realizadas:
-                    </p>
-                    <p className="text-xs text-gray-700 line-clamp-2">
-                      #{collector.saleNumbers.join(", #")}
-                    </p>
+                    {/* Barra de Progresso */}
+                    <div className="space-y-1.5">
+                      <div className="h-1.5 w-full bg-gray-50 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full transition-all duration-1000 ease-out ${
+                            index === 0 ? "bg-amber-500" : "bg-blue-500"
+                          }`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                        <span>Ticket: {formatCurrency(collector.transactionCount > 0 ? collector.receivedAmount / collector.transactionCount : 0)}</span>
+                        <span>{collector.clients.length} Clientes</span>
+                      </div>
+                    </div>
+
+                    {collector.saleNumbers.length > 0 && showDetails && (
+                      <div className="mt-4 pt-4 border-t border-dashed border-gray-100">
+                        <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider mb-2 flex items-center gap-1">
+                          <Receipt className="h-3 w-3" /> Vendas Realizadas
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {collector.saleNumbers.slice(0, 5).map(num => (
+                            <span key={num} className="px-2 py-0.5 bg-gray-50 text-gray-600 rounded text-[10px] font-bold border border-gray-100">
+                              #{num}
+                            </span>
+                          ))}
+                          {collector.saleNumbers.length > 5 && (
+                            <span className="text-[10px] font-bold text-gray-400 self-center ml-1">
+                              +{collector.saleNumbers.length - 5}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                );
+              })}
           </div>
         </div>
       )}
@@ -1015,79 +1128,108 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             Transações Detalhadas
           </h3>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
-              {/* Tabela Responsiva */}
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+              {/* Tabela Responsiva Otimizada */}
+              <table className="w-full table-auto border-collapse">
+                <thead className="bg-gray-50/50 border-b border-gray-100">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[200px]">
                       Cliente / Venda
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider hidden xl:table-cell">
-                      CPF/CNPJ
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider hidden sm:table-cell">
+                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest hidden 2xl:table-cell">
                       Loja
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider hidden md:table-cell">
-                      Cobrador
+                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest hidden xl:table-cell">
+                      Forma
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider hidden lg:table-cell">
-                      Forma Pag.
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      Recebido
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Valor
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest hidden xl:table-cell">
+                      Pago (Acum.)
+                    </th>
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">
+                      Desconto
+                    </th>
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">
+                      Total Dívida
+                    </th>
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      Pendente
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {reportData.payments.map((payment, index) => (
-                    <tr
-                      key={`${payment.saleKey}-${index}`}
-                      className="hover:bg-gray-50"
-                    >
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {payment.client}
+                <tbody className="divide-y divide-gray-100">
+                  {reportData.payments.map((payment, index) => {
+                    const method = payment.paymentMethod?.toLowerCase() || "";
+                    const methodColor = 
+                      method.includes("pix") ? "bg-indigo-50 text-indigo-700 border-indigo-100" :
+                      method.includes("dinheiro") ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
+                      method.includes("cart") ? "bg-blue-50 text-blue-700 border-blue-100" :
+                      method.includes("boleto") ? "bg-amber-50 text-amber-700 border-amber-100" :
+                      "bg-gray-50 text-gray-700 border-gray-100";
+
+                    return (
+                      <tr
+                        key={`${payment.saleKey}-${index}`}
+                        className="hover:bg-blue-50/30 transition-colors group animate-in fade-in slide-in-from-left-2"
+                        style={{ animationDelay: `${index * 50}ms` }}
+                      >
+                        <td className="px-4 py-4">
+                          <div className="flex flex-col">
+                            <button
+                              onClick={() => handleOpenClientModal(payment.clientDocument)}
+                              className="text-sm font-bold text-gray-900 leading-none mb-1 text-left hover:text-blue-600 transition-colors"
+                            >
+                              {payment.client}
+                            </button>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                                {payment.saleNumber ? `Venda #${payment.saleNumber}` : "Sem número"}
+                              </span>
+                              <span className="text-[10px] font-medium text-gray-400 font-mono hidden sm:inline">
+                                {payment.clientDocument}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 hidden 2xl:table-cell">
+                          <p className="text-xs font-semibold text-gray-500 truncate max-w-[120px]">{payment.store}</p>
+                        </td>
+                        <td className="px-4 py-4 hidden xl:table-cell">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border tracking-tighter ${methodColor}`}>
+                            {payment.paymentMethod?.split(" ")[0]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <p className="text-sm font-black text-emerald-600">
+                            {formatCurrency(payment.totalReceivedValue)}
                           </p>
-                          <p className="text-xs text-gray-500">
-                            {payment.saleNumber
-                              ? `Venda #${payment.saleNumber}`
-                              : "Sem número"}
+                        </td>
+                        <td className="px-4 py-4 text-right hidden xl:table-cell">
+                          <p className="text-xs font-bold text-gray-500">
+                            {formatCurrency(payment.totalPaidOnDebt)}
                           </p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 hidden xl:table-cell">
-                        <p className="text-sm text-gray-600">{payment.clientDocument}</p>
-                      </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
-                        <p className="text-sm text-gray-600">{payment.store}</p>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <p className="text-sm text-gray-600">
-                          {payment.collector}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-left hidden lg:table-cell">
-                        <p className="text-sm text-gray-600">
-                          {payment.paymentMethod}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <p className="text-sm font-bold text-green-600">
-                          {formatCurrency(payment.totalReceivedValue)}
-                        </p>
-                        {payment.totalPendingValue > 0 && (
-                          <p className="text-xs text-red-600">
-                            Pendente:{" "}
-                            {formatCurrency(payment.totalPendingValue)}
+                        </td>
+                        <td className="px-4 py-4 text-right hidden md:table-cell">
+                          <p className={`text-xs font-bold ${payment.totalDiscount > 0 ? "text-orange-600" : "text-gray-300"}`}>
+                            {payment.totalDiscount > 0 ? formatCurrency(payment.totalDiscount) : "-"}
                           </p>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-4 py-4 text-right hidden lg:table-cell">
+                          <p className="text-xs font-bold text-gray-400">
+                            {formatCurrency(payment.totalDebt)}
+                          </p>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <p className={`text-sm font-black ${payment.remainingDebt > 0 ? "text-red-600" : "text-gray-400"}`}>
+                            {payment.remainingDebt > 0 ? formatCurrency(payment.remainingDebt) : "Quitado"}
+                          </p>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1111,6 +1253,15 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           </p>
         </div>
       )}
+
+      {/* Modal de Detalhes do Cliente */}
+      {selectedClientForModal && (
+        <ClientDetailModal
+          clientGroup={selectedClientForModal}
+          userType={user?.type || "collector"}
+          onClose={() => setSelectedClientForModal(null)}
+        />
+      )}
     </div>
   );
 };
@@ -1125,6 +1276,7 @@ const generateReportContent = (
     "=".repeat(60),
     "",
     `Total Recebido: ${formatCurrency(data.totalReceived)}`,
+    `Total de Descontos: ${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalDiscount, 0))}`,
     `Total de Vendas: ${data.totalTransactions}`,
     `Cobradores Ativos: ${data.collectorSummary.length}`,
     "",
@@ -1151,9 +1303,8 @@ const generateReportContent = (
         `Cliente: ${payment.client}`,
         `${payment.saleNumber ? `Venda: #${payment.saleNumber}` : "Venda sem número"} | Loja: ${payment.store}`,
         `Forma de Pagamento: ${payment.paymentMethod}`,
-        `Parcelas: ${payment.installments.length}`,
-        `Valor Devido: ${formatCurrency(payment.totalOriginalValue)} | Valor Recebido: ${formatCurrency(payment.totalReceivedValue)}`,
-        `Valor Pendente: ${payment.totalPendingValue > 0 ? formatCurrency(payment.totalPendingValue) : "Quitado"}`,
+        `Valor Recebido: ${formatCurrency(payment.totalReceivedValue)} | Desconto: ${formatCurrency(payment.totalDiscount)}`,
+        `Total da Dívida: ${formatCurrency(payment.totalDebt)} | Pendente Atual: ${payment.remainingDebt > 0 ? formatCurrency(payment.remainingDebt) : "Quitado"}`,
         `Cobrador: ${payment.collector}`,
         "",
       );
@@ -1399,16 +1550,16 @@ const generatePrintableReport = (
             <div class="value">${formatCurrency(data.totalReceived)}</div>
           </div>
           <div class="summary-item">
+            <div class="label">Total Descontos</div>
+            <div class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalDiscount, 0))}</div>
+          </div>
+          <div class="summary-item">
             <div class="label">Total de Vendas</div>
             <div class="value">${data.totalTransactions}</div>
           </div>
           <div class="summary-item">
             <div class="label">Cobradores Ativos</div>
             <div class="value">${data.collectorSummary.length}</div>
-          </div>
-          <div class="summary-item">
-            <div class="label">Ticket Médio</div>
-            <div class="value">${data.totalTransactions > 0 ? formatCurrency(data.totalReceived / data.totalTransactions) : formatCurrency(0)}</div>
           </div>
         </div>
       </div>
@@ -1446,12 +1597,13 @@ const generatePrintableReport = (
           <th>Cliente</th>
           <th>Documento</th>
           <th>Venda</th>
-          <th>Parcelas</th>
           <th>Loja</th>
           <th>Forma Pag.</th>
-          <th>Valor Devido</th>
-          <th>Valor Recebido</th>
-          <th>Valor Pendente</th>
+          <th>Recebido Hoje</th>
+          <th>Total Pago (Hist.)</th>
+          <th>Desconto</th>
+          <th>Total Dívida</th>
+          <th>Pendente Atual</th>
           <th>Cobrador</th>
         </tr>
         ${data.payments
@@ -1461,12 +1613,13 @@ const generatePrintableReport = (
             <td>${p.client}</td>
             <td>${p.clientDocument}</td>
             <td>${p.saleNumber ? `#${p.saleNumber}` : "Sem número"}</td>
-            <td>${p.installments.length}</td>
             <td>${p.store}</td>
             <td>${p.paymentMethod}</td>
-            <td style="text-align: right;">${formatCurrency(p.totalOriginalValue)}</td>
             <td style="font-weight: bold; text-align: right;">${formatCurrency(p.totalReceivedValue)}</td>
-            <td style="text-align: right;">${p.totalPendingValue > 0 ? formatCurrency(p.totalPendingValue) : "-"}</td>
+            <td style="text-align: right;">${formatCurrency(p.totalPaidOnDebt)}</td>
+            <td style="text-align: right; color: #e67e22;">${p.totalDiscount > 0 ? formatCurrency(p.totalDiscount) : "-"}</td>
+            <td style="text-align: right;">${formatCurrency(p.totalDebt)}</td>
+            <td style="font-weight: bold; text-align: right; color: ${p.remainingDebt > 0 ? "#e74c3c" : "#2ecc71"};">${p.remainingDebt > 0 ? formatCurrency(p.remainingDebt) : "Quitado"}</td>
             <td>${p.collector}</td>
           </tr>
         `,
@@ -1483,23 +1636,31 @@ const generatePrintableReport = (
               <span class="value">${data.totalTransactions}</span>
             </div>
             <div class="total-row">
-              <span class="label">Total Devido:</span>
-              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalOriginalValue, 0))}</span>
+              <span class="label">Total Original da Dívida:</span>
+              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalDebt, 0))}</span>
+            </div>
+            <div class="total-row">
+              <span class="label">Total já Pago (Histórico):</span>
+              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalPaidOnDebt, 0))}</span>
             </div>
           </div>
           <div class="totals-column">
             <div class="total-row">
-              <span class="label">Total Recebido:</span>
+              <span class="label">Total Recebido (Hoje):</span>
               <span class="value">${formatCurrency(data.totalReceived)}</span>
             </div>
             <div class="total-row">
+              <span class="label">Total Descontos:</span>
+              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalDiscount, 0))}</span>
+            </div>
+            <div class="total-row">
               <span class="label">Total Pendente:</span>
-              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalPendingValue, 0))}</span>
+              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.remainingDebt, 0))}</span>
             </div>
           </div>
         </div>
         <div class="total-row grand-total">
-          <span class="label">RESULTADO FINAL:</span>
+          <span class="label">ARRECADAÇÃO LÍQUIDA:</span>
           <span class="value">${formatCurrency(data.totalReceived)}</span>
         </div>
       </div>
