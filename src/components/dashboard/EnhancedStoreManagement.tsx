@@ -13,6 +13,9 @@ import {
   Users,
   DollarSign,
   Award,
+  MapPin,
+  X,
+  Calendar,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
@@ -173,6 +176,7 @@ const formatMobileCurrency = (value: number) => {
 
 interface StoreStats {
   storeName: string;
+  city: string;
   assignedCollector: string;
   collectorName: string;
   isFormalAssignment: boolean;
@@ -194,11 +198,32 @@ const EnhancedStoreManagement: React.FC = () => {
   const { users, collections, getAvailableStores, loading } = useCollection();
 
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<
     "storeName" | "conversionRate" | "totalAmount"
   >("storeName");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [collectorFilter, setCollectorFilter] = useState<string>("all");
+  const [selectedStoreForModal, setSelectedStoreForModal] =
+    useState<StoreStats | null>(null);
+
+  // Filtros de Data
+  const today = new Date();
+  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+  const formatDateToYYYYMMDD = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const [dateFrom, setDateFrom] = useState<string>(
+    formatDateToYYYYMMDD(firstDayOfMonth),
+  );
+  const [dateTo, setDateTo] = useState<string>(
+    formatDateToYYYYMMDD(lastDayOfMonth),
+  );
 
   const collectors = users.filter((u) => u.type === "collector");
   const availableStores = getAvailableStores();
@@ -209,9 +234,33 @@ const EnhancedStoreManagement: React.FC = () => {
 
     availableStores.forEach((storeName) => {
       // Get collections for this store first to see who's actually working on it
-      const storeCollections = collections.filter(
+      let storeCollections = collections.filter(
         (c) => c.nome_da_loja === storeName,
       );
+
+      // Aplicar filtro de período (por data de lançamento/venda)
+      if (dateFrom || dateTo) {
+        storeCollections = storeCollections.filter((c) => {
+          if (!c.data_lancamento) return false;
+          const launchDate = c.data_lancamento.split("T")[0];
+          if (dateFrom && launchDate < dateFrom) return false;
+          if (dateTo && launchDate > dateTo) return false;
+          return true;
+        });
+      }
+
+      if (storeCollections.length === 0) return;
+
+      // Determine the predominant city for this store
+      const cityCounts = new Map<string, number>();
+      storeCollections.forEach((c) => {
+        if (c.cidade) {
+          cityCounts.set(c.cidade, (cityCounts.get(c.cidade) || 0) + 1);
+        }
+      });
+      const storeCity =
+        Array.from(cityCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ||
+        "Não informada";
 
       // Find who is actually working on this store (from collections)
       const workingCollectors = new Set(
@@ -312,6 +361,7 @@ const EnhancedStoreManagement: React.FC = () => {
 
       stats.push({
         storeName,
+        city: storeCity,
         assignedCollector,
         collectorName,
         isFormalAssignment,
@@ -331,7 +381,7 @@ const EnhancedStoreManagement: React.FC = () => {
     });
 
     return stats;
-  }, [availableStores, collectors, collections]);
+  }, [availableStores, collectors, collections, dateFrom, dateTo]);
 
   // Filter and sort stores
   const filteredAndSortedStores = useMemo(() => {
@@ -343,6 +393,13 @@ const EnhancedStoreManagement: React.FC = () => {
         (store) =>
           store.storeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
           store.collectorName.toLowerCase().includes(searchTerm.toLowerCase()),
+      );
+    }
+
+    // Apply collector filter
+    if (collectorFilter !== "all") {
+      filtered = filtered.filter(
+        (store) => store.assignedCollector === collectorFilter,
       );
     }
 
@@ -363,7 +420,7 @@ const EnhancedStoreManagement: React.FC = () => {
     });
 
     return filtered;
-  }, [storeStats, searchTerm, sortBy, sortOrder]);
+  }, [storeStats, searchTerm, sortBy, sortOrder, collectorFilter]);
 
   // Calculate overview statistics
   const overviewStats = useMemo(() => {
@@ -393,16 +450,6 @@ const EnhancedStoreManagement: React.FC = () => {
       avgConversionRate,
     };
   }, [storeStats]);
-
-  const toggleCardExpansion = (storeName: string) => {
-    const newExpanded = new Set(expandedCards);
-    if (newExpanded.has(storeName)) {
-      newExpanded.delete(storeName);
-    } else {
-      newExpanded.add(storeName);
-    }
-    setExpandedCards(newExpanded);
-  };
 
   const exportStoreData = () => {
     // Headers with better formatting
@@ -476,263 +523,318 @@ const EnhancedStoreManagement: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-600">Carregando...</div>
+      <div className="space-y-4 animate-pulse">
+        <div className="h-20 bg-gray-200 rounded-2xl" />
+        <div className="h-48 bg-gray-200 rounded-2xl" />
+        <div className="h-16 bg-gray-200 rounded-2xl" />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-64 bg-gray-100 rounded-2xl" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header Simplificado */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 lg:p-6 transition-all duration-300">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-              <Building className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
+              <Building className="h-6 w-6 mr-2 text-blue-600 flex-shrink-0" />
               Acompanhamento de Lojas
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Performance e status das {overviewStats.totalStores} lojas
+            <p className="text-sm text-gray-500 mt-1">
+              Performance e status de {overviewStats.totalStores} lojas cadastradas
             </p>
           </div>
 
           {/* Ações Principais */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {overviewStats.unassignedStores > 0 && (
-              <span className="flex items-center text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full font-medium">
-                <AlertCircle className="h-3 w-3 mr-1" />
+              <div className="flex items-center text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded-full font-semibold border border-amber-100">
+                <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
                 {overviewStats.unassignedStores} sem atribuição
-              </span>
+              </div>
             )}
 
             <button
               onClick={exportStoreData}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
-              title="Exportar"
+              className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 border border-gray-200 rounded-xl transition-all duration-200 text-sm font-medium"
+              title="Exportar dados para CSV"
             >
-              <Download className="h-5 w-5" />
+              <Download className="h-4 w-4" />
+              <span className="hidden md:inline">Exportar</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Card Principal - Taxa de Conversão Média */}
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-blue-100 text-sm font-medium">
-              Taxa de Conversão Média
-            </p>
-            <p className="text-4xl font-bold mt-1">
-              {overviewStats.avgConversionRate.toFixed(1)}%
-            </p>
-            <p className="text-blue-100 text-sm mt-2">
-              {overviewStats.totalStores} lojas cadastradas
-            </p>
-          </div>
-          <Award className="h-16 w-16 text-blue-200 opacity-50" />
+      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-3xl shadow-xl p-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-8 opacity-10 transform translate-x-4 -translate-y-4">
+          <Award className="h-48 w-48" />
         </div>
-
-        {/* Métricas secundárias */}
-        <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-4 mt-6 pt-6 border-t border-blue-400">
-          <div>
-            <p className="text-blue-100 text-xs">Receita</p>
-            <div className="text-2xl font-semibold">
-              {formatMobileCurrency(overviewStats.totalRevenue)}
+        
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <p className="text-blue-100 text-sm font-medium uppercase tracking-wider">
+                Taxa de Conversão Média
+              </p>
+              <div className="flex items-baseline gap-2 mt-2">
+                <p className="text-5xl font-black">
+                  {overviewStats.avgConversionRate.toFixed(1)}%
+                </p>
+                <div className="flex items-center px-2 py-1 bg-white/20 rounded-lg text-xs font-bold">
+                  GERAL
+                </div>
+              </div>
+            </div>
+            <div className="hidden lg:flex items-center justify-center h-20 w-20 bg-white/10 rounded-3xl backdrop-blur-sm border border-white/20">
+              <Award className="h-10 w-10 text-white" />
             </div>
           </div>
-          <div>
-            <p className="text-blue-100 text-xs">Atribuídas</p>
-            <p className="text-2xl font-semibold">
-              {overviewStats.assignedStores}
-            </p>
-          </div>
-          <div>
-            <p className="text-blue-100 text-xs">Vendas</p>
-            <p className="text-2xl font-semibold">{overviewStats.totalSales}</p>
+
+          {/* Métricas secundárias */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-8 border-t border-white/20">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 bg-white/10 rounded-2xl flex items-center justify-center">
+                <DollarSign className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-blue-100 text-xs font-medium">Receita Total</p>
+                <div className="text-xl font-bold">
+                  {formatMobileCurrency(overviewStats.totalRevenue)}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 bg-white/10 rounded-2xl flex items-center justify-center">
+                <Store className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-blue-100 text-xs font-medium">Lojas Atribuídas</p>
+                <p className="text-xl font-bold">{overviewStats.assignedStores}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 bg-white/10 rounded-2xl flex items-center justify-center">
+                <FileText className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-blue-100 text-xs font-medium">Vendas Realizadas</p>
+                <p className="text-xl font-bold">{overviewStats.totalSales}</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Filtros Minimalistas */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center gap-2">
-          {/* Busca */}
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+      {/* Filtros Modernizados */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-2 lg:p-3">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+          {/* Busca com feedback visual */}
+          <div className="flex-1 relative group">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar loja ou cobrador..."
-              className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors text-sm"
+              placeholder="Buscar por nome da loja ou cobrador..."
+              className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-medium placeholder-gray-400"
             />
           </div>
 
-          {/* Ordenação Minimalista */}
-          <div className="flex items-center gap-2">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="pl-3 pr-8 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors text-sm min-w-[120px]"
-            >
-              <option value="storeName">Nome</option>
-              <option value="conversionRate">Taxa</option>
-              <option value="totalAmount">Valor</option>
-            </select>
+          <div className="flex flex-wrap items-center gap-2 p-1">
+            {/* Filtro de Período */}
+            <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-2xl border border-transparent focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+              <div className="flex items-center gap-2 px-2">
+                <Calendar className="h-4 w-4 text-gray-400" />
+                <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider hidden sm:inline">Período</span>
+              </div>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="bg-transparent border-none p-0 text-xs font-bold text-gray-700 focus:ring-0 w-[110px]"
+              />
+              <span className="text-gray-300">/</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="bg-transparent border-none p-0 text-xs font-bold text-gray-700 focus:ring-0 w-[110px]"
+              />
+            </div>
 
-            <button
-              onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-              className={`flex items-center justify-center w-10 h-10 rounded-2xl transition-all duration-200 ${
-                sortOrder === "desc"
-                  ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-              title={sortOrder === "desc" ? "Decrescente" : "Crescente"}
-            >
-              {sortOrder === "desc" ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronUp className="h-4 w-4" />
-              )}
-            </button>
-          </div>
+            <div className="h-8 w-px bg-gray-100 hidden xl:block mx-1" />
 
-          {/* Contador */}
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <BarChart3 className="h-4 w-4" />
-            <span className="font-medium">
-              {filteredAndSortedStores.length}
-            </span>
-            <span className="hidden sm:inline">lojas</span>
+            {/* Filtro de Cobrador */}
+            <div className="relative">
+              <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
+              <select
+                value={collectorFilter}
+                onChange={(e) => setCollectorFilter(e.target.value)}
+                className="pl-10 pr-10 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-semibold text-gray-700 appearance-none cursor-pointer min-w-[180px]"
+              >
+                <option value="all">Todos os Cobradores</option>
+                {collectors.map((collector) => (
+                  <option key={collector.id} value={collector.id}>
+                    {collector.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            </div>
+
+            <div className="h-8 w-px bg-gray-100 hidden sm:block mx-1" />
+
+            {/* Ordenação Modernizada */}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <BarChart3 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="pl-10 pr-10 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-semibold text-gray-700 appearance-none cursor-pointer min-w-[140px]"
+                >
+                  <option value="storeName">Nome</option>
+                  <option value="conversionRate">Taxa</option>
+                  <option value="totalAmount">Valor</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
+
+              <button
+                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                className={`flex items-center justify-center w-11 h-11 rounded-2xl transition-all duration-300 ${
+                  sortOrder === "desc"
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
+                    : "bg-white text-gray-600 border border-gray-100 hover:border-blue-200 hover:text-blue-500"
+                }`}
+                title={sortOrder === "desc" ? "Ordem Decrescente" : "Ordem Crescente"}
+              >
+                {sortOrder === "desc" ? (
+                  <ChevronDown className="h-5 w-5" />
+                ) : (
+                  <ChevronUp className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+
+            {/* Contador Dinâmico */}
+            <div className="ml-2 flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-xl">
+              <span className="text-xs font-bold text-blue-600">
+                {filteredAndSortedStores.length}
+              </span>
+              <span className="text-[10px] font-black uppercase text-blue-400 tracking-widest">
+                Lojas
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Lista de Lojas */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      {/* Lista de Lojas com Cards Aprimorados */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
         {filteredAndSortedStores.map((store) => {
-          const isExpanded = expandedCards.has(store.storeName);
           const isUnassigned = !store.assignedCollector;
+          
+          const statusColor = isUnassigned
+            ? "amber"
+            : store.conversionRate >= 70
+              ? "green"
+              : store.conversionRate >= 40
+                ? "blue"
+                : "red";
 
           return (
             <div
               key={store.storeName}
-              className={`bg-white rounded-2xl shadow-sm border-2 transition-all duration-200 hover:shadow-lg ${
-                isUnassigned
-                  ? "border-amber-200 hover:border-amber-300"
-                  : store.conversionRate >= 70
-                    ? "border-green-200 hover:border-green-300"
-                    : store.conversionRate >= 40
-                      ? "border-blue-200 hover:border-blue-300"
-                      : "border-red-200 hover:border-red-300"
-              }`}
+              onClick={() => setSelectedStoreForModal(store)}
+              className={`group bg-white rounded-[2rem] shadow-sm border border-gray-100 transition-all duration-500 hover:shadow-2xl hover:shadow-gray-200/50 hover:-translate-y-1.5 cursor-pointer relative overflow-hidden`}
             >
-              <div className="p-5">
-                {/* Header with Main Metric */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                      <Store
-                        className={`h-5 w-5 ${
-                          isUnassigned
-                            ? "text-amber-600"
-                            : store.conversionRate >= 70
-                              ? "text-green-600"
-                              : store.conversionRate >= 40
-                                ? "text-blue-600"
-                                : "text-red-600"
-                        }`}
-                      />
-                      {store.storeName}
-                      {isUnassigned && (
-                        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md font-medium">
-                          Sem atribuição
-                        </span>
-                      )}
-                    </h4>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {store.collectorName}
-                      {store.isFormalAssignment && !isUnassigned && (
-                        <span className="text-xs text-green-600 ml-1">
-                          (Formal)
-                        </span>
-                      )}
-                    </p>
+              {/* Barra lateral de status */}
+              <div className={`absolute top-0 left-0 w-2 h-full bg-${statusColor}-500 transition-all duration-500 group-hover:w-3`} />
+              
+              <div className="p-6 lg:p-8">
+                {/* Header do Card */}
+                <div className="flex items-start justify-between mb-8">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`p-2 rounded-xl bg-${statusColor}-50`}>
+                        <Store className={`h-5 w-5 text-${statusColor}-600`} />
+                      </div>
+                      <h4 className="text-lg font-bold text-gray-900 truncate pr-2">
+                        {store.storeName}
+                      </h4>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center text-sm font-medium text-gray-400">
+                        <MapPin className="h-3.5 w-3.5 mr-1.5" />
+                        {store.city}
+                      </div>
+                      <div className="flex items-center text-sm">
+                        <div className={`h-2 w-2 rounded-full bg-${statusColor}-400 mr-2`} />
+                        <span className="font-bold text-gray-700">{store.collectorName}</span>
+                        {store.isFormalAssignment && !isUnassigned && (
+                          <span className={`ml-2 text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-green-50 text-green-600 border border-green-100`}>
+                            Formal
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Main Metric Highlight */}
-                  <div className="text-right">
-                    <div
-                      className={`text-3xl font-bold ${
-                        store.conversionRate >= 70
-                          ? "text-green-600"
-                          : store.conversionRate >= 40
-                            ? "text-blue-600"
-                            : "text-red-600"
-                      }`}
-                    >
-                      {store.conversionRate.toFixed(1)}%
+                  {/* Destaque de Conversão */}
+                  <div className="flex flex-col items-end">
+                    <div className={`text-3xl font-black tracking-tight text-${statusColor}-600 leading-none mb-1`}>
+                      {store.conversionRate.toFixed(1)}<span className="text-sm font-bold opacity-70">%</span>
                     </div>
-                    <div className="text-xs text-gray-500">conversão</div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Conversão</span>
                   </div>
                 </div>
 
-                {/* Simplified Metrics (Sales, Clients) */}
+                {/* Métricas Operacionais */}
                 {!isUnassigned && (
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-4 text-sm text-gray-700">
-                    <div className="flex items-center">
-                      <FileText className="h-4 w-4 text-gray-500 mr-2" />
-                      <span>
-                        <span className="font-semibold">
-                          {store.totalSales}
-                        </span>{" "}
-                        vendas
-                      </span>
+                  <div className="grid grid-cols-2 gap-4 mb-8">
+                    <div className="bg-gray-50/50 rounded-2xl p-4 border border-transparent hover:border-gray-200 transition-all group-hover:bg-white">
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileText className="h-4 w-4 text-blue-500" />
+                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Vendas</span>
+                      </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-xl font-bold text-gray-900">{store.totalSales}</span>
+                        <span className="text-xs font-medium text-gray-500">fichas</span>
+                      </div>
                     </div>
-                    <div className="flex items-center">
-                      <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
-                      <span>
-                        <span className="font-semibold text-green-700">
-                          {store.completedSales}
-                        </span>{" "}
-                        finalizadas
-                      </span>
-                    </div>
-                    <div className="flex items-center">
-                      <AlertCircle className="h-4 w-4 text-orange-600 mr-2" />
-                      <span>
-                        <span className="font-semibold text-orange-700">
-                          {store.pendingSales}
-                        </span>{" "}
-                        pendentes
-                      </span>
-                    </div>
-                    <div className="flex items-center">
-                      <Users className="h-4 w-4 text-purple-600 mr-2" />
-                      <span>
-                        <span className="font-semibold text-purple-700">
-                          {store.clientsCount}
-                        </span>{" "}
-                        clientes
-                      </span>
+                    <div className="bg-gray-50/50 rounded-2xl p-4 border border-transparent hover:border-gray-200 transition-all group-hover:bg-white">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="h-4 w-4 text-purple-500" />
+                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Base</span>
+                      </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-xl font-bold text-gray-900">{store.clientsCount}</span>
+                        <span className="text-xs font-medium text-gray-500">clientes</span>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Progress Bar */}
+                {/* Barra de Progresso Customizada */}
                 {!isUnassigned && (
-                  <div className="mb-4">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="mb-8">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Eficiência</span>
+                      <span className={`text-xs font-bold text-${statusColor}-600`}>{store.conversionRate.toFixed(0)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-3 p-1">
                       <div
-                        className={`h-2 rounded-full transition-all duration-500 ${
-                          store.conversionRate >= 70
-                            ? "bg-gradient-to-r from-green-500 to-green-600"
-                            : store.conversionRate >= 40
-                              ? "bg-gradient-to-r from-blue-500 to-blue-600"
-                              : "bg-gradient-to-r from-red-500 to-red-600"
-                        }`}
+                        className={`h-1 rounded-full bg-${statusColor}-500 transition-all duration-1000 ease-out shadow-sm shadow-${statusColor}-500/50`}
                         style={{
                           width: `${Math.min(store.conversionRate, 100)}%`,
                         }}
@@ -741,105 +843,39 @@ const EnhancedStoreManagement: React.FC = () => {
                   </div>
                 )}
 
-                {/* Financial Values */}
+                {/* Resumo Financeiro com Melhor Contraste */}
                 {!isUnassigned && (
-                  <div className="flex items-center justify-between py-2 border-t border-b border-gray-100 my-4">
-                    <div className="text-center flex-1">
-                      <div className="text-xs text-gray-600">Total</div>
-                      <div className="text-sm font-bold text-gray-900">
-                        {formatCurrency(store.totalAmount)}
-                      </div>
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-2xl border border-gray-100 group-hover:border-blue-100 transition-colors">
+                    <div className="flex-1 px-2">
+                      <p className="text-[9px] font-black uppercase tracking-tighter text-gray-400 mb-0.5">Total</p>
+                      <p className="text-sm font-bold text-gray-900 truncate">{formatCurrency(store.totalAmount, false)}</p>
                     </div>
-                    <div className="text-center flex-1">
-                      <div className="text-xs text-green-600">Recebido</div>
-                      <div className="text-sm font-bold text-green-700">
-                        {formatCurrency(store.receivedAmount)}
-                      </div>
+                    <div className="h-8 w-px bg-gray-200" />
+                    <div className="flex-1 px-2">
+                      <p className="text-[9px] font-black uppercase tracking-tighter text-green-500 mb-0.5">Pago</p>
+                      <p className="text-sm font-bold text-green-600 truncate">{formatCurrency(store.receivedAmount, false)}</p>
                     </div>
-                    <div className="text-center flex-1">
-                      <div className="text-xs text-red-600">Pendente</div>
-                      <div className="text-sm font-bold text-red-700">
-                        {formatCurrency(store.pendingAmount)}
-                      </div>
+                    <div className="h-8 w-px bg-gray-200" />
+                    <div className="flex-1 px-2">
+                      <p className="text-[9px] font-black uppercase tracking-tighter text-red-500 mb-0.5">Pend.</p>
+                      <p className="text-sm font-bold text-red-600 truncate">{formatCurrency(store.pendingAmount, false)}</p>
                     </div>
-                    <button
-                      onClick={() => toggleCardExpansion(store.storeName)}
-                      className={`p-2 rounded-full transition-colors ml-2 ${
-                        isExpanded
-                          ? "bg-blue-100 text-blue-600"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
-                      title={
-                        isExpanded ? "Ocultar detalhes" : "Ver mais detalhes"
-                      }
-                    >
-                      {isExpanded ? (
-                        <ChevronUp className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
-                )}
-
-                {/* Expanded Details */}
-                {isExpanded && !isUnassigned && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-sm text-gray-700">
-                      <div className="flex items-center">
-                        <AlertCircle className="h-4 w-4 text-amber-600 mr-2" />
-                        <span>
-                          <span className="font-semibold text-amber-700">
-                            {store.clientsWithPending}
-                          </span>{" "}
-                          clientes inadimplentes
-                        </span>
-                      </div>
-                      <div className="flex items-center">
-                        <DollarSign className="h-4 w-4 text-green-600 mr-2" />
-                        <span>
-                          <span className="font-semibold text-green-700">
-                            {formatCurrency(store.averageTicket)}
-                          </span>{" "}
-                          ticket médio
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="bg-blue-50 rounded-md p-3 border border-blue-200">
-                      <div className="flex items-center justify-between text-sm mb-2">
-                        <div className="flex items-center">
-                          <Award className="h-4 w-4 text-blue-600 mr-2" />
-                          <span className="text-blue-700 font-medium">
-                            Eficiência de Recebimento
-                          </span>
-                        </div>
-                        <span className="font-bold text-blue-900">
-                          {store.efficiency.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-blue-200 rounded-full h-2">
-                        <div
-                          className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500"
-                          style={{
-                            width: `${Math.min(store.efficiency, 100)}%`,
-                          }}
-                        />
-                      </div>
+                    <div className="ml-1 p-2 bg-white rounded-xl text-blue-600 shadow-sm border border-gray-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                      <BarChart3 className="h-4 w-4" />
                     </div>
                   </div>
                 )}
 
-                {/* Unassigned Store State */}
+                {/* Unassigned Store State com visual de Alerta */}
                 {isUnassigned && (
-                  <div className="bg-amber-50 rounded-md p-4 border border-amber-200 text-amber-700">
-                    <div className="flex items-center">
-                      <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                  <div className="bg-amber-50 rounded-2xl p-6 border-2 border-dashed border-amber-200 text-amber-800 animate-pulse">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0">
+                        <AlertCircle className="h-6 w-6 text-amber-700" />
+                      </div>
                       <div>
-                        <div className="font-medium">Loja sem atribuição</div>
-                        <div className="text-sm">
-                          Necessário atribuir um cobrador responsável
-                        </div>
+                        <div className="font-black uppercase text-xs tracking-widest mb-1">Atenção Gerencial</div>
+                        <div className="text-sm font-medium">Nenhum cobrador está operando nesta unidade no momento.</div>
                       </div>
                     </div>
                   </div>
@@ -850,20 +886,267 @@ const EnhancedStoreManagement: React.FC = () => {
         })}
       </div>
 
-      {/* Empty State */}
+      {/* Empty State Customizado */}
       {filteredAndSortedStores.length === 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
-          <Store className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Nenhuma loja encontrada
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-20 text-center transition-all">
+          <div className="h-24 w-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Store className="h-10 w-10 text-gray-300" />
+          </div>
+          <h3 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">
+            Nenhuma loja foi encontrada
           </h3>
-          <p className="text-gray-600">
+          <p className="text-gray-500 max-w-md mx-auto leading-relaxed">
             {searchTerm
-              ? "Tente ajustar os filtros de busca."
-              : "Não há lojas cadastradas no sistema."}
+              ? `Não existem resultados que correspondam à sua busca por "${searchTerm}".`
+              : "A base de dados de lojas está vazia ou ainda está sendo carregada."}
           </p>
+          {searchTerm && (
+            <button 
+              onClick={() => setSearchTerm("")}
+              className="mt-8 px-6 py-3 bg-gray-900 text-white rounded-2xl text-sm font-bold hover:bg-gray-800 transition-all active:scale-95"
+            >
+              Limpar Pesquisa
+            </button>
+          )}
         </div>
       )}
+
+      {/* Modal de Detalhes da Loja */}
+      {selectedStoreForModal && (
+        <StoreDetailModal
+          store={selectedStoreForModal}
+          onClose={() => setSelectedStoreForModal(null)}
+        />
+      )}
+    </div>
+  );
+};
+
+interface StoreDetailModalProps {
+  store: StoreStats;
+  onClose: () => void;
+}
+
+const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
+  store,
+  onClose,
+}) => {
+  const { collections } = useCollection();
+
+  const cityBreakdown = useMemo(() => {
+    const breakdown: Record<
+      string,
+      {
+        city: string;
+        clients: Set<string>;
+        sales: Set<string>;
+        totalAmount: number;
+        receivedAmount: number;
+      }
+    > = {};
+
+    collections
+      .filter((c) => c.nome_da_loja === store.storeName)
+      .forEach((c) => {
+        const city = c.cidade || "Não informada";
+        if (!breakdown[city]) {
+          breakdown[city] = {
+            city,
+            clients: new Set(),
+            sales: new Set(),
+            totalAmount: 0,
+            receivedAmount: 0,
+          };
+        }
+
+        if (c.documento) breakdown[city].clients.add(c.documento);
+        if (c.venda_n)
+          breakdown[city].sales.add(`${c.venda_n}-${c.documento}`);
+
+        breakdown[city].totalAmount += Number(c.valor_original || 0);
+        breakdown[city].receivedAmount += Number(c.valor_recebido || 0);
+      });
+
+    return Object.values(breakdown).sort((a, b) =>
+      a.city.localeCompare(b.city),
+    );
+  }, [collections, store.storeName]);
+
+  const statusColor = !store.assignedCollector
+    ? "amber"
+    : store.conversionRate >= 70
+      ? "green"
+      : store.conversionRate >= 40
+        ? "blue"
+        : "red";
+
+  return (
+    <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+      <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white/20">
+        {/* Header Elegante */}
+        <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
+          <div className="flex items-center gap-4">
+            <div className={`h-14 w-14 rounded-2xl bg-${statusColor}-50 flex items-center justify-center`}>
+              <Store className={`h-7 w-7 text-${statusColor}-600`} />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-gray-900 tracking-tight leading-none">
+                {store.storeName}
+              </h3>
+              <div className="flex items-center gap-3 mt-2">
+                <span className="flex items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+                  <MapPin className="h-3 w-3 mr-1" />
+                  {store.city}
+                </span>
+                <div className="h-1 w-1 rounded-full bg-gray-300" />
+                <span className="text-xs font-bold text-gray-600">
+                  Operado por: <span className="text-blue-600">{store.collectorName}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="h-12 w-12 flex items-center justify-center bg-gray-100 hover:bg-red-50 hover:text-red-500 rounded-2xl transition-all active:scale-95 group"
+          >
+            <X className="h-6 w-6 transition-transform group-hover:rotate-90" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-8 overflow-y-auto flex-1 minimal-scrollbar bg-white">
+          {/* Dashboard de Performance no Modal */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <div className="p-6 bg-blue-50/50 rounded-[2rem] border border-blue-100/50 group hover:bg-blue-600 transition-all duration-500">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-blue-100 rounded-xl group-hover:bg-blue-500">
+                  <Award className="h-5 w-5 text-blue-600 group-hover:text-white" />
+                </div>
+                <span className="text-[10px] font-black uppercase text-blue-400 tracking-widest group-hover:text-blue-200">Taxa</span>
+              </div>
+              <p className="text-3xl font-black text-blue-900 group-hover:text-white">
+                {store.conversionRate.toFixed(1)}%
+              </p>
+              <p className="text-xs font-medium text-blue-600/60 mt-1 group-hover:text-blue-100">Eficiência de Conversão</p>
+            </div>
+
+            <div className="p-6 bg-green-50/50 rounded-[2rem] border border-green-100/50 group hover:bg-green-600 transition-all duration-500">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-green-100 rounded-xl group-hover:bg-green-500">
+                  <CheckCircle className="h-5 w-5 text-green-600 group-hover:text-white" />
+                </div>
+                <span className="text-[10px] font-black uppercase text-green-400 tracking-widest group-hover:text-green-200">Pago</span>
+              </div>
+              <p className="text-2xl font-black text-green-900 group-hover:text-white truncate">
+                {formatCurrency(store.receivedAmount)}
+              </p>
+              <p className="text-xs font-medium text-green-600/60 mt-1 group-hover:text-green-100">Valor Recebido</p>
+            </div>
+
+            <div className="p-6 bg-red-50/50 rounded-[2rem] border border-red-100/50 group hover:bg-red-600 transition-all duration-500">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-red-100 rounded-xl group-hover:bg-red-500">
+                  <AlertCircle className="h-5 w-5 text-red-600 group-hover:text-white" />
+                </div>
+                <span className="text-[10px] font-black uppercase text-red-400 tracking-widest group-hover:text-red-200">Aberto</span>
+              </div>
+              <p className="text-2xl font-black text-red-900 group-hover:text-white truncate">
+                {formatCurrency(store.pendingAmount)}
+              </p>
+              <p className="text-xs font-medium text-red-600/60 mt-1 group-hover:text-red-100">Valor Pendente</p>
+            </div>
+
+            <div className="p-6 bg-purple-50/50 rounded-[2rem] border border-purple-100/50 group hover:bg-purple-600 transition-all duration-500">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-purple-100 rounded-xl group-hover:bg-purple-500">
+                  <DollarSign className="h-5 w-5 text-purple-600 group-hover:text-white" />
+                </div>
+                <span className="text-[10px] font-black uppercase text-purple-400 tracking-widest group-hover:text-purple-200">Média</span>
+              </div>
+              <p className="text-2xl font-black text-purple-900 group-hover:text-white truncate">
+                {formatCurrency(store.averageTicket)}
+              </p>
+              <p className="text-xs font-medium text-purple-600/60 mt-1 group-hover:text-purple-100">Ticket Médio</p>
+            </div>
+          </div>
+
+          {/* Tabela de Cidades Modernizada */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between px-2">
+              <h4 className="text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
+                <BarChart3 className="h-5 w-5 text-blue-600" />
+                Distribuição Geográfica Detalhada
+              </h4>
+              <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
+                {cityBreakdown.length} Cidades Identificadas
+              </span>
+            </div>
+
+            <div className="overflow-x-auto rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/80 backdrop-blur-sm border-b border-gray-100">
+                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Cidade</th>
+                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Clientes</th>
+                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Fichas</th>
+                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">Valor Bruto</th>
+                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">Valor Pago</th>
+                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">Pendente</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {cityBreakdown.map((item) => {
+                    const pending = item.totalAmount - item.receivedAmount;
+                    const rowStatus = pending <= 0.01 ? "success" : "warning";
+                    
+                    return (
+                      <tr key={item.city} className="group hover:bg-blue-50/30 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-full bg-white border border-gray-100 flex items-center justify-center text-xs shadow-sm group-hover:border-blue-200">
+                              📍
+                            </div>
+                            <span className="text-sm font-bold text-gray-900 group-hover:text-blue-700">{item.city}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200 group-hover:bg-white group-hover:border-blue-200">
+                            {item.clients.size}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center text-sm font-semibold text-gray-500">
+                          {item.sales.size}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                          {formatCurrency(item.totalAmount)}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-bold text-green-600 text-right">
+                          {formatCurrency(item.receivedAmount)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className={`text-sm font-black ${pending > 0 ? "text-red-600" : "text-gray-400"}`}>
+                            {formatCurrency(pending)}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Moderno */}
+        <div className="p-8 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-4">
+          <button
+            onClick={onClose}
+            className="px-10 py-4 bg-gray-900 text-white rounded-[1.5rem] hover:bg-gray-800 transition-all font-black text-sm uppercase tracking-widest shadow-xl shadow-gray-900/20 active:scale-95"
+          >
+            Concluir Análise
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

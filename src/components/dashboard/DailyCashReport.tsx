@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Calendar,
   Download,
@@ -7,7 +7,10 @@ import {
   Printer,
   Filter,
   RefreshCw,
+  ChevronDown,
+  FileSpreadsheet,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Collection } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
@@ -45,6 +48,7 @@ interface DailyReportData {
       receivedValue: number;
       pendingValue: number;
     }[];
+    clientDocument: string;
   }[];
 }
 
@@ -140,7 +144,23 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const [showUpdateNotification, setShowUpdateNotification] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
+  const [showExportOptions, setShowExportOptions] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
   const [] = useState(false);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        exportDropdownRef.current &&
+        !exportDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowExportOptions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Contador de filtros ativos
   const activeFiltersCount = useMemo(() => {
@@ -234,11 +254,19 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
       // Filtro de loja (buscar loja das collections para compatibilidade)
       if (selectedStore !== "all") {
-        const relatedCollection = collections.find(
+        let relatedCollection = collections.find(
           (c) =>
             c.documento === payment.clientDocument &&
             c.venda_n === payment.saleNumber,
         );
+
+        // Fallback para buscar a loja por documento se não achar pela venda específica
+        if (!relatedCollection) {
+          relatedCollection = collections.find(
+            (c) => c.documento === payment.clientDocument,
+          );
+        }
+
         if (
           !relatedCollection ||
           relatedCollection.nome_da_loja !== selectedStore
@@ -273,17 +301,28 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       const saleKey = `${payment.saleNumber}-${payment.clientDocument}-${payment.collectorId}-${payment.id}`;
 
       // Buscar dados da collection para obter valores originais e loja
-      const relatedCollection = collections.find(
+      // Tentar match específico primeiro, se falhar (ex: venda 0), buscar qualquer registro do cliente
+      let relatedCollection = collections.find(
         (c) =>
           c.documento === payment.clientDocument &&
           c.venda_n === payment.saleNumber,
       );
 
+      if (!relatedCollection) {
+        relatedCollection = collections.find(
+          (c) => c.documento === payment.clientDocument,
+        );
+      }
+
       if (!salesMap.has(saleKey)) {
         salesMap.set(saleKey, {
           saleKey,
           collectorId: payment.collectorId || "unknown",
-          client: payment.clientDocument || "Cliente não informado",
+          client:
+            payment.clientName ||
+            relatedCollection?.cliente ||
+            payment.clientDocument ||
+            "Cliente não informado",
           totalReceived: 0,
           originalValue: relatedCollection?.valor_original || 0,
           store: relatedCollection?.nome_da_loja || "",
@@ -346,6 +385,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       {
         saleKey: string;
         client: string;
+        clientDocument: string;
         saleNumber: string;
         store: string;
         totalOriginalValue: number;
@@ -366,11 +406,18 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       const saleKey = `${payment.id}`;
 
       // Buscar dados da collection para obter valores originais e loja
-      const relatedCollection = collections.find(
+      // Tentar match específico primeiro, se falhar (ex: venda 0), buscar qualquer registro do cliente
+      let relatedCollection = collections.find(
         (c) =>
           c.documento === payment.clientDocument &&
           c.venda_n === payment.saleNumber,
       );
+
+      if (!relatedCollection) {
+        relatedCollection = collections.find(
+          (c) => c.documento === payment.clientDocument,
+        );
+      }
 
       if (!salesPaymentMap.has(saleKey)) {
         salesPaymentMap.set(saleKey, {
@@ -380,6 +427,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             relatedCollection?.cliente ||
             payment.clientDocument ||
             "Cliente não informado",
+          clientDocument: payment.clientDocument || relatedCollection?.documento || "",
           saleNumber: payment.saleNumber?.toString() || "",
           store: relatedCollection?.nome_da_loja || "",
           totalOriginalValue: 0,
@@ -472,6 +520,90 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     link.download = `relatorio-caixa-${exportDate}.txt`;
     link.click();
     URL.revokeObjectURL(url);
+    setShowExportOptions(false);
+  };
+
+  const handleExportExcel = () => {
+    // 1. Sheet: Resumo Geral
+    const summaryData = [
+      ["RELATÓRIO DO CAIXA", reportData.date],
+      [""],
+      ["Métricas Gerais"],
+      ["Total Recebido", reportData.totalReceived],
+      ["Total de Vendas", reportData.totalTransactions],
+      ["Cobradores Ativos", reportData.collectorSummary.length],
+      [
+        "Ticket Médio",
+        reportData.totalTransactions > 0
+          ? reportData.totalReceived / reportData.totalTransactions
+          : 0,
+      ],
+      [""],
+      ["Resumo por Cobrador"],
+      [
+        "Cobrador",
+        "Valor Recebido",
+        "Vendas",
+        "Clientes",
+        "Números das Vendas",
+      ],
+    ];
+
+    reportData.collectorSummary.forEach((c) => {
+      summaryData.push([
+        c.collectorName,
+        c.receivedAmount,
+        c.transactionCount,
+        c.clients.length,
+        c.saleNumbers.join(", "),
+      ]);
+    });
+
+    const summaryWS = XLSX.utils.aoa_to_sheet(summaryData);
+
+    // 2. Sheet: Detalhes
+    const detailsData = [
+      [
+        "Cliente",
+        "Documento (CPF/CNPJ)",
+        "Venda",
+        "Parcelas",
+        "Loja",
+        "Forma Pagamento",
+        "Valor Devido",
+        "Valor Recebido",
+        "Valor Pendente",
+        "Cobrador",
+      ],
+    ];
+
+    reportData.payments.forEach((p) => {
+      detailsData.push([
+        p.client,
+        p.clientDocument,
+        p.saleNumber,
+        p.installments.length,
+        p.store,
+        p.paymentMethod,
+        p.totalOriginalValue,
+        p.totalReceivedValue,
+        p.totalPendingValue,
+        p.collector,
+      ]);
+    });
+
+    const detailsWS = XLSX.utils.aoa_to_sheet(detailsData);
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, summaryWS, "Resumo");
+    XLSX.utils.book_append_sheet(wb, detailsWS, "Transações");
+
+    // Save file
+    const exportDate =
+      dateRangeMode === "single" ? selectedDate : `${selectedDate}_${endDate}`;
+    XLSX.writeFile(wb, `relatorio-caixa-${exportDate}.xlsx`);
+    setShowExportOptions(false);
   };
 
   const handlePrintReport = () => {
@@ -542,16 +674,43 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             <button
               onClick={handlePrintReport}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
+              title="Imprimir"
             >
               <Printer className="h-5 w-5" />
             </button>
 
-            <button
-              onClick={handleExportReport}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
-            >
-              <Download className="h-5 w-5" />
-            </button>
+            {/* Dropdown de Exportação */}
+            <div className="relative" ref={exportDropdownRef}>
+              <button
+                onClick={() => setShowExportOptions(!showExportOptions)}
+                className="flex items-center gap-1 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
+                title="Exportar"
+              >
+                <Download className="h-5 w-5" />
+                <ChevronDown
+                  className={`h-3 w-3 transition-transform duration-200 ${showExportOptions ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {showExportOptions && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 animate-in fade-in zoom-in duration-200">
+                  <button
+                    onClick={handleExportReport}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <FileText className="h-4 w-4 text-blue-500" />
+                    Salvar em TXT
+                  </button>
+                  <button
+                    onClick={handleExportExcel}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                    Salvar em Excel
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -865,6 +1024,9 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                       Cliente / Venda
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider hidden xl:table-cell">
+                      CPF/CNPJ
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider hidden sm:table-cell">
                       Loja
                     </th>
@@ -896,6 +1058,9 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                               : "Sem número"}
                           </p>
                         </div>
+                      </td>
+                      <td className="px-4 py-3 hidden xl:table-cell">
+                        <p className="text-sm text-gray-600">{payment.clientDocument}</p>
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
                         <p className="text-sm text-gray-600">{payment.store}</p>
@@ -1279,6 +1444,7 @@ const generatePrintableReport = (
       <table>
         <tr>
           <th>Cliente</th>
+          <th>Documento</th>
           <th>Venda</th>
           <th>Parcelas</th>
           <th>Loja</th>
@@ -1293,6 +1459,7 @@ const generatePrintableReport = (
             (p) => `
           <tr>
             <td>${p.client}</td>
+            <td>${p.clientDocument}</td>
             <td>${p.saleNumber ? `#${p.saleNumber}` : "Sem número"}</td>
             <td>${p.installments.length}</td>
             <td>${p.store}</td>

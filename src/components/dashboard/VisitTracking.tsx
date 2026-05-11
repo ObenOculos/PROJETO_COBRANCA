@@ -52,6 +52,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     approveVisitCancellation,
     rejectVisitCancellation,
     fetchScheduledVisits,
+    collections, // Add collections from context
   } = useCollection();
   const { user } = useAuth();
 
@@ -61,6 +62,66 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const [selectedCollector, setSelectedCollector] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchFilter, setSearchFilter] = useState<string>("");
+  const [cityFilter, setCityFilter] = useState<string>("all");
+  const [neighborhoodFilter, setNeighborhoodFilter] = useState<string>("all");
+  const [showCityStats, setShowCityStats] = useState(false);
+
+  // Get available cities and neighborhoods from scheduled visits
+  const availableCities = useMemo(() => {
+    const cities = new Set<string>();
+    scheduledVisits.forEach((v) => {
+      if (v.clientCity) cities.add(v.clientCity);
+    });
+    return Array.from(cities).sort();
+  }, [scheduledVisits]);
+
+  const availableNeighborhoods = useMemo(() => {
+    const neighborhoods = new Set<string>();
+    scheduledVisits.forEach((v) => {
+      const cityMatch = cityFilter === "all" || v.clientCity === cityFilter;
+      if (cityMatch && v.clientNeighborhood) {
+        neighborhoods.add(v.clientNeighborhood);
+      }
+    });
+    return Array.from(neighborhoods).sort();
+  }, [scheduledVisits, cityFilter]);
+
+  // Calculate city statistics
+  const cityStats = useMemo(() => {
+    const stats: Record<
+      string,
+      { totalClients: number; scheduledVisits: number }
+    > = {};
+
+    // Count total unique clients per city from collections
+    const clientsByCity = new Map<string, Set<string>>();
+    collections.forEach((c) => {
+      if (c.cidade && c.documento) {
+        if (!clientsByCity.has(c.cidade)) {
+          clientsByCity.set(c.cidade, new Set());
+        }
+        clientsByCity.get(c.cidade)?.add(c.documento);
+      }
+    });
+
+    clientsByCity.forEach((clients, city) => {
+      stats[city] = { totalClients: clients.size, scheduledVisits: 0 };
+    });
+
+    // Count scheduled visits per city
+    scheduledVisits.forEach((v) => {
+      if (v.clientCity && v.status === "agendada") {
+        if (!stats[v.clientCity]) {
+          stats[v.clientCity] = { totalClients: 0, scheduledVisits: 0 };
+        }
+        stats[v.clientCity].scheduledVisits++;
+      }
+    });
+
+    return Object.entries(stats)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.totalClients - a.totalClients);
+  }, [collections, scheduledVisits]);
 
   // Calculate first and last day of the current month for default filters
   const today = new Date();
@@ -352,6 +413,16 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       // Filtro por período de data
       if (!isDateInRange(visit.scheduledDate)) return false;
 
+      // Filtro por cidade
+      if (cityFilter !== "all" && visit.clientCity !== cityFilter) return false;
+
+      // Filtro por bairro
+      if (
+        neighborhoodFilter !== "all" &&
+        visit.clientNeighborhood !== neighborhoodFilter
+      )
+        return false;
+
       // Filtro por atraso
       if (overdueFilter !== "all") {
         const isOverdue = isVisitOverdue(visit);
@@ -429,6 +500,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     setDateToFilter("");
     setSearchFilter("");
     setOverdueFilter("all");
+    setCityFilter("all");
+    setNeighborhoodFilter("all");
   };
 
   const handleVisitsPerPageChange = (
@@ -448,6 +521,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     if (dateToFilter) count++;
     if (searchFilter.trim()) count++;
     if (overdueFilter !== "all") count++;
+    if (cityFilter !== "all") count++;
+    if (neighborhoodFilter !== "all") count++;
     return count;
   };
 
@@ -792,6 +867,55 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       <option value="all">Todas</option>
                       <option value="overdue">Somente atrasadas</option>
                       <option value="not_overdue">Somente não atrasadas</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="city-filter"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
+                      Cidade
+                    </label>
+                    <select
+                      id="city-filter"
+                      name="city"
+                      value={cityFilter}
+                      onChange={(e) => {
+                        setCityFilter(e.target.value);
+                        setNeighborhoodFilter("all");
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">Todas as cidades</option>
+                      {availableCities.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="neighborhood-filter"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
+                      Bairro
+                    </label>
+                    <select
+                      id="neighborhood-filter"
+                      name="neighborhood"
+                      value={neighborhoodFilter}
+                      onChange={(e) => setNeighborhoodFilter(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">Todos os bairros</option>
+                      {availableNeighborhoods.map((neighborhood) => (
+                        <option key={neighborhood} value={neighborhood}>
+                          {neighborhood}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -1465,6 +1589,62 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             </div>
           </div>
         </div>
+
+        {/* Resumo por Cidade - Colapsável */}
+        {user?.type === "manager" && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <button
+              onClick={() => setShowCityStats(!showCityStats)}
+              className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <MapPin className="h-5 w-5 text-blue-600" />
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Resumo de Clientes por Cidade
+                </h3>
+              </div>
+              {showCityStats ? (
+                <ChevronUp className="h-5 w-5 text-gray-500" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-gray-500" />
+              )}
+            </button>
+
+            {showCityStats && (
+              <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-200">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {cityStats.map((stat) => (
+                    <div
+                      key={stat.name}
+                      className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex flex-col"
+                    >
+                      <span className="text-sm font-semibold text-gray-900 truncate mb-2">
+                        {stat.name}
+                      </span>
+                      <div className="flex items-center justify-between text-xs text-gray-600">
+                        <span>Total de Clientes:</span>
+                        <span className="font-bold text-gray-900">
+                          {stat.totalClients}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-gray-600 mt-1">
+                        <span>Visitas Agendadas:</span>
+                        <span className="font-bold text-blue-600">
+                          {stat.scheduledVisits}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {cityStats.length === 0 && (
+                    <p className="text-sm text-gray-500 col-span-full text-center py-4">
+                      Nenhum dado geográfico disponível.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Content */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
