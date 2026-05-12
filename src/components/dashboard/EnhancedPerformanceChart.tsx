@@ -29,6 +29,8 @@ interface EnhancedCollectorPerformance {
   totalAmount: number;
   receivedAmount: number;
   pendingAmount: number;
+  pendingAmountScheduled: number;
+  pendingAmountTotal: number;
   clientsCount: number;
   visitsPerformance: number;
   paymentsPerformance: number;
@@ -127,8 +129,28 @@ const EnhancedPerformanceChart: React.FC = () => {
         .reduce((sum, p) => sum + p.paymentAmount, 0);
 
       const totalAmount = filteredCollections.reduce((sum, c) => sum + Number(c.valor_original || 0), 0);
-      const receivedFromFiltered = filteredCollections.reduce((sum, c) => sum + Number(c.valor_recebido || 0), 0);
-      const pendingAmount = Math.max(0, totalAmount - receivedFromFiltered);
+      const pendingAmount = Math.max(0, totalAmount - receivedAmount);
+
+      // A receber total: toda a carteira, sem filtro de período
+      const allCollectorCollections = collections.filter((c) => c.user_id === collector.id);
+      const pendingAmountTotal = allCollectorCollections.reduce((sum, c) => {
+        const diff = Number(c.valor_original || 0) - Number(c.valor_recebido || 0);
+        return sum + (diff > 0.01 ? diff : 0);
+      }, 0);
+
+      // A receber (agendados): clientes com visita agendada, sem filtro de período
+      const scheduledClientDocs = new Set(
+        scheduledVisits
+          .filter((v) => v.collectorId === collector.id && v.status === "agendada")
+          .map((v) => v.clientDocument)
+          .filter(Boolean)
+      );
+      const pendingAmountScheduled = allCollectorCollections
+        .filter((c) => c.documento && scheduledClientDocs.has(c.documento))
+        .reduce((sum, c) => {
+          const diff = Number(c.valor_original || 0) - Number(c.valor_recebido || 0);
+          return sum + (diff > 0.01 ? diff : 0);
+        }, 0);
 
       const salesMap = new Map<string, { clientDocument: string; isPending: boolean }>();
       filteredCollections.forEach((collection) => {
@@ -140,8 +162,13 @@ const EnhancedPerformanceChart: React.FC = () => {
         if (isPending) salesMap.get(saleKey)!.isPending = true;
       });
       const salesArray = Array.from(salesMap.values());
-      const totalSales = salesArray.length;
       const pendingSales = salesArray.filter((s) => s.isPending).length;
+
+      // Total de títulos sem filtro de período
+      const allSalesSet = new Set(
+        allCollectorCollections.map((c) => `${c.venda_n}-${c.documento}`)
+      );
+      const totalSales = allSalesSet.size;
       const clientsWithPending = new Set(salesArray.filter((s) => s.isPending).map((s) => s.clientDocument).filter(Boolean)).size;
       const clientsCount = new Set(salesArray.map((s) => s.clientDocument)).size;
 
@@ -199,6 +226,8 @@ const EnhancedPerformanceChart: React.FC = () => {
         totalAmount,
         receivedAmount,
         pendingAmount,
+        pendingAmountScheduled,
+        pendingAmountTotal,
         clientsCount,
         visitsPerformance,
         paymentsPerformance,
@@ -472,11 +501,11 @@ const EnhancedPerformanceChart: React.FC = () => {
                     <div className="flex items-center gap-4 mt-1">
                       <div className="flex items-center gap-1.5">
                         <ShoppingCart className="w-3 h-3 text-gray-400" />
-                        <span className="text-[10px] font-bold text-gray-500 dark:text-dark-text-secondary uppercase">{collector.totalSales} Vendas</span>
+                        <span className="text-[10px] font-bold text-gray-500 dark:text-dark-text-secondary uppercase">{collector.totalSales} Títulos</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <Users className="w-3 h-3 text-gray-400" />
-                        <span className="text-[10px] font-bold text-gray-500 dark:text-dark-text-secondary uppercase">{collector.clientsCount} Clientes</span>
+                        <Users className="w-3 h-3 text-blue-400" />
+                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase">{collector.totalAssignedClients} na Carteira</span>
                       </div>
                     </div>
                   </div>
@@ -492,27 +521,50 @@ const EnhancedPerformanceChart: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-xl border border-gray-100 dark:border-dark-border">
                   <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Volume Financeiro</label>
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <div className="flex justify-between items-baseline">
                       <span className="text-[10px] font-bold text-green-600 uppercase">Recebido</span>
                       <span className="text-base font-black text-gray-800 dark:text-dark-text">{formatCurrency(collector.receivedAmount)}</span>
                     </div>
                     <div className="flex justify-between items-baseline">
-                      <span className="text-[10px] font-bold text-amber-600 uppercase">A Receber</span>
-                      <span className="text-sm font-bold text-gray-500 dark:text-dark-text-secondary">{formatCurrency(collector.pendingAmount)}</span>
+                      <span className="flex flex-col leading-tight">
+                        <span className="text-[10px] font-bold text-amber-500 uppercase">A Receber</span>
+                        <span className="text-[8px] font-normal text-gray-400 uppercase tracking-wider">Agendados</span>
+                      </span>
+                      <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{formatCurrency(collector.pendingAmountScheduled)}</span>
+                    </div>
+                    <div className="flex justify-between items-baseline">
+                      <span className="flex flex-col leading-tight">
+                        <span className="text-[10px] font-bold text-rose-500 uppercase">A Receber</span>
+                        <span className="text-[8px] font-normal text-gray-400 uppercase tracking-wider">Total</span>
+                      </span>
+                      <span className="text-sm font-bold text-rose-600 dark:text-rose-400">{formatCurrency(collector.pendingAmountTotal)}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-xl border border-gray-100 dark:border-dark-border">
-                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Visitas no Período</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Visitas no Período</label>
+                    {collector.currentMonthVisitsGoal > 0 && (
+                      <span className="text-[9px] font-bold text-gray-400 uppercase">
+                        Meta: {collector.currentMonthVisitsGoal}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-blue-600 uppercase">Realizadas</span>
+                      <span className="text-[9px] font-bold text-blue-600 uppercase">Feitas</span>
                       <span className="text-base font-black text-gray-800 dark:text-dark-text">{collector.visitsRealizadas}</span>
                     </div>
+                    <div className="flex flex-col text-center">
+                      <span className="text-[9px] font-bold text-amber-500 uppercase">Agendadas</span>
+                      <span className={`text-base font-black ${collector.visitsAgendadas > 0 ? "text-amber-500" : "text-gray-300 dark:text-gray-700"}`}>
+                        {collector.visitsAgendadas}
+                      </span>
+                    </div>
                     <div className="flex flex-col text-right">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase">Atrasadas</span>
+                      <span className="text-[9px] font-bold text-rose-500 uppercase">Atrasadas</span>
                       <span className={`text-base font-black ${collector.visitsAtrasadas > 0 ? "text-rose-500" : "text-gray-300 dark:text-gray-700"}`}>
                         {collector.visitsAtrasadas}
                       </span>

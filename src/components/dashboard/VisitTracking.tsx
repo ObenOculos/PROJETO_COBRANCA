@@ -14,9 +14,12 @@ import {
   Filter,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Search,
   Star, // Add Star icon
   FileDown,
+  Zap,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import * as XLSX from "xlsx";
@@ -742,235 +745,172 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
     return (
       <div className="space-y-4">
-        {/* Filtros Colapsáveis */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Filtros</h3>
+        {/* Filtros — Estilo Moderno */}
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
+          <div className="p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors relative"
-                >
-                  <Filter className="h-5 w-5" />
-                  {activeFiltersCount > 0 && (
-                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                      {activeFiltersCount}
-                    </span>
-                  )}
-                </button>
+                <Filter className="h-4 w-4 text-blue-600" />
+                <h3 className="text-sm font-black text-gray-900 dark:text-dark-text uppercase tracking-widest">
+                  Filtros e Ferramentas
+                </h3>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 {activeFiltersCount > 0 && (
                   <button
                     onClick={clearAllFilters}
-                    className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-2xl hover:bg-gray-200 transition-colors text-sm font-medium"
+                    className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 dark:hover:text-dark-text transition-colors"
                   >
-                    Limpar
+                    Limpar Tudo
                   </button>
                 )}
                 <button
                   onClick={handleExportToExcel}
-                  className="px-3 py-1.5 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
-                  title="Exportar para Excel"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-green-100 dark:shadow-none"
                 >
-                  <FileDown className="h-4 w-4" />
-                  <span className="hidden sm:inline">Exportar</span>
+                  <FileDown className="h-3.5 w-3.5" />
+                  Exportar CSV
+                </button>
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`p-2.5 rounded-xl transition-all border ${
+                    showFilters || activeFiltersCount > 0
+                      ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 dark:shadow-none"
+                      : "bg-gray-50 dark:bg-dark-bg text-gray-400 border-gray-100 dark:border-dark-border hover:bg-gray-100"
+                  }`}
+                >
+                  <Filter className="h-4 w-4" />
                 </button>
               </div>
             </div>
 
-            {/* Busca sempre visível */}
-            <div>
-              <label
-                htmlFor="search-input"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Buscar
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  id="search-input"
-                  name="search"
-                  type="text"
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
-                  placeholder="Nome, documento, endereço ou observações..."
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
+            {/* Busca Principal */}
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+              <input
+                type="text"
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                placeholder="BUSCAR POR CLIENTE, DOCUMENTO OU ENDEREÇO..."
+                className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-bold dark:text-dark-text placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all uppercase"
+              />
             </div>
 
-            {/* Filtros Colapsáveis */}
+            {/* Filtros Avançados Colapsáveis */}
             {showFilters && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-200 animate-in slide-in-from-top-2 duration-200">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
-                    <label
-                      htmlFor="collector-select"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Cobrador
-                    </label>
+              <div className="mt-6 pt-6 border-t border-gray-50 dark:border-dark-border animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Cobrador</label>
                     <select
-                      id="collector-select"
-                      name="collector"
                       value={selectedCollector}
                       onChange={(e) => setSelectedCollector(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tighter"
                     >
-                      <option value="all">Todos os cobradores</option>
+                      <option value="all">TODOS OS COBRADORES</option>
                       {collectors.map((collector) => (
                         <option key={collector.id} value={collector.id}>
-                          {collector.name}
+                          {collector.name.toUpperCase()}
                         </option>
                       ))}
                     </select>
                   </div>
 
-                  <div>
-                    <label
-                      htmlFor="status-select"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Status
-                    </label>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Status</label>
                     <select
-                      id="status-select"
-                      name="status"
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tighter"
                     >
-                      <option value="all">Todos os status</option>
-                      <option value="agendada">Agendada</option>
-                      <option value="realizada">Realizada</option>
-                      <option value="cancelada">Cancelada</option>
-                      <option value="nao_encontrado">Não Encontrado</option>
-                      <option value="reagendada">Reagendada</option>
+                      <option value="all">TODOS OS STATUS</option>
+                      <option value="agendada">AGENDADA</option>
+                      <option value="realizada">REALIZADA</option>
+                      <option value="cancelada">CANCELADA</option>
+                      <option value="nao_encontrado">NÃO ENCONTRADO</option>
+                      <option value="reagendada">REAGENDADA</option>
                     </select>
                   </div>
 
-                  <div>
-                    <label
-                      htmlFor="overdue-filter"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Atrasadas
-                    </label>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Atraso</label>
                     <select
-                      id="overdue-filter"
-                      name="overdue"
                       value={overdueFilter}
                       onChange={(e) => setOverdueFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tighter"
                     >
-                      <option value="all">Todas</option>
-                      <option value="overdue">Somente atrasadas</option>
-                      <option value="not_overdue">Somente não atrasadas</option>
+                      <option value="all">TODAS</option>
+                      <option value="overdue">SOMENTE ATRASADAS</option>
+                      <option value="not_overdue">SOMENTE EM DIA</option>
                     </select>
                   </div>
 
-                  <div>
-                    <label
-                      htmlFor="city-filter"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Cidade
-                    </label>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Cidade</label>
                     <select
-                      id="city-filter"
-                      name="city"
                       value={cityFilter}
                       onChange={(e) => {
                         setCityFilter(e.target.value);
                         setNeighborhoodFilter("all");
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tighter"
                     >
-                      <option value="all">Todas as cidades</option>
+                      <option value="all">TODAS AS CIDADES</option>
                       {availableCities.map((city) => (
                         <option key={city} value={city}>
-                          {city}
+                          {city.toUpperCase()}
                         </option>
                       ))}
                     </select>
                   </div>
 
-                  <div>
-                    <label
-                      htmlFor="neighborhood-filter"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Bairro
-                    </label>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Bairro</label>
                     <select
-                      id="neighborhood-filter"
-                      name="neighborhood"
                       value={neighborhoodFilter}
                       onChange={(e) => setNeighborhoodFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tighter"
                     >
-                      <option value="all">Todos os bairros</option>
+                      <option value="all">TODOS OS BAIRROS</option>
                       {availableNeighborhoods.map((neighborhood) => (
                         <option key={neighborhood} value={neighborhood}>
-                          {neighborhood}
+                          {neighborhood.toUpperCase()}
                         </option>
                       ))}
                     </select>
                   </div>
 
-                  <div>
-                    <label
-                      htmlFor="date-from-filter"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Data Inicial
-                    </label>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Início</label>
                     <input
-                      id="date-from-filter"
-                      name="dateFrom"
                       type="date"
                       value={dateFromFilter}
                       onChange={(e) => setDateFromFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
-                  <div>
-                    <label
-                      htmlFor="date-to-filter"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Data Final
-                    </label>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Fim</label>
                     <input
-                      id="date-to-filter"
-                      name="dateTo"
                       type="date"
                       value={dateToFilter}
                       onChange={(e) => setDateToFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
-                  <div>
-                    <label
-                      htmlFor="visits-per-page-select"
-                      className="block text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Visitas por Página
-                    </label>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Registros</label>
                     <select
-                      id="visits-per-page-select"
-                      name="visitsPerPage"
                       value={visitsPerPage}
                       onChange={handleVisitsPerPageChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tighter"
                     >
-                      <option value={5}>5</option>
-                      <option value={10}>10</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
+                      <option value={5}>5 POR PÁGINA</option>
+                      <option value={10}>10 POR PÁGINA</option>
+                      <option value={50}>50 POR PÁGINA</option>
+                      <option value={100}>100 POR PÁGINA</option>
                     </select>
                   </div>
                 </div>
@@ -999,288 +939,267 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               return (
                 <div
                   key={collectorId}
-                  className="bg-white rounded-2xl shadow-sm border border-gray-200"
+                  className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden"
                 >
-                  {/* Header do cobrador */}
+                  {/* Header do cobrador — Estilo Refinado */}
                   <div
-                    className="p-4 lg:p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+                    className="p-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors flex items-center justify-between"
                     onClick={() => toggleCollectorExpansion(collectorId)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center flex-1 min-w-0">
-                        <div className="h-10 w-10 lg:h-12 lg:w-12 rounded-full flex items-center justify-center mr-3 lg:mr-4 bg-blue-100 flex-shrink-0">
-                          <User className="h-5 w-5 lg:h-6 lg:w-6 text-blue-600" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="text-base lg:text-lg font-semibold text-gray-900 truncate">
-                            {collectorName}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            {visits.length}{" "}
-                            {visits.length === 1 ? "visita" : "visitas"}
-                          </p>
-                        </div>
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-900/30">
+                        <User className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
-                        <div className="text-right hidden sm:block">
-                          <div className="text-xl lg:text-2xl font-bold text-gray-900">
-                            {visits.length}
-                          </div>
-                          <div className="text-sm text-gray-600">Visitas</div>
-                        </div>
-                        {user?.type === "manager" && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent collector card from expanding
-                              setSelectedCollectorForScheduler(collectorId);
-                              setShowSchedulerModal(true);
-                            }}
-                            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
-                            title="Agendar Visita"
-                          >
-                            <Calendar className="h-5 w-5" />
-                          </button>
-                        )}
+                      <div>
+                        <h3 className="text-sm font-black text-gray-900 dark:text-dark-text uppercase tracking-tight">
+                          {collectorName}
+                        </h3>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
+                          {visits.length} {visits.length === 1 ? "Visita Programada" : "Visitas Programadas"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      {user?.type === "manager" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCollectorForScheduler(collectorId);
+                            setShowSchedulerModal(true);
+                          }}
+                          className="hidden sm:flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-blue-100 dark:shadow-none"
+                        >
+                          <Calendar className="h-3.5 w-3.5" />
+                          Nova Visita
+                        </button>
+                      )}
+                      <div className="bg-gray-50 dark:bg-dark-bg p-2 rounded-xl border border-gray-100 dark:border-dark-border">
                         {isExpanded ? (
-                          <ChevronUp className="h-5 w-5 text-gray-600" />
+                          <ChevronUp className="h-5 w-5 text-gray-400" />
                         ) : (
-                          <ChevronDown className="h-5 w-5 text-gray-600" />
+                          <ChevronDown className="h-5 w-5 text-gray-400" />
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Lista de visitas */}
+                  {/* Área Expandida — Tabela e Cards */}
                   {isExpanded && (
-                    <div className="p-4 lg:p-6 pt-0 space-y-4">
+                    <div className="px-6 pb-6 animate-in fade-in slide-in-from-top-4 duration-300">
                       {visits.length === 0 ? (
-                        <div className="text-center py-8">
-                          <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                          <p className="text-gray-500 text-sm">
-                            Nenhuma visita agendada para este cobrador
-                          </p>
-                          <p className="text-gray-400 text-xs mt-1">
-                            Ajuste os filtros ou clique no ícone de calendário
-                            para agendar
+                        <div className="text-center py-12 bg-gray-50 dark:bg-dark-bg rounded-2xl border border-dashed border-gray-200 dark:border-dark-border">
+                          <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                            Nenhuma visita para este cobrador
                           </p>
                         </div>
                       ) : (
                         (() => {
                           const currentPage = collectorPages[collectorId] || 1;
-                          const totalPages = Math.ceil(
-                            visits.length / visitsPerPage,
-                          );
-                          const paginatedVisits = visits.slice(
-                            (currentPage - 1) * visitsPerPage,
-                            currentPage * visitsPerPage,
-                          );
-
-                          const handlePageChange = (
-                            collectorId: string,
-                            newPage: number,
-                          ) => {
-                            setCollectorPages((prev) => ({
-                              ...prev,
-                              [collectorId]: newPage,
-                            }));
-                          };
+                          const totalPages = Math.ceil(visits.length / visitsPerPage);
+                          const paginatedVisits = visits.slice((currentPage - 1) * visitsPerPage, currentPage * visitsPerPage);
+                          const startItemCollector = (currentPage - 1) * visitsPerPage + 1;
+                          const endItemCollector = Math.min(currentPage * visitsPerPage, visits.length);
 
                           return (
-                            <>
-                              {paginatedVisits.map((visit) => {
-                                const isOverdue = isVisitOverdue(visit);
-                                return (
-                                  <div
-                                    key={visit.id}
-                                    className={`p-3 lg:p-4 rounded-2xl border transition-all duration-200 hover:shadow-md ${
-                                      isOverdue
-                                        ? "border-red-300 bg-red-50"
-                                        : "border-gray-200 bg-gray-50"
-                                    }`}
-                                  >
-                                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
-                                      <div className="flex-1">
-                                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 mb-3">
-                                          <div className="font-semibold text-gray-900 mb-1 sm:mb-0">
-                                            {visit.clientName}
-                                          </div>
-                                          <div className="flex flex-wrap gap-2">
-                                            {getStatusBadge(visit.status)}
-                                            {isVisitOverdue(visit) && (
-                                              <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 flex items-center">
-                                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                                Atrasada{" "}
-                                                {getOverdueDays(
-                                                  visit.scheduledDate,
-                                                )}{" "}
-                                                {getOverdueDays(
-                                                  visit.scheduledDate,
-                                                ) === 1
-                                                  ? "dia"
-                                                  : "dias"}
+                            <div className="space-y-6">
+                              {/* Visualização em Tabela (Desktop) */}
+                              <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                  <thead>
+                                    <tr className="border-b border-gray-100 dark:border-dark-border">
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente / Documento</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Agendamento</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Localização</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status / Valor</th>
+                                      <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
+                                    {paginatedVisits.map((visit) => {
+                                      const isOverdue = isVisitOverdue(visit);
+                                      return (
+                                        <tr key={visit.id} className={`group hover:bg-gray-50/50 dark:hover:bg-dark-bg/30 transition-colors ${isOverdue ? 'bg-red-50/20' : ''}`}>
+                                          <td className="py-4 pr-4">
+                                            <div className="flex flex-col">
+                                              <span className="text-xs font-black text-gray-900 dark:text-dark-text uppercase">{visit.clientName}</span>
+                                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{visit.clientDocument}</span>
+                                            </div>
+                                          </td>
+                                          <td className="py-4 pr-4">
+                                            <div className="flex flex-col">
+                                              <div className="flex items-center text-[11px] font-bold text-gray-700 dark:text-dark-text-secondary">
+                                                <Calendar className="h-3 w-3 mr-1.5 text-blue-500" />
+                                                {formatSafeDate(visit.scheduledDate)}
+                                              </div>
+                                              <div className="flex items-center text-[10px] font-bold text-gray-400 mt-1">
+                                                <Clock className="h-3 w-3 mr-1.5" />
+                                                {visit.scheduledTime || "00:00"}
+                                              </div>
+                                            </div>
+                                          </td>
+                                          <td className="py-4 pr-4">
+                                            <div className="flex items-center text-[11px] font-bold text-gray-600 dark:text-dark-text-secondary max-w-[200px]">
+                                              <MapPin className="h-3.5 w-3.5 mr-1.5 text-gray-400 shrink-0" />
+                                              <span className="truncate uppercase">
+                                                {visit.clientNeighborhood}, {visit.clientCity}
                                               </span>
-                                            )}
-                                            {visit.scheduled_by_manager_id && (
-                                              <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 flex items-center">
-                                                <Star className="h-3 w-3 mr-1" />
-                                                Agendado pelo gerente
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600 mb-3">
-                                          <div className="space-y-2">
-                                            <div className="flex items-center">
-                                              <Calendar className="h-4 w-4 mr-2" />
-                                              {formatSafeDateTime(
-                                                visit.scheduledDate,
-                                                visit.scheduledTime,
+                                            </div>
+                                          </td>
+                                          <td className="py-4 pr-4">
+                                            <div className="flex flex-col gap-2">
+                                              {getStatusBadge(visit.status)}
+                                              {visit.totalPendingValue && (
+                                                <span className="text-[10px] font-black text-red-600 dark:text-red-400 tracking-tight">
+                                                  {formatCurrency(visit.totalPendingValue)}
+                                                </span>
                                               )}
                                             </div>
-                                            <div className="flex items-center">
-                                              <MapPin className="h-4 w-4 mr-2" />
-                                              {visit.clientAddress}
-                                              {visit.clientNumber &&
-                                                `, ${visit.clientNumber}`}
-                                              {visit.clientNeighborhood &&
-                                                `, ${visit.clientNeighborhood}`}
-                                              {visit.clientCity &&
-                                                `, ${visit.clientCity}`}
-                                            </div>
-                                          </div>
+                                          </td>
+                                          <td className="py-4 text-right">
+                                            {visit.status === "cancelamento_solicitado" && (
+                                              <div className="flex items-center justify-end gap-2">
+                                                <button
+                                                  onClick={() => handleOpenApproval(visit, "approve")}
+                                                  className="p-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-100 transition-all"
+                                                  title="Aprovar"
+                                                >
+                                                  <CheckCircle className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                  onClick={() => handleOpenApproval(visit, "reject")}
+                                                  className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 transition-all"
+                                                  title="Rejeitar"
+                                                >
+                                                  <XCircle className="h-4 w-4" />
+                                                </button>
+                                              </div>
+                                            )}
+                                            {isOverdue && (
+                                              <div className="inline-flex items-center px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[9px] font-black uppercase">
+                                                Atrasada
+                                              </div>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
 
-                                          <div className="space-y-2">
-                                            {visit.totalPendingValue && (
-                                              <div className="flex items-center">
-                                                <DollarSign className="h-4 w-4 mr-2" />
-                                                Pendente:{" "}
-                                                {formatCurrency(
-                                                  visit.totalPendingValue,
-                                                )}
-                                              </div>
-                                            )}
-                                            {visit.overdueCount && (
-                                              <div className="flex items-center">
-                                                <AlertTriangle className="h-4 w-4 mr-2" />
-                                                {visit.overdueCount}{" "}
-                                                {visit.overdueCount === 1
-                                                  ? "parcela vencida"
-                                                  : "parcelas vencidas"}
-                                              </div>
-                                            )}
-                                          </div>
+                              {/* Visualização em Cards (Mobile) */}
+                              <div className="md:hidden space-y-4">
+                                {paginatedVisits.map((visit) => {
+                                  const isOverdue = isVisitOverdue(visit);
+                                  return (
+                                    <div key={visit.id} className={`p-4 rounded-2xl border transition-all ${isOverdue ? 'border-red-200 bg-red-50/30' : 'border-gray-100 dark:border-dark-border bg-gray-50/50 dark:bg-dark-bg/50'}`}>
+                                      <div className="flex justify-between items-start mb-3">
+                                        <div className="min-w-0">
+                                          <h4 className="text-xs font-black text-gray-900 dark:text-dark-text truncate uppercase tracking-tight">{visit.clientName}</h4>
+                                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mt-0.5">{visit.clientDocument}</p>
                                         </div>
-
-                                        {visit.notes && (
-                                          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 mb-3">
-                                            <div className="flex items-start">
-                                              <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
-                                              <div>
-                                                <div className="text-sm font-medium text-gray-700 mb-1">
-                                                  Observações da visita:
-                                                </div>
-                                                <div className="text-sm text-gray-600 italic whitespace-pre-line">
-                                                  {visit.notes}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        )}
-
-                                        {visit.cancellationRequestReason && (
-                                          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 mb-3">
-                                            <div className="flex items-start">
-                                              <MessageSquare className="h-4 w-4 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
-                                              <div>
-                                                <div className="text-sm font-medium text-yellow-800 mb-1">
-                                                  Motivo do cancelamento
-                                                  solicitado:
-                                                </div>
-                                                <div className="text-sm text-yellow-700 italic">
-                                                  "
-                                                  {
-                                                    visit.cancellationRequestReason
-                                                  }
-                                                  "
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        )}
+                                        <div className="shrink-0 text-right">
+                                          {visit.totalPendingValue && (
+                                            <p className="text-xs font-black text-red-600 dark:text-red-400">{formatCurrency(visit.totalPendingValue)}</p>
+                                          )}
+                                          {getStatusBadge(visit.status)}
+                                        </div>
                                       </div>
 
-                                      {visit.status ===
-                                        "cancelamento_solicitado" && (
-                                        <div className="flex flex-col sm:flex-row gap-2 mt-3 lg:ml-4">
+                                      <div className="space-y-2 mb-4">
+                                        <div className="flex items-center text-[10px] font-bold text-gray-600 dark:text-dark-text-secondary">
+                                          <Calendar className="h-3 w-3 mr-2 text-blue-500" />
+                                          {formatSafeDate(visit.scheduledDate)} {visit.scheduledTime && `ÀS ${visit.scheduledTime}`}
+                                        </div>
+                                        <div className="flex items-center text-[10px] font-bold text-gray-500 dark:text-dark-text-secondary">
+                                          <MapPin className="h-3 w-3 mr-2" />
+                                          <span className="truncate uppercase">{visit.clientNeighborhood}, {visit.clientCity}</span>
+                                        </div>
+                                      </div>
+
+                                      {visit.status === "cancelamento_solicitado" && (
+                                        <div className="flex gap-2 border-t border-gray-100 dark:border-dark-border pt-3 mt-3">
                                           <button
-                                            onClick={() =>
-                                              handleOpenApproval(
-                                                visit,
-                                                "approve",
-                                              )
-                                            }
-                                            className="flex-1 sm:flex-none px-3 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium flex items-center justify-center text-sm"
+                                            onClick={() => handleOpenApproval(visit, "approve")}
+                                            className="flex-1 flex items-center justify-center gap-2 py-2 bg-green-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
                                           >
-                                            <CheckCircle className="h-4 w-4 mr-1" />
-                                            <span className="hidden sm:inline">
-                                              Aprovar
-                                            </span>
-                                            <span className="sm:hidden">✓</span>
+                                            <CheckCircle className="h-3.5 w-3.5" /> Aprovar
                                           </button>
                                           <button
-                                            onClick={() =>
-                                              handleOpenApproval(
-                                                visit,
-                                                "reject",
-                                              )
-                                            }
-                                            className="flex-1 sm:flex-none px-3 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors font-medium flex items-center justify-center text-sm"
+                                            onClick={() => handleOpenApproval(visit, "reject")}
+                                            className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
                                           >
-                                            <XCircle className="h-4 w-4 mr-1" />
-                                            <span className="hidden sm:inline">
-                                              Rejeitar
-                                            </span>
-                                            <span className="sm:hidden">✕</span>
+                                            <XCircle className="h-3.5 w-3.5" /> Rejeitar
                                           </button>
                                         </div>
                                       )}
+                                      
+                                      {isOverdue && (
+                                        <div className="mt-2 text-center py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[9px] font-black uppercase rounded-lg">
+                                          Visita Atrasada — {getOverdueDays(visit.scheduledDate)} Dias
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Paginação — Estilo Dashboard */}
+                              {totalPages > 1 && (
+                                <div className="bg-gray-900 dark:bg-dark-bg-secondary mt-6 border border-gray-800 dark:border-dark-border px-6 py-4 rounded-2xl shadow-lg">
+                                  <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+                                    <div className="flex items-center gap-3">
+                                      <div className="bg-blue-600/20 text-blue-400 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border border-blue-600/30">
+                                        Pág {currentPage} / {totalPages}
+                                      </div>
+                                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                                        Exibindo {startItemCollector}–{endItemCollector} de {visits.length}
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => setCollectorPages(prev => ({ ...prev, [collectorId]: Math.max(1, currentPage - 1) }))}
+                                        disabled={currentPage === 1}
+                                        className="p-2 bg-white/5 border border-white/10 rounded-xl text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                      >
+                                        <ChevronLeft className="h-4 w-4" />
+                                      </button>
+                                      <div className="flex items-center gap-1">
+                                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                          let pNum;
+                                          if (totalPages <= 5) pNum = i + 1;
+                                          else if (currentPage <= 3) pNum = i + 1;
+                                          else if (currentPage >= totalPages - 2) pNum = totalPages - 4 + i;
+                                          else pNum = currentPage - 2 + i;
+                                          return (
+                                            <button
+                                              key={pNum}
+                                              onClick={() => setCollectorPages(prev => ({ ...prev, [collectorId]: pNum }))}
+                                              className={`w-9 h-9 flex items-center justify-center text-xs font-black rounded-xl transition-all ${
+                                                pNum === currentPage
+                                                  ? "bg-blue-600 text-white shadow-lg"
+                                                  : "bg-white/5 text-gray-400 hover:text-white border border-white/5"
+                                              }`}
+                                            >
+                                              {pNum}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                      <button
+                                        onClick={() => setCollectorPages(prev => ({ ...prev, [collectorId]: Math.min(totalPages, currentPage + 1) }))}
+                                        disabled={currentPage === totalPages}
+                                        className="p-2 bg-white/5 border border-white/10 rounded-xl text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                      >
+                                        <ChevronRight className="h-4 w-4" />
+                                      </button>
                                     </div>
                                   </div>
-                                );
-                              })}
-                              {totalPages > 1 && (
-                                <div className="flex items-center justify-between pt-4">
-                                  <button
-                                    onClick={() =>
-                                      handlePageChange(
-                                        collectorId,
-                                        currentPage - 1,
-                                      )
-                                    }
-                                    disabled={currentPage === 1}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                  >
-                                    Anterior
-                                  </button>
-                                  <span className="text-sm text-gray-700">
-                                    Página {currentPage} de {totalPages}
-                                  </span>
-                                  <button
-                                    onClick={() =>
-                                      handlePageChange(
-                                        collectorId,
-                                        currentPage + 1,
-                                      )
-                                    }
-                                    disabled={currentPage === totalPages}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                  >
-                                    Próxima
-                                  </button>
                                 </div>
                               )}
-                            </>
+                            </div>
                           );
                         })()
                       )}
@@ -1296,133 +1215,129 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   };
 
   const renderCancellationsTab = () => (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {pendingRequests.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
-          <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-12 text-center">
+          <div className="h-16 w-16 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-100 dark:border-green-900/30">
+            <CheckCircle className="h-8 w-8 text-green-500" />
+          </div>
+          <h3 className="text-lg font-black text-gray-900 dark:text-dark-text uppercase tracking-tight mb-2">
             Nenhuma solicitação pendente
           </h3>
-          <p className="text-gray-600">
+          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
             Todas as solicitações de cancelamento foram processadas
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Solicitações Pendentes ({pendingRequests.length})
-            </h3>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-black text-gray-900 dark:text-dark-text uppercase tracking-tight">
+                Solicitações de Cancelamento
+              </h3>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Aguardando aprovação do gerente ({pendingRequests.length})
+              </p>
+            </div>
           </div>
 
-          {pendingRequests.map((request) => (
-            <div
-              key={request.id}
-              className="bg-white rounded-2xl shadow-sm border border-red-200 p-4 lg:p-6"
-            >
-              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-3 lg:space-y-0">
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 mb-3">
-                    <div className="font-semibold text-gray-900 mb-1 sm:mb-0">
-                      {request.clientName}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800 w-fit">
-                        Cancelamento Solicitado
-                      </span>
-                      {isVisitOverdue(request) && (
-                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 flex items-center">
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                          Atrasada {getOverdueDays(request.scheduledDate)}{" "}
-                          {getOverdueDays(request.scheduledDate) === 1
-                            ? "dia"
-                            : "dias"}
+          {/* Visualização em Tabela (Desktop) */}
+          <div className="hidden md:block bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/50 dark:bg-dark-bg border-b border-gray-100 dark:border-dark-border">
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente / Cobrador</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Agendamento</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Motivo do Cancelamento</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
+                {pendingRequests.map((request) => (
+                  <tr key={request.id} className="hover:bg-gray-50/50 dark:hover:bg-dark-bg transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-black text-gray-900 dark:text-dark-text uppercase">{request.clientName}</span>
+                        <span className="text-[10px] font-bold text-blue-500 uppercase tracking-tighter">Cobrador: {getCollectorName(request.collectorId)}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-bold text-gray-700 dark:text-dark-text-secondary uppercase">
+                          {formatSafeDate(request.scheduledDate)}
                         </span>
-                      )}
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                          Solicitado em: {formatSafeDate(request.cancellationRequestDate || "")}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 max-w-xs">
+                      <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20 rounded-lg p-2">
+                        <p className="text-[10px] font-medium text-amber-800 dark:text-amber-400 italic leading-tight">
+                          "{request.cancellationRequestReason || "NÃO INFORMADO"}"
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleOpenApproval(request, "approve")}
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all"
+                        >
+                          Aprovar
+                        </button>
+                        <button
+                          onClick={() => handleOpenApproval(request, "reject")}
+                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all"
+                        >
+                          Rejeitar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Visualização em Cards (Mobile) */}
+          <div className="md:hidden space-y-4">
+            {pendingRequests.map((request) => (
+              <div key={request.id} className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30 overflow-hidden">
+                <div className="p-5">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h4 className="text-xs font-black text-gray-900 dark:text-dark-text uppercase tracking-tight">{request.clientName}</h4>
+                      <p className="text-[10px] font-bold text-blue-500 uppercase mt-0.5">{getCollectorName(request.collectorId)}</p>
                     </div>
+                    <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] font-black uppercase">
+                      Pendente
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600 mb-3">
-                    <div className="space-y-2">
-                      <div className="flex items-center">
-                        <Calendar className="h-4 w-4 mr-2" />
-                        {formatSafeDateTime(
-                          request.scheduledDate,
-                          request.scheduledTime,
-                        )}
-                      </div>
-                      <div className="flex items-center">
-                        <User className="h-4 w-4 mr-2" />
-                        Cobrador: {getCollectorName(request.collectorId)}
-                      </div>
-                      <div className="flex items-center">
-                        <MapPin className="h-4 w-4 mr-2" />
-                        {request.clientAddress}
-                        {request.clientNumber && `, ${request.clientNumber}`}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      {request.totalPendingValue && (
-                        <div className="flex items-center">
-                          <DollarSign className="h-4 w-4 mr-2" />
-                          Pendente: {formatCurrency(request.totalPendingValue)}
-                        </div>
-                      )}
-                      {request.cancellationRequestDate && (
-                        <div className="flex items-center">
-                          <Clock className="h-4 w-4 mr-2" />
-                          Solicitado em:{" "}
-                          {formatSafeDate(request.cancellationRequestDate)}
-                        </div>
-                      )}
-                    </div>
+                  <div className="bg-gray-50 dark:bg-dark-bg p-3 rounded-xl mb-4 space-y-2">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Motivo do Cancelamento:</p>
+                    <p className="text-[11px] font-medium text-gray-700 dark:text-dark-text-secondary italic">"{request.cancellationRequestReason}"</p>
                   </div>
 
-                  {request.cancellationRequestReason && (
-                    <div className="bg-white border border-gray-200 rounded-2xl p-3 mb-3">
-                      <div className="flex items-start">
-                        <MessageSquare className="h-4 w-4 text-gray-500 mr-2 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <div className="text-sm font-medium text-gray-700 mb-1">
-                            Motivo do cancelamento:
-                          </div>
-                          <div className="text-sm text-gray-600 italic">
-                            "{request.cancellationRequestReason}"
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {request.notes && (
-                    <div className="text-sm text-gray-500 italic mb-3 whitespace-pre-line">
-                      Observações da visita: {request.notes}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-2 mt-3 lg:ml-4">
-                  <button
-                    onClick={() => handleOpenApproval(request, "approve")}
-                    className="flex-1 sm:flex-none px-3 lg:px-4 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium flex items-center justify-center text-sm"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                    <span className="hidden sm:inline">Aprovar</span>
-                    <span className="sm:hidden">✓ Aprovar</span>
-                  </button>
-                  <button
-                    onClick={() => handleOpenApproval(request, "reject")}
-                    className="flex-1 sm:flex-none px-3 lg:px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors font-medium flex items-center justify-center text-sm"
-                  >
-                    <XCircle className="h-4 w-4 mr-1" />
-                    <span className="hidden sm:inline">Rejeitar</span>
-                    <span className="sm:hidden">✕ Rejeitar</span>
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleOpenApproval(request, "approve")}
+                      className="flex-1 py-2 bg-green-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
+                    >
+                      Aprovar
+                    </button>
+                    <button
+                      onClick={() => handleOpenApproval(request, "reject")}
+                      className="flex-1 py-2 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
+                    >
+                      Rejeitar
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -1472,24 +1387,28 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   return (
     <>
       <div className="space-y-6">
-        {/* Header + Navegação Combinados */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-                Acompanhamento de Visitas
-              </h2>
-              <p className="text-sm text-gray-600 mt-1 hidden sm:block">
-                Gerencie visitas e cancelamentos
-              </p>
+        {/* Header — Estilo Ranking de Performance */}
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-600 p-2 rounded-xl">
+                <Calendar className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-gray-900 dark:text-dark-text tracking-tight uppercase">
+                  Acompanhamento de Visitas
+                </h2>
+                <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mt-1">
+                  Gestão estratégica de rotas e cancelamentos
+                </p>
+              </div>
             </div>
 
             {/* Ação de Fechar */}
             {onClose && (
               <button
                 onClick={onClose}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
+                className="p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-dark-text bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl transition-all"
                 title="Fechar"
               >
                 <X className="h-5 w-5" />
@@ -1497,33 +1416,31 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             )}
           </div>
 
-          {/* Navegação por Tabs - Desktop com texto, Mobile apenas ícones */}
-          <div className="grid grid-cols-3 sm:flex gap-2">
+          {/* Navegação por Tabs — Estilo Unificado */}
+          <div className="mt-8 grid grid-cols-1 sm:flex gap-2">
             <button
               onClick={() => setActiveTab("visits")}
-              className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-2xl text-sm font-medium transition-colors ${
+              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
                 activeTab === "visits"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-100 dark:shadow-none"
+                  : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
               }`}
-              title="Visitas"
             >
-              <Calendar className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Visitas</span>
+              <Calendar className="h-4 w-4 mr-2" />
+              Visitas
             </button>
             <button
               onClick={() => setActiveTab("cancellations")}
-              className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-2xl text-sm font-medium transition-colors relative ${
+              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all relative ${
                 activeTab === "cancellations"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-100 dark:shadow-none"
+                  : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
               }`}
-              title="Cancelamentos"
             >
-              <AlertTriangle className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Cancelamentos</span>
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Cancelamentos
               {pendingRequests.length > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium sm:static sm:ml-2 sm:h-auto sm:w-auto sm:px-2 sm:py-0.5 sm:bg-red-100 sm:text-red-800">
+                <span className="ml-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[10px] px-1.5 py-0.5 rounded-md">
                   {pendingRequests.length}
                 </span>
               )}
@@ -1532,62 +1449,63 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             {user?.type === "manager" && (
               <button
                 onClick={() => setActiveTab("scheduledDates")}
-                className={`flex items-center justify-center px-4 py-3 sm:py-2 rounded-2xl text-sm font-medium transition-colors ${
+                className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
                   activeTab === "scheduledDates"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-100 dark:shadow-none"
+                    : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
                 }`}
-                title="Datas Programadas"
               >
-                <CalendarClock className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Datas Programadas</span>
+                <CalendarClock className="h-4 w-4 mr-2" />
+                Datas Programadas
               </button>
             )}
           </div>
         </div>
 
-        {/* Card Principal - Visitas Agendadas */}
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-blue-100 text-sm font-medium">
-                Visitas Agendadas
-              </p>
-              <p className="text-4xl font-bold mt-1">
-                {overviewStats.agendadas}
-              </p>
-              {overviewStats.atrasadas > 0 && (
-                <p className="text-red-200 text-sm mt-2 flex items-center">
-                  <AlertTriangle className="h-4 w-4 mr-1" />
-                  {overviewStats.atrasadas} atrasada
-                  {overviewStats.atrasadas !== 1 ? "s" : ""}
+        {/* Card Principal — Taxa e Resumo */}
+        <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white rounded-2xl shadow-xl p-8 relative overflow-hidden group">
+          <div className="relative z-10">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-blue-100 text-[10px] font-black uppercase tracking-[0.2em] mb-1">
+                  Fluxo de Visitas Agendadas
                 </p>
-              )}
+                <div className="flex items-baseline gap-2">
+                  <span className="text-5xl font-black tracking-tighter">
+                    {overviewStats.agendadas}
+                  </span>
+                  <div className={`flex items-center text-xs font-bold px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-md ${overviewStats.atrasadas > 0 ? 'text-red-200' : 'text-green-300'}`}>
+                    <Zap className="w-3 h-3 mr-1 fill-current" />
+                    {overviewStats.atrasadas > 0 ? `${overviewStats.atrasadas} Atrasadas` : 'Em Dia'}
+                  </div>
+                </div>
+              </div>
+              <Calendar className="h-16 w-16 text-white opacity-20 group-hover:opacity-30 transition-opacity" />
             </div>
-            <Calendar className="h-16 w-16 text-blue-200 opacity-50" />
+
+            {/* Métricas secundárias */}
+            <div className="grid grid-cols-3 gap-8 mt-10 pt-8 border-t border-white/10">
+              <div>
+                <p className="text-blue-200 text-[9px] font-bold uppercase tracking-wider mb-1">Total Geral</p>
+                <p className="text-2xl font-black">{overviewStats.totalVisits}</p>
+              </div>
+              <div>
+                <p className="text-blue-200 text-[9px] font-bold uppercase tracking-wider mb-1">Realizadas</p>
+                <p className="text-2xl font-black text-green-300">
+                  {overviewStats.realizadas}
+                </p>
+              </div>
+              <div>
+                <p className="text-blue-200 text-[9px] font-bold uppercase tracking-wider mb-1">Solic. Cancel.</p>
+                <p className="text-2xl font-black text-amber-300">
+                  {overviewStats.pendingRequests}
+                </p>
+              </div>
+            </div>
           </div>
 
-          {/* Métricas secundárias */}
-          <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-blue-400">
-            <div>
-              <p className="text-blue-100 text-xs">Total</p>
-              <p className="text-2xl font-semibold">
-                {overviewStats.totalVisits}
-              </p>
-            </div>
-            <div>
-              <p className="text-blue-100 text-xs">Realizadas</p>
-              <p className="text-2xl font-semibold">
-                {overviewStats.realizadas}
-              </p>
-            </div>
-            <div>
-              <p className="text-blue-100 text-xs">Pendências</p>
-              <p className="text-2xl font-semibold">
-                {overviewStats.pendingRequests}
-              </p>
-            </div>
-          </div>
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl" />
         </div>
 
         {/* Resumo por Cidade - Colapsável */}
@@ -1647,13 +1565,15 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
         )}
 
         {/* Content */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
-          <div className="p-6">
-            {activeTab === "visits" && renderVisitsTab()}
-            {activeTab === "cancellations" && renderCancellationsTab()}
+        <div className="animate-in fade-in duration-500">
+          {activeTab === "visits" && renderVisitsTab()}
+          {activeTab === "cancellations" && renderCancellationsTab()}
 
-            {activeTab === "scheduledDates" && <AllowedVisitDatesManager />}
-          </div>
+          {activeTab === "scheduledDates" && (
+            <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-6">
+              <AllowedVisitDatesManager />
+            </div>
+          )}
         </div>
       </div>
 

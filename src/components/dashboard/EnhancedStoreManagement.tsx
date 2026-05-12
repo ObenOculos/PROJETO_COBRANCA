@@ -15,7 +15,6 @@ import {
   Award,
   MapPin,
   X,
-  Calendar,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
@@ -206,25 +205,6 @@ const EnhancedStoreManagement: React.FC = () => {
   const [selectedStoreForModal, setSelectedStoreForModal] =
     useState<StoreStats | null>(null);
 
-  // Filtros de Data
-  const today = new Date();
-  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
-  const formatDateToYYYYMMDD = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const [dateFrom, setDateFrom] = useState<string>(
-    formatDateToYYYYMMDD(firstDayOfMonth),
-  );
-  const [dateTo, setDateTo] = useState<string>(
-    formatDateToYYYYMMDD(lastDayOfMonth),
-  );
-
   const collectors = users.filter((u) => u.type === "collector");
   const availableStores = getAvailableStores();
 
@@ -233,28 +213,7 @@ const EnhancedStoreManagement: React.FC = () => {
     const stats: StoreStats[] = [];
 
     availableStores.forEach((storeName) => {
-      const toYYYYMMDD = (dateStr: string | null | undefined): string | null => {
-        if (!dateStr) return null;
-        if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.substring(0, 10);
-        const parts = dateStr.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/);
-        if (parts) return `${parts[3]}-${parts[2]}-${parts[1]}`;
-        try {
-          const d = new Date(dateStr);
-          if (!isNaN(d.getTime())) return d.toISOString().substring(0, 10);
-        } catch (_) { /* noop */ }
-        return null;
-      };
-
-      // Fichas dessa loja no período — usa data_lancamento ou data_vencimento como fallback
-      const periodCollections = collections.filter(c => {
-        if (c.nome_da_loja !== storeName) return false;
-        const raw = c.data_lancamento || c.data_vencimento;
-        const recordDate = toYYYYMMDD(raw);
-        if (!recordDate) return false;
-        if (dateFrom && recordDate < dateFrom) return false;
-        if (dateTo && recordDate > dateTo) return false;
-        return true;
-      });
+      const periodCollections = collections.filter(c => c.nome_da_loja === storeName);
 
       if (periodCollections.length === 0) return;
 
@@ -326,7 +285,7 @@ const EnhancedStoreManagement: React.FC = () => {
     });
 
     return stats;
-  }, [availableStores, collectors, collections, dateFrom, dateTo]);
+  }, [availableStores, collectors, collections]);
 
   // Filter and sort stores
   const filteredAndSortedStores = useMemo(() => {
@@ -594,28 +553,6 @@ const EnhancedStoreManagement: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 p-1">
-            {/* Filtro de Período */}
-            <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-2xl border border-transparent focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
-              <div className="flex items-center gap-2 px-2">
-                <Calendar className="h-4 w-4 text-gray-400" />
-                <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider hidden sm:inline">Período</span>
-              </div>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="bg-transparent border-none p-0 text-xs font-bold text-gray-700 focus:ring-0 w-[110px]"
-              />
-              <span className="text-gray-300">/</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="bg-transparent border-none p-0 text-xs font-bold text-gray-700 focus:ring-0 w-[110px]"
-              />
-            </div>
-
-            <div className="h-8 w-px bg-gray-100 hidden xl:block mx-1" />
 
             {/* Filtro de Cobrador */}
             <div className="relative">

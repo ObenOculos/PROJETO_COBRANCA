@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Search,
-  UserPlus,
-  UserMinus,
   Users,
   AlertCircle,
   Filter,
@@ -15,11 +13,12 @@ import {
   Briefcase,
   CircleSlash,
   Building2,
+  Zap,
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
 import { Collection } from "../types";
 import { formatCurrency } from "../utils/formatters";
-import { Modal } from "./Modal";
+import BulkAssignmentModal from "./BulkAssignmentModal";
 
 interface ClientWithCollections {
   cliente: string;
@@ -104,6 +103,7 @@ export const ClientAssignment = React.memo(() => {
     assignCollectorToClients,
     removeCollectorFromClients,
     updateCollection,
+    refreshData,
   } = useCollection();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCollector, setSelectedCollector] = useState<string>("");
@@ -126,13 +126,7 @@ export const ClientAssignment = React.memo(() => {
   const [showFilters, setShowFilters] = useState(false);
 
   // Modal states
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [showRemoveModal, setShowRemoveModal] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [modalData, setModalData] = useState<{
-    clientsWithCollectors?: number;
-    totalClients?: number;
-  }>({});
+  const [showBulkModal, setShowBulkModal] = useState(false);
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
@@ -558,319 +552,6 @@ export const ClientAssignment = React.memo(() => {
     setSelectedClients(newSelected);
   };
 
-  const handleAssignCollectorClick = () => {
-    if (!selectedCollector || selectedClients.size === 0) {
-      // Toast notification seria melhor aqui
-      const notification = document.createElement("div");
-      notification.className =
-        "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50";
-      notification.textContent =
-        "Selecione um cobrador e pelo menos um cliente";
-      document.body.appendChild(notification);
-      setTimeout(() => document.body.removeChild(notification), 3000);
-      return;
-    }
-
-    setShowAssignModal(true);
-  };
-
-  const handleAssignCollector = async () => {
-    setShowAssignModal(false);
-
-    setLoading(true);
-    const clientsToProcess = Array.from(selectedClients).map((key) => {
-      const client = clientsData.find((c) => c.uniqueKey === key);
-      return { document: client?.documento, clientName: client?.cliente };
-    });
-
-    const totalClients = clientsToProcess.length;
-    let successCount = 0;
-    let errorCount = 0;
-
-    const showNotification = (
-      message: string,
-      type: "success" | "error" | "info",
-    ) => {
-      const notification = document.createElement("div");
-      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center`;
-      notification.innerHTML = `
-      <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-        ${type === "success" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' : type === "error" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' : '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>'}
-      </svg>
-      ${message}
-    `;
-      document.body.appendChild(notification);
-      setTimeout(() => document.body.removeChild(notification), 5000);
-    };
-
-    const processBatch = async (
-      batch: { document?: string; clientName?: string }[],
-    ) => {
-      try {
-        await assignCollectorToClients(selectedCollector, batch);
-        successCount += batch.length;
-      } catch (error) {
-        console.error("Erro ao atribuir cobrador em lote:", error);
-        errorCount += batch.length;
-      }
-    };
-
-    try {
-      if (totalClients > MAX_BATCH_SIZE) {
-        // showNotification(`Iniciando atribuição em lotes. Total: ${totalClients} clientes.`, "info"); // Removed intermediate notification
-        for (let i = 0; i < totalClients; i += MAX_BATCH_SIZE) {
-          const batch = clientsToProcess.slice(i, i + MAX_BATCH_SIZE);
-          await processBatch(batch);
-          if (i + MAX_BATCH_SIZE < totalClients) {
-            await new Promise((resolve) => setTimeout(resolve, 1000)); // Delay de 1 segundo entre lotes
-          }
-        }
-        if (errorCount === 0) {
-          showNotification(
-            `${successCount} cliente(s) atribuído(s) com sucesso em lotes!`,
-            "success",
-          );
-        } else if (successCount === 0) {
-          showNotification(
-            `Erro ao atribuir cobrador a todos os ${errorCount} clientes.`,
-            "error",
-          );
-        } else {
-          showNotification(
-            `${successCount} clientes atribuídos, ${errorCount} com erro.`,
-            "error",
-          );
-        }
-      } else {
-        await assignCollectorToClients(selectedCollector, clientsToProcess);
-        showNotification(
-          `${totalClients} cliente(s) atribuído(s) com sucesso!`,
-          "success",
-        );
-      }
-      setSelectedClients(new Set());
-    } catch (error) {
-      console.error("Erro geral ao atribuir cobrador:", error);
-      showNotification("Erro ao atribuir cobrador. Tente novamente.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRemoveCollectorClick = () => {
-    if (selectedClients.size === 0) {
-      // Toast notification
-      const notification = document.createElement("div");
-      notification.className =
-        "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50";
-      notification.textContent = "Selecione pelo menos um cliente";
-      document.body.appendChild(notification);
-      setTimeout(() => document.body.removeChild(notification), 3000);
-      return;
-    }
-
-    // Verificar se os clientes selecionados realmente têm cobradores
-    const selectedClientsData = Array.from(selectedClients)
-      .map((uniqueKey) => clientsData.find((c) => c.uniqueKey === uniqueKey))
-      .filter(Boolean);
-
-    const clientsWithCollectors = selectedClientsData.filter(
-      (c) => c?.collectorId,
-    );
-
-    if (clientsWithCollectors.length === 0) {
-      const notification = document.createElement("div");
-      notification.className =
-        "fixed top-4 right-4 bg-amber-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50";
-      notification.textContent =
-        "Nenhum dos clientes selecionados possui cobrador atribuído";
-      document.body.appendChild(notification);
-      setTimeout(() => document.body.removeChild(notification), 4000);
-      return;
-    }
-
-    setModalData({
-      clientsWithCollectors: clientsWithCollectors.length,
-      totalClients: selectedClients.size,
-    });
-    setShowRemoveModal(true);
-  };
-
-  const handleRemoveCollector = async () => {
-    setShowRemoveModal(false);
-
-    setLoading(true);
-    const clientsToProcess = Array.from(selectedClients).map((key) => {
-      const client = clientsData.find((c) => c.uniqueKey === key);
-      return { document: client?.documento, clientName: client?.cliente };
-    });
-
-    const totalClients = clientsToProcess.length;
-    let successCount = 0;
-    let errorCount = 0;
-
-    const showNotification = (
-      message: string,
-      type: "success" | "error" | "info",
-    ) => {
-      const notification = document.createElement("div");
-      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center`;
-      notification.innerHTML = `
-      <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-        ${type === "success" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' : type === "error" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' : '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>'}
-      </svg>
-      ${message}
-    `;
-      document.body.appendChild(notification);
-      setTimeout(() => document.body.removeChild(notification), 5000);
-    };
-
-    const processBatch = async (
-      batch: { document?: string; clientName?: string }[],
-    ) => {
-      try {
-        await removeCollectorFromClients(batch);
-        successCount += batch.length;
-      } catch (error) {
-        console.error("Erro ao remover cobrador em lote:", error);
-        errorCount += batch.length;
-      }
-    };
-
-    try {
-      if (totalClients > MAX_BATCH_SIZE) {
-        // showNotification(`Iniciando remoção em lotes. Total: ${totalClients} clientes.`, "info"); // Removed intermediate notification
-        for (let i = 0; i < totalClients; i += MAX_BATCH_SIZE) {
-          const batch = clientsToProcess.slice(i, i + MAX_BATCH_SIZE);
-          await processBatch(batch);
-          if (i + MAX_BATCH_SIZE < totalClients) {
-            await new Promise((resolve) => setTimeout(resolve, 1000)); // Delay de 1 segundo entre lotes
-          }
-        }
-        if (errorCount === 0) {
-          showNotification(
-            `Cobrador removido de ${successCount} cliente(s) com sucesso em lotes!`,
-            "success",
-          );
-        } else if (successCount === 0) {
-          showNotification(
-            `Erro ao remover cobrador de todos os ${errorCount} clientes.`,
-            "error",
-          );
-        } else {
-          showNotification(
-            `${successCount} clientes processados, ${errorCount} com erro na remoção.`,
-            "error",
-          );
-        }
-      } else {
-        await removeCollectorFromClients(clientsToProcess);
-        showNotification(
-          `Cobrador removido de ${totalClients} cliente(s)!`,
-          "success",
-        );
-      }
-      setSelectedClients(new Set());
-    } catch (error) {
-      console.error("Erro geral ao remover cobrador:", error);
-      showNotification("Erro ao remover cobrador. Tente novamente.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAssignStatusClick = () => {
-    if (!selectedStatus || selectedClients.size === 0) {
-      const notification = document.createElement("div");
-      notification.className =
-        "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-2xl shadow-lg z-50";
-      notification.textContent = "Selecione um status e pelo menos um cliente";
-      document.body.appendChild(notification);
-      setTimeout(() => document.body.removeChild(notification), 3000);
-      return;
-    }
-
-    setShowStatusModal(true);
-  };
-
-  const handleAssignStatus = async () => {
-    setShowStatusModal(false);
-    setLoading(true);
-
-    const showNotification = (
-      message: string,
-      type: "success" | "error" | "info",
-    ) => {
-      const notification = document.createElement("div");
-      notification.className = `fixed top-4 right-4 ${type === "success" ? "bg-green-500" : type === "error" ? "bg-red-500" : "bg-blue-500"} text-white px-4 py-2 rounded-2xl shadow-lg z-50 flex items-center`;
-      notification.innerHTML = `
-      <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-        ${type === "success" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' : type === "error" ? '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' : '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>'}
-      </svg>
-      ${message}
-    `;
-      document.body.appendChild(notification);
-      setTimeout(() => document.body.removeChild(notification), 5000);
-    };
-
-    let successCount = 0;
-    let errorCount = 0;
-
-    try {
-      // Get all collections for selected clients
-      const selectedClientsData = Array.from(selectedClients)
-        .map((uniqueKey) => clientsData.find((c) => c.uniqueKey === uniqueKey))
-        .filter(Boolean);
-
-      const allCollections = selectedClientsData.flatMap(
-        (client) => client?.collections || [],
-      );
-
-      // Update status for all collections
-      for (const collection of allCollections) {
-        try {
-          const statusValue =
-            selectedStatus === "empty" ? null : selectedStatus;
-          await updateCollection(collection.id_parcela, {
-            situacao: statusValue,
-          });
-          successCount++;
-        } catch (error) {
-          console.error(
-            "Erro ao atualizar status da parcela:",
-            collection.id_parcela,
-            error,
-          );
-          errorCount++;
-        }
-      }
-
-      if (errorCount === 0) {
-        showNotification(
-          `Status atualizado em ${successCount} parcela(s) com sucesso!`,
-          "success",
-        );
-      } else if (successCount === 0) {
-        showNotification(
-          `Erro ao atualizar status em todas as ${errorCount} parcelas.`,
-          "error",
-        );
-      } else {
-        showNotification(
-          `${successCount} parcelas atualizadas, ${errorCount} com erro.`,
-          "error",
-        );
-      }
-
-      setSelectedClients(new Set());
-    } catch (error) {
-      console.error("Erro geral ao atualizar status:", error);
-      showNotification("Erro ao atualizar status. Tente novamente.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const hasActiveFilters = activeFilterChips.length > 0;
 
   // Calculate overview statistics
@@ -979,76 +660,88 @@ export const ClientAssignment = React.memo(() => {
   }, [hasActiveFilters, filteredStats, overviewStats]);
 
   return (
-    <div className="space-y-4">
-      {/* Header Simplificado */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Header — Estilo Ranking de Performance */}
+      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-              <Users className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
+            <h2 className="text-2xl font-black text-gray-900 dark:text-dark-text tracking-tight flex items-center gap-2">
+              <Users className="h-6 w-6 text-blue-600 flex-shrink-0" />
               Atribuição de Cobradores
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Gerencie a atribuição de {mainStats.total} clientes
+            <p className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary mt-1 uppercase tracking-wider">
+              Gestão de carteira para {mainStats.total} clientes
             </p>
           </div>
 
-          {/* Ações Principais */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
-              title="Filtros"
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all border ${
+                showFilters || hasActiveFilters
+                  ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 dark:shadow-none"
+                  : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
+              }`}
             >
-              <Filter className="h-5 w-5" />
+              <Filter className="h-4 w-4" />
+              Filtros {hasActiveFilters && `(${activeFilterChips.length})`}
             </button>
           </div>
         </div>
       </div>
 
       {/* Card Principal - Taxa de Atribuição */}
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-blue-100 text-sm font-medium">
-              Taxa de Atribuição
-            </p>
-            <p className="text-4xl font-bold mt-1">
-              {mainStats.assignmentRate.toFixed(1)}%
-            </p>
-            <p className="text-blue-100 text-sm mt-2">
-              {mainStats.total} clientes cadastrados
-            </p>
+      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white rounded-2xl shadow-xl p-8 relative overflow-hidden group">
+        <div className="relative z-10">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-blue-100 text-[10px] font-black uppercase tracking-[0.2em] mb-1">
+                Taxa de Atribuição Global
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-5xl font-black tracking-tighter">
+                  {mainStats.assignmentRate.toFixed(1)}%
+                </span>
+                <div className={`flex items-center text-xs font-bold px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-md ${mainStats.assignmentRate > 90 ? 'text-green-300' : 'text-blue-200'}`}>
+                  <Zap className="w-3 h-3 mr-1 fill-current" />
+                  {mainStats.assignmentRate > 90 ? 'Excelente' : 'Em progresso'}
+                </div>
+              </div>
+            </div>
+            <Award className="h-16 w-16 text-white opacity-20 group-hover:opacity-30 transition-opacity" />
           </div>
-          <Award className="h-16 w-16 text-blue-200 opacity-50" />
+
+          {/* Métricas secundárias */}
+          <div className="grid grid-cols-3 gap-8 mt-10 pt-8 border-t border-white/10">
+            <div>
+              <p className="text-blue-200 text-[9px] font-bold uppercase tracking-wider mb-1">Atribuídos</p>
+              <p className="text-2xl font-black">{mainStats.assigned}</p>
+            </div>
+            <div>
+              <p className="text-blue-200 text-[9px] font-bold uppercase tracking-wider mb-1">Pendentes</p>
+              <p className="text-2xl font-black text-blue-100">
+                {mainStats.total - mainStats.assigned}
+              </p>
+            </div>
+            <div>
+              <p className="text-blue-200 text-[9px] font-bold uppercase tracking-wider mb-1">Cobradores</p>
+              <p className="text-2xl font-black">{collectors.length}</p>
+            </div>
+          </div>
         </div>
 
-        {/* Métricas secundárias */}
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-blue-400">
-          <div>
-            <p className="text-blue-100 text-xs">Atribuídos</p>
-            <p className="text-2xl font-semibold">{mainStats.assigned}</p>
-          </div>
-          <div>
-            <p className="text-blue-100 text-xs">Pendentes</p>
-            <p className="text-2xl font-semibold">
-              {mainStats.total - mainStats.assigned}
-            </p>
-          </div>
-          <div>
-            <p className="text-blue-100 text-xs">Cobradores</p>
-            <p className="text-2xl font-semibold">{collectors.length}</p>
-          </div>
-        </div>
+        {/* Efeito visual de fundo */}
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl" />
       </div>
 
       {/* Filtros Colapsáveis */}
       {showFilters && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 animate-in slide-in-from-top-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <div>
-              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                <Search className="h-4 w-4 mr-1" />
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-6 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
+                <Search className="h-3 w-3 mr-1.5" />
                 Buscar Cliente
               </label>
               <input
@@ -1056,48 +749,48 @@ export const ClientAssignment = React.memo(() => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Nome ou documento..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
-            <div>
-              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                <Users className="h-4 w-4 mr-1" />
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
+                <Users className="h-3 w-3 mr-1.5" />
                 Cobrador
               </label>
               <select
                 value={filterCollector}
                 onChange={(e) => setFilterCollector(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Todos os cobradores</option>
+                <option value="">TODOS OS COBRADORES</option>
                 {collectors.map((collector) => (
                   <option key={collector.id} value={collector.id}>
-                    {collector.name}
+                    {collector.name.toUpperCase()}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div>
-              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                <AlertCircle className="h-4 w-4 mr-1" />
-                Status
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
+                <AlertCircle className="h-3 w-3 mr-1.5" />
+                Status de Atribuição
               </label>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Todos os status</option>
-                <option value="with_collector">Com cobrador</option>
-                <option value="without_collector">Sem cobrador</option>
+                <option value="">TODOS</option>
+                <option value="with_collector">COM COBRADOR</option>
+                <option value="without_collector">SEM COBRADOR</option>
               </select>
             </div>
 
-            <div>
-              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                <MapPin className="h-4 w-4 mr-1" />
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
+                <MapPin className="h-3 w-3 mr-1.5" />
                 Cidade
               </label>
               <select
@@ -1106,76 +799,76 @@ export const ClientAssignment = React.memo(() => {
                   setFilterCity(e.target.value);
                   setFilterNeighborhood("");
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Todas as cidades</option>
+                <option value="">TODAS AS CIDADES</option>
                 {availableCities.map((city) => (
                   <option key={city} value={city}>
-                    {city}
+                    {city.toUpperCase()}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div>
-              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                <MapPin className="h-4 w-4 mr-1" />
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
+                <MapPin className="h-3 w-3 mr-1.5" />
                 Bairro
               </label>
               <select
                 value={filterNeighborhood}
                 onChange={(e) => setFilterNeighborhood(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={!filterCity}
               >
-                <option value="">Todos os bairros</option>
+                <option value="">TODOS OS BAIRROS</option>
                 {availableNeighborhoods.map((neighborhood) => (
                   <option key={neighborhood} value={neighborhood}>
-                    {neighborhood}
+                    {neighborhood.toUpperCase()}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div>
-              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                <Building className="h-4 w-4 mr-1" />
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
+                <Building className="h-3 w-3 mr-1.5" />
                 Loja
               </label>
               <select
                 value={filterStore}
                 onChange={(e) => setFilterStore(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Todas as lojas</option>
+                <option value="">TODAS AS LOJAS</option>
                 {availableStores.map((store) => (
                   <option key={store} value={store}>
-                    {store}
+                    {store.toUpperCase()}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div>
-              <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                <Award className="h-4 w-4 mr-1" />
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
+                <Award className="h-3 w-3 mr-1.5" />
                 Situação
               </label>
               <select
                 value={filterSituacao}
                 onChange={(e) => setFilterSituacao(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Todas as situações</option>
-                <option value="Em mãos">Em mãos</option>
-                <option value="Em tratamento">Em tratamento</option>
-                <option value="Aguardando Interno">Aguardando Interno</option>
-                <option value="Cobrança Interna">Cobrança Interna</option>
-                <option value="empty">Vazio</option>
+                <option value="">TODAS AS SITUAÇÕES</option>
+                <option value="Em mãos">EM MÃOS</option>
+                <option value="Em tratamento">EM TRATAMENTO</option>
+                <option value="Aguardando Interno">AGUARDANDO INTERNO</option>
+                <option value="Cobrança Interna">COBRANÇA INTERNA</option>
+                <option value="empty">VAZIO</option>
               </select>
             </div>
 
-            <div className="col-span-full space-y-2">
+            <div className="col-span-full pt-4 border-t border-gray-100 dark:border-dark-border flex justify-end gap-3">
               <button
                 onClick={() => {
                   setSearchTerm("");
@@ -1190,15 +883,13 @@ export const ClientAssignment = React.memo(() => {
                   setIncludeWithoutDate(false);
                   setCurrentPage(1);
                 }}
-                className="w-full px-4 py-2 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition-colors text-sm font-medium"
+                className="px-4 py-2 text-xs font-black text-gray-400 uppercase tracking-widest hover:text-gray-600 dark:hover:text-dark-text transition-colors"
               >
                 Limpar Filtros
               </button>
-
-              {/* Botão Fechar para mobile */}
               <button
                 onClick={() => setShowFilters(false)}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors text-sm font-medium sm:hidden"
+                className="px-6 py-2 bg-gray-900 dark:bg-blue-600 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:opacity-90 shadow-lg transition-all sm:hidden"
               >
                 Fechar
               </button>
@@ -1209,296 +900,205 @@ export const ClientAssignment = React.memo(() => {
 
       {/* Client List */}
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Lista de Clientes ({filteredClients.length})
-          </h3>
-          <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-black text-gray-900 dark:text-dark-text uppercase tracking-tight">
+              Lista de Clientes
+            </h3>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              Mostrando {filteredClients.length} registros filtrados
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
             <button
               onClick={handleSelectAll}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-2xl hover:bg-gray-50 transition-colors font-medium"
+              className="px-4 py-2 text-[10px] font-black uppercase tracking-widest border border-gray-200 dark:border-dark-border dark:text-dark-text rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg/50 transition-all"
             >
-              <span className="hidden sm:inline">
-                {paginatedClients.every((c) => selectedClients.has(c.documento))
-                  ? "Desmarcar"
-                  : "Selecionar"}{" "}
-                página
-              </span>
-              <span className="sm:hidden">
-                {paginatedClients.every((c) => selectedClients.has(c.documento))
-                  ? "Desmarcar"
-                  : "Selecionar"}{" "}
-                página
-              </span>
+              {paginatedClients.every((c) => selectedClients.has(c.uniqueKey))
+                ? "Desmarcar Página"
+                : "Selecionar Página"}
             </button>
             {filteredClients.length > itemsPerPage && (
               <button
                 onClick={handleSelectAllFiltered}
-                className="px-4 py-2 text-sm border border-blue-300 text-blue-700 bg-blue-50 rounded-2xl hover:bg-blue-100 transition-colors font-medium"
+                className="px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-xl hover:bg-blue-100 transition-all"
               >
-                <span className="hidden sm:inline">
-                  Selecionar todos ({filteredClients.length})
-                </span>
-                <span className="sm:hidden">
-                  Todos ({filteredClients.length})
-                </span>
+                Todos ({filteredClients.length})
               </button>
             )}
           </div>
         </div>
-        {/* Assignment Actions */}
-        {selectedClients.size > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
-            <div className="p-4 lg:p-6">
-              <div className="flex mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Ações em Massa
-                </h3>
-                <p className=" ml-6 text-sm text-gray-600 mt-1">
-                  {selectedClients.size} selecionados
-                </p>
-              </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Coluna 1: Atribuição de Cobrador */}
-                <div className="space-y-3">
-                  <h4 className="text-sm font-medium text-gray-700">
-                    Atribuição de Cobrador
-                  </h4>
-                  <select
-                    id="selectedCollector"
-                    name="selectedCollector"
-                    value={selectedCollector}
-                    onChange={(e) => setSelectedCollector(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Selecione um cobrador</option>
-                    {collectors.map((collector) => (
-                      <option key={collector.id} value={collector.id}>
-                        {collector.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleAssignCollectorClick}
-                      disabled={loading || !selectedCollector}
-                      className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        {/* Visualização em Tabela (Desktop) */}
+        <div className="hidden md:block bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/50 dark:bg-dark-bg border-b border-gray-100 dark:border-dark-border">
+                  <th className="px-6 py-4 w-10">
+                    <input
+                      type="checkbox"
+                      checked={paginatedClients.length > 0 && paginatedClients.every((c) => selectedClients.has(c.uniqueKey))}
+                      onChange={handleSelectAll}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded bg-white dark:bg-dark-bg"
+                    />
+                  </th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Cliente / Documento</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Parcelas</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Status / Cobrador</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Localização</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">Valores</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
+                {paginatedClients.map((client) => {
+                  const isWithoutCollector = !client.collectorId;
+                  const totalValue = client.collections.reduce((sum, c) => sum + c.valor_original, 0);
+                  const pendingValue = totalValue - client.collections.reduce((sum, c) => sum + c.valor_recebido, 0);
+                  const situacao = getSituacaoIndicator(client.collections);
+
+                  return (
+                    <tr
+                      key={client.uniqueKey}
+                      className={`hover:bg-gray-50/50 dark:hover:bg-dark-bg transition-colors cursor-pointer group ${
+                        selectedClients.has(client.uniqueKey) ? "bg-blue-50/30 dark:bg-blue-900/10" : ""
+                      }`}
+                      onClick={() => handleSelectClient(client.uniqueKey)}
                     >
-                      {loading ? (
-                        <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-                      ) : (
-                        <UserPlus className="h-4 w-4 mr-2" />
-                      )}
-                      Atribuir
-                    </button>
-                    <button
-                      onClick={handleRemoveCollectorClick}
-                      disabled={loading}
-                      className="flex-1 flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? (
-                        <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-                      ) : (
-                        <UserMinus className="h-4 w-4 mr-2" />
-                      )}
-                      Remover
-                    </button>
-                  </div>
-                </div>
-
-                {/* Coluna 2: Atribuição de Status */}
-                <div className="space-y-3">
-                  <h4 className="text-sm font-medium text-gray-700">
-                    Atribuição de Status
-                  </h4>
-                  <select
-                    id="selectedStatus"
-                    name="selectedStatus"
-                    value={selectedStatus}
-                    onChange={(e) => setSelectedStatus(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Selecione um status</option>
-                    <option value="Em mãos">Em mãos</option>
-                    <option value="Em tratamento">Em tratamento</option>
-                    <option value="Aguardando Interno">Aguardando Interno</option>
-                    <option value="Cobrança Interna">Cobrança Interna</option>
-                    <option value="empty">Vazio</option>
-                  </select>
-                  <button
-                    onClick={handleAssignStatusClick}
-                    disabled={loading || !selectedStatus}
-                    className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-                    ) : (
-                      <Award className="h-4 w-4 mr-2" />
-                    )}
-                    Atribuir Status
-                  </button>
-                </div>
-              </div>
-
-              {selectedClients.size > MAX_BATCH_SIZE && (
-                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl">
-                  <div className="flex items-center text-amber-700">
-                    <AlertCircle className="h-4 w-4 mr-2" />
-                    <span className="text-sm">
-                      Operação será processada em{" "}
-                      {Math.ceil(selectedClients.size / MAX_BATCH_SIZE)} lotes
-                      de {MAX_BATCH_SIZE} clientes
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Client Cards - Mobile Optimized */}
-        {paginatedClients.map((client) => {
-          const isWithoutCollector = !client.collectorId;
-          const totalValue = client.collections.reduce(
-            (sum, c) => sum + c.valor_original,
-            0,
-          );
-          const pendingValue =
-            totalValue -
-            client.collections.reduce((sum, c) => sum + c.valor_recebido, 0);
-
-          return (
-            <div
-              key={client.uniqueKey}
-              className={`bg-white rounded-2xl shadow-sm border transition-all duration-200 hover:shadow-md cursor-pointer ${
-                isWithoutCollector
-                  ? "border-amber-300 bg-amber-50"
-                  : "border-gray-200"
-              } ${
-                selectedClients.has(client.uniqueKey)
-                  ? "ring-2 ring-blue-500"
-                  : ""
-              }`}
-              onClick={(e) => {
-                // Previne o clique no card quando clicar no checkbox
-                if ((e.target as HTMLElement).tagName !== "INPUT") {
-                  handleSelectClient(client.uniqueKey);
-                }
-              }}
-            >
-              <div className="p-4">
-                <div className="flex items-start gap-3">
-                  {/* Larger checkbox for mobile */}
-                  <input
-                    id={`select-client-${client.uniqueKey}`}
-                    name={`select-client-${client.uniqueKey}`}
-                    type="checkbox"
-                    checked={selectedClients.has(client.uniqueKey)}
-                    onChange={() => handleSelectClient(client.uniqueKey)}
-                    onClick={(e) => e.stopPropagation()} // Evita duplo clique
-                    className="h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500 border-gray-300 rounded mt-1 flex-shrink-0"
-                  />
-
-                  <div className="flex-1 min-w-0">
-                    {/* Client info - more compact */}
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="min-w-0 flex-1">
-                        <h4 className="text-base font-semibold text-gray-900 flex items-center gap-2 min-w-0">
-                          <span className="truncate">{client.cliente}</span>
-                          {isWithoutCollector && (
-                            <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedClients.has(client.uniqueKey)}
+                          onChange={() => handleSelectClient(client.uniqueKey)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded bg-white dark:bg-dark-bg"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black text-gray-900 dark:text-dark-text truncate max-w-[250px]" title={client.cliente}>
+                            {client.cliente.toUpperCase()}
+                          </span>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{client.documento}</span>
+                          {client.apelido && <span className="text-[10px] text-blue-500 font-black italic mt-0.5">"{client.apelido.toUpperCase()}"</span>}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-black bg-gray-100 dark:bg-dark-bg text-gray-700 dark:text-dark-text border border-gray-200 dark:border-dark-border">
+                          {client.collections.length}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-2">
+                          {client.collectorName ? (
+                            <span className="inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100 dark:border-green-900/30 uppercase tracking-widest w-fit">
+                              {client.collectorName}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 uppercase tracking-widest w-fit">
+                              Sem Cobrador
+                            </span>
                           )}
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          {client.documento} • {client.collections.length}{" "}
-                          parcela{client.collections.length !== 1 ? "s" : ""}
-                        </p>
+                          {situacao && (
+                            <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight w-fit ${situacao.className} border border-current opacity-80`}>
+                              <situacao.icon className="h-3 w-3" />
+                              {situacao.label}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center text-[11px] font-bold text-gray-500 dark:text-dark-text-secondary">
+                          <MapPin className="h-3.5 w-3.5 mr-1.5 text-gray-400 shrink-0" />
+                          <span className="truncate max-w-[180px] uppercase">
+                            {client.bairro && client.cidade ? `${client.bairro}, ${client.cidade}` : client.cidade || client.bairro || "-"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black text-red-600 dark:text-red-400 tracking-tight">{formatCurrency(pendingValue)}</span>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Total: {formatCurrency(totalValue)}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Visualização em Cards (Mobile) */}
+        <div className="md:hidden space-y-4">
+          {paginatedClients.map((client) => {
+            const isWithoutCollector = !client.collectorId;
+            const totalValue = client.collections.reduce((sum, c) => sum + c.valor_original, 0);
+            const pendingValue = totalValue - client.collections.reduce((sum, c) => sum + c.valor_recebido, 0);
+            const situacao = getSituacaoIndicator(client.collections);
+
+            return (
+              <div
+                key={client.uniqueKey}
+                className={`bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border transition-all duration-200 cursor-pointer overflow-hidden ${
+                  selectedClients.has(client.uniqueKey) ? "ring-2 ring-blue-500 border-blue-500 shadow-lg" : "border-gray-100 dark:border-dark-border"
+                } ${isWithoutCollector && !selectedClients.has(client.uniqueKey) ? "border-amber-200 dark:border-amber-900/30 bg-amber-50/20" : ""}`}
+                onClick={() => handleSelectClient(client.uniqueKey)}
+              >
+                <div className="p-5">
+                  <div className="flex items-start gap-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedClients.has(client.uniqueKey)}
+                      onChange={() => handleSelectClient(client.uniqueKey)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded mt-1 bg-white dark:bg-dark-bg"
+                    />
+                    <div className="flex-1 min-w-0 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-black text-gray-900 dark:text-dark-text truncate uppercase tracking-tight">{client.cliente}</h4>
+                          <p className="text-[10px] font-bold text-gray-400 mt-0.5 uppercase">{client.documento}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-black text-red-600 dark:text-red-400 tracking-tight">{formatCurrency(pendingValue)}</p>
+                          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Total: {formatCurrency(totalValue)}</p>
+                        </div>
                       </div>
 
-                      {/* Collector status - more prominent */}
-                      <div className="flex-shrink-0 ml-2 flex items-center gap-2">
+                      <div className="flex flex-wrap gap-2 items-center">
                         {client.collectorName ? (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <span className="px-2 py-0.5 rounded-lg text-[9px] font-black bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100 dark:border-green-900/30 uppercase tracking-widest">
                             {client.collectorName}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                            Sem cobrador
+                          <span className="px-2 py-0.5 rounded-lg text-[9px] font-black bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 uppercase tracking-widest">
+                            Sem Cobrador
                           </span>
                         )}
-
-                        {/* Indicador de situação */}
-                        {(() => {
-                          const situacao = getSituacaoIndicator(
-                            client.collections,
-                          );
-                          if (!situacao) return null;
-                          const Icon = situacao.icon;
-                          return (
-                            <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${situacao.className}`}
-                              title={`Situação: ${situacao.label}`}
-                            >
-                              <Icon className="h-3.5 w-3.5" />
-                              <span className="hidden sm:inline">
-                                {situacao.label}
-                              </span>
-                            </span>
-                          );
-                        })()}
+                        {situacao && (
+                          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase border border-current ${situacao.className}`}>
+                            <situacao.icon className="h-3 w-3" />
+                            {situacao.label}
+                          </div>
+                        )}
                       </div>
-                    </div>
 
-                    {/* Location info - condensed */}
-                    {(client.cidade || client.bairro) && (
-                      <div className="flex items-center text-sm text-gray-600 mb-3">
-                        <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
-                        <span className="truncate">
-                          {client.bairro && client.cidade
-                            ? `${client.bairro}, ${client.cidade}`
-                            : client.cidade ||
-                              client.bairro ||
-                              "Localização não informada"}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Stats - simplified for mobile */}
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <span className="text-gray-600">Total: </span>
-                          <span className="font-semibold text-blue-600">
-                            {formatCurrency(totalValue)}
-                          </span>
+                      <div className="pt-3 border-t border-gray-50 dark:border-dark-border flex items-center justify-between">
+                        <div className="flex items-center text-[10px] font-bold text-gray-500 uppercase tracking-tight">
+                          <MapPin className="h-3 w-3 mr-1 text-gray-400" />
+                          <span className="truncate max-w-[120px]">{client.cidade || "-"}</span>
                         </div>
-                        <div>
-                          <span className="text-gray-600">Pendente: </span>
-                          <span className="font-semibold text-red-600">
-                            {formatCurrency(pendingValue)}
-                          </span>
+                        <div className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">
+                          {client.collections.length} Parcelas
                         </div>
                       </div>
                     </div>
-
-                    {/* Alert for unassigned - more compact */}
-                    {isWithoutCollector && (
-                      <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-md">
-                        <div className="flex items-center text-amber-700">
-                          <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
-                          <span className="text-xs font-medium">
-                            Cliente sem cobrador atribuído
-                          </span>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {/* Empty State */}
@@ -1510,355 +1110,128 @@ export const ClientAssignment = React.memo(() => {
           </h3>
           <p className="text-gray-600">
             {hasActiveFilters
-              ? "Tente ajustar os filtros de busca."
+              ? "Tente ajustar los filtros de busca."
               : "Não há clientes cadastrados no sistema."}
           </p>
         </div>
       )}
 
-      {/* Controles de Paginação */}
+      {/* Controles de Paginação — Estilo Dashboard */}
       {totalPages > 1 && (
-        <div className="bg-gray-800 mt-4 border rounded-2xl border-gray-200 px-4 sm:px-6 py-4 rounded-2xl-b-lg">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-white text-center sm:text-left">
-              <span className="font-semibold">
+        <div className="bg-gray-900 dark:bg-dark-bg-secondary mt-6 border border-gray-800 dark:border-dark-border px-6 py-4 rounded-2xl shadow-lg">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-600/20 text-blue-400 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border border-blue-600/30">
                 Página {currentPage} de {totalPages}
-              </span>
-              <span className="text-gray-300 ml-2">
-                • Mostrando {startItem} a {endItem} de {filteredClients.length}{" "}
-                clientes
+              </div>
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                Exibindo {startItem}–{endItem} de {filteredClients.length}
               </span>
             </div>
 
-            <div className="flex items-center justify-between w-full sm:w-auto space-x-1 sm:space-x-2">
-              {/* Botão Início */}
+            <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-2 lg:pb-0 custom-scrollbar">
               <button
-                id="pagination-start-2"
-                name="paginationStart2"
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="flex items-center px-2 sm:px-2 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
-                <span className="text-xs">Início</span>
+                Início
               </button>
 
-              {/* Botão Anterior */}
               <button
-                id="pagination-previous-2"
-                name="paginationPrevious2"
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="flex items-center px-2 sm:px-2 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
-                <ChevronLeft className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline">Anterior</span>
+                <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                Anterior
               </button>
 
-              {/* Números das páginas */}
-              <div className="flex space-x-1 flex-1 justify-center sm:flex-none">
-                {Array.from(
-                  {
-                    length: Math.min(maxButtons, totalPages),
-                  },
-                  (_, i) => {
-                    let pageNum;
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(maxButtons, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= maxButtons) pageNum = i + 1;
+                  else if (currentPage <= Math.ceil(maxButtons / 2)) pageNum = i + 1;
+                  else if (currentPage >= totalPages - Math.floor(maxButtons / 2)) pageNum = totalPages - maxButtons + 1 + i;
+                  else pageNum = currentPage - Math.floor(maxButtons / 2) + i;
 
-                    if (totalPages <= maxButtons) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= Math.ceil(maxButtons / 2)) {
-                      pageNum = i + 1;
-                    } else if (
-                      currentPage >=
-                      totalPages - Math.floor(maxButtons / 2)
-                    ) {
-                      pageNum = totalPages - maxButtons + 1 + i;
-                    } else {
-                      pageNum = currentPage - Math.floor(maxButtons / 2) + i;
-                    }
-
-                    return (
-                      <button
-                        key={pageNum}
-                        id={`pagination-page-${pageNum}-2`}
-                        name={`paginationPage${pageNum}2`}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 sm:px-3 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[34px] ${
-                          pageNum === currentPage
-                            ? "bg-white text-gray shadow-lg"
-                            : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  },
-                )}
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`min-w-[36px] h-9 flex items-center justify-center text-xs font-black rounded-xl transition-all ${
+                        pageNum === currentPage
+                          ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
+                          : "bg-white/5 text-gray-400 hover:text-white border border-white/5 hover:border-white/20"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Botão Próxima */}
               <button
-                id="pagination-next-2"
-                name="paginationNext2"
-                onClick={() =>
-                  setCurrentPage(Math.min(totalPages, currentPage + 1))
-                }
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
-                <span className="hidden sm:inline">Próxima</span>
-                <ChevronRight className="h-4 w-4 sm:ml-1" />
+                Próxima
+                <ChevronRight className="h-3.5 w-3.5 ml-1" />
               </button>
 
-              {/* Botão Fim */}
               <button
-                id="pagination-end-2"
-                name="paginationEnd2"
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
-                <span className="text-xs">Fim</span>
+                Fim
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal de Confirmação - Atribuir Cobrador */}
-      <Modal
-        isOpen={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
-        title="Confirmar Atribuição"
-        size="md"
-      >
-        <div className="space-y-4">
-          <div className="flex items-center justify-center">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-              <UserPlus className="h-6 w-6 text-green-600" />
+      {/* Barra de Ação Contextual (Substitui o botão flutuante e os modais antigos) */}
+      <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 transform ${selectedClients.size > 0 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
+        <div className="bg-gray-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-6 border border-gray-700">
+          <div className="flex items-center gap-3 pr-6 border-r border-gray-700">
+            <div className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">
+              {selectedClients.size}
             </div>
+            <span className="text-sm font-medium text-gray-300 whitespace-nowrap">
+              {selectedClients.size === 1 ? 'cliente selecionado' : 'clientes selecionados'}
+            </span>
           </div>
-
-          <div className="text-center">
-            <p className="text-gray-700">
-              Você está prestes a atribuir{" "}
-              <span className="font-semibold">
-                {selectedClients.size} cliente
-                {selectedClients.size !== 1 ? "s" : ""}
-              </span>{" "}
-              ao cobrador:
-            </p>
-            <p className="text-lg font-semibold text-gray-900 mt-2">
-              {collectors.find((c) => c.id === selectedCollector)?.name}
-            </p>
-          </div>
-
-          {selectedClients.size > MAX_BATCH_SIZE && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl">
-              <div className="flex items-center text-amber-700">
-                <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
-                <span className="text-sm">
-                  A operação será processada em{" "}
-                  {Math.ceil(selectedClients.size / MAX_BATCH_SIZE)} lotes de{" "}
-                  {MAX_BATCH_SIZE} clientes
-                </span>
-              </div>
-            </div>
-          )}
-
-          <div className="flex gap-3 mt-6">
+          
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowAssignModal(false)}
-              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-2xl transition-colors font-medium"
+              onClick={() => setSelectedClients(new Set())}
+              className="px-4 py-2 text-sm font-bold text-gray-400 hover:text-white transition-colors uppercase tracking-widest"
             >
               Cancelar
             </button>
             <button
-              onClick={handleAssignCollector}
-              disabled={loading}
-              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              onClick={() => setShowBulkModal(true)}
+              className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-lg active:scale-95"
             >
-              {loading ? (
-                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-              ) : (
-                <>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Confirmar Atribuição
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Modal de Confirmação - Remover Cobrador */}
-      <Modal
-        isOpen={showRemoveModal}
-        onClose={() => setShowRemoveModal(false)}
-        title="Confirmar Remoção"
-        size="md"
-      >
-        <div className="space-y-4">
-          <div className="flex items-center justify-center">
-            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-              <UserMinus className="h-6 w-6 text-red-600" />
-            </div>
-          </div>
-
-          <div className="text-center space-y-3">
-            <p className="text-gray-700">
-              Confirma a remoção de cobradores de{" "}
-              <span className="font-semibold">
-                {modalData.totalClients} cliente
-                {modalData.totalClients !== 1 ? "s" : ""}
+              <Zap className="w-4 h-4 text-yellow-400" />
+              <span className="text-sm font-black uppercase tracking-widest">
+                Atribuir / Ajustar
               </span>
-              ?
-            </p>
-
-            <div className="space-y-1 text-sm text-gray-600">
-              <p>
-                <span className="font-medium text-green-600">
-                  {modalData.clientsWithCollectors}
-                </span>{" "}
-                cliente
-                {modalData.clientsWithCollectors !== 1 ? "s têm" : " tem"}{" "}
-                cobradores atribuídos
-              </p>
-              <p>
-                <span className="font-medium text-gray-500">
-                  {(modalData.totalClients || 0) -
-                    (modalData.clientsWithCollectors || 0)}
-                </span>{" "}
-                cliente
-                {(modalData.totalClients || 0) -
-                  (modalData.clientsWithCollectors || 0) !==
-                1
-                  ? "s"
-                  : ""}{" "}
-                já não{" "}
-                {(modalData.totalClients || 0) -
-                  (modalData.clientsWithCollectors || 0) !==
-                1
-                  ? "possuem"
-                  : "possui"}{" "}
-                cobrador
-              </p>
-            </div>
-
-            <div className="p-3 bg-red-50 border border-red-200 rounded-2xl mt-4">
-              <p className="text-sm text-red-700 font-medium">
-                Esta ação não pode ser desfeita
-              </p>
-            </div>
-          </div>
-
-          {(modalData.totalClients || 0) > MAX_BATCH_SIZE && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl">
-              <div className="flex items-center text-amber-700">
-                <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
-                <span className="text-sm">
-                  A operação será processada em{" "}
-                  {Math.ceil((modalData.totalClients || 0) / MAX_BATCH_SIZE)}{" "}
-                  lotes de {MAX_BATCH_SIZE} clientes
-                </span>
-              </div>
-            </div>
-          )}
-
-          <div className="flex gap-3 mt-6">
-            <button
-              onClick={() => setShowRemoveModal(false)}
-              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-2xl transition-colors font-medium"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleRemoveCollector}
-              disabled={loading}
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            >
-              {loading ? (
-                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-              ) : (
-                <>
-                  <UserMinus className="h-4 w-4 mr-2" />
-                  Confirmar Remoção
-                </>
-              )}
             </button>
           </div>
         </div>
-      </Modal>
+      </div>
 
-      {/* Modal de Confirmação - Atribuir Status */}
-      <Modal
-        isOpen={showStatusModal}
-        onClose={() => setShowStatusModal(false)}
-        title="Confirmar Atribuição de Status"
-        size="md"
-      >
-        <div className="space-y-4">
-          <div className="flex items-center justify-center">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-              <Award className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
-
-          <div className="text-center">
-            <p className="text-gray-700">
-              Você está prestes a atribuir o status{" "}
-              <span className="font-semibold">
-                {selectedStatus === "empty" ? "Vazio" : selectedStatus}
-              </span>{" "}
-              para todas as parcelas de{" "}
-              <span className="font-semibold">
-                {selectedClients.size} cliente
-                {selectedClients.size !== 1 ? "s" : ""}
-              </span>
-              .
-            </p>
-            <p className="text-sm text-gray-600 mt-2">
-              Esta ação afetará{" "}
-              {Array.from(selectedClients)
-                .map((key) => clientsData.find((c) => c.uniqueKey === key))
-                .reduce(
-                  (total, client) => total + (client?.collections.length || 0),
-                  0,
-                )}{" "}
-              parcela(s) no total.
-            </p>
-          </div>
-
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl">
-            <p className="text-sm text-blue-700 font-medium text-center">
-              O status será aplicado a todas as parcelas dos clientes
-              selecionados
-            </p>
-          </div>
-
-          <div className="flex gap-3 mt-6">
-            <button
-              onClick={() => setShowStatusModal(false)}
-              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-2xl transition-colors font-medium"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleAssignStatus}
-              disabled={loading}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            >
-              {loading ? (
-                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-              ) : (
-                <>
-                  <Award className="h-4 w-4 mr-2" />
-                  Confirmar Atribuição
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </Modal>
+      <BulkAssignmentModal
+        isOpen={showBulkModal}
+        onClose={() => { setShowBulkModal(false); setSelectedClients(new Set()); }}
+        selectedClients={selectedClients}
+        clientsData={clientsData}
+        collectors={collectors}
+        onComplete={() => setSelectedClients(new Set())}
+      />
     </div>
   );
 });

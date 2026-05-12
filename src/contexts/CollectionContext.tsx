@@ -86,6 +86,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     new Map(),
   );
 
+  const realtimeRefreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // ✅ CORREÇÃO: Ref para mirror do cache para evitar dependências circulares em callbacks
   const clientDataCacheRef = React.useRef(clientDataCache);
   React.useEffect(() => {
@@ -363,8 +365,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           },
           (payload) => {
             console.log("Mudança detectada na tabela BANCO_DADOS:", payload);
-            // Atualizar apenas as collections quando houver mudanças
-            refreshCollections();
+            if (realtimeRefreshTimer.current) clearTimeout(realtimeRefreshTimer.current);
+            realtimeRefreshTimer.current = setTimeout(() => {
+              realtimeRefreshTimer.current = null;
+              refreshCollections();
+            }, 2000);
           },
         )
         .on(
@@ -1920,8 +1925,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     return Array.from(stores).sort();
   };
 
-  const refreshData = async () => {
-    setGlobalLoading(true, "Atualizando dados...");
+  const refreshData = async (showLoading = true) => {
+    if (showLoading) setGlobalLoading(true, "Atualizando dados...");
     try {
       invalidateCollections(); // Ensure collections are fresh
       invalidatePayments(); // Ensure sale payments are fresh
@@ -1936,24 +1941,25 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         fetchActiveAddressHistory(),
       ]);
     } finally {
-      setGlobalLoading(false);
+      if (showLoading) setGlobalLoading(false);
     }
   };
 
   const assignCollectorToClients = async (
     collectorId: string,
     clientIdentifiers: { document?: string; clientName?: string }[],
+    skipRefresh = false,
+    onBatchProgress?: (completed: number, total: number) => void,
   ) => {
     try {
-      // setGlobalLoading(true, 'Atribuindo clientes ao cobrador...'); // Moved to ClientAssignment.tsx
-      setLoading(true);
-
       console.log(
         `Iniciando atribuição de ${clientIdentifiers.length} clientes ao cobrador ${collectorId}`,
       );
 
       const batchSize = 200;
       let totalParcelasAtualizadas = 0;
+      const totalBatches = Math.ceil(clientIdentifiers.length / batchSize);
+      let batchesCompleted = 0;
 
       for (let i = 0; i < clientIdentifiers.length; i += batchSize) {
         const batch = clientIdentifiers.slice(i, i + batchSize);
@@ -1968,13 +1974,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           .filter((id) => !id.document && id.clientName)
           .map((id) => id.clientName);
 
-        let parcelas: { id_parcela: number }[] = [];
+        let parcelas: { id_parcela: number; user_id: string | null; documento: string | null; cliente: string | null; nome_da_loja: string | null }[] = [];
         let fetchError: any = null;
 
         if (documentBatch.length > 0) {
           const { data, error } = await supabase
             .from("BANCO_DADOS")
-            .select("id_parcela")
+            .select("id_parcela, user_id, documento, cliente, nome_da_loja")
             .in("documento", documentBatch);
           if (error) fetchError = error;
           if (data) parcelas = parcelas.concat(data);
@@ -1983,7 +1989,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         if (clientNameBatch.length > 0 && !fetchError) {
           const { data, error } = await supabase
             .from("BANCO_DADOS")
-            .select("id_parcela")
+            .select("id_parcela, user_id, documento, cliente, nome_da_loja")
             .in("cliente", clientNameBatch);
           if (error) fetchError = error;
           if (data) parcelas = parcelas.concat(data);
@@ -2017,13 +2023,38 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }
 
         totalParcelasAtualizadas += parcelas.length;
+        batchesCompleted++;
+        onBatchProgress?.(batchesCompleted, totalBatches);
+
+        // Gravar histórico — um registro por cliente único (não por parcela)
+        const uniqueClients = new Map<string, { cliente_nome: string | null; nome_da_loja: string | null; cobrador_anterior_id: string | null }>();
+        parcelas.forEach((p) => {
+          const doc = p.documento ?? "";
+          if (doc && !uniqueClients.has(doc)) {
+            uniqueClients.set(doc, {
+              cliente_nome: p.cliente ?? null,
+              nome_da_loja: p.nome_da_loja ?? null,
+              cobrador_anterior_id: p.user_id ?? null,
+            });
+          }
+        });
+        if (uniqueClients.size > 0) {
+          const historyRecords = Array.from(uniqueClients.entries()).map(([doc, data]) => ({
+            documento: doc,
+            cliente_nome: data.cliente_nome,
+            nome_da_loja: data.nome_da_loja,
+            cobrador_anterior_id: data.cobrador_anterior_id,
+            cobrador_novo_id: collectorId,
+            gerente_id: user?.id ?? "",
+          }));
+          await supabase.from("atribuicoes_historico").insert(historyRecords);
+        }
         console.log(
           `Lote processado com sucesso. Total de parcelas atualizadas até agora: ${totalParcelasAtualizadas}`,
         );
       }
 
-      // await refreshData(); // Moved outside the loop
-      await refreshData(); // Moved outside the loop
+      if (!skipRefresh) await refreshData();
       console.log(
         `✅ Atribuição concluída: ${clientIdentifiers.length} clientes (${totalParcelasAtualizadas} parcelas) atribuídos ao cobrador ${collectorId}`,
       );
@@ -2041,14 +2072,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   const removeCollectorFromClients = async (
     clientIdentifiers: { document?: string; clientName?: string }[],
+    skipRefresh = false,
+    onBatchProgress?: (completed: number, total: number) => void,
   ) => {
     try {
-      // setGlobalLoading(true, 'Removendo cobrador dos clientes...'); // Moved to ClientAssignment.tsx
-      setLoading(true);
       console.log(`Removendo cobrador de ${clientIdentifiers.length} clientes`);
 
       const batchSize = 200;
       let totalParcelasAtualizadas = 0;
+      const totalBatches = Math.ceil(clientIdentifiers.length / batchSize);
+      let batchesCompleted = 0;
 
       for (let i = 0; i < clientIdentifiers.length; i += batchSize) {
         const batch = clientIdentifiers.slice(i, i + batchSize);
@@ -2112,13 +2145,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }
 
         totalParcelasAtualizadas += parcelas.length;
+        batchesCompleted++;
+        onBatchProgress?.(batchesCompleted, totalBatches);
         console.log(
           `Lote processado com sucesso. Total de parcelas atualizadas até agora: ${totalParcelasAtualizadas}`,
         );
       }
 
-      // await refreshData(); // Moved outside the loop
-      await refreshData(); // Moved outside the loop
+      if (!skipRefresh) await refreshData();
       console.log(
         `✅ Remoção concluída: ${clientIdentifiers.length} clientes (${totalParcelasAtualizadas} parcelas) removidos do cobrador`,
       );

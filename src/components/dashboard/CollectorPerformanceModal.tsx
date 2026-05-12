@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   BarChart2,
   Calendar,
@@ -8,11 +8,14 @@ import {
   TrendingUp,
   History,
   Info,
+  Users,
+  UserPlus,
 } from "lucide-react";
 import { formatCurrency } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
 import { Modal } from "../Modal";
 import TabTransition from "../common/TabTransition";
+import { supabase } from "../../lib/supabase";
 
 interface CollectorPerformanceModalProps {
   isOpen: boolean;
@@ -25,6 +28,69 @@ interface CollectorPerformanceModalProps {
 type ViewMode = "list" | "chart";
 type SortOrder = "desc" | "asc";
 
+interface AssignmentRecord {
+  id: string;
+  documento: string;
+  cliente_nome: string | null;
+  nome_da_loja: string | null;
+  cobrador_novo_id: string;
+  cobrador_anterior_id: string | null;
+  gerente_id: string;
+  assigned_at: string;
+}
+
+const Pagination: React.FC<{ page: number; total: number; perPage: number; onChange: (p: number) => void }> = ({ page, total, perPage, onChange }) => {
+  const totalPages = Math.ceil(total / perPage);
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 dark:border-dark-border">
+      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+        {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} de {total}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onChange(page - 1)}
+          disabled={page === 1}
+          className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg border border-gray-100 dark:border-dark-border disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-dark-bg transition-all"
+        >
+          ←
+        </button>
+        {Array.from({ length: totalPages }, (_, i) => i + 1)
+          .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+          .reduce<(number | "…")[]>((acc, p, idx, arr) => {
+            if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("…");
+            acc.push(p);
+            return acc;
+          }, [])
+          .map((p, i) =>
+            p === "…" ? (
+              <span key={`ellipsis-${i}`} className="px-2 text-[10px] text-gray-300">…</span>
+            ) : (
+              <button
+                key={p}
+                onClick={() => onChange(p as number)}
+                className={`w-7 h-7 text-[10px] font-bold rounded-lg transition-all ${
+                  page === p
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-500 hover:bg-gray-100 dark:hover:bg-dark-bg"
+                }`}
+              >
+                {p}
+              </button>
+            )
+          )}
+        <button
+          onClick={() => onChange(page + 1)}
+          disabled={page === totalPages}
+          className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg border border-gray-100 dark:border-dark-border disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-dark-bg transition-all"
+        >
+          →
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
   isOpen,
   onClose,
@@ -34,11 +100,27 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
 }) => {
   const { monthlyGoals, salePayments, scheduledVisits, collections } = useCollection();
   
-  const [activeTab, setActiveTab] = useState<"summary" | "history" | "pending">("summary");
+  const [activeTab, setActiveTab] = useState<"summary" | "history" | "pending" | "carteira">("summary");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [itemsToShow, setItemsToShow] = useState<number>(6);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [pendingPage, setPendingPage] = useState(1);
   const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
+  const [assignmentRecords, setAssignmentRecords] = useState<AssignmentRecord[]>([]);
+  const [carteiraYear, setCarteiraYear] = useState<number | "all">(new Date().getFullYear());
+
+  const HISTORY_PER_PAGE = 6;
+  const PENDING_PER_PAGE = 12;
+
+  useEffect(() => {
+    if (!collector) return;
+    supabase
+      .from("atribuicoes_historico")
+      .select("*")
+      .or(`cobrador_novo_id.eq.${collector.collectorId},cobrador_anterior_id.eq.${collector.collectorId}`)
+      .order("assigned_at", { ascending: false })
+      .then(({ data }) => setAssignmentRecords((data as AssignmentRecord[]) ?? []));
+  }, [collector?.collectorId]);
 
   // Function to parse dates consistently with the dashboard
   const parseDateSafely = (dateStr: string | null | undefined): Date | null => {
@@ -196,12 +278,137 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
     return "bg-rose-500";
   };
 
+  // Carteira atual: clientes únicos com user_id deste cobrador
+  const currentPortfolio = useMemo(() => {
+    if (!collector) return 0;
+    return new Set(
+      collections.filter((c) => c.user_id === collector.collectorId && c.documento).map((c) => c.documento)
+    ).size;
+  }, [collector, collections]);
+
+  // Carteira por mês: tamanho cumulativo + entradas/saídas + títulos com vencimento
+  const portfolioByMonth = useMemo(() => {
+    if (!collector) return [];
+
+    interface MonthEntry {
+      key: string;
+      label: string;
+      year: number;
+      month: number;
+      additions: number;
+      removals: number;
+      portfolioSize: number;
+      titlesCount: number;
+    }
+
+    const map = new Map<string, MonthEntry>();
+
+    assignmentRecords.forEach((r) => {
+      const d = new Date(r.assigned_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          label: d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
+          year: d.getFullYear(),
+          month: d.getMonth(),
+          additions: 0,
+          removals: 0,
+          portfolioSize: 0,
+          titlesCount: 0,
+        });
+      }
+      const entry = map.get(key)!;
+      if (r.cobrador_novo_id === collector.collectorId) entry.additions++;
+      if (r.cobrador_anterior_id === collector.collectorId) entry.removals++;
+    });
+
+    // Títulos únicos (venda_n + documento) pelo mês de lançamento da venda
+    const titlesByMonth = new Map<string, Set<string>>();
+    const seenTitles = new Set<string>();
+    collections
+      .filter((c) => c.user_id === collector.collectorId && c.data_lancamento)
+      .forEach((c) => {
+        const titleKey = `${c.venda_n}-${c.documento}`;
+        if (seenTitles.has(titleKey)) return;
+        seenTitles.add(titleKey);
+        const d = parseDateSafely(c.data_lancamento);
+        if (!d) return;
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        if (!titlesByMonth.has(key)) titlesByMonth.set(key, new Set());
+        titlesByMonth.get(key)!.add(titleKey);
+        // Garante que o mês aparece na tabela mesmo sem atribuições
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            label: d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
+            year: d.getFullYear(),
+            month: d.getMonth(),
+            additions: 0,
+            removals: 0,
+            portfolioSize: 0,
+            titlesCount: 0,
+          });
+        }
+      });
+
+    // Sort newest first, then work backwards from currentPortfolio to fill sizes
+    const sorted = Array.from(map.values()).sort((a, b) =>
+      b.year !== a.year ? b.year - a.year : b.month - a.month
+    );
+
+    let running = currentPortfolio;
+    sorted.forEach((entry) => {
+      entry.portfolioSize = running;
+      entry.titlesCount = titlesByMonth.get(entry.key)?.size ?? 0;
+      running = running - entry.additions + entry.removals;
+    });
+
+    return sorted;
+  }, [assignmentRecords, currentPortfolio, collector, collections]);
+
+  // Clientes adicionados no mês passado
+  const lastMonthCount = useMemo(() => {
+    if (!collector) return 0;
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return assignmentRecords.filter((r) => {
+      if (r.cobrador_novo_id !== collector.collectorId) return false;
+      const d = new Date(r.assigned_at);
+      return d.getFullYear() === lastMonth.getFullYear() && d.getMonth() === lastMonth.getMonth();
+    }).length;
+  }, [assignmentRecords, collector]);
+
+  const lastMonthLabel = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)
+    .toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+
+  const carteiraAvailableYears = useMemo(() => {
+    const years = new Set(portfolioByMonth.map((e) => e.year));
+    return Array.from(years).sort((a, b) => b - a);
+  }, [portfolioByMonth]);
+
+  const filteredPortfolioByMonth = useMemo(() => {
+    if (carteiraYear === "all") return portfolioByMonth;
+    return portfolioByMonth.filter((e) => e.year === carteiraYear);
+  }, [portfolioByMonth, carteiraYear]);
+
+  const carteiraTotals = useMemo(() => {
+    const totalAdditions = assignmentRecords.filter(
+      (r) => r.cobrador_novo_id === collector?.collectorId
+    ).length;
+    const totalRemovals = assignmentRecords.filter(
+      (r) => r.cobrador_anterior_id === collector?.collectorId
+    ).length;
+    return { totalAdditions, totalRemovals };
+  }, [assignmentRecords, collector]);
+
   if (!collector) return null;
 
   const tabs = [
     { id: "summary", name: "Resumo", icon: TrendingUp },
     { id: "history", name: "Histórico", icon: History },
     { id: "pending", name: "Pendências", icon: AlertCircle },
+    { id: "carteira", name: "Carteira", icon: Users },
   ];
 
   return (
@@ -209,18 +416,23 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={`Desempenho: ${collector.collectorName}`}
-      size="2xl"
+      size="4xl"
+      tallHeight
     >
-      <div className="flex flex-col h-full -mt-2">
-        {/* Tab Navigation */}
-        <div className="flex gap-1 mb-6 border-b border-gray-100 dark:border-dark-border">
+      <div className="flex flex-col flex-1 min-h-0">
+        {/* Tab Navigation — sticky */}
+        <div className="flex gap-1 px-6 border-b border-gray-100 dark:border-dark-border shrink-0">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => {
+                  setActiveTab(tab.id as any);
+                  setHistoryPage(1);
+                  setPendingPage(1);
+                }}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all border-b-2 ${
                   isActive
                     ? "border-blue-600 text-blue-600"
@@ -234,8 +446,8 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
           })}
         </div>
 
-        {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar px-1">
+        {/* Tab Content — scrollable */}
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 py-5">
           <TabTransition activeKey={activeTab}>
             {activeTab === "summary" && (
               <div className="space-y-6">
@@ -320,7 +532,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
 
                 {viewMode === "list" ? (
                   <div className="space-y-3">
-                    {filteredHistory.slice(0, itemsToShow).map((history, index) => (
+                    {filteredHistory.slice((historyPage - 1) * HISTORY_PER_PAGE, historyPage * HISTORY_PER_PAGE).map((history, index) => (
                       <div key={index} className="p-4 border border-gray-100 dark:border-dark-border rounded-2xl bg-white dark:bg-dark-bg shadow-sm">
                         <div className="flex justify-between items-center mb-4">
                           <p className="text-xs font-black text-gray-800 dark:text-dark-text uppercase tracking-widest">{history.month}</p>
@@ -356,7 +568,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                     <div className="grid grid-cols-2 gap-8">
                       <div className="space-y-3">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-4 text-center">Visitas (%)</label>
-                        {filteredHistory.slice(0, itemsToShow).map((h, i) => (
+                        {filteredHistory.slice((historyPage - 1) * HISTORY_PER_PAGE, historyPage * HISTORY_PER_PAGE).map((h, i) => (
                           <div key={i} className="flex items-center gap-2">
                             <span className="text-[9px] font-bold text-gray-400 w-12 truncate">{h.monthShort}</span>
                             <div className="flex-1 bg-gray-100 dark:bg-dark-bg-secondary rounded-full h-3 overflow-hidden">
@@ -367,7 +579,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                       </div>
                       <div className="space-y-3">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase mb-4 text-center">Pagamentos (%)</label>
-                        {filteredHistory.slice(0, itemsToShow).map((h, i) => (
+                        {filteredHistory.slice((historyPage - 1) * HISTORY_PER_PAGE, historyPage * HISTORY_PER_PAGE).map((h, i) => (
                           <div key={i} className="flex items-center gap-2">
                             <span className="text-[9px] font-bold text-gray-400 w-12 truncate">{h.monthShort}</span>
                             <div className="flex-1 bg-gray-100 dark:bg-dark-bg-secondary rounded-full h-3 overflow-hidden">
@@ -380,25 +592,14 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                   </div>
                 )}
 
-                {/* Pagination buttons logic kept */}
-                <div className="flex justify-center gap-2 mt-4">
-                  {itemsToShow < filteredHistory.length && (
-                    <button
-                      onClick={() => setItemsToShow((prev) => prev + 6)}
-                      className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest py-2 px-4 hover:bg-blue-50 dark:hover:bg-blue-900/10 rounded-xl transition-all"
-                    >
-                      Mostrar Mais
-                    </button>
-                  )}
-                  {itemsToShow > 6 && (
-                    <button
-                      onClick={() => setItemsToShow(6)}
-                      className="text-[10px] font-bold text-gray-400 uppercase tracking-widest py-2 px-4 hover:bg-gray-50 dark:hover:bg-dark-bg rounded-xl transition-all"
-                    >
-                      Mostrar Menos
-                    </button>
-                  )}
-                </div>
+                {filteredHistory.length > HISTORY_PER_PAGE && (
+                  <Pagination
+                    page={historyPage}
+                    total={filteredHistory.length}
+                    perPage={HISTORY_PER_PAGE}
+                    onChange={setHistoryPage}
+                  />
+                )}
               </div>
             )}
 
@@ -419,7 +620,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
-                          {pendingClients.map((c) => (
+                          {pendingClients.slice((pendingPage - 1) * PENDING_PER_PAGE, pendingPage * PENDING_PER_PAGE).map((c) => (
                             <tr key={c.documento} className="hover:bg-gray-50 dark:hover:bg-dark-bg/30 transition-colors">
                               <td className="px-4 py-3">
                                 <p className="text-xs font-bold text-gray-800 dark:text-dark-text">{c.cliente}</p>
@@ -433,12 +634,144 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                         </tbody>
                       </table>
                     </div>
+                  {pendingClients.length > PENDING_PER_PAGE && (
+                    <Pagination
+                      page={pendingPage}
+                      total={pendingClients.length}
+                      perPage={PENDING_PER_PAGE}
+                      onChange={setPendingPage}
+                    />
+                  )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center p-12 text-center bg-gray-50 dark:bg-dark-bg/30 rounded-3xl border-2 border-dashed border-gray-100 dark:border-dark-border">
                     <Info className="w-10 h-10 text-gray-200 mb-4" />
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Tudo em dia</h3>
                     <p className="text-[10px] text-gray-400 mt-2">Nenhuma pendência financeira encontrada para este cobrador no período.</p>
+                  </div>
+                )}
+              </div>
+            )}
+            {activeTab === "carteira" && (
+              <div className="space-y-5 pb-4">
+                {/* 4 cards de resumo */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-4 border border-blue-100 dark:border-blue-900/30 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Users className="w-3.5 h-3.5 text-blue-500" />
+                      <label className="text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Carteira Atual</label>
+                    </div>
+                    <p className="text-3xl font-black text-blue-600 dark:text-blue-400">{currentPortfolio}</p>
+                    <p className="text-[9px] text-blue-400 mt-0.5">clientes únicos</p>
+                  </div>
+                  <div className="p-4 border border-green-100 dark:border-green-900/30 rounded-2xl bg-green-50/50 dark:bg-green-900/10">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <UserPlus className="w-3.5 h-3.5 text-green-500" />
+                      <label className="text-[9px] font-bold text-green-600 dark:text-green-400 uppercase tracking-widest">Mês Passado</label>
+                    </div>
+                    <p className="text-3xl font-black text-green-600 dark:text-green-400">{lastMonthCount}</p>
+                    <p className="text-[9px] text-green-400 mt-0.5 capitalize">{lastMonthLabel}</p>
+                  </div>
+                  <div className="p-4 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl bg-emerald-50/50 dark:bg-emerald-900/10">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <UserPlus className="w-3.5 h-3.5 text-emerald-500" />
+                      <label className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Total Entradas</label>
+                    </div>
+                    <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{carteiraTotals.totalAdditions}</p>
+                    <p className="text-[9px] text-emerald-400 mt-0.5">desde o início</p>
+                  </div>
+                  <div className="p-4 border border-rose-100 dark:border-rose-900/30 rounded-2xl bg-rose-50/50 dark:bg-rose-900/10">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Users className="w-3.5 h-3.5 text-rose-400" />
+                      <label className="text-[9px] font-bold text-rose-500 dark:text-rose-400 uppercase tracking-widest">Total Saídas</label>
+                    </div>
+                    <p className="text-3xl font-black text-rose-500 dark:text-rose-400">{carteiraTotals.totalRemovals}</p>
+                    <p className="text-[9px] text-rose-300 mt-0.5">desde o início</p>
+                  </div>
+                </div>
+
+                {/* Histórico mensal cumulativo */}
+                {portfolioByMonth.length > 0 ? (
+                  <div>
+                    {/* Filtro de ano */}
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em]">
+                        Evolução da carteira por mês
+                      </h4>
+                      <div className="flex items-center gap-1 bg-gray-100 dark:bg-dark-bg rounded-xl p-0.5">
+                        <button
+                          onClick={() => setCarteiraYear("all")}
+                          className={`text-[9px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg transition-all ${carteiraYear === "all" ? "bg-white dark:bg-dark-bg-secondary text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+                        >
+                          Todos
+                        </button>
+                        {carteiraAvailableYears.map((y) => (
+                          <button
+                            key={y}
+                            onClick={() => setCarteiraYear(y)}
+                            className={`text-[9px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg transition-all ${carteiraYear === y ? "bg-white dark:bg-dark-bg-secondary text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+                          >
+                            {y}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden border border-gray-100 dark:border-dark-border rounded-2xl shadow-sm">
+                      <table className="w-full text-left">
+                        <thead className="bg-gray-50 dark:bg-dark-bg/50">
+                          <tr>
+                            <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Mês</th>
+                            <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Evolução</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Clientes</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-purple-500 uppercase tracking-widest">Títulos</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-green-500 uppercase tracking-widest">+Entradas</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-rose-400 uppercase tracking-widest">−Saídas</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Líquido</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
+                          {(() => {
+                            const maxSize = Math.max(...filteredPortfolioByMonth.map((e) => e.portfolioSize), 1);
+                            return filteredPortfolioByMonth.map((entry) => {
+                              const net = entry.additions - entry.removals;
+                              return (
+                                <tr key={entry.key} className="hover:bg-gray-50 dark:hover:bg-dark-bg/30 transition-colors">
+                                  <td className="px-4 py-3 text-xs font-bold text-gray-700 dark:text-dark-text capitalize whitespace-nowrap">{entry.label}</td>
+                                  <td className="px-4 py-3 w-32">
+                                    <div className="w-full bg-gray-100 dark:bg-dark-bg-secondary rounded-full h-1.5 overflow-hidden">
+                                      <div
+                                        className="h-full bg-blue-400 rounded-full transition-all duration-500"
+                                        style={{ width: `${(entry.portfolioSize / maxSize) * 100}%` }}
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-sm font-black text-blue-600 dark:text-blue-400">{entry.portfolioSize}</td>
+                                  <td className="px-4 py-3 text-right text-sm font-black text-purple-600 dark:text-purple-400">{entry.titlesCount > 0 ? entry.titlesCount : "—"}</td>
+                                  <td className="px-4 py-3 text-right text-xs font-bold text-green-600 dark:text-green-400">
+                                    {entry.additions > 0 ? `+${entry.additions}` : "—"}
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-xs font-bold text-rose-500 dark:text-rose-400">
+                                    {entry.removals > 0 ? `−${entry.removals}` : "—"}
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-xs font-bold">
+                                    <span className={net > 0 ? "text-emerald-600" : net < 0 ? "text-rose-500" : "text-gray-400"}>
+                                      {net > 0 ? `+${net}` : net < 0 ? `${net}` : "—"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-12 text-center bg-gray-50 dark:bg-dark-bg/30 rounded-3xl border-2 border-dashed border-gray-100 dark:border-dark-border">
+                    <Users className="w-10 h-10 text-gray-200 mb-4" />
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Sem histórico</h3>
+                    <p className="text-[10px] text-gray-400 mt-2">Nenhuma atribuição registrada para este cobrador ainda.</p>
                   </div>
                 )}
               </div>

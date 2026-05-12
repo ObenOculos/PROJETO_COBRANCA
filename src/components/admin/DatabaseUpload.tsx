@@ -568,152 +568,82 @@ const DatabaseUpload: React.FC = () => {
     if (onProgress)
       onProgress(30, `Atualizando ${dataToUpdate.length} registros...`);
 
-    // 4. Iterar e atualizar apenas os registros filtrados
-    for (let i = 0; i < dataToUpdate.length; i++) {
-      const row = dataToUpdate[i];
-      const idParcela = row.id_parcela || row["id_parcela"];
-      const status = row.status || row["status"];
+    // 4. Construir o objeto de update para uma linha (sem efeitos colaterais)
+    const buildUpdateObj = (row: FileData): { updateObj: any; error?: string } => {
       const situacao = row.situacao || row["situacao"];
-      const data_de_recebimento =
-        row.data_de_recebimento || row["data_de_recebimento"];
-      const valor_reajustado =
-        row.valor_reajustado || row["valor_reajustado"];
-      const multa = row.multa || row["multa"];
-      const juros_por_dia = row.juros_por_dia || row["juros_por_dia"];
-      const multa_aplicada = row.multa_aplicada || row["multa_aplicada"];
-      const juros_aplicado = row.juros_aplicado || row["juros_aplicado"];
-      const valor_recebido = row.valor_recebido || row["valor_recebido"];
-      const desconto = row.desconto || row["desconto"];
+      const updateObj: any = {};
 
-      if (!idParcela) continue; // Segurança, embora já filtrado
+      if (row.status) updateObj.status = row.status;
+      if (row.data_de_recebimento) updateObj.data_de_recebimento = row.data_de_recebimento;
 
-      try {
-        const updateObj: any = {};
-        if (status) updateObj.status = status;
-        if (data_de_recebimento)
-          updateObj.data_de_recebimento = data_de_recebimento;
-
-        const parsedValorReajustado = parseNullableNumber(valor_reajustado);
-        if (valor_reajustado !== undefined && valor_reajustado !== null) {
-          if (valor_reajustado.toString().trim() === "") {
-            updateObj.valor_reajustado = null;
-          } else if (parsedValorReajustado !== null) {
-            updateObj.valor_reajustado = parsedValorReajustado;
-          }
+      const numericFields: [string, string][] = [
+        ["valor_reajustado", "valor_reajustado"],
+        ["multa", "multa"],
+        ["juros_por_dia", "juros_por_dia"],
+        ["multa_aplicada", "multa_aplicada"],
+        ["juros_aplicado", "juros_aplicado"],
+        ["valor_recebido", "valor_recebido"],
+        ["desconto", "desconto"],
+      ];
+      for (const [field] of numericFields) {
+        const raw = row[field];
+        if (raw !== undefined && raw !== null) {
+          updateObj[field] = raw.toString().trim() === "" ? null : (parseNullableNumber(raw) ?? undefined);
         }
-
-        const parsedMulta = parseNullableNumber(multa);
-        if (multa !== undefined && multa !== null) {
-          if (multa.toString().trim() === "") {
-            updateObj.multa = null;
-          } else if (parsedMulta !== null) {
-            updateObj.multa = parsedMulta;
-          }
-        }
-
-        const parsedJurosPorDia = parseNullableNumber(juros_por_dia);
-        if (juros_por_dia !== undefined && juros_por_dia !== null) {
-          if (juros_por_dia.toString().trim() === "") {
-            updateObj.juros_por_dia = null;
-          } else if (parsedJurosPorDia !== null) {
-            updateObj.juros_por_dia = parsedJurosPorDia;
-          }
-        }
-
-        const parsedMultaAplicada = parseNullableNumber(multa_aplicada);
-        if (multa_aplicada !== undefined && multa_aplicada !== null) {
-          if (multa_aplicada.toString().trim() === "") {
-            updateObj.multa_aplicada = null;
-          } else if (parsedMultaAplicada !== null) {
-            updateObj.multa_aplicada = parsedMultaAplicada;
-          }
-        }
-
-        const parsedJurosAplicado = parseNullableNumber(juros_aplicado);
-        if (juros_aplicado !== undefined && juros_aplicado !== null) {
-          if (juros_aplicado.toString().trim() === "") {
-            updateObj.juros_aplicado = null;
-          } else if (parsedJurosAplicado !== null) {
-            updateObj.juros_aplicado = parsedJurosAplicado;
-          }
-        }
-
-        if (valor_recebido !== undefined && valor_recebido !== null) {
-          if (valor_recebido.toString().trim() === "") {
-            updateObj.valor_recebido = null;
-          } else {
-            const valor = parseNullableNumber(valor_recebido);
-            if (valor !== null) {
-              updateObj.valor_recebido = valor;
-            }
-          }
-        }
-
-        if (desconto !== undefined && desconto !== null) {
-          if (desconto.toString().trim() === "") {
-            updateObj.desconto = null;
-          } else {
-            const valor = parseNullableNumber(desconto);
-            if (valor !== null) {
-              updateObj.desconto = valor;
-            }
-          }
-        }
-
-        const validatedSituacao = validateSituacao(situacao);
-        if (situacao && validatedSituacao !== null) {
-          updateObj.situacao = validatedSituacao;
-        } else if (situacao) {
-          updates.push({
-            id_parcela: idParcela,
-            status: "error",
-            error: `Valor de situacao inválido: "${situacao}".`,
-          });
-          continue;
-        }
-
-        if (Object.keys(updateObj).length === 0) {
-          updates.push({
-            id_parcela: idParcela,
-            status: "error",
-            error: "Nenhum campo válido para atualização.",
-          });
-          continue;
-        }
-
-        const { data: updateData, error } = await supabase
-          .from("BANCO_DADOS")
-          .update(updateObj)
-          .eq("id_parcela", idParcela)
-          .select();
-
-        if (error) {
-          console.error(`❌ Erro ao atualizar ${idParcela}:`, error);
-          updates.push({
-            id_parcela: idParcela,
-            status: "error",
-            error: error.message,
-          });
-        } else {
-          console.log(`✅ Sucesso ao atualizar ${idParcela}:`, updateData);
-          updates.push({ id_parcela: idParcela, status: "success" });
-        }
-      } catch (error) {
-        console.error(`❌ Exceção ao atualizar ${idParcela}:`, error);
-        updates.push({
-          id_parcela: idParcela,
-          status: "error",
-          error: (error as Error).message,
-        });
       }
 
+      const validatedSituacao = validateSituacao(situacao);
+      if (situacao && validatedSituacao !== null) {
+        updateObj.situacao = validatedSituacao;
+      } else if (situacao) {
+        return { updateObj: {}, error: `Valor de situacao inválido: "${situacao}".` };
+      }
+
+      if (Object.keys(updateObj).length === 0) {
+        return { updateObj: {}, error: "Nenhum campo válido para atualização." };
+      }
+
+      return { updateObj };
+    };
+
+    // 5. Atualizar em lotes paralelos de 20 para máxima velocidade
+    const PARALLEL_SIZE = 20;
+    for (let i = 0; i < dataToUpdate.length; i += PARALLEL_SIZE) {
+      const batchRows = dataToUpdate.slice(i, i + PARALLEL_SIZE);
+
+      const batchResults = await Promise.allSettled(
+        batchRows.map(async (row): Promise<UpdateResult> => {
+          const idParcela = row.id_parcela || row["id_parcela"];
+          const { updateObj, error: buildError } = buildUpdateObj(row);
+
+          if (buildError) {
+            return { id_parcela: idParcela, status: "error", error: buildError };
+          }
+
+          const { error } = await supabase
+            .from("BANCO_DADOS")
+            .update(updateObj)
+            .eq("id_parcela", idParcela);
+
+          if (error) {
+            return { id_parcela: idParcela, status: "error", error: error.message };
+          }
+          return { id_parcela: idParcela, status: "success" };
+        }),
+      );
+
+      batchResults.forEach((result) => {
+        if (result.status === "fulfilled") {
+          updates.push(result.value);
+        } else {
+          updates.push({ id_parcela: "?", status: "error", error: String(result.reason) });
+        }
+      });
+
       if (onProgress) {
-        const percentage =
-          30 + Math.round(((i + 1) / dataToUpdate.length) * 70);
-        onProgress(
-          percentage,
-          `Atualizando registro ${i + 1} de ${dataToUpdate.length}...`,
-        );
+        const processed = Math.min(i + PARALLEL_SIZE, dataToUpdate.length);
+        const percentage = 30 + Math.round((processed / dataToUpdate.length) * 70);
+        onProgress(percentage, `Atualizando ${processed} de ${dataToUpdate.length} registros...`);
       }
     }
 

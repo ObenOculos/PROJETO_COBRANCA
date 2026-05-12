@@ -67,6 +67,39 @@ export type Database = {
         }
         Relationships: []
       }
+      atribuicoes_historico: {
+        Row: {
+          assigned_at: string
+          cliente_nome: string | null
+          cobrador_anterior_id: string | null
+          cobrador_novo_id: string
+          documento: string
+          gerente_id: string
+          id: string
+          nome_da_loja: string | null
+        }
+        Insert: {
+          assigned_at?: string
+          cliente_nome?: string | null
+          cobrador_anterior_id?: string | null
+          cobrador_novo_id: string
+          documento: string
+          gerente_id: string
+          id?: string
+          nome_da_loja?: string | null
+        }
+        Update: {
+          assigned_at?: string
+          cliente_nome?: string | null
+          cobrador_anterior_id?: string | null
+          cobrador_novo_id?: string
+          documento?: string
+          gerente_id?: string
+          id?: string
+          nome_da_loja?: string | null
+        }
+        Relationships: []
+      }
       authorization_history: {
         Row: {
           client_address: string | null
