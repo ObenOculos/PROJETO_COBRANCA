@@ -559,21 +559,43 @@ export const ClientAssignment = React.memo(() => {
     const totalClients = clientsData.length;
     const assignedClients = clientsData.filter((c) => c.collectorId).length;
     const unassignedClients = totalClients - assignedClients;
-    const totalCollections = clientsData.reduce(
-      (sum, c) => sum + c.collections.length,
-      0,
-    );
-    const avgCollectionsPerClient =
-      totalClients > 0 ? totalCollections / totalClients : 0;
-    const assignmentRate =
-      totalClients > 0 ? (assignedClients / totalClients) * 100 : 0;
+    
+    // Calcular valor total pendente
+    const totalPendingValue = clientsData.reduce((sum, client) => {
+      const clientTotal = client.collections.reduce((s, c) => s + c.valor_original, 0);
+      const clientReceived = client.collections.reduce((s, c) => s + c.valor_recebido, 0);
+      return sum + (clientTotal - clientReceived);
+    }, 0);
+
+    // Calcular novos clientes (Mês Atual vs Mês Anterior)
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    
+    const newClientsMonth = clientsData.filter(client => {
+      return client.collections.some(c => {
+        const launchDate = parseAndNormalizeDate(c.data_lancamento);
+        return launchDate && launchDate >= currentMonthStart;
+      });
+    }).length;
+
+    const prevMonthCount = clientsData.filter(client => {
+      return client.collections.some(c => {
+        const launchDate = parseAndNormalizeDate(c.data_lancamento);
+        return launchDate && launchDate >= prevMonthStart && launchDate <= prevMonthEnd;
+      });
+    }).length;
+
+    const assignmentRate = totalClients > 0 ? (assignedClients / totalClients) * 100 : 0;
 
     return {
       totalClients,
       assignedClients,
       unassignedClients,
-      totalCollections,
-      avgCollectionsPerClient,
+      totalPendingValue,
+      newClientsMonth,
+      prevMonthCount,
       assignmentRate,
     };
   }, [clientsData]);
@@ -581,20 +603,42 @@ export const ClientAssignment = React.memo(() => {
   // Calculate filtered overview statistics
   const filteredStats = useMemo(() => {
     const totalFiltered = filteredClients.length;
-    const assignedFiltered = filteredClients.filter(
-      (c) => c.collectorId,
-    ).length;
+    const assignedFiltered = filteredClients.filter((c) => c.collectorId).length;
     const unassignedFiltered = totalFiltered - assignedFiltered;
-    const totalCollectionsFiltered = filteredClients.reduce(
-      (sum, c) => sum + c.collections.length,
-      0,
-    );
+    
+    const totalPendingFiltered = filteredClients.reduce((sum, client) => {
+      const clientTotal = client.collections.reduce((s, c) => s + c.valor_original, 0);
+      const clientReceived = client.collections.reduce((s, c) => s + c.valor_recebido, 0);
+      return sum + (clientTotal - clientReceived);
+    }, 0);
+
+    // Novos clientes filtrados (Mês Atual vs Mês Anterior)
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    const newClientsFiltered = filteredClients.filter(client => {
+      return client.collections.some(c => {
+        const launchDate = parseAndNormalizeDate(c.data_lancamento);
+        return launchDate && launchDate >= currentMonthStart;
+      });
+    }).length;
+
+    const prevMonthFiltered = filteredClients.filter(client => {
+      return client.collections.some(c => {
+        const launchDate = parseAndNormalizeDate(c.data_lancamento);
+        return launchDate && launchDate >= prevMonthStart && launchDate <= prevMonthEnd;
+      });
+    }).length;
 
     return {
       totalFiltered,
       assignedFiltered,
       unassignedFiltered,
-      totalCollectionsFiltered,
+      totalPendingFiltered,
+      newClientsFiltered,
+      prevMonthFiltered,
     };
   }, [filteredClients]);
 
@@ -650,11 +694,25 @@ export const ClientAssignment = React.memo(() => {
     const assigned = hasActiveFilters
       ? filteredStats.assignedFiltered
       : overviewStats.assignedClients;
+    const newClients = hasActiveFilters
+      ? filteredStats.newClientsFiltered
+      : overviewStats.newClientsMonth;
+    const prevMonth = hasActiveFilters
+      ? filteredStats.prevMonthFiltered
+      : overviewStats.prevMonthCount;
+    const pendingValue = hasActiveFilters
+      ? filteredStats.totalPendingFiltered
+      : overviewStats.totalPendingValue;
+    
     const assignmentRate = total > 0 ? (assigned / total) * 100 : 0;
 
     return {
       total,
       assigned,
+      unassigned: total - assigned,
+      newClients,
+      prevMonth,
+      pendingValue,
       assignmentRate,
     };
   }, [hasActiveFilters, filteredStats, overviewStats]);
@@ -670,7 +728,7 @@ export const ClientAssignment = React.memo(() => {
               Atribuição de Cobradores
             </h2>
             <p className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary mt-1 uppercase tracking-wider">
-              Gestão de carteira para {mainStats.total} clientes
+              {hasActiveFilters ? "Visão Filtrada" : "Gestão Estratégica de Carteira"}
             </p>
           </div>
 
@@ -690,49 +748,178 @@ export const ClientAssignment = React.memo(() => {
         </div>
       </div>
 
-      {/* Card Principal - Taxa de Atribuição */}
-      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white rounded-2xl shadow-xl p-8 relative overflow-hidden group">
-        <div className="relative z-10">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-blue-100 text-[10px] font-black uppercase tracking-[0.2em] mb-1">
-                Taxa de Atribuição Global
-              </p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-black tracking-tighter">
-                  {mainStats.assignmentRate.toFixed(1)}%
-                </span>
-                <div className={`flex items-center text-xs font-bold px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-md ${mainStats.assignmentRate > 90 ? 'text-green-300' : 'text-blue-200'}`}>
-                  <Zap className="w-3 h-3 mr-1 fill-current" />
-                  {mainStats.assignmentRate > 90 ? 'Excelente' : 'Em progresso'}
-                </div>
-              </div>
+      {/* Grid de Cards Executivos */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card: Total de Clientes */}
+        <div className="bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+              <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <Award className="h-16 w-16 text-white opacity-20 group-hover:opacity-30 transition-opacity" />
+            {mainStats.unassigned > 0 && (
+              <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg uppercase tracking-tight">
+                {mainStats.unassigned} Pendentes
+              </span>
+            )}
           </div>
+          <div>
+            <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-1">Total Clientes</p>
+            <p className="text-3xl font-black text-gray-900 dark:text-dark-text tracking-tighter">{mainStats.total}</p>
+          </div>
+        </div>
 
-          {/* Métricas secundárias */}
-          <div className="grid grid-cols-3 gap-8 mt-10 pt-8 border-t border-white/10">
-            <div>
-              <p className="text-blue-200 text-[9px] font-bold uppercase tracking-wider mb-1">Atribuídos</p>
-              <p className="text-2xl font-black">{mainStats.assigned}</p>
+        {/* Card: Novos Clientes */}
+        <div className="bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-xl">
+              <Zap className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
-            <div>
-              <p className="text-blue-200 text-[9px] font-bold uppercase tracking-wider mb-1">Pendentes</p>
-              <p className="text-2xl font-black text-blue-100">
-                {mainStats.total - mainStats.assigned}
-              </p>
-            </div>
-            <div>
-              <p className="text-blue-200 text-[9px] font-bold uppercase tracking-wider mb-1">Cobradores</p>
-              <p className="text-2xl font-black">{collectors.length}</p>
+            {mainStats.prevMonth > 0 ? (
+              <span className={`text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-tight ${mainStats.newClients >= mainStats.prevMonth ? 'text-green-600 bg-green-50' : 'text-amber-600 bg-amber-50'}`}>
+                {mainStats.newClients >= mainStats.prevMonth ? '+' : ''}{((mainStats.newClients / mainStats.prevMonth - 1) * 100).toFixed(0)}% vs mês ant.
+              </span>
+            ) : (
+              <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-lg uppercase tracking-tight">
+                Mês Atual
+              </span>
+            )}
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-1">Novos Clientes</p>
+            <div className="flex items-baseline gap-2">
+              <p className="text-3xl font-black text-gray-900 dark:text-dark-text tracking-tighter">{mainStats.newClients}</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">vs {mainStats.prevMonth} no mês ant.</p>
             </div>
           </div>
         </div>
 
-        {/* Efeito visual de fundo */}
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl" />
+        {/* Card: Valor em Aberto */}
+        <div className="bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
+              <HandCoins className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-1">Valor em Aberto</p>
+            <p className="text-2xl font-black text-indigo-700 dark:text-indigo-400 tracking-tighter">{formatCurrency(mainStats.pendingValue)}</p>
+          </div>
+        </div>
+
+        {/* Card: Taxa de Atribuição */}
+        <div className={`p-5 rounded-2xl shadow-xl flex flex-col justify-between relative overflow-hidden group transition-all ${mainStats.assignmentRate > 90 ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white' : 'bg-white dark:bg-dark-bg-secondary border border-gray-100 dark:border-dark-border text-gray-900 dark:text-dark-text'}`}>
+          <div className="flex items-center justify-between mb-4 relative z-10">
+            <div className={`p-2 rounded-xl ${mainStats.assignmentRate > 90 ? 'bg-white/20 backdrop-blur-md' : 'bg-blue-50 dark:bg-blue-900/20'}`}>
+              <Award className={`h-5 w-5 ${mainStats.assignmentRate > 90 ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
+            </div>
+            <div className={`flex items-center text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-tight ${mainStats.assignmentRate > 90 ? 'bg-white/20 text-blue-100' : 'bg-blue-50 text-blue-600'}`}>
+              {mainStats.assignmentRate > 90 ? 'Excelente' : 'Em progresso'}
+            </div>
+          </div>
+          <div className="relative z-10">
+            <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${mainStats.assignmentRate > 90 ? 'text-blue-100' : 'text-gray-400 dark:text-dark-text-secondary'}`}>Taxa Atribuição</p>
+            <p className="text-3xl font-black tracking-tighter">{mainStats.assignmentRate.toFixed(1)}%</p>
+          </div>
+          {mainStats.assignmentRate > 90 && (
+            <div className="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
+          )}
+        </div>
+      </div>
+
+      {/* Filtros Rápidos */}
+      <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
+        <span className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mr-2">Visão Rápida:</span>
+        
+        <button
+          onClick={() => {
+            setFilterStatus("");
+            setFilterDateFrom("");
+          }}
+          className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${
+            !filterStatus && !filterDateFrom
+              ? "bg-gray-900 text-white border-gray-900 shadow-md"
+              : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
+          }`}
+        >
+          Todos
+        </button>
+
+        <button
+          onClick={() => {
+            setFilterStatus("without_collector");
+            setFilterDateFrom("");
+          }}
+          className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border flex items-center gap-1.5 ${
+            filterStatus === "without_collector"
+              ? "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20"
+              : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-amber-50 dark:hover:bg-amber-900/10 hover:text-amber-600 hover:border-amber-200"
+          }`}
+        >
+          <AlertCircle className="w-3.5 h-3.5" />
+          Pendentes
+        </button>
+
+        <button
+          onClick={() => {
+            setFilterStatus("with_collector");
+            setFilterDateFrom("");
+          }}
+          className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border flex items-center gap-1.5 ${
+            filterStatus === "with_collector"
+              ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20"
+              : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:text-blue-600 hover:border-blue-200"
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          Atribuídos
+        </button>
+
+        <button
+          onClick={() => {
+            const now = new Date();
+            const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            setFilterDateFrom(currentMonthStart.toISOString().split('T')[0]);
+            setFilterStatus("");
+          }}
+          className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border flex items-center gap-1.5 ${
+            filterDateFrom && !filterStatus
+              ? "bg-green-600 text-white border-green-600 shadow-md shadow-green-600/20"
+              : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-green-50 dark:hover:bg-green-900/10 hover:text-green-600 hover:border-green-200"
+          }`}
+        >
+          <Zap className="w-3.5 h-3.5" />
+          Novos (Mês)
+        </button>
+      </div>
+
+      {/* Filtros Rápidos: Cobradores */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-4 custom-scrollbar">
+        <span className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mr-2 whitespace-nowrap">Por Cobrador:</span>
+        
+        <button
+          onClick={() => setFilterCollector("")}
+          className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border whitespace-nowrap ${
+            !filterCollector
+              ? "bg-blue-600 text-white border-blue-600"
+              : "bg-gray-100 dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border-transparent hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary"
+          }`}
+        >
+          Todos
+        </button>
+
+        {collectors.map((collector) => (
+          <button
+            key={collector.id}
+            onClick={() => setFilterCollector(collector.id)}
+            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border whitespace-nowrap ${
+              filterCollector === collector.id
+                ? "bg-blue-600 text-white border-blue-600 shadow-md"
+                : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:border-blue-300 hover:text-blue-600"
+            }`}
+          >
+            {collector.name}
+          </button>
+        ))}
       </div>
 
       {/* Filtros Colapsáveis */}

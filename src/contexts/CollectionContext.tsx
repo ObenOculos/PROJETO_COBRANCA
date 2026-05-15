@@ -794,9 +794,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       await fetchUsers(false); // Force fresh fetch
     } catch (err) {
       console.error("Erro ao adicionar usuário:", err);
-      setError(
-        err instanceof Error ? err.message : "Erro ao adicionar usuário",
-      );
+      const message = err instanceof Error ? err.message : "Erro ao adicionar usuário";
+      setError(message);
+      throw err;
     }
   };
 
@@ -821,9 +821,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       await fetchUsers(false); // Force fresh fetch
     } catch (err) {
       console.error("Erro ao atualizar usuário:", err);
-      setError(
-        err instanceof Error ? err.message : "Erro ao atualizar usuário",
-      );
+      const message = err instanceof Error ? err.message : "Erro ao atualizar usuário";
+      setError(message);
+      throw err;
     }
   };
 
@@ -842,7 +842,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       await fetchUsers(false); // Force fresh fetch
     } catch (err) {
       console.error("Erro ao deletar usuário:", err);
-      setError(err instanceof Error ? err.message : "Erro ao deletar usuário");
+      const message = err instanceof Error ? err.message : "Erro ao deletar usuário";
+      setError(message);
+      throw err;
     }
   };
 

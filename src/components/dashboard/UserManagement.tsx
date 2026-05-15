@@ -4,12 +4,14 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { User as UserType, UserType as UserRoleType } from "../../types";
 
 const UserManagement: React.FC = () => {
-  const { users, addUser, updateUser, deleteUser } = useCollection();
+  const { users, addUser, updateUser, deleteUser, error: contextError } = useCollection();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserType | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -21,6 +23,7 @@ const UserManagement: React.FC = () => {
   });
 
   const handleOpenModal = (user?: UserType) => {
+    setLocalError(null);
     if (user) {
       setEditingUser(user);
       setFormData({
@@ -39,40 +42,61 @@ const UserManagement: React.FC = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingUser(null);
+    setLocalError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingUser) {
-      const updates: Partial<UserType> = {
-        name: formData.name,
-        login: formData.login,
-        type: formData.type,
-      };
-      if (formData.password.trim()) {
-        updates.password = formData.password;
+    setLocalError(null);
+    try {
+      if (editingUser) {
+        const updates: Partial<UserType> = {
+          name: formData.name,
+          login: formData.login,
+          type: formData.type,
+        };
+        if (formData.password.trim()) {
+          updates.password = formData.password;
+        }
+        await updateUser(editingUser.id, updates);
+      } else {
+        await addUser(formData);
       }
-      updateUser(editingUser.id, updates);
-    } else {
-      addUser(formData);
+      handleCloseModal();
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "Erro ao salvar usuário");
     }
-    handleCloseModal();
   };
 
   const handleOpenDeleteModal = (user: UserType) => {
     setUserToDelete(user);
+    setLocalError(null);
     setIsDeleteModalOpen(true);
   };
 
   const handleCloseDeleteModal = () => {
+    if (isDeleting) return;
     setIsDeleteModalOpen(false);
     setUserToDelete(null);
+    setLocalError(null);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (userToDelete) {
-      deleteUser(userToDelete.id);
-      handleCloseDeleteModal();
+      setIsDeleting(true);
+      setLocalError(null);
+      try {
+        await deleteUser(userToDelete.id);
+        setIsDeleting(false);
+        handleCloseDeleteModal();
+      } catch (err) {
+        setIsDeleting(false);
+        setLocalError(
+          err instanceof Error 
+            ? err.message 
+            : "Este usuário não pode ser excluído pois possui registros vinculados (clientes, pagamentos ou visitas)."
+        );
+      }
     }
   };
 
@@ -247,6 +271,11 @@ const UserManagement: React.FC = () => {
               </h3>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {localError && (
+                <div className="p-3 bg-red-100 text-red-700 text-sm rounded-md">
+                  {localError}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Nome
@@ -318,14 +347,16 @@ const UserManagement: React.FC = () => {
                   type="button"
                   onClick={handleCloseModal}
                   className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  disabled={isDeleting}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  disabled={isDeleting}
                 >
-                  {editingUser ? "Atualizar" : "Criar"}
+                  {isDeleting ? "Salvando..." : (editingUser ? "Atualizar" : "Criar")}
                 </button>
               </div>
             </form>
@@ -346,21 +377,28 @@ const UserManagement: React.FC = () => {
                 <strong>{userToDelete.name}</strong>? Esta ação não pode ser
                 desfeita.
               </p>
+              {localError && (
+                <div className="mt-4 p-3 bg-red-100 text-red-700 text-sm rounded-md text-left">
+                  {localError}
+                </div>
+              )}
             </div>
             <div className="mt-6 flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={handleCloseDeleteModal}
                 className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                disabled={isDeleting}
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                disabled={isDeleting}
               >
-                Excluir
+                {isDeleting ? "Excluindo..." : "Excluir"}
               </button>
             </div>
           </div>
