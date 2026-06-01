@@ -214,6 +214,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [customObservation, setCustomObservation] = useState("");
   const [showCustomObservationInput, setShowCustomObservationInput] = useState(false);
+  const [customNotFoundObservation, setCustomNotFoundObservation] = useState("");
+  const [showCustomNotFoundObservationInput, setShowCustomNotFoundObservationInput] = useState(false);
   const [showDateValidationModal, setShowDateValidationModal] = useState(false);
   const [dateValidationMessage, setDateValidationMessage] = useState("");
   const [showTimeWarningModal, setShowTimeWarningModal] = useState(false);
@@ -1383,6 +1385,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   // Função para confirmar que quer marcar como "Não Localizado"
   const handleConfirmNotFoundFirst = () => {
     setShowNotFoundConfirmModal(false);
+    setCustomNotFoundObservation("");
+    setShowCustomNotFoundObservationInput(false);
     setShowNotFoundObservationModal(true);
   };
 
@@ -1396,6 +1400,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       );
       setShowNotFoundObservationModal(false);
       setSelectedVisitForNotFound(null);
+      setCustomNotFoundObservation("");
+      setShowCustomNotFoundObservationInput(false);
     }
   };
 
@@ -3345,8 +3351,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           selectedVisitForNotFound &&
           createPortal(
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
-                <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
+              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 max-h-[90vh] flex flex-col">
+                <div className="px-4 lg:px-6 py-4 border-b border-gray-200 flex-shrink-0">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                     <AlertTriangle className="h-5 w-5 mr-2 text-orange-600" />
                     Marcar como "Não Localizado"
@@ -3356,12 +3362,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   </p>
                 </div>
 
-                <div className="px-4 lg:px-6 py-4">
+                <div className="px-4 lg:px-6 py-4 overflow-y-auto flex-1">
                   <p className="text-sm text-gray-700 mb-4">
                     Selecione o motivo de não ter encontrado o cliente:
                   </p>
 
-                  <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2">
+                  <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2 mb-4">
                     {[
                       "Cliente não estava em casa",
                       "Cliente mudou de endereço",
@@ -3370,25 +3376,88 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                     ].map((note, index) => (
                       <button
                         key={index}
-                        onClick={() => handleConfirmNotFound(note)}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleConfirmNotFound(note);
+                        }}
                         className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-orange-50 hover:border-orange-200 border border-gray-200 rounded-2xl transition-colors text-sm"
                       >
                         {note}
                       </button>
                     ))}
                   </div>
+
+                  {/* Botão "Outro" separado na parte inferior */}
+                  <div className="border-t border-gray-200 pt-4">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowCustomNotFoundObservationInput(true);
+                      }}
+                      className="w-full text-left px-4 py-3 bg-blue-50 hover:bg-blue-100 hover:border-blue-300 border border-blue-200 rounded-2xl transition-colors text-sm text-blue-700 font-medium"
+                    >
+                      Outro (digitar observação personalizada)
+                    </button>
+                  </div>
+
+                  {showCustomNotFoundObservationInput && (
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Digite sua observação personalizada:
+                      </label>
+                      <textarea
+                        value={customNotFoundObservation}
+                        onChange={(e) => setCustomNotFoundObservation(e.target.value)}
+                        placeholder="Descreva o motivo de não ter localizado o cliente..."
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
+                        autoFocus
+                      />
+                    </div>
+                  )}
                 </div>
 
-                <div className="px-4 lg:px-6 py-4 border-t border-gray-200">
-                  <button
-                    onClick={() => {
-                      setShowNotFoundObservationModal(false);
-                      setSelectedVisitForNotFound(null);
-                    }}
-                    className="w-full px-4 py-2 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors"
-                  >
-                    Cancelar
-                  </button>
+                <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex-shrink-0">
+                  {showCustomNotFoundObservationInput ? (
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        onClick={() => {
+                          setShowCustomNotFoundObservationInput(false);
+                          setCustomNotFoundObservation("");
+                        }}
+                        className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors"
+                      >
+                        Voltar
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (customNotFoundObservation.trim()) {
+                            handleConfirmNotFound(customNotFoundObservation.trim());
+                          }
+                        }}
+                        disabled={!customNotFoundObservation.trim()}
+                        className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-2xl hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Confirmar Observação
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setShowNotFoundObservationModal(false);
+                        setSelectedVisitForNotFound(null);
+                        setCustomNotFoundObservation("");
+                        setShowCustomNotFoundObservationInput(false);
+                      }}
+                      className="w-full px-4 py-2 bg-gray-500 text-white rounded-2xl hover:bg-gray-700 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  )}
                 </div>
               </div>
             </div>,

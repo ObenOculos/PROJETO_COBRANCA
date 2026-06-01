@@ -4,12 +4,10 @@ import {
   CalendarClock,
   Clock,
   MapPin,
-  DollarSign,
   AlertTriangle,
   CheckCircle,
   XCircle,
   X,
-  MessageSquare,
   User,
   Filter,
   ChevronDown,
@@ -17,7 +15,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  Star, // Add Star icon
   FileDown,
   Zap,
 } from "lucide-react";
