@@ -3091,8 +3091,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         .eq("id", visitId);
 
       if (error) {
+        // Não atualizar o estado local quando a escrita no banco falha: manter
+        // local e banco em sincronia evita solicitações fantasmas/duplicadas.
         console.error("Erro ao solicitar cancelamento no Supabase:", error);
-        // Continuar com atualização local mesmo se falhar no Supabase
+        throw error;
       }
 
       // Atualizar estado local
@@ -3148,6 +3150,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       if (error) {
         console.error("Erro ao aprovar cancelamento no Supabase:", error);
+        throw error;
       }
 
       // Atualizar estado local
@@ -3198,6 +3201,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       if (error) {
         console.error("Erro ao rejeitar cancelamento no Supabase:", error);
+        throw error;
       }
 
       // Atualizar estado local
@@ -3597,10 +3601,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     try {
       console.log("Reagendando visita:", visitId, newDate, newTime);
 
-      // Fetch the latest visit data from the database
+      // Buscar o estado ATUAL da visita no banco. Não confiar apenas no estado
+      // local (scheduledVisits), que pode estar defasado entre abas/dispositivos
+      // e permitir que o mesmo reagendamento seja disparado mais de uma vez.
       const { data: latestVisitData, error: fetchError } = await supabase
         .from("scheduled_visits")
-        .select("reschedule_count")
+        .select("status, reschedule_count")
         .eq("id", visitId)
         .single();
 
@@ -3612,18 +3618,23 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         throw fetchError;
       }
 
+      // Validar contra o status REAL do banco. Só é possível reagendar uma
+      // visita que ainda esteja "agendada"; qualquer outro estado (já
+      // reagendada, cancelada, realizada, etc.) significa que a operação já
+      // foi concluída e seguir adiante criaria uma visita duplicada.
+      if (latestVisitData?.status !== "agendada") {
+        throw new Error(
+          `Esta visita não pode ser reagendada (status atual: ${latestVisitData?.status}). Atualize a lista e tente novamente.`,
+        );
+      }
+
       const currentRescheduleCount = latestVisitData?.reschedule_count || 0;
       const newRescheduleCount = currentRescheduleCount + 1;
 
-      // Buscar visita atual para manter histórico (from local state for other fields)
+      // Buscar visita atual para manter histórico (demais campos vêm do estado local)
       const currentVisit = scheduledVisits.find((v) => v.id === visitId);
       if (!currentVisit) {
         throw new Error("Visita não encontrada no estado local");
-      }
-
-      // Prevenir reagendamento duplicado se a visita já foi reagendada
-      if (currentVisit.status === "reagendada") {
-        throw new Error("Esta visita já foi reagendada");
       }
 
       // Montar nota com informações do reagendamento
@@ -3678,6 +3689,33 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         updatedNotes = `${formattedExistingNotes}\n${rescheduleNote}`;
       }
 
+      // Pré-checagem: o cliente já tem uma visita ATIVA na data de destino?
+      // Se sim, abortamos ANTES de mexer na visita original, evitando deixá-la
+      // "órfã" (marcada como reagendada sem uma nova visita criada) — já que o
+      // índice único do banco rejeitaria o INSERT de qualquer forma.
+      const { data: conflictRows, error: conflictError } = await supabase
+        .from("scheduled_visits")
+        .select("id")
+        .eq("collector_id", currentVisit.collectorId)
+        .eq("client_document", currentVisit.clientDocument)
+        .eq("scheduled_date", newDate)
+        .eq("status", "agendada")
+        .neq("id", visitId);
+
+      if (conflictError) {
+        console.error(
+          "Erro ao verificar conflito de data no reagendamento:",
+          conflictError,
+        );
+        throw conflictError;
+      }
+
+      if (conflictRows && conflictRows.length > 0) {
+        throw new Error(
+          "Este cliente já possui uma visita agendada nessa data. Escolha outra data.",
+        );
+      }
+
       // Em vez de atualizar a visita existente, vamos:
       // 1. Marcar a visita original como "reagendada"
       // 2. Criar uma nova visita com a nova data
@@ -3691,14 +3729,29 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         reschedule_count: newRescheduleCount,
       };
 
-      const { error: originalError } = await supabase
+      // UPDATE condicional ao status "agendada": funciona como uma trava
+      // atômica. Em caso de corrida (duas tentativas simultâneas, retry após
+      // falha de rede, evento disparado duas vezes), apenas UMA operação
+      // consegue alterar a linha; as demais recebem 0 linhas afetadas e abortam
+      // ANTES do INSERT, impedindo a criação de visitas duplicadas.
+      const { data: claimedRows, error: originalError } = await supabase
         .from("scheduled_visits")
         .update(originalUpdateData)
-        .eq("id", visitId);
+        .eq("id", visitId)
+        .eq("status", "agendada")
+        .select("id");
 
       if (originalError) {
         console.error("Erro ao marcar visita original como reagendada:", originalError);
         throw originalError;
+      }
+
+      if (!claimedRows || claimedRows.length === 0) {
+        // Outra operação já reagendou esta visita nesse intervalo: não criar
+        // duplicata. O estado local será corrigido no próximo fetch.
+        throw new Error(
+          "Esta visita já foi reagendada por outra operação. Atualize a lista.",
+        );
       }
 
       // Agora, criar uma nova visita com a nova data
@@ -3713,6 +3766,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         reschedule_count: 0, // Nova visita começa com 0
+        rescheduled_from_id: visitId, // Vínculo rastreável com a visita de origem
         scheduled_by_manager_id: currentVisit.scheduled_by_manager_id,
         // Copiar dados do cliente
         client_address: currentVisit.clientAddress,
@@ -3731,7 +3785,38 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       if (newVisitError) {
         console.error("Erro ao criar nova visita reagendada:", newVisitError);
+        // A original já foi marcada como "reagendada" no passo anterior. Como a
+        // nova visita não pôde ser criada, revertemos a original para
+        // "agendada" (best-effort) para não deixá-la órfã.
+        const { error: revertError } = await supabase
+          .from("scheduled_visits")
+          .update({
+            status: "agendada",
+            rescheduled_to: currentVisit.rescheduledTo ?? null,
+            reschedule_count: currentRescheduleCount,
+            notes: currentVisit.notes ?? null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", visitId);
+        if (revertError) {
+          console.error(
+            "Falha ao reverter visita original após erro no reagendamento:",
+            revertError,
+          );
+        }
         throw newVisitError;
+      }
+
+      // Fechar o vínculo rastreável: a visita original aponta para a nova por ID.
+      // (rescheduled_to continua preenchido com a data por compatibilidade.)
+      const { error: linkError } = await supabase
+        .from("scheduled_visits")
+        .update({ rescheduled_to_id: newVisit.id })
+        .eq("id", visitId);
+
+      if (linkError) {
+        // Não é crítico para o reagendamento em si; apenas registrar.
+        console.error("Erro ao vincular visita original à nova:", linkError);
       }
 
       // Atualizar estado local: marcar original como reagendada e adicionar nova

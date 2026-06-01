@@ -550,7 +550,9 @@ export type Database = {
           notes: string | null
           overdue_count: number | null
           reschedule_count: number | null
+          rescheduled_from_id: string | null
           rescheduled_to: string | null
+          rescheduled_to_id: string | null
           scheduled_by_manager_id: string | null
           scheduled_date: string
           scheduled_time: string | null
@@ -578,7 +580,9 @@ export type Database = {
           notes?: string | null
           overdue_count?: number | null
           reschedule_count?: number | null
+          rescheduled_from_id?: string | null
           rescheduled_to?: string | null
+          rescheduled_to_id?: string | null
           scheduled_by_manager_id?: string | null
           scheduled_date: string
           scheduled_time?: string | null
@@ -606,7 +610,9 @@ export type Database = {
           notes?: string | null
           overdue_count?: number | null
           reschedule_count?: number | null
+          rescheduled_from_id?: string | null
           rescheduled_to?: string | null
+          rescheduled_to_id?: string | null
           scheduled_by_manager_id?: string | null
           scheduled_date?: string
           scheduled_time?: string | null
@@ -620,6 +626,20 @@ export type Database = {
             columns: ["scheduled_by_manager_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_visits_rescheduled_from_id_fkey"
+            columns: ["rescheduled_from_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_visits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_visits_rescheduled_to_id_fkey"
+            columns: ["rescheduled_to_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_visits"
             referencedColumns: ["id"]
           },
         ]
