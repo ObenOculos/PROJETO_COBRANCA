@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { USER_TYPE_LABELS } from "../../config/profiles";
 import {
   Target,
   Clock,
@@ -184,7 +185,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-6 shadow-sm">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-text">Central de Cobrança Interna</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-text">
+              Central de {USER_TYPE_LABELS[user?.type as keyof typeof USER_TYPE_LABELS] ?? "Cobrança"}
+            </h1>
             <p className="text-sm text-gray-500 dark:text-dark-text-secondary">Gestão de carteira ativa e recuperação de crédito.</p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -911,7 +914,8 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     () => getVisitsByCollector(user?.id || ""),
     [user?.id],
   );
-  const isInternalCollector = user?.type === "internal_collector";
+  const isWalletCollector =
+    user?.type === "internal_collector" || user?.type === "third_party_collector";
 
   // Calcular métricas gamificadas
   const { metrics: periodMetrics, goals } = useMemo(
@@ -1110,7 +1114,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
     switch (activeTab) {
       case "overview":
-      if (isInternalCollector) {
+      if (isWalletCollector) {
         return renderInternalWallet();
       }
 
@@ -1510,7 +1514,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         );
 
       case "collections":
-        if (isInternalCollector) {
+        if (isWalletCollector) {
           return renderInternalWallet();
         }
 
@@ -1536,13 +1540,13 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         );
 
       case "route":
-        if (isInternalCollector) {
+        if (isWalletCollector) {
           return renderInternalWallet();
         }
         return <RouteMap clientGroups={getClientGroups(user?.id)} />;
 
       case "visits":
-        if (isInternalCollector) {
+        if (isWalletCollector) {
           return renderInternalWallet();
         }
         return <VisitScheduler />;
@@ -1574,7 +1578,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       {isDetailModalOpen && selectedClientForDetail && (
         <ClientDetailModal
           clientGroup={selectedClientForDetail}
-          userType={user?.type === "internal_collector" ? "internal_collector" : "collector"}
+          userType={user?.type || "collector"}
           onClose={() => { setIsDetailModalOpen(false); setSelectedClientForDetail(null); }}
         />
       )}

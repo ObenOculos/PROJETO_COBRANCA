@@ -14,6 +14,7 @@ import {
   CircleSlash,
   Building2,
   Zap,
+  Globe,
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
 import { Collection } from "../types";
@@ -77,6 +78,30 @@ const getSituacaoIndicator = (collections: Collection[]) => {
       icon: AlertCircle,
       label: "Aguardando Interno",
       className: "bg-orange-100 text-orange-800",
+    };
+  }
+
+  // Verificar se tem alguma parcela "Cobrança Terceirizada"
+  const hasCobrancaTerceirizada = collections.some(
+    (c) => c.situacao === "Cobrança Terceirizada",
+  );
+  if (hasCobrancaTerceirizada) {
+    return {
+      icon: Globe,
+      label: "Cobrança Terceirizada",
+      className: "bg-red-100 text-red-800",
+    };
+  }
+
+  // Verificar se tem alguma parcela "Aguardando Terceirizado"
+  const hasAguardandoTerceirizado = collections.some(
+    (c) => c.situacao === "Aguardando Terceirizado",
+  );
+  if (hasAguardandoTerceirizado) {
+    return {
+      icon: Zap,
+      label: "Aguardando Terceirizado",
+      className: "bg-rose-100 text-rose-700",
     };
   }
 
@@ -1051,6 +1076,8 @@ export const ClientAssignment = React.memo(() => {
                 <option value="Em tratamento">EM TRATAMENTO</option>
                 <option value="Aguardando Interno">AGUARDANDO INTERNO</option>
                 <option value="Cobrança Interna">COBRANÇA INTERNA</option>
+                <option value="Aguardando Terceirizado">AGUARDANDO TERCEIRIZADO</option>
+                <option value="Cobrança Terceirizada">COBRANÇA TERCEIRIZADA</option>
                 <option value="empty">VAZIO</option>
               </select>
             </div>

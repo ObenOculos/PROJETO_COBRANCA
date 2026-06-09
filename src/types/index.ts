@@ -1,5 +1,9 @@
 // User types
-export type UserType = "manager" | "collector" | "internal_collector";
+export type UserType =
+  | "manager"
+  | "collector"
+  | "internal_collector"
+  | "third_party_collector";
 
 export interface User {
   id: string;

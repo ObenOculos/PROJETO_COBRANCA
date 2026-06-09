@@ -504,6 +504,32 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     setNeighborhoodFilter("all");
   };
 
+  const applyQuickFilter = (type: string) => {
+    const todayStr = formatDateToYYYYMMDD(new Date());
+
+    switch (type) {
+      case "today":
+        setDateFromFilter(todayStr);
+        setDateToFilter(todayStr);
+        setStatusFilter("agendada");
+        setOverdueFilter("all");
+        break;
+      case "overdue":
+        setDateFromFilter("");
+        setDateToFilter(todayStr);
+        setOverdueFilter("overdue");
+        setStatusFilter("agendada");
+        break;
+      case "pending":
+        setStatusFilter("agendada");
+        setOverdueFilter("not_overdue");
+        break;
+      case "all":
+        clearAllFilters();
+        break;
+    }
+  };
+
   const handleVisitsPerPageChange = (
     e: React.ChangeEvent<HTMLSelectElement>,
   ) => {
@@ -742,53 +768,95 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
     return (
       <div className="space-y-4">
-        {/* Filtros — Estilo Moderno */}
+        {/* Filtros — Estilo Moderno e Responsivo */}
         <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-blue-600" />
-                <h3 className="text-sm font-black text-gray-900 dark:text-dark-text uppercase tracking-widest">
-                  Filtros e Ferramentas
-                </h3>
+                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <Filter className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-gray-900 dark:text-dark-text uppercase tracking-widest">
+                    Visitas
+                  </h3>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    {filteredVisitsFlat.length} Registros encontrados
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                {activeFiltersCount > 0 && (
-                  <button
-                    onClick={clearAllFilters}
-                    className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 dark:hover:text-dark-text transition-colors"
-                  >
-                    Limpar Tudo
-                  </button>
-                )}
                 <button
                   onClick={handleExportToExcel}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-green-100 dark:shadow-none"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-green-100 dark:shadow-none"
                 >
-                  <FileDown className="h-3.5 w-3.5" />
-                  Exportar CSV
+                  <FileDown className="h-4 w-4" />
+                  <span className="hidden sm:inline">Exportar CSV</span>
                 </button>
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`p-2.5 rounded-xl transition-all border ${
+                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl transition-all border ${
                     showFilters || activeFiltersCount > 0
                       ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 dark:shadow-none"
                       : "bg-gray-50 dark:bg-dark-bg text-gray-400 border-gray-100 dark:border-dark-border hover:bg-gray-100"
                   }`}
                 >
                   <Filter className="h-4 w-4" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+                    Filtros {activeFiltersCount > 0 && `(${activeFiltersCount})`}
+                  </span>
                 </button>
               </div>
             </div>
 
+            {/* Chips de Filtros Rápidos — Novo */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-1 px-1">
+              <button
+                onClick={() => applyQuickFilter("all")}
+                className={`shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${
+                  activeFiltersCount === 0
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white dark:bg-dark-bg text-gray-500 border-gray-100 dark:border-dark-border hover:border-blue-200"
+                }`}
+              >
+                Todas
+              </button>
+              <button
+                onClick={() => applyQuickFilter("today")}
+                className="shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border bg-white dark:bg-dark-bg text-gray-500 border-gray-100 dark:border-dark-border hover:border-blue-200 transition-all"
+              >
+                Hoje
+              </button>
+              <button
+                onClick={() => applyQuickFilter("overdue")}
+                className="shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border bg-white dark:bg-dark-bg text-gray-500 border-gray-100 dark:border-dark-border hover:border-blue-200 transition-all"
+              >
+                Atrasadas
+              </button>
+              <button
+                onClick={() => applyQuickFilter("pending")}
+                className="shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border bg-white dark:bg-dark-bg text-gray-500 border-gray-100 dark:border-dark-border hover:border-blue-200 transition-all"
+              >
+                Agendadas
+              </button>
+              {activeFiltersCount > 0 && (
+                <button
+                  onClick={clearAllFilters}
+                  className="shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-red-100 text-red-500 hover:bg-red-50 transition-all"
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+
             {/* Busca Principal */}
-            <div className="relative group">
+            <div className="relative group mt-2">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
               <input
                 type="text"
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                placeholder="BUSCAR POR CLIENTE, DOCUMENTO OU ENDEREÇO..."
+                placeholder="BUSCAR CLIENTE, DOCUMENTO OU ENDEREÇO..."
                 className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-bold dark:text-dark-text placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all uppercase"
               />
             </div>
@@ -796,13 +864,13 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             {/* Filtros Avançados Colapsáveis */}
             {showFilters && (
               <div className="mt-6 pt-6 border-t border-gray-50 dark:border-dark-border animate-in fade-in slide-in-from-top-4 duration-300">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Cobrador</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Cobrador</label>
                     <select
                       value={selectedCollector}
                       onChange={(e) => setSelectedCollector(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tighter"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-bold dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tight"
                     >
                       <option value="all">TODOS OS COBRADORES</option>
                       {collectors.map((collector) => (
@@ -813,12 +881,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     </select>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Status</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Status</label>
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tighter"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-bold dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tight"
                     >
                       <option value="all">TODOS OS STATUS</option>
                       <option value="agendada">AGENDADA</option>
@@ -829,12 +897,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     </select>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Atraso</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Atraso</label>
                     <select
                       value={overdueFilter}
                       onChange={(e) => setOverdueFilter(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tighter"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-bold dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tight"
                     >
                       <option value="all">TODAS</option>
                       <option value="overdue">SOMENTE ATRASADAS</option>
@@ -842,15 +910,15 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     </select>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Cidade</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Cidade</label>
                     <select
                       value={cityFilter}
                       onChange={(e) => {
                         setCityFilter(e.target.value);
                         setNeighborhoodFilter("all");
                       }}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tighter"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-bold dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tight"
                     >
                       <option value="all">TODAS AS CIDADES</option>
                       {availableCities.map((city) => (
@@ -861,12 +929,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     </select>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Bairro</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Bairro</label>
                     <select
                       value={neighborhoodFilter}
                       onChange={(e) => setNeighborhoodFilter(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tighter"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-bold dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tight"
                     >
                       <option value="all">TODOS OS BAIRROS</option>
                       {availableNeighborhoods.map((neighborhood) => (
@@ -877,32 +945,32 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     </select>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Início</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Início</label>
                     <input
                       type="date"
                       value={dateFromFilter}
                       onChange={(e) => setDateFromFilter(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-bold dark:text-dark-text focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Fim</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Fim</label>
                     <input
                       type="date"
                       value={dateToFilter}
                       onChange={(e) => setDateToFilter(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-bold dark:text-dark-text focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Registros</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Registros</label>
                     <select
                       value={visitsPerPage}
                       onChange={handleVisitsPerPageChange}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-black dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tighter"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-[11px] font-bold dark:text-dark-text focus:ring-2 focus:ring-blue-500 uppercase tracking-tight"
                     >
                       <option value={5}>5 POR PÁGINA</option>
                       <option value={10}>10 POR PÁGINA</option>
@@ -918,13 +986,13 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
         {/* Visit Cards */}
         {Object.keys(groupedVisits).length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
-            <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Nenhum cobrador encontrado
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-8 sm:p-12 text-center">
+            <Calendar className="h-10 w-10 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-black text-gray-900 dark:text-dark-text uppercase tracking-tight mb-2">
+              Nenhum registro encontrado
             </h3>
-            <p className="text-gray-600">
-              Cadastre cobradores para começar a agendar visitas
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+              Ajuste os filtros para encontrar o que procura
             </p>
           </div>
         ) : (
@@ -933,30 +1001,63 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               const collectorName = getCollectorName(collectorId);
               const isExpanded = expandedCollectors.has(collectorId);
 
+              // Calcular resumos de status para os "Color Dots"
+              const statusCounts = visits.reduce((acc, v) => {
+                const status = v.status;
+                acc[status] = (acc[status] || 0) + 1;
+                if (isVisitOverdue(v)) {
+                  acc.overdue = (acc.overdue || 0) + 1;
+                }
+                return acc;
+              }, {} as Record<string, number>);
+
               return (
                 <div
                   key={collectorId}
-                  className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden"
+                  className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden transition-all duration-300"
                 >
-                  {/* Header do cobrador — Estilo Refinado */}
+                  {/* Header do cobrador — Estilo Refinado e Responsivo */}
                   <div
-                    className="p-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors flex items-center justify-between"
+                    className="p-4 sm:p-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors flex items-center justify-between"
                     onClick={() => toggleCollectorExpansion(collectorId)}
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-900/30">
-                        <User className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-900/30 shrink-0">
+                        <User className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <div>
-                        <h3 className="text-sm font-black text-gray-900 dark:text-dark-text uppercase tracking-tight">
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-black text-gray-900 dark:text-dark-text uppercase tracking-tight truncate">
                           {collectorName}
                         </h3>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
-                          {visits.length} {visits.length === 1 ? "Visita Programada" : "Visitas Programadas"}
-                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest shrink-0">
+                            {visits.length} {visits.length === 1 ? "Visita" : "Visitas"}
+                          </p>
+                          {/* Color Dots Summary — Novo */}
+                          <div className="flex items-center gap-1.5 ml-1 border-l border-gray-100 dark:border-dark-border pl-2">
+                            {statusCounts.agendada > 0 && (
+                              <div className="flex items-center gap-1" title={`${statusCounts.agendada} Agendadas`}>
+                                <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
+                                <span className="text-[9px] font-black text-blue-500">{statusCounts.agendada}</span>
+                              </div>
+                            )}
+                            {statusCounts.realizada > 0 && (
+                              <div className="flex items-center gap-1" title={`${statusCounts.realizada} Realizadas`}>
+                                <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+                                <span className="text-[9px] font-black text-green-500">{statusCounts.realizada}</span>
+                              </div>
+                            )}
+                            {statusCounts.overdue > 0 && (
+                              <div className="flex items-center gap-1" title={`${statusCounts.overdue} Atrasadas`}>
+                                <div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></div>
+                                <span className="text-[9px] font-black text-red-500">{statusCounts.overdue}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4">
                       {user?.type === "manager" && (
                         <button
                           onClick={(e) => {
@@ -964,17 +1065,18 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                             setSelectedCollectorForScheduler(collectorId);
                             setShowSchedulerModal(true);
                           }}
-                          className="hidden sm:flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-blue-100 dark:shadow-none"
+                          className="flex items-center justify-center gap-2 p-2.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-lg shadow-blue-100 dark:shadow-none"
+                          title="Nova Visita"
                         >
-                          <Calendar className="h-3.5 w-3.5" />
-                          Nova Visita
+                          <Calendar className="h-4 w-4" />
+                          <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">Nova Visita</span>
                         </button>
                       )}
                       <div className="bg-gray-50 dark:bg-dark-bg p-2 rounded-xl border border-gray-100 dark:border-dark-border">
                         {isExpanded ? (
-                          <ChevronUp className="h-5 w-5 text-gray-400" />
+                          <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
                         ) : (
-                          <ChevronDown className="h-5 w-5 text-gray-400" />
+                          <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
                         )}
                       </div>
                     </div>
@@ -982,12 +1084,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
                   {/* Área Expandida — Tabela e Cards */}
                   {isExpanded && (
-                    <div className="px-6 pb-6 animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="px-4 sm:px-6 pb-6 animate-in fade-in slide-in-from-top-4 duration-300">
                       {visits.length === 0 ? (
                         <div className="text-center py-12 bg-gray-50 dark:bg-dark-bg rounded-2xl border border-dashed border-gray-200 dark:border-dark-border">
                           <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-3" />
                           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                            Nenhuma visita para este cobrador
+                            Nenhuma visita encontrada
                           </p>
                         </div>
                       ) : (
@@ -995,12 +1097,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                           const currentPage = collectorPages[collectorId] || 1;
                           const totalPages = Math.ceil(visits.length / visitsPerPage);
                           const paginatedVisits = visits.slice((currentPage - 1) * visitsPerPage, currentPage * visitsPerPage);
-                          const startItemCollector = (currentPage - 1) * visitsPerPage + 1;
-                          const endItemCollector = Math.min(currentPage * visitsPerPage, visits.length);
 
                           return (
                             <div className="space-y-6">
-                              {/* Visualização em Tabela (Desktop) */}
+                              {/* Visualização em Tabela (Desktop) — Refinada */}
                               <div className="hidden md:block overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                   <thead>
@@ -1019,64 +1119,63 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                         <tr key={visit.id} className={`group hover:bg-gray-50/50 dark:hover:bg-dark-bg/30 transition-colors ${isOverdue ? 'bg-red-50/20' : ''}`}>
                                           <td className="py-4 pr-4">
                                             <div className="flex flex-col">
-                                              <span className="text-xs font-black text-gray-900 dark:text-dark-text uppercase">{visit.clientName}</span>
-                                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{visit.clientDocument}</span>
+                                              <span className="text-sm font-black text-gray-900 dark:text-dark-text uppercase leading-tight">{visit.clientName}</span>
+                                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mt-0.5">{visit.clientDocument}</span>
                                             </div>
                                           </td>
                                           <td className="py-4 pr-4">
                                             <div className="flex flex-col">
-                                              <div className="flex items-center text-[11px] font-bold text-gray-700 dark:text-dark-text-secondary">
-                                                <Calendar className="h-3 w-3 mr-1.5 text-blue-500" />
+                                              <div className="flex items-center text-xs font-bold text-gray-700 dark:text-dark-text-secondary">
+                                                <Calendar className="h-3.5 w-3.5 mr-2 text-blue-500" />
                                                 {formatSafeDate(visit.scheduledDate)}
                                               </div>
                                               <div className="flex items-center text-[10px] font-bold text-gray-400 mt-1">
-                                                <Clock className="h-3 w-3 mr-1.5" />
+                                                <Clock className="h-3.5 w-3.5 mr-2" />
                                                 {visit.scheduledTime || "00:00"}
                                               </div>
                                             </div>
                                           </td>
                                           <td className="py-4 pr-4">
-                                            <div className="flex items-center text-[11px] font-bold text-gray-600 dark:text-dark-text-secondary max-w-[200px]">
-                                              <MapPin className="h-3.5 w-3.5 mr-1.5 text-gray-400 shrink-0" />
+                                            <div className="flex items-center text-xs font-bold text-gray-600 dark:text-dark-text-secondary max-w-[200px]">
+                                              <MapPin className="h-4 w-4 mr-2 text-gray-400 shrink-0" />
                                               <span className="truncate uppercase">
                                                 {visit.clientNeighborhood}, {visit.clientCity}
                                               </span>
                                             </div>
                                           </td>
                                           <td className="py-4 pr-4">
-                                            <div className="flex flex-col gap-2">
+                                            <div className="flex flex-col items-start gap-1.5">
                                               {getStatusBadge(visit.status)}
                                               {visit.totalPendingValue && (
-                                                <span className="text-[10px] font-black text-red-600 dark:text-red-400 tracking-tight">
+                                                <span className="text-xs font-black text-red-600 dark:text-red-400 tabular-nums">
                                                   {formatCurrency(visit.totalPendingValue)}
                                                 </span>
                                               )}
                                             </div>
                                           </td>
                                           <td className="py-4 text-right">
-                                            {visit.status === "cancelamento_solicitado" && (
+                                            {visit.status === "cancelamento_solicitado" ? (
                                               <div className="flex items-center justify-end gap-2">
                                                 <button
                                                   onClick={() => handleOpenApproval(visit, "approve")}
-                                                  className="p-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-100 transition-all"
+                                                  className="p-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-100 transition-all border border-green-100 dark:border-green-900/30"
                                                   title="Aprovar"
                                                 >
-                                                  <CheckCircle className="h-4 w-4" />
+                                                  <CheckCircle className="h-5 w-5" />
                                                 </button>
                                                 <button
                                                   onClick={() => handleOpenApproval(visit, "reject")}
-                                                  className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 transition-all"
+                                                  className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 transition-all border border-red-100 dark:border-red-900/30"
                                                   title="Rejeitar"
                                                 >
-                                                  <XCircle className="h-4 w-4" />
+                                                  <XCircle className="h-5 w-5" />
                                                 </button>
                                               </div>
-                                            )}
-                                            {isOverdue && (
-                                              <div className="inline-flex items-center px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[9px] font-black uppercase">
-                                                Atrasada
+                                            ) : isOverdue ? (
+                                              <div className="inline-flex items-center px-2 py-1 rounded-md bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[9px] font-black uppercase tracking-widest border border-red-200 dark:border-red-900/50">
+                                                Atrasada {getOverdueDays(visit.scheduledDate)} Dias
                                               </div>
-                                            )}
+                                            ) : null}
                                           </td>
                                         </tr>
                                       );
@@ -1085,56 +1184,63 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                 </table>
                               </div>
 
-                              {/* Visualização em Cards (Mobile) */}
+                              {/* Visualização em Cards (Mobile) — Refinada */}
                               <div className="md:hidden space-y-4">
                                 {paginatedVisits.map((visit) => {
                                   const isOverdue = isVisitOverdue(visit);
+                                  const statusColor = visit.status === 'realizada' ? 'border-green-500' : 
+                                                     visit.status === 'cancelada' ? 'border-gray-300' :
+                                                     isOverdue ? 'border-red-500' : 'border-blue-500';
+
                                   return (
-                                    <div key={visit.id} className={`p-4 rounded-2xl border transition-all ${isOverdue ? 'border-red-200 bg-red-50/30' : 'border-gray-100 dark:border-dark-border bg-gray-50/50 dark:bg-dark-bg/50'}`}>
-                                      <div className="flex justify-between items-start mb-3">
-                                        <div className="min-w-0">
-                                          <h4 className="text-xs font-black text-gray-900 dark:text-dark-text truncate uppercase tracking-tight">{visit.clientName}</h4>
-                                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mt-0.5">{visit.clientDocument}</p>
+                                    <div 
+                                      key={visit.id} 
+                                      className={`p-4 rounded-2xl border-l-4 border bg-white dark:bg-dark-bg-secondary shadow-sm transition-all ${statusColor} ${isOverdue ? 'bg-red-50/10 dark:bg-red-900/5' : ''}`}
+                                    >
+                                      <div className="flex justify-between items-start mb-4">
+                                        <div className="min-w-0 pr-2">
+                                          <h4 className="text-sm font-black text-gray-900 dark:text-dark-text uppercase leading-tight truncate">{visit.clientName}</h4>
+                                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mt-1">{visit.clientDocument}</p>
                                         </div>
-                                        <div className="shrink-0 text-right">
+                                        <div className="shrink-0 flex flex-col items-end gap-1.5">
                                           {visit.totalPendingValue && (
-                                            <p className="text-xs font-black text-red-600 dark:text-red-400">{formatCurrency(visit.totalPendingValue)}</p>
+                                            <p className="text-xs font-black text-red-600 dark:text-red-400 tabular-nums">{formatCurrency(visit.totalPendingValue)}</p>
                                           )}
                                           {getStatusBadge(visit.status)}
                                         </div>
                                       </div>
 
-                                      <div className="space-y-2 mb-4">
-                                        <div className="flex items-center text-[10px] font-bold text-gray-600 dark:text-dark-text-secondary">
-                                          <Calendar className="h-3 w-3 mr-2 text-blue-500" />
+                                      <div className="grid grid-cols-1 gap-3 mb-4">
+                                        <div className="flex items-center text-xs font-bold text-gray-700 dark:text-dark-text-secondary">
+                                          <Calendar className="h-3.5 w-3.5 mr-2.5 text-blue-500 shrink-0" />
                                           {formatSafeDate(visit.scheduledDate)} {visit.scheduledTime && `ÀS ${visit.scheduledTime}`}
                                         </div>
-                                        <div className="flex items-center text-[10px] font-bold text-gray-500 dark:text-dark-text-secondary">
-                                          <MapPin className="h-3 w-3 mr-2" />
+                                        <div className="flex items-center text-xs font-bold text-gray-500 dark:text-dark-text-secondary">
+                                          <MapPin className="h-3.5 w-3.5 mr-2.5 text-gray-400 shrink-0" />
                                           <span className="truncate uppercase">{visit.clientNeighborhood}, {visit.clientCity}</span>
                                         </div>
                                       </div>
 
                                       {visit.status === "cancelamento_solicitado" && (
-                                        <div className="flex gap-2 border-t border-gray-100 dark:border-dark-border pt-3 mt-3">
+                                        <div className="flex gap-2 border-t border-gray-100 dark:border-dark-border pt-4 mt-2">
                                           <button
                                             onClick={() => handleOpenApproval(visit, "approve")}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2 bg-green-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
+                                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-green-100 dark:shadow-none"
                                           >
-                                            <CheckCircle className="h-3.5 w-3.5" /> Aprovar
+                                            <CheckCircle className="h-4 w-4" /> Aprovar
                                           </button>
                                           <button
                                             onClick={() => handleOpenApproval(visit, "reject")}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
+                                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-red-100 dark:shadow-none"
                                           >
-                                            <XCircle className="h-3.5 w-3.5" /> Rejeitar
+                                            <XCircle className="h-4 w-4" /> Rejeitar
                                           </button>
                                         </div>
                                       )}
                                       
-                                      {isOverdue && (
-                                        <div className="mt-2 text-center py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[9px] font-black uppercase rounded-lg">
-                                          Visita Atrasada — {getOverdueDays(visit.scheduledDate)} Dias
+                                      {isOverdue && visit.status === 'agendada' && (
+                                        <div className="mt-2 text-center py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-red-100 dark:border-red-900/30">
+                                          Atrasada {getOverdueDays(visit.scheduledDate)} Dias
                                         </div>
                                       )}
                                     </div>
@@ -1142,16 +1248,16 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                 })}
                               </div>
 
-                              {/* Paginação — Estilo Dashboard */}
+                              {/* Paginação — Estilo Dashboard Refinado */}
                               {totalPages > 1 && (
-                                <div className="bg-gray-900 dark:bg-dark-bg-secondary mt-6 border border-gray-800 dark:border-dark-border px-6 py-4 rounded-2xl shadow-lg">
-                                  <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-                                    <div className="flex items-center gap-3">
-                                      <div className="bg-blue-600/20 text-blue-400 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border border-blue-600/30">
+                                <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border px-4 py-4 rounded-2xl shadow-sm mt-6">
+                                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                                    <div className="flex items-center gap-2">
+                                      <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-blue-100 dark:border-blue-900/30">
                                         Pág {currentPage} / {totalPages}
                                       </div>
                                       <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                                        Exibindo {startItemCollector}–{endItemCollector} de {visits.length}
+                                        Exibindo {Math.min((currentPage - 1) * visitsPerPage + 1, visits.length)}–{Math.min(currentPage * visitsPerPage, visits.length)} de {visits.length}
                                       </span>
                                     </div>
 
@@ -1159,7 +1265,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                       <button
                                         onClick={() => setCollectorPages(prev => ({ ...prev, [collectorId]: Math.max(1, currentPage - 1) }))}
                                         disabled={currentPage === 1}
-                                        className="p-2 bg-white/5 border border-white/10 rounded-xl text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                        className="p-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                                       >
                                         <ChevronLeft className="h-4 w-4" />
                                       </button>
@@ -1174,10 +1280,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                             <button
                                               key={pNum}
                                               onClick={() => setCollectorPages(prev => ({ ...prev, [collectorId]: pNum }))}
-                                              className={`w-9 h-9 flex items-center justify-center text-xs font-black rounded-xl transition-all ${
+                                              className={`w-9 h-9 flex items-center justify-center text-[10px] font-black rounded-xl transition-all border ${
                                                 pNum === currentPage
-                                                  ? "bg-blue-600 text-white shadow-lg"
-                                                  : "bg-white/5 text-gray-400 hover:text-white border border-white/5"
+                                                  ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 dark:shadow-none"
+                                                  : "bg-white dark:bg-dark-bg text-gray-400 border-gray-100 dark:border-dark-border hover:bg-gray-50"
                                               }`}
                                             >
                                               {pNum}
@@ -1188,7 +1294,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                       <button
                                         onClick={() => setCollectorPages(prev => ({ ...prev, [collectorId]: Math.min(totalPages, currentPage + 1) }))}
                                         disabled={currentPage === totalPages}
-                                        className="p-2 bg-white/5 border border-white/10 rounded-xl text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                        className="p-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                                       >
                                         <ChevronRight className="h-4 w-4" />
                                       </button>
@@ -1297,38 +1403,38 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             </table>
           </div>
 
-          {/* Visualização em Cards (Mobile) */}
+          {/* Visualização em Cards (Mobile) — Refinada */}
           <div className="md:hidden space-y-4">
             {pendingRequests.map((request) => (
               <div key={request.id} className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30 overflow-hidden">
-                <div className="p-5">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h4 className="text-xs font-black text-gray-900 dark:text-dark-text uppercase tracking-tight">{request.clientName}</h4>
-                      <p className="text-[10px] font-bold text-blue-500 uppercase mt-0.5">{getCollectorName(request.collectorId)}</p>
+                <div className="p-4 sm:p-5">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="min-w-0 pr-2">
+                      <h4 className="text-sm font-black text-gray-900 dark:text-dark-text uppercase leading-tight truncate">{request.clientName}</h4>
+                      <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1">{getCollectorName(request.collectorId)}</p>
                     </div>
-                    <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] font-black uppercase">
+                    <span className="shrink-0 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] font-black uppercase tracking-widest border border-amber-200 dark:border-amber-900/50">
                       Pendente
                     </span>
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-dark-bg p-3 rounded-xl mb-4 space-y-2">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Motivo do Cancelamento:</p>
-                    <p className="text-[11px] font-medium text-gray-700 dark:text-dark-text-secondary italic">"{request.cancellationRequestReason}"</p>
+                  <div className="bg-gray-50 dark:bg-dark-bg p-3.5 rounded-xl mb-4 border border-gray-100 dark:border-dark-border">
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1.5">Motivo do Cancelamento</p>
+                    <p className="text-xs font-medium text-gray-700 dark:text-dark-text-secondary italic leading-relaxed">"{request.cancellationRequestReason || "Não informado"}"</p>
                   </div>
 
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleOpenApproval(request, "approve")}
-                      className="flex-1 py-2 bg-green-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
+                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-green-100 dark:shadow-none"
                     >
-                      Aprovar
+                      <CheckCircle className="h-4 w-4" /> Aprovar
                     </button>
                     <button
                       onClick={() => handleOpenApproval(request, "reject")}
-                      className="flex-1 py-2 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
+                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-red-100 dark:shadow-none"
                     >
-                      Rejeitar
+                      <XCircle className="h-4 w-4" /> Rejeitar
                     </button>
                   </div>
                 </div>
@@ -1413,11 +1519,11 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             )}
           </div>
 
-          {/* Navegação por Tabs — Estilo Unificado */}
-          <div className="mt-8 grid grid-cols-1 sm:flex gap-2">
+          {/* Navegação por Tabs — Estilo Unificado e Scrollable Mobile */}
+          <div className="mt-8 flex items-center gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-2 px-2">
             <button
               onClick={() => setActiveTab("visits")}
-              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shrink-0 ${
                 activeTab === "visits"
                   ? "bg-blue-600 text-white shadow-lg shadow-blue-100 dark:shadow-none"
                   : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
@@ -1428,7 +1534,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             </button>
             <button
               onClick={() => setActiveTab("cancellations")}
-              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all relative ${
+              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shrink-0 relative ${
                 activeTab === "cancellations"
                   ? "bg-blue-600 text-white shadow-lg shadow-blue-100 dark:shadow-none"
                   : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
@@ -1446,7 +1552,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             {user?.type === "manager" && (
               <button
                 onClick={() => setActiveTab("scheduledDates")}
-                className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shrink-0 ${
                   activeTab === "scheduledDates"
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-100 dark:shadow-none"
                     : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
@@ -1459,8 +1565,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           </div>
         </div>
 
-        {/* Card Principal — Taxa e Resumo */}
-        <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white rounded-2xl shadow-xl p-8 relative overflow-hidden group">
+        {/* Card Principal — Taxa e Resumo — Refinado para Responsividade */}
+        <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white rounded-2xl shadow-xl p-6 sm:p-8 relative overflow-hidden group">
           <div className="relative z-10">
             <div className="flex items-start justify-between">
               <div>
@@ -1468,27 +1574,27 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   Fluxo de Visitas Agendadas
                 </p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-5xl font-black tracking-tighter">
+                  <span className="text-4xl sm:text-5xl font-black tracking-tighter">
                     {overviewStats.agendadas}
                   </span>
-                  <div className={`flex items-center text-xs font-bold px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-md ${overviewStats.atrasadas > 0 ? 'text-red-200' : 'text-green-300'}`}>
+                  <div className={`flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md ${overviewStats.atrasadas > 0 ? 'text-red-200' : 'text-green-300'}`}>
                     <Zap className="w-3 h-3 mr-1 fill-current" />
-                    {overviewStats.atrasadas > 0 ? `${overviewStats.atrasadas} Atrasadas` : 'Em Dia'}
+                    {overviewStats.atrasadas > 0 ? `${overviewStats.atrasadas} ATRASADAS` : 'EM DIA'}
                   </div>
                 </div>
               </div>
-              <Calendar className="h-16 w-16 text-white opacity-20 group-hover:opacity-30 transition-opacity" />
+              <Calendar className="hidden sm:block h-16 w-16 text-white opacity-20 group-hover:opacity-30 transition-opacity" />
             </div>
 
             {/* Métricas secundárias */}
-            <div className="grid grid-cols-3 gap-8 mt-10 pt-8 border-t border-white/10">
+            <div className="grid grid-cols-3 gap-4 sm:gap-8 mt-8 pt-8 border-t border-white/10">
               <div>
                 <p className="text-blue-200 text-[9px] font-bold uppercase tracking-wider mb-1">Total Geral</p>
-                <p className="text-2xl font-black">{overviewStats.totalVisits}</p>
+                <p className="text-xl sm:text-2xl font-black">{overviewStats.totalVisits}</p>
               </div>
               <div>
                 <p className="text-blue-200 text-[9px] font-bold uppercase tracking-wider mb-1">Realizadas</p>
-                <p className="text-2xl font-black text-green-300">
+                <p className="text-xl sm:text-2xl font-black text-green-300">
                   {overviewStats.realizadas}
                 </p>
               </div>

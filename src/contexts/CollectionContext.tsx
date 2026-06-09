@@ -24,6 +24,7 @@ import {
   AllowedVisitDate,
 } from "../types";
 import { supabase } from "../lib/supabase";
+import { PRIMARY_SITUACAO, situacoesOutsideProfile } from "../config/profiles";
 import { useAuth } from "./AuthContext";
 import { useLoading } from "./LoadingContext";
 import { useOffline } from "../hooks/useOffline";
@@ -1573,8 +1574,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         let filteredCollections = collections;
 
         if (collectorId) {
-          const user = users.find((u) => u.id === collectorId);
-          const isInternal = user?.type === "internal_collector";
+          const profileUser = users.find((u) => u.id === collectorId);
+          const profileType = profileUser?.type;
           const assignedStores: string[] = [];
 
           filteredCollections = collections.filter((c) => {
@@ -1582,18 +1583,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               c.user_id === collectorId ||
               assignedStores.includes(c.nome_da_loja || "");
 
-            // Se for cobrador interno, vê o que está atribuído a ele
-            if (isInternal) {
+            // Non-external collectors see only clients assigned directly to them
+            if (profileType !== "collector") {
               return isAssigned;
             }
 
-            // Se for cobrador externo, vê o que está atribuído a ele, 
-            // EXCETO se a situação indicar que foi transferido para o interno
-            const isInternalStatus = 
-              c.situacao === "Cobrança Interna" || 
-              c.situacao === "Aguardando Interno";
+            // External collectors don't see clients that moved to a later phase
+            const movedToLaterPhase =
+              c.situacao != null &&
+              (situacoesOutsideProfile("collector") as string[]).includes(c.situacao);
 
-            return isAssigned && !isInternalStatus;
+            return isAssigned && !movedToLaterPhase;
           });
         }
 
@@ -1898,8 +1898,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   );
 
   const getCollectorCollections = (collectorId: string): Collection[] => {
-    const user = users.find((u) => u.id === collectorId);
-    const isInternal = user?.type === "internal_collector";
+    const profileUser = users.find((u) => u.id === collectorId);
+    const profileType = profileUser?.type;
     const assignedStores: string[] = [];
 
     return collections.filter((c) => {
@@ -1907,13 +1907,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         c.user_id === collectorId ||
         assignedStores.includes(c.nome_da_loja || "");
 
-      if (isInternal) return isAssigned;
+      if (profileType !== "collector") return isAssigned;
 
-      const isInternalStatus =
-        c.situacao === "Cobrança Interna" ||
-        c.situacao === "Aguardando Interno";
+      const movedToLaterPhase =
+        c.situacao != null &&
+        (situacoesOutsideProfile("collector") as string[]).includes(c.situacao);
 
-      return isAssigned && !isInternalStatus;
+      return isAssigned && !movedToLaterPhase;
     });
   };
 
@@ -1957,6 +1957,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       console.log(
         `Iniciando atribuição de ${clientIdentifiers.length} clientes ao cobrador ${collectorId}`,
       );
+
+      const targetUser = users.find((u) => u.id === collectorId);
+      const targetType = targetUser?.type;
+      const situacaoUpdate =
+        targetType === "internal_collector" || targetType === "third_party_collector"
+          ? PRIMARY_SITUACAO[targetType]
+          : undefined;
 
       const batchSize = 200;
       let totalParcelasAtualizadas = 0;
@@ -2011,9 +2018,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
         console.log(`Encontradas ${parcelas.length} parcelas para este lote`);
 
+        const updatePayload: { user_id: string; situacao?: string } = {
+          user_id: collectorId,
+          ...(situacaoUpdate !== undefined && { situacao: situacaoUpdate }),
+        };
+
         const { error: updateError } = await supabase
           .from("BANCO_DADOS")
-          .update({ user_id: collectorId })
+          .update(updatePayload)
           .in(
             "id_parcela",
             parcelas.map((p) => p.id_parcela),

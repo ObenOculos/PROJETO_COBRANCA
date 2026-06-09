@@ -179,12 +179,18 @@ const UserManagement: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.type === "manager" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800"}`}
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        user.type === "manager"
+                          ? "bg-purple-100 text-purple-800"
+                          : user.type === "third_party_collector"
+                          ? "bg-red-100 text-red-800"
+                          : user.type === "internal_collector"
+                          ? "bg-orange-100 text-orange-800"
+                          : "bg-blue-100 text-blue-800"
+                      }`}
                     >
                       {user.type === "manager" ? (
                         <Shield className="h-3 w-3 mr-1" />
-                      ) : user.type === "internal_collector" ? (
-                        <User className="h-3 w-3 mr-1" />
                       ) : (
                         <User className="h-3 w-3 mr-1" />
                       )}
@@ -192,6 +198,8 @@ const UserManagement: React.FC = () => {
                         ? "Gerente"
                         : user.type === "internal_collector"
                         ? "Cobrança Interna"
+                        : user.type === "third_party_collector"
+                        ? "Cobrança Terceirizada"
                         : "Cobrador"}
                     </span>
                   </td>
@@ -339,6 +347,7 @@ const UserManagement: React.FC = () => {
                 >
                   <option value="collector">Cobrador</option>
                   <option value="internal_collector">Cobrança Interna</option>
+                  <option value="third_party_collector">Cobrança Terceirizada</option>
                   <option value="manager">Gerente</option>
                 </select>
               </div>
