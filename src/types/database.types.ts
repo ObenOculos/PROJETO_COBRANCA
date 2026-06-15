@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       allowed_visit_dates: {
@@ -543,6 +568,7 @@ export type Database = {
           client_document: string
           client_name: string
           client_neighborhood: string | null
+          client_number: string | null
           collector_id: string
           created_at: string | null
           data_visita_realizada: string | null
@@ -573,6 +599,7 @@ export type Database = {
           client_document: string
           client_name: string
           client_neighborhood?: string | null
+          client_number?: string | null
           collector_id: string
           created_at?: string | null
           data_visita_realizada?: string | null
@@ -603,6 +630,7 @@ export type Database = {
           client_document?: string
           client_name?: string
           client_neighborhood?: string | null
+          client_number?: string | null
           collector_id?: string
           created_at?: string | null
           data_visita_realizada?: string | null
@@ -622,13 +650,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "scheduled_visits_scheduled_by_manager_id_fkey"
-            columns: ["scheduled_by_manager_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "scheduled_visits_rescheduled_from_id_fkey"
             columns: ["rescheduled_from_id"]
             isOneToOne: false
@@ -640,6 +661,13 @@ export type Database = {
             columns: ["rescheduled_to_id"]
             isOneToOne: false
             referencedRelation: "scheduled_visits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_visits_scheduled_by_manager_id_fkey"
+            columns: ["scheduled_by_manager_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -941,6 +969,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
