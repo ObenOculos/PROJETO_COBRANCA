@@ -409,6 +409,42 @@ export type Database = {
         }
         Relationships: []
       }
+      collection_attempts: {
+        Row: {
+          collection_id: string
+          created_at: string
+          date: string
+          id: string
+          next_action: string | null
+          next_action_date: string | null
+          notes: string | null
+          result: string
+          type: string
+        }
+        Insert: {
+          collection_id: string
+          created_at?: string
+          date: string
+          id?: string
+          next_action?: string | null
+          next_action_date?: string | null
+          notes?: string | null
+          result: string
+          type: string
+        }
+        Update: {
+          collection_id?: string
+          created_at?: string
+          date?: string
+          id?: string
+          next_action?: string | null
+          next_action_date?: string | null
+          notes?: string | null
+          result?: string
+          type?: string
+        }
+        Relationships: []
+      }
       enderecos_historico: {
         Row: {
           bairro: string | null

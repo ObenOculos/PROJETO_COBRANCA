@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseConfig } from "./supabase-config";
+import { Database } from "../types/database.types";
 
 // Configuração segura do Supabase
 const config = getSupabaseConfig();
@@ -11,7 +12,7 @@ try {
   throw new Error(`Formato inválido da URL do Supabase: "${config.url}"`);
 }
 
-export const supabase = createClient(config.url, config.anonKey, {
+export const supabase = createClient<Database>(config.url, config.anonKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
