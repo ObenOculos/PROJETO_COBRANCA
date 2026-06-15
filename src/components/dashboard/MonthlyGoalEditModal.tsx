@@ -186,7 +186,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
 
     let error = null;
 
-    if (currentGoal) {
+    if (currentGoal?.id) {
       const { error: updateError } = await supabase
         .from("monthly_goals")
         .update(goalData)

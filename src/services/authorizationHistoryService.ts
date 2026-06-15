@@ -1,5 +1,14 @@
 import { supabase } from "../lib/supabase";
 import { AuthorizationHistory } from "../types";
+import { Database } from "../types/database.types";
+
+type AuthRow = Database["public"]["Tables"]["authorization_history"]["Row"];
+
+// A linha do banco e a entidade de dominio diferem em null-vs-undefined e na
+// precisao do status (string no banco vs uniao no dominio). A conversao acontece
+// aqui, na fronteira de acesso a dados.
+const toEntity = (row: AuthRow): AuthorizationHistory =>
+  row as unknown as AuthorizationHistory;
 
 export class AuthorizationHistoryService {
   /**
@@ -36,7 +45,7 @@ export class AuthorizationHistoryService {
       );
     }
 
-    return result;
+    return toEntity(result);
   }
 
   /**
@@ -54,7 +63,7 @@ export class AuthorizationHistoryService {
       throw new Error(`Failed to get pending requests: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []).map(toEntity);
   }
 
   /**
@@ -77,7 +86,7 @@ export class AuthorizationHistoryService {
       );
     }
 
-    return data || [];
+    return (data || []).map(toEntity);
   }
 
   /**
@@ -94,7 +103,7 @@ export class AuthorizationHistoryService {
       throw new Error(`Failed to get expired requests: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []).map(toEntity);
   }
 
   /**
@@ -122,7 +131,7 @@ export class AuthorizationHistoryService {
       throw new Error(`Failed to approve request: ${error.message}`);
     }
 
-    return result;
+    return toEntity(result);
   }
 
   /**
@@ -152,7 +161,7 @@ export class AuthorizationHistoryService {
       throw new Error(`Failed to reject request: ${error.message}`);
     }
 
-    return result;
+    return toEntity(result);
   }
 
   /**
@@ -274,7 +283,7 @@ export class AuthorizationHistoryService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      data: data || [],
+      data: (data || []).map(toEntity),
       total,
       page,
       totalPages,
@@ -339,7 +348,7 @@ export class AuthorizationHistoryService {
       throw new Error(`Failed to get authorization by token: ${error.message}`);
     }
 
-    return data;
+    return data ? toEntity(data) : null;
   }
 
   /**

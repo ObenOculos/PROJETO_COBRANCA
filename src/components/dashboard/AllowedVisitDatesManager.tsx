@@ -143,7 +143,9 @@ const AllowedVisitDatesManager: React.FC = () => {
           console.error("Erro ao buscar datas permitidas:", error);
           setError(error.message);
         } else {
-          setAllowedDates(data || []);
+          // allowed_date e nullable no banco mas sempre preenchido (dia 1-31);
+          // o dominio o trata como number.
+          setAllowedDates((data || []) as AllowedVisitDate[]);
         }
       } catch (err) {
         console.error("Erro ao buscar datas permitidas:", err);
@@ -380,7 +382,7 @@ const AllowedVisitDatesManager: React.FC = () => {
       if (error) {
         setError(error.message);
       } else if (data) {
-        setAllowedDates([...allowedDates, ...data]);
+        setAllowedDates([...allowedDates, ...(data as AllowedVisitDate[])]);
         // Invalidar o cache para forçar refresh em outras partes da aplicação
         dataCache.invalidatePrefix("allowed-visit-dates");
         // Limpar seleção após adicionar

@@ -327,7 +327,7 @@ export const useOffline = () => {
       p_discount_amount: paymentData.discountAmount || 0,
       p_payment_method: paymentData.paymentMethod || "default",
       p_notes: paymentData.notes || "",
-      p_sale_number: paymentData.saleNumber,
+      p_sale_number: paymentData.saleNumber ?? undefined,
     });
 
     if (error) {

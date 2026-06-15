@@ -28,6 +28,11 @@ const LogContactModal: React.FC<LogContactModalProps> = ({ client, onClose, onSu
       return;
     }
 
+    if (!user?.id) {
+      setError("Usuário não autenticado.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -38,7 +43,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({ client, onClose, onSu
 
       const { error: insertError } = await supabase.from("scheduled_visits").insert([
         {
-          collector_id: user?.id,
+          collector_id: user.id,
           client_document: client.document,
           client_name: client.client,
           scheduled_date: new Date().toISOString().split("T")[0],

@@ -14,6 +14,9 @@ import {
   Download,
 } from "lucide-react"; // Importar ícones
 import AddTituloModal from "./AddTituloModal";
+import { Database } from "../../types/database.types";
+
+type BancoDadosInsert = Database["public"]["Tables"]["BANCO_DADOS"]["Insert"];
 
 interface FileData {
   [key: string]: string;
@@ -510,7 +513,7 @@ const DatabaseUpload: React.FC = () => {
       const { data: chunkRecords, error: chunkError } = await supabase
         .from("BANCO_DADOS")
         .select("id_parcela")
-        .in("id_parcela", chunk);
+        .in("id_parcela", chunk.map(Number));
 
       if (chunkError) {
         console.error("❌ Erro ao verificar um chunk de títulos:", chunkError);
@@ -623,7 +626,7 @@ const DatabaseUpload: React.FC = () => {
           const { error } = await supabase
             .from("BANCO_DADOS")
             .update(updateObj)
-            .eq("id_parcela", idParcela);
+            .eq("id_parcela", Number(idParcela));
 
           if (error) {
             return { id_parcela: idParcela, status: "error", error: error.message };
@@ -684,7 +687,7 @@ const DatabaseUpload: React.FC = () => {
         const { data: chunkRecords, error: chunkError } = await supabase
           .from("BANCO_DADOS")
           .select("id_parcela")
-          .in("id_parcela", chunk);
+          .in("id_parcela", chunk.map(Number));
 
         if (chunkError) {
           console.error("❌ Erro ao verificar duplicatas:", chunkError);
@@ -766,7 +769,7 @@ const DatabaseUpload: React.FC = () => {
 
       const { error } = await supabase
         .from("BANCO_DADOS")
-        .insert(processedChunk);
+        .insert(processedChunk as BancoDadosInsert[]);
 
       if (error) {
         console.error("❌ Erro ao inserir dados:", error);
