@@ -38,7 +38,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Configurações de inatividade
   const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutos
-  let inactivityTimer: NodeJS.Timeout;
+  let inactivityTimer: ReturnType<typeof setTimeout>;
 
   // Função para resetar o timer de inatividade
   const resetInactivityTimer = () => {
