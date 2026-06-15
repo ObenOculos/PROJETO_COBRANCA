@@ -238,14 +238,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         return;
       }
 
-      const transformedDates: AllowedVisitDate[] = data.map((date) => ({
+      const transformedDates = data.map((date) => ({
         id: date.id,
         city: date.city,
         neighborhood: date.neighborhood,
         allowed_date: date.allowed_date,
         created_at: date.created_at,
         updated_at: date.updated_at,
-      }));
+      })) as AllowedVisitDate[];
 
       setAllowedVisitDates(transformedDates);
 
@@ -276,7 +276,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         return;
       }
 
-      setActiveAddressHistory(data || []);
+      setActiveAddressHistory((data || []) as typeof activeAddressHistory);
     } catch (err) {
       console.error("Erro ao carregar histórico de endereços:", err);
     }
@@ -1988,7 +1988,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           const { data, error } = await supabase
             .from("BANCO_DADOS")
             .select("id_parcela, user_id, documento, cliente, nome_da_loja")
-            .in("documento", documentBatch);
+            .in("documento", documentBatch as string[]);
           if (error) fetchError = error;
           if (data) parcelas = parcelas.concat(data);
         }
@@ -1997,7 +1997,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           const { data, error } = await supabase
             .from("BANCO_DADOS")
             .select("id_parcela, user_id, documento, cliente, nome_da_loja")
-            .in("cliente", clientNameBatch);
+            .in("cliente", clientNameBatch as string[]);
           if (error) fetchError = error;
           if (data) parcelas = parcelas.concat(data);
         }
@@ -2115,7 +2115,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           const { data, error } = await supabase
             .from("BANCO_DADOS")
             .select("id_parcela")
-            .in("documento", documentBatch);
+            .in("documento", documentBatch as string[]);
           if (error) fetchError = error;
           if (data) parcelas = parcelas.concat(data);
         }
@@ -2124,7 +2124,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           const { data, error } = await supabase
             .from("BANCO_DADOS")
             .select("id_parcela")
-            .in("cliente", clientNameBatch);
+            .in("cliente", clientNameBatch as string[]);
           if (error) fetchError = error;
           if (data) parcelas = parcelas.concat(data);
         }
@@ -2207,8 +2207,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }
 
       // Converter para o formato esperado pela aplicação
-      const convertedPayments: SalePayment[] = (payments || []).map(
-        (payment) => ({
+      const convertedPayments = (payments || []).map(
+        (payment) =>
+          ({
           id: payment.id,
           saleNumber: payment.sale_number,
           clientDocument: payment.client_document,
@@ -2221,7 +2222,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           createdAt: payment.created_at,
           distribution_details: payment.distribution_details || [], // Corrected casing
           discountAmount: payment.discount_amount, // Added this line
-        }),
+        }) as unknown as SalePayment,
       );
 
       setSalePayments(convertedPayments);
@@ -2276,7 +2277,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         p_discount_amount: payment.discountAmount || 0,
         p_payment_method: payment.paymentMethod || "default",
         p_notes: payment.notes || "",
-        p_sale_number: payment.saleNumber,
+        p_sale_number: payment.saleNumber ?? undefined,
       });
 
       if (error) {
@@ -2341,7 +2342,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         p_notes: notes || "",
         p_sale_number:
           saleNumber === null
-            ? null
+            ? undefined
             : typeof saleNumber === "number"
               ? saleNumber
               : 0,
@@ -2934,7 +2935,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         cancellationRejectionReason: data.cancellation_rejection_reason,
         rescheduleCount: data.reschedule_count, // Include rescheduleCount
         rescheduledTo: data.rescheduled_to,
-      };
+        // Fronteira DB->dominio: colunas nullable mapeadas para campos opcionais
+      } as ScheduledVisit;
 
       // Update local state
       setScheduledVisits((prev) => [...prev, newVisit]);
@@ -3863,7 +3865,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           clientCity: newVisit.client_city,
           totalPendingValue: newVisit.total_pending_value,
           overdueCount: newVisit.overdue_count,
-        });
+        } as ScheduledVisit);
         console.log("Estado local atualizado. Visitas:", updated.length);
         return updated;
       });
