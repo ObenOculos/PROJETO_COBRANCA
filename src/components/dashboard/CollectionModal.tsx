@@ -12,7 +12,7 @@ import {
   History,
   Info,
 } from "lucide-react";
-import { Collection, UserType } from "../../types";
+import { Collection, UserType, CollectionAttempt } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import {
   formatCurrency,
@@ -28,6 +28,23 @@ interface CollectionModalProps {
   userType: UserType;
   onClose: () => void;
 }
+
+const ATTEMPT_TYPE_LABELS: Record<CollectionAttempt["type"], string> = {
+  call: "Ligação",
+  visit: "Visita",
+  email: "E-mail",
+  whatsapp: "WhatsApp",
+};
+
+const ATTEMPT_RESULT_LABELS: Record<CollectionAttempt["result"], string> = {
+  no_answer: "Não atendeu",
+  busy: "Ocupado",
+  not_found: "Não encontrado",
+  promise: "Promessa de pagamento",
+  refusal: "Recusa",
+  partial_payment: "Pagamento parcial",
+  full_payment: "Pagamento integral",
+};
 
 const CollectionModal: React.FC<CollectionModalProps> = ({
   collection,
@@ -64,6 +81,43 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
     };
     fetchAddress();
   }, [collection.documento]);
+
+  const [attempts, setAttempts] = useState<CollectionAttempt[]>([]);
+  const [attemptsLoading, setAttemptsLoading] = useState(true);
+
+  const fetchAttempts = async () => {
+    setAttemptsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("collection_attempts")
+        .select("*")
+        .eq("collection_id", collection.id_parcela.toString())
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      setAttempts(
+        (data || []).map((row) => ({
+          id: row.id,
+          date: row.date,
+          type: row.type as CollectionAttempt["type"],
+          result: row.result as CollectionAttempt["result"],
+          notes: row.notes ?? undefined,
+          nextAction: row.next_action ?? undefined,
+          nextActionDate: row.next_action_date ?? undefined,
+        })),
+      );
+    } catch (err) {
+      console.error("Erro ao buscar tentativas de cobrança:", err);
+    } finally {
+      setAttemptsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttempts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collection.id_parcela]);
 
   const [newStatus, setNewStatus] = useState(collection.status || "");
   const [newAttempt, setNewAttempt] = useState<{
@@ -110,6 +164,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
       ...newAttempt,
       date: new Date().toISOString().split("T")[0],
     });
+    await fetchAttempts();
     setNewAttempt({
       type: "call",
       result: "no_answer",
@@ -347,14 +402,64 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
             )}
 
             {activeTab === "attempts" && (
-              <div className="space-y-6 min-h-[300px] flex flex-col items-center justify-center text-center p-8 bg-gray-50/50 dark:bg-dark-bg/30 rounded-2xl border-2 border-dashed border-gray-100 dark:border-dark-border">
-                <div className="p-4 bg-white dark:bg-dark-bg rounded-full shadow-sm">
-                  <ClipboardList className="w-8 h-8 text-gray-300" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-gray-800 dark:text-dark-text uppercase tracking-wider">Sem Tentativas</h3>
-                  <p className="text-xs text-gray-400 mt-2 max-w-[200px]">Registre novas interações através da aba de Ações</p>
-                </div>
+              <div className="space-y-4 min-h-[300px]">
+                {attemptsLoading ? (
+                  <div className="flex items-center justify-center text-center p-8 min-h-[300px]">
+                    <p className="text-xs text-gray-400">
+                      Carregando tentativas...
+                    </p>
+                  </div>
+                ) : attempts.length === 0 ? (
+                  <div className="space-y-6 min-h-[300px] flex flex-col items-center justify-center text-center p-8 bg-gray-50/50 dark:bg-dark-bg/30 rounded-2xl border-2 border-dashed border-gray-100 dark:border-dark-border">
+                    <div className="p-4 bg-white dark:bg-dark-bg rounded-full shadow-sm">
+                      <ClipboardList className="w-8 h-8 text-gray-300" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-800 dark:text-dark-text uppercase tracking-wider">
+                        Sem Tentativas
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-2 max-w-[200px]">
+                        Registre novas interações através da aba de Ações
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <ul className="space-y-3">
+                    {attempts.map((attempt) => (
+                      <li
+                        key={attempt.id}
+                        className="p-4 border border-gray-100 dark:border-dark-border rounded-2xl bg-white dark:bg-dark-bg shadow-sm"
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-800 dark:text-dark-text">
+                            <History className="w-4 h-4 text-blue-500" />
+                            {ATTEMPT_TYPE_LABELS[attempt.type] ?? attempt.type}
+                          </span>
+                          <span className="text-[10px] text-gray-400">
+                            {formatDate(attempt.date)}
+                          </span>
+                        </div>
+                        <p className="text-xs font-semibold text-gray-600 dark:text-dark-text-secondary mb-1">
+                          {ATTEMPT_RESULT_LABELS[attempt.result] ??
+                            attempt.result}
+                        </p>
+                        {attempt.notes && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap">
+                            {attempt.notes}
+                          </p>
+                        )}
+                        {attempt.nextAction && (
+                          <p className="text-[11px] text-gray-400 mt-2">
+                            Próxima ação: {attempt.nextAction}
+                            {attempt.nextActionDate
+                              ? ` (${formatDate(attempt.nextActionDate)})`
+                              : ""}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 
