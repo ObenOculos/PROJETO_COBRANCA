@@ -179,6 +179,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             scheduled_by_manager_id: visit.scheduled_by_manager_id, // Add this line
             rescheduleCount: visit.reschedule_count,
             rescheduledTo: visit.rescheduled_to,
+            rescheduledFromId: visit.rescheduled_from_id,
+            rescheduledToId: visit.rescheduled_to_id,
           }),
         );
 
@@ -640,10 +642,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         email: row.email,
         user_id: row.user_id,
         situacao: row.situacao,
-        data_visita_agendada: row.data_visita_agendada,
-        data_visita_realizada: row.data_visita_realizada,
-        data_recebimento: row.data_recebimento,
-        updated_at: row.updated_at,
       }));
 
       setCollections(transformedData);

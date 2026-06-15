@@ -97,6 +97,8 @@ export interface ScheduledVisit {
   rescheduleCount?: number;
   scheduled_by_manager_id?: string; // Added for manager scheduling
   rescheduledTo?: string; // Data para onde foi reagendada (YYYY-MM-DD)
+  rescheduledFromId?: string; // ID da visita de origem (quando esta foi gerada por reagendamento)
+  rescheduledToId?: string; // ID da nova visita gerada ao reagendar esta
 }
 
 export interface AllowedVisitDate {
@@ -154,11 +156,6 @@ export interface Collection {
   email: string | null;
   user_id: string | null;
   situacao: string | null;
-  // Visit tracking properties
-  data_visita_agendada: string | null;
-  data_visita_realizada: string | null;
-  data_recebimento: string | null;
-  updated_at: string | null;
 }
 
 export interface CollectionAttempt {
