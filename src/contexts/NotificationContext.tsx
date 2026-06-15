@@ -68,7 +68,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       return new Set();
     }
   });
-  const { collections, salePayments } = useCollection();
+  const { collections, salePayments, scheduledVisits } = useCollection();
   const { user } = useAuth();
 
   // Salvar notificações dispensadas no localStorage sempre que mudarem
@@ -85,7 +85,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
   // Generate notifications based on system data with debouncing
   useEffect(() => {
-    if (!collections || !user || !salePayments) return;
+    if (!collections || !user || !salePayments || !scheduledVisits) return;
 
     // Debounce notifications generation
     const timeoutId = setTimeout(() => {
@@ -93,7 +93,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [collections, user?.id, salePayments]); // Only depend on user.id, not entire user object
+  }, [collections, user?.id, salePayments, scheduledVisits]); // Only depend on user.id, not entire user object
 
   const generateAndSetNotifications = () => {
     if (!user) return; // Guard clause for null user
@@ -118,20 +118,19 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           ? collections
           : collections.filter((c) => c.user_id === user.id);
 
-      // For collectors: Check overdue visits
+      // For collectors: visit-related notifications (based on scheduled_visits)
       if (user.type !== "manager") {
-        const overdueVisits = userCollections.filter((c) => {
-          if (c.status === "received") return false;
+        // Active (pending) visits owned by this collector
+        const myActiveVisits = scheduledVisits.filter(
+          (v) => v.collectorId === user.id && v.status === "agendada",
+        );
 
-          // Check if has a scheduled visit that's overdue
-          if (c.data_visita_agendada) {
-            const visitDate = new Date(c.data_visita_agendada);
-            if (isNaN(visitDate.getTime())) return false; // Skip invalid dates
-            visitDate.setHours(23, 59, 59, 999); // End of the visit day
-            return visitDate < now && !c.data_visita_realizada;
-          }
-
-          return false;
+        // Overdue scheduled visits (scheduled date already passed)
+        const overdueVisits = myActiveVisits.filter((v) => {
+          const visitDate = new Date(v.scheduledDate);
+          if (isNaN(visitDate.getTime())) return false; // Skip invalid dates
+          visitDate.setHours(23, 59, 59, 999); // End of the visit day
+          return visitDate < now;
         });
 
         if (overdueVisits.length > 0) {
@@ -143,17 +142,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           });
         }
 
-        // Check visits scheduled for today
-        const visitsToday = userCollections.filter((c) => {
-          if (c.status === "received" || c.data_visita_realizada) return false;
-
-          if (c.data_visita_agendada) {
-            const visitDate = new Date(c.data_visita_agendada);
-            if (isNaN(visitDate.getTime())) return false; // Skip invalid dates
-            return visitDate >= todayStart && visitDate < tomorrowStart;
-          }
-
-          return false;
+        // Visits scheduled for today
+        const visitsToday = myActiveVisits.filter((v) => {
+          const visitDate = new Date(v.scheduledDate);
+          if (isNaN(visitDate.getTime())) return false; // Skip invalid dates
+          return visitDate >= todayStart && visitDate < tomorrowStart;
         });
 
         if (visitsToday.length > 0) {
@@ -165,14 +158,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           });
         }
 
-        // Check for collections without scheduled visits (pending scheduling)
-        const unscheduledCollections = userCollections.filter((c) => {
-          return (
+        // Pending collections whose client has no active scheduled visit
+        const scheduledDocs = new Set(
+          myActiveVisits.map((v) => v.clientDocument),
+        );
+        const unscheduledCollections = userCollections.filter(
+          (c) =>
             c.status !== "received" &&
-            !c.data_visita_agendada &&
-            !c.data_visita_realizada
-          );
-        });
+            !!c.documento &&
+            !scheduledDocs.has(c.documento),
+        );
 
         if (unscheduledCollections.length > 0) {
           newNotifications.push({
@@ -222,10 +217,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         });
       }
 
-      // 3. Recent payments (last 24 hours)
-      const recentPayments = userCollections.filter((c) => {
-        if (c.status !== "received") return false;
-        const paymentDateStr = c.data_recebimento || c.updated_at;
+      // 3. Recent payments (last 24 hours) — based on sale_payments
+      const recentPayments = salePayments.filter((p) => {
+        // Collectors only see their own payments; managers see all
+        if (user.type !== "manager" && p.collectorId !== user.id) return false;
+        const paymentDateStr = p.paymentDate || p.createdAt;
         if (!paymentDateStr) return false; // Skip if no payment date
         const paymentDate = new Date(paymentDateStr);
         if (isNaN(paymentDate.getTime())) return false; // Skip invalid dates
