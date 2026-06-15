@@ -4,7 +4,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { User as UserType, UserType as UserRoleType } from "../../types";
 
 const UserManagement: React.FC = () => {
-  const { users, addUser, updateUser, deleteUser, error: contextError } = useCollection();
+  const { users, addUser, updateUser, deleteUser } = useCollection();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserType | null>(null);

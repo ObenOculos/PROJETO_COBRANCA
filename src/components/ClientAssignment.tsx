@@ -125,26 +125,19 @@ export const ClientAssignment = React.memo(() => {
   const {
     collections,
     users,
-    assignCollectorToClients,
-    removeCollectorFromClients,
-    updateCollection,
-    refreshData,
   } = useCollection();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCollector, setSelectedCollector] = useState<string>("");
-  const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [selectedClients, setSelectedClients] = useState<Set<string>>(
     new Set(),
   );
-  const [loading, setLoading] = useState(false);
 
   // Novos filtros
   const [filterCollector, setFilterCollector] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>(""); // 'with_collector', 'without_collector', ''
   const [filterCity, setFilterCity] = useState<string>("");
   const [filterNeighborhood, setFilterNeighborhood] = useState<string>("");
-  const [filterStore, setFilterStore] = useState<string>(""); // Novo filtro de loja
-  const [filterSituacao, setFilterSituacao] = useState<string>(""); // Novo filtro de situação
+  const [filterStore, setFilterStore] = useState<string>("");
+  const [filterSituacao, setFilterSituacao] = useState<string>("");
   const [filterDateFrom, setFilterDateFrom] = useState<string>("");
   const [filterDateTo, setFilterDateTo] = useState<string>("");
   const [includeWithoutDate, setIncludeWithoutDate] = useState(false);
@@ -171,9 +164,6 @@ export const ClientAssignment = React.memo(() => {
       window.removeEventListener("resize", handleResize);
     };
   }, []);
-
-  // Limite para operações em massa
-  const MAX_BATCH_SIZE = 100;
 
   const collectors = users.filter(
     (user) => user.type === "collector" || user.type === "internal_collector",
@@ -743,107 +733,111 @@ export const ClientAssignment = React.memo(() => {
   }, [hasActiveFilters, filteredStats, overviewStats]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 pb-24">
       {/* Header — Estilo Ranking de Performance */}
-      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-6">
+      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-black text-gray-900 dark:text-dark-text tracking-tight flex items-center gap-2">
-              <Users className="h-6 w-6 text-blue-600 flex-shrink-0" />
-              Atribuição de Cobradores
-            </h2>
-            <p className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary mt-1 uppercase tracking-wider">
-              {hasActiveFilters ? "Visão Filtrada" : "Gestão Estratégica de Carteira"}
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl shrink-0">
+              <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-dark-text tracking-tight leading-none">
+                Atribuição de Cobradores
+              </h2>
+              <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary mt-1 uppercase tracking-widest">
+                {hasActiveFilters ? "Visão Filtrada" : "Gestão de Carteira"}
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all border ${
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all border ${
                 showFilters || hasActiveFilters
                   ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 dark:shadow-none"
                   : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
               }`}
             >
-              <Filter className="h-4 w-4" />
+              <Filter className="h-3.5 w-3.5" />
               Filtros {hasActiveFilters && `(${activeFilterChips.length})`}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Grid de Cards Executivos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Grid de Cards Executivos — Scroll horizontal em mobile */}
+      <div className="flex overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 custom-scrollbar snap-x">
         {/* Card: Total de Clientes */}
-        <div className="bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
+        <div className="min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow snap-start">
+          <div className="flex items-center justify-between mb-3">
             <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-              <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
             {mainStats.unassigned > 0 && (
-              <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg uppercase tracking-tight">
+              <span className="text-[9px] font-black text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-lg uppercase tracking-tight">
                 {mainStats.unassigned} Pendentes
               </span>
             )}
           </div>
           <div>
-            <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-1">Total Clientes</p>
-            <p className="text-3xl font-black text-gray-900 dark:text-dark-text tracking-tighter">{mainStats.total}</p>
+            <p className="text-[9px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-0.5">Total Clientes</p>
+            <p className="text-2xl font-black text-gray-900 dark:text-dark-text tracking-tighter">{mainStats.total}</p>
           </div>
         </div>
 
         {/* Card: Novos Clientes */}
-        <div className="bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
+        <div className="min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow snap-start">
+          <div className="flex items-center justify-between mb-3">
             <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-xl">
-              <Zap className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <Zap className="h-4 w-4 text-green-600 dark:text-green-400" />
             </div>
             {mainStats.prevMonth > 0 ? (
-              <span className={`text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-tight ${mainStats.newClients >= mainStats.prevMonth ? 'text-green-600 bg-green-50' : 'text-amber-600 bg-amber-50'}`}>
-                {mainStats.newClients >= mainStats.prevMonth ? '+' : ''}{((mainStats.newClients / mainStats.prevMonth - 1) * 100).toFixed(0)}% vs mês ant.
+              <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg uppercase tracking-tight ${mainStats.newClients >= mainStats.prevMonth ? 'text-green-600 bg-green-50' : 'text-amber-600 bg-amber-50'}`}>
+                {mainStats.newClients >= mainStats.prevMonth ? '+' : ''}{((mainStats.newClients / mainStats.prevMonth - 1) * 100).toFixed(0)}%
               </span>
             ) : (
-              <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-lg uppercase tracking-tight">
+              <span className="text-[9px] font-black text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-lg uppercase tracking-tight">
                 Mês Atual
               </span>
             )}
           </div>
           <div>
-            <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-1">Novos Clientes</p>
-            <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-black text-gray-900 dark:text-dark-text tracking-tighter">{mainStats.newClients}</p>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">vs {mainStats.prevMonth} no mês ant.</p>
+            <p className="text-[9px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-0.5">Novos Clientes</p>
+            <div className="flex items-baseline gap-1.5">
+              <p className="text-2xl font-black text-gray-900 dark:text-dark-text tracking-tighter">{mainStats.newClients}</p>
+              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter shrink-0">vs {mainStats.prevMonth}</p>
             </div>
           </div>
         </div>
 
         {/* Card: Valor em Aberto */}
-        <div className="bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
+        <div className="min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow snap-start">
+          <div className="flex items-center justify-between mb-3">
             <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
-              <HandCoins className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              <HandCoins className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
             </div>
           </div>
           <div>
-            <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-1">Valor em Aberto</p>
-            <p className="text-2xl font-black text-indigo-700 dark:text-indigo-400 tracking-tighter">{formatCurrency(mainStats.pendingValue)}</p>
+            <p className="text-[9px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-0.5">Valor em Aberto</p>
+            <p className="text-xl font-black text-indigo-700 dark:text-indigo-400 tracking-tighter">{formatCurrency(mainStats.pendingValue)}</p>
           </div>
         </div>
 
         {/* Card: Taxa de Atribuição */}
-        <div className={`p-5 rounded-2xl shadow-xl flex flex-col justify-between relative overflow-hidden group transition-all ${mainStats.assignmentRate > 90 ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white' : 'bg-white dark:bg-dark-bg-secondary border border-gray-100 dark:border-dark-border text-gray-900 dark:text-dark-text'}`}>
-          <div className="flex items-center justify-between mb-4 relative z-10">
+        <div className={`min-w-[240px] sm:min-w-0 p-4 rounded-2xl shadow-xl flex flex-col justify-between relative overflow-hidden group transition-all snap-start ${mainStats.assignmentRate > 90 ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white' : 'bg-white dark:bg-dark-bg-secondary border border-gray-100 dark:border-dark-border text-gray-900 dark:text-dark-text'}`}>
+          <div className="flex items-center justify-between mb-3 relative z-10">
             <div className={`p-2 rounded-xl ${mainStats.assignmentRate > 90 ? 'bg-white/20 backdrop-blur-md' : 'bg-blue-50 dark:bg-blue-900/20'}`}>
-              <Award className={`h-5 w-5 ${mainStats.assignmentRate > 90 ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
+              <Award className={`h-4 w-4 ${mainStats.assignmentRate > 90 ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
             </div>
-            <div className={`flex items-center text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-tight ${mainStats.assignmentRate > 90 ? 'bg-white/20 text-blue-100' : 'bg-blue-50 text-blue-600'}`}>
-              {mainStats.assignmentRate > 90 ? 'Excelente' : 'Em progresso'}
+            <div className={`flex items-center text-[9px] font-black px-2 py-0.5 rounded-lg uppercase tracking-tight ${mainStats.assignmentRate > 90 ? 'bg-white/20 text-blue-100' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'}`}>
+              {mainStats.assignmentRate > 90 ? 'Excelente' : 'Ajustar'}
             </div>
           </div>
           <div className="relative z-10">
-            <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${mainStats.assignmentRate > 90 ? 'text-blue-100' : 'text-gray-400 dark:text-dark-text-secondary'}`}>Taxa Atribuição</p>
-            <p className="text-3xl font-black tracking-tighter">{mainStats.assignmentRate.toFixed(1)}%</p>
+            <p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-0.5 ${mainStats.assignmentRate > 90 ? 'text-blue-100' : 'text-gray-400 dark:text-dark-text-secondary'}`}>Taxa Atribuição</p>
+            <p className="text-2xl font-black tracking-tighter">{mainStats.assignmentRate.toFixed(1)}%</p>
           </div>
           {mainStats.assignmentRate > 90 && (
             <div className="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
@@ -851,100 +845,107 @@ export const ClientAssignment = React.memo(() => {
         </div>
       </div>
 
-      {/* Filtros Rápidos */}
-      <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
-        <span className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mr-2">Visão Rápida:</span>
-        
-        <button
-          onClick={() => {
-            setFilterStatus("");
-            setFilterDateFrom("");
-          }}
-          className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${
-            !filterStatus && !filterDateFrom
-              ? "bg-gray-900 text-white border-gray-900 shadow-md"
-              : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
-          }`}
-        >
-          Todos
-        </button>
-
-        <button
-          onClick={() => {
-            setFilterStatus("without_collector");
-            setFilterDateFrom("");
-          }}
-          className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border flex items-center gap-1.5 ${
-            filterStatus === "without_collector"
-              ? "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20"
-              : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-amber-50 dark:hover:bg-amber-900/10 hover:text-amber-600 hover:border-amber-200"
-          }`}
-        >
-          <AlertCircle className="w-3.5 h-3.5" />
-          Pendentes
-        </button>
-
-        <button
-          onClick={() => {
-            setFilterStatus("with_collector");
-            setFilterDateFrom("");
-          }}
-          className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border flex items-center gap-1.5 ${
-            filterStatus === "with_collector"
-              ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20"
-              : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:text-blue-600 hover:border-blue-200"
-          }`}
-        >
-          <Users className="w-3.5 h-3.5" />
-          Atribuídos
-        </button>
-
-        <button
-          onClick={() => {
-            const now = new Date();
-            const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-            setFilterDateFrom(currentMonthStart.toISOString().split('T')[0]);
-            setFilterStatus("");
-          }}
-          className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border flex items-center gap-1.5 ${
-            filterDateFrom && !filterStatus
-              ? "bg-green-600 text-white border-green-600 shadow-md shadow-green-600/20"
-              : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-green-50 dark:hover:bg-green-900/10 hover:text-green-600 hover:border-green-200"
-          }`}
-        >
-          <Zap className="w-3.5 h-3.5" />
-          Novos (Mês)
-        </button>
-      </div>
-
-      {/* Filtros Rápidos: Cobradores */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-4 custom-scrollbar">
-        <span className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mr-2 whitespace-nowrap">Por Cobrador:</span>
-        
-        <button
-          onClick={() => setFilterCollector("")}
-          className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border whitespace-nowrap ${
-            !filterCollector
-              ? "bg-blue-600 text-white border-blue-600"
-              : "bg-gray-100 dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border-transparent hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary"
-          }`}
-        >
-          Todos
-        </button>
-
-        {collectors.map((collector) => (
+      {/* Filtros Rápidos — Unificados e Compactos */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar snap-x">
+          <div className="flex items-center gap-1.5 shrink-0 pr-2 border-r border-gray-100 dark:border-dark-border">
+            <Filter className="h-3 w-3 text-gray-400" />
+            <span className="text-[9px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-widest whitespace-nowrap">Visão:</span>
+          </div>
+          
           <button
-            key={collector.id}
-            onClick={() => setFilterCollector(collector.id)}
-            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border whitespace-nowrap ${
-              filterCollector === collector.id
-                ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:border-blue-300 hover:text-blue-600"
+            onClick={() => {
+              setFilterStatus("");
+              setFilterDateFrom("");
+            }}
+            className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 snap-start ${
+              !filterStatus && !filterDateFrom
+                ? "bg-gray-900 dark:bg-blue-600 text-white border-gray-900 dark:border-blue-600 shadow-md"
+                : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
             }`}
           >
-            {collector.name}
+            Todos
           </button>
-        ))}
+
+          <button
+            onClick={() => {
+              setFilterStatus("without_collector");
+              setFilterDateFrom("");
+            }}
+            className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 snap-start flex items-center gap-1.5 ${
+              filterStatus === "without_collector"
+                ? "bg-amber-500 text-white border-amber-500 shadow-md"
+                : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-amber-50 dark:hover:bg-amber-900/10 hover:text-amber-600"
+            }`}
+          >
+            <AlertCircle className="w-3 h-3" />
+            Pendentes
+          </button>
+
+          <button
+            onClick={() => {
+              setFilterStatus("with_collector");
+              setFilterDateFrom("");
+            }}
+            className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 snap-start flex items-center gap-1.5 ${
+              filterStatus === "with_collector"
+                ? "bg-blue-600 text-white border-blue-600 shadow-md"
+                : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:text-blue-600"
+            }`}
+          >
+            <Users className="w-3 h-3" />
+            Atribuídos
+          </button>
+
+          <button
+            onClick={() => {
+              const now = new Date();
+              const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+              setFilterDateFrom(currentMonthStart.toISOString().split('T')[0]);
+              setFilterStatus("");
+            }}
+            className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 snap-start flex items-center gap-1.5 ${
+              filterDateFrom && !filterStatus
+                ? "bg-green-600 text-white border-green-600 shadow-md"
+                : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-green-50 dark:hover:bg-green-900/10 hover:text-green-600"
+            }`}
+          >
+            <Zap className="w-3 h-3" />
+            Novos
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar snap-x">
+          <div className="flex items-center gap-1.5 shrink-0 pr-2 border-r border-gray-100 dark:border-dark-border">
+            <Users className="h-3 w-3 text-gray-400" />
+            <span className="text-[9px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-widest whitespace-nowrap">Cobrador:</span>
+          </div>
+          
+          <button
+            onClick={() => setFilterCollector("")}
+            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border shrink-0 snap-start ${
+              !filterCollector
+                ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                : "bg-gray-100 dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border-transparent hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary"
+            }`}
+          >
+            Todos
+          </button>
+
+          {collectors.map((collector) => (
+            <button
+              key={collector.id}
+              onClick={() => setFilterCollector(collector.id)}
+              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border shrink-0 snap-start ${
+                filterCollector === collector.id
+                  ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                  : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:border-blue-300 hover:text-blue-600"
+              }`}
+            >
+              {collector.name}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Filtros Colapsáveis */}
@@ -1113,37 +1114,38 @@ export const ClientAssignment = React.memo(() => {
       )}
 
       {/* Client List */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h3 className="text-lg font-black text-gray-900 dark:text-dark-text uppercase tracking-tight">
+            <h3 className="text-sm sm:text-lg font-black text-gray-900 dark:text-dark-text uppercase tracking-tight">
               Lista de Clientes
             </h3>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              Mostrando {filteredClients.length} registros filtrados
+            <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              {filteredClients.length} registros filtrados
             </p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handleSelectAll}
-              className="px-4 py-2 text-[10px] font-black uppercase tracking-widest border border-gray-200 dark:border-dark-border dark:text-dark-text rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg/50 transition-all"
+              className="flex-1 sm:flex-none px-3 py-2 text-[9px] font-black uppercase tracking-widest border border-gray-200 dark:border-dark-border dark:text-dark-text rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg/50 transition-all"
             >
               {paginatedClients.every((c) => selectedClients.has(c.uniqueKey))
                 ? "Desmarcar Página"
-                : "Selecionar Página"}
+                : "Marcar Página"}
             </button>
             {filteredClients.length > itemsPerPage && (
               <button
                 onClick={handleSelectAllFiltered}
-                className="px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-xl hover:bg-blue-100 transition-all"
+                className="flex-1 sm:flex-none px-3 py-2 text-[9px] font-black uppercase tracking-widest bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-xl hover:bg-blue-100 transition-all whitespace-nowrap"
               >
-                Todos ({filteredClients.length})
+                Tudo ({filteredClients.length})
               </button>
             )}
           </div>
         </div>
 
         {/* Visualização em Tabela (Desktop) */}
+        {/* ... (mantendo igual, já está bom) */}
         <div className="hidden md:block bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -1166,7 +1168,6 @@ export const ClientAssignment = React.memo(() => {
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
                 {paginatedClients.map((client) => {
-                  const isWithoutCollector = !client.collectorId;
                   const totalValue = client.collections.reduce((sum, c) => sum + c.valor_original, 0);
                   const pendingValue = totalValue - client.collections.reduce((sum, c) => sum + c.valor_recebido, 0);
                   const situacao = getSituacaoIndicator(client.collections);
@@ -1242,69 +1243,92 @@ export const ClientAssignment = React.memo(() => {
           </div>
         </div>
 
-        {/* Visualização em Cards (Mobile) */}
-        <div className="md:hidden space-y-4">
+        {/* Visualização em Cards (Mobile) — Refinada */}
+        <div className="md:hidden space-y-3">
           {paginatedClients.map((client) => {
             const isWithoutCollector = !client.collectorId;
             const totalValue = client.collections.reduce((sum, c) => sum + c.valor_original, 0);
             const pendingValue = totalValue - client.collections.reduce((sum, c) => sum + c.valor_recebido, 0);
             const situacao = getSituacaoIndicator(client.collections);
+            const isSelected = selectedClients.has(client.uniqueKey);
 
             return (
               <div
                 key={client.uniqueKey}
-                className={`bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border transition-all duration-200 cursor-pointer overflow-hidden ${
-                  selectedClients.has(client.uniqueKey) ? "ring-2 ring-blue-500 border-blue-500 shadow-lg" : "border-gray-100 dark:border-dark-border"
-                } ${isWithoutCollector && !selectedClients.has(client.uniqueKey) ? "border-amber-200 dark:border-amber-900/30 bg-amber-50/20" : ""}`}
+                className={`bg-white dark:bg-dark-bg-secondary rounded-xl shadow-sm border transition-all duration-200 cursor-pointer overflow-hidden ${
+                  isSelected 
+                    ? "ring-2 ring-blue-500 border-blue-500 bg-blue-50/10 shadow-md" 
+                    : isWithoutCollector 
+                      ? "border-amber-200 dark:border-amber-900/30 bg-amber-50/10" 
+                      : "border-gray-100 dark:border-dark-border"
+                }`}
                 onClick={() => handleSelectClient(client.uniqueKey)}
               >
-                <div className="p-5">
-                  <div className="flex items-start gap-4">
-                    <input
-                      type="checkbox"
-                      checked={selectedClients.has(client.uniqueKey)}
-                      onChange={() => handleSelectClient(client.uniqueKey)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded mt-1 bg-white dark:bg-dark-bg"
-                    />
-                    <div className="flex-1 min-w-0 space-y-3">
-                      <div className="flex justify-between items-start">
+                <div className="p-3 sm:p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center h-5">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleSelectClient(client.uniqueKey)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-4.5 w-4.5 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded bg-white dark:bg-dark-bg"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-2.5">
+                      <div className="flex justify-between items-start gap-2">
                         <div className="min-w-0">
-                          <h4 className="text-sm font-black text-gray-900 dark:text-dark-text truncate uppercase tracking-tight">{client.cliente}</h4>
-                          <p className="text-[10px] font-bold text-gray-400 mt-0.5 uppercase">{client.documento}</p>
+                          <h4 className="text-[13px] font-black text-gray-900 dark:text-dark-text truncate uppercase tracking-tight leading-tight">
+                            {client.cliente}
+                          </h4>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <p className="text-[9px] font-bold text-gray-400 uppercase leading-none">{client.documento}</p>
+                            {client.apelido && (
+                              <span className="text-[9px] text-blue-500 font-black italic leading-none truncate max-w-[100px]">
+                                "{client.apelido.toUpperCase()}"
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="text-sm font-black text-red-600 dark:text-red-400 tracking-tight">{formatCurrency(pendingValue)}</p>
-                          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Total: {formatCurrency(totalValue)}</p>
+                          <p className="text-[13px] font-black text-red-600 dark:text-red-400 tracking-tighter leading-tight">
+                            {formatCurrency(pendingValue)}
+                          </p>
+                          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter leading-none">
+                            T: {formatCurrency(totalValue)}
+                          </p>
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap gap-2 items-center">
+                      <div className="flex flex-wrap gap-1.5 items-center">
                         {client.collectorName ? (
-                          <span className="px-2 py-0.5 rounded-lg text-[9px] font-black bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100 dark:border-green-900/30 uppercase tracking-widest">
+                          <span className="px-2 py-0.5 rounded-md text-[8px] font-black bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100 dark:border-green-900/30 uppercase tracking-widest">
                             {client.collectorName}
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-lg text-[9px] font-black bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 uppercase tracking-widest">
+                          <span className="px-2 py-0.5 rounded-md text-[8px] font-black bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 uppercase tracking-widest">
                             Sem Cobrador
                           </span>
                         )}
                         {situacao && (
-                          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase border border-current ${situacao.className}`}>
-                            <situacao.icon className="h-3 w-3" />
+                          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase border border-current ${situacao.className} opacity-90`}>
+                            <situacao.icon className="h-2.5 w-2.5" />
                             {situacao.label}
                           </div>
                         )}
+                        <div className="flex items-center text-[9px] font-bold text-gray-400 uppercase tracking-tight ml-auto">
+                          <span className="bg-gray-100 dark:bg-dark-bg px-1.5 py-0.5 rounded-md text-gray-600 dark:text-dark-text-secondary">
+                            {client.collections.length}P
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="pt-3 border-t border-gray-50 dark:border-dark-border flex items-center justify-between">
-                        <div className="flex items-center text-[10px] font-bold text-gray-500 uppercase tracking-tight">
-                          <MapPin className="h-3 w-3 mr-1 text-gray-400" />
-                          <span className="truncate max-w-[120px]">{client.cidade || "-"}</span>
+                      <div className="pt-2 border-t border-gray-50 dark:border-dark-border/50 flex items-center justify-between">
+                        <div className="flex items-center text-[9px] font-bold text-gray-400 uppercase tracking-tight">
+                          <MapPin className="h-2.5 w-2.5 mr-1 text-gray-300" />
+                          <span className="truncate max-w-[180px]">{client.bairro ? `${client.bairro}, ` : ""}{client.cidade || "-"}</span>
                         </div>
-                        <div className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">
-                          {client.collections.length} Parcelas
-                        </div>
+                        <ChevronRight className="h-3 w-3 text-gray-300" />
                       </div>
                     </div>
                   </div>
@@ -1332,33 +1356,34 @@ export const ClientAssignment = React.memo(() => {
 
       {/* Controles de Paginação — Estilo Dashboard */}
       {totalPages > 1 && (
-        <div className="bg-gray-900 dark:bg-dark-bg-secondary mt-6 border border-gray-800 dark:border-dark-border px-6 py-4 rounded-2xl shadow-lg">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+        <div className="bg-gray-900 dark:bg-dark-bg-secondary mt-4 border border-gray-800 dark:border-dark-border px-4 py-3 sm:px-6 sm:py-4 rounded-2xl shadow-lg">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="bg-blue-600/20 text-blue-400 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border border-blue-600/30">
-                Página {currentPage} de {totalPages}
+              <div className="bg-blue-600/20 text-blue-400 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border border-blue-600/30">
+                Pág {currentPage}/{totalPages}
               </div>
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest hidden sm:inline">
                 Exibindo {startItem}–{endItem} de {filteredClients.length}
               </span>
             </div>
 
-            <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-2 lg:pb-0 custom-scrollbar">
+            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 sm:pb-0 custom-scrollbar">
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
-                Início
+                <span className="hidden sm:inline">Início</span>
+                <span className="sm:hidden">«</span>
               </button>
 
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
-                <ChevronLeft className="h-3.5 w-3.5 mr-1" />
-                Anterior
+                <ChevronLeft className="h-3.5 w-3.5 sm:mr-1" />
+                <span className="hidden sm:inline">Anterior</span>
               </button>
 
               <div className="flex items-center gap-1">
@@ -1373,7 +1398,7 @@ export const ClientAssignment = React.memo(() => {
                     <button
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`min-w-[36px] h-9 flex items-center justify-center text-xs font-black rounded-xl transition-all ${
+                      className={`min-w-[32px] sm:min-w-[36px] h-8 sm:h-9 flex items-center justify-center text-[10px] sm:text-xs font-black rounded-xl transition-all ${
                         pageNum === currentPage
                           ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
                           : "bg-white/5 text-gray-400 hover:text-white border border-white/5 hover:border-white/20"
@@ -1388,50 +1413,51 @@ export const ClientAssignment = React.memo(() => {
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
-                Próxima
-                <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                <span className="hidden sm:inline">Próxima</span>
+                <ChevronRight className="h-3.5 w-3.5 sm:ml-1" />
               </button>
 
               <button
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
-                Fim
+                <span className="hidden sm:inline">Fim</span>
+                <span className="sm:hidden">»</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Barra de Ação Contextual (Substitui o botão flutuante e os modais antigos) */}
-      <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 transform ${selectedClients.size > 0 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
-        <div className="bg-gray-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-6 border border-gray-700">
-          <div className="flex items-center gap-3 pr-6 border-r border-gray-700">
-            <div className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">
+      {/* Barra de Ação Contextual — Mais compacta em mobile */}
+      <div className={`fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 transform w-[95%] sm:w-auto ${selectedClients.size > 0 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
+        <div className="bg-gray-900 dark:bg-dark-bg-secondary text-white p-2 sm:px-4 sm:py-3 rounded-2xl shadow-2xl flex items-center justify-between sm:justify-start gap-2 sm:gap-6 border border-gray-700 dark:border-dark-border overflow-hidden">
+          <div className="flex items-center gap-2 sm:gap-3 pr-2 sm:pr-6 border-r border-gray-700 dark:border-dark-border">
+            <div className="bg-blue-600 text-white w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-black text-xs sm:text-sm">
               {selectedClients.size}
             </div>
-            <span className="text-sm font-medium text-gray-300 whitespace-nowrap">
-              {selectedClients.size === 1 ? 'cliente selecionado' : 'clientes selecionados'}
+            <span className="text-[10px] sm:text-sm font-black text-gray-300 uppercase tracking-widest whitespace-nowrap hidden min-[400px]:inline">
+              {selectedClients.size === 1 ? 'Selecionado' : 'Selecionados'}
             </span>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => setSelectedClients(new Set())}
-              className="px-4 py-2 text-sm font-bold text-gray-400 hover:text-white transition-colors uppercase tracking-widest"
+              className="px-3 py-2 text-[10px] sm:text-sm font-black text-gray-400 hover:text-white transition-colors uppercase tracking-widest"
             >
-              Cancelar
+              Limpar
             </button>
             <button
               onClick={() => setShowBulkModal(true)}
-              className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-lg active:scale-95"
+              className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-lg active:scale-95"
             >
-              <Zap className="w-4 h-4 text-yellow-400" />
-              <span className="text-sm font-black uppercase tracking-widest">
-                Atribuir / Ajustar
+              <Zap className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+              <span className="text-[10px] sm:text-sm font-black uppercase tracking-widest whitespace-nowrap">
+                Atribuir
               </span>
             </button>
           </div>

@@ -11,13 +11,9 @@ import {
   FileSpreadsheet,
   TrendingUp,
   User,
-  Store,
-  CreditCard,
   Award,
   Activity,
   Receipt,
-  Wallet,
-  ArrowRight
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Collection } from "../../types";
@@ -417,6 +413,11 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         store: string;
         totalOriginalValue: number;
         totalReceivedValue: number;
+        totalPaidOnDebt: number;
+        totalPendingValue: number;
+        totalDiscount: number;
+        totalDebt: number;
+        remainingDebt: number;
         receivedDate: string;
         collector: string;
         paymentMethod: string;

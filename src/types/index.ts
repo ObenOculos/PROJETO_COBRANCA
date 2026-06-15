@@ -269,9 +269,13 @@ export interface CollectionContextType {
   assignCollectorToClients: (
     collectorId: string,
     clientIdentifiers: { document?: string; clientName?: string }[],
+    skipRefresh?: boolean,
+    onBatchProgress?: (completed: number, total: number) => void,
   ) => Promise<void>;
   removeCollectorFromClients: (
     clientIdentifiers: { document?: string; clientName?: string }[],
+    skipRefresh?: boolean,
+    onBatchProgress?: (completed: number, total: number) => void,
   ) => Promise<void>;
   addAttempt: (
     collectionId: number,
