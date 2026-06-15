@@ -15,6 +15,7 @@ import {
 } from "lucide-react"; // Importar ícones
 import AddTituloModal from "./AddTituloModal";
 import { Database } from "../../types/database.types";
+import { PRIMARY_SITUACAO } from "../../config/profiles";
 
 type BancoDadosInsert = Database["public"]["Tables"]["BANCO_DADOS"]["Insert"];
 
@@ -82,7 +83,7 @@ const parseNullableNumber = (value: string | undefined | null): number | null =>
 };
 
 const DatabaseUpload: React.FC = () => {
-  const { refreshData } = useCollection();
+  const { refreshData, users } = useCollection();
   const [statusFile, setStatusFile] = useState<File | null>(null);
   const [newParcelaFile, setNewParcelaFile] = useState<File | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -711,6 +712,49 @@ const DatabaseUpload: React.FC = () => {
         return { success: true, insertedRows: [], duplicateRows, invalidRows };
       }
 
+      // 3.1 Continuidade da carteira: descobrir, por CPF/CNPJ (documento), o
+      // cobrador que o cliente JA possui. Se possuir, os novos titulos herdam
+      // esse mesmo cobrador (prioridade sobre a regra dos 60 dias). Cliente novo
+      // (sem cobrador) nao recebe atribuicao automatica.
+      const documentos = Array.from(
+        new Set(
+          rowsToInsert
+            .map((row) => row.documento)
+            .filter((doc): doc is string => !!doc),
+        ),
+      );
+
+      const documentoToCollector = new Map<string, string>();
+      const DOC_CHUNK = 300;
+      for (let i = 0; i < documentos.length; i += DOC_CHUNK) {
+        const docChunk = documentos.slice(i, i + DOC_CHUNK);
+        const { data: existing, error: existingErr } = await supabase
+          .from("BANCO_DADOS")
+          .select("documento, user_id")
+          .in("documento", docChunk)
+          .not("user_id", "is", null);
+
+        if (existingErr) {
+          console.error(
+            "Erro ao buscar cobradores existentes por documento:",
+            existingErr,
+          );
+          continue; // segue sem heranca para este chunk
+        }
+
+        existing?.forEach((rec) => {
+          if (
+            rec.documento &&
+            rec.user_id &&
+            !documentoToCollector.has(rec.documento)
+          ) {
+            documentoToCollector.set(rec.documento, rec.user_id);
+          }
+        });
+      }
+
+      const userTypeById = new Map(users.map((u) => [u.id, u.type]));
+
       // 4. Inserir apenas as novas linhas
       if (onProgress)
         onProgress(50, `Inserindo ${rowsToInsert.length} novas parcelas...`);
@@ -764,6 +808,22 @@ const DatabaseUpload: React.FC = () => {
         if (newRow.situacao !== undefined) {
           newRow.situacao = validateSituacao(newRow.situacao);
         }
+
+        // Continuidade da carteira: se o cliente (documento) ja possui cobrador,
+        // o novo titulo herda esse mesmo cobrador, independente dos dias em
+        // atraso. Alinha a situacao ao perfil do cobrador para o titulo aparecer
+        // na carteira dele (o filtro por situacao poderia esconde-lo).
+        const inheritedCollectorId = newRow.documento
+          ? documentoToCollector.get(newRow.documento)
+          : undefined;
+        if (inheritedCollectorId) {
+          newRow.user_id = inheritedCollectorId;
+          const collectorType = userTypeById.get(inheritedCollectorId);
+          if (collectorType && collectorType !== "manager") {
+            newRow.situacao = PRIMARY_SITUACAO[collectorType];
+          }
+        }
+
         return newRow;
       });
 
