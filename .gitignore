@@ -26,3 +26,7 @@ dist-ssr
 .vercel
 .git-credentials
 .env*.local
+
+# Windows Mark-of-the-Web metadata (NTFS alternate data streams)
+*:Zone.Identifier
+*Zone.Identifier
