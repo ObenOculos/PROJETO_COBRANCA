@@ -1963,117 +1963,43 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           ? PRIMARY_SITUACAO[targetType]
           : undefined;
 
-      const batchSize = 200;
+      // Lotes grandes: a RPC recebe os identificadores no corpo da requisicao
+      // (sem risco de URL gigante) e faz UPDATE + historico numa unica transacao
+      // no servidor (atomico). Substitui o antigo fluxo client-side de
+      // SELECT + UPDATE + INSERT em requisicoes separadas e nao-transacionais.
+      const batchSize = 500;
       let totalParcelasAtualizadas = 0;
       const totalBatches = Math.ceil(clientIdentifiers.length / batchSize);
       let batchesCompleted = 0;
 
       for (let i = 0; i < clientIdentifiers.length; i += batchSize) {
         const batch = clientIdentifiers.slice(i, i + batchSize);
-        console.log(
-          `Processando lote ${Math.floor(i / batchSize) + 1}: ${batch.length} identificadores`,
-        );
 
         const documentBatch = batch
           .filter((id) => id.document)
-          .map((id) => id.document);
+          .map((id) => id.document as string);
         const clientNameBatch = batch
           .filter((id) => !id.document && id.clientName)
-          .map((id) => id.clientName);
+          .map((id) => id.clientName as string);
 
-        let parcelas: { id_parcela: number; user_id: string | null; documento: string | null; cliente: string | null; nome_da_loja: string | null }[] = [];
-        let fetchError: any = null;
+        const { data, error } = await supabase.rpc("atribuir_clientes_em_lote", {
+          p_user_id: collectorId,
+          p_documentos: documentBatch,
+          p_clientes: clientNameBatch,
+          p_situacao: situacaoUpdate,
+          p_gerente_id: user?.id,
+        });
 
-        if (documentBatch.length > 0) {
-          const { data, error } = await supabase
-            .from("BANCO_DADOS")
-            .select("id_parcela, user_id, documento, cliente, nome_da_loja")
-            .in("documento", documentBatch as string[]);
-          if (error) fetchError = error;
-          if (data) parcelas = parcelas.concat(data);
+        if (error) {
+          console.error("Erro ao atribuir clientes (RPC):", error);
+          throw error;
         }
 
-        if (clientNameBatch.length > 0 && !fetchError) {
-          const { data, error } = await supabase
-            .from("BANCO_DADOS")
-            .select("id_parcela, user_id, documento, cliente, nome_da_loja")
-            .in("cliente", clientNameBatch as string[]);
-          if (error) fetchError = error;
-          if (data) parcelas = parcelas.concat(data);
-        }
-
-        if (fetchError) {
-          console.error("Erro ao buscar parcelas do lote:", fetchError);
-          throw fetchError;
-        }
-
-        if (!parcelas || parcelas.length === 0) {
-          console.warn(
-            `Nenhuma parcela encontrada para este lote de ${batch.length} clientes`,
-          );
-          continue;
-        }
-
-        console.log(`Encontradas ${parcelas.length} parcelas para este lote`);
-
-        const updatePayload: { user_id: string; situacao?: string } = {
-          user_id: collectorId,
-          ...(situacaoUpdate !== undefined && { situacao: situacaoUpdate }),
-        };
-
-        // Atualiza filtrando direto por documento/cliente, em vez de montar uma
-        // lista gigante de id_parcela na URL (que poderia estourar o limite de
-        // tamanho da requisicao -> 414 -- e e mais lento de parsear).
-        let updateError: any = null;
-        if (documentBatch.length > 0) {
-          const { error } = await supabase
-            .from("BANCO_DADOS")
-            .update(updatePayload)
-            .in("documento", documentBatch as string[]);
-          if (error) updateError = error;
-        }
-        if (clientNameBatch.length > 0 && !updateError) {
-          const { error } = await supabase
-            .from("BANCO_DADOS")
-            .update(updatePayload)
-            .in("cliente", clientNameBatch as string[]);
-          if (error) updateError = error;
-        }
-
-        if (updateError) {
-          console.error("Erro ao atualizar parcelas do lote:", updateError);
-          throw updateError;
-        }
-
-        totalParcelasAtualizadas += parcelas.length;
+        totalParcelasAtualizadas += data ?? 0;
         batchesCompleted++;
         onBatchProgress?.(batchesCompleted, totalBatches);
-
-        // Gravar histórico — um registro por cliente único (não por parcela)
-        const uniqueClients = new Map<string, { cliente_nome: string | null; nome_da_loja: string | null; cobrador_anterior_id: string | null }>();
-        parcelas.forEach((p) => {
-          const doc = p.documento ?? "";
-          if (doc && !uniqueClients.has(doc)) {
-            uniqueClients.set(doc, {
-              cliente_nome: p.cliente ?? null,
-              nome_da_loja: p.nome_da_loja ?? null,
-              cobrador_anterior_id: p.user_id ?? null,
-            });
-          }
-        });
-        if (uniqueClients.size > 0) {
-          const historyRecords = Array.from(uniqueClients.entries()).map(([doc, data]) => ({
-            documento: doc,
-            cliente_nome: data.cliente_nome,
-            nome_da_loja: data.nome_da_loja,
-            cobrador_anterior_id: data.cobrador_anterior_id,
-            cobrador_novo_id: collectorId,
-            gerente_id: user?.id ?? "",
-          }));
-          await supabase.from("atribuicoes_historico").insert(historyRecords);
-        }
         console.log(
-          `Lote processado com sucesso. Total de parcelas atualizadas até agora: ${totalParcelasAtualizadas}`,
+          `Lote ${batchesCompleted}/${totalBatches} concluído. Parcelas atualizadas até agora: ${totalParcelasAtualizadas}`,
         );
       }
 

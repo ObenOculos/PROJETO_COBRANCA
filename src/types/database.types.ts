@@ -777,6 +777,16 @@ export type Database = {
       }
     }
     Functions: {
+      atribuir_clientes_em_lote: {
+        Args: {
+          p_clientes?: string[]
+          p_documentos?: string[]
+          p_gerente_id?: string
+          p_situacao?: string
+          p_user_id: string
+        }
+        Returns: number
+      }
       atribuir_cobrador: {
         Args: { p_documento: string; p_user_id: string }
         Returns: undefined
