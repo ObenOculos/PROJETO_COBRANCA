@@ -1121,10 +1121,30 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }
       }
 
-      const { data, error } = await supabase.from("monthly_goals").select("*");
+      // Paginar para evitar o limite de ~1000 linhas por requisicao.
+      let data: any[] = [];
+      {
+        const pageSize = 1000;
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data: pageData, error } = await supabase
+            .from("monthly_goals")
+            .select("*")
+            .range(from, from + pageSize - 1);
 
-      if (error) {
-        throw error;
+          if (error) {
+            throw error;
+          }
+
+          if (pageData && pageData.length > 0) {
+            data = data.concat(pageData);
+            if (pageData.length < pageSize) hasMore = false;
+            else from += pageSize;
+          } else {
+            hasMore = false;
+          }
+        }
       }
 
       setMonthlyGoals(data || []);
@@ -2115,14 +2135,33 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       console.log("Buscando pagamentos de venda da tabela sale_payments...");
 
-      const { data: payments, error } = await supabase
-        .from("sale_payments")
-        .select("*")
-        .order("payment_date", { ascending: false });
+      // Paginar para nao ficar limitado a ~1000 linhas por requisicao do
+      // Supabase (sistemas com muitos pagamentos perdiam registros).
+      let payments: any[] = [];
+      {
+        const pageSize = 1000;
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data: pageData, error } = await supabase
+            .from("sale_payments")
+            .select("*")
+            .order("payment_date", { ascending: false })
+            .range(from, from + pageSize - 1);
 
-      if (error) {
-        console.error("Erro ao buscar pagamentos:", error);
-        throw error;
+          if (error) {
+            console.error("Erro ao buscar pagamentos:", error);
+            throw error;
+          }
+
+          if (pageData && pageData.length > 0) {
+            payments = payments.concat(pageData);
+            if (pageData.length < pageSize) hasMore = false;
+            else from += pageSize;
+          } else {
+            hasMore = false;
+          }
+        }
       }
 
       // Converter para o formato esperado pela aplicação

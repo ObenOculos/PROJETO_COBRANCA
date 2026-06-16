@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "../../lib/supabase";
 import { Modal } from "../Modal"; // Importar o componente Modal
@@ -25,7 +25,7 @@ interface FileData {
 
 interface UpdateResult {
   id_parcela: string;
-  status: "success" | "error";
+  status: "success" | "error" | "unchanged";
   error?: string;
   details?: any;
 }
@@ -37,6 +37,98 @@ interface InsertResult {
   duplicateRows?: FileData[];
   invalidRows?: FileData[];
 }
+
+// Quantidade de itens renderizados por vez na Visão Analítica. Renderizar
+// milhares de <li> de uma vez trava a UI; mostramos em paginas incrementais.
+const RESULTS_PAGE_SIZE = 50;
+
+// Normaliza a mensagem de erro em uma CATEGORIA estavel, agrupando variacoes
+// (ex.: "Valor de situacao invalido: 'X'" com valores diferentes vira uma so
+// categoria). Permite contar e filtrar as falhas por tipo.
+const getErrorCategory = (error?: string): string => {
+  if (!error) return "Erro desconhecido";
+  const e = error.toLowerCase();
+  if (e.includes("não encontrado") || e.includes("nao encontrado"))
+    return "Título não encontrado no banco";
+  if (e.includes("situacao") || e.includes("situação"))
+    return "Situação inválida";
+  if (e.includes("já consta") || e.includes("ja consta"))
+    return "Título já existente (duplicado)";
+  if (e.includes("id_parcela") || e.includes("linha inválida"))
+    return "Linha inválida / id_parcela ausente";
+  if (e.includes("verificar títulos") || e.includes("verificar titulos"))
+    return "Falha ao verificar títulos";
+  return "Erro no banco de dados";
+};
+
+// Lista de resultados com renderizacao incremental ("mostrar mais") e botao
+// para copiar todos os IDs de uma vez -- evita o travamento com alto volume e
+// torna a lista util mesmo com milhares de registros.
+const ResultList: React.FC<{
+  items: UpdateResult[];
+  emptyMessage: string;
+  showError?: boolean;
+}> = ({ items, emptyMessage, showError = false }) => {
+  const [visibleCount, setVisibleCount] = useState(RESULTS_PAGE_SIZE);
+
+  // Reinicia a paginacao quando o conjunto de itens muda (novo upload).
+  useEffect(() => {
+    setVisibleCount(RESULTS_PAGE_SIZE);
+  }, [items.length]);
+
+  const copyIds = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        items.map((i) => i.id_parcela).join("\n"),
+      );
+    } catch (e) {
+      console.error("Falha ao copiar IDs:", e);
+    }
+  };
+
+  if (items.length === 0) {
+    return (
+      <p className="text-sm text-gray-500 p-4 text-center">{emptyMessage}</p>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex justify-end mb-2">
+        <button
+          onClick={copyIds}
+          className="text-xs font-medium text-blue-600 hover:text-blue-800"
+        >
+          Copiar IDs
+        </button>
+      </div>
+      <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2 bg-gray-50">
+        <ul className="divide-y divide-gray-200">
+          {items.slice(0, visibleCount).map((result, index) => (
+            <li key={index} className="py-2 px-2">
+              <p className="text-sm font-medium text-gray-800">
+                ID Parcela: {result.id_parcela}
+              </p>
+              {showError && result.error && (
+                <p className="text-sm text-red-600">Erro: {result.error}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {visibleCount < items.length && (
+        <button
+          onClick={() =>
+            setVisibleCount((v) => Math.min(v + RESULTS_PAGE_SIZE, items.length))
+          }
+          className="mt-2 w-full text-sm font-medium text-blue-600 hover:text-blue-800 py-2 border border-gray-200 rounded-md bg-white hover:bg-gray-50"
+        >
+          Mostrar mais ({items.length - visibleCount} restantes)
+        </button>
+      )}
+    </div>
+  );
+};
 
 // Valores válidos para a coluna situacao
 const VALID_SITUACAO_VALUES = [
@@ -104,6 +196,51 @@ const DatabaseUpload: React.FC = () => {
   const [needsRefresh, setNeedsRefresh] = useState<boolean>(false);
   const [modalTitle, setModalTitle] = useState<string>("");
   const [showAddTituloModal, setShowAddTituloModal] = useState<boolean>(false);
+
+  // Particiona os resultados uma unica vez por mudanca (em vez de filtrar a
+  // lista varias vezes a cada render do modal).
+  const successResults = useMemo(
+    () => uploadResults.filter((r) => r.status === "success"),
+    [uploadResults],
+  );
+  const errorResults = useMemo(
+    () => uploadResults.filter((r) => r.status === "error"),
+    [uploadResults],
+  );
+  const unchangedResults = useMemo(
+    () => uploadResults.filter((r) => r.status === "unchanged"),
+    [uploadResults],
+  );
+
+  // Agrupa as falhas por categoria de erro (mais frequente primeiro) para
+  // exibir um card por tipo e permitir filtrar a lista de falhas.
+  const errorGroups = useMemo(() => {
+    const map = new Map<string, UpdateResult[]>();
+    for (const r of errorResults) {
+      const cat = getErrorCategory(r.error);
+      const list = map.get(cat);
+      if (list) list.push(r);
+      else map.set(cat, [r]);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1].length - a[1].length);
+  }, [errorResults]);
+
+  // Categoria de erro selecionada para filtrar a lista de falhas (null = todas).
+  const [selectedErrorCategory, setSelectedErrorCategory] = useState<
+    string | null
+  >(null);
+
+  // Reseta o filtro de categoria sempre que um novo resultado e carregado.
+  useEffect(() => {
+    setSelectedErrorCategory(null);
+  }, [uploadResults]);
+
+  const filteredErrors = useMemo(() => {
+    if (!selectedErrorCategory) return errorResults;
+    return (
+      errorGroups.find(([cat]) => cat === selectedErrorCategory)?.[1] ?? []
+    );
+  }, [errorResults, errorGroups, selectedErrorCategory]);
 
   const handleAddSuccess = () => {
     // Maybe show a success message
@@ -504,16 +641,21 @@ const DatabaseUpload: React.FC = () => {
     console.log(`🔍 Verificando a existência de ${allIds.length} títulos...`);
     if (onProgress) onProgress(10, `Verificando ${allIds.length} títulos...`);
 
-    // 2. Verificar quais IDs existem no banco de dados em batches
+    // 2. Verificar quais IDs existem no banco de dados em batches.
+    // Trazemos tambem os valores ATUAIS dos campos comparaveis para, mais
+    // adiante, evitar UPDATEs desnecessarios (registro cujo valor ja e igual
+    // ao do arquivo nao deve ser reescrito nem contado como atualizado).
     const CHUNK_SIZE = 500; // Reduzir o tamanho do batch para evitar URLs muito longas
-    const existingIds = new Set<string>();
+    const existingRecords = new Map<string, any>();
     let fetchError: any = null;
 
     for (let i = 0; i < allIds.length; i += CHUNK_SIZE) {
       const chunk = allIds.slice(i, i + CHUNK_SIZE);
       const { data: chunkRecords, error: chunkError } = await supabase
         .from("BANCO_DADOS")
-        .select("id_parcela")
+        .select(
+          "id_parcela, status, situacao, data_de_recebimento, valor_reajustado, multa, juros_por_dia, multa_aplicada, juros_aplicado, valor_recebido, desconto",
+        )
         .in("id_parcela", chunk.map(Number));
 
       if (chunkError) {
@@ -526,7 +668,7 @@ const DatabaseUpload: React.FC = () => {
 
       if (chunkRecords) {
         chunkRecords.forEach((rec) =>
-          existingIds.add(rec.id_parcela.toString()),
+          existingRecords.set(rec.id_parcela.toString(), rec),
         );
       }
     }
@@ -542,14 +684,14 @@ const DatabaseUpload: React.FC = () => {
         error: `Falha ao verificar títulos: ${fetchError.message}`,
       }));
     }
-    console.log(`✅ Encontrados ${existingIds.size} títulos existentes.`);
+    console.log(`✅ Encontrados ${existingRecords.size} títulos existentes.`);
 
     // 3. Filtrar os dados do arquivo para manter apenas os registros que existem
     const dataToUpdate = data.filter((row) =>
-      existingIds.has(row.id_parcela || row["id_parcela"]),
+      existingRecords.has(row.id_parcela || row["id_parcela"]),
     );
     const ignoredData = data.filter(
-      (row) => !existingIds.has(row.id_parcela || row["id_parcela"]),
+      (row) => !existingRecords.has(row.id_parcela || row["id_parcela"]),
     );
 
     if (ignoredData.length > 0) {
@@ -572,58 +714,99 @@ const DatabaseUpload: React.FC = () => {
     if (onProgress)
       onProgress(30, `Atualizando ${dataToUpdate.length} registros...`);
 
-    // 4. Construir o objeto de update para uma linha (sem efeitos colaterais)
-    const buildUpdateObj = (row: FileData): { updateObj: any; error?: string } => {
+    // 4. Construir o objeto de update para uma linha comparando com o valor
+    // ATUAL no banco. Apenas campos que realmente mudaram entram no updateObj;
+    // se nada mudou, updateObj fica vazio e o registro e tratado como
+    // "inalterado" (nao gera UPDATE nem conta como atualizado).
+    const numericFields = [
+      "valor_reajustado",
+      "multa",
+      "juros_por_dia",
+      "multa_aplicada",
+      "juros_aplicado",
+      "valor_recebido",
+      "desconto",
+    ];
+
+    const buildUpdateObj = (
+      row: FileData,
+      current: any,
+    ): { updateObj: any; error?: string } => {
       const situacao = row.situacao || row["situacao"];
       const updateObj: any = {};
 
-      if (row.status) updateObj.status = row.status;
-      if (row.data_de_recebimento) updateObj.data_de_recebimento = row.data_de_recebimento;
+      // status e data_de_recebimento sao texto: comparacao direta (trim).
+      if (row.status && row.status.trim() !== (current?.status ?? "").trim()) {
+        updateObj.status = row.status;
+      }
+      if (
+        row.data_de_recebimento &&
+        row.data_de_recebimento.trim() !==
+          (current?.data_de_recebimento ?? "").trim()
+      ) {
+        updateObj.data_de_recebimento = row.data_de_recebimento;
+      }
 
-      const numericFields: [string, string][] = [
-        ["valor_reajustado", "valor_reajustado"],
-        ["multa", "multa"],
-        ["juros_por_dia", "juros_por_dia"],
-        ["multa_aplicada", "multa_aplicada"],
-        ["juros_aplicado", "juros_aplicado"],
-        ["valor_recebido", "valor_recebido"],
-        ["desconto", "desconto"],
-      ];
-      for (const [field] of numericFields) {
+      // Campos numericos (armazenados como texto no banco): comparacao
+      // NUMERICA para nao reagir a diferencas de formato (ex.: "10,50" do
+      // arquivo vs "10.5" no banco representam o mesmo valor).
+      for (const field of numericFields) {
         const raw = row[field];
-        if (raw !== undefined && raw !== null) {
-          updateObj[field] = raw.toString().trim() === "" ? null : (parseNullableNumber(raw) ?? undefined);
+        if (raw === undefined || raw === null) continue;
+
+        const isEmpty = raw.toString().trim() === "";
+        const newVal = isEmpty ? null : parseNullableNumber(raw);
+        // Valor nao vazio porem invalido (NaN): nao altera o registro.
+        if (!isEmpty && newVal === null) continue;
+
+        const curVal = parseNullableNumber(current?.[field]);
+        if (newVal !== curVal) {
+          updateObj[field] = newVal;
         }
       }
 
       const validatedSituacao = validateSituacao(situacao);
       if (situacao && validatedSituacao !== null) {
-        updateObj.situacao = validatedSituacao;
+        if (validatedSituacao !== (current?.situacao ?? null)) {
+          updateObj.situacao = validatedSituacao;
+        }
       } else if (situacao) {
         return { updateObj: {}, error: `Valor de situacao inválido: "${situacao}".` };
-      }
-
-      if (Object.keys(updateObj).length === 0) {
-        return { updateObj: {}, error: "Nenhum campo válido para atualização." };
       }
 
       return { updateObj };
     };
 
-    // 5. Atualizar em lotes paralelos de 20 para máxima velocidade
+    // 5. Pre-classificar cada registro em: erro de validacao, inalterado ou
+    // pendente de update. Assim, registros sem mudanca nao geram chamada ao
+    // banco -- reenviar o mesmo arquivo resulta em zero UPDATEs.
+    const rowsNeedingUpdate: { idParcela: string; updateObj: any }[] = [];
+    for (const row of dataToUpdate) {
+      const idParcela = row.id_parcela || row["id_parcela"];
+      const current = existingRecords.get(idParcela);
+      const { updateObj, error: buildError } = buildUpdateObj(row, current);
+
+      if (buildError) {
+        updates.push({ id_parcela: idParcela, status: "error", error: buildError });
+      } else if (Object.keys(updateObj).length === 0) {
+        updates.push({ id_parcela: idParcela, status: "unchanged" });
+      } else {
+        rowsNeedingUpdate.push({ idParcela, updateObj });
+      }
+    }
+
+    const unchangedCount = dataToUpdate.length - rowsNeedingUpdate.length;
+    console.log(
+      `🔄 ${rowsNeedingUpdate.length} registro(s) com alteracao real; ${unchangedCount} inalterado(s) (ignorados).`,
+    );
+
+    // 6. Atualizar em lotes paralelos de 20 apenas o que realmente mudou.
     const PARALLEL_SIZE = 20;
-    for (let i = 0; i < dataToUpdate.length; i += PARALLEL_SIZE) {
-      const batchRows = dataToUpdate.slice(i, i + PARALLEL_SIZE);
+    for (let i = 0; i < rowsNeedingUpdate.length; i += PARALLEL_SIZE) {
+      const batch = rowsNeedingUpdate.slice(i, i + PARALLEL_SIZE);
 
       const batchResults = await Promise.allSettled(
-        batchRows.map(async (row): Promise<UpdateResult> => {
-          const idParcela = row.id_parcela || row["id_parcela"];
-          const { updateObj, error: buildError } = buildUpdateObj(row);
-
-          if (buildError) {
-            return { id_parcela: idParcela, status: "error", error: buildError };
-          }
-
+        batch.map(async ({ idParcela, updateObj }): Promise<UpdateResult> => {
           const { error } = await supabase
             .from("BANCO_DADOS")
             .update(updateObj)
@@ -645,10 +828,17 @@ const DatabaseUpload: React.FC = () => {
       });
 
       if (onProgress) {
-        const processed = Math.min(i + PARALLEL_SIZE, dataToUpdate.length);
-        const percentage = 30 + Math.round((processed / dataToUpdate.length) * 70);
-        onProgress(percentage, `Atualizando ${processed} de ${dataToUpdate.length} registros...`);
+        const processed = Math.min(i + PARALLEL_SIZE, rowsNeedingUpdate.length);
+        const percentage = 30 + Math.round((processed / rowsNeedingUpdate.length) * 70);
+        onProgress(
+          percentage,
+          `Atualizando ${processed} de ${rowsNeedingUpdate.length} registros...`,
+        );
       }
+    }
+
+    if (rowsNeedingUpdate.length === 0 && onProgress) {
+      onProgress(100, "Nenhum registro precisou ser atualizado.");
     }
 
     return updates;
@@ -1027,8 +1217,9 @@ const DatabaseUpload: React.FC = () => {
 
       const successful = results.filter((r) => r.status === "success").length;
       const failed = results.filter((r) => r.status === "error").length;
+      const unchanged = results.filter((r) => r.status === "unchanged").length;
       const finalProgressMessage = "✅ Atualização concluída!";
-      const statusMessage = `Status: ${successful} sucesso(s), ${failed} falha(s).`;
+      const statusMessage = `Status: ${successful} atualizado(s), ${unchanged} inalterado(s), ${failed} falha(s).`;
 
       setUploadStatus(statusMessage);
       setProgressMessage(finalProgressMessage);
@@ -1416,7 +1607,7 @@ const DatabaseUpload: React.FC = () => {
                 <h3 className="text-lg font-bold text-gray-900 mb-4">
                   Resumo da Operação
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-green-50 p-4 rounded-lg flex items-center space-x-3">
                     <CheckCircle className="h-8 w-8 text-green-500" />
                     <div>
@@ -1424,10 +1615,18 @@ const DatabaseUpload: React.FC = () => {
                         Títulos Atualizados
                       </p>
                       <p className="text-2xl font-bold text-gray-900">
-                        {
-                          uploadResults.filter((r) => r.status === "success")
-                            .length
-                        }
+                        {successResults.length}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="bg-gray-100 p-4 rounded-lg flex items-center space-x-3">
+                    <Info className="h-8 w-8 text-gray-500" />
+                    <div>
+                      <p className="text-sm text-gray-600">
+                        Inalterados (ignorados)
+                      </p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {unchangedResults.length}
                       </p>
                     </div>
                   </div>
@@ -1436,14 +1635,14 @@ const DatabaseUpload: React.FC = () => {
                     <div>
                       <p className="text-sm text-gray-600">Títulos com Falha</p>
                       <p className="text-2xl font-bold text-gray-900">
-                        {
-                          uploadResults.filter((r) => r.status === "error")
-                            .length
-                        }
+                        {errorResults.length}
                       </p>
                     </div>
                   </div>
                 </div>
+                <p className="text-xs text-gray-500 mt-4 text-center">
+                  Total processado: {uploadResults.length} registro(s)
+                </p>
               </div>
             )}
 
@@ -1456,65 +1655,75 @@ const DatabaseUpload: React.FC = () => {
                   {/* Falhas */}
                   <div>
                     <h4 className="text-md font-semibold text-red-700 mb-2">
-                      Títulos com Falha (
-                      {uploadResults.filter((r) => r.status === "error").length}
-                      )
+                      Títulos com Falha ({errorResults.length})
                     </h4>
-                    <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2 bg-gray-50">
-                      {uploadResults.filter((r) => r.status === "error")
-                        .length > 0 ? (
-                        <ul className="divide-y divide-gray-200">
-                          {uploadResults
-                            .filter((r) => r.status === "error")
-                            .map((result, index) => (
-                              <li key={index} className="py-2 px-2">
-                                <p className="text-sm font-medium text-gray-800">
-                                  ID Parcela: {result.id_parcela}
-                                </p>
-                                <p className="text-sm text-red-600">
-                                  Erro: {result.error}
-                                </p>
-                              </li>
-                            ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-gray-500 p-4 text-center">
-                          Nenhuma falha registrada.
-                        </p>
-                      )}
-                    </div>
+
+                    {/* Cards por tipo de erro (clicaveis para filtrar a lista) */}
+                    {errorGroups.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <button
+                          onClick={() => setSelectedErrorCategory(null)}
+                          className={`px-3 py-2 rounded-lg border text-left transition-colors ${
+                            selectedErrorCategory === null
+                              ? "border-red-400 bg-red-100"
+                              : "border-gray-200 bg-gray-50 hover:bg-gray-100"
+                          }`}
+                        >
+                          <span className="block text-lg font-bold text-gray-900">
+                            {errorResults.length}
+                          </span>
+                          <span className="block text-xs text-gray-600">
+                            Todas
+                          </span>
+                        </button>
+                        {errorGroups.map(([category, items]) => (
+                          <button
+                            key={category}
+                            onClick={() => setSelectedErrorCategory(category)}
+                            className={`px-3 py-2 rounded-lg border text-left transition-colors ${
+                              selectedErrorCategory === category
+                                ? "border-red-400 bg-red-100"
+                                : "border-gray-200 bg-gray-50 hover:bg-gray-100"
+                            }`}
+                          >
+                            <span className="block text-lg font-bold text-red-700">
+                              {items.length}
+                            </span>
+                            <span className="block text-xs text-gray-600 max-w-[12rem]">
+                              {category}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <ResultList
+                      items={filteredErrors}
+                      emptyMessage="Nenhuma falha registrada."
+                      showError
+                    />
+                  </div>
+
+                  {/* Inalterados */}
+                  <div>
+                    <h4 className="text-md font-semibold text-gray-700 mb-2">
+                      Inalterados / ignorados ({unchangedResults.length})
+                    </h4>
+                    <ResultList
+                      items={unchangedResults}
+                      emptyMessage="Nenhum registro inalterado."
+                    />
                   </div>
 
                   {/* Sucessos */}
                   <div>
                     <h4 className="text-md font-semibold text-green-700 mb-2">
-                      Títulos Atualizados com Sucesso (
-                      {
-                        uploadResults.filter((r) => r.status === "success")
-                          .length
-                      }
-                      )
+                      Títulos Atualizados com Sucesso ({successResults.length})
                     </h4>
-                    <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2 bg-gray-50">
-                      {uploadResults.filter((r) => r.status === "success")
-                        .length > 0 ? (
-                        <ul className="divide-y divide-gray-200">
-                          {uploadResults
-                            .filter((r) => r.status === "success")
-                            .map((result, index) => (
-                              <li key={index} className="py-2 px-2">
-                                <p className="text-sm font-medium text-gray-800">
-                                  ID Parcela: {result.id_parcela}
-                                </p>
-                              </li>
-                            ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-gray-500 p-4 text-center">
-                          Nenhum título atualizado com sucesso.
-                        </p>
-                      )}
-                    </div>
+                    <ResultList
+                      items={successResults}
+                      emptyMessage="Nenhum título atualizado com sucesso."
+                    />
                   </div>
                 </div>
               </div>

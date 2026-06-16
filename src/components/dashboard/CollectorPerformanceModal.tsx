@@ -10,6 +10,7 @@ import {
   Info,
   Users,
   UserPlus,
+  Sparkles,
 } from "lucide-react";
 import { formatCurrency } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
@@ -91,6 +92,36 @@ const Pagination: React.FC<{ page: number; total: number; perPage: number; onCha
   );
 };
 
+// Busca TODAS as linhas de uma query do Supabase paginando de 1000 em 1000
+// (o Supabase/PostgREST retorna no maximo ~1000 linhas por requisicao). Sem
+// isso, cobradores com muito historico de atribuicao tinham os numeros da aba
+// Carteira truncados nos primeiros 1000 registros.
+async function fetchAllRows<T>(
+  runPage: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: any }>,
+  shouldCancel?: () => boolean,
+): Promise<T[]> {
+  const PAGE = 1000;
+  const all: T[] = [];
+  let from = 0;
+
+  while (!shouldCancel?.()) {
+    const { data, error } = await runPage(from, from + PAGE - 1);
+    if (error) {
+      console.error("Erro ao paginar dados do modal de performance:", error);
+      break;
+    }
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  return all;
+}
+
 const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
   isOpen,
   onClose,
@@ -108,18 +139,89 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
   const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
   const [assignmentRecords, setAssignmentRecords] = useState<AssignmentRecord[]>([]);
   const [carteiraYear, setCarteiraYear] = useState<number | "all">(new Date().getFullYear());
+  // Documentos de clientes criados no sistema (clientes.created_at) no mes
+  // passado -- mesma fonte de verdade do card "Novos Clientes" e do badge
+  // "Novo". Usado para distinguir, dentro das entradas da carteira, quem e
+  // cliente realmente novo no banco (vs. transferido de outro cobrador).
+  const [newClientsLastMonthDocs, setNewClientsLastMonthDocs] = useState<
+    Set<string>
+  >(new Set());
 
   const HISTORY_PER_PAGE = 6;
   const PENDING_PER_PAGE = 12;
 
   useEffect(() => {
     if (!collector) return;
-    supabase
-      .from("atribuicoes_historico")
-      .select("*")
-      .or(`cobrador_novo_id.eq.${collector.collectorId},cobrador_anterior_id.eq.${collector.collectorId}`)
-      .order("assigned_at", { ascending: false })
-      .then(({ data }) => setAssignmentRecords((data as AssignmentRecord[]) ?? []));
+    let cancelled = false;
+
+    (async () => {
+      const records = await fetchAllRows<AssignmentRecord>(
+        (from, to) =>
+          supabase
+            .from("atribuicoes_historico")
+            .select("*")
+            .or(
+              `cobrador_novo_id.eq.${collector.collectorId},cobrador_anterior_id.eq.${collector.collectorId}`,
+            )
+            .order("assigned_at", { ascending: false })
+            .range(from, to),
+        () => cancelled,
+      );
+      if (!cancelled) setAssignmentRecords(records);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [collector?.collectorId]);
+
+  // Busca os documentos criados no sistema no mes passado (janela pequena).
+  useEffect(() => {
+    if (!collector) return;
+    let cancelled = false;
+
+    const loadNewClients = async () => {
+      const now = new Date();
+      const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevMonthEnd = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        0,
+        23,
+        59,
+        59,
+        999,
+      );
+
+      const rows = await fetchAllRows<{
+        documento: string | null;
+        created_at: string | null;
+      }>(
+        (from, to) =>
+          supabase
+            .from("clientes")
+            .select("documento, created_at")
+            .gte("created_at", prevMonthStart.toISOString())
+            .lte("created_at", prevMonthEnd.toISOString())
+            .range(from, to),
+        () => cancelled,
+      );
+
+      if (cancelled) return;
+
+      setNewClientsLastMonthDocs(
+        new Set(
+          rows
+            .filter((r) => r.documento)
+            .map((r) => r.documento as string),
+        ),
+      );
+    };
+
+    loadNewClients();
+    return () => {
+      cancelled = true;
+    };
   }, [collector?.collectorId]);
 
   // Function to parse dates consistently with the dashboard
@@ -302,10 +404,10 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
     }
 
     const map = new Map<string, MonthEntry>();
+    const addsByMonth = new Map<string, Set<string>>();
+    const removesByMonth = new Map<string, Set<string>>();
 
-    assignmentRecords.forEach((r) => {
-      const d = new Date(r.assigned_at);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const ensureMonth = (key: string, d: Date) => {
       if (!map.has(key)) {
         map.set(key, {
           key,
@@ -318,9 +420,24 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
           titlesCount: 0,
         });
       }
-      const entry = map.get(key)!;
-      if (r.cobrador_novo_id === collector.collectorId) entry.additions++;
-      if (r.cobrador_anterior_id === collector.collectorId) entry.removals++;
+    };
+
+    // Entradas/saidas contadas por DOCUMENTOS UNICOS por mes (nao por evento):
+    // o mesmo cliente atribuido 2x no mesmo mes conta 1. Mantem coerencia com a
+    // carteira atual (clientes unicos) e com a reconstrucao cumulativa.
+    assignmentRecords.forEach((r) => {
+      if (!r.documento) return;
+      const d = new Date(r.assigned_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      ensureMonth(key, d);
+      if (r.cobrador_novo_id === collector.collectorId) {
+        if (!addsByMonth.has(key)) addsByMonth.set(key, new Set());
+        addsByMonth.get(key)!.add(r.documento);
+      }
+      if (r.cobrador_anterior_id === collector.collectorId) {
+        if (!removesByMonth.has(key)) removesByMonth.set(key, new Set());
+        removesByMonth.get(key)!.add(r.documento);
+      }
     });
 
     // Títulos únicos (venda_n + documento) pelo mês de lançamento da venda
@@ -338,18 +455,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
         if (!titlesByMonth.has(key)) titlesByMonth.set(key, new Set());
         titlesByMonth.get(key)!.add(titleKey);
         // Garante que o mês aparece na tabela mesmo sem atribuições
-        if (!map.has(key)) {
-          map.set(key, {
-            key,
-            label: d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
-            year: d.getFullYear(),
-            month: d.getMonth(),
-            additions: 0,
-            removals: 0,
-            portfolioSize: 0,
-            titlesCount: 0,
-          });
-        }
+        ensureMonth(key, d);
       });
 
     // Sort newest first, then work backwards from currentPortfolio to fill sizes
@@ -359,6 +465,8 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
 
     let running = currentPortfolio;
     sorted.forEach((entry) => {
+      entry.additions = addsByMonth.get(entry.key)?.size ?? 0;
+      entry.removals = removesByMonth.get(entry.key)?.size ?? 0;
       entry.portfolioSize = running;
       entry.titlesCount = titlesByMonth.get(entry.key)?.size ?? 0;
       running = running - entry.additions + entry.removals;
@@ -367,20 +475,44 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
     return sorted;
   }, [assignmentRecords, currentPortfolio, collector, collections]);
 
-  // Clientes adicionados no mês passado
+  // Clientes que entraram na carteira no mês passado (documentos únicos).
   const lastMonthCount = useMemo(() => {
     if (!collector) return 0;
     const now = new Date();
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    return assignmentRecords.filter((r) => {
-      if (r.cobrador_novo_id !== collector.collectorId) return false;
+    const docs = new Set<string>();
+    assignmentRecords.forEach((r) => {
+      if (r.cobrador_novo_id !== collector.collectorId || !r.documento) return;
       const d = new Date(r.assigned_at);
-      return d.getFullYear() === lastMonth.getFullYear() && d.getMonth() === lastMonth.getMonth();
-    }).length;
+      if (
+        d.getFullYear() === lastMonth.getFullYear() &&
+        d.getMonth() === lastMonth.getMonth()
+      ) {
+        docs.add(r.documento);
+      }
+    });
+    return docs.size;
   }, [assignmentRecords, collector]);
 
   const lastMonthLabel = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)
     .toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+
+  // Entre os clientes da carteira atual deste cobrador, quantos sao realmente
+  // novos no sistema (criados no mes passado). Diferente de "entraram na
+  // carteira", que inclui clientes transferidos de outro cobrador.
+  const newInSystemLastMonth = useMemo(() => {
+    if (!collector || newClientsLastMonthDocs.size === 0) return 0;
+    const portfolioDocs = new Set(
+      collections
+        .filter((c) => c.user_id === collector.collectorId && c.documento)
+        .map((c) => c.documento),
+    );
+    let count = 0;
+    newClientsLastMonthDocs.forEach((doc) => {
+      if (portfolioDocs.has(doc)) count++;
+    });
+    return count;
+  }, [collector, collections, newClientsLastMonthDocs]);
 
   const carteiraAvailableYears = useMemo(() => {
     const years = new Set(portfolioByMonth.map((e) => e.year));
@@ -392,15 +524,13 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
     return portfolioByMonth.filter((e) => e.year === carteiraYear);
   }, [portfolioByMonth, carteiraYear]);
 
+  // Totais = soma das contagens mensais (documentos únicos por mês), para
+  // bater exatamente com a soma das colunas +Entradas/−Saídas da tabela.
   const carteiraTotals = useMemo(() => {
-    const totalAdditions = assignmentRecords.filter(
-      (r) => r.cobrador_novo_id === collector?.collectorId
-    ).length;
-    const totalRemovals = assignmentRecords.filter(
-      (r) => r.cobrador_anterior_id === collector?.collectorId
-    ).length;
+    const totalAdditions = portfolioByMonth.reduce((s, e) => s + e.additions, 0);
+    const totalRemovals = portfolioByMonth.reduce((s, e) => s + e.removals, 0);
     return { totalAdditions, totalRemovals };
-  }, [assignmentRecords, collector]);
+  }, [portfolioByMonth]);
 
   if (!collector) return null;
 
@@ -654,8 +784,8 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
             )}
             {activeTab === "carteira" && (
               <div className="space-y-5 pb-4">
-                {/* 4 cards de resumo */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* Cards de resumo */}
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                   <div className="p-4 border border-blue-100 dark:border-blue-900/30 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10">
                     <div className="flex items-center gap-1.5 mb-1">
                       <Users className="w-3.5 h-3.5 text-blue-500" />
@@ -667,10 +797,18 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                   <div className="p-4 border border-green-100 dark:border-green-900/30 rounded-2xl bg-green-50/50 dark:bg-green-900/10">
                     <div className="flex items-center gap-1.5 mb-1">
                       <UserPlus className="w-3.5 h-3.5 text-green-500" />
-                      <label className="text-[9px] font-bold text-green-600 dark:text-green-400 uppercase tracking-widest">Mês Passado</label>
+                      <label className="text-[9px] font-bold text-green-600 dark:text-green-400 uppercase tracking-widest">Entraram na Carteira</label>
                     </div>
                     <p className="text-3xl font-black text-green-600 dark:text-green-400">{lastMonthCount}</p>
                     <p className="text-[9px] text-green-400 mt-0.5 capitalize">{lastMonthLabel}</p>
+                  </div>
+                  <div className="p-4 border border-cyan-100 dark:border-cyan-900/30 rounded-2xl bg-cyan-50/50 dark:bg-cyan-900/10">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-500" />
+                      <label className="text-[9px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-widest">Novos no Sistema</label>
+                    </div>
+                    <p className="text-3xl font-black text-cyan-600 dark:text-cyan-400">{newInSystemLastMonth}</p>
+                    <p className="text-[9px] text-cyan-400 mt-0.5 capitalize">{lastMonthLabel}</p>
                   </div>
                   <div className="p-4 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl bg-emerald-50/50 dark:bg-emerald-900/10">
                     <div className="flex items-center gap-1.5 mb-1">
