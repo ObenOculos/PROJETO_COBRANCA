@@ -2021,13 +2021,24 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           ...(situacaoUpdate !== undefined && { situacao: situacaoUpdate }),
         };
 
-        const { error: updateError } = await supabase
-          .from("BANCO_DADOS")
-          .update(updatePayload)
-          .in(
-            "id_parcela",
-            parcelas.map((p) => p.id_parcela),
-          );
+        // Atualiza filtrando direto por documento/cliente, em vez de montar uma
+        // lista gigante de id_parcela na URL (que poderia estourar o limite de
+        // tamanho da requisicao -> 414 -- e e mais lento de parsear).
+        let updateError: any = null;
+        if (documentBatch.length > 0) {
+          const { error } = await supabase
+            .from("BANCO_DADOS")
+            .update(updatePayload)
+            .in("documento", documentBatch as string[]);
+          if (error) updateError = error;
+        }
+        if (clientNameBatch.length > 0 && !updateError) {
+          const { error } = await supabase
+            .from("BANCO_DADOS")
+            .update(updatePayload)
+            .in("cliente", clientNameBatch as string[]);
+          if (error) updateError = error;
+        }
 
         if (updateError) {
           console.error("Erro ao atualizar parcelas do lote:", updateError);
@@ -2108,55 +2119,37 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           .filter((id) => !id.document && id.clientName)
           .map((id) => id.clientName);
 
-        let parcelas: { id_parcela: number }[] = [];
-        let fetchError: any = null;
+        // Remove o cobrador filtrando direto por documento/cliente. Nao precisa
+        // buscar antes a lista de id_parcela (sem historico aqui), o que elimina
+        // um round-trip por lote e a lista gigante de ids na URL. O total
+        // afetado vem do count: "exact" do proprio UPDATE.
+        let updateError: any = null;
+        let parcelasAfetadas = 0;
 
         if (documentBatch.length > 0) {
-          const { data, error } = await supabase
+          const { error, count } = await supabase
             .from("BANCO_DADOS")
-            .select("id_parcela")
+            .update({ user_id: null }, { count: "exact" })
             .in("documento", documentBatch as string[]);
-          if (error) fetchError = error;
-          if (data) parcelas = parcelas.concat(data);
+          if (error) updateError = error;
+          else parcelasAfetadas += count ?? 0;
         }
 
-        if (clientNameBatch.length > 0 && !fetchError) {
-          const { data, error } = await supabase
+        if (clientNameBatch.length > 0 && !updateError) {
+          const { error, count } = await supabase
             .from("BANCO_DADOS")
-            .select("id_parcela")
+            .update({ user_id: null }, { count: "exact" })
             .in("cliente", clientNameBatch as string[]);
-          if (error) fetchError = error;
-          if (data) parcelas = parcelas.concat(data);
+          if (error) updateError = error;
+          else parcelasAfetadas += count ?? 0;
         }
-
-        if (fetchError) {
-          console.error("Erro ao buscar parcelas do lote:", fetchError);
-          throw fetchError;
-        }
-
-        if (!parcelas || parcelas.length === 0) {
-          console.warn(
-            `Nenhuma parcela encontrada para este lote de ${batch.length} clientes`,
-          );
-          continue;
-        }
-
-        console.log(`Encontradas ${parcelas.length} parcelas para este lote`);
-
-        const { error: updateError } = await supabase
-          .from("BANCO_DADOS")
-          .update({ user_id: null })
-          .in(
-            "id_parcela",
-            parcelas.map((p) => p.id_parcela),
-          );
 
         if (updateError) {
           console.error("Erro ao atualizar parcelas do lote:", updateError);
           throw updateError;
         }
 
-        totalParcelasAtualizadas += parcelas.length;
+        totalParcelasAtualizadas += parcelasAfetadas;
         batchesCompleted++;
         onBatchProgress?.(batchesCompleted, totalBatches);
         console.log(
