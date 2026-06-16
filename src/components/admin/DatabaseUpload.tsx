@@ -680,7 +680,7 @@ const DatabaseUpload: React.FC = () => {
       // 2. Verificar duplicatas em lote
       if (onProgress) onProgress(10, "Verificando duplicatas...");
       const allIds = validData.map((row) => row.id_parcela);
-      const existingIds = new Set<string>();
+      const existingIds = new Set<number>();
       const CHUNK_SIZE = 500;
 
       for (let i = 0; i < allIds.length; i += CHUNK_SIZE) {
@@ -694,18 +694,26 @@ const DatabaseUpload: React.FC = () => {
           console.error("❌ Erro ao verificar duplicatas:", chunkError);
           return { success: false, error: chunkError.message };
         }
-        chunkRecords?.forEach((rec) =>
-          existingIds.add(rec.id_parcela.toString()),
-        );
+        chunkRecords?.forEach((rec) => existingIds.add(Number(rec.id_parcela)));
       }
 
-      // 3. Separar dados em "para inserir" e "duplicatas"
-      const rowsToInsert = validData.filter(
-        (row) => !existingIds.has(row.id_parcela),
-      );
-      const duplicateRows = validData.filter((row) =>
-        existingIds.has(row.id_parcela),
-      );
+      // 3. Separar dados em "para inserir" e "duplicatas".
+      // Considera duplicata tanto o id_parcela ja existente no banco quanto o
+      // repetido DENTRO do proprio arquivo (este ultimo antes passava batido e
+      // estourava a PK no insert). Comparacao numerica para evitar mismatch de
+      // formato (ex.: "123" do Excel vs 123 no banco).
+      const seenInFile = new Set<number>();
+      const rowsToInsert: typeof validData = [];
+      const duplicateRows: typeof validData = [];
+      for (const row of validData) {
+        const idNum = Number(row.id_parcela);
+        if (existingIds.has(idNum) || seenInFile.has(idNum)) {
+          duplicateRows.push(row);
+        } else {
+          seenInFile.add(idNum);
+          rowsToInsert.push(row);
+        }
+      }
 
       if (rowsToInsert.length === 0) {
         if (onProgress) onProgress(100, "Nenhuma nova parcela para inserir.");
@@ -827,9 +835,15 @@ const DatabaseUpload: React.FC = () => {
         return newRow;
       });
 
+      // upsert com ignoreDuplicates: rede de seguranca -- se algum id_parcela
+      // duplicado escapar da verificacao acima, o banco ignora a linha
+      // (ON CONFLICT DO NOTHING) em vez de abortar a importacao inteira.
       const { error } = await supabase
         .from("BANCO_DADOS")
-        .insert(processedChunk as BancoDadosInsert[]);
+        .upsert(processedChunk as BancoDadosInsert[], {
+          onConflict: "id_parcela",
+          ignoreDuplicates: true,
+        });
 
       if (error) {
         console.error("❌ Erro ao inserir dados:", error);
