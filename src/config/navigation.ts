@@ -1,5 +1,4 @@
 import {
-  ChartPie,
   HandCoins,
   MapPin,
   Calendar,
@@ -23,14 +22,6 @@ export interface NavItemConfig {
 }
 
 export const navigationItems: NavItemConfig[] = [
-  {
-    id: "overview",
-    managerName: "Visão Geral",
-    collectorName: "Resumo",
-    managerIcon: ChartPie,
-    collectorIcon: ChartPie,
-    roles: ["manager", "collector"],
-  },
   {
     id: "collections",
     managerName: "Cobranças",

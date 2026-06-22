@@ -16,7 +16,6 @@ import { FilterOptions } from "../../types";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 import { CollectionTableRef } from "./CollectionTable";
 import { Notification } from "../../contexts/NotificationContext";
-import { OverviewTab } from "./OverviewTab";
 
 interface ManagerDashboardProps {
   activeTab?: string;
@@ -28,16 +27,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   onTabChange,
 }) => {
   const {
-    getDashboardStats,
-    getCollectorPerformance,
     getFilteredCollections,
-    getPendingCancellationRequests,
     collections,
-    scheduledVisits,
   } = useCollection();
 
   const [internalActiveTab, setInternalActiveTab] = useState<
-    | "overview"
     | "collections"
     | "performance"
     | "users"
@@ -48,7 +42,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     | "database-upload"
   >(() => {
     const savedTab = localStorage.getItem("managerActiveTab");
-    return (savedTab as any) || "overview";
+    return (savedTab as any) || "collections";
   });
 
   const activeTab = externalActiveTab || internalActiveTab;
@@ -147,36 +141,17 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     };
   }, [isMobileMenuOpen]);
 
-  const stats = useMemo(() => getDashboardStats(), [collections]);
-  const performance = useMemo(() => getCollectorPerformance(), [collections]);
   const baseFilteredCollections = useMemo(
     () => getFilteredCollections(filters, "manager"),
     [filters, collections],
   );
 
   const filteredCollections = baseFilteredCollections;
-  const overviewCollections = collections;
-  const pendingCancellations = getPendingCancellationRequests();
 
   const renderTabContent = () => {
     switch (activeTab) {
       case "database-upload":
         return <DatabaseUpload />;
-      case "overview":
-        return (
-          <div className="space-y-4 sm:space-y-6">
-            <OverviewTab
-              collections={overviewCollections}
-              performance={performance}
-              stats={stats}
-              pendingCancellations={pendingCancellations}
-              setActiveTab={setActiveTab}
-              setFilters={setFilters}
-              filters={filters}
-              scheduledVisits={scheduledVisits}
-            />
-          </div>
-        );
       case "collections":
         return (
           <div className="space-y-3 sm:space-y-4">

@@ -26,13 +26,13 @@ const AppContent: React.FC = () => {
   // Estado para gerenciar aba ativa do manager
   const [managerActiveTab, setManagerActiveTab] = useState(() => {
     const savedTab = localStorage.getItem("managerActiveTab");
-    return savedTab || "overview";
+    return savedTab && savedTab !== "overview" ? savedTab : "collections";
   });
 
   // Estado para gerenciar aba ativa do collector
   const [collectorActiveTab, setCollectorActiveTab] = useState(() => {
     const savedTab = localStorage.getItem("collectorActiveTab");
-    return savedTab || "overview";
+    return savedTab && savedTab !== "overview" ? savedTab : "collections";
   });
 
   // Estado para controlar transições suaves entre loadings
