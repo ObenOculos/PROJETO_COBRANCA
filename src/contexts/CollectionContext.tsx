@@ -1329,105 +1329,70 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       });
     }
 
-    // Apply existing status filter
+    // Apply status filter (Pago / Parcial / Pendente)
+    // Classificacao por venda (venda_n), alinhada a exibicao da tabela
+    // (CollectionTable) e ao filtro do cobrador. Normaliza o vocabulario, pois o
+    // dropdown envia "Em atraso"/"Pago"/"Pago Parcial" e os botoes enviam
+    // "pendente"/"pago"/"parcial".
     if (filters.status) {
-      // Para filtros 'parcial' e 'pago', precisamos de lógica especial para status do cliente
-      if (
-        filters.status?.toLowerCase() === "parcial" ||
-        filters.status?.toLowerCase() === "pago"
-      ) {
-        // Agrupar por cliente para verificar status do cliente
-        const clientGroups = new Map<string, Collection[]>();
-        filtered.forEach((c) => {
-          const key = `${c.documento}-${c.cliente}`;
-          if (!clientGroups.has(key)) {
-            clientGroups.set(key, []);
-          }
-          clientGroups.get(key)!.push(c);
-        });
+      const raw = filters.status.toLowerCase().trim();
+      const targetStatus = [
+        "pago",
+        "recebido",
+        "paid",
+        "quitado",
+        "finalizado",
+      ].includes(raw)
+        ? "pago"
+        : [
+              "parcial",
+              "pago parcial",
+              "parcialmente pago",
+              "parcialmente_pago",
+              "partial",
+            ].includes(raw)
+          ? "parcial"
+          : "pendente";
 
-        // Filtrar clientes baseado no status solicitado
-        const targetClientKeys = new Set<string>();
-        clientGroups.forEach((clientCollections, clientKey) => {
-          const totalValue = clientCollections.reduce(
-            (sum, c) => sum + c.valor_original,
-            0,
-          );
-          const totalReceived = clientCollections.reduce(
-            (sum, c) => sum + c.valor_recebido,
-            0,
-          );
-          const pendingValue = Math.max(0, totalValue - totalReceived);
+      // Agrupa por venda; renegociadas (sem venda_n) contam como uma unica venda.
+      const saleGroups = new Map<string, Collection[]>();
+      filtered.forEach((c) => {
+        const key = `${c.documento}-${c.venda_n || 0}`;
+        if (!saleGroups.has(key)) saleGroups.set(key, []);
+        saleGroups.get(key)!.push(c);
+      });
 
-          if (filters.status?.toLowerCase() === "parcial") {
-            // Cliente é parcial se tem valor recebido E ainda tem valor pendente
-            if (totalReceived > 0 && pendingValue > 0) {
-              targetClientKeys.add(clientKey);
-            }
-          } else if (filters.status?.toLowerCase() === "pago") {
-            // Cliente é pago apenas se não tem nenhum valor pendente E tem valor recebido (completamente quitado)
-            if (pendingValue <= 0.01 && totalReceived > 0) {
-              targetClientKeys.add(clientKey);
-            }
-          }
-        });
+      const matchingSaleKeys = new Set<string>();
+      const round2 = (n: number) =>
+        Math.round((n + Number.EPSILON) * 100) / 100;
+      saleGroups.forEach((saleCollections, key) => {
+        const totalValue = round2(
+          saleCollections.reduce((sum, c) => sum + c.valor_original, 0),
+        );
+        const totalReceived = round2(
+          saleCollections.reduce((sum, c) => sum + c.valor_recebido, 0),
+        );
+        const totalDiscount = round2(
+          saleCollections.reduce((sum, c) => sum + (c.desconto || 0), 0),
+        );
+        // Saldo considera o desconto: a venda quita quando recebido + desconto
+        // cobrem o valor original (mesma regra de calculateSaleBalance).
+        const effectivePaid = round2(totalReceived + totalDiscount);
+        const pendingValue = round2(totalValue - effectivePaid);
 
-        // Filtrar collections dos clientes que atendem ao critério
-        filtered = filtered.filter((c) => {
-          const key = `${c.documento}-${c.cliente}`;
-          return targetClientKeys.has(key);
-        });
-        // Para outros filtros, incluindo 'pendente', usar lógica de cliente
-      } else if (filters.status?.toLowerCase() === "pendente") {
-        const clientGroups = new Map<string, Collection[]>();
-        filtered.forEach((c) => {
-          const key = `${c.documento}-${c.cliente}`;
-          if (!clientGroups.has(key)) {
-            clientGroups.set(key, []);
-          }
-          clientGroups.get(key)!.push(c);
-        });
+        const status =
+          effectivePaid === 0
+            ? "pendente"
+            : pendingValue > 0.01
+              ? "parcial"
+              : "pago";
 
-        const targetClientKeys = new Set<string>();
-        clientGroups.forEach((clientCollections, clientKey) => {
-          const totalValue = clientCollections.reduce(
-            (sum, c) => sum + c.valor_original,
-            0,
-          );
-          const totalReceived = clientCollections.reduce(
-            (sum, c) => sum + c.valor_recebido,
-            0,
-          );
-          const pendingValue = Math.max(0, totalValue - totalReceived);
+        if (status === targetStatus) matchingSaleKeys.add(key);
+      });
 
-          // Cliente é pendente se não tem valor recebido E ainda tem valor pendente
-          if (totalReceived <= 0.01 && pendingValue > 0) {
-            targetClientKeys.add(clientKey);
-          }
-        });
-
-        filtered = filtered.filter((c) => {
-          const key = `${c.documento}-${c.cliente}`;
-          return targetClientKeys.has(key);
-        });
-      } else {
-        // Para qualquer outro status não tratado acima, usar a lógica de parcela individual
-        filtered = filtered.filter((c) => {
-          const currentStatus = c.status?.toLowerCase() || "pendente";
-          const filterStatus = filters.status?.toLowerCase();
-
-          if (!filterStatus) return true; // No status filter
-
-          if (filterStatus === "pago") {
-            return (
-              currentStatus === "pago" || currentStatus === "pago com desconto"
-            );
-          }
-
-          // For other statuses like 'parcial' or 'pendente', do an exact match.
-          return currentStatus === filterStatus;
-        });
-      }
+      filtered = filtered.filter((c) =>
+        matchingSaleKeys.has(`${c.documento}-${c.venda_n || 0}`),
+      );
     }
 
     if (filters.dueDate) {
