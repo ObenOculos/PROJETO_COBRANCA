@@ -141,7 +141,24 @@ const getSituacaoIndicator = (collections: Collection[]) => {
   return null;
 };
 
-export const ClientAssignment = React.memo(() => {
+// Conta a quantidade de vendas distintas de um cliente.
+// Parcelas sem venda_n são renegociadas e contam como UMA única venda
+// (mesma regra usada em getSalesByClient/getClientGroups no contexto).
+const getVendasCount = (collections: Collection[]) => {
+  const vendas = new Set<number>();
+  let hasRenegociada = false;
+  collections.forEach((c) => {
+    if (c.venda_n) vendas.add(c.venda_n);
+    else hasRenegociada = true;
+  });
+  return vendas.size + (hasRenegociada ? 1 : 0);
+};
+
+interface ClientAssignmentProps {
+  onViewClient?: (clientIdentifier: string) => void;
+}
+
+export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentProps) => {
   const {
     collections,
     users,
@@ -1383,6 +1400,7 @@ export const ClientAssignment = React.memo(() => {
                     />
                   </th>
                   <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Cliente / Documento</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Vendas</th>
                   <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Parcelas</th>
                   <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Status / Cobrador</th>
                   <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Localização</th>
@@ -1413,12 +1431,25 @@ export const ClientAssignment = React.memo(() => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
-                          <span className="text-sm font-black text-gray-900 dark:text-dark-text truncate max-w-[250px]" title={client.cliente}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onViewClient?.(client.documento || client.cliente);
+                            }}
+                            title={`Ver cobranças de ${client.cliente}`}
+                            className="text-left text-sm font-black text-gray-900 dark:text-dark-text truncate max-w-[250px] hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
+                          >
                             {client.cliente.toUpperCase()}
-                          </span>
+                          </button>
                           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{client.documento}</span>
                           {client.apelido && <span className="text-[10px] text-blue-500 font-black italic mt-0.5">"{client.apelido.toUpperCase()}"</span>}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-black bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/30">
+                          {getVendasCount(client.collections)}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-black bg-gray-100 dark:bg-dark-bg text-gray-700 dark:text-dark-text border border-gray-200 dark:border-dark-border">
@@ -1501,9 +1532,16 @@ export const ClientAssignment = React.memo(() => {
                     <div className="flex-1 min-w-0 space-y-2.5">
                       <div className="flex justify-between items-start gap-2">
                         <div className="min-w-0">
-                          <h4 className="text-[13px] font-black text-gray-900 dark:text-dark-text truncate uppercase tracking-tight leading-tight">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onViewClient?.(client.documento || client.cliente);
+                            }}
+                            className="text-left text-[13px] font-black text-gray-900 dark:text-dark-text truncate uppercase tracking-tight leading-tight hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
+                          >
                             {client.cliente}
-                          </h4>
+                          </button>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <p className="text-[9px] font-bold text-gray-400 uppercase leading-none">{client.documento}</p>
                             {client.apelido && (
@@ -1539,7 +1577,10 @@ export const ClientAssignment = React.memo(() => {
                             {situacao.label}
                           </div>
                         )}
-                        <div className="flex items-center text-[9px] font-bold text-gray-400 uppercase tracking-tight ml-auto">
+                        <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase tracking-tight ml-auto">
+                          <span className="bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded-md text-indigo-600 dark:text-indigo-400">
+                            {getVendasCount(client.collections)}V
+                          </span>
                           <span className="bg-gray-100 dark:bg-dark-bg px-1.5 py-0.5 rounded-md text-gray-600 dark:text-dark-text-secondary">
                             {client.collections.length}P
                           </span>

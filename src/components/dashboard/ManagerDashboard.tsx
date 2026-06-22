@@ -230,7 +230,14 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         return <EnhancedStoreManagement />;
 
       case "clients":
-        return <ClientAssignment />;
+        return (
+          <ClientAssignment
+            onViewClient={(clientIdentifier) => {
+              setFilters({ search: clientIdentifier });
+              setActiveTab("collections");
+            }}
+          />
+        );
 
       case "visit-tracking":
         return <VisitTracking />;
