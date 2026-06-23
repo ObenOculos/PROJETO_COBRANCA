@@ -40,6 +40,7 @@ import {
   parseAndFormatDate,
   calculateOverdueDays,
 } from "../../utils/formatters";
+import { isCancelado } from "../../types/status";
 import CollectionModal from "./CollectionModal";
 import ClientDetailModal from "./ClientDetailModal";
 import SaleDetailsModal from "./SaleDetailsModal";
@@ -1530,11 +1531,25 @@ export const CollectionTable = React.forwardRef<
                   <div className="px-4 sm:px-6 py-4 mt-2 rounded-2xl border border-gray-200 bg-gray-50 animate-in slide-in-from-top-2 duration-200">
                     <div className="space-y-3">
                       {clientGroup.sales.map((sale: SaleGroup) => {
-                        // Determinar o status real da venda baseado nos valores
+                        // Determinar o status real da venda baseado nos valores.
+                        // Venda totalmente cancelada (todas as parcelas) recebe
+                        // o selo "Cancelado" (so aparece no filtro Cancelado).
                         let displayStatus: string;
                         let statusColor: string;
 
-                        if (sale.totalReceived > 0 && sale.pendingValue > 0) {
+                        const allCancelled =
+                          sale.installments.length > 0 &&
+                          sale.installments.every((i: Collection) =>
+                            isCancelado(i.status),
+                          );
+
+                        if (allCancelled) {
+                          displayStatus = "Cancelado";
+                          statusColor = "bg-gray-200 text-gray-600";
+                        } else if (
+                          sale.totalReceived > 0 &&
+                          sale.pendingValue > 0
+                        ) {
                           displayStatus = "Parcial";
                           statusColor = "bg-yellow-100 text-yellow-800";
                         } else if (sale.pendingValue <= 0.01) {

@@ -11,6 +11,10 @@ const normalizeStatus = (
 
   const normalized = status.toLowerCase().trim();
 
+  if (normalized === "cancelado") {
+    return CollectionStatus.CANCELADO;
+  }
+
   if (
     ["recebido", "pago", "paid", "received", "quitado", "finalizado"].includes(
       normalized,
@@ -157,15 +161,16 @@ export const formatDate = (date: string | null | undefined): string => {
 
     const dateStr = date.toString().trim();
 
-    // Formato ISO (2024-01-01 ou 2024-01-01T00:00:00)
-    if (dateStr.includes("-") && dateStr.length >= 10) {
-      // Para formato YYYY-MM-DD, criar data local evitando timezone UTC
-      if (dateStr.length === 10 && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        const [year, month, day] = dateStr.split("-").map(Number);
-        parsedDate = new Date(year, month - 1, day);
-      } else {
-        parsedDate = new Date(dateStr);
-      }
+    // Formato ISO iniciando com YYYY-MM-DD (aceita "T..", " 00:00:00+00", etc.)
+    const isoLeading = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoLeading) {
+      // Usa apenas a parte da DATA (ignora hora/fuso) criando data local, para
+      // evitar o deslocamento de -1 dia quando vem como ISO com timezone.
+      parsedDate = new Date(
+        Number(isoLeading[1]),
+        Number(isoLeading[2]) - 1,
+        Number(isoLeading[3]),
+      );
     }
     // Formato brasileiro (01/01/2024 ou 01-01-2024)
     else if (
@@ -174,9 +179,13 @@ export const formatDate = (date: string | null | undefined): string => {
     ) {
       const parts = dateStr.split(/[\/\-]/);
       if (parts.length === 3) {
-        // Tentar dd/mm/yyyy primeiro
+        // Tentar dd/mm/yyyy primeiro (data local, sem conversao UTC)
         if (parseInt(parts[0]) <= 31 && parseInt(parts[1]) <= 12) {
-          parsedDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          parsedDate = new Date(
+            Number(parts[2]),
+            Number(parts[1]) - 1,
+            Number(parts[0]),
+          );
         } else {
           parsedDate = new Date(dateStr);
         }
@@ -266,21 +275,24 @@ export const calculateOverdueDays = (dueDateStr: string | null | undefined): num
         return 0;
       }
     } 
-    // Formato ISO YYYY-MM-DD
+    // Formato ISO iniciando com YYYY-MM-DD (aceita "T..Z" ou " 00:00:00+00")
     else if (cleanDateStr.includes("-")) {
-      const parts = cleanDateStr.split("-");
-      if (parts.length === 3) {
-        if (parts[0].length === 4) {
-          // ISO format YYYY-MM-DD
-          const [y, m, d] = parts.map(Number);
-          dueDate = new Date(y, m - 1, d);
-        } else {
-          // MM-DD-YYYY or other
+      const isoLeading = cleanDateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (isoLeading) {
+        dueDate = new Date(
+          Number(isoLeading[1]),
+          Number(isoLeading[2]) - 1,
+          Number(isoLeading[3]),
+        );
+      } else {
+        // MM-DD-YYYY ou outros
+        const parts = cleanDateStr.split("-");
+        if (parts.length === 3) {
           const [m, d, y] = parts.map(Number);
           dueDate = new Date(y, m - 1, d);
+        } else {
+          dueDate = new Date(cleanDateStr);
         }
-      } else {
-        dueDate = new Date(cleanDateStr);
       }
     } else {
       dueDate = new Date(cleanDateStr);

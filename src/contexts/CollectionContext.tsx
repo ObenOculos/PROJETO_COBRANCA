@@ -35,6 +35,7 @@ import {
   collectionsCache,
 } from "../utils/cache";
 import { calculateOverdueDays } from "../utils/formatters";
+import { isCancelado } from "../types/status";
 import {
   useRealtimeCacheInvalidation,
   useOfflineSyncCacheInvalidation,
@@ -62,7 +63,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const { user, isLoading: isAuthLoading } = useAuth();
   const { setLoading: setGlobalLoading } = useLoading();
   const { isOnline, addToOfflineQueue } = useOffline();
-  const [collections, setCollections] = useState<Collection[]>([]);
+  // Conjunto bruto vindo do banco (inclui titulos cancelados). Toda a operacao
+  // de cobranca consome `collections` (derivado abaixo), que exclui cancelados.
+  const [allCollections, setAllCollections] = useState<Collection[]>([]);
+  // Titulos cancelados na origem (status === "Cancelado") saem de toda a
+  // cobranca ativa: totais, carteira, atribuicao, rota/visitas e desempenho.
+  const collections = useMemo(
+    () => allCollections.filter((c) => !isCancelado(c.status)),
+    [allCollections],
+  );
   const [users, setUsers] = useState<User[]>([]);
   const [salePayments, setSalePayments] = useState<SalePayment[]>([]);
   const [scheduledVisits, setScheduledVisits] = useState<ScheduledVisit[]>([]);
@@ -410,7 +419,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         });
     } else {
       console.log("Usuário não logado, limpando dados...");
-      setCollections([]);
+      setAllCollections([]);
       setUsers([]);
       setSalePayments([]);
       setScheduledVisits([]);
@@ -472,7 +481,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             cachedData.length,
             "registros",
           );
-          setCollections(cachedData);
+          setAllCollections(cachedData);
           return;
         }
       } else {
@@ -485,7 +494,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           "🚫 Offline e sem cache de collections. A busca de dados foi ignorada.",
         );
         // Manter os dados existentes ou um array vazio se não houver nada
-        setCollections((prev) => (prev.length > 0 ? prev : []));
+        setAllCollections((prev) => (prev.length > 0 ? prev : []));
         return;
       }
 
@@ -545,7 +554,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       if (!data || data.length === 0) {
         console.warn("Nenhum dado retornado do Supabase");
-        setCollections([]);
+        setAllCollections([]);
         return;
       }
 
@@ -644,7 +653,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         situacao: row.situacao,
       }));
 
-      setCollections(transformedData);
+      setAllCollections(transformedData);
 
       // Cache the data using dedicated collections cache
       collectionsCache.set(cacheKey, transformedData);
@@ -729,7 +738,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }
 
       // Atualizar estado local
-      setCollections((prev) =>
+      setAllCollections((prev) =>
         prev.map((collection) =>
           collection.id_parcela === id
             ? { ...collection, ...updates }
@@ -1196,7 +1205,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     userType: UserType,
     collectorId?: string,
   ): Collection[] => {
-    let filtered = collections;
+    // O filtro "Cancelado" e o unico que enxerga os titulos cancelados (que
+    // ficam fora da cobranca ativa). Demais filtros operam so no conjunto ativo.
+    const wantCancelados =
+      (filters.status || "").trim().toLowerCase() === "cancelado";
+    let filtered = wantCancelados
+      ? allCollections.filter((c) => isCancelado(c.status))
+      : collections;
 
     // Filtrar por cobrador se o usuário for cobrador
     if (userType !== "manager" && collectorId) {
@@ -1333,8 +1348,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     // Classificacao por venda (venda_n), alinhada a exibicao da tabela
     // (CollectionTable) e ao filtro do cobrador. Normaliza o vocabulario, pois o
     // dropdown envia "Em atraso"/"Pago"/"Pago Parcial" e os botoes enviam
-    // "pendente"/"pago"/"parcial".
-    if (filters.status) {
+    // "pendente"/"pago"/"parcial". O caso "cancelado" ja foi resolvido na
+    // selecao da base (wantCancelados) e nao entra nesta classificacao.
+    if (filters.status && !wantCancelados) {
       const raw = filters.status.toLowerCase().trim();
       const targetStatus = [
         "pago",
@@ -2457,11 +2473,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   const getSalesByClient = React.useCallback(
     (clientDocument: string): SaleGroup[] => {
-      // Agrupar collections por venda
+      // Agrupar collections por venda. Usa allCollections (inclui canceladas)
+      // para que as parcelas canceladas aparecam no DETALHE do titulo; os
+      // totais abaixo, porem, ignoram as canceladas.
       const salesMap = new Map<number, Collection[]>();
       const individualInstallments: Collection[] = [];
 
-      collections
+      allCollections
         .filter((collection) => collection.documento === clientDocument)
         .forEach((collection) => {
           const saleNumber = collection.venda_n;
@@ -2484,14 +2502,19 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           // Arredondar para 2 casas decimais para evitar problemas de precisão
           const roundTo2Decimals = (num: number) =>
             Math.round((num + Number.EPSILON) * 100) / 100;
+          // Totais ignoram parcelas canceladas (mas elas seguem em
+          // `installments` para exibicao com selo no detalhe).
+          const active = installments.filter(
+            (inst) => !isCancelado(inst.status),
+          );
           const totalValue = roundTo2Decimals(
-            installments.reduce((sum, inst) => sum + inst.valor_original, 0),
+            active.reduce((sum, inst) => sum + inst.valor_original, 0),
           );
           // Limitar o valor recebido ao valor original para evitar valores negativos
           const totalReceived = roundTo2Decimals(
             Math.min(
               totalValue,
-              installments.reduce((sum, inst) => sum + inst.valor_recebido, 0),
+              active.reduce((sum, inst) => sum + inst.valor_recebido, 0),
             ),
           );
           const pendingValue = Math.max(
@@ -2515,66 +2538,49 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         },
       );
 
-      // Converter parcelas individuais para uma única "Venda Renegociada"
-      const renegotiatedSaleGroups =
-        individualInstallments.length > 0
-          ? [
-              {
-                saleNumber: 0, // Usar 0 para identificar como renegociada
-                titleNumber: individualInstallments[0]?.numero_titulo || 0,
-                description: `Renegociada (${individualInstallments.length} parcela${individualInstallments.length !== 1 ? "s" : ""})`,
-                installments: individualInstallments,
-                totalValue: individualInstallments.reduce(
-                  (sum, inst) => sum + inst.valor_original,
-                  0,
-                ),
-                totalReceived: Math.min(
-                  individualInstallments.reduce(
-                    (sum, inst) => sum + inst.valor_original,
-                    0,
-                  ),
-                  individualInstallments.reduce(
-                    (sum, inst) => sum + inst.valor_recebido,
-                    0,
-                  ),
-                ),
-                pendingValue: Math.max(
-                  0,
-                  individualInstallments.reduce(
-                    (sum, inst) =>
-                      sum +
-                      Math.max(0, inst.valor_original - inst.valor_recebido),
-                    0,
-                  ),
-                ),
-                saleStatus: (() => {
-                  const totalValue = individualInstallments.reduce(
-                    (sum, inst) => sum + inst.valor_original,
-                    0,
-                  );
-                  const totalReceived = Math.min(
-                    totalValue,
-                    individualInstallments.reduce(
-                      (sum, inst) => sum + inst.valor_recebido,
-                      0,
-                    ),
-                  );
-                  const pendingValue = totalValue - totalReceived;
-
-                  if (totalReceived === 0) return "pending" as const;
-                  if (pendingValue <= 0.01) return "fully_paid" as const;
-                  return "partially_paid" as const;
-                })(),
-                payments: getSalePayments(0, clientDocument), // Usar 0 para buscar pagamentos da renegociada
-                clientDocument,
-              },
-            ]
-          : [];
+      // Converter parcelas individuais para uma única "Venda Renegociada".
+      // Totais ignoram parcelas canceladas; elas seguem em `installments`
+      // para aparecerem com selo no detalhe.
+      const renegotiatedSaleGroups = (() => {
+        if (individualInstallments.length === 0) return [];
+        const activeIndividual = individualInstallments.filter(
+          (inst) => !isCancelado(inst.status),
+        );
+        const totalValue = activeIndividual.reduce(
+          (sum, inst) => sum + inst.valor_original,
+          0,
+        );
+        const totalReceived = Math.min(
+          totalValue,
+          activeIndividual.reduce((sum, inst) => sum + inst.valor_recebido, 0),
+        );
+        const pendingValue = Math.max(0, totalValue - totalReceived);
+        const saleStatus =
+          totalReceived === 0
+            ? ("pending" as const)
+            : pendingValue <= 0.01
+              ? ("fully_paid" as const)
+              : ("partially_paid" as const);
+        return [
+          {
+            saleNumber: 0, // Usar 0 para identificar como renegociada
+            titleNumber: individualInstallments[0]?.numero_titulo || 0,
+            description: `Renegociada (${individualInstallments.length} parcela${individualInstallments.length !== 1 ? "s" : ""})`,
+            installments: individualInstallments,
+            totalValue,
+            totalReceived,
+            pendingValue,
+            saleStatus,
+            payments: getSalePayments(0, clientDocument), // Usar 0 para buscar pagamentos da renegociada
+            clientDocument,
+          },
+        ];
+      })();
 
       // Retornar vendas agrupadas + venda renegociada
       return [...saleGroups, ...renegotiatedSaleGroups];
     },
-    [collections, calculateSaleBalance, getSalePayments],
+    [allCollections, calculateSaleBalance, getSalePayments],
   );
   // NOVO: Função para pré-carregar dados dos clientes em batch
   const prefetchClientsData = React.useCallback(
@@ -2984,7 +2990,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
 
       if (isTransferToInternal && clientDocument) {
-        setCollections((prev) =>
+        setAllCollections((prev) =>
           prev.map((collection) =>
             collection.documento === clientDocument
               ? {

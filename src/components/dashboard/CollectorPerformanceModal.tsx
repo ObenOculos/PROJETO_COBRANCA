@@ -17,6 +17,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { Modal } from "../Modal";
 import TabTransition from "../common/TabTransition";
 import { supabase } from "../../lib/supabase";
+import { fetchAllRows } from "../../utils/fetchAllRows";
 
 interface CollectorPerformanceModalProps {
   isOpen: boolean;
@@ -96,31 +97,6 @@ const Pagination: React.FC<{ page: number; total: number; perPage: number; onCha
 // (o Supabase/PostgREST retorna no maximo ~1000 linhas por requisicao). Sem
 // isso, cobradores com muito historico de atribuicao tinham os numeros da aba
 // Carteira truncados nos primeiros 1000 registros.
-async function fetchAllRows<T>(
-  runPage: (
-    from: number,
-    to: number,
-  ) => PromiseLike<{ data: T[] | null; error: any }>,
-  shouldCancel?: () => boolean,
-): Promise<T[]> {
-  const PAGE = 1000;
-  const all: T[] = [];
-  let from = 0;
-
-  while (!shouldCancel?.()) {
-    const { data, error } = await runPage(from, from + PAGE - 1);
-    if (error) {
-      console.error("Erro ao paginar dados do modal de performance:", error);
-      break;
-    }
-    if (!data || data.length === 0) break;
-    all.push(...data);
-    if (data.length < PAGE) break;
-    from += PAGE;
-  }
-
-  return all;
-}
 
 const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
   isOpen,

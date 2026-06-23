@@ -16,12 +16,14 @@ import {
   Zap,
   Globe,
   CalendarPlus,
+  FileText,
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
 import { supabase } from "../lib/supabase";
 import { Collection } from "../types";
 import { formatCurrency } from "../utils/formatters";
 import BulkAssignmentModal from "./BulkAssignmentModal";
+import AssignmentReportModal from "./dashboard/AssignmentReportModal";
 
 const MONTHS_PT = [
   "Jan",
@@ -167,6 +169,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   const [selectedClients, setSelectedClients] = useState<Set<string>>(
     new Set(),
   );
+  const [showReport, setShowReport] = useState(false);
 
   // Novos filtros
   const [filterCollector, setFilterCollector] = useState<string>("");
@@ -931,6 +934,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => setShowReport(true)}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all border bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
+              title="Relatório de atribuições"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Relatório
+            </button>
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all border ${
@@ -1735,6 +1746,12 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         clientsData={clientsData}
         collectors={collectors}
         onComplete={() => setSelectedClients(new Set())}
+      />
+
+      <AssignmentReportModal
+        isOpen={showReport}
+        onClose={() => setShowReport(false)}
+        users={users}
       />
     </div>
   );

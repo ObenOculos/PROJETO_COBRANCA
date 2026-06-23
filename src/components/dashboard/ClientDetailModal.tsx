@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { ClientGroup, UserType } from "../../types";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
+import { isCancelado } from "../../types/status";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
@@ -37,36 +38,33 @@ const formatDate = (dateString: string | null): string => {
   if (!dateString) return "-";
 
   try {
-    let date: Date;
+    // Trata apenas a parte de DATA (ignora hora/fuso). Isso evita o
+    // deslocamento de -1 dia quando o valor vem como ISO com timezone
+    // (ex.: "2023-08-26T00:00:00Z"), que ao virar horario local recuava o dia.
+    let day: number, month: number, year: number;
 
-    // Verificar se já está no formato brasileiro (dd/mm/yyyy)
-    if (dateString.includes("/")) {
-      const [day, month, year] = dateString.split("/");
-      date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    }
-    // Se estiver no formato ISO (yyyy-mm-dd)
-    else if (dateString.includes("-")) {
-      const dateStr = dateString.includes("T")
-        ? dateString
-        : `${dateString}T00:00:00`;
-      date = new Date(dateStr);
-    }
-    // Outros formatos
-    else {
-      date = new Date(dateString);
+    if (dateString.includes("-")) {
+      // ISO: YYYY-MM-DD (com ou sem "T...")
+      const [y, m, d] = dateString.split("T")[0].split("-");
+      year = parseInt(y, 10);
+      month = parseInt(m, 10);
+      day = parseInt(d, 10);
+    } else if (dateString.includes("/")) {
+      // Brasileiro: DD/MM/YYYY
+      const [d, m, y] = dateString.split("/");
+      day = parseInt(d, 10);
+      month = parseInt(m, 10);
+      year = parseInt(y, 10);
+    } else {
+      return dateString;
     }
 
-    // Verificar se a data é válida
-    if (isNaN(date.getTime())) {
+    if (isNaN(day) || isNaN(month) || isNaN(year)) {
       console.warn("Data inválida:", dateString);
-      return dateString; // Retorna a string original se não conseguir converter
+      return dateString;
     }
 
-    return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
   } catch (error) {
     console.error("Erro ao formatar data:", dateString, error);
     return dateString; // Retorna a string original em caso de erro
@@ -837,6 +835,9 @@ const handleEditPaymentClick = () => {
                       sale.saleNumber,
                       clientGroup.document,
                     );
+                    const saleAllCancelled =
+                      sale.installments.length > 0 &&
+                      sale.installments.every((i) => isCancelado(i.status));
 
                     return (
                       <div
@@ -866,7 +867,13 @@ const handleEditPaymentClick = () => {
                                       ? "Renegociada"
                                       : sale.saleNumber}
                                   </h4>
-                                  <StatusBadge status={saleBalance.status} />
+                                  {saleAllCancelled ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs border bg-gray-200 text-gray-600 border-gray-300">
+                                      Cancelado
+                                    </span>
+                                  ) : (
+                                    <StatusBadge status={saleBalance.status} />
+                                  )}
                                 </div>
                                 <p className="text-xs text-gray-500">
                                   {sale.installments.length} parcela
@@ -957,13 +964,22 @@ const handleEditPaymentClick = () => {
                                             <span className="font-mono text-xs text-gray-500">
                                               #{installment.id_parcela}
                                             </span>
-                                            {isOverdue && !isPaid && (
-                                              <span className="text-xs text-red-600 font-medium">
-                                                {formatDaysOverdue(
-                                                  actualAtraso,
-                                                )}
+                                            {isCancelado(installment.status) && (
+                                              <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">
+                                                Cancelado
                                               </span>
                                             )}
+                                            {isOverdue &&
+                                              !isPaid &&
+                                              !isCancelado(
+                                                installment.status,
+                                              ) && (
+                                                <span className="text-xs text-red-600 font-medium">
+                                                  {formatDaysOverdue(
+                                                    actualAtraso,
+                                                  )}
+                                                </span>
+                                              )}
                                           </div>
                                           <div className="text-xs text-gray-600 truncate">
                                             {formatDate(

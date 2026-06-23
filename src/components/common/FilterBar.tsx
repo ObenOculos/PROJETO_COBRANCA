@@ -187,6 +187,22 @@ const FilterBar: React.FC<FilterBarProps> = ({
           >
             Parcial
           </button>
+          <button
+            onClick={() =>
+              onFilterChange({
+                ...filters,
+                status:
+                  filters.status === "cancelado" ? undefined : "cancelado",
+              })
+            }
+            className={`px-3 py-2 text-xs font-medium rounded-full transition-colors ${
+              filters.status === "cancelado"
+                ? "bg-gray-300 text-gray-800 border border-gray-400"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            Cancelado
+          </button>
         </div>
       </div>
 
