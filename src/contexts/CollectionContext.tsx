@@ -1205,13 +1205,30 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     userType: UserType,
     collectorId?: string,
   ): Collection[] => {
+    // Chave do cliente, identica ao agrupamento da tabela (CollectionTable):
+    // documento, com fallback no nome. Garante que a contagem por status bata
+    // com o total de clientes exibido.
+    const clientKey = (c: Collection) =>
+      (c.documento || c.cliente || "").trim();
+
     // O filtro "Cancelado" e o unico que enxerga os titulos cancelados (que
-    // ficam fora da cobranca ativa). Demais filtros operam so no conjunto ativo.
+    // ficam fora da cobranca ativa). So entram aqui clientes 100% cancelados:
+    // se o cliente ainda tem algum titulo ativo, ele aparece nas categorias
+    // ativas (Pago/Parcial/Pendente), nunca em Cancelado. Assim cada cliente
+    // cai em uma unica categoria e a soma fecha com o total.
     const wantCancelados =
       (filters.status || "").trim().toLowerCase() === "cancelado";
-    let filtered = wantCancelados
-      ? allCollections.filter((c) => isCancelado(c.status))
-      : collections;
+    let filtered: Collection[];
+    if (wantCancelados) {
+      const activeClientKeys = new Set(
+        collections.map(clientKey).filter(Boolean),
+      );
+      filtered = allCollections.filter(
+        (c) => isCancelado(c.status) && !activeClientKeys.has(clientKey(c)),
+      );
+    } else {
+      filtered = collections;
+    }
 
     // Filtrar por cobrador se o usuário for cobrador
     if (userType !== "manager" && collectorId) {
@@ -1345,9 +1362,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
 
     // Apply status filter (Pago / Parcial / Pendente)
-    // Classificacao por venda (venda_n), alinhada a exibicao da tabela
-    // (CollectionTable) e ao filtro do cobrador. Normaliza o vocabulario, pois o
-    // dropdown envia "Em atraso"/"Pago"/"Pago Parcial" e os botoes enviam
+    // Classificacao por CLIENTE (documento), por valor agregado de todas as
+    // vendas ativas dele. Cada cliente cai em uma unica categoria, entao a soma
+    // Pendente + Parcial + Pago = total de clientes (sem duplicidade entre
+    // categorias). Normaliza o vocabulario, pois o dropdown envia
+    // "Em atraso"/"Pago"/"Pago Parcial" e os botoes enviam
     // "pendente"/"pago"/"parcial". O caso "cancelado" ja foi resolvido na
     // selecao da base (wantCancelados) e nao entra nesta classificacao.
     if (filters.status && !wantCancelados) {
@@ -1370,32 +1389,37 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           ? "parcial"
           : "pendente";
 
-      // Agrupa por venda; renegociadas (sem venda_n) contam como uma unica venda.
-      const saleGroups = new Map<string, Collection[]>();
+      // Agrupa por cliente (mesma chave da tabela).
+      const clientGroups = new Map<string, Collection[]>();
       filtered.forEach((c) => {
-        const key = `${c.documento}-${c.venda_n || 0}`;
-        if (!saleGroups.has(key)) saleGroups.set(key, []);
-        saleGroups.get(key)!.push(c);
+        const key = clientKey(c);
+        if (!key) return;
+        if (!clientGroups.has(key)) clientGroups.set(key, []);
+        clientGroups.get(key)!.push(c);
       });
 
-      const matchingSaleKeys = new Set<string>();
+      const matchingClientKeys = new Set<string>();
       const round2 = (n: number) =>
         Math.round((n + Number.EPSILON) * 100) / 100;
-      saleGroups.forEach((saleCollections, key) => {
+      clientGroups.forEach((clientCollections, key) => {
         const totalValue = round2(
-          saleCollections.reduce((sum, c) => sum + c.valor_original, 0),
+          clientCollections.reduce((sum, c) => sum + c.valor_original, 0),
         );
         const totalReceived = round2(
-          saleCollections.reduce((sum, c) => sum + c.valor_recebido, 0),
+          clientCollections.reduce((sum, c) => sum + c.valor_recebido, 0),
         );
         const totalDiscount = round2(
-          saleCollections.reduce((sum, c) => sum + (c.desconto || 0), 0),
+          clientCollections.reduce((sum, c) => sum + (c.desconto || 0), 0),
         );
-        // Saldo considera o desconto: a venda quita quando recebido + desconto
-        // cobrem o valor original (mesma regra de calculateSaleBalance).
+        // Saldo do cliente considera o desconto: quita quando recebido +
+        // desconto cobrem o valor original somado de todas as vendas dele.
         const effectivePaid = round2(totalReceived + totalDiscount);
         const pendingValue = round2(totalValue - effectivePaid);
 
+        // Status agregado do cliente:
+        // - nada recebido           -> Pendente
+        // - recebeu algo, ainda deve -> Parcial
+        // - quitou tudo             -> Pago
         const status =
           effectivePaid === 0
             ? "pendente"
@@ -1403,12 +1427,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               ? "parcial"
               : "pago";
 
-        if (status === targetStatus) matchingSaleKeys.add(key);
+        if (status === targetStatus) matchingClientKeys.add(key);
       });
 
-      filtered = filtered.filter((c) =>
-        matchingSaleKeys.has(`${c.documento}-${c.venda_n || 0}`),
-      );
+      filtered = filtered.filter((c) => matchingClientKeys.has(clientKey(c)));
     }
 
     if (filters.dueDate) {
