@@ -17,11 +17,13 @@ import {
   Globe,
   CalendarPlus,
   FileText,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
 import { supabase } from "../lib/supabase";
 import { Collection } from "../types";
-import { formatCurrency } from "../utils/formatters";
+import { formatCurrency, formatDate } from "../utils/formatters";
+import * as XLSX from "xlsx";
 import BulkAssignmentModal from "./BulkAssignmentModal";
 import AssignmentReportModal from "./dashboard/AssignmentReportModal";
 
@@ -729,6 +731,107 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     setSelectedClients(newSelected);
   };
 
+  const handleExportToExcel = () => {
+    // 1. Planilha 1: Clientes (Resumo)
+    const clientRows = filteredClients.map((client) => {
+      const totalValue = client.collections.reduce((sum, c) => sum + c.valor_original, 0);
+      const receivedValue = client.collections.reduce((sum, c) => sum + c.valor_recebido, 0);
+      const pendingValue = totalValue - receivedValue;
+      const situacao = getSituacaoIndicator(client.collections);
+
+      return {
+        "Cliente": client.cliente ? client.cliente.toUpperCase() : "",
+        "Documento": client.documento || "",
+        "Apelido": client.apelido ? client.apelido.toUpperCase() : "",
+        "Cidade": client.cidade || "",
+        "Bairro": client.bairro || "",
+        "Cobrador": client.collectorName || "Sem Cobrador",
+        "Qtd Vendas": getVendasCount(client.collections),
+        "Qtd Parcelas": client.collections.length,
+        "Total Original (R$)": totalValue,
+        "Total Recebido (R$)": receivedValue,
+        "Total Pendente (R$)": pendingValue,
+        "Situação Geral": situacao ? situacao.label : "-",
+      };
+    });
+
+    const clientWS = XLSX.utils.json_to_sheet(clientRows);
+
+    // Set widths for clients sheet
+    clientWS["!cols"] = [
+      { wch: 35 }, // Cliente
+      { wch: 18 }, // Documento
+      { wch: 20 }, // Apelido
+      { wch: 18 }, // Cidade
+      { wch: 18 }, // Bairro
+      { wch: 25 }, // Cobrador
+      { wch: 12 }, // Qtd Vendas
+      { wch: 12 }, // Qtd Parcelas
+      { wch: 20 }, // Total Original
+      { wch: 20 }, // Total Recebido
+      { wch: 20 }, // Total Pendente
+      { wch: 18 }, // Situação Geral
+    ];
+
+    // 2. Planilha 2: Detalhamento de Parcelas
+    const installmentRows: any[] = [];
+    filteredClients.forEach((client) => {
+      client.collections.forEach((col) => {
+        const pending = col.valor_original - col.valor_recebido;
+        installmentRows.push({
+          "Cliente": client.cliente ? client.cliente.toUpperCase() : "",
+          "Documento": client.documento || "",
+          "ID Parcela": col.id_parcela,
+          "Loja": col.nome_da_loja || "",
+          "Venda Nº": col.venda_n || "-",
+          "Nº Título": col.numero_titulo || "-",
+          "Parcela": col.parcela || "-",
+          "Data Lançamento": col.data_lancamento ? formatDate(col.data_lancamento) : "-",
+          "Data Vencimento": col.data_vencimento ? formatDate(col.data_vencimento) : "-",
+          "Data Recebimento": col.data_de_recebimento ? formatDate(col.data_de_recebimento) : "-",
+          "Valor Original (R$)": col.valor_original,
+          "Valor Recebido (R$)": col.valor_recebido,
+          "Valor Pendente (R$)": pending,
+          "Dias em Atraso": col.dias_em_atraso || 0,
+          "Situação da Parcela": col.situacao || "-",
+          "Cobrador": client.collectorName || "Sem Cobrador",
+          "Observação": col.obs || "",
+        });
+      });
+    });
+
+    const installmentWS = XLSX.utils.json_to_sheet(installmentRows);
+
+    // Set widths for installments sheet
+    installmentWS["!cols"] = [
+      { wch: 35 }, // Cliente
+      { wch: 18 }, // Documento
+      { wch: 12 }, // ID Parcela
+      { wch: 15 }, // Loja
+      { wch: 10 }, // Venda Nº
+      { wch: 12 }, // Nº Título
+      { wch: 10 }, // Parcela
+      { wch: 16 }, // Data Lançamento
+      { wch: 16 }, // Data Vencimento
+      { wch: 16 }, // Data Recebimento
+      { wch: 20 }, // Valor Original
+      { wch: 20 }, // Valor Recebido
+      { wch: 20 }, // Valor Pendente
+      { wch: 14 }, // Dias em Atraso
+      { wch: 20 }, // Situação da Parcela
+      { wch: 25 }, // Cobrador
+      { wch: 30 }, // Observação
+    ];
+
+    // 3. Create Workbook and save
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, clientWS, "Resumo por Cliente");
+    XLSX.utils.book_append_sheet(wb, installmentWS, "Parcelas Detalhadas");
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `Relatorio_Clientes_Filtrados_${dateStr}.xlsx`);
+  };
+
   const hasActiveFilters = activeFilterChips.length > 0;
 
   // Calculate overview statistics
@@ -891,6 +994,13 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   const isAllActive =
     !filterStatus && !filterCreatedFrom && !filterCreatedTo && !filterDateFrom;
 
+  const currentVision = useMemo(() => {
+    if (isPendingFilterActive) return "pending";
+    if (filterStatus === "with_collector") return "assigned";
+    if (isNewClientsFilterActive) return "new";
+    return "all";
+  }, [isPendingFilterActive, filterStatus, isNewClientsFilterActive]);
+
   const handleToggleNewClientsFilter = () => {
     if (isNewClientsFilterActive) {
       setFilterCreatedFrom("");
@@ -915,50 +1025,26 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 pb-24">
-      {/* Header — Estilo Ranking de Performance */}
-      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl shrink-0">
-              <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-dark-text tracking-tight leading-none">
-                Atribuição de Cobradores
-              </h2>
-              <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary mt-1 uppercase tracking-widest">
-                {hasActiveFilters ? "Visão Filtrada" : "Gestão de Carteira"}
-              </p>
-            </div>
+    <div className="space-y-4 sm:space-y-6 pb-24 text-gray-700 dark:text-dark-text">
+      {/* Header */}
+      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-4 sm:p-5">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl shrink-0">
+            <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
           </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button
-              onClick={() => setShowReport(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all border bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
-              title="Relatório de atribuições"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Relatório
-            </button>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all border ${
-                showFilters || hasActiveFilters
-                  ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 dark:shadow-none"
-                  : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
-              }`}
-            >
-              <Filter className="h-3.5 w-3.5" />
-              Filtros {hasActiveFilters && `(${activeFilterChips.length})`}
-            </button>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight leading-none">
+              Atribuição de Cobradores
+            </h2>
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 uppercase tracking-wider">
+              {hasActiveFilters ? "Visão Filtrada" : "Gestão de Carteira"}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Grid de Cards Executivos — Scroll horizontal em mobile */}
-      <div className="flex overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 custom-scrollbar snap-x">
+      {/* Grid de Cards Executivos — Scroll horizontal em mobile com padding vertical para evitar corte de sombras */}
+      <div className="flex overflow-x-auto pt-3 pb-5 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pt-0 sm:pb-0 sm:overflow-visible sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 custom-scrollbar snap-x">
         {/* Card: Total de Clientes */}
         <div
           role="button"
@@ -973,7 +1059,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           title="Mostrar todos os clientes (limpar filtros)"
           className={`min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
             isAllActive
-              ? "border-blue-500 ring-2 ring-blue-500/30"
+              ? "border-blue-500 ring-2 ring-blue-500/10"
               : "border-gray-100 dark:border-dark-border"
           }`}
         >
@@ -982,14 +1068,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
             {mainStats.unassigned > 0 && (
-              <span className="text-[9px] font-black text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-lg uppercase tracking-tight">
+              <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-md uppercase tracking-wider border border-amber-100 dark:border-amber-900/30">
                 {mainStats.unassigned} Pendentes
               </span>
             )}
           </div>
           <div>
-            <p className="text-[9px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-0.5">Total Clientes</p>
-            <p className="text-2xl font-black text-gray-900 dark:text-dark-text tracking-tighter">{mainStats.total}</p>
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Total Clientes</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{mainStats.total}</p>
           </div>
         </div>
 
@@ -1007,7 +1093,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           title={`Filtrar clientes criados em ${currentMonthLabel}`}
           className={`min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
             isNewClientsFilterActive
-              ? "border-green-500 ring-2 ring-green-500/30"
+              ? "border-green-500 ring-2 ring-green-500/10"
               : "border-gray-100 dark:border-dark-border"
           }`}
         >
@@ -1016,23 +1102,27 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <Zap className="h-4 w-4 text-green-600 dark:text-green-400" />
             </div>
             {mainStats.prevMonth > 0 ? (
-              <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg uppercase tracking-tight ${mainStats.newClients >= mainStats.prevMonth ? 'text-green-600 bg-green-50' : 'text-amber-600 bg-amber-50'}`}>
+              <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider border ${
+                mainStats.newClients >= mainStats.prevMonth 
+                  ? 'text-green-700 bg-green-50 border-green-150 dark:text-green-400 dark:bg-green-900/20 dark:border-green-900/30' 
+                  : 'text-amber-700 bg-amber-50 border-amber-150 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-900/30'
+              }`}>
                 {mainStats.newClients >= mainStats.prevMonth ? '▲ +' : '▼ '}{((mainStats.newClients / mainStats.prevMonth - 1) * 100).toFixed(0)}%
               </span>
             ) : (
-              <span className="text-[9px] font-black text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-lg uppercase tracking-tight">
+              <span className="text-[9px] font-semibold text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20 px-2 py-0.5 rounded-md uppercase tracking-wider border border-green-100 dark:border-green-900/30">
                 {currentMonthLabel}
               </span>
             )}
           </div>
           <div>
-            <p className="text-[9px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-0.5">Novos Clientes</p>
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Novos Clientes</p>
             <div className="flex items-baseline gap-1.5">
-              <p className="text-2xl font-black text-gray-900 dark:text-dark-text tracking-tighter">{mainStats.newClients}</p>
-              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter shrink-0">{currentMonthLabel}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{mainStats.newClients}</p>
+              <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-tight shrink-0">{currentMonthLabel}</p>
             </div>
-            <p className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary mt-0.5 tracking-tight">
-              {prevMonthLabel}: <span className="text-gray-600 dark:text-dark-text font-black">{mainStats.prevMonth}</span>
+            <p className="text-[10px] font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5 tracking-tight">
+              {prevMonthLabel}: <span className="text-gray-600 dark:text-dark-text font-semibold">{mainStats.prevMonth}</span>
             </p>
           </div>
         </div>
@@ -1045,8 +1135,8 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             </div>
           </div>
           <div>
-            <p className="text-[9px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-0.5">Valor em Aberto</p>
-            <p className="text-xl font-black text-indigo-700 dark:text-indigo-400 tracking-tighter">{formatCurrency(mainStats.pendingValue)}</p>
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Valor em Aberto</p>
+            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-450 tracking-tight">{formatCurrency(mainStats.pendingValue)}</p>
           </div>
         </div>
 
@@ -1062,164 +1152,146 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             }
           }}
           title="Filtrar clientes pendentes (sem cobrador)"
-          className={`min-w-[240px] sm:min-w-0 p-4 rounded-2xl shadow-xl flex flex-col justify-between relative overflow-hidden group transition-all snap-start cursor-pointer ${mainStats.assignmentRate > 90 ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white' : 'bg-white dark:bg-dark-bg-secondary border border-gray-100 dark:border-dark-border text-gray-900 dark:text-dark-text'} ${isPendingFilterActive ? 'ring-2 ring-amber-500/50' : ''}`}>
-
-          <div className="flex items-center justify-between mb-3 relative z-10">
-            <div className={`p-2 rounded-xl ${mainStats.assignmentRate > 90 ? 'bg-white/20 backdrop-blur-md' : 'bg-blue-50 dark:bg-blue-900/20'}`}>
-              <Award className={`h-4 w-4 ${mainStats.assignmentRate > 90 ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
+          className={`min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
+            isPendingFilterActive
+              ? "border-amber-500 ring-2 ring-amber-500/10"
+              : "border-gray-100 dark:border-dark-border"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
+              <Award className="h-4 w-4 text-purple-600 dark:text-purple-400" />
             </div>
-            <div className={`flex items-center text-[9px] font-black px-2 py-0.5 rounded-lg uppercase tracking-tight ${mainStats.assignmentRate > 90 ? 'bg-white/20 text-blue-100' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'}`}>
+            <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider border ${
+              mainStats.assignmentRate > 90
+                ? 'text-green-700 bg-green-50 border-green-100 dark:text-green-400 dark:bg-green-900/20 dark:border-green-900/30'
+                : 'text-amber-700 bg-amber-50 border-amber-100 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-900/30'
+            }`}>
               {mainStats.assignmentRate > 90 ? 'Excelente' : 'Ajustar'}
-            </div>
+            </span>
           </div>
-          <div className="relative z-10">
-            <p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-0.5 ${mainStats.assignmentRate > 90 ? 'text-blue-100' : 'text-gray-400 dark:text-dark-text-secondary'}`}>Taxa Atribuição</p>
-            <p className="text-2xl font-black tracking-tighter">{mainStats.assignmentRate.toFixed(1)}%</p>
+          <div>
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Taxa Atribuição</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{mainStats.assignmentRate.toFixed(1)}%</p>
           </div>
-          {mainStats.assignmentRate > 90 && (
-            <div className="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
-          )}
         </div>
       </div>
 
-      {/* Filtros Rápidos — Unificados e Compactos */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar snap-x">
-          <div className="flex items-center gap-1.5 shrink-0 pr-2 border-r border-gray-100 dark:border-dark-border">
-            <Filter className="h-3 w-3 text-gray-400" />
-            <span className="text-[9px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-widest whitespace-nowrap">Visão:</span>
-          </div>
-          
-          <button
-            onClick={handleShowAll}
-            className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 snap-start ${
-              isAllActive
-                ? "bg-gray-900 dark:bg-blue-600 text-white border-gray-900 dark:border-blue-600 shadow-md"
-                : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
-            }`}
-          >
-            Todos
-          </button>
-
-          <button
-            onClick={handleTogglePendingFilter}
-            className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 snap-start flex items-center gap-1.5 ${
-              isPendingFilterActive
-                ? "bg-amber-500 text-white border-amber-500 shadow-md"
-                : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-amber-50 dark:hover:bg-amber-900/10 hover:text-amber-600"
-            }`}
-          >
-            <AlertCircle className="w-3 h-3" />
-            Pendentes
-          </button>
-
-          <button
-            onClick={() => {
-              setFilterStatus("with_collector");
-              setFilterDateFrom("");
-            }}
-            className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 snap-start flex items-center gap-1.5 ${
-              filterStatus === "with_collector"
-                ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:text-blue-600"
-            }`}
-          >
-            <Users className="w-3 h-3" />
-            Atribuídos
-          </button>
-
-          <button
-            onClick={handleToggleNewClientsFilter}
-            className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shrink-0 snap-start flex items-center gap-1.5 ${
-              isNewClientsFilterActive
-                ? "bg-green-600 text-white border-green-600 shadow-md"
-                : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-green-50 dark:hover:bg-green-900/10 hover:text-green-600"
-            }`}
-          >
-            <Zap className="w-3 h-3" />
-            Novos
-          </button>
+      {/* Barra de Filtros Unificada */}
+      <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-150/80 dark:border-dark-border shadow-sm flex flex-col md:flex-row items-stretch md:items-center gap-3">
+        {/* Busca */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-405 pointer-events-none" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar por nome, apelido ou documento..."
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-gray-450"
+          />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 custom-scrollbar snap-x">
-          <div className="flex items-center gap-1.5 shrink-0 pr-2 border-r border-gray-100 dark:border-dark-border">
-            <Users className="h-3 w-3 text-gray-400" />
-            <span className="text-[9px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-widest whitespace-nowrap">Cobrador:</span>
+        <div className="flex flex-col sm:flex-row items-stretch gap-2.5 shrink-0">
+          {/* Dropdown Visão */}
+          <div className="relative flex-1 sm:flex-none">
+            <select
+              value={currentVision}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "all") {
+                  handleShowAll();
+                } else if (val === "pending") {
+                  setFilterStatus("without_collector");
+                  setFilterCollector("");
+                  setFilterDateFrom("");
+                  setFilterCreatedFrom("");
+                  setFilterCreatedTo("");
+                } else if (val === "assigned") {
+                  setFilterStatus("with_collector");
+                  setFilterCollector("");
+                  setFilterDateFrom("");
+                  setFilterCreatedFrom("");
+                  setFilterCreatedTo("");
+                } else if (val === "new") {
+                  const now = new Date();
+                  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                  setFilterCreatedFrom(firstDay.toISOString().slice(0, 10));
+                  setFilterCreatedTo(lastDay.toISOString().slice(0, 10));
+                  setFilterStatus("");
+                  setFilterCollector("");
+                  setFilterDateFrom("");
+                }
+              }}
+              className="w-full sm:w-[155px] pl-3 pr-8 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-semibold text-gray-600 dark:text-dark-text uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer appearance-none"
+            >
+              <option value="all">Visão: Todos</option>
+              <option value="pending">Visão: Pendentes</option>
+              <option value="assigned">Visão: Atribuídos</option>
+              <option value="new">Visão: Novos</option>
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+              <Filter className="h-3.5 w-3.5" />
+            </div>
           </div>
-          
+
+          {/* Dropdown Cobrador */}
+          <div className="relative flex-1 sm:flex-none">
+            <select
+              value={filterCollector}
+              onChange={(e) => setFilterCollector(e.target.value)}
+              className="w-full sm:w-[195px] pl-3 pr-8 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-semibold text-gray-600 dark:text-dark-text uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer appearance-none"
+            >
+              <option value="">Cobrador: Todos</option>
+              {collectors.map((collector) => (
+                <option key={collector.id} value={collector.id}>
+                  Cobrador: {collector.name.toUpperCase()}
+                </option>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+              <Users className="h-3.5 w-3.5" />
+            </div>
+          </div>
+
+          {/* Botão Relatório */}
           <button
-            onClick={() => setFilterCollector("")}
-            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border shrink-0 snap-start ${
-              !filterCollector
-                ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                : "bg-gray-100 dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border-transparent hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary"
-            }`}
+            onClick={() => setShowReport(true)}
+            className="px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all border bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-150 dark:hover:bg-dark-bg-tertiary flex items-center justify-center gap-1.5 whitespace-nowrap"
+            title="Relatório de atribuições"
           >
-            Todos
+            <FileText className="h-3.5 w-3.5" />
+            <span>Relatório</span>
           </button>
 
-          {collectors.map((collector) => (
-            <button
-              key={collector.id}
-              onClick={() => setFilterCollector(collector.id)}
-              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border shrink-0 snap-start ${
-                filterCollector === collector.id
-                  ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                  : "bg-white dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:border-blue-300 hover:text-blue-600"
-              }`}
-            >
-              {collector.name}
-            </button>
-          ))}
+          {/* Botão Avançado */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all border flex items-center justify-center gap-1.5 whitespace-nowrap ${
+              showFilters || hasActiveFilters
+                ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+            }`}
+          >
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filtros {hasActiveFilters && `(${activeFilterChips.length})`}</span>
+          </button>
         </div>
       </div>
 
       {/* Filtros Colapsáveis */}
       {showFilters && (
-        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-6 animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-5 animate-in fade-in slide-in-from-top-4 duration-300">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
-                <Search className="h-3 w-3 mr-1.5" />
-                Buscar Cliente
-              </label>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Nome ou documento..."
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
-                <Users className="h-3 w-3 mr-1.5" />
-                Cobrador
-              </label>
-              <select
-                value={filterCollector}
-                onChange={(e) => setFilterCollector(e.target.value)}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">TODOS OS COBRADORES</option>
-                {collectors.map((collector) => (
-                  <option key={collector.id} value={collector.id}>
-                    {collector.name.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
+              <label className="text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider flex items-center">
                 <AlertCircle className="h-3 w-3 mr-1.5" />
                 Status de Atribuição
               </label>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
               >
                 <option value="">TODOS</option>
                 <option value="with_collector">COM COBRADOR</option>
@@ -1228,7 +1300,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
+              <label className="text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider flex items-center">
                 <MapPin className="h-3 w-3 mr-1.5" />
                 Cidade
               </label>
@@ -1238,7 +1310,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                   setFilterCity(e.target.value);
                   setFilterNeighborhood("");
                 }}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
               >
                 <option value="">TODAS AS CIDADES</option>
                 {availableCities.map((city) => (
@@ -1250,14 +1322,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
+              <label className="text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider flex items-center">
                 <MapPin className="h-3 w-3 mr-1.5" />
                 Bairro
               </label>
               <select
                 value={filterNeighborhood}
                 onChange={(e) => setFilterNeighborhood(e.target.value)}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                 disabled={!filterCity}
               >
                 <option value="">TODOS OS BAIRROS</option>
@@ -1270,14 +1342,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
+              <label className="text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider flex items-center">
                 <Building className="h-3 w-3 mr-1.5" />
                 Loja
               </label>
               <select
                 value={filterStore}
                 onChange={(e) => setFilterStore(e.target.value)}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
               >
                 <option value="">TODAS AS LOJAS</option>
                 {availableStores.map((store) => (
@@ -1289,14 +1361,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
+              <label className="text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider flex items-center">
                 <Award className="h-3 w-3 mr-1.5" />
                 Situação
               </label>
               <select
                 value={filterSituacao}
                 onChange={(e) => setFilterSituacao(e.target.value)}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
               >
                 <option value="">TODAS AS SITUAÇÕES</option>
                 <option value="Em mãos">EM MÃOS</option>
@@ -1310,7 +1382,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] flex items-center">
+              <label className="text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider flex items-center">
                 <CalendarPlus className="h-3 w-3 mr-1.5" />
                 Criado em
               </label>
@@ -1320,14 +1392,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                   aria-label="Criado de"
                   value={filterCreatedFrom}
                   onChange={(e) => setFilterCreatedFrom(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                 />
                 <input
                   type="date"
                   aria-label="Criado até"
                   value={filterCreatedTo}
                   onChange={(e) => setFilterCreatedTo(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                 />
               </div>
             </div>
@@ -1349,13 +1421,13 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                   setFilterCreatedTo("");
                   setCurrentPage(1);
                 }}
-                className="px-4 py-2 text-xs font-black text-gray-400 uppercase tracking-widest hover:text-gray-600 dark:hover:text-dark-text transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-dark-text transition-colors uppercase tracking-wider"
               >
                 Limpar Filtros
               </button>
               <button
                 onClick={() => setShowFilters(false)}
-                className="px-6 py-2 bg-gray-900 dark:bg-blue-600 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:opacity-90 shadow-lg transition-all sm:hidden"
+                className="px-5 py-2 bg-gray-900 dark:bg-blue-600 text-white text-xs font-semibold uppercase tracking-wider rounded-xl hover:opacity-90 shadow-md transition-all sm:hidden"
               >
                 Fechar
               </button>
@@ -1368,17 +1440,17 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h3 className="text-sm sm:text-lg font-black text-gray-900 dark:text-dark-text uppercase tracking-tight">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-dark-text tracking-tight">
               Lista de Clientes
             </h3>
-            <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider">
               {filteredClients.length} registros filtrados
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={handleSelectAll}
-              className="flex-1 sm:flex-none px-3 py-2 text-[9px] font-black uppercase tracking-widest border border-gray-200 dark:border-dark-border dark:text-dark-text rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg/50 transition-all"
+              className="flex-1 sm:flex-none px-3 py-2 text-[10px] font-semibold uppercase tracking-wider border border-gray-250 dark:border-dark-border dark:text-dark-text rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg/50 transition-all"
             >
               {paginatedClients.every((c) => selectedClients.has(c.uniqueKey))
                 ? "Desmarcar Página"
@@ -1387,16 +1459,71 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             {filteredClients.length > itemsPerPage && (
               <button
                 onClick={handleSelectAllFiltered}
-                className="flex-1 sm:flex-none px-3 py-2 text-[9px] font-black uppercase tracking-widest bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30 rounded-xl hover:bg-blue-100 transition-all whitespace-nowrap"
+                className="flex-1 sm:flex-none px-3 py-2 text-[10px] font-semibold uppercase tracking-wider bg-blue-50/70 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100/50 dark:border-blue-900/30 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all whitespace-nowrap"
               >
                 Tudo ({filteredClients.length})
               </button>
             )}
+            
+            {/* Espaçamento / Gap */}
+            <div className="w-px h-5 bg-gray-200 dark:bg-dark-border mx-1 hidden sm:block" />
+            
+            <button
+              onClick={handleExportToExcel}
+              title="Exportar para Excel"
+              className="flex-1 sm:flex-none px-3 py-2 text-[10px] font-semibold uppercase tracking-wider bg-green-50/70 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100/50 dark:border-green-900/30 rounded-xl hover:bg-green-100 dark:hover:bg-green-900/30 transition-all flex items-center justify-center gap-1.5"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />
+              <span className="sm:hidden">Exportar</span>
+            </button>
           </div>
         </div>
 
+        {/* Active Filter Chips */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-1.5 p-2 bg-gray-50/50 dark:bg-dark-bg/25 rounded-xl border border-gray-150/40 dark:border-dark-border/40">
+            <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider pl-1.5 mr-1">
+              Filtros ativos:
+            </span>
+            {activeFilterChips.map((chip, index) => (
+              <div
+                key={index}
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-white dark:bg-dark-bg-secondary text-gray-700 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-lg shadow-sm"
+              >
+                <span>{chip.label}</span>
+                <button
+                  onClick={chip.onClear}
+                  className="w-4 h-4 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-dark-bg transition-all ml-1"
+                  title="Remover filtro"
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => {
+                setSearchTerm("");
+                setFilterCollector("");
+                setFilterStatus("");
+                setFilterCity("");
+                setFilterNeighborhood("");
+                setFilterStore("");
+                setFilterSituacao("");
+                setFilterDateFrom("");
+                setFilterDateTo("");
+                setIncludeWithoutDate(false);
+                setFilterCreatedFrom("");
+                setFilterCreatedTo("");
+                setCurrentPage(1);
+              }}
+              className="ml-auto text-[10px] font-bold text-red-500 hover:text-red-600 hover:underline px-2 transition-colors"
+            >
+              Limpar Todos
+            </button>
+          </div>
+        )}
+
         {/* Visualização em Tabela (Desktop) */}
-        {/* ... (mantendo igual, já está bom) */}
         <div className="hidden md:block bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -1410,12 +1537,12 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded bg-white dark:bg-dark-bg"
                     />
                   </th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Cliente / Documento</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Vendas</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Parcelas</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Status / Cobrador</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Localização</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">Valores</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">Cliente / Documento</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider text-center">Vendas</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider text-center">Parcelas</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">Status / Cobrador</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">Localização</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider text-right">Valores</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
@@ -1440,7 +1567,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded bg-white dark:bg-dark-bg"
                         />
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-3.5">
                         <div className="flex flex-col">
                           <button
                             type="button"
@@ -1449,55 +1576,55 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                               onViewClient?.(client.documento || client.cliente);
                             }}
                             title={`Ver cobranças de ${client.cliente}`}
-                            className="text-left text-sm font-black text-gray-900 dark:text-dark-text truncate max-w-[250px] hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
+                            className="text-left text-sm font-semibold text-gray-900 dark:text-dark-text truncate max-w-[250px] hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
                           >
                             {client.cliente.toUpperCase()}
                           </button>
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{client.documento}</span>
-                          {client.apelido && <span className="text-[10px] text-blue-500 font-black italic mt-0.5">"{client.apelido.toUpperCase()}"</span>}
+                          <span className="text-[10px] font-medium text-gray-450 uppercase tracking-tight mt-0.5">{client.documento}</span>
+                          {client.apelido && <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">"{client.apelido.toUpperCase()}"</span>}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-black bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/30">
+                      <td className="px-6 py-3.5 text-center">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-100/50 dark:border-indigo-900/30">
                           {getVendasCount(client.collections)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-black bg-gray-100 dark:bg-dark-bg text-gray-700 dark:text-dark-text border border-gray-200 dark:border-dark-border">
+                      <td className="px-6 py-3.5 text-center">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border border-gray-150 dark:border-dark-border">
                           {client.collections.length}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-2">
+                      <td className="px-6 py-3.5">
+                        <div className="flex flex-col gap-1.5">
                           {client.collectorName ? (
-                            <span className="inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100 dark:border-green-900/30 uppercase tracking-widest w-fit">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-450 border border-green-100/50 dark:border-green-900/30 uppercase tracking-wider w-fit">
                               {client.collectorName}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 uppercase tracking-widest w-fit">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-450 border border-amber-100/50 dark:border-amber-900/30 uppercase tracking-wider w-fit">
                               Sem Cobrador
                             </span>
                           )}
                           {situacao && (
-                            <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight w-fit ${situacao.className} border border-current opacity-80`}>
+                            <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-tight w-fit ${situacao.className} border border-current/25 opacity-90`}>
                               <situacao.icon className="h-3 w-3" />
                               {situacao.label}
                             </div>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center text-[11px] font-bold text-gray-500 dark:text-dark-text-secondary">
+                      <td className="px-6 py-3.5">
+                        <div className="flex items-center text-[11px] font-medium text-gray-500 dark:text-dark-text-secondary">
                           <MapPin className="h-3.5 w-3.5 mr-1.5 text-gray-400 shrink-0" />
                           <span className="truncate max-w-[180px] uppercase">
                             {client.bairro && client.cidade ? `${client.bairro}, ${client.cidade}` : client.cidade || client.bairro || "-"}
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-3.5 text-right">
                         <div className="flex flex-col">
-                          <span className="text-sm font-black text-red-600 dark:text-red-400 tracking-tight">{formatCurrency(pendingValue)}</span>
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Total: {formatCurrency(totalValue)}</span>
+                          <span className="text-sm font-semibold text-red-600 dark:text-red-400 tracking-tight">{formatCurrency(pendingValue)}</span>
+                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-tight">Total: {formatCurrency(totalValue)}</span>
                         </div>
                       </td>
                     </tr>
@@ -1520,11 +1647,11 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             return (
               <div
                 key={client.uniqueKey}
-                className={`bg-white dark:bg-dark-bg-secondary rounded-xl shadow-sm border transition-all duration-200 cursor-pointer overflow-hidden ${
+                className={`bg-white dark:bg-dark-bg-secondary rounded-xl shadow-sm border transition-all duration-200 cursor-pointer relative ${
                   isSelected 
-                    ? "ring-2 ring-blue-500 border-blue-500 bg-blue-50/10 shadow-md" 
+                    ? "ring-2 ring-blue-500/20 border-blue-500 bg-blue-50/5 shadow-md" 
                     : isWithoutCollector 
-                      ? "border-amber-200 dark:border-amber-900/30 bg-amber-50/10" 
+                      ? "border-amber-200 dark:border-amber-900/20 bg-amber-50/5" 
                       : "border-gray-100 dark:border-dark-border"
                 }`}
                 onClick={() => handleSelectClient(client.uniqueKey)}
@@ -1549,24 +1676,24 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                               e.stopPropagation();
                               onViewClient?.(client.documento || client.cliente);
                             }}
-                            className="text-left text-[13px] font-black text-gray-900 dark:text-dark-text truncate uppercase tracking-tight leading-tight hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
+                            className="text-left text-[13px] font-semibold text-gray-900 dark:text-dark-text truncate uppercase tracking-tight leading-tight hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
                           >
                             {client.cliente}
                           </button>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <p className="text-[9px] font-bold text-gray-400 uppercase leading-none">{client.documento}</p>
+                            <p className="text-[9px] font-medium text-gray-455 uppercase leading-none">{client.documento}</p>
                             {client.apelido && (
-                              <span className="text-[9px] text-blue-500 font-black italic leading-none truncate max-w-[100px]">
+                              <span className="text-[9px] text-blue-600 dark:text-blue-400 font-semibold leading-none truncate max-w-[100px]">
                                 "{client.apelido.toUpperCase()}"
                               </span>
                             )}
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="text-[13px] font-black text-red-600 dark:text-red-400 tracking-tighter leading-tight">
+                          <p className="text-[13px] font-semibold text-red-650 dark:text-red-400 tracking-tight leading-tight">
                             {formatCurrency(pendingValue)}
                           </p>
-                          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter leading-none">
+                          <p className="text-[8px] font-semibold text-gray-400 uppercase tracking-tight leading-none">
                             T: {formatCurrency(totalValue)}
                           </p>
                         </div>
@@ -1574,32 +1701,32 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
 
                       <div className="flex flex-wrap gap-1.5 items-center">
                         {client.collectorName ? (
-                          <span className="px-2 py-0.5 rounded-md text-[8px] font-black bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100 dark:border-green-900/30 uppercase tracking-widest">
+                          <span className="px-2 py-0.5 rounded-md text-[8px] font-semibold bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100/55 uppercase tracking-wider">
                             {client.collectorName}
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-md text-[8px] font-black bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30 uppercase tracking-widest">
+                          <span className="px-2 py-0.5 rounded-md text-[8px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-150/55 uppercase tracking-wider">
                             Sem Cobrador
                           </span>
                         )}
                         {situacao && (
-                          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase border border-current ${situacao.className} opacity-90`}>
+                          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-semibold uppercase border border-current/25 ${situacao.className} opacity-90`}>
                             <situacao.icon className="h-2.5 w-2.5" />
                             {situacao.label}
                           </div>
                         )}
-                        <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase tracking-tight ml-auto">
-                          <span className="bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded-md text-indigo-600 dark:text-indigo-400">
+                        <div className="flex items-center gap-1 text-[9px] font-medium text-gray-400 uppercase tracking-tight ml-auto">
+                          <span className="bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded-md text-indigo-700 dark:text-indigo-400 font-semibold">
                             {getVendasCount(client.collections)}V
                           </span>
-                          <span className="bg-gray-100 dark:bg-dark-bg px-1.5 py-0.5 rounded-md text-gray-600 dark:text-dark-text-secondary">
+                          <span className="bg-gray-50 dark:bg-dark-bg px-1.5 py-0.5 rounded-md text-gray-600 dark:text-dark-text-secondary">
                             {client.collections.length}P
                           </span>
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t border-gray-50 dark:border-dark-border/50 flex items-center justify-between">
-                        <div className="flex items-center text-[9px] font-bold text-gray-400 uppercase tracking-tight">
+                      <div className="pt-2 border-t border-gray-50 dark:border-dark-border/40 flex items-center justify-between">
+                        <div className="flex items-center text-[9px] font-medium text-gray-400 uppercase tracking-tight">
                           <MapPin className="h-2.5 w-2.5 mr-1 text-gray-300" />
                           <span className="truncate max-w-[180px]">{client.bairro ? `${client.bairro}, ` : ""}{client.cidade || "-"}</span>
                         </div>
@@ -1631,22 +1758,22 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
 
       {/* Controles de Paginação — Estilo Dashboard */}
       {totalPages > 1 && (
-        <div className="bg-gray-900 dark:bg-dark-bg-secondary mt-4 border border-gray-800 dark:border-dark-border px-4 py-3 sm:px-6 sm:py-4 rounded-2xl shadow-lg">
+        <div className="bg-white dark:bg-dark-bg-secondary mt-4 border border-gray-100 dark:border-dark-border px-4 py-3 sm:px-6 sm:py-3.5 rounded-2xl shadow-sm text-gray-700 dark:text-dark-text">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="bg-blue-600/20 text-blue-400 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border border-blue-600/30">
+              <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider border border-blue-100 dark:border-blue-900/30">
                 Pág {currentPage}/{totalPages}
               </div>
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest hidden sm:inline">
+              <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider hidden sm:inline">
                 Exibindo {startItem}–{endItem} de {filteredClients.length}
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 sm:pb-0 custom-scrollbar">
+            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pt-2 pb-3 sm:pt-0 sm:pb-0 sm:overflow-visible custom-scrollbar">
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="flex items-center px-3 py-1.5 bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
                 <span className="hidden sm:inline">Início</span>
                 <span className="sm:hidden">«</span>
@@ -1655,7 +1782,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="flex items-center px-3 py-1.5 bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
                 <ChevronLeft className="h-3.5 w-3.5 sm:mr-1" />
                 <span className="hidden sm:inline">Anterior</span>
@@ -1673,10 +1800,10 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                     <button
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`min-w-[32px] sm:min-w-[36px] h-8 sm:h-9 flex items-center justify-center text-[10px] sm:text-xs font-black rounded-xl transition-all ${
+                      className={`min-w-[32px] sm:min-w-[36px] h-8 sm:h-9 flex items-center justify-center text-[11px] font-semibold rounded-xl transition-all border ${
                         pageNum === currentPage
-                          ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
-                          : "bg-white/5 text-gray-400 hover:text-white border border-white/5 hover:border-white/20"
+                          ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                          : "bg-gray-50 dark:bg-dark-bg border-gray-200 dark:border-dark-border text-gray-600 dark:text-dark-text-secondary hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
                       }`}
                     >
                       {pageNum}
@@ -1688,7 +1815,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="flex items-center px-3 py-1.5 bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
                 <span className="hidden sm:inline">Próxima</span>
                 <ChevronRight className="h-3.5 w-3.5 sm:ml-1" />
@@ -1697,7 +1824,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <button
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="flex items-center px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="flex items-center px-3 py-1.5 bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
                 <span className="hidden sm:inline">Fim</span>
                 <span className="sm:hidden">»</span>

@@ -19,160 +19,6 @@ import {
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
 
-// Função auxiliar para converter números em extenso
-const numeroParaExtenso = (num: number): string => {
-  const unidades = [
-    "",
-    "um",
-    "dois",
-    "três",
-    "quatro",
-    "cinco",
-    "seis",
-    "sete",
-    "oito",
-    "nove",
-  ];
-  const dezenas = [
-    "",
-    "",
-    "vinte",
-    "trinta",
-    "quarenta",
-    "cinquenta",
-    "sessenta",
-    "setenta",
-    "oitenta",
-    "noventa",
-  ];
-  const dezenasEspeciais = [
-    "dez",
-    "onze",
-    "doze",
-    "treze",
-    "quatorze",
-    "quinze",
-    "dezesseis",
-    "dezessete",
-    "dezoito",
-    "dezenove",
-  ];
-  const centenas = [
-    "",
-    "cento",
-    "duzentos",
-    "trezentos",
-    "quatrocentos",
-    "quinhentos",
-    "seiscentos",
-    "setecentos",
-    "oitocentos",
-    "novecentos",
-  ];
-
-  if (num === 0) return "zero";
-  if (num === 100) return "cem";
-  if (num === 1000) return "mil";
-
-  const partes = [];
-
-  // Centenas
-  const c = Math.floor(num / 100);
-  if (c > 0) {
-    partes.push(centenas[c]);
-  }
-
-  // Dezenas e unidades
-  const resto = num % 100;
-  if (resto >= 10 && resto <= 19) {
-    partes.push(dezenasEspeciais[resto - 10]);
-  } else {
-    const d = Math.floor(resto / 10);
-    const u = resto % 10;
-    if (d > 0) partes.push(dezenas[d]);
-    if (u > 0) partes.push(unidades[u]);
-  }
-
-  return partes.join(" e ");
-};
-
-// Função para formatar valores grandes em mobile
-const formatMobileCurrency = (value: number) => {
-  const isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
-
-  if (!isMobile) {
-    return formatCurrency(value, false);
-  }
-
-  const intValue = Math.floor(value);
-
-  if (intValue === 0) {
-    return "R$ 0";
-  }
-
-  // Determinar a escala e formatar
-  let mainValue = "";
-  let extensoParts = [];
-
-  if (intValue >= 1000000) {
-    // Milhões
-    const milhoes = Math.floor(intValue / 1000000);
-    const resto = intValue % 1000000;
-    mainValue = `R$ ${milhoes}M`;
-
-    if (resto > 0) {
-      const milRestantes = Math.floor(resto / 1000);
-      const unidadesRestantes = resto % 1000;
-
-      if (milRestantes > 0) {
-        const milExtenso = numeroParaExtenso(milRestantes);
-        extensoParts.push(`${milExtenso} mil`);
-      }
-
-      if (unidadesRestantes > 0) {
-        const unidadesExtenso = numeroParaExtenso(unidadesRestantes);
-        extensoParts.push(`${unidadesExtenso} reais`);
-      } else if (extensoParts.length > 0) {
-        extensoParts.push("reais");
-      }
-    }
-  } else if (intValue >= 10000) {
-    // Dezenas de milhares
-    const mil = Math.floor(intValue / 1000);
-    const resto = intValue % 1000;
-    mainValue = `R$ ${mil} mil`;
-
-    if (resto > 0) {
-      const restoExtenso = numeroParaExtenso(resto);
-      extensoParts.push(`${restoExtenso} reais`);
-    }
-  } else if (intValue >= 1000) {
-    // Milhares
-    const mil = Math.floor(intValue / 1000);
-    const resto = intValue % 1000;
-    mainValue = `R$ ${mil} mil`;
-
-    if (resto > 0) {
-      const restoExtenso = numeroParaExtenso(resto);
-      extensoParts.push(`${restoExtenso} reais`);
-    }
-  } else {
-    // Menos de mil
-    return `R$ ${intValue}`;
-  }
-
-  const extensoText = extensoParts.join(" e ");
-
-  return (
-    <div className="flex flex-col items-start">
-      <span className="text-2xl font-semibold">{mainValue}</span>
-      {extensoText && (
-        <span className="text-xs text-blue-200 opacity-90">{extensoText}</span>
-      )}
-    </div>
-  );
-};
-
 interface StoreStats {
   storeName: string;
   city: string;
@@ -375,7 +221,7 @@ const EnhancedStoreManagement: React.FC = () => {
     ];
 
     // Data rows with proper formatting
-    const rows = storeStats.map((s) => [
+    const rows = filteredAndSortedStores.map((s) => [
       s.storeName,
       s.collectorName,
       s.isFormalAssignment
@@ -441,24 +287,28 @@ const EnhancedStoreManagement: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header Simplificado */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 lg:p-6 transition-all duration-300">
+    <div className="space-y-6 text-gray-700 dark:text-dark-text">
+      {/* Header */}
+      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-4 sm:p-5 transition-all duration-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-              <Building className="h-6 w-6 mr-2 text-blue-600 flex-shrink-0" />
-              Acompanhamento de Lojas
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Performance e status de {overviewStats.totalStores} lojas cadastradas
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl shrink-0">
+              <Building className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+                Acompanhamento de Lojas
+              </h2>
+              <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 uppercase tracking-wider">
+                Performance e status de {overviewStats.totalStores} lojas cadastradas
+              </p>
+            </div>
           </div>
 
           {/* Ações Principais */}
           <div className="flex items-center gap-3">
             {overviewStats.unassignedStores > 0 && (
-              <div className="flex items-center text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded-full font-semibold border border-amber-100">
+              <div className="flex items-center text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full font-semibold border border-amber-100 dark:border-amber-900/35">
                 <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
                 {overviewStats.unassignedStores} sem atribuição
               </div>
@@ -466,7 +316,7 @@ const EnhancedStoreManagement: React.FC = () => {
 
             <button
               onClick={exportStoreData}
-              className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 border border-gray-200 rounded-xl transition-all duration-200 text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-dark-text bg-white dark:bg-dark-bg hover:text-blue-600 hover:dark:text-blue-400 border border-gray-200 dark:border-dark-border rounded-xl transition-all duration-200 text-sm font-medium shadow-sm"
               title="Exportar dados para CSV"
             >
               <Download className="h-4 w-4" />
@@ -476,91 +326,95 @@ const EnhancedStoreManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Card Principal - Taxa de Conversão Média */}
-      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-3xl shadow-xl p-8 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-10 transform translate-x-4 -translate-y-4">
-          <Award className="h-48 w-48" />
-        </div>
-        
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <p className="text-blue-100 text-sm font-medium uppercase tracking-wider">
-                Taxa de Conversão Média
-              </p>
-              <div className="flex items-baseline gap-2 mt-2">
-                <p className="text-5xl font-black">
-                  {overviewStats.avgConversionRate.toFixed(1)}%
-                </p>
-                <div className="flex items-center px-2 py-1 bg-white/20 rounded-lg text-xs font-bold">
-                  GERAL
-                </div>
-              </div>
+      {/* Grid de Cards Executivos — Scroll horizontal em mobile com padding vertical para evitar corte de sombras */}
+      <div className="flex overflow-x-auto pt-3 pb-5 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pt-0 sm:pb-0 sm:overflow-visible sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 custom-scrollbar snap-x">
+        {/* Card: Total de Lojas */}
+        <div className="min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow snap-start">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+              <Store className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <div className="hidden lg:flex items-center justify-center h-20 w-20 bg-white/10 rounded-3xl backdrop-blur-sm border border-white/20">
-              <Award className="h-10 w-10 text-white" />
+            {overviewStats.unassignedStores > 0 ? (
+              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-md uppercase tracking-wider border border-amber-150 dark:border-amber-900/30">
+                {overviewStats.unassignedStores} Pendentes
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-md uppercase tracking-wider border border-green-150 dark:border-green-900/30">
+                100% Atribuídas
+              </span>
+            )}
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Total de Lojas</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.totalStores}</p>
+          </div>
+        </div>
+
+        {/* Card: Taxa de Conversão */}
+        <div className="min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow snap-start">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
+              <Award className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
             </div>
           </div>
+          <div>
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Conversão Média</p>
+            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 tracking-tight">{overviewStats.avgConversionRate.toFixed(1)}%</p>
+          </div>
+        </div>
 
-          {/* Métricas secundárias */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-8 border-t border-white/20">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 bg-white/10 rounded-2xl flex items-center justify-center">
-                <DollarSign className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-blue-100 text-xs font-medium">Receita Total</p>
-                <div className="text-xl font-bold">
-                  {formatMobileCurrency(overviewStats.totalRevenue)}
-                </div>
-              </div>
+        {/* Card: Receita Total */}
+        <div className="min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow snap-start">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2.5 bg-green-50 dark:bg-green-900/20 rounded-xl">
+              <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 bg-white/10 rounded-2xl flex items-center justify-center">
-                <Store className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-blue-100 text-xs font-medium">Lojas Atribuídas</p>
-                <p className="text-xl font-bold">{overviewStats.assignedStores}</p>
-              </div>
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Receita Total</p>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400 tracking-tight">
+              {formatCurrency(overviewStats.totalRevenue)}
             </div>
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 bg-white/10 rounded-2xl flex items-center justify-center">
-                <FileText className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-blue-100 text-xs font-medium">Vendas Realizadas</p>
-                <p className="text-xl font-bold">{overviewStats.totalSales}</p>
-              </div>
+          </div>
+        </div>
+
+        {/* Card: Vendas Concluídas */}
+        <div className="min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow snap-start">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2.5 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
+              <FileText className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             </div>
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Fichas / Vendas</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.totalSales}</p>
           </div>
         </div>
       </div>
 
       {/* Filtros Modernizados */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-2 lg:p-3">
+      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-2 sm:p-3">
         <div className="flex flex-col lg:flex-row lg:items-center gap-3">
           {/* Busca com feedback visual */}
           <div className="flex-1 relative group">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar por nome da loja ou cobrador..."
-              className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-medium placeholder-gray-400"
+              className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-medium dark:text-dark-text placeholder-gray-400"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-2 p-1">
-
             {/* Filtro de Cobrador */}
             <div className="relative">
               <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
               <select
                 value={collectorFilter}
                 onChange={(e) => setCollectorFilter(e.target.value)}
-                className="pl-10 pr-10 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-semibold text-gray-700 appearance-none cursor-pointer min-w-[180px]"
+                className="pl-10 pr-10 py-3 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-semibold text-gray-700 dark:text-dark-text appearance-none cursor-pointer min-w-[180px]"
               >
                 <option value="all">Todos os Cobradores</option>
                 {collectors.map((collector) => (
@@ -572,7 +426,7 @@ const EnhancedStoreManagement: React.FC = () => {
               <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             </div>
 
-            <div className="h-8 w-px bg-gray-100 hidden sm:block mx-1" />
+            <div className="h-8 w-px bg-gray-100 dark:bg-dark-border hidden sm:block mx-1" />
 
             {/* Ordenação Modernizada */}
             <div className="flex items-center gap-2">
@@ -581,7 +435,7 @@ const EnhancedStoreManagement: React.FC = () => {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                  className="pl-10 pr-10 py-3 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-semibold text-gray-700 appearance-none cursor-pointer min-w-[140px]"
+                  className="pl-10 pr-10 py-3 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-semibold text-gray-700 dark:text-dark-text appearance-none cursor-pointer min-w-[140px]"
                 >
                   <option value="storeName">Nome</option>
                   <option value="conversionRate">Taxa</option>
@@ -592,10 +446,10 @@ const EnhancedStoreManagement: React.FC = () => {
 
               <button
                 onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-                className={`flex items-center justify-center w-11 h-11 rounded-2xl transition-all duration-300 ${
+                className={`flex items-center justify-center w-11 h-11 rounded-xl transition-all duration-300 ${
                   sortOrder === "desc"
-                    ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
-                    : "bg-white text-gray-600 border border-gray-100 hover:border-blue-200 hover:text-blue-500"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
+                    : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:border-blue-200 hover:text-blue-500"
                 }`}
                 title={sortOrder === "desc" ? "Ordem Decrescente" : "Ordem Crescente"}
               >
@@ -608,11 +462,11 @@ const EnhancedStoreManagement: React.FC = () => {
             </div>
 
             {/* Contador Dinâmico */}
-            <div className="ml-2 flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-xl">
-              <span className="text-xs font-bold text-blue-600">
+            <div className="ml-2 flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 rounded-xl">
+              <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
                 {filteredAndSortedStores.length}
               </span>
-              <span className="text-[10px] font-black uppercase text-blue-400 tracking-widest">
+              <span className="text-[10px] font-semibold uppercase text-blue-400 dark:text-blue-300 tracking-wider">
                 Lojas
               </span>
             </div>
@@ -621,143 +475,138 @@ const EnhancedStoreManagement: React.FC = () => {
       </div>
 
       {/* Lista de Lojas com Cards Aprimorados */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 p-1">
         {filteredAndSortedStores.map((store) => {
           const isUnassigned = !store.assignedCollector;
           
-          const statusColor = isUnassigned
-            ? "amber"
+          const statusBgColor = isUnassigned
+            ? "bg-amber-500"
             : store.conversionRate >= 70
-              ? "green"
+              ? "bg-green-500"
               : store.conversionRate >= 40
-                ? "blue"
-                : "red";
+                ? "bg-blue-500"
+                : "bg-red-500";
+
+          const statusTextColor = isUnassigned
+            ? "text-amber-600 dark:text-amber-400"
+            : store.conversionRate >= 70
+              ? "text-green-600 dark:text-green-400"
+              : store.conversionRate >= 40
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-red-600 dark:text-red-400";
+
+          const statusBgLight = isUnassigned
+            ? "bg-amber-50 dark:bg-amber-900/20"
+            : store.conversionRate >= 70
+              ? "bg-green-50 dark:bg-green-900/20"
+              : store.conversionRate >= 40
+                ? "bg-blue-50 dark:bg-blue-900/20"
+                : "bg-red-50 dark:bg-red-900/20";
+
+          const statusBorderColor = isUnassigned
+            ? "border-amber-500/10 dark:border-amber-500/20"
+            : store.conversionRate >= 70
+              ? "border-green-500/10 dark:border-green-500/20"
+              : store.conversionRate >= 40
+                ? "border-blue-500/10 dark:border-blue-500/20"
+                : "border-red-500/10 dark:border-red-500/20";
 
           return (
             <div
               key={store.storeName}
               onClick={() => setSelectedStoreForModal(store)}
-              className={`group bg-white rounded-[2rem] shadow-sm border border-gray-100 transition-all duration-500 hover:shadow-2xl hover:shadow-gray-200/50 hover:-translate-y-1.5 cursor-pointer relative overflow-hidden`}
+              className="group bg-white dark:bg-dark-bg-secondary rounded-2xl border border-gray-100 dark:border-dark-border p-5 hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-250/20 dark:hover:shadow-black/20 transition-all duration-300 cursor-pointer flex flex-col justify-between"
             >
-              {/* Barra lateral de status */}
-              <div className={`absolute top-0 left-0 w-2 h-full bg-${statusColor}-500 transition-all duration-500 group-hover:w-3`} />
-              
-              <div className="p-6 lg:p-8">
+              <div>
                 {/* Header do Card */}
-                <div className="flex items-start justify-between mb-8">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`p-2 rounded-xl bg-${statusColor}-50`}>
-                        <Store className={`h-5 w-5 text-${statusColor}-600`} />
-                      </div>
-                      <h4 className="text-lg font-bold text-gray-900 truncate pr-2">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`p-2.5 rounded-xl ${statusBgLight} border ${statusBorderColor} transition-colors shrink-0`}>
+                      <Store className={`h-5 w-5 ${statusTextColor}`} />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-dark-text truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         {store.storeName}
                       </h4>
-                    </div>
-                    
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center text-sm font-medium text-gray-400">
-                        <MapPin className="h-3.5 w-3.5 mr-1.5" />
+                      <p className="text-xs text-gray-400 dark:text-dark-text-secondary mt-1 flex items-center">
+                        <MapPin className="h-3.5 w-3.5 mr-1 shrink-0 text-gray-400 dark:text-dark-text-secondary" />
                         {store.city}
-                      </div>
-                      <div className="flex items-center text-sm">
-                        <div className={`h-2 w-2 rounded-full bg-${statusColor}-400 mr-2`} />
-                        <span className="font-bold text-gray-700">{store.collectorName}</span>
-                        {store.isFormalAssignment && !isUnassigned && (
-                          <span className={`ml-2 text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-green-50 text-green-600 border border-green-100`}>
-                            Formal
-                          </span>
-                        )}
-                      </div>
+                      </p>
                     </div>
                   </div>
 
-                  {/* Destaque de Conversão */}
-                  <div className="flex flex-col items-end">
-                    <div className={`text-3xl font-black tracking-tight text-${statusColor}-600 leading-none mb-1`}>
-                      {store.conversionRate.toFixed(1)}<span className="text-sm font-bold opacity-70">%</span>
-                    </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Conversão</span>
+                  {/* Destaque de Conversão como Pill Tag */}
+                  <div className={`inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-bold ${statusTextColor} ${statusBgLight} border ${statusBorderColor} shrink-0`}>
+                    {store.conversionRate.toFixed(1)}%
                   </div>
                 </div>
 
-                {/* Métricas Operacionais */}
-                {!isUnassigned && (
-                  <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div className="bg-gray-50/50 rounded-2xl p-4 border border-transparent hover:border-gray-200 transition-all group-hover:bg-white">
-                      <div className="flex items-center gap-2 mb-2">
-                        <FileText className="h-4 w-4 text-blue-500" />
-                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Vendas</span>
-                      </div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-xl font-bold text-gray-900">{store.totalSales}</span>
-                        <span className="text-xs font-medium text-gray-500">fichas</span>
-                      </div>
-                    </div>
-                    <div className="bg-gray-50/50 rounded-2xl p-4 border border-transparent hover:border-gray-200 transition-all group-hover:bg-white">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Users className="h-4 w-4 text-purple-500" />
-                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Base</span>
-                      </div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-xl font-bold text-gray-900">{store.clientsCount}</span>
-                        <span className="text-xs font-medium text-gray-500">clientes</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {/* Info do Cobrador */}
+                <div className="flex items-center justify-between mb-4 bg-gray-50/50 dark:bg-dark-bg/25 px-3 py-2 rounded-xl border border-gray-100/50 dark:border-dark-border/40">
+                  <span className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                    Cobrador: <span className="font-semibold text-gray-700 dark:text-dark-text">{store.collectorName}</span>
+                  </span>
+                  {store.isFormalAssignment && !isUnassigned && (
+                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                      Formal
+                    </span>
+                  )}
+                </div>
 
-                {/* Barra de Progresso Customizada */}
-                {!isUnassigned && (
-                  <div className="mb-8">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Eficiência</span>
-                      <span className={`text-xs font-bold text-${statusColor}-600`}>{store.conversionRate.toFixed(0)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-3 p-1">
-                      <div
-                        className={`h-1 rounded-full bg-${statusColor}-500 transition-all duration-1000 ease-out shadow-sm shadow-${statusColor}-500/50`}
-                        style={{
-                          width: `${Math.min(store.conversionRate, 100)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Resumo Financeiro com Melhor Contraste */}
-                {!isUnassigned && (
-                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-2xl border border-gray-100 group-hover:border-blue-100 transition-colors">
-                    <div className="flex-1 px-2">
-                      <p className="text-[9px] font-black uppercase tracking-tighter text-gray-400 mb-0.5">Total</p>
-                      <p className="text-sm font-bold text-gray-900 truncate">{formatCurrency(store.totalAmount, false)}</p>
-                    </div>
-                    <div className="h-8 w-px bg-gray-200" />
-                    <div className="flex-1 px-2">
-                      <p className="text-[9px] font-black uppercase tracking-tighter text-green-500 mb-0.5">Pago</p>
-                      <p className="text-sm font-bold text-green-600 truncate">{formatCurrency(store.receivedAmount, false)}</p>
-                    </div>
-                    <div className="h-8 w-px bg-gray-200" />
-                    <div className="flex-1 px-2">
-                      <p className="text-[9px] font-black uppercase tracking-tighter text-red-500 mb-0.5">Pend.</p>
-                      <p className="text-sm font-bold text-red-600 truncate">{formatCurrency(store.pendingAmount, false)}</p>
-                    </div>
-                    <div className="ml-1 p-2 bg-white rounded-xl text-blue-600 shadow-sm border border-gray-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                      <BarChart3 className="h-4 w-4" />
-                    </div>
-                  </div>
-                )}
-
-                {/* Unassigned Store State com visual de Alerta */}
-                {isUnassigned && (
-                  <div className="bg-amber-50 rounded-2xl p-6 border-2 border-dashed border-amber-200 text-amber-800 animate-pulse">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0">
-                        <AlertCircle className="h-6 w-6 text-amber-700" />
+                {!isUnassigned ? (
+                  <>
+                    {/* Grid de Métricas Principais - Limpo e sem bordas excessivas */}
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 mb-4">
+                      <div>
+                        <span className="text-[10px] font-semibold uppercase text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-0.5">Vendas</span>
+                        <div className="text-sm font-bold text-gray-900 dark:text-dark-text">
+                          {store.totalSales} <span className="text-xs font-normal text-gray-555 dark:text-dark-text-secondary">fichas</span>
+                        </div>
                       </div>
                       <div>
-                        <div className="font-black uppercase text-xs tracking-widest mb-1">Atenção Gerencial</div>
-                        <div className="text-sm font-medium">Nenhum cobrador está operando nesta unidade no momento.</div>
+                        <span className="text-[10px] font-semibold uppercase text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-0.5">Clientes</span>
+                        <div className="text-sm font-bold text-gray-900 dark:text-dark-text">
+                          {store.clientsCount} <span className="text-xs font-normal text-gray-555 dark:text-dark-text-secondary">base</span>
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold uppercase text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-0.5">Recebido</span>
+                        <div className="text-sm font-bold text-green-600 dark:text-green-455">
+                          {formatCurrency(store.receivedAmount)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold uppercase text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-0.5">Pendente</span>
+                        <div className={`text-sm font-bold ${store.pendingAmount > 0.01 ? 'text-red-600 dark:text-red-400' : 'text-gray-405 dark:text-dark-text-secondary'}`}>
+                          {formatCurrency(store.pendingAmount)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Barra de Progresso Fina e Elegante */}
+                    <div className="mt-3">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-dark-text-secondary">Eficiência</span>
+                        <span className={`text-xs font-bold ${statusTextColor}`}>{store.conversionRate.toFixed(0)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 dark:bg-dark-bg rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full ${statusBgColor} transition-all duration-1000 ease-out`}
+                          style={{
+                            width: `${Math.min(store.conversionRate, 100)}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  /* Unassigned Store State - Compacto e elegante */
+                  <div className="bg-amber-50/50 dark:bg-amber-900/10 rounded-xl p-4 border border-dashed border-amber-200 dark:border-amber-900/30 text-amber-800 dark:text-amber-300">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-bold text-xs uppercase tracking-wider mb-0.5 text-amber-800 dark:text-amber-400">Pendente</div>
+                        <div className="text-xs text-gray-500 dark:text-dark-text-secondary">Sem cobrador atribuído à unidade.</div>
                       </div>
                     </div>
                   </div>
@@ -770,14 +619,14 @@ const EnhancedStoreManagement: React.FC = () => {
 
       {/* Empty State Customizado */}
       {filteredAndSortedStores.length === 0 && (
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-20 text-center transition-all">
-          <div className="h-24 w-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Store className="h-10 w-10 text-gray-300" />
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-20 text-center transition-all">
+          <div className="h-24 w-24 bg-gray-50 dark:bg-dark-bg rounded-full flex items-center justify-center mx-auto mb-6">
+            <Store className="h-10 w-10 text-gray-300 dark:text-gray-600" />
           </div>
-          <h3 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-dark-text mb-3 tracking-tight">
             Nenhuma loja foi encontrada
           </h3>
-          <p className="text-gray-500 max-w-md mx-auto leading-relaxed">
+          <p className="text-sm font-semibold text-gray-400 dark:text-dark-text-secondary max-w-md mx-auto leading-relaxed">
             {searchTerm
               ? `Não existem resultados que correspondam à sua busca por "${searchTerm}".`
               : "A base de dados de lojas está vazia ou ainda está sendo carregada."}
@@ -785,7 +634,7 @@ const EnhancedStoreManagement: React.FC = () => {
           {searchTerm && (
             <button 
               onClick={() => setSearchTerm("")}
-              className="mt-8 px-6 py-3 bg-gray-900 text-white rounded-2xl text-sm font-bold hover:bg-gray-800 transition-all active:scale-95"
+              className="mt-8 px-6 py-3 bg-gray-900 text-white rounded-2xl text-sm font-bold hover:bg-gray-800 transition-all active:scale-95 shadow-md"
             >
               Limpar Pesquisa
             </button>
@@ -850,7 +699,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
       });
 
     return Object.values(breakdown).sort((a, b) =>
-      a.city.localeCompare(b.city),
+      a.city.localeCompare(b.city)
     );
   }, [collections, store.storeName]);
 
@@ -862,150 +711,160 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
         ? "blue"
         : "red";
 
+  const statusBgLight = statusColor === "amber" ? "bg-amber-50 dark:bg-amber-900/20" :
+                        statusColor === "green" ? "bg-green-50 dark:bg-green-900/20" :
+                        statusColor === "blue" ? "bg-blue-50 dark:bg-blue-900/20" :
+                        "bg-red-50 dark:bg-red-900/20";
+
+  const statusTextColor = statusColor === "amber" ? "text-amber-600 dark:text-amber-400" :
+                          statusColor === "green" ? "text-green-600 dark:text-green-400" :
+                          statusColor === "blue" ? "text-blue-600 dark:text-blue-400" :
+                          "text-red-600 dark:text-red-400";
+
   return (
-    <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
-      <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white/20">
+    <div className="fixed inset-0 bg-gray-900/60 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-gray-100 dark:border-dark-border">
         {/* Header Elegante */}
-        <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
+        <div className="p-6 border-b border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50 dark:bg-dark-bg">
           <div className="flex items-center gap-4">
-            <div className={`h-14 w-14 rounded-2xl bg-${statusColor}-50 flex items-center justify-center`}>
-              <Store className={`h-7 w-7 text-${statusColor}-600`} />
+            <div className={`h-14 w-14 rounded-xl ${statusBgLight} flex items-center justify-center`}>
+              <Store className={`h-7 w-7 ${statusTextColor}`} />
             </div>
             <div>
-              <h3 className="text-2xl font-black text-gray-900 tracking-tight leading-none">
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
                 {store.storeName}
               </h3>
-              <div className="flex items-center gap-3 mt-2">
-                <span className="flex items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
-                  <MapPin className="h-3 w-3 mr-1" />
+              <div className="flex items-center gap-3 mt-1.5">
+                <span className="flex items-center text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">
+                  <MapPin className="h-3.5 w-3.5 mr-1" />
                   {store.city}
                 </span>
-                <div className="h-1 w-1 rounded-full bg-gray-300" />
-                <span className="text-xs font-bold text-gray-600">
-                  Operado por: <span className="text-blue-600">{store.collectorName}</span>
+                <div className="h-1 w-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+                <span className="text-xs font-semibold text-gray-600 dark:text-dark-text-secondary">
+                  Operado por: <span className="text-blue-600 dark:text-blue-400 font-semibold">{store.collectorName}</span>
                 </span>
               </div>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="h-12 w-12 flex items-center justify-center bg-gray-100 hover:bg-red-50 hover:text-red-500 rounded-2xl transition-all active:scale-95 group"
+            className="h-10 w-10 flex items-center justify-center bg-gray-100 hover:bg-red-50 hover:text-red-500 dark:bg-dark-bg dark:hover:bg-red-950/20 dark:hover:text-red-400 text-gray-500 dark:text-dark-text-secondary rounded-xl transition-all active:scale-95 group"
           >
-            <X className="h-6 w-6 transition-transform group-hover:rotate-90" />
+            <X className="h-5 w-5 transition-transform group-hover:rotate-90" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-8 overflow-y-auto flex-1 minimal-scrollbar bg-white">
+        <div className="p-6 overflow-y-auto flex-1 minimal-scrollbar bg-white dark:bg-dark-bg-secondary">
           {/* Dashboard de Performance no Modal */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-            <div className="p-6 bg-blue-50/50 rounded-[2rem] border border-blue-100/50 group hover:bg-blue-600 transition-all duration-500">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+            <div className="p-5 bg-gradient-to-br from-blue-50/40 to-blue-50/10 dark:from-blue-950/20 dark:to-blue-950/5 rounded-2xl border border-blue-100/40 dark:border-blue-900/30 flex flex-col justify-between">
               <div className="flex items-center justify-between mb-4">
-                <div className="p-2 bg-blue-100 rounded-xl group-hover:bg-blue-500">
-                  <Award className="h-5 w-5 text-blue-600 group-hover:text-white" />
+                <div className="p-2.5 bg-blue-100/80 dark:bg-blue-900/50 rounded-xl text-blue-600 dark:text-blue-400">
+                  <Award className="h-5 w-5" />
                 </div>
-                <span className="text-[10px] font-black uppercase text-blue-400 tracking-widest group-hover:text-blue-200">Taxa</span>
+                <span className="text-[10px] font-bold uppercase text-blue-500 dark:text-blue-400 tracking-wider">Taxa</span>
               </div>
-              <p className="text-3xl font-black text-blue-900 group-hover:text-white">
+              <p className="text-2xl sm:text-3xl font-extrabold text-blue-950 dark:text-blue-200">
                 {store.conversionRate.toFixed(1)}%
               </p>
-              <p className="text-xs font-medium text-blue-600/60 mt-1 group-hover:text-blue-100">Eficiência de Conversão</p>
+              <p className="text-xs text-blue-650/70 dark:text-blue-400/70 mt-1">Eficiência de Conversão</p>
             </div>
 
-            <div className="p-6 bg-green-50/50 rounded-[2rem] border border-green-100/50 group hover:bg-green-600 transition-all duration-500">
+            <div className="p-5 bg-gradient-to-br from-green-50/40 to-green-50/10 dark:from-green-950/20 dark:to-green-950/5 rounded-2xl border border-green-100/40 dark:border-green-900/30 flex flex-col justify-between">
               <div className="flex items-center justify-between mb-4">
-                <div className="p-2 bg-green-100 rounded-xl group-hover:bg-green-500">
-                  <CheckCircle className="h-5 w-5 text-green-600 group-hover:text-white" />
+                <div className="p-2.5 bg-green-100/80 dark:bg-green-900/50 rounded-xl text-green-600 dark:text-green-400">
+                  <CheckCircle className="h-5 w-5" />
                 </div>
-                <span className="text-[10px] font-black uppercase text-green-400 tracking-widest group-hover:text-green-200">Pago</span>
+                <span className="text-[10px] font-bold uppercase text-green-500 dark:text-green-400 tracking-wider">Pago</span>
               </div>
-              <p className="text-2xl font-black text-green-900 group-hover:text-white truncate">
+              <p className="text-2xl sm:text-3xl font-extrabold text-green-950 dark:text-green-200 truncate">
                 {formatCurrency(store.receivedAmount)}
               </p>
-              <p className="text-xs font-medium text-green-600/60 mt-1 group-hover:text-green-100">Valor Recebido</p>
+              <p className="text-xs text-green-650/70 dark:text-green-400/70 mt-1">Valor Recebido</p>
             </div>
 
-            <div className="p-6 bg-red-50/50 rounded-[2rem] border border-red-100/50 group hover:bg-red-600 transition-all duration-500">
+            <div className="p-5 bg-gradient-to-br from-red-50/40 to-red-50/10 dark:from-red-950/20 dark:to-red-950/5 rounded-2xl border border-red-100/40 dark:border-red-900/30 flex flex-col justify-between">
               <div className="flex items-center justify-between mb-4">
-                <div className="p-2 bg-red-100 rounded-xl group-hover:bg-red-500">
-                  <AlertCircle className="h-5 w-5 text-red-600 group-hover:text-white" />
+                <div className="p-2.5 bg-red-100/80 dark:bg-red-900/50 rounded-xl text-red-600 dark:text-red-400">
+                  <AlertCircle className="h-5 w-5" />
                 </div>
-                <span className="text-[10px] font-black uppercase text-red-400 tracking-widest group-hover:text-red-200">Aberto</span>
+                <span className="text-[10px] font-bold uppercase text-red-500 dark:text-red-400 tracking-wider">Aberto</span>
               </div>
-              <p className="text-2xl font-black text-red-900 group-hover:text-white truncate">
+              <p className="text-2xl sm:text-3xl font-extrabold text-red-950 dark:text-red-200 truncate">
                 {formatCurrency(store.pendingAmount)}
               </p>
-              <p className="text-xs font-medium text-red-600/60 mt-1 group-hover:text-red-100">Valor Pendente</p>
+              <p className="text-xs text-red-650/70 dark:text-red-400/70 mt-1">Valor Pendente</p>
             </div>
 
-            <div className="p-6 bg-purple-50/50 rounded-[2rem] border border-purple-100/50 group hover:bg-purple-600 transition-all duration-500">
+            <div className="p-5 bg-gradient-to-br from-purple-50/40 to-purple-50/10 dark:from-purple-950/20 dark:to-purple-950/5 rounded-2xl border border-purple-100/40 dark:border-purple-900/30 flex flex-col justify-between">
               <div className="flex items-center justify-between mb-4">
-                <div className="p-2 bg-purple-100 rounded-xl group-hover:bg-purple-500">
-                  <DollarSign className="h-5 w-5 text-purple-600 group-hover:text-white" />
+                <div className="p-2.5 bg-purple-100/80 dark:bg-purple-900/50 rounded-xl text-purple-600 dark:text-purple-400">
+                  <DollarSign className="h-5 w-5" />
                 </div>
-                <span className="text-[10px] font-black uppercase text-purple-400 tracking-widest group-hover:text-purple-200">Média</span>
+                <span className="text-[10px] font-bold uppercase text-purple-505 dark:text-purple-400 tracking-wider">Média</span>
               </div>
-              <p className="text-2xl font-black text-purple-900 group-hover:text-white truncate">
+              <p className="text-2xl sm:text-3xl font-extrabold text-purple-950 dark:text-purple-200 truncate">
                 {formatCurrency(store.averageTicket)}
               </p>
-              <p className="text-xs font-medium text-purple-600/60 mt-1 group-hover:text-purple-100">Ticket Médio</p>
+              <p className="text-xs text-purple-650/70 dark:text-purple-400/70 mt-1">Ticket Médio</p>
             </div>
           </div>
 
           {/* Tabela de Cidades Modernizada */}
-          <div className="space-y-6">
-            <div className="flex items-center justify-between px-2">
-              <h4 className="text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest">
-                <BarChart3 className="h-5 w-5 text-blue-600" />
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-dark-text flex items-center gap-2 uppercase tracking-wider">
+                <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 Distribuição Geográfica Detalhada
               </h4>
-              <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
-                {cityBreakdown.length} Cidades Identificadas
+              <span className="self-start sm:self-auto text-xs font-semibold text-gray-400 dark:text-dark-text-secondary bg-gray-50 dark:bg-dark-bg px-3 py-1 rounded-full border border-gray-100 dark:border-dark-border">
+                {cityBreakdown.length} {cityBreakdown.length === 1 ? "Cidade Identificada" : "Cidades Identificadas"}
               </span>
             </div>
 
-            <div className="overflow-x-auto rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-gray-50/80 backdrop-blur-sm border-b border-gray-100">
-                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Cidade</th>
-                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Clientes</th>
-                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Fichas</th>
-                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">Valor Bruto</th>
-                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">Valor Pago</th>
-                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">Pendente</th>
+                  <tr className="bg-gray-50 dark:bg-dark-bg border-b border-gray-100 dark:border-dark-border">
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Cidade</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider text-center">Clientes</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider text-center">Fichas</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider text-right">Valor Bruto</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider text-right">Valor Pago</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider text-right">Pendente</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
                   {cityBreakdown.map((item) => {
                     const pending = item.totalAmount - item.receivedAmount;
                     
                     return (
-                      <tr key={item.city} className="group hover:bg-blue-50/30 transition-colors">
+                      <tr key={item.city} className="group hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-white border border-gray-100 flex items-center justify-center text-xs shadow-sm group-hover:border-blue-200">
+                            <div className="h-8 w-8 rounded-full bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border flex items-center justify-center text-xs shadow-sm group-hover:border-blue-200">
                               📍
                             </div>
-                            <span className="text-sm font-bold text-gray-900 group-hover:text-blue-700">{item.city}</span>
+                            <span className="text-sm font-semibold text-gray-900 dark:text-dark-text group-hover:text-blue-700 dark:group-hover:text-blue-400">{item.city}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-center">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200 group-hover:bg-white group-hover:border-blue-200">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text border border-gray-200 dark:border-dark-border group-hover:bg-white dark:group-hover:bg-dark-bg-secondary">
                             {item.clients.size}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-center text-sm font-semibold text-gray-500">
+                        <td className="px-6 py-4 text-center text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
                           {item.sales.size}
                         </td>
-                        <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                        <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-dark-text text-right">
                           {formatCurrency(item.totalAmount)}
                         </td>
-                        <td className="px-6 py-4 text-sm font-bold text-green-600 text-right">
+                        <td className="px-6 py-4 text-sm font-semibold text-green-600 dark:text-green-400 text-right">
                           {formatCurrency(item.receivedAmount)}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <span className={`text-sm font-black ${pending > 0 ? "text-red-600" : "text-gray-400"}`}>
+                          <span className={`text-sm font-semibold ${pending > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}>
                             {formatCurrency(pending)}
                           </span>
                         </td>
@@ -1019,10 +878,10 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
         </div>
 
         {/* Footer Moderno */}
-        <div className="p-8 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-4">
+        <div className="p-6 border-t border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg flex justify-end gap-4">
           <button
             onClick={onClose}
-            className="px-10 py-4 bg-gray-900 text-white rounded-[1.5rem] hover:bg-gray-800 transition-all font-black text-sm uppercase tracking-widest shadow-xl shadow-gray-900/20 active:scale-95"
+            className="px-8 py-3 bg-gray-950 hover:bg-gray-800 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-xl transition-all font-semibold text-sm active:scale-95 shadow-sm"
           >
             Concluir Análise
           </button>
@@ -1031,5 +890,4 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
     </div>
   );
 };
-
 export default EnhancedStoreManagement;

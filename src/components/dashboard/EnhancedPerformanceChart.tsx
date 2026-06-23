@@ -288,23 +288,23 @@ const EnhancedPerformanceChart: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Dashboard Header */}
-      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-dark-border">
+      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-dark-border">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-black text-gray-900 dark:text-dark-text tracking-tight flex items-center gap-2">
-              <BarChart3 className="w-6 h-6 text-blue-600" />
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight flex items-center gap-2">
+              <BarChart3 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               Ranking de Performance
             </h2>
-            <p className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary mt-1 uppercase tracking-wider">
+            <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 uppercase tracking-wider">
               Análise detalhada por cobrador e período
             </p>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wider transition-all border ${
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all border ${
                 showFilters || hasActiveFilters
-                  ? "bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 dark:shadow-none"
+                  ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/10"
                   : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
               }`}
             >
@@ -313,7 +313,7 @@ const EnhancedPerformanceChart: React.FC = () => {
             </button>
             <button
               onClick={exportPerformanceData}
-              className="p-2.5 bg-gray-50 dark:bg-dark-bg text-gray-500 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-xl hover:bg-gray-100 dark:hover:bg-dark-bg/50 transition-all"
+              className="p-2.5 bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg/50 transition-all shadow-sm"
               title="Exportar CSV"
             >
               <Download className="w-5 h-5" />
@@ -337,7 +337,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                       })}
                       className={`py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${
                         selectedMonths.includes(idx)
-                          ? "bg-blue-600 text-white shadow-md"
+                          ? "bg-blue-600 text-white shadow-sm"
                           : "bg-white dark:bg-dark-bg-secondary text-gray-500 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:border-blue-400"
                       }`}
                     >
@@ -359,7 +359,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                       })}
                       className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
                         selectedYears.includes(year)
-                          ? "bg-green-600 text-white shadow-md"
+                          ? "bg-green-600 text-white shadow-sm"
                           : "bg-white dark:bg-dark-bg-secondary text-gray-500 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:border-green-400"
                       }`}
                     >
@@ -375,7 +375,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="w-full px-4 py-2.5 bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border rounded-xl text-sm font-bold dark:text-dark-text focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2.5 bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border rounded-xl text-xs font-bold dark:text-dark-text appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500/25"
                 >
                   <option value="receivedAmount">VALOR RECEBIDO</option>
                   <option value="totalSales">TOTAL DE VENDAS</option>
@@ -385,7 +385,7 @@ const EnhancedPerformanceChart: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-dark-border flex justify-end gap-3">
+            <div className="mt-6 pt-6 border-t border-gray-100 dark:border-dark-border flex justify-end gap-3">
               <button
                 onClick={() => startTransition(() => { setSelectedMonths([]); setSelectedYears([]); setShowFilters(false); })}
                 className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 dark:hover:text-dark-text"
@@ -394,7 +394,7 @@ const EnhancedPerformanceChart: React.FC = () => {
               </button>
               <button
                 onClick={() => setShowFilters(false)}
-                className="px-6 py-2 bg-blue-600 text-white text-xs font-bold uppercase tracking-widest rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-100 dark:shadow-none transition-all"
+                className="px-6 py-2 bg-blue-600 text-white text-xs font-bold uppercase tracking-widest rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/10 transition-all"
               >
                 Aplicar Filtros
               </button>
@@ -404,66 +404,66 @@ const EnhancedPerformanceChart: React.FC = () => {
       </div>
 
       {/* Summary Card: Visitas do Período */}
-      <div className="relative overflow-hidden bg-white dark:bg-dark-bg-secondary rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-dark-border">
+      <div className="relative overflow-hidden bg-white dark:bg-dark-bg-secondary rounded-2xl p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-dark-border">
         {/* Decorative background element */}
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-blue-500/5 dark:bg-blue-400/5 rounded-full blur-3xl pointer-events-none"></div>
         
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-              <Calendar className="w-5 h-5 text-blue-600" />
+              <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-gray-800 dark:text-dark-text uppercase tracking-wider">Visitas do Período</h3>
-              <p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">Visão consolidada da equipe</p>
+              <h3 className="text-sm font-bold text-gray-800 dark:text-dark-text uppercase tracking-wider">Visitas do Período</h3>
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase mt-0.5">Visão consolidada da equipe</p>
             </div>
           </div>
           {teamStats.totalVisitsGoal > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-black text-blue-600">
+              <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
                 {((teamStats.totalVisitsActual / teamStats.totalVisitsGoal) * 100).toFixed(0)}%
               </span>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">da Meta</span>
+              <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-tighter">da Meta</span>
             </div>
           )}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-2xl border border-gray-100 dark:border-dark-border group hover:border-green-200 dark:hover:border-green-900/30 transition-all">
+          <div className="p-4 bg-gray-50/40 dark:bg-dark-bg/25 rounded-2xl border border-gray-100/50 dark:border-dark-border/40 transition-colors">
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Realizadas</label>
+              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Realizadas</label>
             </div>
-            <p className="text-2xl font-black text-gray-800 dark:text-dark-text group-hover:text-green-600 transition-colors">{teamStats.totalVisitsActual}</p>
+            <p className="text-xl font-bold text-gray-800 dark:text-dark-text">{teamStats.totalVisitsActual}</p>
           </div>
-          <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-2xl border border-gray-100 dark:border-dark-border group hover:border-amber-200 dark:hover:border-amber-900/30 transition-all">
+          <div className="p-4 bg-gray-50/40 dark:bg-dark-bg/25 rounded-2xl border border-gray-100/50 dark:border-dark-border/40 transition-colors">
             <div className="flex items-center gap-2 mb-2">
               <Search className="w-3.5 h-3.5 text-amber-500" />
-              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Não Loc.</label>
+              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Não Loc.</label>
             </div>
-            <p className="text-2xl font-black text-gray-800 dark:text-dark-text group-hover:text-amber-600 transition-colors">{teamStats.totalVisitsNaoEncontrado}</p>
+            <p className="text-xl font-bold text-gray-800 dark:text-dark-text">{teamStats.totalVisitsNaoEncontrado}</p>
           </div>
-          <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-2xl border border-gray-100 dark:border-dark-border group hover:border-blue-200 dark:hover:border-blue-900/30 transition-all">
+          <div className="p-4 bg-gray-50/40 dark:bg-dark-bg/25 rounded-2xl border border-gray-100/50 dark:border-dark-border/40 transition-colors">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="w-3.5 h-3.5 text-blue-500" />
-              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Agendadas</label>
+              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Agendadas</label>
             </div>
-            <p className="text-2xl font-black text-gray-800 dark:text-dark-text group-hover:text-blue-600 transition-colors">{teamStats.totalPendingVisits}</p>
+            <p className="text-xl font-bold text-gray-800 dark:text-dark-text">{teamStats.totalPendingVisits}</p>
           </div>
-          <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-2xl border border-gray-100 dark:border-dark-border group hover:border-rose-200 dark:hover:border-rose-900/30 transition-all">
+          <div className="p-4 bg-gray-50/40 dark:bg-dark-bg/25 rounded-2xl border border-gray-100/50 dark:border-dark-border/40 transition-colors">
             <div className="flex items-center gap-2 mb-2">
               <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
-              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Atrasadas</label>
+              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Atrasadas</label>
             </div>
-            <p className="text-2xl font-black text-gray-800 dark:text-dark-text group-hover:text-rose-600 transition-colors">{teamStats.totalVisitsAtrasadas}</p>
+            <p className="text-xl font-bold text-gray-800 dark:text-dark-text">{teamStats.totalVisitsAtrasadas}</p>
           </div>
         </div>
 
         {teamStats.totalVisitsGoal > 0 && (
           <div className="mt-6">
-            <div className="w-full bg-gray-100 dark:bg-dark-bg h-2 rounded-full overflow-hidden border border-gray-50 dark:border-dark-border">
+            <div className="w-full bg-gray-100 dark:bg-dark-bg h-1.5 rounded-full overflow-hidden">
               <div 
-                className="bg-blue-600 h-full rounded-full transition-all duration-1000 ease-out shadow-lg shadow-blue-200"
+                className="bg-blue-600 h-full rounded-full transition-all duration-1000 ease-out"
                 style={{ width: `${Math.min(100, (teamStats.totalVisitsActual / teamStats.totalVisitsGoal) * 100)}%` }}
               />
             </div>
@@ -472,117 +472,164 @@ const EnhancedPerformanceChart: React.FC = () => {
       </div>
 
       {/* Collector Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 p-0.5">
         {filteredAndSortedPerformance.map((collector, index) => {
           const isTop3 = index < 3 && sortOrder === "desc";
           const rank = index + 1;
           
+          const getSortMetricDisplay = () => {
+            switch (sortBy) {
+              case "receivedAmount":
+                return {
+                  value: formatCurrency(collector.receivedAmount),
+                  label: "Valor Recebido",
+                  color: "text-green-600 dark:text-green-400"
+                };
+              case "totalSales":
+                return {
+                  value: `${collector.totalSales}`,
+                  label: "Títulos Vendidos",
+                  color: "text-blue-600 dark:text-blue-400"
+                };
+              case "clientsCount":
+                return {
+                  value: `${collector.clientsCount}`,
+                  label: "Total de Clientes",
+                  color: "text-purple-600 dark:text-purple-400"
+                };
+              case "pendingSales":
+                return {
+                  value: `${collector.pendingSales}`,
+                  label: "Fichas Pendentes",
+                  color: "text-rose-600 dark:text-rose-400"
+                };
+              default:
+                return {
+                  value: formatCurrency(collector.receivedAmount),
+                  label: "Valor Recebido",
+                  color: "text-green-600 dark:text-green-400"
+                };
+            }
+          };
+
+          const scoreDisplay = getSortMetricDisplay();
+
           return (
             <div 
               key={collector.collectorId}
-              className="group relative bg-white dark:bg-dark-bg-secondary rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-dark-border hover:shadow-xl transition-all duration-300"
+              className="group bg-white dark:bg-dark-bg-secondary rounded-2xl p-5 border border-gray-100 dark:border-dark-border hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-250/20 dark:hover:shadow-black/20 transition-all duration-300 cursor-pointer flex flex-col justify-between"
             >
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <div className={`relative w-12 h-12 flex items-center justify-center rounded-2xl text-lg font-black transition-all ${
-                    isTop3 
-                      ? rank === 1 ? "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400" 
-                      : rank === 2 ? "bg-gray-100 text-gray-600 dark:bg-gray-700/30 dark:text-gray-400"
-                      : "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
-                    : "bg-gray-50 text-gray-400 dark:bg-dark-bg dark:text-dark-text-secondary"
-                  }`}>
-                    {rank}
-                    {isTop3 && <Trophy className="absolute -top-1 -right-1 w-3.5 h-3.5 animate-bounce-slow" />}
+              <div>
+                {/* Header do Card */}
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Rank Badge Gamificado */}
+                    <div className={`relative w-10 h-10 flex items-center justify-center rounded-xl text-sm font-bold shrink-0 transition-all ${
+                      isTop3 
+                        ? rank === 1 
+                          ? "bg-gradient-to-r from-amber-100 to-yellow-50 text-amber-700 dark:from-amber-950/40 dark:to-yellow-950/20 dark:text-amber-300 border border-amber-200/50" 
+                          : rank === 2 
+                            ? "bg-gradient-to-r from-slate-100 to-gray-50 text-slate-700 dark:from-slate-800/40 dark:to-gray-800/20 dark:text-slate-300 border border-slate-200/50"
+                            : "bg-gradient-to-r from-orange-100 to-orange-50 text-orange-700 dark:from-orange-950/40 dark:to-orange-900/20 dark:text-orange-300 border border-orange-200/50"
+                        : "bg-gray-50 dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-150 dark:border-dark-border"
+                    }`}>
+                      {rank}
+                      {isTop3 && <Trophy className="absolute -top-1 -right-1 w-3.5 h-3.5 text-amber-500" />}
+                    </div>
+
+                    <div className="min-w-0">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-dark-text truncate leading-tight uppercase group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {collector.collectorName}
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary">
+                        <span className="flex items-center gap-1">
+                          <ShoppingCart className="w-3 h-3 text-gray-400" />
+                          {collector.totalSales} títulos
+                        </span>
+                        <span className="text-gray-300 dark:text-gray-600">•</span>
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3 h-3 text-gray-400" />
+                          {collector.totalAssignedClients} carteira
+                        </span>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Score de Ordenação Principal */}
+                  <div className="text-right shrink-0">
+                    <div className={`text-base sm:text-lg font-bold tracking-tight leading-none mb-0.5 ${scoreDisplay.color}`}>
+                      {scoreDisplay.value}
+                    </div>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-gray-400 dark:text-dark-text-secondary block">
+                      {scoreDisplay.label}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="h-px bg-gray-100 dark:bg-dark-border/50 my-4" />
+
+                {/* Grid de Informações - Sem bordas excessivas */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 mb-5">
+                  {/* Volume Financeiro */}
                   <div>
-                    <h4 className="text-lg font-black text-gray-800 dark:text-dark-text group-hover:text-blue-600 transition-colors uppercase tracking-tight">
-                      {collector.collectorName}
-                    </h4>
-                    <div className="flex items-center gap-4 mt-1">
-                      <div className="flex items-center gap-1.5">
-                        <ShoppingCart className="w-3 h-3 text-gray-400" />
-                        <span className="text-[10px] font-bold text-gray-500 dark:text-dark-text-secondary uppercase">{collector.totalSales} Títulos</span>
+                    <span className="text-[10px] font-semibold uppercase text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-2">Volume Financeiro</span>
+                    <div className="space-y-1.5">
+                      {sortBy !== "receivedAmount" && (
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-gray-500 dark:text-dark-text-secondary">Recebido</span>
+                          <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(collector.receivedAmount)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-500 dark:text-dark-text-secondary font-medium">Agendados</span>
+                        <span className="font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(collector.pendingAmountScheduled)}</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <Users className="w-3 h-3 text-blue-400" />
-                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase">{collector.totalAssignedClients} na Carteira</span>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-500 dark:text-dark-text-secondary font-medium">Total Aberto</span>
+                        <span className="font-semibold text-rose-600 dark:text-rose-400">{formatCurrency(collector.pendingAmountTotal)}</span>
                       </div>
                     </div>
                   </div>
-                </div>
-                {collector.pendingSales > 0 && (
-                  <div className="px-2 py-1 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-rose-100 dark:border-rose-900/30">
-                    {collector.pendingSales} Pendências
-                  </div>
-                )}
-              </div>
 
-              {/* Metric Groups */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-xl border border-gray-100 dark:border-dark-border">
-                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Volume Financeiro</label>
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-[10px] font-bold text-green-600 uppercase">Recebido</span>
-                      <span className="text-base font-black text-gray-800 dark:text-dark-text">{formatCurrency(collector.receivedAmount)}</span>
+                  {/* Visitas no Período */}
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[10px] font-semibold uppercase text-gray-400 dark:text-dark-text-secondary tracking-wider">Visitas</span>
+                      {collector.currentMonthVisitsGoal > 0 && (
+                        <span className="text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary">Meta: {collector.currentMonthVisitsGoal}</span>
+                      )}
                     </div>
-                    <div className="flex justify-between items-baseline">
-                      <span className="flex flex-col leading-tight">
-                        <span className="text-[10px] font-bold text-amber-500 uppercase">A Receber</span>
-                        <span className="text-[8px] font-normal text-gray-400 uppercase tracking-wider">Agendados</span>
-                      </span>
-                      <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{formatCurrency(collector.pendingAmountScheduled)}</span>
+                    <div className="grid grid-cols-3 gap-1 mb-2 text-center">
+                      <div className="text-left">
+                        <span className="text-[9px] font-bold text-blue-500 uppercase block leading-none">Feitas</span>
+                        <span className="text-xs font-bold text-gray-800 dark:text-dark-text">{collector.visitsRealizadas}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-bold text-amber-500 uppercase block leading-none">Agend.</span>
+                        <span className={`text-xs font-bold ${collector.visitsAgendadas > 0 ? "text-amber-500" : "text-gray-300 dark:text-gray-700"}`}>{collector.visitsAgendadas}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[9px] font-bold text-rose-500 uppercase block leading-none">Atras.</span>
+                        <span className={`text-xs font-bold ${collector.visitsAtrasadas > 0 ? "text-rose-500" : "text-gray-300 dark:text-gray-700"}`}>{collector.visitsAtrasadas}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-baseline">
-                      <span className="flex flex-col leading-tight">
-                        <span className="text-[10px] font-bold text-rose-500 uppercase">A Receber</span>
-                        <span className="text-[8px] font-normal text-gray-400 uppercase tracking-wider">Total</span>
-                      </span>
-                      <span className="text-sm font-bold text-rose-600 dark:text-rose-400">{formatCurrency(collector.pendingAmountTotal)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-gray-50/50 dark:bg-dark-bg/30 rounded-xl border border-gray-100 dark:border-dark-border">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Visitas no Período</label>
                     {collector.currentMonthVisitsGoal > 0 && (
-                      <span className="text-[9px] font-bold text-gray-400 uppercase">
-                        Meta: {collector.currentMonthVisitsGoal}
-                      </span>
+                      <div className="w-full bg-gray-100 dark:bg-dark-bg h-1 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-blue-600 h-full transition-all duration-500" 
+                          style={{ width: `${Math.min(100, (collector.visitsRealizadas / collector.currentMonthVisitsGoal) * 100)}%` }} 
+                        />
+                      </div>
                     )}
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="flex flex-col">
-                      <span className="text-[9px] font-bold text-blue-600 uppercase">Feitas</span>
-                      <span className="text-base font-black text-gray-800 dark:text-dark-text">{collector.visitsRealizadas}</span>
-                    </div>
-                    <div className="flex flex-col text-center">
-                      <span className="text-[9px] font-bold text-amber-500 uppercase">Agendadas</span>
-                      <span className={`text-base font-black ${collector.visitsAgendadas > 0 ? "text-amber-500" : "text-gray-300 dark:text-gray-700"}`}>
-                        {collector.visitsAgendadas}
-                      </span>
-                    </div>
-                    <div className="flex flex-col text-right">
-                      <span className="text-[9px] font-bold text-rose-500 uppercase">Atrasadas</span>
-                      <span className={`text-base font-black ${collector.visitsAtrasadas > 0 ? "text-rose-500" : "text-gray-300 dark:text-gray-700"}`}>
-                        {collector.visitsAtrasadas}
-                      </span>
-                    </div>
-                  </div>
-                  {collector.currentMonthVisitsGoal > 0 && (
-                    <div className="mt-2 w-full bg-gray-200 dark:bg-dark-bg-secondary h-1 rounded-full overflow-hidden">
-                      <div className="bg-blue-600 h-full transition-all duration-500" style={{ width: `${Math.min(100, (collector.visitsRealizadas / collector.currentMonthVisitsGoal) * 100)}%` }} />
-                    </div>
-                  )}
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Botões de Ação Modernizados */}
+              <div className="grid grid-cols-2 gap-3 mt-2">
                 <button
                   onClick={() => { setSelectedCollector(collector); setIsModalOpen(true); }}
-                  className="flex items-center justify-center gap-2 py-3 bg-gray-900 dark:bg-dark-bg text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-black dark:hover:bg-dark-bg/50 transition-all group/btn"
+                  className="flex items-center justify-center gap-2 py-2.5 bg-gray-950 hover:bg-gray-800 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-xl text-xs font-semibold uppercase tracking-wider transition-all shadow-sm active:scale-95 group/btn"
                 >
                   <Eye className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" />
                   Detalhes
@@ -592,9 +639,9 @@ const EnhancedPerformanceChart: React.FC = () => {
                     const user = users.find(u => u.id === collector.collectorId);
                     if (user) { setSelectedCollectorForGoals(user); setIsGoalModalOpen(true); }
                   }}
-                  className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-blue-700 shadow-lg shadow-blue-100 dark:shadow-none transition-all group/btn"
+                  className="flex items-center justify-center gap-2 py-2.5 bg-white hover:bg-gray-50 dark:bg-dark-bg text-gray-755 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 group/btn"
                 >
-                  <Target className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" />
+                  <Target className="w-3.5 h-3.5 text-blue-500 group-hover/btn:scale-110 transition-transform" />
                   Metas
                 </button>
               </div>
@@ -605,11 +652,11 @@ const EnhancedPerformanceChart: React.FC = () => {
 
       {/* Empty State */}
       {filteredAndSortedPerformance.length === 0 && (
-        <div className="flex flex-col items-center justify-center p-20 text-center bg-white dark:bg-dark-bg-secondary rounded-3xl border-2 border-dashed border-gray-100 dark:border-dark-border">
+        <div className="flex flex-col items-center justify-center p-20 text-center bg-white dark:bg-dark-bg-secondary rounded-2xl border border-gray-100 dark:border-dark-border">
           <div className="p-6 bg-gray-50 dark:bg-dark-bg rounded-full mb-4">
             <Users className="w-12 h-12 text-gray-300" />
           </div>
-          <h3 className="text-lg font-black text-gray-800 dark:text-dark-text uppercase tracking-tight">Nenhum cobrador encontrado</h3>
+          <h3 className="text-lg font-bold text-gray-800 dark:text-dark-text uppercase tracking-tight">Nenhum cobrador encontrado</h3>
           <p className="text-sm text-gray-500 dark:text-dark-text-secondary mt-2 max-w-xs">Ajuste os filtros de período acima para visualizar o ranking de desempenho.</p>
         </div>
       )}

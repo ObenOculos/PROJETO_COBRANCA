@@ -561,11 +561,11 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="p-5 border border-green-100 dark:border-green-900/30 rounded-2xl bg-green-50/50 dark:bg-green-900/10">
                     <label className="block text-[10px] font-bold text-green-700 dark:text-green-400 uppercase tracking-widest mb-1">Total Recebido</label>
-                    <p className="text-3xl font-black text-green-600 dark:text-green-400">{formatCurrency(collector.receivedAmount)}</p>
+                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(collector.receivedAmount)}</p>
                   </div>
                   <div className="p-5 border border-amber-100 dark:border-amber-900/30 rounded-2xl bg-amber-50/50 dark:bg-amber-900/10">
                     <label className="block text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest mb-1">Total a Receber</label>
-                    <p className="text-3xl font-black text-amber-600 dark:text-amber-400">{formatCurrency(collector.pendingAmount)}</p>
+                    <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">{formatCurrency(collector.pendingAmount)}</p>
                   </div>
                 </div>
 
@@ -575,19 +575,19 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
                         <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Visitas</p>
-                        <p className="text-lg font-black text-blue-600">{summaryStats.avgVisitsPerformance.toFixed(1)}%</p>
+                        <p className="text-lg font-bold text-blue-600">{summaryStats.avgVisitsPerformance.toFixed(1)}%</p>
                       </div>
                       <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
                         <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Pagos</p>
-                        <p className="text-lg font-black text-green-600">{summaryStats.avgPaymentsPerformance.toFixed(1)}%</p>
+                        <p className="text-lg font-bold text-green-600">{summaryStats.avgPaymentsPerformance.toFixed(1)}%</p>
                       </div>
                       <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
                         <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Sucesso</p>
-                        <p className="text-lg font-black text-purple-600">{summaryStats.achievementRate.toFixed(1)}%</p>
+                        <p className="text-lg font-bold text-purple-600">{summaryStats.achievementRate.toFixed(1)}%</p>
                       </div>
                       <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
                         <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Metas</p>
-                        <p className="text-lg font-black text-gray-700 dark:text-dark-text">{summaryStats.achievedMonths}/{summaryStats.totalMonths}</p>
+                        <p className="text-lg font-bold text-gray-700 dark:text-dark-text">{summaryStats.achievedMonths}/{summaryStats.totalMonths}</p>
                       </div>
                     </div>
                   </div>
@@ -641,7 +641,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                     {filteredHistory.slice((historyPage - 1) * HISTORY_PER_PAGE, historyPage * HISTORY_PER_PAGE).map((history, index) => (
                       <div key={index} className="p-4 border border-gray-100 dark:border-dark-border rounded-2xl bg-white dark:bg-dark-bg shadow-sm">
                         <div className="flex justify-between items-center mb-4">
-                          <p className="text-xs font-black text-gray-800 dark:text-dark-text uppercase tracking-widest">{history.month}</p>
+                          <p className="text-xs font-bold text-gray-800 dark:text-dark-text uppercase tracking-widest">{history.month}</p>
                           <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-tight ${getPerformanceColor(history.overallPerformance)}`}>
                             {history.overallPerformance.toFixed(1)}% Geral
                           </span>
@@ -733,7 +733,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                                 <p className="text-[9px] text-gray-400 font-mono mt-0.5">{c.documento}</p>
                               </td>
                               <td className="px-4 py-3 text-right">
-                                <p className="text-xs font-black text-amber-600 dark:text-amber-400">{formatCurrency(c.valorPendente)}</p>
+                                <p className="text-xs font-bold text-amber-600 dark:text-amber-400">{formatCurrency(c.valorPendente)}</p>
                               </td>
                             </tr>
                           ))}
@@ -767,7 +767,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                       <Users className="w-3.5 h-3.5 text-blue-500" />
                       <label className="text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Carteira Atual</label>
                     </div>
-                    <p className="text-3xl font-black text-blue-600 dark:text-blue-400">{currentPortfolio}</p>
+                    <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{currentPortfolio}</p>
                     <p className="text-[9px] text-blue-400 mt-0.5">clientes únicos</p>
                   </div>
                   <div className="p-4 border border-green-100 dark:border-green-900/30 rounded-2xl bg-green-50/50 dark:bg-green-900/10">
@@ -775,7 +775,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                       <UserPlus className="w-3.5 h-3.5 text-green-500" />
                       <label className="text-[9px] font-bold text-green-600 dark:text-green-400 uppercase tracking-widest">Entraram na Carteira</label>
                     </div>
-                    <p className="text-3xl font-black text-green-600 dark:text-green-400">{lastMonthCount}</p>
+                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">{lastMonthCount}</p>
                     <p className="text-[9px] text-green-400 mt-0.5 capitalize">{lastMonthLabel}</p>
                   </div>
                   <div className="p-4 border border-cyan-100 dark:border-cyan-900/30 rounded-2xl bg-cyan-50/50 dark:bg-cyan-900/10">
@@ -783,7 +783,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                       <Sparkles className="w-3.5 h-3.5 text-cyan-500" />
                       <label className="text-[9px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-widest">Novos no Sistema</label>
                     </div>
-                    <p className="text-3xl font-black text-cyan-600 dark:text-cyan-400">{newInSystemLastMonth}</p>
+                    <p className="text-3xl font-bold text-cyan-600 dark:text-cyan-400">{newInSystemLastMonth}</p>
                     <p className="text-[9px] text-cyan-400 mt-0.5 capitalize">{lastMonthLabel}</p>
                   </div>
                   <div className="p-4 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl bg-emerald-50/50 dark:bg-emerald-900/10">
@@ -791,7 +791,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                       <UserPlus className="w-3.5 h-3.5 text-emerald-500" />
                       <label className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Total Entradas</label>
                     </div>
-                    <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{carteiraTotals.totalAdditions}</p>
+                    <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{carteiraTotals.totalAdditions}</p>
                     <p className="text-[9px] text-emerald-400 mt-0.5">desde o início</p>
                   </div>
                   <div className="p-4 border border-rose-100 dark:border-rose-900/30 rounded-2xl bg-rose-50/50 dark:bg-rose-900/10">
@@ -799,7 +799,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                       <Users className="w-3.5 h-3.5 text-rose-400" />
                       <label className="text-[9px] font-bold text-rose-500 dark:text-rose-400 uppercase tracking-widest">Total Saídas</label>
                     </div>
-                    <p className="text-3xl font-black text-rose-500 dark:text-rose-400">{carteiraTotals.totalRemovals}</p>
+                    <p className="text-3xl font-bold text-rose-500 dark:text-rose-400">{carteiraTotals.totalRemovals}</p>
                     <p className="text-[9px] text-rose-300 mt-0.5">desde o início</p>
                   </div>
                 </div>
@@ -860,8 +860,8 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                                       />
                                     </div>
                                   </td>
-                                  <td className="px-4 py-3 text-right text-sm font-black text-blue-600 dark:text-blue-400">{entry.portfolioSize}</td>
-                                  <td className="px-4 py-3 text-right text-sm font-black text-purple-600 dark:text-purple-400">{entry.titlesCount > 0 ? entry.titlesCount : "—"}</td>
+                                  <td className="px-4 py-3 text-right text-sm font-bold text-blue-600 dark:text-blue-400">{entry.portfolioSize}</td>
+                                  <td className="px-4 py-3 text-right text-sm font-bold text-purple-600 dark:text-purple-400">{entry.titlesCount > 0 ? entry.titlesCount : "—"}</td>
                                   <td className="px-4 py-3 text-right text-xs font-bold text-green-600 dark:text-green-400">
                                     {entry.additions > 0 ? `+${entry.additions}` : "—"}
                                   </td>

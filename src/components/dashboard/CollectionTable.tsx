@@ -645,6 +645,13 @@ export const CollectionTable = React.forwardRef<
     const totalItems = showGrouped
       ? filteredClientGroups.length
       : filteredAndGroupedSales.length;
+    // Total de clientes (documentos únicos) e total de vendas exibidos.
+    // Sao grandezas diferentes: um cliente pode ter varias vendas, e por isso a
+    // soma das categorias de status (por venda) costuma passar do nº de clientes.
+    const totalClientes = totalItems;
+    const totalVendas = (
+      showGrouped ? filteredClientGroups : filteredAndGroupedSales
+    ).reduce((sum, group) => sum + (group.sales?.length || 0), 0);
     const totalPages = Math.ceil(totalItems / itemsPerPage);
     const startItem = totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
     const endItem = Math.min(currentPage * itemsPerPage, totalItems);
@@ -717,9 +724,9 @@ export const CollectionTable = React.forwardRef<
                             : "Meus Clientes"}
                         </h2>
                         <p className="text-sm text-gray-600 mt-1">
-                          {filteredClientGroups.length} cliente
-                          {filteredClientGroups.length !== 1 ? "s" : ""} com
-                          cobranças
+                          {totalClientes} cliente
+                          {totalClientes !== 1 ? "s" : ""} • {totalVendas} venda
+                          {totalVendas !== 1 ? "s" : ""}
                         </p>
                       </div>
 
@@ -948,7 +955,9 @@ export const CollectionTable = React.forwardRef<
                     Página {currentPage} de {totalPages}
                   </span>
                   <span className="text-gray-300 ml-2">
-                    • Mostrando {startItem} a {endItem} de {totalItems} clientes
+                    • Mostrando {startItem} a {endItem} de {totalClientes}{" "}
+                    {totalClientes === 1 ? "cliente" : "clientes"} •{" "}
+                    {totalVendas} {totalVendas === 1 ? "venda" : "vendas"}
                   </span>
                 </div>
 
@@ -1174,11 +1183,18 @@ export const CollectionTable = React.forwardRef<
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <DollarSign className="h-5 w-5 text-blue-600" />
-                    <h2 className="text-lg font-semibold text-gray-900">
-                      {userType === "manager"
-                        ? "Todas as Cobranças"
-                        : "Minha Carteira"}
-                    </h2>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">
+                        {userType === "manager"
+                          ? "Todas as Cobranças"
+                          : "Minha Carteira"}
+                      </h2>
+                      <p className="text-sm text-gray-600 mt-0.5">
+                        {totalClientes} cliente
+                        {totalClientes !== 1 ? "s" : ""} • {totalVendas} venda
+                        {totalVendas !== 1 ? "s" : ""}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {userType === "manager" && (
@@ -1746,7 +1762,9 @@ export const CollectionTable = React.forwardRef<
                   Página {currentPage} de {totalPages}
                 </span>
                 <span className="text-gray-300 ml-2">
-                  • Mostrando {startItem} a {endItem} de {totalItems} clientes
+                  • Mostrando {startItem} a {endItem} de {totalClientes}{" "}
+                  {totalClientes === 1 ? "cliente" : "clientes"} • {totalVendas}{" "}
+                  {totalVendas === 1 ? "venda" : "vendas"}
                 </span>
               </div>
 
