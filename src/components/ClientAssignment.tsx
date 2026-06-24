@@ -8,14 +8,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Award,
-  Building,
   HandCoins,
   Briefcase,
   CircleSlash,
   Building2,
   Zap,
   Globe,
-  CalendarPlus,
   FileText,
   FileSpreadsheet,
 } from "lucide-react";
@@ -25,6 +23,7 @@ import { Collection } from "../types";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { parseAndNormalizeDate } from "../filters/dates";
 import { clientMatchesFilters } from "../filters/predicates";
+import FilterPanel from "./filters/FilterPanel";
 import * as XLSX from "xlsx";
 import BulkAssignmentModal from "./BulkAssignmentModal";
 import AssignmentReportModal from "./dashboard/AssignmentReportModal";
@@ -871,6 +870,50 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     setCurrentPage(1);
   };
 
+  // Limpa todos os filtros (reutilizado pelo painel, pelos chips e pelos cards).
+  const clearAllFilters = () => {
+    setSearchTerm("");
+    setFilterCollector("");
+    setFilterStatus("");
+    setFilterCity("");
+    setFilterNeighborhood("");
+    setFilterStore("");
+    setFilterSituacao("");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+    setIncludeWithoutDate(false);
+    setFilterCreatedFrom("");
+    setFilterCreatedTo("");
+    setCurrentPage(1);
+  };
+
+  // Valores e adaptador consumidos pelo FilterPanel compartilhado. O vocabulario
+  // de atribuicao (com/sem cobrador) vai em `assignment`; o de localizacao mantem
+  // a dependencia cidade -> bairro como regra desta tela.
+  const filterPanelValues = {
+    assignment: filterStatus,
+    city: filterCity,
+    neighborhood: filterNeighborhood,
+    store: filterStore,
+    situacao: filterSituacao,
+    createdFrom: filterCreatedFrom,
+    createdTo: filterCreatedTo,
+  };
+
+  const handleFilterPanelChange = (patch: Partial<typeof filterPanelValues>) => {
+    if ("assignment" in patch) setFilterStatus(patch.assignment ?? "");
+    if ("city" in patch) {
+      setFilterCity(patch.city ?? "");
+      setFilterNeighborhood(""); // dependencia: trocar cidade reseta o bairro
+    }
+    if ("neighborhood" in patch) setFilterNeighborhood(patch.neighborhood ?? "");
+    if ("store" in patch) setFilterStore(patch.store ?? "");
+    if ("situacao" in patch) setFilterSituacao(patch.situacao ?? "");
+    if ("createdFrom" in patch) setFilterCreatedFrom(patch.createdFrom ?? "");
+    if ("createdTo" in patch) setFilterCreatedTo(patch.createdTo ?? "");
+    setCurrentPage(1);
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6 pb-24 text-gray-700 dark:text-dark-text">
       {/* Header */}
@@ -1126,161 +1169,20 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         </div>
       </div>
 
-      {/* Filtros Colapsáveis */}
+      {/* Filtros Colapsáveis (painel compartilhado) */}
       {showFilters && (
-        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-5 animate-in fade-in slide-in-from-top-4 duration-300">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <div className="space-y-2">
-              <label className="text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider flex items-center">
-                <AlertCircle className="h-3 w-3 mr-1.5" />
-                Status de Atribuição
-              </label>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-              >
-                <option value="">TODOS</option>
-                <option value="with_collector">COM COBRADOR</option>
-                <option value="without_collector">SEM COBRADOR</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider flex items-center">
-                <MapPin className="h-3 w-3 mr-1.5" />
-                Cidade
-              </label>
-              <select
-                value={filterCity}
-                onChange={(e) => {
-                  setFilterCity(e.target.value);
-                  setFilterNeighborhood("");
-                }}
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-              >
-                <option value="">TODAS AS CIDADES</option>
-                {availableCities.map((city) => (
-                  <option key={city} value={city}>
-                    {city.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider flex items-center">
-                <MapPin className="h-3 w-3 mr-1.5" />
-                Bairro
-              </label>
-              <select
-                value={filterNeighborhood}
-                onChange={(e) => setFilterNeighborhood(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                disabled={!filterCity}
-              >
-                <option value="">TODOS OS BAIRROS</option>
-                {availableNeighborhoods.map((neighborhood) => (
-                  <option key={neighborhood} value={neighborhood}>
-                    {neighborhood.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider flex items-center">
-                <Building className="h-3 w-3 mr-1.5" />
-                Loja
-              </label>
-              <select
-                value={filterStore}
-                onChange={(e) => setFilterStore(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-              >
-                <option value="">TODAS AS LOJAS</option>
-                {availableStores.map((store) => (
-                  <option key={store} value={store}>
-                    {store.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider flex items-center">
-                <Award className="h-3 w-3 mr-1.5" />
-                Situação
-              </label>
-              <select
-                value={filterSituacao}
-                onChange={(e) => setFilterSituacao(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-              >
-                <option value="">TODAS AS SITUAÇÕES</option>
-                <option value="Em mãos">EM MÃOS</option>
-                <option value="Em tratamento">EM TRATAMENTO</option>
-                <option value="Aguardando Interno">AGUARDANDO INTERNO</option>
-                <option value="Cobrança Interna">COBRANÇA INTERNA</option>
-                <option value="Aguardando Terceirizado">AGUARDANDO TERCEIRIZADO</option>
-                <option value="Cobrança Terceirizada">COBRANÇA TERCEIRIZADA</option>
-                <option value="empty">VAZIO</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider flex items-center">
-                <CalendarPlus className="h-3 w-3 mr-1.5" />
-                Criado em
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="date"
-                  aria-label="Criado de"
-                  value={filterCreatedFrom}
-                  onChange={(e) => setFilterCreatedFrom(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                />
-                <input
-                  type="date"
-                  aria-label="Criado até"
-                  value={filterCreatedTo}
-                  onChange={(e) => setFilterCreatedTo(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="col-span-full pt-4 border-t border-gray-100 dark:border-dark-border flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setSearchTerm("");
-                  setFilterCollector("");
-                  setFilterStatus("");
-                  setFilterCity("");
-                  setFilterNeighborhood("");
-                  setFilterStore("");
-                  setFilterSituacao("");
-                  setFilterDateFrom("");
-                  setFilterDateTo("");
-                  setIncludeWithoutDate(false);
-                  setFilterCreatedFrom("");
-                  setFilterCreatedTo("");
-                  setCurrentPage(1);
-                }}
-                className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-dark-text transition-colors uppercase tracking-wider"
-              >
-                Limpar Filtros
-              </button>
-              <button
-                onClick={() => setShowFilters(false)}
-                className="px-5 py-2 bg-gray-900 dark:bg-blue-600 text-white text-xs font-semibold uppercase tracking-wider rounded-xl hover:opacity-90 shadow-md transition-all sm:hidden"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
+        <FilterPanel
+          context="assignment"
+          values={filterPanelValues}
+          onChange={handleFilterPanelChange}
+          onClear={clearAllFilters}
+          onClose={() => setShowFilters(false)}
+          options={{
+            cities: availableCities,
+            neighborhoods: availableNeighborhoods,
+            stores: availableStores,
+          }}
+        />
       )}
 
       {/* Client List */}
@@ -1348,21 +1250,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               </div>
             ))}
             <button
-              onClick={() => {
-                setSearchTerm("");
-                setFilterCollector("");
-                setFilterStatus("");
-                setFilterCity("");
-                setFilterNeighborhood("");
-                setFilterStore("");
-                setFilterSituacao("");
-                setFilterDateFrom("");
-                setFilterDateTo("");
-                setIncludeWithoutDate(false);
-                setFilterCreatedFrom("");
-                setFilterCreatedTo("");
-                setCurrentPage(1);
-              }}
+              onClick={clearAllFilters}
               className="ml-auto text-[10px] font-bold text-red-500 hover:text-red-600 hover:underline px-2 transition-colors"
             >
               Limpar Todos
