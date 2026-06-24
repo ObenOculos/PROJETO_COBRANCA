@@ -5,6 +5,9 @@ import {
   Building,
   Award,
   CalendarPlus,
+  Users,
+  DollarSign,
+  Calendar,
 } from "lucide-react";
 import {
   FilterContext,
@@ -12,7 +15,6 @@ import {
   FILTER_FIELDS,
   SITUACAO_OPTIONS,
   PAYMENT_STATUS_OPTIONS,
-  AGING_OPTIONS,
   SelectOption,
 } from "../../filters/filterConfig";
 
@@ -20,6 +22,8 @@ interface FilterPanelOptions {
   cities?: string[];
   neighborhoods?: string[];
   stores?: string[];
+  /** Cobradores selecionaveis (contexto de cobranca do gerente). */
+  collectors?: SelectOption[];
 }
 
 interface FilterPanelProps {
@@ -69,7 +73,12 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   options = {},
 }) => {
   const fields = FILTER_FIELDS[context];
-  const { cities = [], neighborhoods = [], stores = [] } = options;
+  const {
+    cities = [],
+    neighborhoods = [],
+    stores = [],
+    collectors = [],
+  } = options;
 
   const renderSelect = (
     field: keyof FilterValues,
@@ -145,12 +154,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
           </Field>
         )}
 
-        {fields.aging && (
-          <Field
-            icon={<AlertCircle className="h-3 w-3 mr-1.5" />}
-            label="Faixa de Atraso"
-          >
-            {renderSelect("aging", "TODAS AS FAIXAS", AGING_OPTIONS)}
+        {fields.collector && (
+          <Field icon={<Users className="h-3 w-3 mr-1.5" />} label="Cobrador">
+            {renderSelect("collector", "TODOS OS COBRADORES", collectors)}
           </Field>
         )}
 
@@ -175,6 +181,87 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
                 className={dateClass}
               />
             </div>
+          </Field>
+        )}
+
+        {fields.launchRange && (
+          <Field
+            icon={<Calendar className="h-3 w-3 mr-1.5" />}
+            label="Lançamento"
+          >
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                aria-label="Lançamento de"
+                value={values.launchFrom || ""}
+                onChange={(e) => onChange({ launchFrom: e.target.value })}
+                className={dateClass}
+              />
+              <input
+                type="date"
+                aria-label="Lançamento até"
+                value={values.launchTo || ""}
+                onChange={(e) => onChange({ launchTo: e.target.value })}
+                className={dateClass}
+              />
+            </div>
+          </Field>
+        )}
+
+        {fields.amount && (
+          <Field
+            icon={<DollarSign className="h-3 w-3 mr-1.5" />}
+            label="Valor"
+          >
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                aria-label="Valor mínimo"
+                placeholder="Mínimo"
+                value={values.minAmount ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    minAmount: e.target.value
+                      ? parseFloat(e.target.value)
+                      : undefined,
+                  })
+                }
+                className={dateClass}
+              />
+              <input
+                type="number"
+                aria-label="Valor máximo"
+                placeholder="Máximo"
+                value={values.maxAmount ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    maxAmount: e.target.value
+                      ? parseFloat(e.target.value)
+                      : undefined,
+                  })
+                }
+                className={dateClass}
+              />
+            </div>
+          </Field>
+        )}
+
+        {fields.visits && (
+          <Field
+            icon={<Calendar className="h-3 w-3 mr-1.5" />}
+            label="Visitas"
+          >
+            <button
+              type="button"
+              onClick={() => onChange({ visitsOnly: !values.visitsOnly })}
+              className={`w-full px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+                values.visitsOnly
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+              }`}
+            >
+              {values.visitsOnly ? "✓ Apenas com visitas" : "Apenas com visitas"}
+            </button>
           </Field>
         )}
 
