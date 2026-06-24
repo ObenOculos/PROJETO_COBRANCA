@@ -22,6 +22,8 @@ interface FilterBarProps {
   context?: FilterContext;
   /** Exibe a barra de busca (telas de agregacao tem busca propria). */
   showSearch?: boolean;
+  /** Placeholder da busca (default: clientes/titulos). */
+  searchPlaceholder?: string;
 }
 
 const FilterBar: React.FC<FilterBarProps> = ({
@@ -30,6 +32,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   userType,
   context,
   showSearch = true,
+  searchPlaceholder = "Buscar cliente, apelido, documento, título...",
 }) => {
   const { getAvailableStores, users, getCollectorCollections, collections } =
     useCollection();
@@ -258,7 +261,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar cliente, apelido, documento, título..."
+                placeholder={searchPlaceholder}
                 className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-gray-450"
               />
             </div>

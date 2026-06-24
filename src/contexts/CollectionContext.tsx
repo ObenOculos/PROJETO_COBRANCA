@@ -1517,6 +1517,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           c.cliente?.toLowerCase().includes(searchLower) ||
           c.documento?.toLowerCase().includes(searchLower) ||
           c.apelido?.toLowerCase().includes(searchLower) ||
+          c.nome_da_loja?.toLowerCase().includes(searchLower) ||
+          c.cidade?.toLowerCase().includes(searchLower) ||
           c.numero_titulo?.toString().includes(searchLower) ||
           c.venda_n?.toString().includes(searchLower) ||
           c.id_parcela?.toString().includes(searchLower),

@@ -3,14 +3,12 @@ import {
   Store,
   AlertCircle,
   CheckCircle,
-  Search,
   Download,
   BarChart3,
   Building,
   ChevronDown,
   ChevronUp,
   FileText,
-  Users,
   DollarSign,
   Award,
   MapPin,
@@ -54,15 +52,14 @@ const EnhancedStoreManagement: React.FC = () => {
     [filters, collections],
   );
 
-  const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortBy, setSortBy] = useState<
     "storeName" | "conversionRate" | "totalAmount"
   >("storeName");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [collectorFilter, setCollectorFilter] = useState<string>("all");
   const [selectedStoreForModal, setSelectedStoreForModal] =
     useState<StoreStats | null>(null);
 
+  const hasActiveFilters = Object.values(filters).some(Boolean);
   const collectors = users.filter((u) => u.type === "collector");
   const availableStores = getAvailableStores();
 
@@ -145,25 +142,9 @@ const EnhancedStoreManagement: React.FC = () => {
     return stats;
   }, [availableStores, collectors, sourceCollections]);
 
-  // Filter and sort stores
+  // Ordena as lojas (busca/cobrador/status sao aplicados na fonte via FilterBar).
   const filteredAndSortedStores = useMemo(() => {
-    let filtered = [...storeStats]; // Create a copy to avoid mutating the original array
-
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (store) =>
-          store.storeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          store.collectorName.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
-    }
-
-    // Apply collector filter
-    if (collectorFilter !== "all") {
-      filtered = filtered.filter(
-        (store) => store.assignedCollector === collectorFilter,
-      );
-    }
+    const filtered = [...storeStats]; // Create a copy to avoid mutating the original array
 
     // Apply sorting
     filtered.sort((a, b) => {
@@ -182,7 +163,7 @@ const EnhancedStoreManagement: React.FC = () => {
     });
 
     return filtered;
-  }, [storeStats, searchTerm, sortBy, sortOrder, collectorFilter]);
+  }, [storeStats, sortBy, sortOrder]);
 
   // Calculate overview statistics
   const overviewStats = useMemo(() => {
@@ -404,96 +385,53 @@ const EnhancedStoreManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Filtros Modernizados */}
-      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-2 sm:p-3">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-          {/* Busca com feedback visual */}
-          <div className="flex-1 relative group">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por nome da loja ou cobrador..."
-              className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-medium dark:text-dark-text placeholder-gray-400"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 p-1">
-            {/* Filtro de Cobrador */}
-            <div className="relative">
-              <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
-              <select
-                value={collectorFilter}
-                onChange={(e) => setCollectorFilter(e.target.value)}
-                className="pl-10 pr-10 py-3 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-semibold text-gray-700 dark:text-dark-text appearance-none cursor-pointer min-w-[180px]"
-              >
-                <option value="all">Todos os Cobradores</option>
-                {collectors.map((collector) => (
-                  <option key={collector.id} value={collector.id}>
-                    {collector.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-            </div>
-
-            <div className="h-8 w-px bg-gray-100 dark:bg-dark-border hidden sm:block mx-1" />
-
-            {/* Ordenação Modernizada */}
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <BarChart3 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                  className="pl-10 pr-10 py-3 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-blue-500/20 transition-all text-sm font-semibold text-gray-700 dark:text-dark-text appearance-none cursor-pointer min-w-[140px]"
-                >
-                  <option value="storeName">Nome</option>
-                  <option value="conversionRate">Taxa</option>
-                  <option value="totalAmount">Valor</option>
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-              </div>
-
-              <button
-                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-                className={`flex items-center justify-center w-11 h-11 rounded-xl transition-all duration-300 ${
-                  sortOrder === "desc"
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
-                    : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:border-blue-200 hover:text-blue-500"
-                }`}
-                title={sortOrder === "desc" ? "Ordem Decrescente" : "Ordem Crescente"}
-              >
-                {sortOrder === "desc" ? (
-                  <ChevronDown className="h-5 w-5" />
-                ) : (
-                  <ChevronUp className="h-5 w-5" />
-                )}
-              </button>
-            </div>
-
-            {/* Contador Dinâmico */}
-            <div className="ml-2 flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 rounded-xl">
-              <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
-                {filteredAndSortedStores.length}
-              </span>
-              <span className="text-[10px] font-semibold text-blue-400 dark:text-blue-300 tracking-wider">
-                Lojas
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filtros compartilhados (refinam a fonte das lojas) */}
+      {/* Barra de filtros unificada (busca por loja/cliente/cidade + status,
+          cobrador, vencimento, lançamento, valor — refina a fonte das lojas) */}
       <FilterBar
         filters={filters}
         onFilterChange={setFilters}
         userType="manager"
-        context="aggregate"
-        showSearch={false}
+        context="stores"
+        searchPlaceholder="Buscar loja, cliente ou cidade..."
       />
+
+      {/* Controles de lista: contagem + ordenação */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <span className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
+          {filteredAndSortedStores.length}{" "}
+          {filteredAndSortedStores.length === 1 ? "loja" : "lojas"}
+        </span>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <BarChart3 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="pl-10 pr-9 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium text-gray-700 dark:text-dark-text appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500/20 transition-all"
+            >
+              <option value="storeName">Nome</option>
+              <option value="conversionRate">Taxa</option>
+              <option value="totalAmount">Valor</option>
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          </div>
+          <button
+            onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+            className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all ${
+              sortOrder === "desc"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:border-blue-200 hover:text-blue-500"
+            }`}
+            title={sortOrder === "desc" ? "Ordem decrescente" : "Ordem crescente"}
+          >
+            {sortOrder === "desc" ? (
+              <ChevronDown className="h-5 w-5" />
+            ) : (
+              <ChevronUp className="h-5 w-5" />
+            )}
+          </button>
+        </div>
+      </div>
 
       {/* Lista de Lojas com Cards Aprimorados */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 p-1">
@@ -648,16 +586,16 @@ const EnhancedStoreManagement: React.FC = () => {
             Nenhuma loja foi encontrada
           </h3>
           <p className="text-sm font-semibold text-gray-400 dark:text-dark-text-secondary max-w-md mx-auto leading-relaxed">
-            {searchTerm
-              ? `Não existem resultados que correspondam à sua busca por "${searchTerm}".`
+            {hasActiveFilters
+              ? "Nenhuma loja corresponde aos filtros aplicados."
               : "A base de dados de lojas está vazia ou ainda está sendo carregada."}
           </p>
-          {searchTerm && (
-            <button 
-              onClick={() => setSearchTerm("")}
+          {hasActiveFilters && (
+            <button
+              onClick={() => setFilters({})}
               className="mt-8 px-6 py-3 bg-gray-900 text-white rounded-2xl text-sm font-bold hover:bg-gray-800 transition-all active:scale-95 shadow-md"
             >
-              Limpar Pesquisa
+              Limpar filtros
             </button>
           )}
         </div>
