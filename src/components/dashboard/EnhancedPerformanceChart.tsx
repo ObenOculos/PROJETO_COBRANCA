@@ -515,10 +515,9 @@ const EnhancedPerformanceChart: React.FC = () => {
         searchPlaceholder="Buscar cliente, cidade ou loja..."
         showStatusPills={false}
         showAgingPills={false}
-      />
-
+      >
       {/* Atalhos: Período (escopo de tempo) + Segmento de meta (lente de desempenho) */}
-      <div className="flex flex-wrap items-center gap-2 px-1">
+      <div className="flex flex-wrap items-center gap-2">
         {periodPresets.map((p) => (
           <button
             key={p.id}
@@ -563,6 +562,7 @@ const EnhancedPerformanceChart: React.FC = () => {
           Acima da meta
         </button>
       </div>
+      </FilterBar>
 
       {/* Controles de lista: contagem + ordenação */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-1">

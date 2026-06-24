@@ -29,6 +29,8 @@ interface FilterBarProps {
   showStatusPills?: boolean;
   /** Exibe as pills de faixa de atraso (default true). */
   showAgingPills?: boolean;
+  /** Conteúdo extra (ex.: pills próprias da tela) renderizado DENTRO do card. */
+  children?: React.ReactNode;
 }
 
 const FilterBar: React.FC<FilterBarProps> = ({
@@ -40,6 +42,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   searchPlaceholder = "Buscar cliente, apelido, documento, título...",
   showStatusPills = true,
   showAgingPills = true,
+  children,
 }) => {
   const { getAvailableStores, users, getCollectorCollections, collections } =
     useCollection();
@@ -316,6 +319,9 @@ const FilterBar: React.FC<FilterBarProps> = ({
             showAging={showAgingPills}
           />
         )}
+
+        {/* Slot para pills/conteúdo próprio da tela (dentro do card) */}
+        {children}
 
         {/* Painel avançado compartilhado */}
         {isExpanded && (
