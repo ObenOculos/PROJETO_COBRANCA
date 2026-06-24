@@ -37,6 +37,12 @@ import {
 import { calculateOverdueDays } from "../utils/formatters";
 import { isCancelado } from "../types/status";
 import {
+  clientKey,
+  getClientPaymentStatus,
+  normalizePaymentStatus,
+  isCanceladoFilter,
+} from "../filters/clientStatus";
+import {
   useRealtimeCacheInvalidation,
   useOfflineSyncCacheInvalidation,
 } from "../hooks/useCacheInvalidation";
@@ -1205,19 +1211,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     userType: UserType,
     collectorId?: string,
   ): Collection[] => {
-    // Chave do cliente, identica ao agrupamento da tabela (CollectionTable):
-    // documento, com fallback no nome. Garante que a contagem por status bata
-    // com o total de clientes exibido.
-    const clientKey = (c: Collection) =>
-      (c.documento || c.cliente || "").trim();
-
     // O filtro "Cancelado" e o unico que enxerga os titulos cancelados (que
     // ficam fora da cobranca ativa). So entram aqui clientes 100% cancelados:
     // se o cliente ainda tem algum titulo ativo, ele aparece nas categorias
     // ativas (Pago/Parcial/Pendente), nunca em Cancelado. Assim cada cliente
     // cai em uma unica categoria e a soma fecha com o total.
-    const wantCancelados =
-      (filters.status || "").trim().toLowerCase() === "cancelado";
+    const wantCancelados = isCanceladoFilter(filters.status);
     let filtered: Collection[];
     if (wantCancelados) {
       const activeClientKeys = new Set(
@@ -1370,26 +1369,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     // "pendente"/"pago"/"parcial". O caso "cancelado" ja foi resolvido na
     // selecao da base (wantCancelados) e nao entra nesta classificacao.
     if (filters.status && !wantCancelados) {
-      const raw = filters.status.toLowerCase().trim();
-      const targetStatus = [
-        "pago",
-        "recebido",
-        "paid",
-        "quitado",
-        "finalizado",
-      ].includes(raw)
-        ? "pago"
-        : [
-              "parcial",
-              "pago parcial",
-              "parcialmente pago",
-              "parcialmente_pago",
-              "partial",
-            ].includes(raw)
-          ? "parcial"
-          : "pendente";
+      const targetStatus = normalizePaymentStatus(filters.status);
 
-      // Agrupa por cliente (mesma chave da tabela).
+      // Agrupa por cliente (mesma chave da tabela) e classifica pelo status
+      // agregado compartilhado (src/filters/clientStatus).
       const clientGroups = new Map<string, Collection[]>();
       filtered.forEach((c) => {
         const key = clientKey(c);
@@ -1399,35 +1382,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       });
 
       const matchingClientKeys = new Set<string>();
-      const round2 = (n: number) =>
-        Math.round((n + Number.EPSILON) * 100) / 100;
       clientGroups.forEach((clientCollections, key) => {
-        const totalValue = round2(
-          clientCollections.reduce((sum, c) => sum + c.valor_original, 0),
-        );
-        const totalReceived = round2(
-          clientCollections.reduce((sum, c) => sum + c.valor_recebido, 0),
-        );
-        const totalDiscount = round2(
-          clientCollections.reduce((sum, c) => sum + (c.desconto || 0), 0),
-        );
-        // Saldo do cliente considera o desconto: quita quando recebido +
-        // desconto cobrem o valor original somado de todas as vendas dele.
-        const effectivePaid = round2(totalReceived + totalDiscount);
-        const pendingValue = round2(totalValue - effectivePaid);
-
-        // Status agregado do cliente:
-        // - nada recebido           -> Pendente
-        // - recebeu algo, ainda deve -> Parcial
-        // - quitou tudo             -> Pago
-        const status =
-          effectivePaid === 0
-            ? "pendente"
-            : pendingValue > 0.01
-              ? "parcial"
-              : "pago";
-
-        if (status === targetStatus) matchingClientKeys.add(key);
+        if (getClientPaymentStatus(clientCollections) === targetStatus) {
+          matchingClientKeys.add(key);
+        }
       });
 
       filtered = filtered.filter((c) => matchingClientKeys.has(clientKey(c)));
