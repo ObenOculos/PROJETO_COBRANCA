@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, Filter, X } from "lucide-react";
+import { Search, Filter } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import FilterPanel from "../filters/FilterPanel";
@@ -12,6 +12,13 @@ interface FilterBarProps {
   onFilterChange: (filters: FilterOptions) => void;
   userType: UserType;
 }
+
+const STATUS_PILLS: { value: string; label: string; active: string }[] = [
+  { value: "pendente", label: "Pendente", active: "bg-red-600 border-red-600 text-white shadow-sm" },
+  { value: "pago", label: "Pago", active: "bg-green-600 border-green-600 text-white shadow-sm" },
+  { value: "parcial", label: "Parcial", active: "bg-orange-500 border-orange-500 text-white shadow-sm" },
+  { value: "cancelado", label: "Cancelado", active: "bg-gray-700 border-gray-700 text-white shadow-sm" },
+];
 
 const FilterBar: React.FC<FilterBarProps> = ({
   filters,
@@ -93,6 +100,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
   const clearFilters = () => {
     onFilterChange({});
+    setSearchTerm("");
     setIsExpanded(false);
   };
 
@@ -146,151 +154,109 @@ const FilterBar: React.FC<FilterBarProps> = ({
     collectors: collectors.map((c) => ({ value: c.id, label: c.name })),
   };
 
+  // Chips de filtros ativos (mesmo padrao visual da Atribuicao).
+  const activeFilterChips: { label: string; onClear: () => void }[] = [];
+  if (filters.search)
+    activeFilterChips.push({
+      label: `Busca: "${filters.search}"`,
+      onClear: () => {
+        setSearchTerm("");
+        onFilterChange({ ...filters, search: undefined });
+      },
+    });
+  if (filters.status)
+    activeFilterChips.push({
+      label: `Status: ${filters.status}`,
+      onClear: () => onFilterChange({ ...filters, status: undefined }),
+    });
+  if (filters.store)
+    activeFilterChips.push({
+      label: `Loja: ${filters.store}`,
+      onClear: () => onFilterChange({ ...filters, store: undefined }),
+    });
+  if (filters.collector)
+    activeFilterChips.push({
+      label: `Cobrador: ${collectors.find((c) => c.id === filters.collector)?.name ?? ""}`,
+      onClear: () => onFilterChange({ ...filters, collector: undefined }),
+    });
+  if (filters.city)
+    activeFilterChips.push({
+      label: `Cidade: ${filters.city}`,
+      onClear: () => onFilterChange({ ...filters, city: undefined }),
+    });
+  if (filters.neighborhood)
+    activeFilterChips.push({
+      label: `Bairro: ${filters.neighborhood}`,
+      onClear: () => onFilterChange({ ...filters, neighborhood: undefined }),
+    });
+  if (filters.visitsOnly)
+    activeFilterChips.push({
+      label: "Apenas com visitas",
+      onClear: () => onFilterChange({ ...filters, visitsOnly: undefined }),
+    });
+
+  const togglePill = (value: string) =>
+    onFilterChange({
+      ...filters,
+      status: filters.status === value ? undefined : value,
+    });
+
   return (
-    <div className="bg-gray-50 rounded-2xl shadow-sm border border-gray-200 mb-4">
-      {/* Search Bar */}
-      <div className="p-4">
-        <div className="relative">
-          <label htmlFor="search-input" className="sr-only">
-            Buscar
-          </label>
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            id="search-input"
-            name="search"
-            type="text"
-            placeholder="Buscar cliente, apelido, documento, título..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-      </div>
+    <div className="space-y-3 mb-4">
+      {/* Barra de Filtros Unificada */}
+      <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-150/80 dark:border-dark-border shadow-sm space-y-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+          {/* Busca */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <input
+              id="search-input"
+              name="search"
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar cliente, apelido, documento, título..."
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-gray-450"
+            />
+          </div>
 
-      {/* Quick Filter Pills */}
-      <div className="px-4 pb-4">
-        <div className="flex flex-wrap gap-2">
+          {/* Botão Filtros Avançados */}
           <button
-            onClick={() =>
-              onFilterChange({
-                ...filters,
-                status: filters.status === "pendente" ? undefined : "pendente",
-              })
-            }
-            className={`px-3 py-2 text-xs font-medium rounded-full transition-colors ${
-              filters.status === "pendente"
-                ? "bg-red-100 text-red-700 border border-red-300"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all border flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
+              isExpanded || hasActiveFilters
+                ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
             }`}
           >
-            Pendente
-          </button>
-          <button
-            onClick={() =>
-              onFilterChange({
-                ...filters,
-                status: filters.status === "pago" ? undefined : "pago",
-              })
-            }
-            className={`px-3 py-2 text-xs font-medium rounded-full transition-colors ${
-              filters.status === "pago"
-                ? "bg-green-100 text-green-700 border border-green-300"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            Pago
-          </button>
-          <button
-            onClick={() =>
-              onFilterChange({
-                ...filters,
-                status: filters.status === "parcial" ? undefined : "parcial",
-              })
-            }
-            className={`px-3 py-2 text-xs font-medium rounded-full transition-colors ${
-              filters.status === "parcial"
-                ? "bg-orange-100 text-orange-700 border border-orange-300"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            Parcial
-          </button>
-          <button
-            onClick={() =>
-              onFilterChange({
-                ...filters,
-                status:
-                  filters.status === "cancelado" ? undefined : "cancelado",
-              })
-            }
-            className={`px-3 py-2 text-xs font-medium rounded-full transition-colors ${
-              filters.status === "cancelado"
-                ? "bg-gray-300 text-gray-800 border border-gray-400"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            Cancelado
-          </button>
-        </div>
-      </div>
-
-      {/* Filter Toggle Button */}
-      <div className="px-4 pb-4">
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-between py-2 px-3 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors border border-gray-200"
-        >
-          <div className="flex items-center">
-            <Filter className="h-4 w-4 text-gray-600 mr-2" />
-            <span className="text-sm font-medium text-gray-700">
-              Filtros avançados
-              {hasActiveFilters && (
-                <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
-                  {Object.values(filters).filter(Boolean).length} ativos
-                </span>
-              )}
+            <Filter className="h-3.5 w-3.5" />
+            <span>
+              Filtros
+              {hasActiveFilters &&
+                ` (${Object.values(filters).filter(Boolean).length})`}
             </span>
-          </div>
-          <div className="flex items-center">
-            {hasActiveFilters && (
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  clearFilters();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.stopPropagation();
-                    clearFilters();
-                  }
-                }}
-                className="mr-2 p-1 text-red-600 hover:text-red-800 cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </div>
-            )}
-            <svg
-              className={`w-4 h-4 text-gray-500 transform transition-transform ${isExpanded ? "rotate-180" : ""}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </div>
-        </button>
-      </div>
+          </button>
+        </div>
 
-      {/* Expanded Filters (painel compartilhado) */}
-      {isExpanded && (
-        <div className="px-4 sm:px-4 pb-6 space-y-4 border-t border-gray-200 pt-4">
+        {/* Pills rápidas de status */}
+        <div className="flex flex-wrap gap-2">
+          {STATUS_PILLS.map((pill) => (
+            <button
+              key={pill.value}
+              onClick={() => togglePill(pill.value)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider border transition-all ${
+                filters.status === pill.value
+                  ? pill.active
+                  : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+              }`}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Painel avançado compartilhado */}
+        {isExpanded && (
           <FilterPanel
             context={
               userType === "manager" ? "collections" : "collectionsCollector"
@@ -301,91 +267,36 @@ const FilterBar: React.FC<FilterBarProps> = ({
             onClose={() => setIsExpanded(false)}
             options={panelOptions}
           />
+        )}
+      </div>
 
-          {/* Active Filters Summary */}
-          {hasActiveFilters && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-2xl border border-gray-200">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-medium text-gray-600">
-                  Filtros ativos:
-                </h4>
-                <button
-                  onClick={clearFilters}
-                  className="text-xs text-red-600 hover:text-red-800 font-medium"
-                >
-                  Limpar tudo
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {filters.status && (
-                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-200 text-gray-700">
-                    Status: {filters.status}
-                    <button
-                      onClick={() =>
-                        onFilterChange({ ...filters, status: undefined })
-                      }
-                      className="ml-1 text-gray-500 hover:text-gray-700"
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {filters.store && (
-                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-200 text-gray-700">
-                    Loja: {filters.store}
-                    <button
-                      onClick={() =>
-                        onFilterChange({ ...filters, store: undefined })
-                      }
-                      className="ml-1 text-gray-500 hover:text-gray-700"
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {filters.collector && (
-                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-200 text-gray-700">
-                    Cobrador:{" "}
-                    {collectors.find((c) => c.id === filters.collector)?.name}
-                    <button
-                      onClick={() =>
-                        onFilterChange({ ...filters, collector: undefined })
-                      }
-                      className="ml-1 text-gray-500 hover:text-gray-700"
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {filters.city && (
-                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-200 text-gray-700">
-                    Cidade: {filters.city}
-                    <button
-                      onClick={() =>
-                        onFilterChange({ ...filters, city: undefined })
-                      }
-                      className="ml-1 text-gray-500 hover:text-gray-700"
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-                {filters.visitsOnly && (
-                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                    Apenas com visitas
-                    <button
-                      onClick={() =>
-                        onFilterChange({ ...filters, visitsOnly: undefined })
-                      }
-                      className="ml-1 text-blue-500 hover:text-blue-700"
-                    >
-                      ×
-                    </button>
-                  </span>
-                )}
-              </div>
+      {/* Active Filter Chips */}
+      {hasActiveFilters && activeFilterChips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 p-2 bg-gray-50/50 dark:bg-dark-bg/25 rounded-xl border border-gray-150/40 dark:border-dark-border/40">
+          <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider pl-1.5 mr-1">
+            Filtros ativos:
+          </span>
+          {activeFilterChips.map((chip, index) => (
+            <div
+              key={index}
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-white dark:bg-dark-bg-secondary text-gray-700 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-lg shadow-sm"
+            >
+              <span>{chip.label}</span>
+              <button
+                onClick={chip.onClear}
+                className="w-4 h-4 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-dark-bg transition-all ml-1"
+                title="Remover filtro"
+              >
+                &times;
+              </button>
             </div>
-          )}
+          ))}
+          <button
+            onClick={clearFilters}
+            className="ml-auto text-[10px] font-bold text-red-500 hover:text-red-600 hover:underline px-2 transition-colors"
+          >
+            Limpar Todos
+          </button>
         </div>
       )}
     </div>
