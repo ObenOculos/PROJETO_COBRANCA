@@ -21,7 +21,7 @@ import {
 import { useCollection } from "../../contexts/CollectionContext";
 import * as XLSX from "xlsx";
 import { useAuth } from "../../contexts/AuthContext";
-import { ScheduledVisit } from "../../types";
+import { ScheduledVisit, isCollectorType } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import VisitScheduler from "./VisitScheduler"; // Import the VisitScheduler component
 import AllowedVisitDatesManager from "./AllowedVisitDatesManager"; // Import the AllowedVisitDatesManager component
@@ -288,7 +288,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     );
   }
 
-  const collectors = users.filter((u) => u.type === "collector");
+  const collectors = users.filter((u) => isCollectorType(u.type));
 
   const getCollectorName = (collectorId: string) => {
     const collector = users.find((u) => u.id === collectorId);

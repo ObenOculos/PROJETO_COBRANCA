@@ -22,6 +22,7 @@ import {
   SaleBalance,
   ScheduledVisit,
   AllowedVisitDate,
+  isCollectorType,
 } from "../types";
 import { supabase } from "../lib/supabase";
 import { PRIMARY_SITUACAO, situacoesOutsideProfile } from "../config/profiles";
@@ -1739,8 +1740,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const pendingAmount = totalAmount - receivedAmount;
       const conversionRate =
         collections.length > 0 ? (totalReceived / collections.length) * 100 : 0;
-      const collectorsCount = users.filter(
-        (u) => u.type === "collector",
+      const collectorsCount = users.filter((u) =>
+        isCollectorType(u.type),
       ).length;
 
       const result = {
@@ -1772,7 +1773,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         return cachedData;
       }
 
-      const collectors = users.filter((u) => u.type === "collector");
+      const collectors = users.filter((u) => isCollectorType(u.type));
 
       const result = collectors.map((collector) => {
         const assignedStores: string[] = [];

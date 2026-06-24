@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { supabase } from "../../lib/supabase";
-import { AllowedVisitDate } from "../../types";
+import { AllowedVisitDate, isCollectorType } from "../../types";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -188,7 +188,7 @@ const AllowedVisitDatesManager: React.FC = () => {
   const collectors = useMemo(() => {
     if (!users) return [];
     return users
-      .filter((u) => u.type === "collector")
+      .filter((u) => isCollectorType(u.type))
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [users]);
 

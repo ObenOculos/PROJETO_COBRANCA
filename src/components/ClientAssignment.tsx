@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
 import { supabase } from "../lib/supabase";
-import { Collection } from "../types";
+import { Collection, isCollectorType } from "../types";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { parseAndNormalizeDate } from "../filters/dates";
 import { clientMatchesFilters } from "../filters/predicates";
@@ -308,7 +308,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   }, []);
 
   const collectors = users.filter(
-    (user) => user.type === "collector" || user.type === "internal_collector",
+    (user) => isCollectorType(user.type),
   );
 
   // Obter opções únicas para filtros

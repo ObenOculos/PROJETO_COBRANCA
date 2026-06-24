@@ -17,7 +17,7 @@ import { formatCurrency } from "../../utils/formatters";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
 import FilterBar from "../common/FilterBar";
-import { User, FilterOptions } from "../../types";
+import { User, FilterOptions, isCollectorType } from "../../types";
 
 interface EnhancedCollectorPerformance {
   collectorId: string;
@@ -122,7 +122,7 @@ const EnhancedPerformanceChart: React.FC = () => {
   );
 
   const enhancedPerformance = useMemo((): EnhancedCollectorPerformance[] => {
-    const collectors = users.filter((u) => u.type === "collector");
+    const collectors = users.filter((u) => isCollectorType(u.type));
 
     const parseDateSafely = (dateStr: string | null | undefined): Date | null => {
       if (!dateStr) return null;

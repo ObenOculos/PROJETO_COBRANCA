@@ -17,7 +17,7 @@ import {
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
 import FilterBar from "../common/FilterBar";
-import { FilterOptions } from "../../types";
+import { FilterOptions, isCollectorType } from "../../types";
 
 interface StoreStats {
   storeName: string;
@@ -60,7 +60,7 @@ const EnhancedStoreManagement: React.FC = () => {
     useState<StoreStats | null>(null);
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
-  const collectors = users.filter((u) => u.type === "collector");
+  const collectors = users.filter((u) => isCollectorType(u.type));
   const availableStores = getAvailableStores();
 
   // Calculate store statistics

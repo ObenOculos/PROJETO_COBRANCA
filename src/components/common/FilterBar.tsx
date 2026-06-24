@@ -13,7 +13,7 @@ import {
   periodLabel,
 } from "../../filters/filterConfig";
 
-import { FilterOptions, UserType } from "../../types";
+import { FilterOptions, UserType, isCollectorType } from "../../types";
 
 interface FilterBarProps {
   filters: FilterOptions;
@@ -69,9 +69,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   }, [filters.search]);
 
   const availableStores = getAvailableStores();
-  const collectors = users.filter(
-    (u) => u.type === "collector" || u.type === "internal_collector",
-  );
+  const collectors = users.filter((u) => isCollectorType(u.type));
 
   // Para cobradores, buscar apenas as lojas dos seus clientes
   const getCollectorStores = () => {

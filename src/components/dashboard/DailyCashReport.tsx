@@ -16,7 +16,7 @@ import {
   Receipt,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-import { Collection } from "../../types";
+import { Collection, isCollectorType } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -241,7 +241,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
   const availableCollectors = useMemo(() => {
     return users
-      .filter((u) => u.type === "collector")
+      .filter((u) => isCollectorType(u.type))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [users]);
 

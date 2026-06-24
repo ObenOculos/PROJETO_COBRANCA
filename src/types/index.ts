@@ -5,6 +5,19 @@ export type UserType =
   | "internal_collector"
   | "third_party_collector";
 
+/** Tipos de usuário que são cobradores: Externo, Interno e Terceirizado. */
+export const COLLECTOR_TYPES: UserType[] = [
+  "collector",
+  "internal_collector",
+  "third_party_collector",
+];
+
+/** True quando o usuário é cobrador de qualquer tipo. Fonte única — use sempre
+ * que precisar listar/contar cobradores, nunca compare so com "collector". */
+export const isCollectorType = (
+  type: UserType | null | undefined,
+): boolean => !!type && COLLECTOR_TYPES.includes(type);
+
 export interface User {
   id: string;
   name: string;
