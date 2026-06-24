@@ -87,14 +87,13 @@ export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
     amount: true,
     createdRange: true,
   },
-  // Ranking de Performance: filtra a fonte (sem cobrador, que e a dimensao da
-  // tela) + Periodo (mes/ano). Pills (status + atraso) vem do FilterPills.
+  // Ranking de Performance: foco em comparacao de desempenho. So filtros que
+  // recortam de forma consistente (Periodo recorta todas as medidas pela mesma
+  // janela; Cidade e um escopo que mantem a comparacao valida). Sem status de
+  // pagamento / faixa de atraso / vencimento / lancamento / valor: recortam a
+  // carteira pelo estado da divida e distorcem recebido x meta.
   performance: {
-    paymentStatus: true,
     city: true,
-    dueRange: true,
-    launchRange: true,
-    amount: true,
     period: true,
   },
   // Lojas: igual + cobrador (a dimensao da tela e a loja).

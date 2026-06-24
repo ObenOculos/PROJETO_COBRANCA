@@ -470,6 +470,8 @@ const EnhancedPerformanceChart: React.FC = () => {
         userType="manager"
         context="performance"
         searchPlaceholder="Buscar cliente, cidade ou loja..."
+        showStatusPills={false}
+        showAgingPills={false}
       />
 
       {/* Controles de lista: contagem + ordenação */}

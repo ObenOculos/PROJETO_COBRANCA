@@ -25,6 +25,10 @@ interface FilterBarProps {
   showSearch?: boolean;
   /** Placeholder da busca (default: clientes/titulos). */
   searchPlaceholder?: string;
+  /** Exibe as pills de status de pagamento (default true). */
+  showStatusPills?: boolean;
+  /** Exibe as pills de faixa de atraso (default true). */
+  showAgingPills?: boolean;
 }
 
 const FilterBar: React.FC<FilterBarProps> = ({
@@ -34,6 +38,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
   context,
   showSearch = true,
   searchPlaceholder = "Buscar cliente, apelido, documento, título...",
+  showStatusPills = true,
+  showAgingPills = true,
 }) => {
   const { getAvailableStores, users, getCollectorCollections, collections } =
     useCollection();
@@ -302,12 +308,14 @@ const FilterBar: React.FC<FilterBarProps> = ({
         </div>
 
         {/* Atalhos rápidos: status + faixa de atraso (componente compartilhado) */}
-        <FilterPills
-          values={panelValues}
-          onChange={handlePanelChange}
-          showPaymentStatus
-          showAging
-        />
+        {(showStatusPills || showAgingPills) && (
+          <FilterPills
+            values={panelValues}
+            onChange={handlePanelChange}
+            showPaymentStatus={showStatusPills}
+            showAging={showAgingPills}
+          />
+        )}
 
         {/* Painel avançado compartilhado */}
         {isExpanded && (
