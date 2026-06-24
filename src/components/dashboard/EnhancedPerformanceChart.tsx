@@ -81,6 +81,32 @@ const EnhancedPerformanceChart: React.FC = () => {
   const selectedMonths = useMemo(() => filters.months ?? [], [filters.months]);
   const selectedYears = useMemo(() => filters.years ?? [], [filters.years]);
 
+  // Segmento de meta (lente de desempenho sobre o ranking, nao sobre a carteira).
+  const [goalSegment, setGoalSegment] = useState<"above" | "below" | null>(null);
+
+  // Atalhos rapidos de periodo (escrevem em months/years — mesma fonte de verdade).
+  const periodPresets = useMemo(() => {
+    const prev = new Date(currentYear, currentMonth - 1, 1);
+    return [
+      { id: "thisMonth", label: "Este mês", months: [currentMonth], years: [currentYear] },
+      { id: "lastMonth", label: "Mês passado", months: [prev.getMonth()], years: [prev.getFullYear()] },
+      { id: "thisYear", label: "Este ano", months: [] as number[], years: [currentYear] },
+      { id: "all", label: "Tudo", months: [] as number[], years: [] as number[] },
+    ];
+  }, [currentMonth, currentYear]);
+
+  const sameSet = (a: number[], b: number[]) =>
+    a.length === b.length && a.every((x) => b.includes(x));
+  const activePreset = periodPresets.find(
+    (p) => sameSet(selectedMonths, p.months) && sameSet(selectedYears, p.years),
+  )?.id;
+  const applyPeriodPreset = (p: { months: number[]; years: number[] }) =>
+    handleFiltersChange({
+      ...filters,
+      months: p.months.length ? p.months : undefined,
+      years: p.years.length ? p.years : undefined,
+    });
+
   // Filtros de dados (sem o Periodo) ativos -> usado para restringir pagamentos.
   const hasSourceFilter = Object.entries(filters).some(
     ([k, v]) => k !== "months" && k !== "years" && Boolean(v),
@@ -270,14 +296,22 @@ const EnhancedPerformanceChart: React.FC = () => {
     });
   }, [sourceCollections, allowedDocs, hasSourceFilter, users, monthlyGoals, salePayments, scheduledVisits, selectedMonths, selectedYears]);
 
-  // Filtro de Cobrador isola um cobrador no ranking e nos KPIs (fonte: filters).
-  const rankedPerformance = useMemo(
-    () =>
-      filters.collector
-        ? enhancedPerformance.filter((p) => p.collectorId === filters.collector)
-        : enhancedPerformance,
-    [enhancedPerformance, filters.collector],
-  );
+  // Cobrador isola um cobrador; segmento de meta filtra por atingimento da meta
+  // de recebimento. Ambos refletem no ranking e nos KPIs (fonte: rankedPerformance).
+  const rankedPerformance = useMemo(() => {
+    let list = enhancedPerformance;
+    if (filters.collector) {
+      list = list.filter((p) => p.collectorId === filters.collector);
+    }
+    if (goalSegment) {
+      list = list.filter((p) => {
+        if (p.currentMonthPaymentsGoal <= 0) return false; // sem meta nao entra no segmento
+        const atingiu = p.receivedAmount >= p.currentMonthPaymentsGoal;
+        return goalSegment === "above" ? atingiu : !atingiu;
+      });
+    }
+    return list;
+  }, [enhancedPerformance, filters.collector, goalSegment]);
 
   const filteredAndSortedPerformance = useMemo(() => {
     const filtered = [...rankedPerformance];
@@ -482,6 +516,53 @@ const EnhancedPerformanceChart: React.FC = () => {
         showStatusPills={false}
         showAgingPills={false}
       />
+
+      {/* Atalhos: Período (escopo de tempo) + Segmento de meta (lente de desempenho) */}
+      <div className="flex flex-wrap items-center gap-2 px-1">
+        {periodPresets.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => applyPeriodPreset(p)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+              activePreset === p.id
+                ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+
+        <span className="w-px h-5 bg-gray-200 dark:bg-dark-border mx-1 hidden sm:block" />
+
+        <button
+          type="button"
+          onClick={() =>
+            setGoalSegment((s) => (s === "below" ? null : "below"))
+          }
+          className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+            goalSegment === "below"
+              ? "bg-rose-600 border-rose-600 text-white shadow-sm"
+              : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+          }`}
+        >
+          Abaixo da meta
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            setGoalSegment((s) => (s === "above" ? null : "above"))
+          }
+          className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+            goalSegment === "above"
+              ? "bg-green-600 border-green-600 text-white shadow-sm"
+              : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+          }`}
+        >
+          Acima da meta
+        </button>
+      </div>
 
       {/* Controles de lista: contagem + ordenação */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-1">
