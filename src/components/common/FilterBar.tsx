@@ -6,8 +6,9 @@ import FilterPanel from "../filters/FilterPanel";
 import FilterPills from "../filters/FilterPills";
 import {
   FilterValues,
-  agingToDueTo,
+  agingToDueRange,
   dueToAging,
+  agingLabel,
 } from "../../filters/filterConfig";
 
 import { FilterOptions, UserType } from "../../types";
@@ -142,13 +143,15 @@ const FilterBar: React.FC<FilterBarProps> = ({
     if ("neighborhood" in patch)
       next.neighborhood = patch.neighborhood || undefined;
     if ("visitsOnly" in patch) next.visitsOnly = patch.visitsOnly || undefined;
-    // Pill de atraso escreve no proprio campo de vencimento (dueTo), nao em um
-    // filtro separado: clicar define "ate = hoje - X dias"; desmarcar limpa.
+    // Pill de atraso escreve no proprio campo de vencimento (de/ate): cada faixa
+    // vira um intervalo de datas; desmarcar limpa ambos.
     if ("aging" in patch) {
       if (patch.aging) {
-        next.dateFrom = undefined;
-        next.dateTo = agingToDueTo(patch.aging) || undefined;
+        const { dueFrom, dueTo } = agingToDueRange(patch.aging);
+        next.dateFrom = dueFrom || undefined;
+        next.dateTo = dueTo || undefined;
       } else {
+        next.dateFrom = undefined;
         next.dateTo = undefined;
       }
     }
@@ -207,8 +210,9 @@ const FilterBar: React.FC<FilterBarProps> = ({
   const derivedAging = dueToAging(filters.dateFrom, filters.dateTo);
   if (derivedAging) {
     activeFilterChips.push({
-      label: `Atraso: +${derivedAging} dias`,
-      onClear: () => onFilterChange({ ...filters, dateTo: undefined }),
+      label: `Atraso: ${agingLabel(derivedAging)}`,
+      onClear: () =>
+        onFilterChange({ ...filters, dateFrom: undefined, dateTo: undefined }),
     });
   } else {
     if (filters.dateFrom)

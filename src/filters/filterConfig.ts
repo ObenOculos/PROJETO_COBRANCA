@@ -136,13 +136,58 @@ export const PAYMENT_STATUS_PILLS: {
 ];
 
 /**
- * Converte um atalho de atraso (dias) na data-limite de vencimento (YYYY-MM-DD,
- * local). Ex.: "30" -> hoje menos 30 dias. E a unica fonte: o pill so escreve no
- * campo de vencimento (dueTo), nao em um filtro separado.
+ * Faixas de atraso (em dias), por parcela. Cada faixa vira um intervalo de
+ * vencimento (de/ate), entao os pills permanecem sincronizados com o filtro
+ * detalhado de Vencimento. `maxDays: null` = sem teto (121+).
  */
-export const agingToDueTo = (threshold: string): string => {
-  const days = parseInt(threshold, 10);
-  if (!days) return "";
+export interface AgingBand {
+  value: string;
+  label: string;
+  active: string;
+  minDays: number;
+  maxDays: number | null;
+}
+
+export const AGING_PILLS: AgingBand[] = [
+  {
+    value: "0-30",
+    label: "0–30 dias",
+    minDays: 0,
+    maxDays: 30,
+    active: "bg-yellow-400 border-yellow-400 text-white shadow-sm",
+  },
+  {
+    value: "31-60",
+    label: "31–60 dias",
+    minDays: 31,
+    maxDays: 60,
+    active: "bg-amber-500 border-amber-500 text-white shadow-sm",
+  },
+  {
+    value: "61-90",
+    label: "61–90 dias",
+    minDays: 61,
+    maxDays: 90,
+    active: "bg-orange-500 border-orange-500 text-white shadow-sm",
+  },
+  {
+    value: "91-120",
+    label: "91–120 dias",
+    minDays: 91,
+    maxDays: 120,
+    active: "bg-orange-600 border-orange-600 text-white shadow-sm",
+  },
+  {
+    value: "121",
+    label: "121+ dias",
+    minDays: 121,
+    maxDays: null,
+    active: "bg-red-700 border-red-700 text-white shadow-sm",
+  },
+];
+
+/** Data (YYYY-MM-DD local) de hoje menos N dias. */
+const dateDaysAgo = (days: number): string => {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - days);
@@ -153,39 +198,37 @@ export const agingToDueTo = (threshold: string): string => {
 };
 
 /**
- * Deriva qual atalho de atraso corresponde ao intervalo de vencimento atual.
- * So casa quando ha apenas "ate" (dueTo) igual a hoje menos o limite e sem "de"
- * (dueFrom). Mantem pills e filtro detalhado sincronizados.
+ * Converte uma faixa de atraso no intervalo de vencimento (de/ate).
+ * Atraso em [min, max] dias <=> vencimento em [hoje-max, hoje-min].
+ * Faixa sem teto (121+) nao tem "de".
+ */
+export const agingToDueRange = (
+  bandValue: string,
+): { dueFrom: string; dueTo: string } => {
+  const band = AGING_PILLS.find((b) => b.value === bandValue);
+  if (!band) return { dueFrom: "", dueTo: "" };
+  return {
+    dueFrom: band.maxDays != null ? dateDaysAgo(band.maxDays) : "",
+    dueTo: dateDaysAgo(band.minDays),
+  };
+};
+
+/**
+ * Deriva qual faixa de atraso corresponde ao intervalo de vencimento atual.
+ * Mantem os pills e o filtro detalhado de Vencimento sincronizados.
  */
 export const dueToAging = (
   dueFrom: string | undefined,
   dueTo: string | undefined,
 ): string => {
-  if (dueFrom || !dueTo) return "";
-  const match = AGING_PILLS.find((p) => agingToDueTo(p.value) === dueTo);
+  if (!dueTo) return "";
+  const match = AGING_PILLS.find((b) => {
+    const range = agingToDueRange(b.value);
+    return range.dueFrom === (dueFrom || "") && range.dueTo === dueTo;
+  });
   return match ? match.value : "";
 };
 
-/** Atalhos rapidos de faixa de atraso (atraso minimo, em dias). */
-export const AGING_PILLS: { value: string; label: string; active: string }[] = [
-  {
-    value: "30",
-    label: "+30 dias",
-    active: "bg-yellow-500 border-yellow-500 text-white shadow-sm",
-  },
-  {
-    value: "60",
-    label: "+60 dias",
-    active: "bg-amber-600 border-amber-600 text-white shadow-sm",
-  },
-  {
-    value: "90",
-    label: "+90 dias",
-    active: "bg-orange-600 border-orange-600 text-white shadow-sm",
-  },
-  {
-    value: "120",
-    label: "+120 dias",
-    active: "bg-red-700 border-red-700 text-white shadow-sm",
-  },
-];
+/** Rotulo amigavel de uma faixa de atraso (para chips). */
+export const agingLabel = (bandValue: string): string =>
+  AGING_PILLS.find((b) => b.value === bandValue)?.label ?? "";

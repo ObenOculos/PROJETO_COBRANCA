@@ -27,8 +27,9 @@ import FilterPanel from "./filters/FilterPanel";
 import FilterPills from "./filters/FilterPills";
 import {
   FilterValues,
-  agingToDueTo,
+  agingToDueRange,
   dueToAging,
+  agingLabel,
 } from "../filters/filterConfig";
 import * as XLSX from "xlsx";
 import BulkAssignmentModal from "./BulkAssignmentModal";
@@ -453,8 +454,11 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     if (filterAging) {
       // Vencimento controlado por um atalho de atraso: mostra o atalho, nao a data.
       chips.push({
-        label: `Atraso: +${filterAging} dias`,
-        onClear: () => setFilterDateTo(""),
+        label: `Atraso: ${agingLabel(filterAging)}`,
+        onClear: () => {
+          setFilterDateFrom("");
+          setFilterDateTo("");
+        },
       });
     } else {
       if (filterDateFrom) {
@@ -1002,12 +1006,15 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     if ("launchTo" in patch) setFilterLaunchTo(patch.launchTo ?? "");
     if ("minAmount" in patch) setFilterMinAmount(patch.minAmount);
     if ("maxAmount" in patch) setFilterMaxAmount(patch.maxAmount);
-    // Pill de atraso escreve no proprio vencimento (dueTo): "ate = hoje - X dias".
+    // Pill de atraso escreve no proprio vencimento (de/ate): cada faixa vira um
+    // intervalo de datas; desmarcar limpa ambos.
     if ("aging" in patch) {
       if (patch.aging) {
-        setFilterDateFrom("");
-        setFilterDateTo(agingToDueTo(patch.aging));
+        const { dueFrom, dueTo } = agingToDueRange(patch.aging);
+        setFilterDateFrom(dueFrom);
+        setFilterDateTo(dueTo);
       } else {
+        setFilterDateFrom("");
         setFilterDateTo("");
       }
     }
