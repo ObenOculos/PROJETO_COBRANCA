@@ -22,6 +22,8 @@ export interface FilterValues {
   maxAmount?: number;
   visitsOnly?: boolean;
   includeWithoutDue?: boolean;
+  // Faixa de atraso minima (dias) -> "30" | "60" | "90" | "120".
+  aging?: string;
   // Status de atribuicao (Atribuicao) -> "" | "with_collector" | "without_collector".
   assignment?: string;
   city?: string;
@@ -103,4 +105,56 @@ export const PAYMENT_STATUS_OPTIONS: SelectOption[] = [
   { value: "parcial", label: "PARCIAL" },
   { value: "pago", label: "PAGO" },
   { value: "cancelado", label: "CANCELADO" },
+];
+
+/** Atalhos rapidos (pills) de status de pagamento, com a cor do estado ativo. */
+export const PAYMENT_STATUS_PILLS: {
+  value: string;
+  label: string;
+  active: string;
+}[] = [
+  {
+    value: "pendente",
+    label: "Pendente",
+    active: "bg-red-600 border-red-600 text-white shadow-sm",
+  },
+  {
+    value: "pago",
+    label: "Pago",
+    active: "bg-green-600 border-green-600 text-white shadow-sm",
+  },
+  {
+    value: "parcial",
+    label: "Parcial",
+    active: "bg-orange-500 border-orange-500 text-white shadow-sm",
+  },
+  {
+    value: "cancelado",
+    label: "Cancelado",
+    active: "bg-gray-700 border-gray-700 text-white shadow-sm",
+  },
+];
+
+/** Atalhos rapidos de faixa de atraso (atraso minimo, em dias). */
+export const AGING_PILLS: { value: string; label: string; active: string }[] = [
+  {
+    value: "30",
+    label: "+30 dias",
+    active: "bg-yellow-500 border-yellow-500 text-white shadow-sm",
+  },
+  {
+    value: "60",
+    label: "+60 dias",
+    active: "bg-amber-600 border-amber-600 text-white shadow-sm",
+  },
+  {
+    value: "90",
+    label: "+90 dias",
+    active: "bg-orange-600 border-orange-600 text-white shadow-sm",
+  },
+  {
+    value: "120",
+    label: "+120 dias",
+    active: "bg-red-700 border-red-700 text-white shadow-sm",
+  },
 ];

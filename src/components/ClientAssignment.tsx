@@ -24,6 +24,7 @@ import { formatCurrency, formatDate } from "../utils/formatters";
 import { parseAndNormalizeDate } from "../filters/dates";
 import { clientMatchesFilters } from "../filters/predicates";
 import FilterPanel from "./filters/FilterPanel";
+import FilterPills from "./filters/FilterPills";
 import { FilterValues } from "../filters/filterConfig";
 import * as XLSX from "xlsx";
 import BulkAssignmentModal from "./BulkAssignmentModal";
@@ -195,6 +196,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   const [filterMaxAmount, setFilterMaxAmount] = useState<number | undefined>(
     undefined,
   );
+  const [filterAging, setFilterAging] = useState<string>("");
   // Filtro "Criado em": intervalo de datas sobre clientes.created_at (data em
   // que o cliente foi inserido pela primeira vez no banco).
   const [filterCreatedFrom, setFilterCreatedFrom] = useState<string>("");
@@ -490,6 +492,12 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         onClear: () => setFilterMaxAmount(undefined),
       });
     }
+    if (filterAging) {
+      chips.push({
+        label: `Atraso: +${filterAging} dias`,
+        onClear: () => setFilterAging(""),
+      });
+    }
     if (filterCreatedFrom) {
       chips.push({
         label: `Criado de: ${filterCreatedFrom}`,
@@ -520,6 +528,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     filterLaunchTo,
     filterMinAmount,
     filterMaxAmount,
+    filterAging,
     filterCreatedFrom,
     filterCreatedTo,
     collectors,
@@ -551,6 +560,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           launchTo: filterLaunchTo,
           minAmount: filterMinAmount,
           maxAmount: filterMaxAmount,
+          aging: filterAging,
           createdFrom: filterCreatedFrom,
           createdTo: filterCreatedTo,
         },
@@ -574,6 +584,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     filterLaunchTo,
     filterMinAmount,
     filterMaxAmount,
+    filterAging,
     filterCreatedFrom,
     filterCreatedTo,
     clientCreatedAtMap,
@@ -943,6 +954,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     setFilterLaunchTo("");
     setFilterMinAmount(undefined);
     setFilterMaxAmount(undefined);
+    setFilterAging("");
     setFilterCreatedFrom("");
     setFilterCreatedTo("");
     setCurrentPage(1);
@@ -964,6 +976,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     launchTo: filterLaunchTo,
     minAmount: filterMinAmount,
     maxAmount: filterMaxAmount,
+    aging: filterAging,
     createdFrom: filterCreatedFrom,
     createdTo: filterCreatedTo,
   };
@@ -985,6 +998,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     if ("launchTo" in patch) setFilterLaunchTo(patch.launchTo ?? "");
     if ("minAmount" in patch) setFilterMinAmount(patch.minAmount);
     if ("maxAmount" in patch) setFilterMaxAmount(patch.maxAmount);
+    if ("aging" in patch) setFilterAging(patch.aging ?? "");
     if ("createdFrom" in patch) setFilterCreatedFrom(patch.createdFrom ?? "");
     if ("createdTo" in patch) setFilterCreatedTo(patch.createdTo ?? "");
     setCurrentPage(1);
@@ -1244,6 +1258,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           </button>
         </div>
       </div>
+
+      {/* Atalhos rápidos: status de pagamento + faixa de atraso */}
+      <FilterPills
+        values={{ paymentStatus: filterPaymentStatus, aging: filterAging }}
+        onChange={handleFilterPanelChange}
+        showPaymentStatus
+        showAging
+      />
 
       {/* Filtros Colapsáveis (painel compartilhado) */}
       {showFilters && (

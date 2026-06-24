@@ -3,6 +3,7 @@ import { Search, Filter } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import FilterPanel from "../filters/FilterPanel";
+import FilterPills from "../filters/FilterPills";
 import { FilterValues } from "../../filters/filterConfig";
 
 import { FilterOptions, UserType } from "../../types";
@@ -12,13 +13,6 @@ interface FilterBarProps {
   onFilterChange: (filters: FilterOptions) => void;
   userType: UserType;
 }
-
-const STATUS_PILLS: { value: string; label: string; active: string }[] = [
-  { value: "pendente", label: "Pendente", active: "bg-red-600 border-red-600 text-white shadow-sm" },
-  { value: "pago", label: "Pago", active: "bg-green-600 border-green-600 text-white shadow-sm" },
-  { value: "parcial", label: "Parcial", active: "bg-orange-500 border-orange-500 text-white shadow-sm" },
-  { value: "cancelado", label: "Cancelado", active: "bg-gray-700 border-gray-700 text-white shadow-sm" },
-];
 
 const FilterBar: React.FC<FilterBarProps> = ({
   filters,
@@ -195,12 +189,6 @@ const FilterBar: React.FC<FilterBarProps> = ({
       onClear: () => onFilterChange({ ...filters, visitsOnly: undefined }),
     });
 
-  const togglePill = (value: string) =>
-    onFilterChange({
-      ...filters,
-      status: filters.status === value ? undefined : value,
-    });
-
   return (
     <div className="space-y-3 mb-4">
       {/* Barra de Filtros Unificada */}
@@ -238,22 +226,12 @@ const FilterBar: React.FC<FilterBarProps> = ({
           </button>
         </div>
 
-        {/* Pills rápidas de status */}
-        <div className="flex flex-wrap gap-2">
-          {STATUS_PILLS.map((pill) => (
-            <button
-              key={pill.value}
-              onClick={() => togglePill(pill.value)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider border transition-all ${
-                filters.status === pill.value
-                  ? pill.active
-                  : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
-              }`}
-            >
-              {pill.label}
-            </button>
-          ))}
-        </div>
+        {/* Atalhos rápidos de status (componente compartilhado) */}
+        <FilterPills
+          values={panelValues}
+          onChange={handlePanelChange}
+          showPaymentStatus
+        />
 
         {/* Painel avançado compartilhado */}
         {isExpanded && (
