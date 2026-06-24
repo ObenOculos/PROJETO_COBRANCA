@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useTransition } from "react";
 import {
   Users,
-  Filter,
   Download,
   Eye,
   Target,
@@ -326,8 +325,8 @@ const EnhancedPerformanceChart: React.FC = () => {
                   : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
               }`}
             >
-              <Filter className="w-4 h-4" />
-              Filtros {hasActiveFilters && `(${selectedMonths.length + selectedYears.length})`}
+              <Calendar className="w-4 h-4" />
+              Período {hasActiveFilters && `(${selectedMonths.length + selectedYears.length})`}
             </button>
             <button
               onClick={exportPerformanceData}
@@ -339,10 +338,10 @@ const EnhancedPerformanceChart: React.FC = () => {
           </div>
         </div>
 
-        {/* Filters Section */}
+        {/* Período Section */}
         {showFilters && (
           <div className="mt-6 p-6 bg-gray-50 dark:bg-dark-bg rounded-2xl border border-gray-100 dark:border-dark-border animate-in fade-in slide-in-from-top-4 duration-300">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Month Select */}
               <div className="space-y-3">
                 <label className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-[0.2em]">Meses</label>
@@ -387,20 +386,6 @@ const EnhancedPerformanceChart: React.FC = () => {
                 </div>
               </div>
 
-              {/* Sorting */}
-              <div className="space-y-3">
-                <label className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-[0.2em]">Ordenação</label>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="w-full px-4 py-2.5 bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border rounded-xl text-xs font-bold dark:text-dark-text appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500/25"
-                >
-                  <option value="receivedAmount">VALOR RECEBIDO</option>
-                  <option value="totalSales">TOTAL DE VENDAS</option>
-                  <option value="clientsCount">TOTAL DE CLIENTES</option>
-                  <option value="pendingSales">TOTAL DE PENDÊNCIAS</option>
-                </select>
-              </div>
             </div>
 
             <div className="mt-6 pt-6 border-t border-gray-100 dark:border-dark-border flex justify-end gap-3">
@@ -408,13 +393,13 @@ const EnhancedPerformanceChart: React.FC = () => {
                 onClick={() => startTransition(() => { setSelectedMonths([]); setSelectedYears([]); setShowFilters(false); })}
                 className="px-4 py-2 text-xs font-bold text-gray-400 tracking-wide hover:text-gray-600 dark:hover:text-dark-text"
               >
-                Limpar Todos
+                Limpar período
               </button>
               <button
                 onClick={() => setShowFilters(false)}
                 className="px-6 py-2 bg-blue-600 text-white text-xs font-bold tracking-wide rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/10 transition-all"
               >
-                Aplicar Filtros
+                Aplicar
               </button>
             </div>
           </div>
@@ -496,6 +481,29 @@ const EnhancedPerformanceChart: React.FC = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Controles de lista: contagem + ordenação */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <span className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
+          {filteredAndSortedPerformance.length}{" "}
+          {filteredAndSortedPerformance.length === 1 ? "cobrador" : "cobradores"}
+        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary">
+            Ordenar por
+          </span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium text-gray-700 dark:text-dark-text appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500/20 transition-all"
+          >
+            <option value="receivedAmount">Valor recebido</option>
+            <option value="totalSales">Total de vendas</option>
+            <option value="clientsCount">Total de clientes</option>
+            <option value="pendingSales">Total de pendências</option>
+          </select>
+        </div>
       </div>
 
       {/* Collector Grid */}
