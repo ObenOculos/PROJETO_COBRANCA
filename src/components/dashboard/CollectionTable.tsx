@@ -40,6 +40,7 @@ import {
   calculateOverdueDays,
 } from "../../utils/formatters";
 import { isCancelado } from "../../types/status";
+import { countVendas } from "../../filters/sales";
 import CollectionModal from "./CollectionModal";
 import ClientDetailModal from "./ClientDetailModal";
 import SaleDetailsModal from "./SaleDetailsModal";
@@ -648,9 +649,15 @@ export const CollectionTable = React.forwardRef<
     // Sao grandezas diferentes: um cliente pode ter varias vendas, e por isso a
     // soma das categorias de status (por venda) costuma passar do nº de clientes.
     const totalClientes = totalItems;
-    const totalVendas = (
-      showGrouped ? filteredClientGroups : filteredAndGroupedSales
-    ).reduce((sum, group) => sum + (group.sales?.length || 0), 0);
+    // Visão do gerente (não agrupada): usa o helper único countVendas sobre as
+    // collections exibidas — mesma regra de Lojas e Atribuição. A visão agrupada
+    // do cobrador mantém a contagem pelas vendas já montadas para exibição.
+    const totalVendas = showGrouped
+      ? filteredClientGroups.reduce(
+          (sum, group) => sum + (group.sales?.length || 0),
+          0,
+        )
+      : countVendas(collections);
     const totalPages = Math.ceil(totalItems / itemsPerPage);
     const startItem = totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
     const endItem = Math.min(currentPage * itemsPerPage, totalItems);

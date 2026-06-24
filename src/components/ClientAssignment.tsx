@@ -20,6 +20,7 @@ import {
 import { useCollection } from "../contexts/CollectionContext";
 import { supabase } from "../lib/supabase";
 import { Collection, isCollectorType } from "../types";
+import { countVendas } from "../filters/sales";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { parseAndNormalizeDate } from "../filters/dates";
 import { clientMatchesFilters } from "../filters/predicates";
@@ -156,16 +157,6 @@ const getSituacaoIndicator = (collections: Collection[]) => {
 // Conta a quantidade de vendas distintas de um cliente.
 // Parcelas sem venda_n são renegociadas e contam como UMA única venda
 // (mesma regra usada em getSalesByClient/getClientGroups no contexto).
-const getVendasCount = (collections: Collection[]) => {
-  const vendas = new Set<number>();
-  let hasRenegociada = false;
-  collections.forEach((c) => {
-    if (c.venda_n) vendas.add(c.venda_n);
-    else hasRenegociada = true;
-  });
-  return vendas.size + (hasRenegociada ? 1 : 0);
-};
-
 interface ClientAssignmentProps {
   onViewClient?: (clientIdentifier: string) => void;
 }
@@ -668,7 +659,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         "Cidade": client.cidade || "",
         "Bairro": client.bairro || "",
         "Cobrador": client.collectorName || "Sem Cobrador",
-        "Qtd Vendas": getVendasCount(client.collections),
+        "Qtd Vendas": countVendas(client.collections),
         "Qtd Parcelas": client.collections.length,
         "Total Original (R$)": totalValue,
         "Total Recebido (R$)": receivedValue,
@@ -885,11 +876,19 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     const pendingValue = hasActiveFilters
       ? filteredStats.totalPendingFiltered
       : overviewStats.totalPendingValue;
-    
+
+    // Total de vendas (mesma base de clientes que o total: filtrada ou geral).
+    const baseClients = hasActiveFilters ? filteredClients : clientsData;
+    const totalSales = baseClients.reduce(
+      (sum, c) => sum + countVendas(c.collections),
+      0,
+    );
+
     const assignmentRate = total > 0 ? (assigned / total) * 100 : 0;
 
     return {
       total,
+      totalSales,
       assigned,
       unassigned: total - assigned,
       newClients,
@@ -897,7 +896,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
       pendingValue,
       assignmentRate,
     };
-  }, [hasActiveFilters, filteredStats, overviewStats]);
+  }, [hasActiveFilters, filteredStats, overviewStats, filteredClients, clientsData]);
 
   // Rótulos explícitos dos períodos comparados no card "Novos Clientes".
   const now = new Date();
@@ -1075,6 +1074,9 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           <div>
             <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Total Clientes</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{mainStats.total}</p>
+            <p className="text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5">
+              <span className="text-gray-600 dark:text-dark-text font-semibold">{mainStats.totalSales}</span> vendas
+            </p>
           </div>
         </div>
 
@@ -1442,7 +1444,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                       </td>
                       <td className="px-6 py-3.5 text-center">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-100/50 dark:border-indigo-900/30">
-                          {getVendasCount(client.collections)}
+                          {countVendas(client.collections)}
                         </span>
                       </td>
                       <td className="px-6 py-3.5 text-center">
@@ -1573,7 +1575,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                         )}
                         <div className="flex items-center gap-1 text-[9px] font-medium text-gray-400 tracking-tight ml-auto">
                           <span className="bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded-md text-indigo-700 dark:text-indigo-400 font-semibold">
-                            {getVendasCount(client.collections)}V
+                            {countVendas(client.collections)}V
                           </span>
                           <span className="bg-gray-50 dark:bg-dark-bg px-1.5 py-0.5 rounded-md text-gray-600 dark:text-dark-text-secondary">
                             {client.collections.length}P

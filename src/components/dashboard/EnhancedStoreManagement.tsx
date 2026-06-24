@@ -18,6 +18,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
 import FilterBar from "../common/FilterBar";
 import { FilterOptions, isCollectorType } from "../../types";
+import { countVendas } from "../../filters/sales";
 
 interface StoreStats {
   storeName: string;
@@ -170,10 +171,10 @@ const EnhancedStoreManagement: React.FC = () => {
     const totalStores = storeStats.length;
     const assignedStores = storeStats.filter((s) => s.assignedCollector).length;
     const unassignedStores = totalStores - assignedStores;
-    const totalSales = storeStats.reduce(
-      (sum, s) => sum + s.totalCollections,
-      0,
-    );
+    // Fichas/Vendas: contagem global por cliente (mesma regra de Cobrança e
+    // Atribuição). Antes somava o total por loja (s.totalCollections) e
+    // duplicava vendas espalhadas em mais de uma loja.
+    const totalSales = countVendas(sourceCollections);
     const totalRevenue = storeStats.reduce(
       (sum, s) => sum + s.receivedAmount,
       0,
@@ -192,7 +193,7 @@ const EnhancedStoreManagement: React.FC = () => {
       totalRevenue,
       avgConversionRate,
     };
-  }, [storeStats]);
+  }, [storeStats, sourceCollections]);
 
   const exportStoreData = () => {
     // Headers with better formatting
