@@ -25,7 +25,11 @@ import { parseAndNormalizeDate } from "../filters/dates";
 import { clientMatchesFilters } from "../filters/predicates";
 import FilterPanel from "./filters/FilterPanel";
 import FilterPills from "./filters/FilterPills";
-import { FilterValues } from "../filters/filterConfig";
+import {
+  FilterValues,
+  agingToDueTo,
+  dueToAging,
+} from "../filters/filterConfig";
 import * as XLSX from "xlsx";
 import BulkAssignmentModal from "./BulkAssignmentModal";
 import AssignmentReportModal from "./dashboard/AssignmentReportModal";
@@ -196,7 +200,9 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   const [filterMaxAmount, setFilterMaxAmount] = useState<number | undefined>(
     undefined,
   );
-  const [filterAging, setFilterAging] = useState<string>("");
+  // O atalho de atraso e derivado do vencimento (filterDateFrom/filterDateTo),
+  // fonte unica — nao ha estado proprio de "aging".
+  const filterAging = dueToAging(filterDateFrom, filterDateTo);
   // Filtro "Criado em": intervalo de datas sobre clientes.created_at (data em
   // que o cliente foi inserido pela primeira vez no banco).
   const [filterCreatedFrom, setFilterCreatedFrom] = useState<string>("");
@@ -444,17 +450,25 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         onClear: () => setFilterSituacao(""),
       });
     }
-    if (filterDateFrom) {
+    if (filterAging) {
+      // Vencimento controlado por um atalho de atraso: mostra o atalho, nao a data.
       chips.push({
-        label: `De: ${filterDateFrom}`,
-        onClear: () => setFilterDateFrom(""),
-      });
-    }
-    if (filterDateTo) {
-      chips.push({
-        label: `Até: ${filterDateTo}`,
+        label: `Atraso: +${filterAging} dias`,
         onClear: () => setFilterDateTo(""),
       });
+    } else {
+      if (filterDateFrom) {
+        chips.push({
+          label: `De: ${filterDateFrom}`,
+          onClear: () => setFilterDateFrom(""),
+        });
+      }
+      if (filterDateTo) {
+        chips.push({
+          label: `Até: ${filterDateTo}`,
+          onClear: () => setFilterDateTo(""),
+        });
+      }
     }
     if (includeWithoutDate && (filterDateFrom || filterDateTo)) {
       chips.push({
@@ -492,12 +506,6 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         onClear: () => setFilterMaxAmount(undefined),
       });
     }
-    if (filterAging) {
-      chips.push({
-        label: `Atraso: +${filterAging} dias`,
-        onClear: () => setFilterAging(""),
-      });
-    }
     if (filterCreatedFrom) {
       chips.push({
         label: `Criado de: ${filterCreatedFrom}`,
@@ -528,7 +536,6 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     filterLaunchTo,
     filterMinAmount,
     filterMaxAmount,
-    filterAging,
     filterCreatedFrom,
     filterCreatedTo,
     collectors,
@@ -560,7 +567,6 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           launchTo: filterLaunchTo,
           minAmount: filterMinAmount,
           maxAmount: filterMaxAmount,
-          aging: filterAging,
           createdFrom: filterCreatedFrom,
           createdTo: filterCreatedTo,
         },
@@ -584,7 +590,6 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     filterLaunchTo,
     filterMinAmount,
     filterMaxAmount,
-    filterAging,
     filterCreatedFrom,
     filterCreatedTo,
     clientCreatedAtMap,
@@ -954,7 +959,6 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     setFilterLaunchTo("");
     setFilterMinAmount(undefined);
     setFilterMaxAmount(undefined);
-    setFilterAging("");
     setFilterCreatedFrom("");
     setFilterCreatedTo("");
     setCurrentPage(1);
@@ -998,7 +1002,15 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     if ("launchTo" in patch) setFilterLaunchTo(patch.launchTo ?? "");
     if ("minAmount" in patch) setFilterMinAmount(patch.minAmount);
     if ("maxAmount" in patch) setFilterMaxAmount(patch.maxAmount);
-    if ("aging" in patch) setFilterAging(patch.aging ?? "");
+    // Pill de atraso escreve no proprio vencimento (dueTo): "ate = hoje - X dias".
+    if ("aging" in patch) {
+      if (patch.aging) {
+        setFilterDateFrom("");
+        setFilterDateTo(agingToDueTo(patch.aging));
+      } else {
+        setFilterDateTo("");
+      }
+    }
     if ("createdFrom" in patch) setFilterCreatedFrom(patch.createdFrom ?? "");
     if ("createdTo" in patch) setFilterCreatedTo(patch.createdTo ?? "");
     setCurrentPage(1);

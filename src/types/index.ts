@@ -452,6 +452,4 @@ export interface FilterOptions {
   overdueOnly?: boolean;
   highValueOnly?: boolean;
   visitsOnly?: boolean;
-  /** Atraso minimo (dias) considerando a parcela pendente mais atrasada do cliente. */
-  aging?: string;
 }

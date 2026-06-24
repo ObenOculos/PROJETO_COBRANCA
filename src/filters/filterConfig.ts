@@ -135,6 +135,37 @@ export const PAYMENT_STATUS_PILLS: {
   },
 ];
 
+/**
+ * Converte um atalho de atraso (dias) na data-limite de vencimento (YYYY-MM-DD,
+ * local). Ex.: "30" -> hoje menos 30 dias. E a unica fonte: o pill so escreve no
+ * campo de vencimento (dueTo), nao em um filtro separado.
+ */
+export const agingToDueTo = (threshold: string): string => {
+  const days = parseInt(threshold, 10);
+  if (!days) return "";
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+/**
+ * Deriva qual atalho de atraso corresponde ao intervalo de vencimento atual.
+ * So casa quando ha apenas "ate" (dueTo) igual a hoje menos o limite e sem "de"
+ * (dueFrom). Mantem pills e filtro detalhado sincronizados.
+ */
+export const dueToAging = (
+  dueFrom: string | undefined,
+  dueTo: string | undefined,
+): string => {
+  if (dueFrom || !dueTo) return "";
+  const match = AGING_PILLS.find((p) => agingToDueTo(p.value) === dueTo);
+  return match ? match.value : "";
+};
+
 /** Atalhos rapidos de faixa de atraso (atraso minimo, em dias). */
 export const AGING_PILLS: { value: string; label: string; active: string }[] = [
   {

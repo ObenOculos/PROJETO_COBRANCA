@@ -8,7 +8,6 @@
 import { Collection } from "../types";
 import { parseAndNormalizeDate, toYYYYMMDD } from "./dates";
 import { getClientPaymentStatus, normalizePaymentStatus } from "./clientStatus";
-import { calculateOverdueDays } from "../utils/formatters";
 
 /** Forma minima de cliente que os predicados precisam para filtrar. */
 export interface FilterableClient {
@@ -47,8 +46,6 @@ export interface ClientFilters {
   /** Faixa do valor pendente total do cliente. */
   minAmount?: number;
   maxAmount?: number;
-  /** Atraso minimo (dias) considerando a parcela pendente mais atrasada. */
-  aging?: string;
   /** Intervalo sobre clientes.created_at (mapa passado a parte). */
   createdFrom?: string;
   createdTo?: string;
@@ -103,22 +100,6 @@ const matchesAmount = (
   if (hasMin && pending < (filters.minAmount as number)) return false;
   if (hasMax && pending > (filters.maxAmount as number)) return false;
   return true;
-};
-
-const matchesAging = (client: FilterableClient, aging?: string): boolean => {
-  if (!aging) return true;
-  const threshold = parseInt(aging, 10);
-  if (!threshold) return true;
-  // Maior atraso entre as parcelas ainda pendentes do cliente (mesma regra do
-  // CollectorDashboard).
-  let maxOverdue = 0;
-  for (const c of client.collections) {
-    const isPending = (c.valor_original || 0) - (c.valor_recebido || 0) > 0.01;
-    if (!isPending) continue;
-    const overdue = calculateOverdueDays(c.data_vencimento);
-    if (overdue > maxOverdue) maxOverdue = overdue;
-  }
-  return maxOverdue >= threshold;
 };
 
 const matchesSearch = (client: FilterableClient, search?: string): boolean => {
@@ -234,7 +215,6 @@ export const clientMatchesFilters = (
     matchesDueRange(client, filters) &&
     matchesLaunchRange(client, filters) &&
     matchesAmount(client, filters) &&
-    matchesAging(client, filters.aging) &&
     matchesCreatedRange(client, filters, createdAt)
   );
 };

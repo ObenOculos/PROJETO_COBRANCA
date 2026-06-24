@@ -4,7 +4,11 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import FilterPanel from "../filters/FilterPanel";
 import FilterPills from "../filters/FilterPills";
-import { FilterValues } from "../../filters/filterConfig";
+import {
+  FilterValues,
+  agingToDueTo,
+  dueToAging,
+} from "../../filters/filterConfig";
 
 import { FilterOptions, UserType } from "../../types";
 
@@ -118,7 +122,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
     city: filters.city,
     neighborhood: filters.neighborhood,
     visitsOnly: filters.visitsOnly,
-    aging: filters.aging,
+    // O pill de atraso e derivado do campo de vencimento (fonte unica).
+    aging: dueToAging(filters.dateFrom, filters.dateTo),
   };
 
   const handlePanelChange = (patch: Partial<FilterValues>) => {
@@ -137,7 +142,16 @@ const FilterBar: React.FC<FilterBarProps> = ({
     if ("neighborhood" in patch)
       next.neighborhood = patch.neighborhood || undefined;
     if ("visitsOnly" in patch) next.visitsOnly = patch.visitsOnly || undefined;
-    if ("aging" in patch) next.aging = patch.aging || undefined;
+    // Pill de atraso escreve no proprio campo de vencimento (dueTo), nao em um
+    // filtro separado: clicar define "ate = hoje - X dias"; desmarcar limpa.
+    if ("aging" in patch) {
+      if (patch.aging) {
+        next.dateFrom = undefined;
+        next.dateTo = agingToDueTo(patch.aging) || undefined;
+      } else {
+        next.dateTo = undefined;
+      }
+    }
     onFilterChange(next);
   };
 
@@ -190,11 +204,24 @@ const FilterBar: React.FC<FilterBarProps> = ({
       label: "Apenas com visitas",
       onClear: () => onFilterChange({ ...filters, visitsOnly: undefined }),
     });
-  if (filters.aging)
+  const derivedAging = dueToAging(filters.dateFrom, filters.dateTo);
+  if (derivedAging) {
     activeFilterChips.push({
-      label: `Atraso: +${filters.aging} dias`,
-      onClear: () => onFilterChange({ ...filters, aging: undefined }),
+      label: `Atraso: +${derivedAging} dias`,
+      onClear: () => onFilterChange({ ...filters, dateTo: undefined }),
     });
+  } else {
+    if (filters.dateFrom)
+      activeFilterChips.push({
+        label: `Vencimento de: ${filters.dateFrom}`,
+        onClear: () => onFilterChange({ ...filters, dateFrom: undefined }),
+      });
+    if (filters.dateTo)
+      activeFilterChips.push({
+        label: `Vencimento até: ${filters.dateTo}`,
+        onClear: () => onFilterChange({ ...filters, dateTo: undefined }),
+      });
+  }
 
   return (
     <div className="space-y-3 mb-4">
