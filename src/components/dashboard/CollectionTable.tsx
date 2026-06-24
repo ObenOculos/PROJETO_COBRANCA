@@ -26,7 +26,6 @@ import {
   ArrowDown,
   ChevronDown,
   ChevronUp,
-  Hash,
   Maximize2,
   Minimize2,
   EyeIcon,
@@ -1267,36 +1266,7 @@ export const CollectionTable = React.forwardRef<
                   </div>
                 </div>
               )}
-              {/* Second Row: Total Count and Items Per Page (always visible) */}
-              <div className="flex justify-between sm:flex-row items-start sm:items-center gap-2">
-                {/* Total Count */}
-                <div className="flex items-center gap- text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
-                  <div className="flex items-center gap-1 text-sm text-gray-500">
-                    <Hash className="h-3 w-3" />
-                    {filteredAndGroupedSales.length}
-                  </div>
-                </div>
-                {/* Items Per Page Selector */}
-                <div className="flex items-center gap- text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
-                  <EyeIcon className="h-4 w-4 text-gray-400" />
-                  <select
-                    id="items-per-page"
-                    name="itemsPerPage"
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="text-sm border-0 bg-transparent focus:ring-0 text-gray-600"
-                  >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                </div>
-              </div>
-              {/* Third Row: Sorting and Pagination Controls (can be hidden/collapsed on mobile) */}
+              {/* Controls Row: ordenação (esquerda) · exibição + paginação (direita) */}
               <div className="flex justify-between sm:flex-row items-start sm:items-center gap-2 sm:gap-1">
                 {/* Sorting */}
                 <div className="flex items-center gap-1">
@@ -1355,32 +1325,51 @@ export const CollectionTable = React.forwardRef<
                   )}
                 </div>
 
-                {/* Quick Navigation (Pagination) */}
-                {totalPages > 1 && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() =>
-                        setCurrentPage(Math.max(1, currentPage - 1))
-                      }
-                      disabled={currentPage === 1}
-                      className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
-                      title="Página anterior"
+                {/* Exibição + Paginação */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
+                    <EyeIcon className="h-4 w-4 text-gray-400" />
+                    <select
+                      id="items-per-page"
+                      name="itemsPerPage"
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="text-sm border-0 bg-transparent focus:ring-0 text-gray-600"
                     >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() =>
-                        setCurrentPage(Math.min(totalPages, currentPage + 1))
-                      }
-                      disabled={currentPage === totalPages}
-                      className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
-                      title="Próxima página"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                    <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
                   </div>
-                )}
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() =>
+                          setCurrentPage(Math.max(1, currentPage - 1))
+                        }
+                        disabled={currentPage === 1}
+                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                        title="Página anterior"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() =>
+                          setCurrentPage(Math.min(totalPages, currentPage + 1))
+                        }
+                        disabled={currentPage === totalPages}
+                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                        title="Próxima página"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>{" "}
               {/* Expanded Filters (Conditional) */}
               {userType !== "manager" && showFilters && (
