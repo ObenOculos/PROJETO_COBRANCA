@@ -94,6 +94,8 @@ export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
   // carteira pelo estado da divida e distorcem recebido x meta.
   performance: {
     city: true,
+    store: true,
+    collector: true,
     period: true,
   },
   // Lojas: igual + cobrador (a dimensao da tela e a loja).

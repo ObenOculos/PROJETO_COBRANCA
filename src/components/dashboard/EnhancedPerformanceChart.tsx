@@ -270,19 +270,28 @@ const EnhancedPerformanceChart: React.FC = () => {
     });
   }, [sourceCollections, allowedDocs, hasSourceFilter, users, monthlyGoals, salePayments, scheduledVisits, selectedMonths, selectedYears]);
 
+  // Filtro de Cobrador isola um cobrador no ranking e nos KPIs (fonte: filters).
+  const rankedPerformance = useMemo(
+    () =>
+      filters.collector
+        ? enhancedPerformance.filter((p) => p.collectorId === filters.collector)
+        : enhancedPerformance,
+    [enhancedPerformance, filters.collector],
+  );
+
   const filteredAndSortedPerformance = useMemo(() => {
-    let filtered = [...enhancedPerformance];
+    const filtered = [...rankedPerformance];
     filtered.sort((a, b) => {
       const aValue = a[sortBy];
       const bValue = b[sortBy];
       return sortOrder === "desc" ? bValue - aValue : aValue - bValue;
     });
     return filtered;
-  }, [enhancedPerformance, sortBy, sortOrder]);
+  }, [rankedPerformance, sortBy, sortOrder]);
 
   const teamStats = useMemo(() => {
     const sum = (f: (p: EnhancedCollectorPerformance) => number) =>
-      enhancedPerformance.reduce((acc, p) => acc + f(p), 0);
+      rankedPerformance.reduce((acc, p) => acc + f(p), 0);
 
     const totalReceived = sum((p) => p.receivedAmount);
     const totalPending = sum((p) => p.pendingAmountTotal); // a receber (carteira)
@@ -292,7 +301,7 @@ const EnhancedPerformanceChart: React.FC = () => {
     const totalVisitsActual = sum((p) => p.currentMonthVisitsActual);
     const totalVisitsGoal = sum((p) => p.currentMonthVisitsGoal);
     const totalVisitsAtrasadas = sum((p) => p.visitsAtrasadas);
-    const collectorsCount = enhancedPerformance.length;
+    const collectorsCount = rankedPerformance.length;
 
     const paymentGoalPct =
       totalPaymentsGoal > 0 ? (totalReceived / totalPaymentsGoal) * 100 : 0;
@@ -312,7 +321,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       paymentGoalPct,
       visitsGoalPct,
     };
-  }, [enhancedPerformance]);
+  }, [rankedPerformance]);
 
   const exportPerformanceData = () => {
     const headers = ["Cobrador", "Vendas", "Clientes", "Total (R$)", "Recebido (R$)", "Pendente (R$)", "Visitas OK", "Visitas Pend"];
