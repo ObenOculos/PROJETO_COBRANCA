@@ -69,10 +69,14 @@ export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
   },
   assignment: {
     assignment: true,
+    paymentStatus: true,
     city: true,
     neighborhood: true,
     store: true,
     situacao: true,
+    dueRange: true,
+    launchRange: true,
+    amount: true,
     createdRange: true,
   },
 };

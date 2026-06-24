@@ -24,6 +24,7 @@ import { formatCurrency, formatDate } from "../utils/formatters";
 import { parseAndNormalizeDate } from "../filters/dates";
 import { clientMatchesFilters } from "../filters/predicates";
 import FilterPanel from "./filters/FilterPanel";
+import { FilterValues } from "../filters/filterConfig";
 import * as XLSX from "xlsx";
 import BulkAssignmentModal from "./BulkAssignmentModal";
 import AssignmentReportModal from "./dashboard/AssignmentReportModal";
@@ -184,6 +185,16 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   const [filterDateFrom, setFilterDateFrom] = useState<string>("");
   const [filterDateTo, setFilterDateTo] = useState<string>("");
   const [includeWithoutDate, setIncludeWithoutDate] = useState(false);
+  // Filtros equivalentes aos da Cobranca (status de pagamento, lancamento, valor).
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
+  const [filterLaunchFrom, setFilterLaunchFrom] = useState<string>("");
+  const [filterLaunchTo, setFilterLaunchTo] = useState<string>("");
+  const [filterMinAmount, setFilterMinAmount] = useState<number | undefined>(
+    undefined,
+  );
+  const [filterMaxAmount, setFilterMaxAmount] = useState<number | undefined>(
+    undefined,
+  );
   // Filtro "Criado em": intervalo de datas sobre clientes.created_at (data em
   // que o cliente foi inserido pela primeira vez no banco).
   const [filterCreatedFrom, setFilterCreatedFrom] = useState<string>("");
@@ -449,6 +460,36 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         onClear: () => setIncludeWithoutDate(false),
       });
     }
+    if (filterPaymentStatus) {
+      chips.push({
+        label: `Pagamento: ${filterPaymentStatus}`,
+        onClear: () => setFilterPaymentStatus(""),
+      });
+    }
+    if (filterLaunchFrom) {
+      chips.push({
+        label: `Lançado de: ${filterLaunchFrom}`,
+        onClear: () => setFilterLaunchFrom(""),
+      });
+    }
+    if (filterLaunchTo) {
+      chips.push({
+        label: `Lançado até: ${filterLaunchTo}`,
+        onClear: () => setFilterLaunchTo(""),
+      });
+    }
+    if (filterMinAmount != null) {
+      chips.push({
+        label: `Valor mín: ${filterMinAmount}`,
+        onClear: () => setFilterMinAmount(undefined),
+      });
+    }
+    if (filterMaxAmount != null) {
+      chips.push({
+        label: `Valor máx: ${filterMaxAmount}`,
+        onClear: () => setFilterMaxAmount(undefined),
+      });
+    }
     if (filterCreatedFrom) {
       chips.push({
         label: `Criado de: ${filterCreatedFrom}`,
@@ -471,9 +512,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     filterNeighborhood,
     filterStore,
     filterSituacao,
+    filterPaymentStatus,
     filterDateFrom,
     filterDateTo,
     includeWithoutDate,
+    filterLaunchFrom,
+    filterLaunchTo,
+    filterMinAmount,
+    filterMaxAmount,
     filterCreatedFrom,
     filterCreatedTo,
     collectors,
@@ -497,9 +543,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           neighborhood: filterNeighborhood,
           store: filterStore,
           situacao: filterSituacao,
+          paymentStatus: filterPaymentStatus,
           dueFrom: filterDateFrom,
           dueTo: filterDateTo,
           includeWithoutDue: includeWithoutDate,
+          launchFrom: filterLaunchFrom,
+          launchTo: filterLaunchTo,
+          minAmount: filterMinAmount,
+          maxAmount: filterMaxAmount,
           createdFrom: filterCreatedFrom,
           createdTo: filterCreatedTo,
         },
@@ -515,9 +566,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     filterNeighborhood,
     filterStore,
     filterSituacao,
+    filterPaymentStatus,
     filterDateFrom,
     filterDateTo,
     includeWithoutDate,
+    filterLaunchFrom,
+    filterLaunchTo,
+    filterMinAmount,
+    filterMaxAmount,
     filterCreatedFrom,
     filterCreatedTo,
     clientCreatedAtMap,
@@ -879,9 +935,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     setFilterNeighborhood("");
     setFilterStore("");
     setFilterSituacao("");
+    setFilterPaymentStatus("");
     setFilterDateFrom("");
     setFilterDateTo("");
     setIncludeWithoutDate(false);
+    setFilterLaunchFrom("");
+    setFilterLaunchTo("");
+    setFilterMinAmount(undefined);
+    setFilterMaxAmount(undefined);
     setFilterCreatedFrom("");
     setFilterCreatedTo("");
     setCurrentPage(1);
@@ -890,18 +951,27 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   // Valores e adaptador consumidos pelo FilterPanel compartilhado. O vocabulario
   // de atribuicao (com/sem cobrador) vai em `assignment`; o de localizacao mantem
   // a dependencia cidade -> bairro como regra desta tela.
-  const filterPanelValues = {
+  const filterPanelValues: Partial<FilterValues> = {
     assignment: filterStatus,
+    paymentStatus: filterPaymentStatus,
     city: filterCity,
     neighborhood: filterNeighborhood,
     store: filterStore,
     situacao: filterSituacao,
+    dueFrom: filterDateFrom,
+    dueTo: filterDateTo,
+    launchFrom: filterLaunchFrom,
+    launchTo: filterLaunchTo,
+    minAmount: filterMinAmount,
+    maxAmount: filterMaxAmount,
     createdFrom: filterCreatedFrom,
     createdTo: filterCreatedTo,
   };
 
-  const handleFilterPanelChange = (patch: Partial<typeof filterPanelValues>) => {
+  const handleFilterPanelChange = (patch: Partial<FilterValues>) => {
     if ("assignment" in patch) setFilterStatus(patch.assignment ?? "");
+    if ("paymentStatus" in patch)
+      setFilterPaymentStatus(patch.paymentStatus ?? "");
     if ("city" in patch) {
       setFilterCity(patch.city ?? "");
       setFilterNeighborhood(""); // dependencia: trocar cidade reseta o bairro
@@ -909,6 +979,12 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     if ("neighborhood" in patch) setFilterNeighborhood(patch.neighborhood ?? "");
     if ("store" in patch) setFilterStore(patch.store ?? "");
     if ("situacao" in patch) setFilterSituacao(patch.situacao ?? "");
+    if ("dueFrom" in patch) setFilterDateFrom(patch.dueFrom ?? "");
+    if ("dueTo" in patch) setFilterDateTo(patch.dueTo ?? "");
+    if ("launchFrom" in patch) setFilterLaunchFrom(patch.launchFrom ?? "");
+    if ("launchTo" in patch) setFilterLaunchTo(patch.launchTo ?? "");
+    if ("minAmount" in patch) setFilterMinAmount(patch.minAmount);
+    if ("maxAmount" in patch) setFilterMaxAmount(patch.maxAmount);
     if ("createdFrom" in patch) setFilterCreatedFrom(patch.createdFrom ?? "");
     if ("createdTo" in patch) setFilterCreatedTo(patch.createdTo ?? "");
     setCurrentPage(1);

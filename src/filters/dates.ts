@@ -46,3 +46,38 @@ export const parseAndNormalizeDate = (
     return null;
   }
 };
+
+/**
+ * Normaliza uma data (ISO `YYYY-MM-DD[...]` ou BR `DD/MM/YYYY`) para a string
+ * comparavel `YYYY-MM-DD`. Usado em filtros de intervalo por comparacao textual
+ * (mesma regra do getFilteredCollections). Retorna null se nao reconhecer.
+ */
+export const toYYYYMMDD = (
+  dateStr: string | null | undefined,
+): string | null => {
+  if (!dateStr || typeof dateStr !== "string") return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr.substring(0, 10))) {
+    return dateStr.substring(0, 10);
+  }
+
+  const parts = dateStr.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+  if (parts) {
+    const [, day, month, year] = parts;
+    return `${year}-${month}-${day}`;
+  }
+
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+  } catch {
+    // formato desconhecido
+  }
+
+  return null;
+};

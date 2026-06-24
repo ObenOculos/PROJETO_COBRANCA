@@ -6,7 +6,8 @@
 // nivel do titulo. O comportamento reproduz exatamente o que o ClientAssignment
 // fazia antes desta extracao.
 import { Collection } from "../types";
-import { parseAndNormalizeDate } from "./dates";
+import { parseAndNormalizeDate, toYYYYMMDD } from "./dates";
+import { getClientPaymentStatus, normalizePaymentStatus } from "./clientStatus";
 
 /** Forma minima de cliente que os predicados precisam para filtrar. */
 export interface FilterableClient {
@@ -32,15 +33,74 @@ export interface ClientFilters {
   store?: string;
   /** Valor de situacao, ou a marca especial "empty" para sem situacao. */
   situacao?: string;
+  /** Status de pagamento agregado do cliente (pago | parcial | pendente | cancelado). */
+  paymentStatus?: string;
   /** Intervalo de data de vencimento das parcelas. */
   dueFrom?: string;
   dueTo?: string;
   /** Inclui clientes sem nenhuma data de vencimento valida quando ha filtro de data. */
   includeWithoutDue?: boolean;
+  /** Intervalo de data de lancamento (data_lancamento). */
+  launchFrom?: string;
+  launchTo?: string;
+  /** Faixa do valor pendente total do cliente. */
+  minAmount?: number;
+  maxAmount?: number;
   /** Intervalo sobre clientes.created_at (mapa passado a parte). */
   createdFrom?: string;
   createdTo?: string;
 }
+
+const matchesPaymentStatus = (
+  client: FilterableClient,
+  paymentStatus?: string,
+): boolean => {
+  if (!paymentStatus) return true;
+  // A base de clientes da Atribuicao e a ativa (sem cancelados), entao nenhum
+  // cliente classifica como "cancelado" aqui.
+  if (paymentStatus.trim().toLowerCase() === "cancelado") return false;
+  return (
+    getClientPaymentStatus(client.collections) ===
+    normalizePaymentStatus(paymentStatus)
+  );
+};
+
+const matchesLaunchRange = (
+  client: FilterableClient,
+  filters: ClientFilters,
+): boolean => {
+  if (!filters.launchFrom && !filters.launchTo) return true;
+  return client.collections.some((c) => {
+    const launch = toYYYYMMDD(c.data_lancamento);
+    if (!launch) return false;
+    if (filters.launchFrom && launch < filters.launchFrom) return false;
+    if (filters.launchTo && launch > filters.launchTo) return false;
+    return true;
+  });
+};
+
+const matchesAmount = (
+  client: FilterableClient,
+  filters: ClientFilters,
+): boolean => {
+  const hasMin = filters.minAmount != null && filters.minAmount > 0;
+  const hasMax = filters.maxAmount != null && filters.maxAmount > 0;
+  if (!hasMin && !hasMax) return true;
+
+  const totalValue = client.collections.reduce(
+    (sum, c) => sum + (c.valor_original || 0),
+    0,
+  );
+  const totalReceived = client.collections.reduce(
+    (sum, c) => sum + (c.valor_recebido || 0),
+    0,
+  );
+  const pending = Math.max(0, totalValue - totalReceived);
+
+  if (hasMin && pending < (filters.minAmount as number)) return false;
+  if (hasMax && pending > (filters.maxAmount as number)) return false;
+  return true;
+};
 
 const matchesSearch = (client: FilterableClient, search?: string): boolean => {
   const term = (search ?? "").toLowerCase();
@@ -151,7 +211,10 @@ export const clientMatchesFilters = (
     (!filters.store ||
       client.collections.some((c) => c.nome_da_loja === filters.store)) &&
     matchesSituacao(client, filters.situacao) &&
+    matchesPaymentStatus(client, filters.paymentStatus) &&
     matchesDueRange(client, filters) &&
+    matchesLaunchRange(client, filters) &&
+    matchesAmount(client, filters) &&
     matchesCreatedRange(client, filters, createdAt)
   );
 };
