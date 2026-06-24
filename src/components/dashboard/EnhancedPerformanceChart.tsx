@@ -7,11 +7,10 @@ import {
   Calendar,
   Trophy,
   BarChart3,
-  CheckCircle,
   AlertTriangle,
   ShoppingCart,
-  Clock,
-  Search,
+  TrendingUp,
+  Wallet,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
@@ -282,14 +281,37 @@ const EnhancedPerformanceChart: React.FC = () => {
   }, [enhancedPerformance, sortBy, sortOrder]);
 
   const teamStats = useMemo(() => {
-    const totalReceived = enhancedPerformance.reduce((sum, p) => sum + p.receivedAmount, 0);
-    const totalVisitsActual = enhancedPerformance.reduce((sum, p) => sum + p.currentMonthVisitsActual, 0);
-    const totalVisitsGoal = enhancedPerformance.reduce((sum, p) => sum + p.currentMonthVisitsGoal, 0);
-    const totalPendingVisits = enhancedPerformance.reduce((sum, p) => sum + p.pendingVisits, 0);
-    const totalVisitsNaoEncontrado = enhancedPerformance.reduce((sum, p) => sum + p.visitsNaoEncontrado, 0);
-    const totalVisitsAtrasadas = enhancedPerformance.reduce((sum, p) => sum + p.visitsAtrasadas, 0);
+    const sum = (f: (p: EnhancedCollectorPerformance) => number) =>
+      enhancedPerformance.reduce((acc, p) => acc + f(p), 0);
 
-    return { totalReceived, totalVisitsActual, totalVisitsGoal, totalPendingVisits, totalVisitsNaoEncontrado, totalVisitsAtrasadas };
+    const totalReceived = sum((p) => p.receivedAmount);
+    const totalPending = sum((p) => p.pendingAmountTotal); // a receber (carteira)
+    const totalPaymentsGoal = sum((p) => p.currentMonthPaymentsGoal);
+    const totalClientsWithPending = sum((p) => p.clientsWithPending);
+    const totalAssignedClients = sum((p) => p.totalAssignedClients);
+    const totalVisitsActual = sum((p) => p.currentMonthVisitsActual);
+    const totalVisitsGoal = sum((p) => p.currentMonthVisitsGoal);
+    const totalVisitsAtrasadas = sum((p) => p.visitsAtrasadas);
+    const collectorsCount = enhancedPerformance.length;
+
+    const paymentGoalPct =
+      totalPaymentsGoal > 0 ? (totalReceived / totalPaymentsGoal) * 100 : 0;
+    const visitsGoalPct =
+      totalVisitsGoal > 0 ? (totalVisitsActual / totalVisitsGoal) * 100 : 0;
+
+    return {
+      totalReceived,
+      totalPending,
+      totalPaymentsGoal,
+      totalClientsWithPending,
+      totalAssignedClients,
+      totalVisitsActual,
+      totalVisitsGoal,
+      totalVisitsAtrasadas,
+      collectorsCount,
+      paymentGoalPct,
+      visitsGoalPct,
+    };
   }, [enhancedPerformance]);
 
   const exportPerformanceData = () => {
@@ -329,82 +351,126 @@ const EnhancedPerformanceChart: React.FC = () => {
         </div>
       </div>
 
+      {/* Resumo executivo (acima dos filtros): visão geral antes de refinar */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* Recuperado no período */}
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-dark-border">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-xl">
+              <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
+            </div>
+            <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary">
+              Recuperado no período
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+            {formatCurrency(teamStats.totalReceived)}
+          </p>
+          {teamStats.totalPaymentsGoal > 0 && (
+            <>
+              <div className="mt-3 flex justify-between text-[11px] font-medium">
+                <span className="text-gray-400 dark:text-dark-text-secondary">
+                  Meta: {formatCurrency(teamStats.totalPaymentsGoal)}
+                </span>
+                <span className="text-green-600 dark:text-green-400">
+                  {teamStats.paymentGoalPct.toFixed(0)}%
+                </span>
+              </div>
+              <div className="mt-1.5 h-1.5 bg-gray-100 dark:bg-dark-bg rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-green-600 rounded-full transition-all duration-700"
+                  style={{ width: `${Math.min(100, teamStats.paymentGoalPct)}%` }}
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* A receber (carteira em aberto) */}
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-dark-border">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
+              <Wallet className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            </div>
+            <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary">
+              A receber (carteira)
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+            {formatCurrency(teamStats.totalPending)}
+          </p>
+          <p className="mt-3 text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary">
+            {teamStats.totalClientsWithPending} clientes em aberto
+          </p>
+        </div>
+
+        {/* Visitas realizadas */}
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-dark-border">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+              <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary">
+              Visitas realizadas
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+            {teamStats.totalVisitsActual}
+          </p>
+          {teamStats.totalVisitsGoal > 0 ? (
+            <>
+              <div className="mt-3 flex justify-between text-[11px] font-medium">
+                <span className="text-gray-400 dark:text-dark-text-secondary">
+                  Meta: {teamStats.totalVisitsGoal}
+                </span>
+                <span className="text-blue-600 dark:text-blue-400">
+                  {teamStats.visitsGoalPct.toFixed(0)}%
+                </span>
+              </div>
+              <div className="mt-1.5 h-1.5 bg-gray-100 dark:bg-dark-bg rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-600 rounded-full transition-all duration-700"
+                  style={{ width: `${Math.min(100, teamStats.visitsGoalPct)}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            teamStats.totalVisitsAtrasadas > 0 && (
+              <p className="mt-3 text-[11px] font-medium text-rose-500 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                {teamStats.totalVisitsAtrasadas} atrasadas
+              </p>
+            )
+          )}
+        </div>
+
+        {/* Cobradores */}
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-dark-border">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
+              <Users className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            </div>
+            <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary">
+              Cobradores
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+            {teamStats.collectorsCount}
+          </p>
+          <p className="mt-3 text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary">
+            {teamStats.totalAssignedClients} clientes na carteira
+          </p>
+        </div>
+      </div>
+
       {/* Barra de filtros unificada (inclui Período) */}
       <FilterBar
         filters={filters}
         onFilterChange={handleFiltersChange}
         userType="manager"
         context="performance"
-        showSearch={false}
+        searchPlaceholder="Buscar cliente, cidade ou loja..."
       />
-
-      {/* Summary Card: Visitas do Período */}
-      <div className="relative overflow-hidden bg-white dark:bg-dark-bg-secondary rounded-2xl p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-dark-border">
-        {/* Decorative background element */}
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-blue-500/5 dark:bg-blue-400/5 rounded-full blur-3xl pointer-events-none"></div>
-        
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-              <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-gray-800 dark:text-dark-text tracking-wide">Visitas do Período</h3>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary mt-0.5">Visão consolidada da equipe</p>
-            </div>
-          </div>
-          {teamStats.totalVisitsGoal > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                {((teamStats.totalVisitsActual / teamStats.totalVisitsGoal) * 100).toFixed(0)}%
-              </span>
-              <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-tighter">da Meta</span>
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-4 bg-gray-50/40 dark:bg-dark-bg/25 rounded-2xl border border-gray-100/50 dark:border-dark-border/40 transition-colors">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Realizadas</label>
-            </div>
-            <p className="text-xl font-bold text-gray-800 dark:text-dark-text">{teamStats.totalVisitsActual}</p>
-          </div>
-          <div className="p-4 bg-gray-50/40 dark:bg-dark-bg/25 rounded-2xl border border-gray-100/50 dark:border-dark-border/40 transition-colors">
-            <div className="flex items-center gap-2 mb-2">
-              <Search className="w-3.5 h-3.5 text-amber-500" />
-              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Não Loc.</label>
-            </div>
-            <p className="text-xl font-bold text-gray-800 dark:text-dark-text">{teamStats.totalVisitsNaoEncontrado}</p>
-          </div>
-          <div className="p-4 bg-gray-50/40 dark:bg-dark-bg/25 rounded-2xl border border-gray-100/50 dark:border-dark-border/40 transition-colors">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-3.5 h-3.5 text-blue-500" />
-              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Agendadas</label>
-            </div>
-            <p className="text-xl font-bold text-gray-800 dark:text-dark-text">{teamStats.totalPendingVisits}</p>
-          </div>
-          <div className="p-4 bg-gray-50/40 dark:bg-dark-bg/25 rounded-2xl border border-gray-100/50 dark:border-dark-border/40 transition-colors">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
-              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Atrasadas</label>
-            </div>
-            <p className="text-xl font-bold text-gray-800 dark:text-dark-text">{teamStats.totalVisitsAtrasadas}</p>
-          </div>
-        </div>
-
-        {teamStats.totalVisitsGoal > 0 && (
-          <div className="mt-6">
-            <div className="w-full bg-gray-100 dark:bg-dark-bg h-1.5 rounded-full overflow-hidden">
-              <div 
-                className="bg-blue-600 h-full rounded-full transition-all duration-1000 ease-out"
-                style={{ width: `${Math.min(100, (teamStats.totalVisitsActual / teamStats.totalVisitsGoal) * 100)}%` }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Controles de lista: contagem + ordenação */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-1">
