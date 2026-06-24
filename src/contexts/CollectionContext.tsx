@@ -1360,6 +1360,29 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       });
     }
 
+    // Faixa de atraso: mantem clientes cujo maior atraso entre as parcelas
+    // pendentes seja >= ao limite (mesma regra do FilterPills/CollectorDashboard).
+    if (filters.aging) {
+      const threshold = parseInt(filters.aging, 10);
+      if (threshold) {
+        const clientMaxOverdue = new Map<string, number>();
+        filtered.forEach((c) => {
+          const key = clientKey(c);
+          const isPending =
+            (c.valor_original || 0) - (c.valor_recebido || 0) > 0.01;
+          const overdue = isPending
+            ? calculateOverdueDays(c.data_vencimento)
+            : 0;
+          if (overdue > (clientMaxOverdue.get(key) || 0)) {
+            clientMaxOverdue.set(key, overdue);
+          }
+        });
+        filtered = filtered.filter(
+          (c) => (clientMaxOverdue.get(clientKey(c)) || 0) >= threshold,
+        );
+      }
+    }
+
     // Apply status filter (Pago / Parcial / Pendente)
     // Classificacao por CLIENTE (documento), por valor agregado de todas as
     // vendas ativas dele. Cada cliente cai em uma unica categoria, entao a soma

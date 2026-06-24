@@ -118,6 +118,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
     city: filters.city,
     neighborhood: filters.neighborhood,
     visitsOnly: filters.visitsOnly,
+    aging: filters.aging,
   };
 
   const handlePanelChange = (patch: Partial<FilterValues>) => {
@@ -136,6 +137,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
     if ("neighborhood" in patch)
       next.neighborhood = patch.neighborhood || undefined;
     if ("visitsOnly" in patch) next.visitsOnly = patch.visitsOnly || undefined;
+    if ("aging" in patch) next.aging = patch.aging || undefined;
     onFilterChange(next);
   };
 
@@ -188,6 +190,11 @@ const FilterBar: React.FC<FilterBarProps> = ({
       label: "Apenas com visitas",
       onClear: () => onFilterChange({ ...filters, visitsOnly: undefined }),
     });
+  if (filters.aging)
+    activeFilterChips.push({
+      label: `Atraso: +${filters.aging} dias`,
+      onClear: () => onFilterChange({ ...filters, aging: undefined }),
+    });
 
   return (
     <div className="space-y-3 mb-4">
@@ -211,7 +218,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
           {/* Botão Filtros Avançados */}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all border flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
               isExpanded || hasActiveFilters
                 ? "bg-blue-600 border-blue-600 text-white shadow-sm"
                 : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
@@ -226,11 +233,12 @@ const FilterBar: React.FC<FilterBarProps> = ({
           </button>
         </div>
 
-        {/* Atalhos rápidos de status (componente compartilhado) */}
+        {/* Atalhos rápidos: status + faixa de atraso (componente compartilhado) */}
         <FilterPills
           values={panelValues}
           onChange={handlePanelChange}
           showPaymentStatus
+          showAging
         />
 
         {/* Painel avançado compartilhado */}
@@ -251,7 +259,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
       {/* Active Filter Chips */}
       {hasActiveFilters && activeFilterChips.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 p-2 bg-gray-50/50 dark:bg-dark-bg/25 rounded-xl border border-gray-150/40 dark:border-dark-border/40">
-          <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider pl-1.5 mr-1">
+          <span className="text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary pl-1.5 mr-1">
             Filtros ativos:
           </span>
           {activeFilterChips.map((chip, index) => (

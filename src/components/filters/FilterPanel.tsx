@@ -36,10 +36,12 @@ interface FilterPanelProps {
   /** Fecha o painel (botao "Fechar" no mobile). */
   onClose?: () => void;
   options?: FilterPanelOptions;
+  /** Valores de status de pagamento a ocultar (ex.: "cancelado" na Atribuicao). */
+  excludePaymentStatus?: string[];
 }
 
 const labelClass =
-  "text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider flex items-center";
+  "text-xs font-medium text-gray-500 dark:text-dark-text-secondary flex items-center";
 const selectClass =
   "w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all";
 const dateClass =
@@ -71,8 +73,12 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   onClear,
   onClose,
   options = {},
+  excludePaymentStatus = [],
 }) => {
   const fields = FILTER_FIELDS[context];
+  const paymentStatusOptions = PAYMENT_STATUS_OPTIONS.filter(
+    (o) => !excludePaymentStatus.includes(o.value),
+  );
   const {
     cities = [],
     neighborhoods = [],
@@ -102,32 +108,32 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   );
 
   const toOptions = (list: string[]): SelectOption[] =>
-    list.map((v) => ({ value: v, label: v.toUpperCase() }));
+    list.map((v) => ({ value: v, label: v }));
 
   return (
     <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-5 animate-in fade-in slide-in-from-top-4 duration-300">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {fields.paymentStatus && (
           <Field icon={<AlertCircle className="h-3 w-3 mr-1.5" />} label="Status">
-            {renderSelect("paymentStatus", "TODOS", PAYMENT_STATUS_OPTIONS)}
+            {renderSelect("paymentStatus", "Todos", paymentStatusOptions)}
           </Field>
         )}
 
         {fields.assignment && (
           <Field
             icon={<AlertCircle className="h-3 w-3 mr-1.5" />}
-            label="Status de Atribuição"
+            label="Status de atribuição"
           >
-            {renderSelect("assignment", "TODOS", [
-              { value: "with_collector", label: "COM COBRADOR" },
-              { value: "without_collector", label: "SEM COBRADOR" },
+            {renderSelect("assignment", "Todos", [
+              { value: "with_collector", label: "Com cobrador" },
+              { value: "without_collector", label: "Sem cobrador" },
             ])}
           </Field>
         )}
 
         {fields.city && (
           <Field icon={<MapPin className="h-3 w-3 mr-1.5" />} label="Cidade">
-            {renderSelect("city", "TODAS AS CIDADES", toOptions(cities))}
+            {renderSelect("city", "Todas as cidades", toOptions(cities))}
           </Field>
         )}
 
@@ -135,7 +141,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
           <Field icon={<MapPin className="h-3 w-3 mr-1.5" />} label="Bairro">
             {renderSelect(
               "neighborhood",
-              "TODOS OS BAIRROS",
+              "Todos os bairros",
               toOptions(neighborhoods),
               { disabled: !values.city },
             )}
@@ -144,19 +150,19 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
         {fields.store && (
           <Field icon={<Building className="h-3 w-3 mr-1.5" />} label="Loja">
-            {renderSelect("store", "TODAS AS LOJAS", toOptions(stores))}
+            {renderSelect("store", "Todas as lojas", toOptions(stores))}
           </Field>
         )}
 
         {fields.situacao && (
           <Field icon={<Award className="h-3 w-3 mr-1.5" />} label="Situação">
-            {renderSelect("situacao", "TODAS AS SITUAÇÕES", SITUACAO_OPTIONS)}
+            {renderSelect("situacao", "Todas as situações", SITUACAO_OPTIONS)}
           </Field>
         )}
 
         {fields.collector && (
           <Field icon={<Users className="h-3 w-3 mr-1.5" />} label="Cobrador">
-            {renderSelect("collector", "TODOS OS COBRADORES", collectors)}
+            {renderSelect("collector", "Todos os cobradores", collectors)}
           </Field>
         )}
 
@@ -292,14 +298,14 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         <div className="col-span-full pt-4 border-t border-gray-100 dark:border-dark-border flex justify-end gap-3">
           <button
             onClick={onClear}
-            className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-dark-text transition-colors uppercase tracking-wider"
+            className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-600 dark:hover:text-dark-text transition-colors"
           >
-            Limpar Filtros
+            Limpar filtros
           </button>
           {onClose && (
             <button
               onClick={onClose}
-              className="px-5 py-2 bg-gray-900 dark:bg-blue-600 text-white text-xs font-semibold uppercase tracking-wider rounded-xl hover:opacity-90 shadow-md transition-all sm:hidden"
+              className="px-5 py-2 bg-gray-900 dark:bg-blue-600 text-white text-sm font-medium rounded-xl hover:opacity-90 shadow-md transition-all sm:hidden"
             >
               Fechar
             </button>

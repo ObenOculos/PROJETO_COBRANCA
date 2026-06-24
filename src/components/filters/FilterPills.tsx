@@ -11,6 +11,8 @@ interface FilterPillsProps {
   onChange: (patch: Partial<FilterValues>) => void;
   /** Mostra os atalhos de status de pagamento (Pendente/Pago/Parcial/Cancelado). */
   showPaymentStatus?: boolean;
+  /** Valores de status a ocultar (ex.: "cancelado" na Atribuicao). */
+  excludePaymentStatus?: string[];
   /** Mostra os atalhos de faixa de atraso (+30/+60/+90/+120 dias). */
   showAging?: boolean;
 }
@@ -27,20 +29,25 @@ const FilterPills: React.FC<FilterPillsProps> = ({
   values,
   onChange,
   showPaymentStatus = true,
+  excludePaymentStatus = [],
   showAging = false,
 }) => {
   const toggle = (field: "paymentStatus" | "aging", value: string) =>
     onChange({ [field]: values[field] === value ? undefined : value });
 
+  const paymentPills = PAYMENT_STATUS_PILLS.filter(
+    (pill) => !excludePaymentStatus.includes(pill.value),
+  );
+
   const pillClass = (isActive: boolean, active: string) =>
-    `px-3 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider border transition-all ${
+    `px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
       isActive ? active : inactiveClass
     }`;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       {showPaymentStatus &&
-        PAYMENT_STATUS_PILLS.map((pill) => (
+        paymentPills.map((pill) => (
           <button
             key={pill.value}
             type="button"

@@ -90,21 +90,21 @@ export interface SelectOption {
 
 /** Opcoes de situacao (Atribuicao). Centralizadas para nao repetir no JSX. */
 export const SITUACAO_OPTIONS: SelectOption[] = [
-  { value: "Em mãos", label: "EM MÃOS" },
-  { value: "Em tratamento", label: "EM TRATAMENTO" },
-  { value: "Aguardando Interno", label: "AGUARDANDO INTERNO" },
-  { value: "Cobrança Interna", label: "COBRANÇA INTERNA" },
-  { value: "Aguardando Terceirizado", label: "AGUARDANDO TERCEIRIZADO" },
-  { value: "Cobrança Terceirizada", label: "COBRANÇA TERCEIRIZADA" },
-  { value: "empty", label: "VAZIO" },
+  { value: "Em mãos", label: "Em mãos" },
+  { value: "Em tratamento", label: "Em tratamento" },
+  { value: "Aguardando Interno", label: "Aguardando interno" },
+  { value: "Cobrança Interna", label: "Cobrança interna" },
+  { value: "Aguardando Terceirizado", label: "Aguardando terceirizado" },
+  { value: "Cobrança Terceirizada", label: "Cobrança terceirizada" },
+  { value: "empty", label: "Sem situação" },
 ];
 
 /** Opcoes de status de pagamento (Cobranca). */
 export const PAYMENT_STATUS_OPTIONS: SelectOption[] = [
-  { value: "pendente", label: "EM ATRASO" },
-  { value: "parcial", label: "PARCIAL" },
-  { value: "pago", label: "PAGO" },
-  { value: "cancelado", label: "CANCELADO" },
+  { value: "pendente", label: "Em atraso" },
+  { value: "parcial", label: "Parcial" },
+  { value: "pago", label: "Pago" },
+  { value: "cancelado", label: "Cancelado" },
 ];
 
 /** Atalhos rapidos (pills) de status de pagamento, com a cor do estado ativo. */

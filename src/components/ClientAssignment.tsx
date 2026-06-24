@@ -1016,7 +1016,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight leading-none">
               Atribuição de Cobradores
             </h2>
-            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 uppercase tracking-wider">
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 tracking-wide">
               {hasActiveFilters ? "Visão Filtrada" : "Gestão de Carteira"}
             </p>
           </div>
@@ -1048,13 +1048,13 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
             {mainStats.unassigned > 0 && (
-              <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-md uppercase tracking-wider border border-amber-100 dark:border-amber-900/30">
+              <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-md tracking-wide border border-amber-100 dark:border-amber-900/30">
                 {mainStats.unassigned} Pendentes
               </span>
             )}
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Total Clientes</p>
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Total Clientes</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{mainStats.total}</p>
           </div>
         </div>
@@ -1082,7 +1082,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <Zap className="h-4 w-4 text-green-600 dark:text-green-400" />
             </div>
             {mainStats.prevMonth > 0 ? (
-              <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider border ${
+              <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md tracking-wide border ${
                 mainStats.newClients >= mainStats.prevMonth 
                   ? 'text-green-700 bg-green-50 border-green-150 dark:text-green-400 dark:bg-green-900/20 dark:border-green-900/30' 
                   : 'text-amber-700 bg-amber-50 border-amber-150 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-900/30'
@@ -1090,16 +1090,16 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                 {mainStats.newClients >= mainStats.prevMonth ? '▲ +' : '▼ '}{((mainStats.newClients / mainStats.prevMonth - 1) * 100).toFixed(0)}%
               </span>
             ) : (
-              <span className="text-[9px] font-semibold text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20 px-2 py-0.5 rounded-md uppercase tracking-wider border border-green-100 dark:border-green-900/30">
+              <span className="text-[9px] font-semibold text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20 px-2 py-0.5 rounded-md tracking-wide border border-green-100 dark:border-green-900/30">
                 {currentMonthLabel}
               </span>
             )}
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Novos Clientes</p>
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Novos Clientes</p>
             <div className="flex items-baseline gap-1.5">
               <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{mainStats.newClients}</p>
-              <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-tight shrink-0">{currentMonthLabel}</p>
+              <p className="text-[9px] font-semibold text-gray-400 tracking-tight shrink-0">{currentMonthLabel}</p>
             </div>
             <p className="text-[10px] font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5 tracking-tight">
               {prevMonthLabel}: <span className="text-gray-600 dark:text-dark-text font-semibold">{mainStats.prevMonth}</span>
@@ -1115,7 +1115,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             </div>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Valor em Aberto</p>
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Valor em Aberto</p>
             <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-450 tracking-tight">{formatCurrency(mainStats.pendingValue)}</p>
           </div>
         </div>
@@ -1142,7 +1142,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
               <Award className="h-4 w-4 text-purple-600 dark:text-purple-400" />
             </div>
-            <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider border ${
+            <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md tracking-wide border ${
               mainStats.assignmentRate > 90
                 ? 'text-green-700 bg-green-50 border-green-100 dark:text-green-400 dark:bg-green-900/20 dark:border-green-900/30'
                 : 'text-amber-700 bg-amber-50 border-amber-100 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-900/30'
@@ -1151,7 +1151,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             </span>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Taxa Atribuição</p>
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Taxa Atribuição</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{mainStats.assignmentRate.toFixed(1)}%</p>
           </div>
         </div>
@@ -1203,7 +1203,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                   setFilterDateFrom("");
                 }
               }}
-              className="w-full sm:w-[155px] pl-3 pr-8 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-semibold text-gray-600 dark:text-dark-text uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer appearance-none"
+              className="w-full sm:w-[155px] pl-3 pr-8 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-semibold text-gray-600 dark:text-dark-text tracking-wide focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer appearance-none"
             >
               <option value="all">Visão: Todos</option>
               <option value="pending">Visão: Pendentes</option>
@@ -1220,12 +1220,12 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             <select
               value={filterCollector}
               onChange={(e) => setFilterCollector(e.target.value)}
-              className="w-full sm:w-[195px] pl-3 pr-8 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-semibold text-gray-600 dark:text-dark-text uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer appearance-none"
+              className="w-full sm:w-[195px] pl-3 pr-8 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-semibold text-gray-600 dark:text-dark-text tracking-wide focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer appearance-none"
             >
               <option value="">Cobrador: Todos</option>
               {collectors.map((collector) => (
                 <option key={collector.id} value={collector.id}>
-                  Cobrador: {collector.name.toUpperCase()}
+                  Cobrador: {collector.name}
                 </option>
               ))}
             </select>
@@ -1237,7 +1237,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           {/* Botão Relatório */}
           <button
             onClick={() => setShowReport(true)}
-            className="px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all border bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-150 dark:hover:bg-dark-bg-tertiary flex items-center justify-center gap-1.5 whitespace-nowrap"
+            className="px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all border bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-150 dark:hover:bg-dark-bg-tertiary flex items-center justify-center gap-1.5 whitespace-nowrap"
             title="Relatório de atribuições"
           >
             <FileText className="h-3.5 w-3.5" />
@@ -1247,7 +1247,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           {/* Botão Avançado */}
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all border flex items-center justify-center gap-1.5 whitespace-nowrap ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all border flex items-center justify-center gap-1.5 whitespace-nowrap ${
               showFilters || hasActiveFilters
                 ? "bg-blue-600 border-blue-600 text-white shadow-sm"
                 : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
@@ -1264,6 +1264,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         values={{ paymentStatus: filterPaymentStatus, aging: filterAging }}
         onChange={handleFilterPanelChange}
         showPaymentStatus
+        excludePaymentStatus={["cancelado"]}
         showAging
       />
 
@@ -1275,6 +1276,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           onChange={handleFilterPanelChange}
           onClear={clearAllFilters}
           onClose={() => setShowFilters(false)}
+          excludePaymentStatus={["cancelado"]}
           options={{
             cities: availableCities,
             neighborhoods: availableNeighborhoods,
@@ -1290,14 +1292,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-dark-text tracking-tight">
               Lista de Clientes
             </h3>
-            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 tracking-wide">
               {filteredClients.length} registros filtrados
             </p>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={handleSelectAll}
-              className="flex-1 sm:flex-none px-3 py-2 text-[10px] font-semibold uppercase tracking-wider border border-gray-250 dark:border-dark-border dark:text-dark-text rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg/50 transition-all"
+              className="flex-1 sm:flex-none px-3 py-2 text-[10px] font-semibold tracking-wide border border-gray-250 dark:border-dark-border dark:text-dark-text rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg/50 transition-all"
             >
               {paginatedClients.every((c) => selectedClients.has(c.uniqueKey))
                 ? "Desmarcar Página"
@@ -1306,7 +1308,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             {filteredClients.length > itemsPerPage && (
               <button
                 onClick={handleSelectAllFiltered}
-                className="flex-1 sm:flex-none px-3 py-2 text-[10px] font-semibold uppercase tracking-wider bg-blue-50/70 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100/50 dark:border-blue-900/30 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all whitespace-nowrap"
+                className="flex-1 sm:flex-none px-3 py-2 text-[10px] font-semibold tracking-wide bg-blue-50/70 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100/50 dark:border-blue-900/30 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all whitespace-nowrap"
               >
                 Tudo ({filteredClients.length})
               </button>
@@ -1318,7 +1320,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             <button
               onClick={handleExportToExcel}
               title="Exportar para Excel"
-              className="flex-1 sm:flex-none px-3 py-2 text-[10px] font-semibold uppercase tracking-wider bg-green-50/70 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100/50 dark:border-green-900/30 rounded-xl hover:bg-green-100 dark:hover:bg-green-900/30 transition-all flex items-center justify-center gap-1.5"
+              className="flex-1 sm:flex-none px-3 py-2 text-[10px] font-semibold tracking-wide bg-green-50/70 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100/50 dark:border-green-900/30 rounded-xl hover:bg-green-100 dark:hover:bg-green-900/30 transition-all flex items-center justify-center gap-1.5"
             >
               <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />
               <span className="sm:hidden">Exportar</span>
@@ -1329,7 +1331,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         {/* Active Filter Chips */}
         {hasActiveFilters && (
           <div className="flex flex-wrap items-center gap-1.5 p-2 bg-gray-50/50 dark:bg-dark-bg/25 rounded-xl border border-gray-150/40 dark:border-dark-border/40">
-            <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider pl-1.5 mr-1">
+            <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide pl-1.5 mr-1">
               Filtros ativos:
             </span>
             {activeFilterChips.map((chip, index) => (
@@ -1370,12 +1372,12 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded bg-white dark:bg-dark-bg"
                     />
                   </th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">Cliente / Documento</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider text-center">Vendas</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider text-center">Parcelas</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">Status / Cobrador</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider">Localização</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary uppercase tracking-wider text-right">Valores</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide">Cliente / Documento</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-center">Vendas</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-center">Parcelas</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide">Status / Cobrador</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide">Localização</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-right">Valores</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
@@ -1411,10 +1413,10 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                             title={`Ver cobranças de ${client.cliente}`}
                             className="text-left text-sm font-semibold text-gray-900 dark:text-dark-text truncate max-w-[250px] hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
                           >
-                            {client.cliente.toUpperCase()}
+                            {client.cliente}
                           </button>
-                          <span className="text-[10px] font-medium text-gray-450 uppercase tracking-tight mt-0.5">{client.documento}</span>
-                          {client.apelido && <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">"{client.apelido.toUpperCase()}"</span>}
+                          <span className="text-[10px] font-medium text-gray-450 tracking-tight mt-0.5">{client.documento}</span>
+                          {client.apelido && <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">"{client.apelido}"</span>}
                         </div>
                       </td>
                       <td className="px-6 py-3.5 text-center">
@@ -1430,16 +1432,16 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                       <td className="px-6 py-3.5">
                         <div className="flex flex-col gap-1.5">
                           {client.collectorName ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-450 border border-green-100/50 dark:border-green-900/30 uppercase tracking-wider w-fit">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-450 border border-green-100/50 dark:border-green-900/30 tracking-wide w-fit">
                               {client.collectorName}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-450 border border-amber-100/50 dark:border-amber-900/30 uppercase tracking-wider w-fit">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-450 border border-amber-100/50 dark:border-amber-900/30 tracking-wide w-fit">
                               Sem Cobrador
                             </span>
                           )}
                           {situacao && (
-                            <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-tight w-fit ${situacao.className} border border-current/25 opacity-90`}>
+                            <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-semibold tracking-tight w-fit ${situacao.className} border border-current/25 opacity-90`}>
                               <situacao.icon className="h-3 w-3" />
                               {situacao.label}
                             </div>
@@ -1449,7 +1451,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                       <td className="px-6 py-3.5">
                         <div className="flex items-center text-[11px] font-medium text-gray-500 dark:text-dark-text-secondary">
                           <MapPin className="h-3.5 w-3.5 mr-1.5 text-gray-400 shrink-0" />
-                          <span className="truncate max-w-[180px] uppercase">
+                          <span className="truncate max-w-[180px]">
                             {client.bairro && client.cidade ? `${client.bairro}, ${client.cidade}` : client.cidade || client.bairro || "-"}
                           </span>
                         </div>
@@ -1457,7 +1459,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                       <td className="px-6 py-3.5 text-right">
                         <div className="flex flex-col">
                           <span className="text-sm font-semibold text-red-600 dark:text-red-400 tracking-tight">{formatCurrency(pendingValue)}</span>
-                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-tight">Total: {formatCurrency(totalValue)}</span>
+                          <span className="text-[10px] font-semibold text-gray-400 tracking-tight">Total: {formatCurrency(totalValue)}</span>
                         </div>
                       </td>
                     </tr>
@@ -1509,15 +1511,15 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                               e.stopPropagation();
                               onViewClient?.(client.documento || client.cliente);
                             }}
-                            className="text-left text-[13px] font-semibold text-gray-900 dark:text-dark-text truncate uppercase tracking-tight leading-tight hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
+                            className="text-left text-[13px] font-semibold text-gray-900 dark:text-dark-text truncate tracking-tight leading-tight hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
                           >
                             {client.cliente}
                           </button>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <p className="text-[9px] font-medium text-gray-455 uppercase leading-none">{client.documento}</p>
+                            <p className="text-[9px] font-medium text-gray-455 leading-none">{client.documento}</p>
                             {client.apelido && (
                               <span className="text-[9px] text-blue-600 dark:text-blue-400 font-semibold leading-none truncate max-w-[100px]">
-                                "{client.apelido.toUpperCase()}"
+                                "{client.apelido}"
                               </span>
                             )}
                           </div>
@@ -1526,7 +1528,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                           <p className="text-[13px] font-semibold text-red-650 dark:text-red-400 tracking-tight leading-tight">
                             {formatCurrency(pendingValue)}
                           </p>
-                          <p className="text-[8px] font-semibold text-gray-400 uppercase tracking-tight leading-none">
+                          <p className="text-[8px] font-semibold text-gray-400 tracking-tight leading-none">
                             T: {formatCurrency(totalValue)}
                           </p>
                         </div>
@@ -1534,11 +1536,11 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
 
                       <div className="flex flex-wrap gap-1.5 items-center">
                         {client.collectorName ? (
-                          <span className="px-2 py-0.5 rounded-md text-[8px] font-semibold bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100/55 uppercase tracking-wider">
+                          <span className="px-2 py-0.5 rounded-md text-[8px] font-semibold bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100/55 tracking-wide">
                             {client.collectorName}
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-md text-[8px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-150/55 uppercase tracking-wider">
+                          <span className="px-2 py-0.5 rounded-md text-[8px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-150/55 tracking-wide">
                             Sem Cobrador
                           </span>
                         )}
@@ -1548,7 +1550,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                             {situacao.label}
                           </div>
                         )}
-                        <div className="flex items-center gap-1 text-[9px] font-medium text-gray-400 uppercase tracking-tight ml-auto">
+                        <div className="flex items-center gap-1 text-[9px] font-medium text-gray-400 tracking-tight ml-auto">
                           <span className="bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded-md text-indigo-700 dark:text-indigo-400 font-semibold">
                             {getVendasCount(client.collections)}V
                           </span>
@@ -1559,7 +1561,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                       </div>
 
                       <div className="pt-2 border-t border-gray-50 dark:border-dark-border/40 flex items-center justify-between">
-                        <div className="flex items-center text-[9px] font-medium text-gray-400 uppercase tracking-tight">
+                        <div className="flex items-center text-[9px] font-medium text-gray-400 tracking-tight">
                           <MapPin className="h-2.5 w-2.5 mr-1 text-gray-300" />
                           <span className="truncate max-w-[180px]">{client.bairro ? `${client.bairro}, ` : ""}{client.cidade || "-"}</span>
                         </div>
@@ -1594,10 +1596,10 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         <div className="bg-white dark:bg-dark-bg-secondary mt-4 border border-gray-100 dark:border-dark-border px-4 py-3 sm:px-6 sm:py-3.5 rounded-2xl shadow-sm text-gray-700 dark:text-dark-text">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider border border-blue-100 dark:border-blue-900/30">
+              <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-lg text-[10px] font-semibold tracking-wide border border-blue-100 dark:border-blue-900/30">
                 Pág {currentPage}/{totalPages}
               </div>
-              <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider hidden sm:inline">
+              <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide hidden sm:inline">
                 Exibindo {startItem}–{endItem} de {filteredClients.length}
               </span>
             </div>
@@ -1606,7 +1608,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="flex items-center px-3 py-1.5 bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                className="flex items-center px-3 py-1.5 bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-[10px] font-semibold tracking-wide text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
                 <span className="hidden sm:inline">Início</span>
                 <span className="sm:hidden">«</span>
@@ -1615,7 +1617,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="flex items-center px-3 py-1.5 bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                className="flex items-center px-3 py-1.5 bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-[10px] font-semibold tracking-wide text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
                 <ChevronLeft className="h-3.5 w-3.5 sm:mr-1" />
                 <span className="hidden sm:inline">Anterior</span>
@@ -1648,7 +1650,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="flex items-center px-3 py-1.5 bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                className="flex items-center px-3 py-1.5 bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-[10px] font-semibold tracking-wide text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
                 <span className="hidden sm:inline">Próxima</span>
                 <ChevronRight className="h-3.5 w-3.5 sm:ml-1" />
@@ -1657,7 +1659,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <button
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="flex items-center px-3 py-1.5 bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-[10px] font-semibold uppercase tracking-wider text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                className="flex items-center px-3 py-1.5 bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-[10px] font-semibold tracking-wide text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
                 <span className="hidden sm:inline">Fim</span>
                 <span className="sm:hidden">»</span>
@@ -1674,7 +1676,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             <div className="bg-blue-600 text-white w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-black text-xs sm:text-sm">
               {selectedClients.size}
             </div>
-            <span className="text-[10px] sm:text-sm font-black text-gray-300 uppercase tracking-widest whitespace-nowrap hidden min-[400px]:inline">
+            <span className="text-[10px] sm:text-sm font-black text-gray-300 tracking-wide whitespace-nowrap hidden min-[400px]:inline">
               {selectedClients.size === 1 ? 'Selecionado' : 'Selecionados'}
             </span>
           </div>
@@ -1682,7 +1684,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => setSelectedClients(new Set())}
-              className="px-3 py-2 text-[10px] sm:text-sm font-black text-gray-400 hover:text-white transition-colors uppercase tracking-widest"
+              className="px-3 py-2 text-[10px] sm:text-sm font-black text-gray-400 hover:text-white transition-colors tracking-wide"
             >
               Limpar
             </button>
@@ -1691,7 +1693,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-lg active:scale-95"
             >
               <Zap className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
-              <span className="text-[10px] sm:text-sm font-black uppercase tracking-widest whitespace-nowrap">
+              <span className="text-[10px] sm:text-sm font-black tracking-wide whitespace-nowrap">
                 Atribuir
               </span>
             </button>
