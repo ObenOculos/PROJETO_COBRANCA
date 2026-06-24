@@ -1206,11 +1206,11 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                   setFilterCreatedFrom("");
                   setFilterCreatedTo("");
                 } else if (val === "new") {
-                  const now = new Date();
-                  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-                  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                  setFilterCreatedFrom(firstDay.toISOString().slice(0, 10));
-                  setFilterCreatedTo(lastDay.toISOString().slice(0, 10));
+                  // Mesma regra do card "Novos": createdFrom = inicio do mes e
+                  // createdTo vazio, para que currentVision detecte "new" e o
+                  // select reflita/limpe corretamente.
+                  setFilterCreatedFrom(currentMonthStartStr);
+                  setFilterCreatedTo("");
                   setFilterStatus("");
                   setFilterCollector("");
                   setFilterDateFrom("");
