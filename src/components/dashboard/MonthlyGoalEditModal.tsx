@@ -246,7 +246,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
             >
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-blue-500" />
-                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm uppercase tracking-wider">Período</span>
+                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">Período</span>
               </div>
               <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("period") ? "" : "-rotate-90"}`} />
             </button>
@@ -254,7 +254,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
             {expandedSections.has("period") && (
               <div className="px-4 pb-4 grid grid-cols-2 gap-4 border-t border-gray-100 dark:border-dark-border bg-gray-50/30 dark:bg-dark-bg/30">
                 <div className="mt-4">
-                  <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 uppercase tracking-wide">Mês</label>
+                  <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">Mês</label>
                   <select
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(Number(e.target.value))}
@@ -266,7 +266,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
                   </select>
                 </div>
                 <div className="mt-4">
-                  <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 uppercase tracking-wide">Ano</label>
+                  <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">Ano</label>
                   <select
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(Number(e.target.value))}
@@ -290,7 +290,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
             >
               <div className="flex items-center gap-2">
                 <Target className="w-4 h-4 text-green-500" />
-                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm uppercase tracking-wider">Objetivos</span>
+                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">Objetivos</span>
               </div>
               <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("goals") ? "" : "-rotate-90"}`} />
             </button>
@@ -299,7 +299,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
               <div className="px-4 pb-4 space-y-4 border-t border-gray-100 dark:border-dark-border bg-gray-50/30 dark:bg-dark-bg/30">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 uppercase tracking-wide">Meta de Visitas</label>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">Meta de Visitas</label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
@@ -312,7 +312,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 uppercase tracking-wide">Meta de Pagamentos</label>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">Meta de Pagamentos</label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
@@ -339,7 +339,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
             >
               <div className="flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-amber-500" />
-                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm uppercase tracking-wider">Sugestões e Insights</span>
+                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">Sugestões e Insights</span>
               </div>
               <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("insights") ? "" : "-rotate-90"}`} />
             </button>
@@ -348,7 +348,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
               <div className="px-4 pb-4 border-t border-gray-100 dark:border-dark-border bg-gray-50/30 dark:bg-dark-bg/30">
                 <div className="mt-4 overflow-hidden border border-gray-200 dark:border-dark-border rounded-lg">
                   <table className="w-full text-xs text-left">
-                    <thead className="bg-gray-50 dark:bg-dark-bg text-gray-500 uppercase">
+                    <thead className="bg-gray-50 dark:bg-dark-bg text-gray-500">
                       <tr>
                         <th className="px-3 py-2 font-bold">Métrica</th>
                         <th className="px-3 py-2 font-bold text-center">3 Meses</th>
@@ -408,7 +408,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
                       if (suggestVisits3) setVisitsGoal(Math.round(suggestVisits3 * 1.1));
                       if (suggestPayments3) setPaymentsGoal(Math.round(suggestPayments3 * 1.1));
                     }}
-                    className="w-full py-2 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-blue-100 transition-colors"
+                    className="w-full py-2 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-lg text-xs font-bold tracking-wide hover:bg-blue-100 transition-colors"
                   >
                     Aplicar +10% sobre média de 3 meses
                   </button>
@@ -426,7 +426,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
             >
               <div className="flex items-center gap-2">
                 <Bell className="w-4 h-4 text-gray-500" />
-                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm uppercase tracking-wider">Configurações Extras</span>
+                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">Configurações Extras</span>
               </div>
               <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("advanced") ? "" : "-rotate-90"}`} />
             </button>
@@ -460,14 +460,14 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 text-sm font-bold text-gray-500 uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-dark-bg rounded-xl transition-all"
+            className="flex-1 px-4 py-2.5 text-sm font-bold text-gray-500 tracking-wide hover:bg-gray-50 dark:hover:bg-dark-bg rounded-xl transition-all"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={isSaving}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-bold uppercase tracking-wider shadow-lg shadow-blue-200 dark:shadow-none transition-all"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-bold tracking-wide shadow-lg shadow-blue-200 dark:shadow-none transition-all"
           >
             {isSaving ? (
               <span className="animate-pulse">Salvando...</span>

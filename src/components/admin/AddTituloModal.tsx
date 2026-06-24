@@ -212,7 +212,7 @@ const AddTituloModal: React.FC<AddTituloModalProps> = ({
                         <div key={String(fieldName)}>
                           <label
                             htmlFor={String(fieldName)}
-                            className="block text-xs font-medium text-gray-700 mb-1.5 uppercase tracking-wide"
+                            className="block text-xs font-medium text-gray-700 mb-1.5 tracking-wide"
                           >
                             {field.label}
                             {fieldName === "id_parcela" && (

@@ -776,7 +776,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   <Filter className="h-4 w-4 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text uppercase tracking-wider">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text tracking-wide">
                     Visitas
                   </h3>
                   <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary mt-0.5">
@@ -856,7 +856,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
                 placeholder="Buscar por cliente, documento ou endereço..."
-                className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all uppercase"
+                className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
 
@@ -1025,7 +1025,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                         <User className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
                       </div>
                       <div className="min-w-0">
-                        <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-dark-text uppercase tracking-tight truncate">
+                        <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-dark-text tracking-tight truncate">
                           {collectorName}
                         </h3>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -1087,7 +1087,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       {visits.length === 0 ? (
                         <div className="text-center py-12 bg-gray-50 dark:bg-dark-bg rounded-2xl border border-dashed border-gray-200 dark:border-dark-border">
                           <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                          <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">
+                          <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
                             Nenhuma visita encontrada
                           </p>
                         </div>
@@ -1104,11 +1104,11 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                 <table className="w-full text-left border-collapse">
                                   <thead>
                                     <tr className="border-b border-gray-100 dark:border-dark-border">
-                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Cliente / Documento</th>
-                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Agendamento</th>
-                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Localização</th>
-                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Status / Valor</th>
-                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider text-right">Ações</th>
+                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Cliente / Documento</th>
+                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Agendamento</th>
+                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Localização</th>
+                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Status / Valor</th>
+                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">Ações</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
@@ -1118,7 +1118,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                         <tr key={visit.id} className={`group hover:bg-gray-50/50 dark:hover:bg-dark-bg/30 transition-colors ${isOverdue ? 'bg-red-50/20' : ''}`}>
                                           <td className="py-4 pr-4">
                                             <div className="flex flex-col">
-                                              <span className="text-sm font-semibold text-gray-900 dark:text-dark-text uppercase leading-tight">{visit.clientName}</span>
+                                              <span className="text-sm font-semibold text-gray-900 dark:text-dark-text leading-tight">{visit.clientName}</span>
                                               <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5">{visit.clientDocument}</span>
                                             </div>
                                           </td>
@@ -1137,7 +1137,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                           <td className="py-4 pr-4">
                                             <div className="flex items-center text-xs font-medium text-gray-600 dark:text-dark-text-secondary max-w-[200px]">
                                               <MapPin className="h-4 w-4 mr-2 text-gray-400 shrink-0" />
-                                              <span className="truncate uppercase">
+                                              <span className="truncate">
                                                 {visit.clientNeighborhood}, {visit.clientCity}
                                               </span>
                                             </div>
@@ -1198,7 +1198,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                     >
                                       <div className="flex justify-between items-start mb-4">
                                         <div className="min-w-0 pr-2">
-                                          <h4 className="text-sm font-semibold text-gray-900 dark:text-dark-text uppercase leading-tight truncate">{visit.clientName}</h4>
+                                          <h4 className="text-sm font-semibold text-gray-900 dark:text-dark-text leading-tight truncate">{visit.clientName}</h4>
                                           <p className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary mt-1">{visit.clientDocument}</p>
                                         </div>
                                         <div className="shrink-0 flex flex-col items-end gap-1.5">
@@ -1216,7 +1216,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                         </div>
                                         <div className="flex items-center text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
                                           <MapPin className="h-3.5 w-3.5 mr-2.5 text-gray-400 shrink-0" />
-                                          <span className="truncate uppercase">{visit.clientNeighborhood}, {visit.clientCity}</span>
+                                          <span className="truncate">{visit.clientNeighborhood}, {visit.clientCity}</span>
                                         </div>
                                       </div>
 
@@ -1323,10 +1323,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           <div className="h-16 w-16 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-100 dark:border-green-900/30">
             <CheckCircle className="h-8 w-8 text-green-500" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text uppercase tracking-tight mb-2">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text tracking-tight mb-2">
             Nenhuma solicitação pendente
           </h3>
-          <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">
+          <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
             Todas as solicitações de cancelamento foram processadas
           </p>
         </div>
@@ -1334,7 +1334,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text uppercase tracking-tight">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text tracking-tight">
                 Solicitações de Cancelamento
               </h3>
               <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary mt-0.5">
@@ -1348,10 +1348,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50/50 dark:bg-dark-bg border-b border-gray-100 dark:border-dark-border">
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Cliente / Cobrador</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Agendamento</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Motivo do Cancelamento</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider text-right">Ações</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Cliente / Cobrador</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Agendamento</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Motivo do Cancelamento</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
@@ -1359,13 +1359,13 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   <tr key={request.id} className="hover:bg-gray-50/50 dark:hover:bg-dark-bg transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-gray-900 dark:text-dark-text uppercase">{request.clientName}</span>
-                        <span className="text-xs font-semibold text-blue-500 uppercase tracking-tighter mt-0.5">Cobrador: {getCollectorName(request.collectorId)}</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-dark-text">{request.clientName}</span>
+                        <span className="text-xs font-semibold text-blue-500 tracking-tighter mt-0.5">Cobrador: {getCollectorName(request.collectorId)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-gray-700 dark:text-dark-text-secondary uppercase">
+                        <span className="text-xs font-semibold text-gray-700 dark:text-dark-text-secondary">
                           {formatSafeDate(request.scheduledDate)}
                         </span>
                         <span className="text-xs text-gray-400 mt-0.5">
@@ -1409,8 +1409,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 <div className="p-4 sm:p-5">
                   <div className="flex justify-between items-start mb-4">
                     <div className="min-w-0 pr-2">
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-dark-text uppercase leading-tight truncate">{request.clientName}</h4>
-                      <p className="text-xs font-medium text-blue-500 uppercase mt-1">{getCollectorName(request.collectorId)}</p>
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-dark-text leading-tight truncate">{request.clientName}</h4>
+                      <p className="text-xs font-medium text-blue-500 mt-1">{getCollectorName(request.collectorId)}</p>
                     </div>
                     <span className="shrink-0 px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] font-semibold border border-amber-200 dark:border-amber-900/50">
                       Pendente
@@ -1418,7 +1418,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   </div>
 
                   <div className="bg-gray-50 dark:bg-dark-bg p-3.5 rounded-xl mb-4 border border-gray-100 dark:border-dark-border">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Motivo do Cancelamento</p>
+                    <p className="text-[10px] font-semibold text-gray-400 tracking-wide mb-1.5">Motivo do Cancelamento</p>
                     <p className="text-xs font-medium text-gray-750 dark:text-dark-text-secondary italic leading-relaxed">"{request.cancellationRequestReason || "Não informado"}"</p>
                   </div>
 
@@ -1502,7 +1502,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
                   Acompanhamento de Visitas
                 </h2>
-                <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 uppercase tracking-wider">
+                <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 tracking-wide">
                   Gestão estratégica de rotas e cancelamentos
                 </p>
               </div>
@@ -1524,7 +1524,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           <div className="mt-6 flex items-center gap-2 overflow-x-auto pt-1 pb-3 sm:overflow-visible -mx-2 px-2 scrollbar-hide">
             <button
               onClick={() => setActiveTab("visits")}
-              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all shrink-0 ${
+              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all shrink-0 ${
                 activeTab === "visits"
                   ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
                   : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
@@ -1535,7 +1535,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             </button>
             <button
               onClick={() => setActiveTab("cancellations")}
-              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all shrink-0 relative ${
+              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all shrink-0 relative ${
                 activeTab === "cancellations"
                   ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
                   : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
@@ -1553,7 +1553,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             {user?.type === "manager" && (
               <button
                 onClick={() => setActiveTab("scheduledDates")}
-                className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all shrink-0 ${
+                className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all shrink-0 ${
                   activeTab === "scheduledDates"
                     ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
                     : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
@@ -1594,7 +1594,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               </div>
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Total Geral</p>
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Total Geral</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.totalVisits}</p>
             </div>
           </div>
@@ -1628,18 +1628,18 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 <Clock className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               </div>
               {overviewStats.atrasadas > 0 ? (
-                <span className="text-[10px] font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md uppercase tracking-wider border border-red-100 dark:border-red-900/35 flex items-center gap-1 animate-pulse">
+                <span className="text-[10px] font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md tracking-wide border border-red-100 dark:border-red-900/35 flex items-center gap-1 animate-pulse">
                   <Zap className="h-3 w-3 fill-current" />
                   {overviewStats.atrasadas} Atrasadas
                 </span>
               ) : (
-                <span className="text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-md uppercase tracking-wider border border-green-100 dark:border-green-900/35">
+                <span className="text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-md tracking-wide border border-green-100 dark:border-green-900/35">
                   Em Dia
                 </span>
               )}
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Agendadas</p>
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Agendadas</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.agendadas}</p>
             </div>
           </div>
@@ -1674,7 +1674,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               </div>
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Realizadas</p>
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Realizadas</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.realizadas}</p>
             </div>
           </div>
@@ -1704,13 +1704,13 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
               {overviewStats.pendingRequests > 0 && (
-                <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-md uppercase tracking-wider border border-amber-100 dark:border-amber-900/35">
+                <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-md tracking-wide border border-amber-100 dark:border-amber-900/35">
                   Aguardando
                 </span>
               )}
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider mb-1">Solicitações</p>
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Solicitações</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.pendingRequests}</p>
             </div>
           </div>

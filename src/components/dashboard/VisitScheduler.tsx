@@ -2629,7 +2629,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                             {/* Observations */}
                             {visit.notes && (
                               <div className="mt-5 pt-4 border-t border-gray-100">
-                                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                                <p className="text-xs font-semibold text-gray-500 mb-2">
                                   Observações
                                 </p>
                                 <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md italic whitespace-pre-line">

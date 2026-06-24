@@ -195,7 +195,7 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
         {/* Filtros */}
         <div className="flex flex-wrap items-end gap-3 p-4 border-b border-gray-200 dark:border-dark-border shrink-0">
           <div className="flex flex-col">
-            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+            <label className="text-[10px] font-black tracking-wide text-gray-400 mb-1">
               De
             </label>
             <input
@@ -207,7 +207,7 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
             />
           </div>
           <div className="flex flex-col">
-            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+            <label className="text-[10px] font-black tracking-wide text-gray-400 mb-1">
               Até
             </label>
             <input
@@ -219,7 +219,7 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
             />
           </div>
           <div className="flex flex-col min-w-[180px] flex-1">
-            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+            <label className="text-[10px] font-black tracking-wide text-gray-400 mb-1">
               Cobrador
             </label>
             <select
@@ -313,7 +313,7 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
                     <div className="border-t border-gray-100 dark:border-dark-border overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead className="bg-gray-50 dark:bg-dark-bg">
-                          <tr className="text-[10px] uppercase tracking-wider text-gray-400">
+                          <tr className="text-[10px] tracking-wide text-gray-400">
                             <th className="px-3 py-2 text-left">Cliente</th>
                             <th className="px-3 py-2 text-left">Documento</th>
                             <th className="px-3 py-2 text-left">Loja</th>

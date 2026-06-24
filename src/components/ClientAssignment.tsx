@@ -1559,7 +1559,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                           </span>
                         )}
                         {situacao && (
-                          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-semibold uppercase border border-current/25 ${situacao.className} opacity-90`}>
+                          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-semibold border border-current/25 ${situacao.className} opacity-90`}>
                             <situacao.icon className="h-2.5 w-2.5" />
                             {situacao.label}
                           </div>

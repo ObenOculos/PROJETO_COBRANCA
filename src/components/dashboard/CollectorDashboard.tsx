@@ -261,7 +261,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50/50 dark:bg-dark-bg-secondary text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+              <tr className="bg-gray-50/50 dark:bg-dark-bg-secondary text-[11px] font-bold text-gray-400 tracking-wide">
                 <th className="px-6 py-4">Cliente</th>
                 <th className="px-6 py-4">Última Interação</th>
                 <th className="px-6 py-4 text-center">Atraso</th>
@@ -290,11 +290,11 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                       </td>
                       <td className="px-6 py-4 max-w-xs" onClick={() => onOpenDetail(group)}>
                         {lastContact ? (
-                          <div className="flex flex-col gap-1"><span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold uppercase">{new Date(lastContact.date).toLocaleDateString("pt-BR")}</span><p className="text-xs text-gray-600 dark:text-dark-text-secondary line-clamp-2 italic">"{lastContact.note}"</p></div>
+                          <div className="flex flex-col gap-1"><span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">{new Date(lastContact.date).toLocaleDateString("pt-BR")}</span><p className="text-xs text-gray-600 dark:text-dark-text-secondary line-clamp-2 italic">"{lastContact.note}"</p></div>
                         ) : (<span className="text-xs text-gray-300 italic">Sem registros</span>)}
                       </td>
                       <td className="px-6 py-4 text-center" onClick={() => onOpenDetail(group)}>
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${getPriorityColor(maxAtraso)}`}>{maxAtraso} dias</span>
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${getPriorityColor(maxAtraso)}`}>{maxAtraso} dias</span>
                       </td>
                       <td className="px-6 py-4 text-right" onClick={() => onOpenDetail(group)}>
                         <div className="flex flex-col"><span className="font-bold text-red-600 dark:text-red-400">{formatCurrency(group.pendingValue)}</span><span className="text-[10px] text-gray-400">Total: {formatCurrency(group.totalValue)}</span></div>

@@ -91,7 +91,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({ client, onClose, onSu
           )}
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-400 uppercase">Resultado do Contato</label>
+            <label className="text-xs font-bold text-gray-400">Resultado do Contato</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
@@ -108,7 +108,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({ client, onClose, onSu
 
           {status === "promessa_pagamento" && (
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-400 uppercase">Data da Promessa</label>
+              <label className="text-xs font-bold text-gray-400">Data da Promessa</label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -123,7 +123,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({ client, onClose, onSu
           )}
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-400 uppercase">Observações da Conversa</label>
+            <label className="text-xs font-bold text-gray-400">Observações da Conversa</label>
             <div className="relative">
               <MessageSquare className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
               <textarea

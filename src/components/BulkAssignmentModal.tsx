@@ -187,10 +187,10 @@ const BulkAssignmentModal: React.FC<Props> = ({
                 <Zap className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h2 className="text-sm font-black text-gray-800 dark:text-dark-text uppercase tracking-widest leading-none">
+                <h2 className="text-sm font-black text-gray-800 dark:text-dark-text tracking-wide leading-none">
                   Atribuição em Massa
                 </h2>
-                <p className="text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary mt-1 uppercase tracking-widest">
+                <p className="text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary mt-1 tracking-wide">
                   {step === 3 && done ? "Processo Finalizado" : `Etapa ${step} de 3`}
                 </p>
               </div>
@@ -203,7 +203,7 @@ const BulkAssignmentModal: React.FC<Props> = ({
         {step === 1 && (
           <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
             <div>
-              <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-3">
+              <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-[0.2em] mb-3">
                 O que fazer com o cobrador?
               </p>
               <div className="grid grid-cols-1 gap-2.5">
@@ -233,7 +233,7 @@ const BulkAssignmentModal: React.FC<Props> = ({
                         {action === "remove" && <UserMinus className="w-3.5 h-3.5" />}
                         {action === "skip" && <Users className="w-3.5 h-3.5" />}
                       </div>
-                      <span className="text-xs font-black text-gray-700 dark:text-dark-text uppercase tracking-tight">
+                      <span className="text-xs font-black text-gray-700 dark:text-dark-text tracking-tight">
                         {action === "assign" ? "Atribuir a um cobrador" :
                          action === "remove" ? "Remover cobrador atual" :
                          "Não alterar atribuição"}
@@ -246,13 +246,13 @@ const BulkAssignmentModal: React.FC<Props> = ({
 
             {collectorAction === "assign" && (
               <div className="animate-in fade-in zoom-in-95 duration-200">
-                <label className="block text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-2">
+                <label className="block text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-[0.2em] mb-2">
                   Selecionar Cobrador
                 </label>
                 <select
                   value={selectedCollector}
                   onChange={(e) => setSelectedCollector(e.target.value)}
-                  className="w-full px-4 py-3 text-xs font-black border border-gray-200 dark:border-dark-border rounded-2xl bg-gray-50 dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase tracking-widest"
+                  className="w-full px-4 py-3 text-xs font-black border border-gray-200 dark:border-dark-border rounded-2xl bg-gray-50 dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-wide"
                 >
                   <option value="">SELECIONE UM COBRADOR...</option>
                   {collectors.map((c) => (
@@ -266,7 +266,7 @@ const BulkAssignmentModal: React.FC<Props> = ({
               type="button"
               onClick={() => setStep(2)}
               disabled={!canProceedStep1}
-              className="w-full flex items-center justify-center gap-2 py-3.5 bg-gray-900 dark:bg-blue-600 hover:bg-gray-800 dark:hover:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl transition-all active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 py-3.5 bg-gray-900 dark:bg-blue-600 hover:bg-gray-800 dark:hover:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed text-white text-[11px] font-black tracking-[0.2em] rounded-2xl shadow-xl transition-all active:scale-[0.98]"
             >
               Continuar <ChevronRight className="w-4 h-4" />
             </button>
@@ -277,13 +277,13 @@ const BulkAssignmentModal: React.FC<Props> = ({
         {step === 2 && (
           <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
             <div>
-              <label className="block text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em] mb-2">
+              <label className="block text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-[0.2em] mb-2">
                 Status das Parcelas
               </label>
               <select
                 value={statusAction}
                 onChange={(e) => setStatusAction(e.target.value)}
-                className="w-full px-4 py-3 text-xs font-black border border-gray-200 dark:border-dark-border rounded-2xl bg-gray-50 dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase tracking-widest"
+                className="w-full px-4 py-3 text-xs font-black border border-gray-200 dark:border-dark-border rounded-2xl bg-gray-50 dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-wide"
               >
                 {STATUS_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label.toUpperCase()}</option>
@@ -293,20 +293,20 @@ const BulkAssignmentModal: React.FC<Props> = ({
 
             {/* Resumo — Estilo Card Executivo */}
             <div className="p-4 bg-gray-50 dark:bg-dark-bg rounded-2xl border border-gray-100 dark:border-dark-border shadow-inner">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 border-b border-gray-100 dark:border-dark-border pb-2">Resumo da Operação</p>
+              <p className="text-[10px] font-black text-gray-400 tracking-[0.2em] mb-3 border-b border-gray-100 dark:border-dark-border pb-2">Resumo da Operação</p>
               <div className="space-y-2">
-                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-tight">
+                <div className="flex justify-between items-center text-[10px] font-bold tracking-tight">
                   <span className="text-gray-500">Clientes Afetados</span>
                   <span className="font-black text-gray-900 dark:text-dark-text bg-white dark:bg-dark-bg-secondary px-2 py-0.5 rounded-lg border border-gray-100 dark:border-dark-border shadow-sm">{clientsList.length}</span>
                 </div>
                 {collectorAction !== "skip" && (
-                  <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-tight">
+                  <div className="flex justify-between items-center text-[10px] font-bold tracking-tight">
                     <span className="text-gray-500">Lotes de Sincronização</span>
                     <span className="font-black text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-lg border border-blue-100 dark:border-blue-900/30">{Math.ceil(clientsList.length / 200)}</span>
                   </div>
                 )}
                 {statusAction !== "skip" && (
-                  <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-tight">
+                  <div className="flex justify-between items-center text-[10px] font-bold tracking-tight">
                     <span className="text-gray-500">Parcelas para Atualizar</span>
                     <span className="font-black text-purple-600 bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded-lg border border-purple-100 dark:border-purple-900/30">
                       {clientsList.flatMap((c) => c.collections).length}
@@ -320,14 +320,14 @@ const BulkAssignmentModal: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="flex items-center justify-center gap-1.5 px-4 py-3.5 border border-gray-200 dark:border-dark-border text-gray-500 hover:bg-gray-50 dark:hover:bg-dark-bg text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all"
+                className="flex items-center justify-center gap-1.5 px-4 py-3.5 border border-gray-200 dark:border-dark-border text-gray-500 hover:bg-gray-50 dark:hover:bg-dark-bg text-[10px] font-black tracking-wide rounded-2xl transition-all"
               >
                 <ChevronLeft className="w-4 h-4" /> Voltar
               </button>
               <button
                 type="button"
                 onClick={execute}
-                className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-green-600 hover:bg-green-700 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-green-900/10 transition-all active:scale-[0.98]"
+                className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-green-600 hover:bg-green-700 text-white text-[11px] font-black tracking-[0.2em] rounded-2xl shadow-xl shadow-green-900/10 transition-all active:scale-[0.98]"
               >
                 <Zap className="w-4 h-4 text-yellow-400" /> Confirmar Execução
               </button>
@@ -342,7 +342,7 @@ const BulkAssignmentModal: React.FC<Props> = ({
             <div className="space-y-3">
               <div className="flex justify-between items-end">
                 <div>
-                  <span className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em]">
+                  <span className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-[0.2em]">
                     Status do Processamento
                   </span>
                   <p className="text-lg font-black text-gray-900 dark:text-dark-text leading-none mt-1">
@@ -350,7 +350,7 @@ const BulkAssignmentModal: React.FC<Props> = ({
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className={`text-xs font-black px-2 py-1 rounded-lg uppercase tracking-tight ${done ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700 animate-pulse"}`}>
+                  <span className={`text-xs font-black px-2 py-1 rounded-lg tracking-tight ${done ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700 animate-pulse"}`}>
                     {done ? "OK" : `${pct}%`}
                   </span>
                 </div>
@@ -371,7 +371,7 @@ const BulkAssignmentModal: React.FC<Props> = ({
                   <div className="w-2 h-2 rounded-full bg-amber-500/50" />
                   <div className="w-2 h-2 rounded-full bg-green-500/50" />
                 </div>
-                <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest ml-2">Operação em Lote</span>
+                <span className="text-[9px] font-black text-gray-600 tracking-wide ml-2">Operação em Lote</span>
               </div>
               <div className="space-y-2">
                 {progressLog.map((entry, i) => (
@@ -401,8 +401,8 @@ const BulkAssignmentModal: React.FC<Props> = ({
                   <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
                 </div>
                 <div>
-                  <p className="text-xs font-black text-green-800 dark:text-green-400 uppercase tracking-tight">Sincronização Concluída</p>
-                  <p className="text-[10px] font-bold text-green-600/70 dark:text-green-400/70 uppercase">{clientsList.length} clientes atualizados na base de dados</p>
+                  <p className="text-xs font-black text-green-800 dark:text-green-400 tracking-tight">Sincronização Concluída</p>
+                  <p className="text-[10px] font-bold text-green-600/70 dark:text-green-400/70">{clientsList.length} clientes atualizados na base de dados</p>
                 </div>
               </div>
             )}
@@ -411,7 +411,7 @@ const BulkAssignmentModal: React.FC<Props> = ({
               type="button"
               onClick={onClose}
               disabled={!done}
-              className="w-full py-4 bg-gray-900 hover:bg-black disabled:opacity-30 disabled:cursor-not-allowed text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl active:scale-[0.98]"
+              className="w-full py-4 bg-gray-900 hover:bg-black disabled:opacity-30 disabled:cursor-not-allowed text-white text-[11px] font-black tracking-[0.2em] rounded-2xl transition-all shadow-xl active:scale-[0.98]"
             >
               Fechar Janela
             </button>

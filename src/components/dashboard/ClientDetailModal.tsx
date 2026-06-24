@@ -965,7 +965,7 @@ const handleEditPaymentClick = () => {
                                               #{installment.id_parcela}
                                             </span>
                                             {isCancelado(installment.status) && (
-                                              <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">
+                                              <span className="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">
                                                 Cancelado
                                               </span>
                                             )}

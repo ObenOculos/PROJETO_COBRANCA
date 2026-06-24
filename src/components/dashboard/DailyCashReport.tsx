@@ -820,7 +820,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
             {/* Quick Date Range Buttons */}
             <div>
-              <label className="block text-xs font-black uppercase text-gray-400 tracking-wider mb-2">
+              <label className="block text-xs font-black text-gray-400 tracking-wider mb-2">
                 Ações Rápidas
               </label>
               <div className="flex flex-wrap gap-2">
@@ -983,7 +983,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               <div className="p-2 bg-white/20 rounded-lg backdrop-blur-md">
                 <TrendingUp className="h-4 w-4 text-emerald-100" />
               </div>
-              <p className="text-emerald-100 text-sm font-black uppercase tracking-widest">Arrecadação Total</p>
+              <p className="text-emerald-100 text-sm font-black tracking-wide">Arrecadação Total</p>
             </div>
             <p className="text-5xl font-black mt-1 tracking-tight">
               {formatCurrency(reportData.totalReceived)}
@@ -1004,7 +1004,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 <div className="p-1.5 bg-emerald-400/30 rounded-lg">
                   <Receipt className="h-4 w-4 text-white" />
                 </div>
-                <p className="text-emerald-50) text-[10px] font-black uppercase tracking-wider">Vendas</p>
+                <p className="text-emerald-50) text-[10px] font-black tracking-wide">Vendas</p>
               </div>
               <p className="text-2xl font-black">{reportData.totalTransactions}</p>
             </div>
@@ -1014,7 +1014,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 <div className="p-1.5 bg-teal-400/30 rounded-lg">
                   <User className="h-4 w-4 text-white" />
                 </div>
-                <p className="text-emerald-50) text-[10px] font-black uppercase tracking-wider">Cobradores</p>
+                <p className="text-emerald-50) text-[10px] font-black tracking-wide">Cobradores</p>
               </div>
               <p className="text-2xl font-black">{reportData.collectorSummary.length}</p>
             </div>
@@ -1065,7 +1065,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                             </h4>
                             {index === 0 && <Award className="h-4 w-4 text-amber-500 fill-amber-500" />}
                           </div>
-                          <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                          <p className="text-[10px] font-black text-gray-400 tracking-wider">
                             {collector.transactionCount} Transações
                           </p>
                         </div>
@@ -1090,7 +1090,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
-                      <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                      <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 tracking-tighter">
                         <span>Ticket: {formatCurrency(collector.transactionCount > 0 ? collector.receivedAmount / collector.transactionCount : 0)}</span>
                         <span>{collector.clients.length} Clientes</span>
                       </div>
@@ -1098,7 +1098,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
                     {collector.saleNumbers.length > 0 && showDetails && (
                       <div className="mt-4 pt-4 border-t border-dashed border-gray-100">
-                        <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider mb-2 flex items-center gap-1">
+                        <p className="text-[10px] font-black text-gray-400 tracking-wider mb-2 flex items-center gap-1">
                           <Receipt className="h-3 w-3" /> Vendas Realizadas
                         </p>
                         <div className="flex flex-wrap gap-1">
@@ -1135,28 +1135,28 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               <table className="w-full table-auto border-collapse">
                 <thead className="bg-gray-50/50 border-b border-gray-100">
                   <tr>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[200px]">
+                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 tracking-wide min-w-[200px]">
                       Cliente / Venda
                     </th>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest hidden 2xl:table-cell">
+                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 tracking-wide hidden 2xl:table-cell">
                       Loja
                     </th>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest hidden xl:table-cell">
+                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 tracking-wide hidden xl:table-cell">
                       Forma
                     </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 tracking-wide">
                       Recebido
                     </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest hidden xl:table-cell">
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 tracking-wide hidden xl:table-cell">
                       Pago (Acum.)
                     </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 tracking-wide hidden md:table-cell">
                       Desconto
                     </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 tracking-wide hidden lg:table-cell">
                       Total Dívida
                     </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 tracking-wide">
                       Pendente
                     </th>
                   </tr>
@@ -1186,7 +1186,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                               {payment.client}
                             </button>
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded tracking-tighter">
                                 {payment.saleNumber ? `Venda #${payment.saleNumber}` : "Sem número"}
                               </span>
                               <span className="text-[10px] font-medium text-gray-400 font-mono hidden sm:inline">
@@ -1199,7 +1199,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                           <p className="text-xs font-semibold text-gray-500 truncate max-w-[120px]">{payment.store}</p>
                         </td>
                         <td className="px-4 py-4 hidden xl:table-cell">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border tracking-tighter ${methodColor}`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black border tracking-tighter ${methodColor}`}>
                             {payment.paymentMethod?.split(" ")[0]}
                           </span>
                         </td>

@@ -46,14 +46,14 @@ const Pagination: React.FC<{ page: number; total: number; perPage: number; onCha
   if (totalPages <= 1) return null;
   return (
     <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 dark:border-dark-border">
-      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+      <span className="text-[10px] font-bold text-gray-400 tracking-wide">
         {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} de {total}
       </span>
       <div className="flex items-center gap-1">
         <button
           onClick={() => onChange(page - 1)}
           disabled={page === 1}
-          className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg border border-gray-100 dark:border-dark-border disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-dark-bg transition-all"
+          className="px-3 py-1.5 text-[10px] font-bold tracking-wide rounded-lg border border-gray-100 dark:border-dark-border disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-dark-bg transition-all"
         >
           ←
         </button>
@@ -84,7 +84,7 @@ const Pagination: React.FC<{ page: number; total: number; perPage: number; onCha
         <button
           onClick={() => onChange(page + 1)}
           disabled={page === totalPages}
-          className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg border border-gray-100 dark:border-dark-border disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-dark-bg transition-all"
+          className="px-3 py-1.5 text-[10px] font-bold tracking-wide rounded-lg border border-gray-100 dark:border-dark-border disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-dark-bg transition-all"
         >
           →
         </button>
@@ -539,7 +539,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                   setHistoryPage(1);
                   setPendingPage(1);
                 }}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all border-b-2 ${
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-bold tracking-wide transition-all border-b-2 ${
                   isActive
                     ? "border-blue-600 text-blue-600"
                     : "border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-dark-text"
@@ -560,33 +560,33 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                 {/* Score Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="p-5 border border-green-100 dark:border-green-900/30 rounded-2xl bg-green-50/50 dark:bg-green-900/10">
-                    <label className="block text-[10px] font-bold text-green-700 dark:text-green-400 uppercase tracking-widest mb-1">Total Recebido</label>
+                    <label className="block text-[10px] font-bold text-green-700 dark:text-green-400 tracking-wide mb-1">Total Recebido</label>
                     <p className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(collector.receivedAmount)}</p>
                   </div>
                   <div className="p-5 border border-amber-100 dark:border-amber-900/30 rounded-2xl bg-amber-50/50 dark:bg-amber-900/10">
-                    <label className="block text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest mb-1">Total a Receber</label>
+                    <label className="block text-[10px] font-bold text-amber-700 dark:text-amber-400 tracking-wide mb-1">Total a Receber</label>
                     <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">{formatCurrency(collector.pendingAmount)}</p>
                   </div>
                 </div>
 
                 {summaryStats && (
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] border-b border-gray-100 dark:border-dark-border pb-2">Estatísticas do Período</h4>
+                    <h4 className="text-[10px] font-bold text-gray-400 tracking-[0.15em] border-b border-gray-100 dark:border-dark-border pb-2">Estatísticas do Período</h4>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Visitas</p>
+                        <p className="text-[10px] font-bold text-gray-400 mb-1">Visitas</p>
                         <p className="text-lg font-bold text-blue-600">{summaryStats.avgVisitsPerformance.toFixed(1)}%</p>
                       </div>
                       <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Pagos</p>
+                        <p className="text-[10px] font-bold text-gray-400 mb-1">Pagos</p>
                         <p className="text-lg font-bold text-green-600">{summaryStats.avgPaymentsPerformance.toFixed(1)}%</p>
                       </div>
                       <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Sucesso</p>
+                        <p className="text-[10px] font-bold text-gray-400 mb-1">Sucesso</p>
                         <p className="text-lg font-bold text-purple-600">{summaryStats.achievementRate.toFixed(1)}%</p>
                       </div>
                       <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Metas</p>
+                        <p className="text-[10px] font-bold text-gray-400 mb-1">Metas</p>
                         <p className="text-lg font-bold text-gray-700 dark:text-dark-text">{summaryStats.achievedMonths}/{summaryStats.totalMonths}</p>
                       </div>
                     </div>
@@ -604,7 +604,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                     <select
                       value={selectedYear || ""}
                       onChange={(e) => setSelectedYear(e.target.value ? Number(e.target.value) : null)}
-                      className="text-xs font-bold uppercase tracking-wider bg-transparent border-none focus:ring-0 p-0 pr-6"
+                      className="text-xs font-bold tracking-wide bg-transparent border-none focus:ring-0 p-0 pr-6"
                     >
                       <option value="">Anos</option>
                       {availableYears.map((year) => <option key={year} value={year}>{year}</option>)}
@@ -614,7 +614,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                   <div className="flex items-center gap-4">
                     <button
                       onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
-                      className="text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-blue-600 flex items-center gap-1"
+                      className="text-[10px] font-bold text-gray-500 tracking-wide hover:text-blue-600 flex items-center gap-1"
                     >
                       <Filter className="w-3 h-3" />
                       {sortOrder === "desc" ? "Recentes" : "Antigos"}
@@ -641,14 +641,14 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                     {filteredHistory.slice((historyPage - 1) * HISTORY_PER_PAGE, historyPage * HISTORY_PER_PAGE).map((history, index) => (
                       <div key={index} className="p-4 border border-gray-100 dark:border-dark-border rounded-2xl bg-white dark:bg-dark-bg shadow-sm">
                         <div className="flex justify-between items-center mb-4">
-                          <p className="text-xs font-bold text-gray-800 dark:text-dark-text uppercase tracking-widest">{history.month}</p>
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-tight ${getPerformanceColor(history.overallPerformance)}`}>
+                          <p className="text-xs font-bold text-gray-800 dark:text-dark-text tracking-wide">{history.month}</p>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold tracking-tight ${getPerformanceColor(history.overallPerformance)}`}>
                             {history.overallPerformance.toFixed(1)}% Geral
                           </span>
                         </div>
                         <div className="space-y-4">
                           <div>
-                            <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider mb-1.5">
+                            <div className="flex justify-between text-[10px] font-bold tracking-wide mb-1.5">
                               <span className="text-gray-400">Visitas</span>
                               <span className="text-gray-800 dark:text-dark-text">{history.visitsActual} / {history.visitsGoal}</span>
                             </div>
@@ -657,7 +657,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                             </div>
                           </div>
                           <div>
-                            <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider mb-1.5">
+                            <div className="flex justify-between text-[10px] font-bold tracking-wide mb-1.5">
                               <span className="text-gray-400">Pagamentos</span>
                               <span className="text-gray-800 dark:text-dark-text">{formatCurrency(history.paymentsActual, false)} / {formatCurrency(history.paymentsGoal, false)}</span>
                             </div>
@@ -673,7 +673,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                   <div className="p-5 border border-gray-100 dark:border-dark-border rounded-2xl bg-white dark:bg-dark-bg shadow-sm overflow-hidden">
                     <div className="grid grid-cols-2 gap-8">
                       <div className="space-y-3">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-4 text-center">Visitas (%)</label>
+                        <label className="block text-[10px] font-bold text-gray-400 mb-4 text-center">Visitas (%)</label>
                         {filteredHistory.slice((historyPage - 1) * HISTORY_PER_PAGE, historyPage * HISTORY_PER_PAGE).map((h, i) => (
                           <div key={i} className="flex items-center gap-2">
                             <span className="text-[9px] font-bold text-gray-400 w-12 truncate">{h.monthShort}</span>
@@ -684,7 +684,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                         ))}
                       </div>
                       <div className="space-y-3">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-4 text-center">Pagamentos (%)</label>
+                        <label className="block text-[10px] font-bold text-gray-400 mb-4 text-center">Pagamentos (%)</label>
                         {filteredHistory.slice((historyPage - 1) * HISTORY_PER_PAGE, historyPage * HISTORY_PER_PAGE).map((h, i) => (
                           <div key={i} className="flex items-center gap-2">
                             <span className="text-[9px] font-bold text-gray-400 w-12 truncate">{h.monthShort}</span>
@@ -713,7 +713,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
               <div className="space-y-6 pb-4">
                 {pendingClients.length > 0 ? (
                   <div className="p-1">
-                    <h4 className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-[0.15em] mb-4 flex items-center gap-2">
+                    <h4 className="text-[10px] font-bold text-amber-600 dark:text-amber-400 tracking-[0.15em] mb-4 flex items-center gap-2">
                       <AlertCircle className="w-3 h-3" />
                       Concentração de Pendências
                     </h4>
@@ -721,8 +721,8 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                       <table className="w-full text-left">
                         <thead className="bg-gray-50 dark:bg-dark-bg/50">
                           <tr>
-                            <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Cliente</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Valor</th>
+                            <th className="px-4 py-3 text-[10px] font-bold text-gray-400 tracking-wide">Cliente</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 tracking-wide">Valor</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
@@ -752,7 +752,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                 ) : (
                   <div className="flex flex-col items-center justify-center p-12 text-center bg-gray-50 dark:bg-dark-bg/30 rounded-3xl border-2 border-dashed border-gray-100 dark:border-dark-border">
                     <Info className="w-10 h-10 text-gray-200 mb-4" />
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Tudo em dia</h3>
+                    <h3 className="text-xs font-bold text-gray-400 tracking-wide">Tudo em dia</h3>
                     <p className="text-[10px] text-gray-400 mt-2">Nenhuma pendência financeira encontrada para este cobrador no período.</p>
                   </div>
                 )}
@@ -765,7 +765,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                   <div className="p-4 border border-blue-100 dark:border-blue-900/30 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10">
                     <div className="flex items-center gap-1.5 mb-1">
                       <Users className="w-3.5 h-3.5 text-blue-500" />
-                      <label className="text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Carteira Atual</label>
+                      <label className="text-[9px] font-bold text-blue-600 dark:text-blue-400 tracking-wide">Carteira Atual</label>
                     </div>
                     <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{currentPortfolio}</p>
                     <p className="text-[9px] text-blue-400 mt-0.5">clientes únicos</p>
@@ -773,7 +773,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                   <div className="p-4 border border-green-100 dark:border-green-900/30 rounded-2xl bg-green-50/50 dark:bg-green-900/10">
                     <div className="flex items-center gap-1.5 mb-1">
                       <UserPlus className="w-3.5 h-3.5 text-green-500" />
-                      <label className="text-[9px] font-bold text-green-600 dark:text-green-400 uppercase tracking-widest">Entraram na Carteira</label>
+                      <label className="text-[9px] font-bold text-green-600 dark:text-green-400 tracking-wide">Entraram na Carteira</label>
                     </div>
                     <p className="text-3xl font-bold text-green-600 dark:text-green-400">{lastMonthCount}</p>
                     <p className="text-[9px] text-green-400 mt-0.5 capitalize">{lastMonthLabel}</p>
@@ -781,7 +781,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                   <div className="p-4 border border-cyan-100 dark:border-cyan-900/30 rounded-2xl bg-cyan-50/50 dark:bg-cyan-900/10">
                     <div className="flex items-center gap-1.5 mb-1">
                       <Sparkles className="w-3.5 h-3.5 text-cyan-500" />
-                      <label className="text-[9px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-widest">Novos no Sistema</label>
+                      <label className="text-[9px] font-bold text-cyan-600 dark:text-cyan-400 tracking-wide">Novos no Sistema</label>
                     </div>
                     <p className="text-3xl font-bold text-cyan-600 dark:text-cyan-400">{newInSystemLastMonth}</p>
                     <p className="text-[9px] text-cyan-400 mt-0.5 capitalize">{lastMonthLabel}</p>
@@ -789,7 +789,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                   <div className="p-4 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl bg-emerald-50/50 dark:bg-emerald-900/10">
                     <div className="flex items-center gap-1.5 mb-1">
                       <UserPlus className="w-3.5 h-3.5 text-emerald-500" />
-                      <label className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Total Entradas</label>
+                      <label className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 tracking-wide">Total Entradas</label>
                     </div>
                     <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{carteiraTotals.totalAdditions}</p>
                     <p className="text-[9px] text-emerald-400 mt-0.5">desde o início</p>
@@ -797,7 +797,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                   <div className="p-4 border border-rose-100 dark:border-rose-900/30 rounded-2xl bg-rose-50/50 dark:bg-rose-900/10">
                     <div className="flex items-center gap-1.5 mb-1">
                       <Users className="w-3.5 h-3.5 text-rose-400" />
-                      <label className="text-[9px] font-bold text-rose-500 dark:text-rose-400 uppercase tracking-widest">Total Saídas</label>
+                      <label className="text-[9px] font-bold text-rose-500 dark:text-rose-400 tracking-wide">Total Saídas</label>
                     </div>
                     <p className="text-3xl font-bold text-rose-500 dark:text-rose-400">{carteiraTotals.totalRemovals}</p>
                     <p className="text-[9px] text-rose-300 mt-0.5">desde o início</p>
@@ -809,13 +809,13 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                   <div>
                     {/* Filtro de ano */}
                     <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em]">
+                      <h4 className="text-[10px] font-bold text-gray-400 tracking-[0.15em]">
                         Evolução da carteira por mês
                       </h4>
                       <div className="flex items-center gap-1 bg-gray-100 dark:bg-dark-bg rounded-xl p-0.5">
                         <button
                           onClick={() => setCarteiraYear("all")}
-                          className={`text-[9px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg transition-all ${carteiraYear === "all" ? "bg-white dark:bg-dark-bg-secondary text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+                          className={`text-[9px] font-bold tracking-wide px-3 py-1.5 rounded-lg transition-all ${carteiraYear === "all" ? "bg-white dark:bg-dark-bg-secondary text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
                         >
                           Todos
                         </button>
@@ -823,7 +823,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                           <button
                             key={y}
                             onClick={() => setCarteiraYear(y)}
-                            className={`text-[9px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg transition-all ${carteiraYear === y ? "bg-white dark:bg-dark-bg-secondary text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+                            className={`text-[9px] font-bold tracking-wide px-3 py-1.5 rounded-lg transition-all ${carteiraYear === y ? "bg-white dark:bg-dark-bg-secondary text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
                           >
                             {y}
                           </button>
@@ -835,13 +835,13 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                       <table className="w-full text-left">
                         <thead className="bg-gray-50 dark:bg-dark-bg/50">
                           <tr>
-                            <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Mês</th>
-                            <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Evolução</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Clientes</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-bold text-purple-500 uppercase tracking-widest">Títulos</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-bold text-green-500 uppercase tracking-widest">+Entradas</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-bold text-rose-400 uppercase tracking-widest">−Saídas</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Líquido</th>
+                            <th className="px-4 py-3 text-[10px] font-bold text-gray-400 tracking-wide">Mês</th>
+                            <th className="px-4 py-3 text-[10px] font-bold text-gray-400 tracking-wide">Evolução</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-500 tracking-wide">Clientes</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-purple-500 tracking-wide">Títulos</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-green-500 tracking-wide">+Entradas</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-rose-400 tracking-wide">−Saídas</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 tracking-wide">Líquido</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
@@ -884,7 +884,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                 ) : (
                   <div className="flex flex-col items-center justify-center p-12 text-center bg-gray-50 dark:bg-dark-bg/30 rounded-3xl border-2 border-dashed border-gray-100 dark:border-dark-border">
                     <Users className="w-10 h-10 text-gray-200 mb-4" />
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Sem histórico</h3>
+                    <h3 className="text-xs font-bold text-gray-400 tracking-wide">Sem histórico</h3>
                     <p className="text-[10px] text-gray-400 mt-2">Nenhuma atribuição registrada para este cobrador ainda.</p>
                   </div>
                 )}

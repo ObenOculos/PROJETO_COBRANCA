@@ -295,14 +295,14 @@ const EnhancedPerformanceChart: React.FC = () => {
               <BarChart3 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               Ranking de Performance
             </h2>
-            <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 uppercase tracking-wider">
+            <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 tracking-wide">
               Análise detalhada por cobrador e período
             </p>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all border ${
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold tracking-wide transition-all border ${
                 showFilters || hasActiveFilters
                   ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/10"
                   : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
@@ -327,7 +327,7 @@ const EnhancedPerformanceChart: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {/* Month Select */}
               <div className="space-y-3">
-                <label className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em]">Meses</label>
+                <label className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-[0.2em]">Meses</label>
                 <div className="grid grid-cols-4 gap-1.5">
                   {monthsDisplay.map((month, idx) => (
                     <button
@@ -335,7 +335,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                       onClick={() => startTransition(() => {
                         setSelectedMonths(prev => prev.includes(idx) ? prev.filter(m => m !== idx) : [...prev, idx]);
                       })}
-                      className={`py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                      className={`py-1.5 rounded-lg text-[10px] font-bold transition-all ${
                         selectedMonths.includes(idx)
                           ? "bg-blue-600 text-white shadow-sm"
                           : "bg-white dark:bg-dark-bg-secondary text-gray-500 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:border-blue-400"
@@ -349,7 +349,7 @@ const EnhancedPerformanceChart: React.FC = () => {
 
               {/* Year Select */}
               <div className="space-y-3">
-                <label className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em]">Anos</label>
+                <label className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-[0.2em]">Anos</label>
                 <div className="flex flex-wrap gap-2">
                   {years.map(year => (
                     <button
@@ -371,7 +371,7 @@ const EnhancedPerformanceChart: React.FC = () => {
 
               {/* Sorting */}
               <div className="space-y-3">
-                <label className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-[0.2em]">Ordenação</label>
+                <label className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-[0.2em]">Ordenação</label>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
@@ -388,13 +388,13 @@ const EnhancedPerformanceChart: React.FC = () => {
             <div className="mt-6 pt-6 border-t border-gray-100 dark:border-dark-border flex justify-end gap-3">
               <button
                 onClick={() => startTransition(() => { setSelectedMonths([]); setSelectedYears([]); setShowFilters(false); })}
-                className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 dark:hover:text-dark-text"
+                className="px-4 py-2 text-xs font-bold text-gray-400 tracking-wide hover:text-gray-600 dark:hover:text-dark-text"
               >
                 Limpar Todos
               </button>
               <button
                 onClick={() => setShowFilters(false)}
-                className="px-6 py-2 bg-blue-600 text-white text-xs font-bold uppercase tracking-widest rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/10 transition-all"
+                className="px-6 py-2 bg-blue-600 text-white text-xs font-bold tracking-wide rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/10 transition-all"
               >
                 Aplicar Filtros
               </button>
@@ -414,8 +414,8 @@ const EnhancedPerformanceChart: React.FC = () => {
               <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-800 dark:text-dark-text uppercase tracking-wider">Visitas do Período</h3>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase mt-0.5">Visão consolidada da equipe</p>
+              <h3 className="text-sm font-bold text-gray-800 dark:text-dark-text tracking-wide">Visitas do Período</h3>
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary mt-0.5">Visão consolidada da equipe</p>
             </div>
           </div>
           {teamStats.totalVisitsGoal > 0 && (
@@ -423,7 +423,7 @@ const EnhancedPerformanceChart: React.FC = () => {
               <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
                 {((teamStats.totalVisitsActual / teamStats.totalVisitsGoal) * 100).toFixed(0)}%
               </span>
-              <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-tighter">da Meta</span>
+              <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-tighter">da Meta</span>
             </div>
           )}
         </div>
@@ -432,28 +432,28 @@ const EnhancedPerformanceChart: React.FC = () => {
           <div className="p-4 bg-gray-50/40 dark:bg-dark-bg/25 rounded-2xl border border-gray-100/50 dark:border-dark-border/40 transition-colors">
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Realizadas</label>
+              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Realizadas</label>
             </div>
             <p className="text-xl font-bold text-gray-800 dark:text-dark-text">{teamStats.totalVisitsActual}</p>
           </div>
           <div className="p-4 bg-gray-50/40 dark:bg-dark-bg/25 rounded-2xl border border-gray-100/50 dark:border-dark-border/40 transition-colors">
             <div className="flex items-center gap-2 mb-2">
               <Search className="w-3.5 h-3.5 text-amber-500" />
-              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Não Loc.</label>
+              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Não Loc.</label>
             </div>
             <p className="text-xl font-bold text-gray-800 dark:text-dark-text">{teamStats.totalVisitsNaoEncontrado}</p>
           </div>
           <div className="p-4 bg-gray-50/40 dark:bg-dark-bg/25 rounded-2xl border border-gray-100/50 dark:border-dark-border/40 transition-colors">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="w-3.5 h-3.5 text-blue-500" />
-              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Agendadas</label>
+              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Agendadas</label>
             </div>
             <p className="text-xl font-bold text-gray-800 dark:text-dark-text">{teamStats.totalPendingVisits}</p>
           </div>
           <div className="p-4 bg-gray-50/40 dark:bg-dark-bg/25 rounded-2xl border border-gray-100/50 dark:border-dark-border/40 transition-colors">
             <div className="flex items-center gap-2 mb-2">
               <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
-              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">Atrasadas</label>
+              <label className="text-[9px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Atrasadas</label>
             </div>
             <p className="text-xl font-bold text-gray-800 dark:text-dark-text">{teamStats.totalVisitsAtrasadas}</p>
           </div>
@@ -538,7 +538,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                     </div>
 
                     <div className="min-w-0">
-                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-dark-text truncate leading-tight uppercase group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-dark-text truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         {collector.collectorName}
                       </h4>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary">
@@ -560,7 +560,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                     <div className={`text-base sm:text-lg font-bold tracking-tight leading-none mb-0.5 ${scoreDisplay.color}`}>
                       {scoreDisplay.value}
                     </div>
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-gray-400 dark:text-dark-text-secondary block">
+                    <span className="text-[9px] font-semibold tracking-wide text-gray-400 dark:text-dark-text-secondary block">
                       {scoreDisplay.label}
                     </span>
                   </div>
@@ -572,7 +572,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 mb-5">
                   {/* Volume Financeiro */}
                   <div>
-                    <span className="text-[10px] font-semibold uppercase text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-2">Volume Financeiro</span>
+                    <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-2">Volume Financeiro</span>
                     <div className="space-y-1.5">
                       {sortBy !== "receivedAmount" && (
                         <div className="flex justify-between items-center text-xs">
@@ -594,22 +594,22 @@ const EnhancedPerformanceChart: React.FC = () => {
                   {/* Visitas no Período */}
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-semibold uppercase text-gray-400 dark:text-dark-text-secondary tracking-wider">Visitas</span>
+                      <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wider">Visitas</span>
                       {collector.currentMonthVisitsGoal > 0 && (
                         <span className="text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary">Meta: {collector.currentMonthVisitsGoal}</span>
                       )}
                     </div>
                     <div className="grid grid-cols-3 gap-1 mb-2 text-center">
                       <div className="text-left">
-                        <span className="text-[9px] font-bold text-blue-500 uppercase block leading-none">Feitas</span>
+                        <span className="text-[9px] font-bold text-blue-500 block leading-none">Feitas</span>
                         <span className="text-xs font-bold text-gray-800 dark:text-dark-text">{collector.visitsRealizadas}</span>
                       </div>
                       <div>
-                        <span className="text-[9px] font-bold text-amber-500 uppercase block leading-none">Agend.</span>
+                        <span className="text-[9px] font-bold text-amber-500 block leading-none">Agend.</span>
                         <span className={`text-xs font-bold ${collector.visitsAgendadas > 0 ? "text-amber-500" : "text-gray-300 dark:text-gray-700"}`}>{collector.visitsAgendadas}</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-[9px] font-bold text-rose-500 uppercase block leading-none">Atras.</span>
+                        <span className="text-[9px] font-bold text-rose-500 block leading-none">Atras.</span>
                         <span className={`text-xs font-bold ${collector.visitsAtrasadas > 0 ? "text-rose-500" : "text-gray-300 dark:text-gray-700"}`}>{collector.visitsAtrasadas}</span>
                       </div>
                     </div>
@@ -629,7 +629,7 @@ const EnhancedPerformanceChart: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 mt-2">
                 <button
                   onClick={() => { setSelectedCollector(collector); setIsModalOpen(true); }}
-                  className="flex items-center justify-center gap-2 py-2.5 bg-gray-950 hover:bg-gray-800 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-xl text-xs font-semibold uppercase tracking-wider transition-all shadow-sm active:scale-95 group/btn"
+                  className="flex items-center justify-center gap-2 py-2.5 bg-gray-950 hover:bg-gray-800 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-xl text-xs font-semibold tracking-wide transition-all shadow-sm active:scale-95 group/btn"
                 >
                   <Eye className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" />
                   Detalhes
@@ -639,7 +639,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                     const user = users.find(u => u.id === collector.collectorId);
                     if (user) { setSelectedCollectorForGoals(user); setIsGoalModalOpen(true); }
                   }}
-                  className="flex items-center justify-center gap-2 py-2.5 bg-white hover:bg-gray-50 dark:bg-dark-bg text-gray-755 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 group/btn"
+                  className="flex items-center justify-center gap-2 py-2.5 bg-white hover:bg-gray-50 dark:bg-dark-bg text-gray-755 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-xl text-xs font-semibold tracking-wide transition-all active:scale-95 group/btn"
                 >
                   <Target className="w-3.5 h-3.5 text-blue-500 group-hover/btn:scale-110 transition-transform" />
                   Metas
@@ -656,7 +656,7 @@ const EnhancedPerformanceChart: React.FC = () => {
           <div className="p-6 bg-gray-50 dark:bg-dark-bg rounded-full mb-4">
             <Users className="w-12 h-12 text-gray-300" />
           </div>
-          <h3 className="text-lg font-bold text-gray-800 dark:text-dark-text uppercase tracking-tight">Nenhum cobrador encontrado</h3>
+          <h3 className="text-lg font-bold text-gray-800 dark:text-dark-text tracking-tight">Nenhum cobrador encontrado</h3>
           <p className="text-sm text-gray-500 dark:text-dark-text-secondary mt-2 max-w-xs">Ajuste os filtros de período acima para visualizar o ranking de desempenho.</p>
         </div>
       )}
