@@ -10,6 +10,7 @@ import {
   agingToDueRange,
   dueToAging,
   agingLabel,
+  periodLabel,
 } from "../../filters/filterConfig";
 
 import { FilterOptions, UserType } from "../../types";
@@ -142,6 +143,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
     city: filters.city,
     neighborhood: filters.neighborhood,
     visitsOnly: filters.visitsOnly,
+    months: filters.months,
+    years: filters.years,
     // O pill de atraso e derivado do campo de vencimento (fonte unica).
     aging: dueToAging(filters.dateFrom, filters.dateTo),
   };
@@ -162,6 +165,12 @@ const FilterBar: React.FC<FilterBarProps> = ({
     if ("neighborhood" in patch)
       next.neighborhood = patch.neighborhood || undefined;
     if ("visitsOnly" in patch) next.visitsOnly = patch.visitsOnly || undefined;
+    // Periodo: arrays vazios viram undefined (= sem filtro), para nao contarem
+    // como filtro ativo.
+    if ("months" in patch)
+      next.months = patch.months && patch.months.length ? patch.months : undefined;
+    if ("years" in patch)
+      next.years = patch.years && patch.years.length ? patch.years : undefined;
     // Pill de atraso escreve no proprio campo de vencimento (de/ate): cada faixa
     // vira um intervalo de datas; desmarcar limpa ambos.
     if ("aging" in patch) {
@@ -225,6 +234,12 @@ const FilterBar: React.FC<FilterBarProps> = ({
     activeFilterChips.push({
       label: "Apenas com visitas",
       onClear: () => onFilterChange({ ...filters, visitsOnly: undefined }),
+    });
+  if (filters.months?.length || filters.years?.length)
+    activeFilterChips.push({
+      label: `Período: ${periodLabel(filters.months, filters.years)}`,
+      onClear: () =>
+        onFilterChange({ ...filters, months: undefined, years: undefined }),
     });
   const derivedAging = dueToAging(filters.dateFrom, filters.dateTo);
   if (derivedAging) {

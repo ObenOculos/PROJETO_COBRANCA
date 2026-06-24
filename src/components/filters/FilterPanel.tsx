@@ -8,6 +8,7 @@ import {
   Users,
   DollarSign,
   Calendar,
+  CalendarRange,
 } from "lucide-react";
 import {
   FilterContext,
@@ -16,6 +17,8 @@ import {
   SITUACAO_OPTIONS,
   PAYMENT_STATUS_OPTIONS,
   SelectOption,
+  MONTHS_SHORT,
+  periodYears,
 } from "../../filters/filterConfig";
 
 interface FilterPanelOptions {
@@ -106,6 +109,14 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
       ))}
     </select>
   );
+
+  const toggleInArray = (field: "months" | "years", value: number) => {
+    const cur = (values[field] as number[] | undefined) ?? [];
+    const next = cur.includes(value)
+      ? cur.filter((v) => v !== value)
+      : [...cur, value];
+    onChange({ [field]: next } as Partial<FilterValues>);
+  };
 
   const toOptions = (list: string[]): SelectOption[] =>
     list.map((v) => ({ value: v, label: v }));
@@ -293,6 +304,59 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
               />
             </div>
           </Field>
+        )}
+
+        {fields.period && (
+          <div className="col-span-full space-y-2">
+            <label className={labelClass}>
+              <CalendarRange className="h-3 w-3 mr-1.5" />
+              Período
+            </label>
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex-1">
+                <span className="text-[10px] font-medium text-gray-400 dark:text-dark-text-secondary">
+                  Meses
+                </span>
+                <div className="grid grid-cols-6 gap-1.5 mt-1.5">
+                  {MONTHS_SHORT.map((m, idx) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => toggleInArray("months", idx)}
+                      className={`py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                        (values.months ?? []).includes(idx)
+                          ? "bg-blue-600 border-blue-600 text-white"
+                          : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:border-blue-300"
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="text-[10px] font-medium text-gray-400 dark:text-dark-text-secondary">
+                  Anos
+                </span>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {periodYears().map((y) => (
+                    <button
+                      key={y}
+                      type="button"
+                      onClick={() => toggleInArray("years", y)}
+                      className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                        (values.years ?? []).includes(y)
+                          ? "bg-green-600 border-green-600 text-white"
+                          : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:border-green-300"
+                      }`}
+                    >
+                      {y}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         <div className="col-span-full pt-4 border-t border-gray-100 dark:border-dark-border flex justify-end gap-3">

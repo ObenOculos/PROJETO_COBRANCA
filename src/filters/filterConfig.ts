@@ -7,7 +7,7 @@ export type FilterContext =
   | "collections" // Cobranca (gerente)
   | "collectionsCollector" // Cobranca (cobrador)
   | "assignment" // Atribuicao de cobradores
-  | "aggregate" // Telas agregadas (Performance)
+  | "performance" // Ranking de Performance (agregada + periodo)
   | "stores"; // Acompanhamento de Lojas (agregada + cobrador)
 
 /** Estado unificado dos filtros. Cada contexto usa um subconjunto. */
@@ -34,6 +34,9 @@ export interface FilterValues {
   situacao?: string;
   createdFrom?: string;
   createdTo?: string;
+  // Periodo (analise por mes/ano). Vazio/ausente = todos. Meses 0-11.
+  months?: number[];
+  years?: number[];
 }
 
 /** Quais campos o grid avancado exibe em cada contexto. */
@@ -50,6 +53,7 @@ export interface FilterFieldFlags {
   amount?: boolean;
   visits?: boolean;
   createdRange?: boolean;
+  period?: boolean;
 }
 
 export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
@@ -83,17 +87,17 @@ export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
     amount: true,
     createdRange: true,
   },
-  // Telas agregadas (Performance/Lojas): filtra a fonte sem o campo redundante
-  // (loja/cobrador sao a dimensao da propria tela). Pills (status + atraso) vem
-  // do FilterPills.
-  aggregate: {
+  // Ranking de Performance: filtra a fonte (sem cobrador, que e a dimensao da
+  // tela) + Periodo (mes/ano). Pills (status + atraso) vem do FilterPills.
+  performance: {
     paymentStatus: true,
     city: true,
     dueRange: true,
     launchRange: true,
     amount: true,
+    period: true,
   },
-  // Lojas: igual ao aggregate + cobrador (a dimensao da tela e a loja).
+  // Lojas: igual + cobrador (a dimensao da tela e a loja).
   stores: {
     paymentStatus: true,
     city: true,
@@ -108,6 +112,34 @@ export interface SelectOption {
   value: string;
   label: string;
 }
+
+/** Rotulos curtos de mes (0-11) para o campo de Periodo. */
+export const MONTHS_SHORT = [
+  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+  "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+];
+
+/** Anos selecionaveis no filtro de periodo (atual -2 .. atual +2). */
+export const periodYears = (): number[] => {
+  const y = new Date().getFullYear();
+  return Array.from({ length: 5 }, (_, i) => y - 2 + i);
+};
+
+/** Rotulo do periodo selecionado (para chips). */
+export const periodLabel = (months?: number[], years?: number[]): string => {
+  const parts: string[] = [];
+  if (months?.length) {
+    parts.push(
+      months.length <= 2
+        ? months.map((m) => MONTHS_SHORT[m] ?? m).join(", ")
+        : `${months.length} meses`,
+    );
+  }
+  if (years?.length) {
+    parts.push(years.length <= 2 ? years.join(", ") : `${years.length} anos`);
+  }
+  return parts.join(" · ");
+};
 
 /** Opcoes de situacao (Atribuicao). Centralizadas para nao repetir no JSX. */
 export const SITUACAO_OPTIONS: SelectOption[] = [

@@ -63,10 +63,7 @@ const EnhancedPerformanceChart: React.FC = () => {
   
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
-  const [showFilters, setShowFilters] = useState(false);
-    const [, startTransition] = useTransition();
-  const [selectedMonths, setSelectedMonths] = useState<number[]>([currentMonth]);
-  const [selectedYears, setSelectedYears] = useState<number[]>([currentYear]);
+  const [, startTransition] = useTransition();
   const [sortBy, setSortBy] = useState<"receivedAmount" | "totalSales" | "clientsCount" | "pendingSales">("receivedAmount");
     const [sortOrder] = useState<"asc" | "desc">("desc");
   const [selectedCollector, setSelectedCollector] = useState<EnhancedCollectorPerformance | null>(null);
@@ -74,13 +71,21 @@ const EnhancedPerformanceChart: React.FC = () => {
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [selectedCollectorForGoals, setSelectedCollectorForGoals] = useState<User | null>(null);
 
-  const monthsDisplay = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+  // Fonte unica: todos os filtros (incl. Periodo mes/ano) vivem em `filters`.
+  // Default = mes/ano atual, mesmo comportamento de antes.
+  const [filters, setFilters] = useState<FilterOptions>({
+    months: [currentMonth],
+    years: [currentYear],
+  });
+  const handleFiltersChange = (next: FilterOptions) =>
+    startTransition(() => setFilters(next));
+  const selectedMonths = useMemo(() => filters.months ?? [], [filters.months]);
+  const selectedYears = useMemo(() => filters.years ?? [], [filters.years]);
 
-  // Filtros compartilhados (status, cidade, vencimento, lancamento, valor) que
-  // refinam a fonte de dados do ranking.
-  const [filters, setFilters] = useState<FilterOptions>({});
-  const hasSourceFilter = Object.values(filters).some(Boolean);
+  // Filtros de dados (sem o Periodo) ativos -> usado para restringir pagamentos.
+  const hasSourceFilter = Object.entries(filters).some(
+    ([k, v]) => k !== "months" && k !== "years" && Boolean(v),
+  );
   const sourceCollections = useMemo(
     () => getFilteredCollections(filters, "manager"),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -300,8 +305,6 @@ const EnhancedPerformanceChart: React.FC = () => {
     link.click();
   };
 
-  const hasActiveFilters = selectedMonths.length > 0 || selectedYears.length > 0;
-
   return (
     <div className="space-y-6">
       {/* Dashboard Header */}
@@ -316,102 +319,22 @@ const EnhancedPerformanceChart: React.FC = () => {
               Análise detalhada por cobrador e período
             </p>
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold tracking-wide transition-all border ${
-                showFilters || hasActiveFilters
-                  ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/10"
-                  : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-              Período {hasActiveFilters && `(${selectedMonths.length + selectedYears.length})`}
-            </button>
-            <button
-              onClick={exportPerformanceData}
-              className="p-2.5 bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg/50 transition-all shadow-sm"
-              title="Exportar CSV"
-            >
-              <Download className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            onClick={exportPerformanceData}
+            className="p-2.5 bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg/50 transition-all shadow-sm"
+            title="Exportar CSV"
+          >
+            <Download className="w-5 h-5" />
+          </button>
         </div>
-
-        {/* Período Section */}
-        {showFilters && (
-          <div className="mt-6 p-6 bg-gray-50 dark:bg-dark-bg rounded-2xl border border-gray-100 dark:border-dark-border animate-in fade-in slide-in-from-top-4 duration-300">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Month Select */}
-              <div className="space-y-3">
-                <label className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-[0.2em]">Meses</label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {monthsDisplay.map((month, idx) => (
-                    <button
-                      key={month}
-                      onClick={() => startTransition(() => {
-                        setSelectedMonths(prev => prev.includes(idx) ? prev.filter(m => m !== idx) : [...prev, idx]);
-                      })}
-                      className={`py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                        selectedMonths.includes(idx)
-                          ? "bg-blue-600 text-white shadow-sm"
-                          : "bg-white dark:bg-dark-bg-secondary text-gray-500 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:border-blue-400"
-                      }`}
-                    >
-                      {month}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Year Select */}
-              <div className="space-y-3">
-                <label className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-[0.2em]">Anos</label>
-                <div className="flex flex-wrap gap-2">
-                  {years.map(year => (
-                    <button
-                      key={year}
-                      onClick={() => startTransition(() => {
-                        setSelectedYears(prev => prev.includes(year) ? prev.filter(y => y !== year) : [...prev, year]);
-                      })}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                        selectedYears.includes(year)
-                          ? "bg-green-600 text-white shadow-sm"
-                          : "bg-white dark:bg-dark-bg-secondary text-gray-500 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:border-green-400"
-                      }`}
-                    >
-                      {year}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-            </div>
-
-            <div className="mt-6 pt-6 border-t border-gray-100 dark:border-dark-border flex justify-end gap-3">
-              <button
-                onClick={() => startTransition(() => { setSelectedMonths([]); setSelectedYears([]); setShowFilters(false); })}
-                className="px-4 py-2 text-xs font-bold text-gray-400 tracking-wide hover:text-gray-600 dark:hover:text-dark-text"
-              >
-                Limpar período
-              </button>
-              <button
-                onClick={() => setShowFilters(false)}
-                className="px-6 py-2 bg-blue-600 text-white text-xs font-bold tracking-wide rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/10 transition-all"
-              >
-                Aplicar
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Filtros compartilhados (refinam a fonte do ranking) */}
+      {/* Barra de filtros unificada (inclui Período) */}
       <FilterBar
         filters={filters}
-        onFilterChange={setFilters}
+        onFilterChange={handleFiltersChange}
         userType="manager"
-        context="aggregate"
+        context="performance"
         showSearch={false}
       />
 

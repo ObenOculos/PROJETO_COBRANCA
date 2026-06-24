@@ -452,4 +452,7 @@ export interface FilterOptions {
   overdueOnly?: boolean;
   highValueOnly?: boolean;
   visitsOnly?: boolean;
+  /** Periodo de analise por mes (0-11) e ano. Vazio/ausente = todos. */
+  months?: number[];
+  years?: number[];
 }
