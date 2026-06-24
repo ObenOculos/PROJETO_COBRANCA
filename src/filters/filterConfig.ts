@@ -115,7 +115,7 @@ export const PAYMENT_STATUS_PILLS: {
 }[] = [
   {
     value: "pendente",
-    label: "Pendente",
+    label: "Em atraso",
     active: "bg-red-600 border-red-600 text-white shadow-sm",
   },
   {
