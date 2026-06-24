@@ -1158,7 +1158,8 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
       </div>
 
       {/* Barra de Filtros Unificada */}
-      <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-150/80 dark:border-dark-border shadow-sm flex flex-col md:flex-row items-stretch md:items-center gap-3">
+      <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-150/80 dark:border-dark-border shadow-sm space-y-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
         {/* Busca */}
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-405 pointer-events-none" />
@@ -1257,33 +1258,34 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             <span>Filtros {hasActiveFilters && `(${activeFilterChips.length})`}</span>
           </button>
         </div>
-      </div>
+        </div>
 
-      {/* Atalhos rápidos: status de pagamento + faixa de atraso */}
-      <FilterPills
-        values={{ paymentStatus: filterPaymentStatus, aging: filterAging }}
-        onChange={handleFilterPanelChange}
-        showPaymentStatus
-        excludePaymentStatus={["cancelado"]}
-        showAging
-      />
-
-      {/* Filtros Colapsáveis (painel compartilhado) */}
-      {showFilters && (
-        <FilterPanel
-          context="assignment"
-          values={filterPanelValues}
+        {/* Atalhos rápidos: status de pagamento + faixa de atraso */}
+        <FilterPills
+          values={{ paymentStatus: filterPaymentStatus, aging: filterAging }}
           onChange={handleFilterPanelChange}
-          onClear={clearAllFilters}
-          onClose={() => setShowFilters(false)}
+          showPaymentStatus
           excludePaymentStatus={["cancelado"]}
-          options={{
-            cities: availableCities,
-            neighborhoods: availableNeighborhoods,
-            stores: availableStores,
-          }}
+          showAging
         />
-      )}
+
+        {/* Filtros Colapsáveis (painel compartilhado) */}
+        {showFilters && (
+          <FilterPanel
+            context="assignment"
+            values={filterPanelValues}
+            onChange={handleFilterPanelChange}
+            onClear={clearAllFilters}
+            onClose={() => setShowFilters(false)}
+            excludePaymentStatus={["cancelado"]}
+            options={{
+              cities: availableCities,
+              neighborhoods: availableNeighborhoods,
+              stores: availableStores,
+            }}
+          />
+        )}
+      </div>
 
       {/* Client List */}
       <div className="space-y-3">
