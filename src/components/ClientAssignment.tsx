@@ -23,6 +23,8 @@ import { useCollection } from "../contexts/CollectionContext";
 import { supabase } from "../lib/supabase";
 import { Collection } from "../types";
 import { formatCurrency, formatDate } from "../utils/formatters";
+import { parseAndNormalizeDate } from "../filters/dates";
+import { clientMatchesFilters } from "../filters/predicates";
 import * as XLSX from "xlsx";
 import BulkAssignmentModal from "./BulkAssignmentModal";
 import AssignmentReportModal from "./dashboard/AssignmentReportModal";
@@ -290,48 +292,6 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     (user) => user.type === "collector" || user.type === "internal_collector",
   );
 
-  // Função utilitária para parsear e normalizar datas
-  const parseAndNormalizeDate = (
-    dateStr: string | null | undefined,
-  ): Date | null => {
-    if (!dateStr || dateStr === "null" || dateStr === "") {
-      return null;
-    }
-
-    try {
-      // Tentar diferentes formatos de data
-      let date: Date;
-
-      // Se já está no formato ISO (YYYY-MM-DD ou YYYY-MM-DDTHH:mm:ss)
-      if (dateStr.includes("-")) {
-        date = new Date(dateStr);
-      }
-      // Se está no formato brasileiro (DD/MM/YYYY)
-      else if (dateStr.includes("/")) {
-        const [day, month, year] = dateStr.split("/");
-        date = new Date(
-          `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`,
-        );
-      }
-      // Outro formato
-      else {
-        date = new Date(dateStr);
-      }
-
-      // Verificar se a data é válida
-      if (isNaN(date.getTime())) {
-        return null;
-      }
-
-      // Normalizar para meia-noite no timezone local
-      date.setHours(0, 0, 0, 0);
-      return date;
-    } catch (error) {
-      console.error("Erro ao parsear data:", dateStr, error);
-      return null;
-    }
-  };
-
   // Obter opções únicas para filtros
   const clientsData = useMemo(() => {
     const getCollectorForCollection = (
@@ -521,145 +481,32 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   ]);
 
   const filteredClients = useMemo(() => {
-    const filtered = clientsData.filter((client) => {
-      const matchesSearch =
-        client.cliente?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.documento?.includes(searchTerm) ||
-        client.apelido?.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesCollector =
-        !filterCollector || client.collectorId === filterCollector;
-
-      const matchesStatus =
-        !filterStatus ||
-        (filterStatus === "with_collector" && client.collectorId) ||
-        (filterStatus === "without_collector" && !client.collectorId);
-
-      const matchesCity = !filterCity || client.cidade === filterCity;
-
-      const matchesNeighborhood =
-        !filterNeighborhood || client.bairro === filterNeighborhood;
-
-      const matchesStore =
-        !filterStore ||
-        client.collections.some((c) => c.nome_da_loja === filterStore);
-
-      // Filtro por situação
-      const matchesSituacao = (() => {
-        if (!filterSituacao) return true;
-
-        // Verificar se alguma collection tem a situação desejada
-        const hasSituacao = client.collections.some((c) => {
-          if (filterSituacao === "empty") {
-            return !c.situacao || c.situacao.trim() === "";
-          }
-          return c.situacao === filterSituacao;
-        });
-
-        return hasSituacao;
-      })();
-
-      // Filtro por período de data de vencimento - VERSÃO CORRIGIDA
-      const matchesDateRange = (() => {
-        // Se não há filtros de data, incluir todos
-        if (!filterDateFrom && !filterDateTo) return true;
-
-        // Parsear as datas do filtro uma vez
-        const fromDate = filterDateFrom
-          ? parseAndNormalizeDate(filterDateFrom)
-          : null;
-        const toDate = filterDateTo
-          ? parseAndNormalizeDate(filterDateTo)
-          : null;
-
-        // Se as datas do filtro são inválidas, incluir todos
-        if ((filterDateFrom && !fromDate) || (filterDateTo && !toDate)) {
-          console.warn("Datas de filtro inválidas:", {
-            filterDateFrom,
-            filterDateTo,
-          });
-          return true;
-        }
-
-        // Verificar se o cliente tem alguma parcela válida
-        let hasValidDate = false;
-        let hasDateInRange = false;
-
-        for (const collection of client.collections) {
-          const dueDate = parseAndNormalizeDate(collection.data_vencimento);
-
-          if (dueDate) {
-            hasValidDate = true;
-
-            // Verificar se está no range
-            let inRange = true;
-
-            if (fromDate) {
-              inRange = inRange && dueDate >= fromDate;
-            }
-
-            if (toDate) {
-              inRange = inRange && dueDate <= toDate;
-            }
-
-            if (inRange) {
-              hasDateInRange = true;
-              break; // Encontrou uma data no range, pode parar
-            }
-          }
-        }
-
-        // Lógica de retorno
-        if (hasDateInRange) {
-          return true; // Tem pelo menos uma parcela no período
-        }
-
-        if (!hasValidDate && includeWithoutDate) {
-          return true; // Não tem data válida mas checkbox está marcado
-        }
-
-        return false; // Tem data válida mas nenhuma no período OU não tem data e checkbox não está marcado
-      })();
-
-      // Filtro "Criado em": intervalo sobre a data de criacao do cliente
-      // (clientes.created_at). Cliente sem created_at conhecido fica de fora
-      // quando ha filtro ativo.
-      const matchesCreatedRange = (() => {
-        if (!filterCreatedFrom && !filterCreatedTo) return true;
-
-        const createdAt = clientCreatedAtMap.get(client.documento);
-        if (!createdAt) return false;
-
-        if (filterCreatedFrom) {
-          const fromDate = parseAndNormalizeDate(filterCreatedFrom);
-          if (fromDate && createdAt < fromDate) return false;
-        }
-        if (filterCreatedTo) {
-          const toDate = parseAndNormalizeDate(filterCreatedTo);
-          // Inclui o dia inteiro do "até" (fim do dia).
-          if (toDate) {
-            const endOfDay = new Date(toDate);
-            endOfDay.setHours(23, 59, 59, 999);
-            if (createdAt > endOfDay) return false;
-          }
-        }
-        return true;
-      })();
-
-      return (
-        matchesSearch &&
-        matchesCollector &&
-        matchesStatus &&
-        matchesCity &&
-        matchesNeighborhood &&
-        matchesStore &&
-        matchesSituacao &&
-        matchesDateRange &&
-        matchesCreatedRange
-      );
-    });
-
-    return filtered;
+    // Filtros aplicados pelo motor compartilhado (src/filters/predicates).
+    // O vocabulario "status de atribuicao" (com/sem cobrador) mora em
+    // `assignment`, distinto do status de pagamento (src/filters/clientStatus).
+    return clientsData.filter((client) =>
+      clientMatchesFilters(
+        client,
+        {
+          search: searchTerm,
+          collector: filterCollector,
+          assignment: filterStatus as
+            | ""
+            | "with_collector"
+            | "without_collector",
+          city: filterCity,
+          neighborhood: filterNeighborhood,
+          store: filterStore,
+          situacao: filterSituacao,
+          dueFrom: filterDateFrom,
+          dueTo: filterDateTo,
+          includeWithoutDue: includeWithoutDate,
+          createdFrom: filterCreatedFrom,
+          createdTo: filterCreatedTo,
+        },
+        clientCreatedAtMap,
+      ),
+    );
   }, [
     clientsData,
     searchTerm,
