@@ -18,7 +18,8 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
-import { User } from "../../types";
+import FilterBar from "../common/FilterBar";
+import { User, FilterOptions } from "../../types";
 
 interface EnhancedCollectorPerformance {
   collectorId: string;
@@ -58,6 +59,7 @@ const EnhancedPerformanceChart: React.FC = () => {
     salePayments,
     scheduledVisits,
     refreshData,
+    getFilteredCollections,
   } = useCollection();
   
   const currentMonth = new Date().getMonth();
@@ -75,6 +77,20 @@ const EnhancedPerformanceChart: React.FC = () => {
 
   const monthsDisplay = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+
+  // Filtros compartilhados (status, cidade, vencimento, lancamento, valor) que
+  // refinam a fonte de dados do ranking.
+  const [filters, setFilters] = useState<FilterOptions>({});
+  const hasSourceFilter = Object.values(filters).some(Boolean);
+  const sourceCollections = useMemo(
+    () => getFilteredCollections(filters, "manager"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filters, collections],
+  );
+  const allowedDocs = useMemo(
+    () => new Set(sourceCollections.map((c) => c.documento).filter(Boolean)),
+    [sourceCollections],
+  );
 
   const enhancedPerformance = useMemo((): EnhancedCollectorPerformance[] => {
     const collectors = users.filter((u) => u.type === "collector");
@@ -113,7 +129,7 @@ const EnhancedPerformanceChart: React.FC = () => {
     };
 
     return collectors.map((collector) => {
-      const filteredCollections = collections.filter((c) => {
+      const filteredCollections = sourceCollections.filter((c) => {
         if (c.user_id !== collector.id) return false;
         const dateVenc = parseDateSafely(c.data_vencimento);
         const dateLanc = parseDateSafely(c.data_lancamento);
@@ -123,6 +139,8 @@ const EnhancedPerformanceChart: React.FC = () => {
       const receivedAmount = salePayments
         .filter((p) => {
           if (p.collectorId !== collector.id || !p.paymentDate) return false;
+          // Quando ha filtro ativo, conta apenas pagamentos de clientes no subconjunto filtrado.
+          if (hasSourceFilter && !allowedDocs.has(p.clientDocument)) return false;
           const paymentDate = parseDateSafely(p.paymentDate);
           return isDateInSelectedMonths(paymentDate);
         })
@@ -131,8 +149,8 @@ const EnhancedPerformanceChart: React.FC = () => {
       const totalAmount = filteredCollections.reduce((sum, c) => sum + Number(c.valor_original || 0), 0);
       const pendingAmount = Math.max(0, totalAmount - receivedAmount);
 
-      // A receber total: toda a carteira, sem filtro de período
-      const allCollectorCollections = collections.filter((c) => c.user_id === collector.id);
+      // A receber total: toda a carteira (do subconjunto filtrado), sem filtro de período
+      const allCollectorCollections = sourceCollections.filter((c) => c.user_id === collector.id);
       const pendingAmountTotal = allCollectorCollections.reduce((sum, c) => {
         const diff = Number(c.valor_original || 0) - Number(c.valor_recebido || 0);
         return sum + (diff > 0.01 ? diff : 0);
@@ -214,7 +232,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       const visitsPerformance = currentMonthVisitsGoal > 0 ? (currentMonthVisitsActual / currentMonthVisitsGoal) * 100 : 0;
       const paymentsPerformance = currentMonthPaymentsGoal > 0 ? (receivedAmount / currentMonthPaymentsGoal) * 100 : 0;
 
-      const allAssignedClients = new Set(collections.filter((c) => c.user_id === collector.id).map((c) => c.documento).filter(Boolean)).size;
+      const allAssignedClients = new Set(sourceCollections.filter((c) => c.user_id === collector.id).map((c) => c.documento).filter(Boolean)).size;
       const visitedClients = new Set(scheduledVisits.filter(v => v.collectorId === collector.id && v.status === "realizada" && isDateInSelectedMonths(parseDateSafely(v.dataVisitaRealizada || v.scheduledDate))).map(v => v.clientDocument).filter(Boolean)).size;
 
       return {
@@ -247,7 +265,7 @@ const EnhancedPerformanceChart: React.FC = () => {
         visitsReagendadas,
       };
     });
-  }, [collections, users, monthlyGoals, salePayments, scheduledVisits, selectedMonths, selectedYears]);
+  }, [sourceCollections, allowedDocs, hasSourceFilter, users, monthlyGoals, salePayments, scheduledVisits, selectedMonths, selectedYears]);
 
   const filteredAndSortedPerformance = useMemo(() => {
     let filtered = [...enhancedPerformance];
@@ -402,6 +420,15 @@ const EnhancedPerformanceChart: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Filtros compartilhados (refinam a fonte do ranking) */}
+      <FilterBar
+        filters={filters}
+        onFilterChange={setFilters}
+        userType="manager"
+        context="aggregate"
+        showSearch={false}
+      />
 
       {/* Summary Card: Visitas do Período */}
       <div className="relative overflow-hidden bg-white dark:bg-dark-bg-secondary rounded-2xl p-5 sm:p-6 shadow-sm border border-gray-100 dark:border-dark-border">

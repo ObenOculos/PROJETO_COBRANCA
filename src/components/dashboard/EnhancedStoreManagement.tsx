@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
+import FilterBar from "../common/FilterBar";
+import { FilterOptions } from "../../types";
 
 interface StoreStats {
   storeName: string;
@@ -40,7 +42,17 @@ interface StoreStats {
 }
 
 const EnhancedStoreManagement: React.FC = () => {
-  const { users, collections, getAvailableStores, loading } = useCollection();
+  const { users, collections, getAvailableStores, getFilteredCollections, loading } =
+    useCollection();
+
+  // Filtros compartilhados (status, cidade, vencimento, lancamento, valor) que
+  // refinam a fonte de dados das lojas.
+  const [filters, setFilters] = useState<FilterOptions>({});
+  const sourceCollections = useMemo(
+    () => getFilteredCollections(filters, "manager"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filters, collections],
+  );
 
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortBy, setSortBy] = useState<
@@ -59,7 +71,7 @@ const EnhancedStoreManagement: React.FC = () => {
     const stats: StoreStats[] = [];
 
     availableStores.forEach((storeName) => {
-      const periodCollections = collections.filter(c => c.nome_da_loja === storeName);
+      const periodCollections = sourceCollections.filter(c => c.nome_da_loja === storeName);
 
       if (periodCollections.length === 0) return;
 
@@ -96,7 +108,7 @@ const EnhancedStoreManagement: React.FC = () => {
       const completedSales = salesArray.filter(s => (s.totalValue - s.paidValue - s.discountValue) <= 0.01).length;
       const conversionRate = salesArray.length > 0 ? (completedSales / salesArray.length) * 100 : 0;
 
-      const allStoreCollections = collections.filter(c => c.nome_da_loja === storeName);
+      const allStoreCollections = sourceCollections.filter(c => c.nome_da_loja === storeName);
       const cityCounts = new Map<string, number>();
       allStoreCollections.forEach(c => { if (c.cidade) cityCounts.set(c.cidade, (cityCounts.get(c.cidade) || 0) + 1); });
       const storeCity = Array.from(cityCounts.entries()).sort((a,b) => b[1]-a[1])[0]?.[0] || "Não informada";
@@ -131,7 +143,7 @@ const EnhancedStoreManagement: React.FC = () => {
     });
 
     return stats;
-  }, [availableStores, collectors, collections]);
+  }, [availableStores, collectors, sourceCollections]);
 
   // Filter and sort stores
   const filteredAndSortedStores = useMemo(() => {
@@ -473,6 +485,15 @@ const EnhancedStoreManagement: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Filtros compartilhados (refinam a fonte das lojas) */}
+      <FilterBar
+        filters={filters}
+        onFilterChange={setFilters}
+        userType="manager"
+        context="aggregate"
+        showSearch={false}
+      />
 
       {/* Lista de Lojas com Cards Aprimorados */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 p-1">

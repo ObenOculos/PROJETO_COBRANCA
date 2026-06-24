@@ -6,7 +6,8 @@
 export type FilterContext =
   | "collections" // Cobranca (gerente)
   | "collectionsCollector" // Cobranca (cobrador)
-  | "assignment"; // Atribuicao de cobradores
+  | "assignment" // Atribuicao de cobradores
+  | "aggregate"; // Telas agregadas (Performance / Lojas)
 
 /** Estado unificado dos filtros. Cada contexto usa um subconjunto. */
 export interface FilterValues {
@@ -80,6 +81,16 @@ export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
     launchRange: true,
     amount: true,
     createdRange: true,
+  },
+  // Telas agregadas (Performance/Lojas): filtra a fonte sem o campo redundante
+  // (loja/cobrador sao a dimensao da propria tela). Pills (status + atraso) vem
+  // do FilterPills.
+  aggregate: {
+    paymentStatus: true,
+    city: true,
+    dueRange: true,
+    launchRange: true,
+    amount: true,
   },
 };
 

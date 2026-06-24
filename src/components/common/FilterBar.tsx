@@ -6,6 +6,7 @@ import FilterPanel from "../filters/FilterPanel";
 import FilterPills from "../filters/FilterPills";
 import {
   FilterValues,
+  FilterContext,
   agingToDueRange,
   dueToAging,
   agingLabel,
@@ -17,14 +18,20 @@ interface FilterBarProps {
   filters: FilterOptions;
   onFilterChange: (filters: FilterOptions) => void;
   userType: UserType;
+  /** Contexto do FilterPanel; default deriva do userType. */
+  context?: FilterContext;
+  /** Exibe a barra de busca (telas de agregacao tem busca propria). */
+  showSearch?: boolean;
 }
 
 const FilterBar: React.FC<FilterBarProps> = ({
   filters,
   onFilterChange,
   userType,
+  context,
+  showSearch = true,
 }) => {
-  const { getAvailableStores, users, getCollectorCollections } =
+  const { getAvailableStores, users, getCollectorCollections, collections } =
     useCollection();
   const { user } = useAuth();
   const [isExpanded, setIsExpanded] = React.useState(false);
@@ -88,9 +95,18 @@ const FilterBar: React.FC<FilterBarProps> = ({
     return neighborhoods.sort();
   }, [userType, user, getCollectorCollections]);
 
+  // Cidades para o gerente: derivadas de todas as collections (getCollectorCities
+  // retorna [] para manager). Usado pelos contextos de agregacao (Performance/Lojas).
+  const managerCities = React.useMemo(() => {
+    if (userType !== "manager") return [];
+    return Array.from(
+      new Set(collections.map((c) => c.cidade).filter(Boolean)),
+    ).sort() as string[];
+  }, [userType, collections]);
+
   const collectorCities = React.useMemo(
-    () => getCollectorCities(),
-    [getCollectorCities],
+    () => (userType === "manager" ? managerCities : getCollectorCities()),
+    [userType, managerCities, getCollectorCities],
   );
   const collectorNeighborhoods = React.useMemo(
     () => getCollectorNeighborhoods(),
@@ -233,18 +249,21 @@ const FilterBar: React.FC<FilterBarProps> = ({
       <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-150/80 dark:border-dark-border shadow-sm space-y-3">
         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
           {/* Busca */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-            <input
-              id="search-input"
-              name="search"
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar cliente, apelido, documento, título..."
-              className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-gray-450"
-            />
-          </div>
+          {showSearch && (
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <input
+                id="search-input"
+                name="search"
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar cliente, apelido, documento, título..."
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-gray-450"
+              />
+            </div>
+          )}
+          {!showSearch && <div className="flex-1" />}
 
           {/* Botão Filtros Avançados */}
           <button
@@ -276,7 +295,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
         {isExpanded && (
           <FilterPanel
             context={
-              userType === "manager" ? "collections" : "collectionsCollector"
+              context ??
+              (userType === "manager" ? "collections" : "collectionsCollector")
             }
             values={panelValues}
             onChange={handlePanelChange}
