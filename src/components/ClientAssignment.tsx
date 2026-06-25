@@ -292,20 +292,30 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
-  // Ordenação da Lista de Clientes (clique no cabeçalho da coluna).
-  const [sortField, setSortField] = useState<SortField | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  // Ordenação CUMULATIVA da Lista de Clientes (clique nos cabeçalhos).
+  // Cada coluna adiciona um critério; clicar de novo: asc -> desc -> remove.
+  const [sortKeys, setSortKeys] = useState<
+    { field: SortField; direction: "asc" | "desc" }[]
+  >([]);
   const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
+    setSortKeys((keys) => {
+      const idx = keys.findIndex((k) => k.field === field);
+      if (idx === -1) return [...keys, { field, direction: "asc" }];
+      if (keys[idx].direction === "asc") {
+        const next = [...keys];
+        next[idx] = { field, direction: "desc" };
+        return next;
+      }
+      return keys.filter((k) => k.field !== field); // desc -> remove
+    });
     setCurrentPage(1);
   };
-  const sortIndicator = (field: SortField) =>
-    sortField === field ? (sortDirection === "asc" ? " ▲" : " ▼") : "";
+  const sortIndicator = (field: SortField) => {
+    const idx = sortKeys.findIndex((k) => k.field === field);
+    if (idx === -1) return "";
+    const arrow = sortKeys[idx].direction === "asc" ? "▲" : "▼";
+    return sortKeys.length > 1 ? ` ${arrow}${idx + 1}` : ` ${arrow}`;
+  };
 
   const [maxButtons, setMaxButtons] = useState(
     typeof window !== "undefined" && window.innerWidth < 640 ? 2 : 5,
@@ -618,12 +628,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     setCurrentPage(1);
   }, [filteredClients]);
 
-  // Ordenação ao clicar nos cabeçalhos da lista.
+  // Ordenação cumulativa: aplica os critérios na ordem em que foram clicados.
   const sortedClients = useMemo(() => {
-    if (!sortField) return filteredClients;
-    const dir = sortDirection === "asc" ? 1 : -1;
-    const valueOf = (client: ClientWithCollections): string | number => {
-      switch (sortField) {
+    if (sortKeys.length === 0) return filteredClients;
+    const valueOf = (
+      client: ClientWithCollections,
+      field: SortField,
+    ): string | number => {
+      switch (field) {
         case "cliente":
           return (client.cliente || "").toLowerCase();
         case "cidade":
@@ -641,14 +653,20 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
       }
     };
     return [...filteredClients].sort((a, b) => {
-      const av = valueOf(a);
-      const bv = valueOf(b);
-      if (typeof av === "string" && typeof bv === "string") {
-        return av.localeCompare(bv) * dir;
+      for (const { field, direction } of sortKeys) {
+        const av = valueOf(a, field);
+        const bv = valueOf(b, field);
+        let cmp = 0;
+        if (typeof av === "string" && typeof bv === "string") {
+          cmp = av.localeCompare(bv);
+        } else {
+          cmp = (av as number) - (bv as number);
+        }
+        if (cmp !== 0) return direction === "asc" ? cmp : -cmp;
       }
-      return ((av as number) - (bv as number)) * dir;
+      return 0;
     });
-  }, [filteredClients, sortField, sortDirection]);
+  }, [filteredClients, sortKeys]);
 
   // Clientes da página atual
   const paginatedClients = useMemo(() => {
