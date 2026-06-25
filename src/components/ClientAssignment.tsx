@@ -55,6 +55,14 @@ const MONTHS_PT = [
 const monthLabel = (date: Date) =>
   `${MONTHS_PT[date.getMonth()]}/${date.getFullYear()}`;
 
+type SortField =
+  | "cliente"
+  | "vendas"
+  | "parcelas"
+  | "cidade"
+  | "pendente"
+  | "cobrador";
+
 interface ClientWithCollections {
   cliente: string;
   documento: string;
@@ -283,6 +291,21 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+
+  // Ordenação da Lista de Clientes (clique no cabeçalho da coluna).
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+    setCurrentPage(1);
+  };
+  const sortIndicator = (field: SortField) =>
+    sortField === field ? (sortDirection === "asc" ? " ▲" : " ▼") : "";
 
   const [maxButtons, setMaxButtons] = useState(
     typeof window !== "undefined" && window.innerWidth < 640 ? 2 : 5,
@@ -595,12 +618,44 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     setCurrentPage(1);
   }, [filteredClients]);
 
+  // Ordenação ao clicar nos cabeçalhos da lista.
+  const sortedClients = useMemo(() => {
+    if (!sortField) return filteredClients;
+    const dir = sortDirection === "asc" ? 1 : -1;
+    const valueOf = (client: ClientWithCollections): string | number => {
+      switch (sortField) {
+        case "cliente":
+          return (client.cliente || "").toLowerCase();
+        case "cidade":
+          return (client.cidade || "").toLowerCase();
+        case "cobrador":
+          return (client.collectorName || "").toLowerCase();
+        case "vendas":
+          return countVendas(client.collections);
+        case "parcelas":
+          return client.collections.length;
+        case "pendente":
+          return getClientPending(client.collections);
+        default:
+          return 0;
+      }
+    };
+    return [...filteredClients].sort((a, b) => {
+      const av = valueOf(a);
+      const bv = valueOf(b);
+      if (typeof av === "string" && typeof bv === "string") {
+        return av.localeCompare(bv) * dir;
+      }
+      return ((av as number) - (bv as number)) * dir;
+    });
+  }, [filteredClients, sortField, sortDirection]);
+
   // Clientes da página atual
   const paginatedClients = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return filteredClients.slice(startIndex, endIndex);
-  }, [filteredClients, currentPage, itemsPerPage]);
+    return sortedClients.slice(startIndex, endIndex);
+  }, [sortedClients, currentPage, itemsPerPage]);
 
   // Informações da paginação
   const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
@@ -1394,12 +1449,12 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded bg-white dark:bg-dark-bg"
                     />
                   </th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide">Cliente / Documento</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-center">Vendas</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-center">Parcelas</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide">Status / Cobrador</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide">Localização</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-right">Valores</th>
+                  <th onClick={() => handleSort("cliente")} className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors">Cliente / Documento{sortIndicator("cliente")}</th>
+                  <th onClick={() => handleSort("vendas")} className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-center cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors">Vendas{sortIndicator("vendas")}</th>
+                  <th onClick={() => handleSort("parcelas")} className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-center cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors">Parcelas{sortIndicator("parcelas")}</th>
+                  <th onClick={() => handleSort("cobrador")} className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors">Status / Cobrador{sortIndicator("cobrador")}</th>
+                  <th onClick={() => handleSort("cidade")} className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors">Localização{sortIndicator("cidade")}</th>
+                  <th onClick={() => handleSort("pendente")} className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-right cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors">Valores{sortIndicator("pendente")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
