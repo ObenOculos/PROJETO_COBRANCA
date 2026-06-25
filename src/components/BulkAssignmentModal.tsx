@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Users, UserPlus, UserMinus, CheckCircle, Loader2, ChevronRight, ChevronLeft, Zap } from "lucide-react";
+import { Users, UserPlus, UserMinus, CheckCircle, Loader2, ChevronRight, ChevronLeft, Zap, CalendarClock } from "lucide-react";
 import { Modal } from "./Modal";
 import { useCollection } from "../contexts/CollectionContext";
 import { supabase } from "../lib/supabase";
@@ -40,9 +40,10 @@ const BulkAssignmentModal: React.FC<Props> = ({
   collectors,
   onComplete,
 }) => {
-  const { assignCollectorToClients, removeCollectorFromClients, refreshData } = useCollection();
+  const { assignCollectorToClients, removeCollectorFromClients, refreshData, scheduledVisits } = useCollection();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [showVisitPrompt, setShowVisitPrompt] = useState(false);
   const [collectorAction, setCollectorAction] = useState<CollectorAction>("assign");
   const [selectedCollector, setSelectedCollector] = useState("");
   const [statusAction, setStatusAction] = useState("skip");
@@ -73,6 +74,20 @@ const BulkAssignmentModal: React.FC<Props> = ({
     .map((key) => clientsData.find((c) => c.uniqueKey === key))
     .filter(Boolean) as ClientWithCollections[];
 
+  // Agendamentos em aberto (status agendada) dos clientes selecionados.
+  const selectedDocs = new Set(
+    clientsList.map((c) => c.documento).filter(Boolean),
+  );
+  const pendingVisitsCount = scheduledVisits.filter(
+    (v) =>
+      v.clientDocument &&
+      selectedDocs.has(v.clientDocument) &&
+      v.status === "agendada",
+  ).length;
+  const selectedCollectorName =
+    collectors.find((c) => c.id === selectedCollector)?.name ??
+    selectedCollector;
+
   const totalBatches =
     (collectorAction !== "skip" ? Math.ceil(clientsList.length / 200) : 0) +
     (statusAction !== "skip" ? 1 : 0);
@@ -86,7 +101,22 @@ const BulkAssignmentModal: React.FC<Props> = ({
     setProgressLog((prev) => [...prev, { text, type }]);
   };
 
-  const execute = async () => {
+  // Ao confirmar: se houver agendamentos em aberto numa atribuição, pergunta
+  // antes se devem ser transferidos junto.
+  const handleConfirmClick = () => {
+    if (
+      collectorAction === "assign" &&
+      selectedCollector &&
+      pendingVisitsCount > 0
+    ) {
+      setShowVisitPrompt(true);
+    } else {
+      execute(true);
+    }
+  };
+
+  const execute = async (transferVisits = true) => {
+    setShowVisitPrompt(false);
     setStep(3);
     const total = totalBatches;
     setProgressTotal(total);
@@ -112,7 +142,16 @@ const BulkAssignmentModal: React.FC<Props> = ({
             const end = Math.min(batchDone * 200, clientsList.length);
             addLog(`Lote ${batchDone}/${batchTotal} — clientes ${start}–${end}`);
           },
+          transferVisits,
         );
+        if (pendingVisitsCount > 0) {
+          addLog(
+            transferVisits
+              ? `${pendingVisitsCount} agendamento(s) transferido(s) junto`
+              : `${pendingVisitsCount} agendamento(s) mantido(s) com o cobrador atual`,
+            "info",
+          );
+        }
       } else if (collectorAction === "remove") {
         addLog(`Removendo cobrador de ${clientsList.length} clientes...`, "info");
         await removeCollectorFromClients(
@@ -326,7 +365,7 @@ const BulkAssignmentModal: React.FC<Props> = ({
               </button>
               <button
                 type="button"
-                onClick={execute}
+                onClick={handleConfirmClick}
                 className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-green-600 hover:bg-green-700 text-white text-[11px] font-black tracking-[0.2em] rounded-2xl shadow-xl shadow-green-900/10 transition-all active:scale-[0.98]"
               >
                 <Zap className="w-4 h-4 text-yellow-400" /> Confirmar Execução
@@ -418,6 +457,53 @@ const BulkAssignmentModal: React.FC<Props> = ({
           </div>
         )}
       </div>
+
+      {/* Confirmação: transferir agendamentos em aberto junto com os clientes? */}
+      {showVisitPrompt && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+            <div className="flex items-start gap-3 mb-5">
+              <div className="p-2.5 bg-amber-50 dark:bg-amber-900/20 rounded-xl shrink-0">
+                <CalendarClock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-dark-text">
+                  Agendamentos em aberto
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-dark-text-secondary mt-1 leading-relaxed">
+                  Os clientes selecionados têm{" "}
+                  <span className="font-bold text-gray-700 dark:text-dark-text">
+                    {pendingVisitsCount}
+                  </span>{" "}
+                  agendamento{pendingVisitsCount === 1 ? "" : "s"} em aberto com
+                  o cobrador atual. Deseja transferi-
+                  {pendingVisitsCount === 1 ? "lo" : "los"} junto para{" "}
+                  <span className="font-bold text-gray-700 dark:text-dark-text">
+                    {selectedCollectorName}
+                  </span>
+                  ?
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => execute(true)}
+                className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all"
+              >
+                Sim, transferir agendamentos
+              </button>
+              <button
+                type="button"
+                onClick={() => execute(false)}
+                className="w-full px-4 py-2.5 bg-gray-100 dark:bg-dark-bg text-gray-700 dark:text-dark-text text-sm font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary transition-all"
+              >
+                Não, manter apenas os clientes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 };

@@ -283,6 +283,7 @@ export interface CollectionContextType {
     clientIdentifiers: { document?: string; clientName?: string }[],
     skipRefresh?: boolean,
     onBatchProgress?: (completed: number, total: number) => void,
+    transferVisits?: boolean,
   ) => Promise<void>;
   removeCollectorFromClients: (
     clientIdentifiers: { document?: string; clientName?: string }[],

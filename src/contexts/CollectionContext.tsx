@@ -1960,6 +1960,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     clientIdentifiers: { document?: string; clientName?: string }[],
     skipRefresh = false,
     onBatchProgress?: (completed: number, total: number) => void,
+    transferVisits = true,
   ) => {
     try {
       console.log(
@@ -2013,22 +2014,28 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         );
       }
 
-      // Os agendamentos seguem a carteira: as visitas AGENDADAS dos clientes
-      // reatribuidos passam para o novo cobrador. Visitas ja realizadas/canceladas
-      // sao historico e nao mudam.
-      const documentos = clientIdentifiers
-        .map((id) => id.document)
-        .filter((d): d is string => !!d);
-      const visitBatch = 300;
-      for (let i = 0; i < documentos.length; i += visitBatch) {
-        const docs = documentos.slice(i, i + visitBatch);
-        const { error: visitError } = await supabase
-          .from("scheduled_visits")
-          .update({ collector_id: collectorId })
-          .in("client_document", docs)
-          .eq("status", "agendada");
-        if (visitError) {
-          console.error("Erro ao migrar agendamentos da carteira:", visitError);
+      // Os agendamentos seguem a carteira (quando transferVisits): as visitas
+      // AGENDADAS dos clientes reatribuidos passam para o novo cobrador. Visitas
+      // ja realizadas/canceladas sao historico e nao mudam. Se transferVisits for
+      // false, os agendamentos permanecem com o cobrador atual.
+      if (transferVisits) {
+        const documentos = clientIdentifiers
+          .map((id) => id.document)
+          .filter((d): d is string => !!d);
+        const visitBatch = 300;
+        for (let i = 0; i < documentos.length; i += visitBatch) {
+          const docs = documentos.slice(i, i + visitBatch);
+          const { error: visitError } = await supabase
+            .from("scheduled_visits")
+            .update({ collector_id: collectorId })
+            .in("client_document", docs)
+            .eq("status", "agendada");
+          if (visitError) {
+            console.error(
+              "Erro ao migrar agendamentos da carteira:",
+              visitError,
+            );
+          }
         }
       }
 
