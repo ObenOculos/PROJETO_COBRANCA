@@ -429,21 +429,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         )
         .subscribe((status) => {
           console.log("Status da conexão realtime:", status);
-          if (
-            status === "CHANNEL_ERROR" ||
-            status === "TIMED_OUT" ||
-            status === "CLOSED"
-          ) {
+          // CLOSED é um estado NORMAL do ciclo de vida do canal: dispara no
+          // teardown do effect (logout, troca de usuário, unmount). Não é erro.
+          //
+          // Em CHANNEL_ERROR/TIMED_OUT o próprio supabase-js reconecta o socket
+          // e refaz o join do canal automaticamente (com backoff). Por isso NÃO
+          // fazemos unsubscribe manual aqui — fazer isso removia o canal e
+          // impedia justamente o auto-reconnect (era a causa do loop de "CLOSED
+          // / tentando reconectar"). Apenas registramos para diagnóstico.
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             console.warn(
-              "Erro na subscription do realtime, tentando reconectar em 5s...",
+              `Conexão realtime instável (${status}); o Supabase tentará reconectar automaticamente.`,
             );
-            setTimeout(() => {
-              if (realtimeChannel) {
-                realtimeChannel.unsubscribe();
-                realtimeChannel = null;
-              }
-              // Reconectar será feito no próximo ciclo do useEffect
-            }, 5000);
           }
         });
     } else {

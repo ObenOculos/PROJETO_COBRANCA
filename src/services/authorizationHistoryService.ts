@@ -52,18 +52,33 @@ export class AuthorizationHistoryService {
    * Get all pending authorization requests
    */
   static async getPendingRequests(): Promise<AuthorizationHistory[]> {
-    const { data, error } = await supabase
-      .from("authorization_history")
-      .select("*")
-      .eq("status", "pending")
-      .gt("expires_at", new Date().toISOString())
-      .order("requested_at", { ascending: false });
+    const run = async (): Promise<AuthorizationHistory[]> => {
+      const { data, error } = await supabase
+        .from("authorization_history")
+        .select("*")
+        .eq("status", "pending")
+        .gt("expires_at", new Date().toISOString())
+        .order("requested_at", { ascending: false });
 
-    if (error) {
-      throw new Error(`Failed to get pending requests: ${error.message}`);
+      if (error) {
+        throw new Error(`Failed to get pending requests: ${error.message}`);
+      }
+
+      return (data || []).map(toEntity);
+    };
+
+    // Quedas de conexão transitórias (ERR_CONNECTION_CLOSED / Failed to fetch)
+    // são comuns; tenta novamente uma vez antes de propagar o erro.
+    try {
+      return await run();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isTransient =
+        /failed to fetch|connection closed|networkerror|load failed/i.test(msg);
+      if (!isTransient) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      return await run();
     }
-
-    return (data || []).map(toEntity);
   }
 
   /**
