@@ -292,35 +292,21 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
-  // Ordenação CUMULATIVA (estilo Excel): o ULTIMO clique vira o critério
-  // principal (indice 0); os anteriores viram desempate, na ordem em que estavam.
-  // Clicar na coluna que ja e a principal alterna asc -> desc -> remove.
-  const [sortKeys, setSortKeys] = useState<
-    { field: SortField; direction: "asc" | "desc" }[]
-  >([]);
+  // Ordenação simples da Lista de Clientes: cada coluna ordena de forma
+  // independente. Clicar numa coluna ordena por ela (asc); clicar de novo inverte.
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const handleSort = (field: SortField) => {
-    setSortKeys((keys) => {
-      const existing = keys.find((k) => k.field === field);
-      const rest = keys.filter((k) => k.field !== field);
-      // Nova coluna -> entra como principal (asc).
-      if (!existing) return [{ field, direction: "asc" }, ...rest];
-      // Ja e a principal -> alterna direcao; se ja era desc, remove da ordenacao.
-      if (keys[0]?.field === field) {
-        return existing.direction === "asc"
-          ? [{ field, direction: "desc" }, ...rest]
-          : rest;
-      }
-      // Era desempate -> promove a principal mantendo a direcao atual.
-      return [existing, ...rest];
-    });
+    if (sortField === field) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
     setCurrentPage(1);
   };
-  const sortIndicator = (field: SortField) => {
-    const idx = sortKeys.findIndex((k) => k.field === field);
-    if (idx === -1) return "";
-    const arrow = sortKeys[idx].direction === "asc" ? "▲" : "▼";
-    return sortKeys.length > 1 ? ` ${arrow}${idx + 1}` : ` ${arrow}`;
-  };
+  const sortIndicator = (field: SortField) =>
+    sortField === field ? (sortDirection === "asc" ? " ▲" : " ▼") : "";
 
   const [maxButtons, setMaxButtons] = useState(
     typeof window !== "undefined" && window.innerWidth < 640 ? 2 : 5,
@@ -636,14 +622,12 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     setSelectedClients(new Set());
   }, [filteredClients]);
 
-  // Ordenação cumulativa: aplica os critérios na ordem em que foram clicados.
+  // Ordenação por uma única coluna (clique no cabeçalho).
   const sortedClients = useMemo(() => {
-    if (sortKeys.length === 0) return filteredClients;
-    const valueOf = (
-      client: ClientWithCollections,
-      field: SortField,
-    ): string | number => {
-      switch (field) {
+    if (!sortField) return filteredClients;
+    const dir = sortDirection === "asc" ? 1 : -1;
+    const valueOf = (client: ClientWithCollections): string | number => {
+      switch (sortField) {
         case "cliente":
           return (client.cliente || "").toLowerCase();
         case "cidade":
@@ -661,20 +645,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
       }
     };
     return [...filteredClients].sort((a, b) => {
-      for (const { field, direction } of sortKeys) {
-        const av = valueOf(a, field);
-        const bv = valueOf(b, field);
-        let cmp = 0;
-        if (typeof av === "string" && typeof bv === "string") {
-          cmp = av.localeCompare(bv);
-        } else {
-          cmp = (av as number) - (bv as number);
-        }
-        if (cmp !== 0) return direction === "asc" ? cmp : -cmp;
+      const av = valueOf(a);
+      const bv = valueOf(b);
+      if (typeof av === "string" && typeof bv === "string") {
+        return av.localeCompare(bv) * dir;
       }
-      return 0;
+      return ((av as number) - (bv as number)) * dir;
     });
-  }, [filteredClients, sortKeys]);
+  }, [filteredClients, sortField, sortDirection]);
 
   // Clientes da página atual
   const paginatedClients = useMemo(() => {
