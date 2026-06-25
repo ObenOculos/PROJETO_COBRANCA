@@ -801,240 +801,397 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const renderVisitsTab = () => {
     const groupedVisits = getVisitsByCollectorGrouped();
 
+    // Labels e chips de filtros ativos (mesmo padrao visual da barra global).
+    const STATUS_LABELS: Record<string, string> = {
+      agendada: "Agendada",
+      realizada: "Realizada",
+      cancelada: "Cancelada",
+      nao_encontrado: "Não Encontrado",
+      reagendada: "Reagendada",
+    };
+    const TYPE_LABELS: Record<string, string> = {
+      internal_collector: "Interno",
+      collector: "Externo",
+      third_party_collector: "Terceirizado",
+    };
+    const filterChips: { label: string; onClear: () => void }[] = [];
+    if (searchFilter)
+      filterChips.push({
+        label: `Busca: "${searchFilter}"`,
+        onClear: () => setSearchFilter(""),
+      });
+    if (typeFilter !== "all")
+      filterChips.push({
+        label: `Tipo: ${TYPE_LABELS[typeFilter] ?? typeFilter}`,
+        onClear: () => {
+          setTypeFilter("all");
+          setSelectedCollector("all");
+        },
+      });
+    if (selectedCollector !== "all")
+      filterChips.push({
+        label: `Cobrador: ${
+          visibleCollectors.find((c) => c.id === selectedCollector)?.name ?? ""
+        }`,
+        onClear: () => setSelectedCollector("all"),
+      });
+    if (statusFilter !== "all")
+      filterChips.push({
+        label: `Status: ${STATUS_LABELS[statusFilter] ?? statusFilter}`,
+        onClear: () => setStatusFilter("all"),
+      });
+    if (overdueFilter !== "all")
+      filterChips.push({
+        label:
+          overdueFilter === "overdue" ? "Somente atrasadas" : "Somente em dia",
+        onClear: () => setOverdueFilter("all"),
+      });
+    if (cityFilter !== "all")
+      filterChips.push({
+        label: `Cidade: ${cityFilter}`,
+        onClear: () => {
+          setCityFilter("all");
+          setNeighborhoodFilter("all");
+        },
+      });
+    if (neighborhoodFilter !== "all")
+      filterChips.push({
+        label: `Bairro: ${neighborhoodFilter}`,
+        onClear: () => setNeighborhoodFilter("all"),
+      });
+    if (dateFromFilter)
+      filterChips.push({
+        label: `De: ${dateFromFilter}`,
+        onClear: () => setDateFromFilter(""),
+      });
+    if (dateToFilter)
+      filterChips.push({
+        label: `Até: ${dateToFilter}`,
+        onClear: () => setDateToFilter(""),
+      });
+
+    const quickFilters: { key: string; label: string }[] = [
+      { key: "all", label: "Todas" },
+      { key: "today", label: "Hoje" },
+      { key: "overdue", label: "Atrasadas" },
+      { key: "pending", label: "Agendadas" },
+    ];
+
+    const typePills: { value: UserType | "all"; label: string }[] = [
+      { value: "all", label: "Todos" },
+      { value: "internal_collector", label: "Interno" },
+      { value: "collector", label: "Externo" },
+      { value: "third_party_collector", label: "Terceirizado" },
+    ];
+
     return (
       <div className="space-y-4">
-        {/* Filtros — Estilo Moderno e Responsivo */}
-        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
-          <div className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <Filter className="h-4 w-4 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text tracking-wide">
-                    Visitas
-                  </h3>
-                  <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary mt-0.5">
-                    {filteredVisitsFlat.length} {filteredVisitsFlat.length === 1 ? "registro encontrado" : "registros encontrados"}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  onClick={handleExportToExcel}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-xl transition-all shadow-sm"
-                >
-                  <FileDown className="h-4 w-4" />
-                  <span>Exportar Excel</span>
-                </button>
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl transition-all border text-xs font-semibold ${
-                    showFilters || activeFiltersCount > 0
-                      ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                      : "bg-gray-50 dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg"
-                  }`}
-                >
-                  <Filter className="h-4 w-4" />
-                  <span>
-                    Filtros {activeFiltersCount > 0 && `(${activeFiltersCount})`}
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Chips de Filtros Rápidos — Novo */}
-            <div className="flex items-center gap-2 overflow-x-auto pt-1 pb-3 sm:overflow-visible scrollbar-hide -mx-1 px-1">
-              <button
-                onClick={() => applyQuickFilter("all")}
-                className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all border ${
-                  activeFiltersCount === 0
-                    ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                    : "bg-white dark:bg-dark-bg-secondary text-gray-500 dark:text-dark-text-secondary border-gray-100 dark:border-dark-border hover:border-blue-200"
-                }`}
-              >
-                Todas
-              </button>
-              <button
-                onClick={() => applyQuickFilter("today")}
-                className="shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold border bg-white dark:bg-dark-bg-secondary text-gray-500 dark:text-dark-text-secondary border-gray-100 dark:border-dark-border hover:border-blue-200 transition-all"
-              >
-                Hoje
-              </button>
-              <button
-                onClick={() => applyQuickFilter("overdue")}
-                className="shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold border bg-white dark:bg-dark-bg-secondary text-gray-500 dark:text-dark-text-secondary border-gray-100 dark:border-dark-border hover:border-blue-200 transition-all"
-              >
-                Atrasadas
-              </button>
-              <button
-                onClick={() => applyQuickFilter("pending")}
-                className="shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold border bg-white dark:bg-dark-bg-secondary text-gray-500 dark:text-dark-text-secondary border-gray-100 dark:border-dark-border hover:border-blue-200 transition-all"
-              >
-                Agendadas
-              </button>
-              {activeFiltersCount > 0 && (
-                <button
-                  onClick={clearAllFilters}
-                  className="shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold border border-red-100 dark:border-red-950/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
-                >
-                  Limpar
-                </button>
-              )}
-            </div>
-
-            {/* Busca Principal */}
-            <div className="relative group mt-2">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+        {/* Barra de Filtros — visual unificado (igual às demais telas) */}
+        <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-150/80 dark:border-dark-border shadow-sm space-y-3">
+          {/* Linha: busca + ações */}
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               <input
                 type="text"
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
                 placeholder="Buscar por cliente, documento ou endereço..."
-                className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-gray-450"
               />
             </div>
+            <button
+              onClick={handleExportToExcel}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-all shadow-sm whitespace-nowrap shrink-0"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              <span>Exportar</span>
+            </button>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
+                showFilters || activeFiltersCount > 0
+                  ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                  : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+              }`}
+            >
+              <Filter className="h-3.5 w-3.5" />
+              <span>
+                Filtros{activeFiltersCount > 0 && ` (${activeFiltersCount})`}
+              </span>
+            </button>
+          </div>
 
-            {/* Filtros Avançados Colapsáveis */}
-            {showFilters && (
-              <div className="mt-6 pt-6 border-t border-gray-50 dark:border-dark-border animate-in fade-in slide-in-from-top-4 duration-300">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-gray-400 dark:text-dark-text-secondary ml-1">Tipo de Cobrador</label>
-                    <select
-                      value={typeFilter}
-                      onChange={(e) => {
-                        setTypeFilter(e.target.value as UserType | "all");
-                        setSelectedCollector("all");
-                      }}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">Todos</option>
-                      <option value="internal_collector">Interno</option>
-                      <option value="collector">Externo</option>
-                      <option value="third_party_collector">Terceirizado</option>
-                    </select>
-                  </div>
+          {/* Atalhos rápidos (pills) */}
+          <div className="flex flex-wrap items-center gap-2">
+            {quickFilters.map((q) => {
+              const todayStr = formatDateToYYYYMMDD(new Date());
+              const isTodayActive =
+                dateFromFilter === todayStr &&
+                dateToFilter === todayStr &&
+                statusFilter === "agendada" &&
+                overdueFilter === "all";
+              const isOverdueActive =
+                !dateFromFilter &&
+                dateToFilter === todayStr &&
+                overdueFilter === "overdue" &&
+                statusFilter === "agendada";
+              const isPendingActive =
+                statusFilter === "agendada" && overdueFilter === "not_overdue";
+              const isAnyQuickFilterActive =
+                isTodayActive || isOverdueActive || isPendingActive;
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-gray-400 dark:text-dark-text-secondary ml-1">Cobrador</label>
-                    <select
-                      value={selectedCollector}
-                      onChange={(e) => setSelectedCollector(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">Todos os Cobradores</option>
-                      {visibleCollectors.map((collector) => (
-                        <option key={collector.id} value={collector.id}>
-                          {collector.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+              let isActive = false;
+              if (q.key === "all") {
+                isActive = !isAnyQuickFilterActive;
+              } else if (q.key === "today") {
+                isActive = isTodayActive;
+              } else if (q.key === "overdue") {
+                isActive = isOverdueActive;
+              } else if (q.key === "pending") {
+                isActive = isPendingActive;
+              }
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-gray-400 dark:text-dark-text-secondary ml-1">Status</label>
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">Todos os Status</option>
-                      <option value="agendada">Agendada</option>
-                      <option value="realizada">Realizada</option>
-                      <option value="cancelada">Cancelada</option>
-                      <option value="nao_encontrado">Não Encontrado</option>
-                      <option value="reagendada">Reagendada</option>
-                    </select>
-                  </div>
+              return (
+                <button
+                  key={q.key}
+                  type="button"
+                  onClick={() => applyQuickFilter(q.key)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                    isActive
+                      ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                      : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+                  }`}
+                >
+                  {q.label}
+                </button>
+              );
+            })}
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-gray-400 dark:text-dark-text-secondary ml-1">Atraso</label>
-                    <select
-                      value={overdueFilter}
-                      onChange={(e) => setOverdueFilter(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">Todas as Visitas</option>
-                      <option value="overdue">Somente Atrasadas</option>
-                      <option value="not_overdue">Somente em Dia</option>
-                    </select>
-                  </div>
+            <span className="w-px h-5 bg-gray-200 dark:bg-dark-border mx-1 hidden sm:block" />
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-gray-400 dark:text-dark-text-secondary ml-1">Cidade</label>
-                    <select
-                      value={cityFilter}
-                      onChange={(e) => {
-                        setCityFilter(e.target.value);
-                        setNeighborhoodFilter("all");
-                      }}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">Todas as Cidades</option>
-                      {availableCities.map((city) => (
-                        <option key={city} value={city}>
-                          {city}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+            {typePills.map((p) => {
+              const isActive = typeFilter === p.value;
+              return (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => {
+                    setTypeFilter(p.value);
+                    setSelectedCollector("all");
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                    isActive
+                      ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                      : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-gray-400 dark:text-dark-text-secondary ml-1">Bairro</label>
-                    <select
-                      value={neighborhoodFilter}
-                      onChange={(e) => setNeighborhoodFilter(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">Todos os Bairros</option>
-                      {availableNeighborhoods.map((neighborhood) => (
-                        <option key={neighborhood} value={neighborhood}>
-                          {neighborhood}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+            <span className="text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary ml-auto">
+              {filteredVisitsFlat.length}{" "}
+              {filteredVisitsFlat.length === 1 ? "registro" : "registros"}
+            </span>
+          </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-gray-400 dark:text-dark-text-secondary ml-1">Início</label>
-                    <input
-                      type="date"
-                      value={dateFromFilter}
-                      onChange={(e) => setDateFromFilter(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+          {/* Painel avançado */}
+          {showFilters && (
+            <div className="pt-3 border-t border-gray-100 dark:border-dark-border animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                    Tipo de Cobrador
+                  </label>
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => {
+                      setTypeFilter(e.target.value as UserType | "all");
+                      setSelectedCollector("all");
+                    }}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="internal_collector">Interno</option>
+                    <option value="collector">Externo</option>
+                    <option value="third_party_collector">Terceirizado</option>
+                  </select>
+                </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-gray-400 dark:text-dark-text-secondary ml-1">Fim</label>
-                    <input
-                      type="date"
-                      value={dateToFilter}
-                      onChange={(e) => setDateToFilter(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                    Cobrador
+                  </label>
+                  <select
+                    value={selectedCollector}
+                    onChange={(e) => setSelectedCollector(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  >
+                    <option value="all">Todos os Cobradores</option>
+                    {visibleCollectors.map((collector) => (
+                      <option key={collector.id} value={collector.id}>
+                        {collector.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-gray-400 dark:text-dark-text-secondary ml-1">Registros</label>
-                    <select
-                      value={visitsPerPage}
-                      onChange={handleVisitsPerPageChange}
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value={5}>5 por Página</option>
-                      <option value={10}>10 por Página</option>
-                      <option value={50}>50 por Página</option>
-                      <option value={100}>100 por Página</option>
-                    </select>
-                  </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                    Status
+                  </label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  >
+                    <option value="all">Todos os Status</option>
+                    <option value="agendada">Agendada</option>
+                    <option value="realizada">Realizada</option>
+                    <option value="cancelada">Cancelada</option>
+                    <option value="nao_encontrado">Não Encontrado</option>
+                    <option value="reagendada">Reagendada</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                    Atraso
+                  </label>
+                  <select
+                    value={overdueFilter}
+                    onChange={(e) => setOverdueFilter(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  >
+                    <option value="all">Todas as Visitas</option>
+                    <option value="overdue">Somente Atrasadas</option>
+                    <option value="not_overdue">Somente em Dia</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                    Cidade
+                  </label>
+                  <select
+                    value={cityFilter}
+                    onChange={(e) => {
+                      setCityFilter(e.target.value);
+                      setNeighborhoodFilter("all");
+                    }}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  >
+                    <option value="all">Todas as Cidades</option>
+                    {availableCities.map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                    Bairro
+                  </label>
+                  <select
+                    value={neighborhoodFilter}
+                    onChange={(e) => setNeighborhoodFilter(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  >
+                    <option value="all">Todos os Bairros</option>
+                    {availableNeighborhoods.map((neighborhood) => (
+                      <option key={neighborhood} value={neighborhood}>
+                        {neighborhood}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                    Início
+                  </label>
+                  <input
+                    type="date"
+                    value={dateFromFilter}
+                    onChange={(e) => setDateFromFilter(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                    Fim
+                  </label>
+                  <input
+                    type="date"
+                    value={dateToFilter}
+                    onChange={(e) => setDateToFilter(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                    Registros
+                  </label>
+                  <select
+                    value={visitsPerPage}
+                    onChange={handleVisitsPerPageChange}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  >
+                    <option value={5}>5 por Página</option>
+                    <option value={10}>10 por Página</option>
+                    <option value={50}>50 por Página</option>
+                    <option value={100}>100 por Página</option>
+                  </select>
                 </div>
               </div>
-            )}
-          </div>
+
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={clearAllFilters}
+                  className="text-xs font-medium text-red-500 hover:text-red-600 hover:underline transition-colors"
+                >
+                  Limpar filtros
+                </button>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Chips de filtros ativos */}
+        {filterChips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 p-2 bg-gray-50/50 dark:bg-dark-bg/25 rounded-xl border border-gray-150/40 dark:border-dark-border/40">
+            <span className="text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary pl-1.5 mr-1">
+              Filtros ativos:
+            </span>
+            {filterChips.map((chip, index) => (
+              <div
+                key={index}
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-white dark:bg-dark-bg-secondary text-gray-700 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-lg shadow-sm"
+              >
+                <span>{chip.label}</span>
+                <button
+                  onClick={chip.onClear}
+                  className="w-4 h-4 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-dark-bg transition-all ml-1"
+                  title="Remover filtro"
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={clearAllFilters}
+              className="ml-auto text-[10px] font-bold text-red-500 hover:text-red-600 hover:underline px-2 transition-colors"
+            >
+              Limpar Todos
+            </button>
+          </div>
+        )}
 
         {/* Visit Cards */}
         {Object.keys(groupedVisits).length === 0 ? (
