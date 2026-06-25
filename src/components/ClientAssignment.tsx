@@ -19,7 +19,9 @@ import {
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
 import { supabase } from "../lib/supabase";
-import { Collection, isCollectorType } from "../types";
+import { Collection, isCollectorType, ClientGroup } from "../types";
+import { createPortal } from "react-dom";
+import ClientDetailModal from "./dashboard/ClientDetailModal";
 import { countVendas } from "../filters/sales";
 import { getClientPending } from "../filters/clientStatus";
 import { formatCurrency, formatDate } from "../utils/formatters";
@@ -174,8 +176,24 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   const {
     collections,
     users,
+    getClientGroups,
   } = useCollection();
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedClientGroup, setSelectedClientGroup] = useState<ClientGroup | null>(null);
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+
+  const handleOpenClientModal = (documento: string, clienteName: string) => {
+    const cGroups = getClientGroups();
+    const group = cGroups.find(
+      (cg) => cg.document === (documento || "").trim()
+    );
+    if (group) {
+      setSelectedClientGroup(group);
+      setIsClientModalOpen(true);
+    } else {
+      onViewClient?.(documento || clienteName);
+    }
+  };
   const [selectedClients, setSelectedClients] = useState<Set<string>>(
     new Set(),
   );
@@ -704,6 +722,57 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     setSelectedClients(newSelected);
   };
 
+  // Estado -> sigla (UF). Aceita valor ja abreviado (2 letras) ou nome completo.
+  const UF_MAP: Record<string, string> = {
+    ACRE: "AC",
+    ALAGOAS: "AL",
+    AMAPA: "AP",
+    AMAZONAS: "AM",
+    BAHIA: "BA",
+    CEARA: "CE",
+    "DISTRITO FEDERAL": "DF",
+    "ESPIRITO SANTO": "ES",
+    GOIAS: "GO",
+    MARANHAO: "MA",
+    "MATO GROSSO": "MT",
+    "MATO GROSSO DO SUL": "MS",
+    "MINAS GERAIS": "MG",
+    PARA: "PA",
+    PARAIBA: "PB",
+    PARANA: "PR",
+    PERNAMBUCO: "PE",
+    PIAUI: "PI",
+    "RIO DE JANEIRO": "RJ",
+    "RIO GRANDE DO NORTE": "RN",
+    "RIO GRANDE DO SUL": "RS",
+    RONDONIA: "RO",
+    RORAIMA: "RR",
+    "SANTA CATARINA": "SC",
+    "SAO PAULO": "SP",
+    SERGIPE: "SE",
+    TOCANTINS: "TO",
+  };
+
+  const toUF = (estado?: string | null): string => {
+    if (!estado) return "";
+    const raw = estado.trim();
+    if (raw.length === 2) return raw.toUpperCase();
+    const key = raw
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "");
+    return UF_MAP[key] ?? raw;
+  };
+
+  // Melhor telefone disponivel do cliente (qualquer parcela).
+  const getClientPhone = (collections: typeof filteredClients[number]["collections"]): string => {
+    for (const c of collections) {
+      const phone = c.telefone || c.celular || c.celular1 || c.celular2;
+      if (phone) return phone;
+    }
+    return "";
+  };
+
   const handleExportToExcel = () => {
     // 1. Planilha 1: Clientes (Resumo)
     const clientRows = filteredClients.map((client) => {
@@ -711,12 +780,16 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
       const receivedValue = client.collections.reduce((sum, c) => sum + c.valor_recebido, 0);
       const pendingValue = getClientPending(client.collections);
       const situacao = getSituacaoIndicator(client.collections);
+      const firstCol = client.collections[0];
 
       return {
         "Cliente": client.cliente ? client.cliente.toUpperCase() : "",
         "Documento": client.documento || "",
         "Apelido": client.apelido ? client.apelido.toUpperCase() : "",
+        "Telefone": getClientPhone(client.collections),
+        "CEP": firstCol?.cep || "",
         "Cidade": client.cidade || "",
+        "Estado": toUF(firstCol?.estado),
         "Bairro": client.bairro || "",
         "Cobrador": client.collectorName || "Sem Cobrador",
         "Qtd Vendas": countVendas(client.collections),
@@ -735,7 +808,10 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
       { wch: 35 }, // Cliente
       { wch: 18 }, // Documento
       { wch: 20 }, // Apelido
+      { wch: 16 }, // Telefone
+      { wch: 12 }, // CEP
       { wch: 18 }, // Cidade
+      { wch: 8 }, // Estado
       { wch: 18 }, // Bairro
       { wch: 25 }, // Cobrador
       { wch: 12 }, // Qtd Vendas
@@ -1489,7 +1565,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onViewClient?.(client.documento || client.cliente);
+                              handleOpenClientModal(client.documento || "", client.cliente || "");
                             }}
                             title={`Ver cobranças de ${client.cliente}`}
                             className="text-left text-sm font-semibold text-gray-900 dark:text-dark-text truncate max-w-[250px] hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
@@ -1590,7 +1666,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onViewClient?.(client.documento || client.cliente);
+                              handleOpenClientModal(client.documento || "", client.cliente || "");
                             }}
                             className="text-left text-[13px] font-semibold text-gray-900 dark:text-dark-text truncate tracking-tight leading-tight hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
                           >
@@ -1796,6 +1872,20 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         onClose={() => setShowReport(false)}
         users={users}
       />
+
+      {isClientModalOpen &&
+        selectedClientGroup &&
+        createPortal(
+          <ClientDetailModal
+            clientGroup={selectedClientGroup}
+            userType="manager"
+            onClose={() => {
+              setIsClientModalOpen(false);
+              setSelectedClientGroup(null);
+            }}
+          />,
+          document.body,
+        )}
     </div>
   );
 });

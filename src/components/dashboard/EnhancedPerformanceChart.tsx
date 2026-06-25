@@ -14,10 +14,11 @@ import {
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
+import { getClientPaymentStatus } from "../../filters/clientStatus";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
 import FilterBar from "../common/FilterBar";
-import { User, UserType, FilterOptions, isCollectorType } from "../../types";
+import { User, UserType, FilterOptions, isCollectorType, Collection } from "../../types";
 
 interface EnhancedCollectorPerformance {
   collectorId: string;
@@ -48,6 +49,11 @@ interface EnhancedCollectorPerformance {
   visitsCanceladas: number;
   visitsAtrasadas: number;
   visitsReagendadas: number;
+  salesPaid: number;
+  salesUnpaidOrPartial: number;
+  salesTotalPeriod: number;
+  clientsPaid: number;
+  clientsUnpaidOrPartial: number;
 }
 
 const EnhancedPerformanceChart: React.FC = () => {
@@ -160,6 +166,26 @@ const EnhancedPerformanceChart: React.FC = () => {
       return monthMatches && yearMatches;
     };
 
+    // Group all active collections by client once (respecting filter bar criteria)
+    const globalClientsMap = new Map<string, Collection[]>();
+    sourceCollections.forEach((collection) => {
+      const key = (collection.documento || collection.cliente || "").trim();
+      if (!key) return;
+      if (!globalClientsMap.has(key)) {
+        globalClientsMap.set(key, []);
+      }
+      globalClientsMap.get(key)!.push(collection);
+    });
+
+    // Determine the collector for each client group using the first non-null user_id (matches ClientAssignment rule)
+    const clientCollectorMap = new Map<string, string>(); // clientKey -> collectorId
+    globalClientsMap.forEach((clientCollections, key) => {
+      const assignedCollection = clientCollections.find((c) => c.user_id);
+      if (assignedCollection?.user_id) {
+        clientCollectorMap.set(key, assignedCollection.user_id);
+      }
+    });
+
     return collectors.map((collector) => {
       const filteredCollections = sourceCollections.filter((c) => {
         if (c.user_id !== collector.id) return false;
@@ -202,17 +228,57 @@ const EnhancedPerformanceChart: React.FC = () => {
           return sum + (diff > 0.01 ? diff : 0);
         }, 0);
 
-      const salesMap = new Map<string, { clientDocument: string; isPending: boolean }>();
+      const salesMap = new Map<
+        string,
+        {
+          clientDocument: string;
+          isPending: boolean;
+          collections: Collection[];
+        }
+      >();
       filteredCollections.forEach((collection) => {
         const saleKey = `${collection.venda_n}-${collection.documento}`;
         if (!salesMap.has(saleKey)) {
-          salesMap.set(saleKey, { clientDocument: collection.documento || "", isPending: false });
+          salesMap.set(saleKey, {
+            clientDocument: collection.documento || "",
+            isPending: false,
+            collections: [],
+          });
         }
-        const isPending = Number(collection.valor_original) - Number(collection.valor_recebido) > 0.01;
-        if (isPending) salesMap.get(saleKey)!.isPending = true;
+        salesMap.get(saleKey)!.collections.push(collection);
       });
+
+      let salesPaid = 0;
+      let salesUnpaidOrPartial = 0;
+      salesMap.forEach((sale) => {
+        const status = getClientPaymentStatus(sale.collections);
+        if (status === "pago") {
+          salesPaid++;
+        } else {
+          salesUnpaidOrPartial++;
+          sale.isPending = true;
+        }
+      });
+      const salesTotal = salesMap.size;
+
       const salesArray = Array.from(salesMap.values());
-      const pendingSales = salesArray.filter((s) => s.isPending).length;
+      const pendingSales = salesUnpaidOrPartial;
+
+      // Cálculo do status da carteira (Pago, Parcial/Atrasado) usando o mapeamento global por documento/cliente
+      let clientsPaid = 0;
+      let clientsUnpaidOrPartial = 0;
+
+      globalClientsMap.forEach((clientCollections, clientKey) => {
+        const assignedCollectorId = clientCollectorMap.get(clientKey);
+        if (assignedCollectorId === collector.id) {
+          const status = getClientPaymentStatus(clientCollections);
+          if (status === "pago") {
+            clientsPaid++;
+          } else {
+            clientsUnpaidOrPartial++;
+          }
+        }
+      });
 
       // Total de títulos sem filtro de período
       const allSalesSet = new Set(
@@ -264,7 +330,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       const visitsPerformance = currentMonthVisitsGoal > 0 ? (currentMonthVisitsActual / currentMonthVisitsGoal) * 100 : 0;
       const paymentsPerformance = currentMonthPaymentsGoal > 0 ? (receivedAmount / currentMonthPaymentsGoal) * 100 : 0;
 
-      const allAssignedClients = new Set(sourceCollections.filter((c) => c.user_id === collector.id).map((c) => c.documento).filter(Boolean)).size;
+      const allAssignedClients = clientsPaid + clientsUnpaidOrPartial;
       const visitedClients = new Set(scheduledVisits.filter(v => v.collectorId === collector.id && v.status === "realizada" && isDateInSelectedMonths(parseDateSafely(v.dataVisitaRealizada || v.scheduledDate))).map(v => v.clientDocument).filter(Boolean)).size;
 
       return {
@@ -296,6 +362,11 @@ const EnhancedPerformanceChart: React.FC = () => {
         visitsCanceladas,
         visitsAtrasadas,
         visitsReagendadas,
+        salesPaid,
+        salesUnpaidOrPartial,
+        salesTotalPeriod: salesTotal,
+        clientsPaid,
+        clientsUnpaidOrPartial,
       };
     });
   }, [sourceCollections, allowedDocs, hasSourceFilter, users, monthlyGoals, salePayments, scheduledVisits, selectedMonths, selectedYears]);
@@ -640,7 +711,7 @@ const EnhancedPerformanceChart: React.FC = () => {
           return (
             <div 
               key={collector.collectorId}
-              className="group bg-white dark:bg-dark-bg-secondary rounded-2xl p-5 border border-gray-100 dark:border-dark-border hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-250/20 dark:hover:shadow-black/20 transition-all duration-300 cursor-pointer flex flex-col justify-between"
+              className="group bg-white dark:bg-dark-bg-secondary rounded-2xl p-5 border border-gray-100 dark:border-dark-border hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/20 dark:hover:shadow-black/20 transition-all duration-300 cursor-pointer flex flex-col justify-between"
             >
               <div>
                 {/* Header do Card */}
@@ -654,7 +725,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                           : rank === 2 
                             ? "bg-gradient-to-r from-slate-100 to-gray-50 text-slate-700 dark:from-slate-800/40 dark:to-gray-800/20 dark:text-slate-300 border border-slate-200/50"
                             : "bg-gradient-to-r from-orange-100 to-orange-50 text-orange-700 dark:from-orange-950/40 dark:to-orange-900/20 dark:text-orange-300 border border-orange-200/50"
-                        : "bg-gray-50 dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-150 dark:border-dark-border"
+                        : "bg-gray-50 dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border"
                     }`}>
                       {rank}
                       {isTop3 && <Trophy className="absolute -top-1 -right-1 w-3.5 h-3.5 text-amber-500" />}
@@ -691,59 +762,92 @@ const EnhancedPerformanceChart: React.FC = () => {
 
                 <div className="h-px bg-gray-100 dark:bg-dark-border/50 my-4" />
 
-                {/* Grid de Informações - Sem bordas excessivas */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 mb-5">
-                  {/* Volume Financeiro */}
-                  <div>
-                    <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-2">Volume Financeiro</span>
-                    <div className="space-y-1.5">
-                      {sortBy !== "receivedAmount" && (
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-gray-500 dark:text-dark-text-secondary">Recebido</span>
-                          <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(collector.receivedAmount)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-500 dark:text-dark-text-secondary font-medium">Agendados</span>
-                        <span className="font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(collector.pendingAmountScheduled)}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-500 dark:text-dark-text-secondary font-medium">Total Aberto</span>
-                        <span className="font-semibold text-rose-600 dark:text-rose-400">{formatCurrency(collector.pendingAmountTotal)}</span>
-                      </div>
+                {/* Grid de Informações - Layout 2x1 com Tabelas Comparativas */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-5">
+                  {/* Tabela 1: Carteira vs Fichas/Venda */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-dark-text-secondary block mb-1">
+                      Carteira vs Fichas/Venda
+                    </span>
+                    <div className="border border-gray-100 dark:border-dark-border/40 rounded-xl overflow-hidden bg-gray-50/25 dark:bg-dark-bg/10">
+                      <table className="w-full text-xs text-left border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 dark:bg-dark-bg/50 border-b border-gray-100 dark:border-dark-border/40 text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider h-8">
+                            <th className="px-3 py-2 whitespace-nowrap">Indicador</th>
+                            <th className="px-3 py-2 text-right whitespace-nowrap">Carteira</th>
+                            <th className="px-3 py-2 text-right whitespace-nowrap">Fichas/Venda</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-dark-border/20 text-gray-700 dark:text-dark-text">
+                          <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
+                            <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">Pagos</td>
+                            <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">{collector.clientsPaid}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">{collector.salesPaid}</td>
+                          </tr>
+                          <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
+                            <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">Pendente + Parcial</td>
+                            <td className="px-3 py-2 text-right font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">{collector.clientsUnpaidOrPartial}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">{collector.salesUnpaidOrPartial}</td>
+                          </tr>
+                          {/* Spacer row for desktop alignment with the 4-row Financeiro table */}
+                          <tr className="hidden sm:table-row h-9 !border-t-0">
+                            <td colSpan={3} className="px-3 py-2"></td>
+                          </tr>
+                          <tr className="bg-gray-50/40 dark:bg-dark-bg/30 font-bold text-gray-900 dark:text-dark-text h-10">
+                            <td className="px-3 py-2.5 whitespace-nowrap">Total</td>
+                            <td className="px-3 py-2.5 text-right whitespace-nowrap">{collector.totalAssignedClients}</td>
+                            <td className="px-3 py-2.5 text-right whitespace-nowrap">{collector.salesTotalPeriod}</td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-
-                  {/* Visitas no Período */}
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wider">Visitas</span>
-                      {collector.currentMonthVisitsGoal > 0 && (
-                        <span className="text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary">Meta: {collector.currentMonthVisitsGoal}</span>
-                      )}
+                      {/* Tabela 2: Financeiro vs Visitas */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-dark-text-secondary block mb-1">
+                      Financeiro vs Visitas
+                    </span>
+                    <div className="border border-gray-100 dark:border-dark-border/40 rounded-xl overflow-hidden bg-gray-50/25 dark:bg-dark-bg/10">
+                      <table className="w-full text-xs text-left border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 dark:bg-dark-bg/50 border-b border-gray-100 dark:border-dark-border/40 text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider h-8">
+                            <th className="px-3 py-2 whitespace-nowrap">Indicador</th>
+                            <th className="px-3 py-2 text-right whitespace-nowrap">Financeiro</th>
+                            <th className="px-3 py-2 text-right whitespace-nowrap">Visitas</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-dark-border/20 text-gray-700 dark:text-dark-text">
+                          <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
+                            <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">Feitas</td>
+                            <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">{formatCurrency(collector.receivedAmount)}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">{collector.visitsRealizadas}</td>
+                          </tr>
+                          <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
+                            <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">Agendados</td>
+                            <td className="px-3 py-2 text-right font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">{formatCurrency(collector.pendingAmountScheduled)}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">{collector.visitsAgendadas}</td>
+                          </tr>
+                          <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
+                            <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">Atrasado</td>
+                            <td className="px-3 py-2 text-right font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">{formatCurrency(collector.pendingAmountTotal)}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">{collector.visitsAtrasadas}</td>
+                          </tr>
+                          <tr className="bg-gray-50/40 dark:bg-dark-bg/30 font-bold text-gray-900 dark:text-dark-text h-10">
+                            <td className="px-3 py-2.5 whitespace-nowrap">Total</td>
+                            <td className="px-3 py-2.5 text-right font-bold whitespace-nowrap">
+                              {collector.currentMonthPaymentsGoal > 0 
+                                ? formatCurrency(collector.currentMonthPaymentsGoal) 
+                                : formatCurrency(collector.totalAmount)}
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-bold whitespace-nowrap">
+                              {collector.currentMonthVisitsGoal > 0 
+                                ? collector.currentMonthVisitsGoal 
+                                : (collector.visitsRealizadas + collector.visitsAgendadas)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
-                    <div className="grid grid-cols-3 gap-1 mb-2 text-center">
-                      <div className="text-left">
-                        <span className="text-[9px] font-bold text-blue-500 block leading-none">Feitas</span>
-                        <span className="text-xs font-bold text-gray-800 dark:text-dark-text">{collector.visitsRealizadas}</span>
-                      </div>
-                      <div>
-                        <span className="text-[9px] font-bold text-amber-500 block leading-none">Agend.</span>
-                        <span className={`text-xs font-bold ${collector.visitsAgendadas > 0 ? "text-amber-500" : "text-gray-300 dark:text-gray-700"}`}>{collector.visitsAgendadas}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[9px] font-bold text-rose-500 block leading-none">Atras.</span>
-                        <span className={`text-xs font-bold ${collector.visitsAtrasadas > 0 ? "text-rose-500" : "text-gray-300 dark:text-gray-700"}`}>{collector.visitsAtrasadas}</span>
-                      </div>
-                    </div>
-                    {collector.currentMonthVisitsGoal > 0 && (
-                      <div className="w-full bg-gray-100 dark:bg-dark-bg h-1 rounded-full overflow-hidden">
-                        <div 
-                          className="bg-blue-600 h-full transition-all duration-500" 
-                          style={{ width: `${Math.min(100, (collector.visitsRealizadas / collector.currentMonthVisitsGoal) * 100)}%` }} 
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -762,7 +866,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                     const user = users.find(u => u.id === collector.collectorId);
                     if (user) { setSelectedCollectorForGoals(user); setIsGoalModalOpen(true); }
                   }}
-                  className="flex items-center justify-center gap-2 py-2.5 bg-white hover:bg-gray-50 dark:bg-dark-bg text-gray-755 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-xl text-xs font-semibold tracking-wide transition-all active:scale-95 group/btn"
+                  className="flex items-center justify-center gap-2 py-2.5 bg-white hover:bg-gray-50 dark:bg-dark-bg text-gray-700 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-xl text-xs font-semibold tracking-wide transition-all active:scale-95 group/btn"
                 >
                   <Target className="w-3.5 h-3.5 text-blue-500 group-hover/btn:scale-110 transition-transform" />
                   Metas

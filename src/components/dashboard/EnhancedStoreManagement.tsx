@@ -520,18 +520,18 @@ const EnhancedStoreManagement: React.FC = () => {
                       <div>
                         <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-0.5">Vendas</span>
                         <div className="text-sm font-bold text-gray-900 dark:text-dark-text">
-                          {store.totalSales} <span className="text-xs font-normal text-gray-555 dark:text-dark-text-secondary">fichas</span>
+                          {store.totalSales} <span className="text-xs font-normal text-gray-500 dark:text-dark-text-secondary">fichas</span>
                         </div>
                       </div>
                       <div>
                         <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-0.5">Clientes</span>
                         <div className="text-sm font-bold text-gray-900 dark:text-dark-text">
-                          {store.clientsCount} <span className="text-xs font-normal text-gray-555 dark:text-dark-text-secondary">base</span>
+                          {store.clientsCount} <span className="text-xs font-normal text-gray-500 dark:text-dark-text-secondary">base</span>
                         </div>
                       </div>
                       <div>
                         <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-0.5">Recebido</span>
-                        <div className="text-sm font-bold text-green-600 dark:text-green-455">
+                        <div className="text-sm font-bold text-green-600 dark:text-green-400">
                           {formatCurrency(store.receivedAmount)}
                         </div>
                       </div>

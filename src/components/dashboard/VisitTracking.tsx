@@ -894,6 +894,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               <input
                 type="text"
+                id="visit-search-filter"
+                name="visitSearchFilter"
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
                 placeholder="Buscar por cliente, documento ou endereço..."
@@ -1002,10 +1004,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             <div className="pt-3 border-t border-gray-100 dark:border-dark-border animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                  <label htmlFor="type-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
                     Tipo de Cobrador
                   </label>
                   <select
+                    id="type-filter"
+                    name="typeFilter"
                     value={typeFilter}
                     onChange={(e) => {
                       setTypeFilter(e.target.value as UserType | "all");
@@ -1021,10 +1025,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                  <label htmlFor="collector-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
                     Cobrador
                   </label>
                   <select
+                    id="collector-filter"
+                    name="collectorFilter"
                     value={selectedCollector}
                     onChange={(e) => setSelectedCollector(e.target.value)}
                     className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
@@ -1039,10 +1045,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                  <label htmlFor="status-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
                     Status
                   </label>
                   <select
+                    id="status-filter"
+                    name="statusFilter"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                     className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
@@ -1057,10 +1065,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                  <label htmlFor="overdue-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
                     Atraso
                   </label>
                   <select
+                    id="overdue-filter"
+                    name="overdueFilter"
                     value={overdueFilter}
                     onChange={(e) => setOverdueFilter(e.target.value)}
                     className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
@@ -1072,10 +1082,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                  <label htmlFor="city-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
                     Cidade
                   </label>
                   <select
+                    id="city-filter"
+                    name="cityFilter"
                     value={cityFilter}
                     onChange={(e) => {
                       setCityFilter(e.target.value);
@@ -1093,10 +1105,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                  <label htmlFor="neighborhood-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
                     Bairro
                   </label>
                   <select
+                    id="neighborhood-filter"
+                    name="neighborhoodFilter"
                     value={neighborhoodFilter}
                     onChange={(e) => setNeighborhoodFilter(e.target.value)}
                     className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
@@ -1111,11 +1125,13 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                  <label htmlFor="date-from-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
                     Início
                   </label>
                   <input
                     type="date"
+                    id="date-from-filter"
+                    name="dateFromFilter"
                     value={dateFromFilter}
                     onChange={(e) => setDateFromFilter(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
@@ -1123,11 +1139,13 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                  <label htmlFor="date-to-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
                     Fim
                   </label>
                   <input
                     type="date"
+                    id="date-to-filter"
+                    name="dateToFilter"
                     value={dateToFilter}
                     onChange={(e) => setDateToFilter(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
@@ -1135,10 +1153,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                  <label htmlFor="visits-per-page" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
                     Registros
                   </label>
                   <select
+                    id="visits-per-page"
+                    name="visitsPerPage"
                     value={visitsPerPage}
                     onChange={handleVisitsPerPageChange}
                     className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
