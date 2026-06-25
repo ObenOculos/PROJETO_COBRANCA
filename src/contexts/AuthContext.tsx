@@ -29,6 +29,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showInactivityModal, setShowInactivityModal] = useState(false);
+  const [showInactiveAccountModal, setShowInactiveAccountModal] =
+    useState(false);
   const { withLoading } = useLoading();
 
   // Função para limpar o erro de autenticação
@@ -176,7 +178,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Usuário desativado: login bloqueado também offline.
       if (foundUser.active === false) {
-        setError("Usuário desativado. Procure o gerente.");
+        setShowInactiveAccountModal(true);
         return false;
       }
 
@@ -290,7 +292,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Usuário desativado: login bloqueado (preserva histórico).
         if (foundUser.active === false) {
-          setError("Usuário desativado. Procure o gerente.");
+          setShowInactiveAccountModal(true);
           return false;
         }
 
@@ -382,6 +384,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   return (
     <AuthContext.Provider value={value}>
       {children}
+
+      {/* Modal: conta desativada (tentativa de login bloqueada) */}
+      {showInactiveAccountModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl p-6 max-w-md w-full shadow-xl">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
+                <svg
+                  className="w-6 h-6 text-red-600 dark:text-red-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-dark-text mb-2">
+                Usuário inativo
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-dark-text-secondary mb-6">
+                Este usuário está desativado e não pode acessar o sistema.
+                Procure o gerente para reativar o acesso.
+              </p>
+              <button
+                onClick={() => setShowInactiveAccountModal(false)}
+                className="w-full px-4 py-2.5 bg-gray-900 dark:bg-blue-600 text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-all"
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Inatividade */}
       {showInactivityModal && (

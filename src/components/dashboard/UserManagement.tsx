@@ -11,16 +11,37 @@ import {
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { User as UserType, UserType as UserRoleType } from "../../types";
+import {
+  User as UserType,
+  UserType as UserRoleType,
+  isCollectorType,
+} from "../../types";
+import ClearVisitsModal, {
+  pendingVisitsCount,
+} from "./ClearVisitsModal";
 
 const UserManagement: React.FC = () => {
-  const { users, addUser, updateUser, deleteUser } = useCollection();
+  const { users, addUser, updateUser, deleteUser, scheduledVisits } =
+    useCollection();
   const { user: currentUser } = useAuth();
+  const [clearVisitsFor, setClearVisitsFor] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const handleToggleActive = async (u: UserType) => {
     setActiveDropdown(null);
+    const isDeactivating = u.active ?? true; // estado atual ativo => vamos desativar
     try {
-      await updateUser(u.id, { active: !(u.active ?? true) });
+      await updateUser(u.id, { active: !isDeactivating });
+      // Ao desativar um cobrador com visitas pendentes, oferece limpá-las.
+      if (
+        isDeactivating &&
+        isCollectorType(u.type) &&
+        pendingVisitsCount(scheduledVisits, u.id) > 0
+      ) {
+        setClearVisitsFor({ id: u.id, name: u.name });
+      }
     } catch (err) {
       console.error("Erro ao (des)ativar usuário:", err);
     }
@@ -461,6 +482,15 @@ const UserManagement: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Ao desativar um cobrador: oferece limpar as visitas pendentes dele */}
+      {clearVisitsFor && (
+        <ClearVisitsModal
+          collectorId={clearVisitsFor.id}
+          collectorName={clearVisitsFor.name}
+          onClose={() => setClearVisitsFor(null)}
+        />
       )}
     </div>
   );
