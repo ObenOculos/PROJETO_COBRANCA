@@ -290,6 +290,16 @@ export interface CollectionContextType {
     skipRefresh?: boolean,
     onBatchProgress?: (completed: number, total: number) => void,
   ) => Promise<void>;
+  // Patches locais otimistas (refletem na UI sem refetch).
+  applyLocalAssignment: (
+    collectorId: string,
+    clientIdentifiers: { document?: string; clientName?: string }[],
+    transferVisits?: boolean,
+  ) => void;
+  applyLocalRemoval: (
+    clientIdentifiers: { document?: string; clientName?: string }[],
+  ) => void;
+  applyLocalStatus: (idParcelas: number[], situacao: string | null) => void;
   addAttempt: (
     collectionId: number,
     attempt: Omit<CollectionAttempt, "id">,
@@ -454,7 +464,8 @@ export interface SaleBalance {
 }
 
 export interface FilterOptions {
-  status?: string;
+  // Status de pagamento agregado. Aceita um valor ou varios (multi-select pills).
+  status?: string | string[];
   dueDate?: string;
   collector?: string;
   store?: string;

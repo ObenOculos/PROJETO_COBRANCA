@@ -7,11 +7,13 @@ import FilterPills from "../filters/FilterPills";
 import {
   FilterValues,
   FilterContext,
-  agingToDueRange,
-  dueToAging,
+  agingRangeToDueRange,
+  dueToAgingSet,
   agingLabel,
   periodLabel,
+  PAYMENT_STATUS_PILLS,
 } from "../../filters/filterConfig";
+import type { PillPatch } from "../filters/FilterPills";
 
 import { FilterOptions, UserType, isCollectorType } from "../../types";
 
@@ -137,8 +139,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
   // Adaptacao entre o modelo FilterOptions (legado desta tela) e o modelo
   // unificado FilterValues consumido pelo FilterPanel compartilhado.
+  // Valores do painel avancado (sem status/atraso — esses ficam nas pills).
   const panelValues: FilterValues = {
-    paymentStatus: filters.status,
     dueFrom: filters.dateFrom,
     dueTo: filters.dateTo,
     launchFrom: filters.launchDateFrom,
@@ -152,13 +154,35 @@ const FilterBar: React.FC<FilterBarProps> = ({
     visitsOnly: filters.visitsOnly,
     months: filters.months,
     years: filters.years,
-    // O pill de atraso e derivado do campo de vencimento (fonte unica).
-    aging: dueToAging(filters.dateFrom, filters.dateTo),
   };
+
+  // Pills (status de pagamento + faixa de atraso) sao multi-select. O status vira
+  // lista em filters.status; o atraso vira a envoltoria de datas de vencimento.
+  const handlePillsChange = (patch: PillPatch) => {
+    const next: FilterOptions = { ...filters };
+    if ("paymentStatus" in patch) {
+      const v = patch.paymentStatus;
+      const arr = Array.isArray(v) ? v : v ? [v] : [];
+      next.status = arr.length ? arr : undefined;
+    }
+    if ("aging" in patch) {
+      const v = patch.aging;
+      const bands = Array.isArray(v) ? v : v ? [v] : [];
+      const { dueFrom, dueTo } = agingRangeToDueRange(bands);
+      next.dateFrom = dueFrom || undefined;
+      next.dateTo = dueTo || undefined;
+    }
+    onFilterChange(next);
+  };
+
+  const selectedStatuses = Array.isArray(filters.status)
+    ? filters.status
+    : filters.status
+    ? [filters.status]
+    : [];
 
   const handlePanelChange = (patch: Partial<FilterValues>) => {
     const next: FilterOptions = { ...filters };
-    if ("paymentStatus" in patch) next.status = patch.paymentStatus || undefined;
     if ("dueFrom" in patch) next.dateFrom = patch.dueFrom || undefined;
     if ("dueTo" in patch) next.dateTo = patch.dueTo || undefined;
     if ("launchFrom" in patch)
@@ -178,18 +202,6 @@ const FilterBar: React.FC<FilterBarProps> = ({
       next.months = patch.months && patch.months.length ? patch.months : undefined;
     if ("years" in patch)
       next.years = patch.years && patch.years.length ? patch.years : undefined;
-    // Pill de atraso escreve no proprio campo de vencimento (de/ate): cada faixa
-    // vira um intervalo de datas; desmarcar limpa ambos.
-    if ("aging" in patch) {
-      if (patch.aging) {
-        const { dueFrom, dueTo } = agingToDueRange(patch.aging);
-        next.dateFrom = dueFrom || undefined;
-        next.dateTo = dueTo || undefined;
-      } else {
-        next.dateFrom = undefined;
-        next.dateTo = undefined;
-      }
-    }
     onFilterChange(next);
   };
 
@@ -212,11 +224,17 @@ const FilterBar: React.FC<FilterBarProps> = ({
         onFilterChange({ ...filters, search: undefined });
       },
     });
-  if (filters.status)
+  selectedStatuses.forEach((st) => {
+    const stLabel =
+      PAYMENT_STATUS_PILLS.find((p) => p.value === st)?.label ?? st;
     activeFilterChips.push({
-      label: `Status: ${filters.status}`,
-      onClear: () => onFilterChange({ ...filters, status: undefined }),
+      label: `Status: ${stLabel}`,
+      onClear: () => {
+        const next = selectedStatuses.filter((s) => s !== st);
+        onFilterChange({ ...filters, status: next.length ? next : undefined });
+      },
     });
+  });
   if (filters.store)
     activeFilterChips.push({
       label: `Loja: ${filters.store}`,
@@ -248,12 +266,21 @@ const FilterBar: React.FC<FilterBarProps> = ({
       onClear: () =>
         onFilterChange({ ...filters, months: undefined, years: undefined }),
     });
-  const derivedAging = dueToAging(filters.dateFrom, filters.dateTo);
-  if (derivedAging) {
-    activeFilterChips.push({
-      label: `Atraso: ${agingLabel(derivedAging)}`,
-      onClear: () =>
-        onFilterChange({ ...filters, dateFrom: undefined, dateTo: undefined }),
+  const derivedAgings = dueToAgingSet(filters.dateFrom, filters.dateTo);
+  if (derivedAgings.length > 0) {
+    derivedAgings.forEach((band) => {
+      activeFilterChips.push({
+        label: `Atraso: ${agingLabel(band)}`,
+        onClear: () => {
+          const next = derivedAgings.filter((b) => b !== band);
+          const { dueFrom, dueTo } = agingRangeToDueRange(next);
+          onFilterChange({
+            ...filters,
+            dateFrom: dueFrom || undefined,
+            dateTo: dueTo || undefined,
+          });
+        },
+      });
     });
   } else {
     if (filters.dateFrom)
@@ -311,10 +338,13 @@ const FilterBar: React.FC<FilterBarProps> = ({
         {/* Atalhos rápidos: status + faixa de atraso (componente compartilhado) */}
         {(showStatusPills || showAgingPills) && (
           <FilterPills
-            values={panelValues}
-            onChange={handlePanelChange}
+            paymentStatus={selectedStatuses}
+            aging={dueToAgingSet(filters.dateFrom, filters.dateTo)}
+            onChange={handlePillsChange}
             showPaymentStatus={showStatusPills}
             showAging={showAgingPills}
+            multiPaymentStatus
+            multiAging
           />
         )}
 

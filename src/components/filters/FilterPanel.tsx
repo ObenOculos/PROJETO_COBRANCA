@@ -54,12 +54,22 @@ const Field: React.FC<{
   icon: React.ReactNode;
   label: string;
   children: React.ReactNode;
-}> = ({ icon, label, children }) => (
+  /** id do controle unico (select). Quando ausente (campos com 2 inputs/botao),
+   * usa <span> para nao gerar <label> sem associacao. */
+  htmlFor?: string;
+}> = ({ icon, label, children, htmlFor }) => (
   <div className="space-y-2">
-    <label className={labelClass}>
-      {icon}
-      {label}
-    </label>
+    {htmlFor ? (
+      <label htmlFor={htmlFor} className={labelClass}>
+        {icon}
+        {label}
+      </label>
+    ) : (
+      <span className={labelClass}>
+        {icon}
+        {label}
+      </span>
+    )}
     {children}
   </div>
 );
@@ -96,6 +106,8 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     extra?: { disabled?: boolean },
   ) => (
     <select
+      id={`filter-${field}`}
+      name={field as string}
       value={(values[field] as string) || ""}
       onChange={(e) => onChange({ [field]: e.target.value } as Partial<FilterValues>)}
       disabled={extra?.disabled}
@@ -125,7 +137,11 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-5 animate-in fade-in slide-in-from-top-4 duration-300">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {fields.paymentStatus && (
-          <Field icon={<AlertCircle className="h-3 w-3 mr-1.5" />} label="Status">
+          <Field
+            icon={<AlertCircle className="h-3 w-3 mr-1.5" />}
+            label="Status"
+            htmlFor="filter-paymentStatus"
+          >
             {renderSelect("paymentStatus", "Todos", paymentStatusOptions)}
           </Field>
         )}
@@ -134,6 +150,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
           <Field
             icon={<AlertCircle className="h-3 w-3 mr-1.5" />}
             label="Status de atribuição"
+            htmlFor="filter-assignment"
           >
             {renderSelect("assignment", "Todos", [
               { value: "with_collector", label: "Com cobrador" },
@@ -143,13 +160,21 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         )}
 
         {fields.city && (
-          <Field icon={<MapPin className="h-3 w-3 mr-1.5" />} label="Cidade">
+          <Field
+            icon={<MapPin className="h-3 w-3 mr-1.5" />}
+            label="Cidade"
+            htmlFor="filter-city"
+          >
             {renderSelect("city", "Todas as cidades", toOptions(cities))}
           </Field>
         )}
 
         {fields.neighborhood && (
-          <Field icon={<MapPin className="h-3 w-3 mr-1.5" />} label="Bairro">
+          <Field
+            icon={<MapPin className="h-3 w-3 mr-1.5" />}
+            label="Bairro"
+            htmlFor="filter-neighborhood"
+          >
             {renderSelect(
               "neighborhood",
               "Todos os bairros",
@@ -160,19 +185,31 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         )}
 
         {fields.store && (
-          <Field icon={<Building className="h-3 w-3 mr-1.5" />} label="Loja">
+          <Field
+            icon={<Building className="h-3 w-3 mr-1.5" />}
+            label="Loja"
+            htmlFor="filter-store"
+          >
             {renderSelect("store", "Todas as lojas", toOptions(stores))}
           </Field>
         )}
 
         {fields.situacao && (
-          <Field icon={<Award className="h-3 w-3 mr-1.5" />} label="Situação">
+          <Field
+            icon={<Award className="h-3 w-3 mr-1.5" />}
+            label="Situação"
+            htmlFor="filter-situacao"
+          >
             {renderSelect("situacao", "Todas as situações", SITUACAO_OPTIONS)}
           </Field>
         )}
 
         {fields.collector && (
-          <Field icon={<Users className="h-3 w-3 mr-1.5" />} label="Cobrador">
+          <Field
+            icon={<Users className="h-3 w-3 mr-1.5" />}
+            label="Cobrador"
+            htmlFor="filter-collector"
+          >
             {renderSelect("collector", "Todos os cobradores", collectors)}
           </Field>
         )}
@@ -185,6 +222,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="date"
+                name="dueFrom"
                 aria-label="Vencimento de"
                 value={values.dueFrom || ""}
                 onChange={(e) => onChange({ dueFrom: e.target.value })}
@@ -192,6 +230,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
               />
               <input
                 type="date"
+                name="dueTo"
                 aria-label="Vencimento até"
                 value={values.dueTo || ""}
                 onChange={(e) => onChange({ dueTo: e.target.value })}
@@ -209,6 +248,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="date"
+                name="launchFrom"
                 aria-label="Lançamento de"
                 value={values.launchFrom || ""}
                 onChange={(e) => onChange({ launchFrom: e.target.value })}
@@ -216,6 +256,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
               />
               <input
                 type="date"
+                name="launchTo"
                 aria-label="Lançamento até"
                 value={values.launchTo || ""}
                 onChange={(e) => onChange({ launchTo: e.target.value })}
@@ -233,6 +274,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="number"
+                name="minAmount"
                 aria-label="Valor mínimo"
                 placeholder="Mínimo"
                 value={values.minAmount ?? ""}
@@ -247,6 +289,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
               />
               <input
                 type="number"
+                name="maxAmount"
                 aria-label="Valor máximo"
                 placeholder="Máximo"
                 value={values.maxAmount ?? ""}
@@ -290,6 +333,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="date"
+                name="createdFrom"
                 aria-label="Criado de"
                 value={values.createdFrom || ""}
                 onChange={(e) => onChange({ createdFrom: e.target.value })}
@@ -297,6 +341,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
               />
               <input
                 type="date"
+                name="createdTo"
                 aria-label="Criado até"
                 value={values.createdTo || ""}
                 onChange={(e) => onChange({ createdTo: e.target.value })}

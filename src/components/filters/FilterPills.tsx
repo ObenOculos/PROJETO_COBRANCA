@@ -1,20 +1,32 @@
 import React from "react";
 import {
-  FilterValues,
   PAYMENT_STATUS_PILLS,
   AGING_PILLS,
 } from "../../filters/filterConfig";
 
+/** Patch emitido pelas pills. Campos podem ser unicos ou lista (multi). */
+export interface PillPatch {
+  paymentStatus?: string | string[];
+  aging?: string | string[];
+}
+
 interface FilterPillsProps {
-  values: Pick<FilterValues, "paymentStatus" | "aging">;
+  /** Status de pagamento selecionado(s): string (single) ou string[] (multi). */
+  paymentStatus?: string | string[];
+  /** Faixa(s) de atraso selecionada(s): string (single) ou string[] (multi). */
+  aging?: string | string[];
   /** Recebe apenas o campo alterado; a pagina mescla no seu estado. */
-  onChange: (patch: Partial<FilterValues>) => void;
+  onChange: (patch: PillPatch) => void;
   /** Mostra os atalhos de status de pagamento (Pendente/Pago/Parcial/Cancelado). */
   showPaymentStatus?: boolean;
   /** Valores de status a ocultar (ex.: "cancelado" na Atribuicao). */
   excludePaymentStatus?: string[];
   /** Mostra os atalhos de faixa de atraso (+30/+60/+90/+120 dias). */
   showAging?: boolean;
+  /** Permite selecionar varios status de pagamento simultaneamente. */
+  multiPaymentStatus?: boolean;
+  /** Permite selecionar varias faixas de atraso (viram um intervalo contiguo). */
+  multiAging?: boolean;
 }
 
 const inactiveClass =
@@ -22,18 +34,51 @@ const inactiveClass =
 
 /**
  * Atalhos rapidos de filtro (pills), compartilhados entre Cobranca e
- * Atribuicao. Cada grupo (status de pagamento, faixa de atraso) e single-select:
- * clicar de novo no ativo limpa o filtro.
+ * Atribuicao. O grupo de faixa de atraso e sempre single-select. O grupo de
+ * status de pagamento e single por padrao; com `multiPaymentStatus` permite
+ * marcar varios ao mesmo tempo (casa com qualquer um dos selecionados).
  */
 const FilterPills: React.FC<FilterPillsProps> = ({
-  values,
+  paymentStatus,
+  aging,
   onChange,
   showPaymentStatus = true,
   excludePaymentStatus = [],
   showAging = false,
+  multiPaymentStatus = false,
+  multiAging = false,
 }) => {
-  const toggle = (field: "paymentStatus" | "aging", value: string) =>
-    onChange({ [field]: values[field] === value ? undefined : value });
+  const selectedPayments = Array.isArray(paymentStatus)
+    ? paymentStatus
+    : paymentStatus
+    ? [paymentStatus]
+    : [];
+
+  const selectedAgings = Array.isArray(aging) ? aging : aging ? [aging] : [];
+
+  const togglePayment = (value: string) => {
+    if (multiPaymentStatus) {
+      const next = selectedPayments.includes(value)
+        ? selectedPayments.filter((s) => s !== value)
+        : [...selectedPayments, value];
+      onChange({ paymentStatus: next });
+    } else {
+      onChange({
+        paymentStatus: selectedPayments.includes(value) ? undefined : value,
+      });
+    }
+  };
+
+  const toggleAging = (value: string) => {
+    if (multiAging) {
+      const next = selectedAgings.includes(value)
+        ? selectedAgings.filter((s) => s !== value)
+        : [...selectedAgings, value];
+      onChange({ aging: next });
+    } else {
+      onChange({ aging: selectedAgings.includes(value) ? undefined : value });
+    }
+  };
 
   const paymentPills = PAYMENT_STATUS_PILLS.filter(
     (pill) => !excludePaymentStatus.includes(pill.value),
@@ -51,9 +96,9 @@ const FilterPills: React.FC<FilterPillsProps> = ({
           <button
             key={pill.value}
             type="button"
-            onClick={() => toggle("paymentStatus", pill.value)}
+            onClick={() => togglePayment(pill.value)}
             className={pillClass(
-              values.paymentStatus === pill.value,
+              selectedPayments.includes(pill.value),
               pill.active,
             )}
           >
@@ -70,8 +115,8 @@ const FilterPills: React.FC<FilterPillsProps> = ({
           <button
             key={pill.value}
             type="button"
-            onClick={() => toggle("aging", pill.value)}
-            className={pillClass(values.aging === pill.value, pill.active)}
+            onClick={() => toggleAging(pill.value)}
+            className={pillClass(selectedAgings.includes(pill.value), pill.active)}
           >
             {pill.label}
           </button>

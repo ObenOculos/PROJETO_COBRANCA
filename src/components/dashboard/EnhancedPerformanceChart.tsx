@@ -785,7 +785,7 @@ const EnhancedPerformanceChart: React.FC = () => {
                             <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">{collector.salesPaid}</td>
                           </tr>
                           <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
-                            <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">Pendente + Parcial</td>
+                            <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">Atrasados</td>
                             <td className="px-3 py-2 text-right font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">{collector.clientsUnpaidOrPartial}</td>
                             <td className="px-3 py-2 text-right font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">{collector.salesUnpaidOrPartial}</td>
                           </tr>

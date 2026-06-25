@@ -31,10 +31,12 @@ import FilterPanel from "./filters/FilterPanel";
 import FilterPills from "./filters/FilterPills";
 import {
   FilterValues,
-  agingToDueRange,
-  dueToAging,
+  agingRangeToDueRange,
+  dueToAgingSet,
   agingLabel,
+  PAYMENT_STATUS_PILLS,
 } from "../filters/filterConfig";
+import type { PillPatch } from "./filters/FilterPills";
 import * as XLSX from "xlsx";
 import BulkAssignmentModal from "./BulkAssignmentModal";
 import AssignmentReportModal from "./dashboard/AssignmentReportModal";
@@ -210,7 +212,10 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   const [filterDateTo, setFilterDateTo] = useState<string>("");
   const [includeWithoutDate, setIncludeWithoutDate] = useState(false);
   // Filtros equivalentes aos da Cobranca (status de pagamento, lancamento, valor).
-  const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
+  // Status de pagamento e multi-select: lista de valores (pago/parcial/pendente).
+  const [filterPaymentStatuses, setFilterPaymentStatuses] = useState<string[]>(
+    [],
+  );
   const [filterLaunchFrom, setFilterLaunchFrom] = useState<string>("");
   const [filterLaunchTo, setFilterLaunchTo] = useState<string>("");
   const [filterMinAmount, setFilterMinAmount] = useState<number | undefined>(
@@ -219,9 +224,10 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   const [filterMaxAmount, setFilterMaxAmount] = useState<number | undefined>(
     undefined,
   );
-  // O atalho de atraso e derivado do vencimento (filterDateFrom/filterDateTo),
-  // fonte unica — nao ha estado proprio de "aging".
-  const filterAging = dueToAging(filterDateFrom, filterDateTo);
+  // Os atalhos de atraso sao derivados do vencimento (filterDateFrom/filterDateTo),
+  // fonte unica — nao ha estado proprio de "aging". Multi-select: varias faixas
+  // contiguas viram um unico intervalo (ex.: 0-30 + 31-60 => 0-60).
+  const filterAgings = dueToAgingSet(filterDateFrom, filterDateTo);
   // Filtro "Criado em": intervalo de datas sobre clientes.created_at (data em
   // que o cliente foi inserido pela primeira vez no banco).
   const [filterCreatedFrom, setFilterCreatedFrom] = useState<string>("");
@@ -485,14 +491,19 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         onClear: () => setFilterSituacao(""),
       });
     }
-    if (filterAging) {
-      // Vencimento controlado por um atalho de atraso: mostra o atalho, nao a data.
-      chips.push({
-        label: `Atraso: ${agingLabel(filterAging)}`,
-        onClear: () => {
-          setFilterDateFrom("");
-          setFilterDateTo("");
-        },
+    if (filterAgings.length > 0) {
+      // Vencimento controlado por atalhos de atraso: mostra as faixas, nao a data.
+      // Remover uma faixa recalcula o intervalo a partir das restantes.
+      filterAgings.forEach((bandVal) => {
+        chips.push({
+          label: `Atraso: ${agingLabel(bandVal)}`,
+          onClear: () => {
+            const next = filterAgings.filter((v) => v !== bandVal);
+            const { dueFrom, dueTo } = agingRangeToDueRange(next);
+            setFilterDateFrom(dueFrom);
+            setFilterDateTo(dueTo);
+          },
+        });
       });
     } else {
       if (filterDateFrom) {
@@ -514,12 +525,15 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         onClear: () => setIncludeWithoutDate(false),
       });
     }
-    if (filterPaymentStatus) {
+    filterPaymentStatuses.forEach((ps) => {
+      const psLabel =
+        PAYMENT_STATUS_PILLS.find((p) => p.value === ps)?.label ?? ps;
       chips.push({
-        label: `Pagamento: ${filterPaymentStatus}`,
-        onClear: () => setFilterPaymentStatus(""),
+        label: `Pagamento: ${psLabel}`,
+        onClear: () =>
+          setFilterPaymentStatuses((prev) => prev.filter((s) => s !== ps)),
       });
-    }
+    });
     if (filterLaunchFrom) {
       chips.push({
         label: `Lançado de: ${filterLaunchFrom}`,
@@ -566,7 +580,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     filterNeighborhood,
     filterStore,
     filterSituacao,
-    filterPaymentStatus,
+    filterPaymentStatuses,
     filterDateFrom,
     filterDateTo,
     includeWithoutDate,
@@ -597,7 +611,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           neighborhood: filterNeighborhood,
           store: filterStore,
           situacao: filterSituacao,
-          paymentStatus: filterPaymentStatus,
+          paymentStatus: filterPaymentStatuses,
           dueFrom: filterDateFrom,
           dueTo: filterDateTo,
           includeWithoutDue: includeWithoutDate,
@@ -620,7 +634,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     filterNeighborhood,
     filterStore,
     filterSituacao,
-    filterPaymentStatus,
+    filterPaymentStatuses,
     filterDateFrom,
     filterDateTo,
     includeWithoutDate,
@@ -633,12 +647,43 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     clientCreatedAtMap,
   ]);
 
-  // Ao mudar o filtro (muda o conjunto), volta p/ a 1a pagina e LIMPA a selecao —
-  // a selecao vale sempre para o conjunto filtrado atual (nunca clientes de fora).
+  // Assinatura dos filtros: muda SO quando o usuario altera um filtro/busca, e
+  // nao quando os dados mudam (ex.: atribuicao otimista). Assim, ao mudar o
+  // filtro volta p/ a 1a pagina e limpa a selecao; ao atribuir um cliente, a
+  // pagina/scroll/selecao sao preservados (fluxo continuo).
+  const filterSignature = JSON.stringify({
+    searchTerm,
+    filterCollector,
+    filterStatus,
+    filterCity,
+    filterNeighborhood,
+    filterStore,
+    filterSituacao,
+    filterPaymentStatuses,
+    filterDateFrom,
+    filterDateTo,
+    includeWithoutDate,
+    filterLaunchFrom,
+    filterLaunchTo,
+    filterMinAmount,
+    filterMaxAmount,
+    filterCreatedFrom,
+    filterCreatedTo,
+  });
+
   useEffect(() => {
     setCurrentPage(1);
     setSelectedClients(new Set());
-  }, [filteredClients]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterSignature]);
+
+  // Se a lista encolher (ex.: clientes saem da visao "Sem Cobrador" apos serem
+  // atribuidos), mantem a pagina dentro do intervalo valido — sem voltar a 1a.
+  useEffect(() => {
+    const pages = Math.max(1, Math.ceil(filteredClients.length / itemsPerPage));
+    if (currentPage > pages) setCurrentPage(pages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredClients.length, itemsPerPage]);
 
   // Ordenação por uma única coluna (clique no cabeçalho).
   const sortedClients = useMemo(() => {
@@ -1088,7 +1133,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     setFilterNeighborhood("");
     setFilterStore("");
     setFilterSituacao("");
-    setFilterPaymentStatus("");
+    setFilterPaymentStatuses([]);
     setFilterDateFrom("");
     setFilterDateTo("");
     setIncludeWithoutDate(false);
@@ -1106,7 +1151,6 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   // a dependencia cidade -> bairro como regra desta tela.
   const filterPanelValues: Partial<FilterValues> = {
     assignment: filterStatus,
-    paymentStatus: filterPaymentStatus,
     city: filterCity,
     neighborhood: filterNeighborhood,
     store: filterStore,
@@ -1117,15 +1161,13 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     launchTo: filterLaunchTo,
     minAmount: filterMinAmount,
     maxAmount: filterMaxAmount,
-    aging: filterAging,
+    // aging fica nas pills (multi-select); o painel nao renderiza esse campo.
     createdFrom: filterCreatedFrom,
     createdTo: filterCreatedTo,
   };
 
   const handleFilterPanelChange = (patch: Partial<FilterValues>) => {
     if ("assignment" in patch) setFilterStatus(patch.assignment ?? "");
-    if ("paymentStatus" in patch)
-      setFilterPaymentStatus(patch.paymentStatus ?? "");
     if ("city" in patch) {
       setFilterCity(patch.city ?? "");
       setFilterNeighborhood(""); // dependencia: trocar cidade reseta o bairro
@@ -1139,20 +1181,27 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     if ("launchTo" in patch) setFilterLaunchTo(patch.launchTo ?? "");
     if ("minAmount" in patch) setFilterMinAmount(patch.minAmount);
     if ("maxAmount" in patch) setFilterMaxAmount(patch.maxAmount);
-    // Pill de atraso escreve no proprio vencimento (de/ate): cada faixa vira um
-    // intervalo de datas; desmarcar limpa ambos.
-    if ("aging" in patch) {
-      if (patch.aging) {
-        const { dueFrom, dueTo } = agingToDueRange(patch.aging);
-        setFilterDateFrom(dueFrom);
-        setFilterDateTo(dueTo);
-      } else {
-        setFilterDateFrom("");
-        setFilterDateTo("");
-      }
-    }
+    // Atraso nao vem pelo painel (mora nas pills -> handlePillsChange).
     if ("createdFrom" in patch) setFilterCreatedFrom(patch.createdFrom ?? "");
     if ("createdTo" in patch) setFilterCreatedTo(patch.createdTo ?? "");
+    setCurrentPage(1);
+  };
+
+  // Atalhos (pills): status de pagamento e atraso sao multi-select. As faixas de
+  // atraso, por serem contiguas, viram um unico intervalo de vencimento (a
+  // envoltoria das selecionadas — ex.: 0-30 + 31-60 => vencimento hoje-60..hoje).
+  const handlePillsChange = (patch: PillPatch) => {
+    if ("paymentStatus" in patch) {
+      const v = patch.paymentStatus;
+      setFilterPaymentStatuses(Array.isArray(v) ? v : v ? [v] : []);
+    }
+    if ("aging" in patch) {
+      const v = patch.aging;
+      const bands = Array.isArray(v) ? v : v ? [v] : [];
+      const { dueFrom, dueTo } = agingRangeToDueRange(bands);
+      setFilterDateFrom(dueFrom);
+      setFilterDateTo(dueTo);
+    }
     setCurrentPage(1);
   };
 
@@ -1320,6 +1369,8 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-405 pointer-events-none" />
           <input
             type="text"
+            id="client-search"
+            name="clientSearch"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar por nome, apelido ou documento..."
@@ -1331,6 +1382,8 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           {/* Dropdown Visão */}
           <div className="relative flex-1 sm:flex-none">
             <select
+              id="vision-filter"
+              name="visionFilter"
               value={currentVision}
               onChange={(e) => {
                 const val = e.target.value;
@@ -1374,6 +1427,8 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           {/* Dropdown Cobrador */}
           <div className="relative flex-1 sm:flex-none">
             <select
+              id="collector-filter"
+              name="collectorFilter"
               value={filterCollector}
               onChange={(e) => setFilterCollector(e.target.value)}
               className="w-full sm:w-[195px] pl-3 pr-8 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-semibold text-gray-600 dark:text-dark-text tracking-wide focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer appearance-none"
@@ -1417,11 +1472,14 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
 
         {/* Atalhos rápidos: status de pagamento + faixa de atraso */}
         <FilterPills
-          values={{ paymentStatus: filterPaymentStatus, aging: filterAging }}
-          onChange={handleFilterPanelChange}
+          paymentStatus={filterPaymentStatuses}
+          aging={filterAgings}
+          onChange={handlePillsChange}
           showPaymentStatus
           excludePaymentStatus={["cancelado"]}
           showAging
+          multiPaymentStatus
+          multiAging
         />
 
         {/* Filtros Colapsáveis (painel compartilhado) */}
@@ -1524,6 +1582,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                   <th className="px-6 py-4 w-10">
                     <input
                       type="checkbox"
+                      name="selectAllClients"
                       checked={paginatedClients.length > 0 && paginatedClients.every((c) => selectedClients.has(c.uniqueKey))}
                       onChange={handleSelectAll}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded bg-white dark:bg-dark-bg"
@@ -1554,6 +1613,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                       <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
+                          name={`select-client-${client.uniqueKey}`}
                           checked={selectedClients.has(client.uniqueKey)}
                           onChange={() => handleSelectClient(client.uniqueKey)}
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded bg-white dark:bg-dark-bg"
@@ -1653,6 +1713,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                     <div className="flex items-center h-5">
                       <input
                         type="checkbox"
+                        name={`select-client-card-${client.uniqueKey}`}
                         checked={isSelected}
                         onChange={() => handleSelectClient(client.uniqueKey)}
                         onClick={(e) => e.stopPropagation()}

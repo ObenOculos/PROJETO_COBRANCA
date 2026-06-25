@@ -2075,10 +2075,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
               {approvalAction === "reject" && (
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="rejection-reason" className="block text-sm font-medium text-gray-700 mb-2">
                     Motivo da rejeição *
                   </label>
                   <textarea
+                    id="rejection-reason"
+                    name="rejectionReason"
                     value={rejectionReason}
                     onChange={(e) => setRejectionReason(e.target.value)}
                     placeholder="Explique por que está rejeitando esta solicitação..."

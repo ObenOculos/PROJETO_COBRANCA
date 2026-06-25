@@ -195,11 +195,13 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
         {/* Filtros */}
         <div className="flex flex-wrap items-end gap-3 p-4 border-b border-gray-200 dark:border-dark-border shrink-0">
           <div className="flex flex-col">
-            <label className="text-[10px] font-black tracking-wide text-gray-400 mb-1">
+            <label htmlFor="report-date-from" className="text-[10px] font-black tracking-wide text-gray-400 mb-1">
               De
             </label>
             <input
               type="date"
+              id="report-date-from"
+              name="reportDateFrom"
               value={dateFrom}
               max={dateTo}
               onChange={(e) => setDateFrom(e.target.value)}
@@ -207,11 +209,13 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
             />
           </div>
           <div className="flex flex-col">
-            <label className="text-[10px] font-black tracking-wide text-gray-400 mb-1">
+            <label htmlFor="report-date-to" className="text-[10px] font-black tracking-wide text-gray-400 mb-1">
               Até
             </label>
             <input
               type="date"
+              id="report-date-to"
+              name="reportDateTo"
               value={dateTo}
               min={dateFrom}
               onChange={(e) => setDateTo(e.target.value)}
@@ -219,10 +223,12 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
             />
           </div>
           <div className="flex flex-col min-w-[180px] flex-1">
-            <label className="text-[10px] font-black tracking-wide text-gray-400 mb-1">
+            <label htmlFor="report-collector" className="text-[10px] font-black tracking-wide text-gray-400 mb-1">
               Cobrador
             </label>
             <select
+              id="report-collector"
+              name="reportCollector"
               value={collectorId}
               onChange={(e) => setCollectorId(e.target.value)}
               className="px-3 py-2 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-sm"

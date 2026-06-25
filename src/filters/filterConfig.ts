@@ -58,7 +58,7 @@ export interface FilterFieldFlags {
 
 export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
   collections: {
-    paymentStatus: true,
+    // Status de pagamento fica nas pills (multi-select), nao no dropdown.
     dueRange: true,
     launchRange: true,
     amount: true,
@@ -66,7 +66,7 @@ export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
     collector: true,
   },
   collectionsCollector: {
-    paymentStatus: true,
+    // Status de pagamento fica nas pills (multi-select), nao no dropdown.
     dueRange: true,
     launchRange: true,
     amount: true,
@@ -77,7 +77,7 @@ export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
   },
   assignment: {
     assignment: true,
-    paymentStatus: true,
+    // Status de pagamento fica nas pills (multi-select), nao no dropdown do painel.
     city: true,
     neighborhood: true,
     store: true,
@@ -100,7 +100,7 @@ export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
   },
   // Lojas: igual + cobrador (a dimensao da tela e a loja).
   stores: {
-    paymentStatus: true,
+    // Status de pagamento fica nas pills (multi-select), nao no dropdown.
     city: true,
     collector: true,
     dueRange: true,
@@ -281,6 +281,49 @@ export const dueToAging = (
     return range.dueFrom === (dueFrom || "") && range.dueTo === dueTo;
   });
   return match ? match.value : "";
+};
+
+/**
+ * Converte um CONJUNTO de faixas de atraso num unico intervalo de vencimento.
+ * Como as faixas sao contiguas, varias selecionadas viram a envoltoria
+ * [menor inicio, maior fim] — ex.: 0-30 + 31-60 => 0-60 (vencimento hoje-60..hoje).
+ * Selecao nao-contigua preenche a lacuna (vira o intervalo que cobre todas).
+ * Qualquer faixa sem teto (121+) remove o "de" (sem piso de data).
+ */
+export const agingRangeToDueRange = (
+  bandValues: string[],
+): { dueFrom: string; dueTo: string } => {
+  const bands = AGING_PILLS.filter((b) => bandValues.includes(b.value));
+  if (bands.length === 0) return { dueFrom: "", dueTo: "" };
+  const minDays = Math.min(...bands.map((b) => b.minDays));
+  const semTeto = bands.some((b) => b.maxDays == null);
+  const maxDays = semTeto
+    ? null
+    : Math.max(...bands.map((b) => b.maxDays as number));
+  return {
+    dueFrom: maxDays != null ? dateDaysAgo(maxDays) : "",
+    dueTo: dateDaysAgo(minDays),
+  };
+};
+
+/**
+ * Deriva o CONJUNTO de faixas que cabem no intervalo de vencimento atual.
+ * Uma faixa esta ativa quando seu sub-intervalo de datas esta contido na
+ * envoltoria [dueFrom, dueTo]. Datas YYYY-MM-DD comparam-se lexicograficamente.
+ */
+export const dueToAgingSet = (
+  dueFrom: string | undefined,
+  dueTo: string | undefined,
+): string[] => {
+  if (!dueTo) return [];
+  return AGING_PILLS.filter((b) => {
+    const r = agingToDueRange(b.value);
+    // Faixa 121+ (r.dueFrom === "") so cabe se a envoltoria tambem nao tem piso.
+    if (r.dueFrom === "") return !dueFrom && r.dueTo <= dueTo;
+    const lowerOk = !dueFrom || r.dueFrom >= dueFrom;
+    const upperOk = r.dueTo <= dueTo;
+    return lowerOk && upperOk;
+  }).map((b) => b.value);
 };
 
 /** Rotulo amigavel de uma faixa de atraso (para chips). */

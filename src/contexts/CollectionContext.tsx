@@ -41,7 +41,6 @@ import {
   clientKey,
   getClientPaymentStatus,
   normalizePaymentStatus,
-  isCanceladoFilter,
 } from "../filters/clientStatus";
 import {
   useRealtimeCacheInvalidation,
@@ -1242,18 +1241,61 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     // se o cliente ainda tem algum titulo ativo, ele aparece nas categorias
     // ativas (Pago/Parcial/Pendente), nunca em Cancelado. Assim cada cliente
     // cai em uma unica categoria e a soma fecha com o total.
-    const wantCancelados = isCanceladoFilter(filters.status);
-    let filtered: Collection[];
-    if (wantCancelados) {
-      const activeClientKeys = new Set(
-        collections.map(clientKey).filter(Boolean),
-      );
-      filtered = allCollections.filter(
-        (c) => isCancelado(c.status) && !activeClientKeys.has(clientKey(c)),
-      );
+    // Status de pagamento (multi-select): classifica por CLIENTE (agregado).
+    // "cancelado" puxa de uma base separada (clientes 100% cancelados, fora da
+    // base ativa); pendente/pago/parcial saem da base ativa. A uniao permite
+    // combinar varios status ao mesmo tempo (ex.: Pago + Em atraso).
+    const rawStatusList = Array.isArray(filters.status)
+      ? filters.status
+      : filters.status
+      ? [filters.status]
+      : [];
+    // "cancelado" precisa ser detectado ANTES de normalizar: normalizePaymentStatus
+    // so conhece pago/parcial/pendente (cancelado cairia em "pendente"). Os demais
+    // sao normalizados para o vocabulario canonico.
+    const isCanceladoValue = (s: string) =>
+      (s || "").trim().toLowerCase() === "cancelado";
+    const wantCancelados = rawStatusList.some(isCanceladoValue);
+    const activeWanted = rawStatusList
+      .filter((s) => !isCanceladoValue(s))
+      .map((s) => normalizePaymentStatus(s));
+
+    const baseActiveClientKeys = new Set(
+      collections.map(clientKey).filter(Boolean),
+    );
+    const canceladoCollections = wantCancelados
+      ? allCollections.filter(
+          (c) =>
+            isCancelado(c.status) && !baseActiveClientKeys.has(clientKey(c)),
+        )
+      : [];
+
+    let activeCollections: Collection[];
+    if (rawStatusList.length === 0) {
+      activeCollections = collections; // sem filtro de status
+    } else if (activeWanted.length === 0) {
+      activeCollections = []; // somente cancelado
     } else {
-      filtered = collections;
+      const wanted = new Set(activeWanted);
+      const statusGroups = new Map<string, Collection[]>();
+      collections.forEach((c) => {
+        const key = clientKey(c);
+        if (!key) return;
+        if (!statusGroups.has(key)) statusGroups.set(key, []);
+        statusGroups.get(key)!.push(c);
+      });
+      const matchingClientKeys = new Set<string>();
+      statusGroups.forEach((cols, key) => {
+        if (wanted.has(getClientPaymentStatus(cols))) {
+          matchingClientKeys.add(key);
+        }
+      });
+      activeCollections = collections.filter((c) =>
+        matchingClientKeys.has(clientKey(c)),
+      );
     }
+
+    let filtered: Collection[] = [...activeCollections, ...canceladoCollections];
 
     // Filtrar por cobrador se o usuário for cobrador
     if (userType !== "manager" && collectorId) {
@@ -1387,36 +1429,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
 
 
-    // Apply status filter (Pago / Parcial / Pendente)
-    // Classificacao por CLIENTE (documento), por valor agregado de todas as
-    // vendas ativas dele. Cada cliente cai em uma unica categoria, entao a soma
-    // Pendente + Parcial + Pago = total de clientes (sem duplicidade entre
-    // categorias). Normaliza o vocabulario, pois o dropdown envia
-    // "Em atraso"/"Pago"/"Pago Parcial" e os botoes enviam
-    // "pendente"/"pago"/"parcial". O caso "cancelado" ja foi resolvido na
-    // selecao da base (wantCancelados) e nao entra nesta classificacao.
-    if (filters.status && !wantCancelados) {
-      const targetStatus = normalizePaymentStatus(filters.status);
-
-      // Agrupa por cliente (mesma chave da tabela) e classifica pelo status
-      // agregado compartilhado (src/filters/clientStatus).
-      const clientGroups = new Map<string, Collection[]>();
-      filtered.forEach((c) => {
-        const key = clientKey(c);
-        if (!key) return;
-        if (!clientGroups.has(key)) clientGroups.set(key, []);
-        clientGroups.get(key)!.push(c);
-      });
-
-      const matchingClientKeys = new Set<string>();
-      clientGroups.forEach((clientCollections, key) => {
-        if (getClientPaymentStatus(clientCollections) === targetStatus) {
-          matchingClientKeys.add(key);
-        }
-      });
-
-      filtered = filtered.filter((c) => matchingClientKeys.has(clientKey(c)));
-    }
+    // (O filtro de status de pagamento — incluindo multi-select e cancelado — ja
+    // foi aplicado acima, na montagem da base `filtered`.)
 
     if (filters.dueDate) {
       filtered = filtered.filter((c) => c.data_vencimento === filters.dueDate);
@@ -2131,6 +2145,92 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       setLoading(false);
       setGlobalLoading(false);
     }
+  };
+
+  // === PATCHES LOCAIS OTIMISTAS (sem refetch) ===
+  // Aplicam no estado as MESMAS mudancas que o banco acabou de receber, para a
+  // UI refletir a atribuicao sem recarregar tudo. Preserva filtros, paginacao,
+  // scroll e contadores (que sao derivados de `collections`). O casamento espelha
+  // a RPC: documento em docSet OU cliente em nameSet.
+  const buildIdentifierSets = (
+    identifiers: { document?: string; clientName?: string }[],
+  ) => {
+    const docSet = new Set(
+      identifiers.map((i) => i.document).filter((d): d is string => !!d),
+    );
+    const nameSet = new Set(
+      identifiers
+        .filter((i) => !i.document && i.clientName)
+        .map((i) => i.clientName as string),
+    );
+    return { docSet, nameSet };
+  };
+
+  const collectionMatchesIdentifiers = (
+    c: Collection,
+    docSet: Set<string>,
+    nameSet: Set<string>,
+  ) =>
+    (!!c.documento && docSet.has(c.documento)) ||
+    (!!c.cliente && nameSet.has(c.cliente));
+
+  const applyLocalAssignment = (
+    collectorId: string,
+    identifiers: { document?: string; clientName?: string }[],
+    transferVisits = true,
+  ) => {
+    const { docSet, nameSet } = buildIdentifierSets(identifiers);
+    const targetType = users.find((u) => u.id === collectorId)?.type;
+    const situacaoUpdate =
+      targetType === "internal_collector" ||
+      targetType === "third_party_collector"
+        ? PRIMARY_SITUACAO[targetType]
+        : undefined;
+
+    setAllCollections((prev) =>
+      prev.map((c) =>
+        collectionMatchesIdentifiers(c, docSet, nameSet)
+          ? {
+              ...c,
+              user_id: collectorId,
+              ...(situacaoUpdate ? { situacao: situacaoUpdate } : {}),
+            }
+          : c,
+      ),
+    );
+
+    if (transferVisits && docSet.size > 0) {
+      setScheduledVisits((prev) =>
+        prev.map((v) =>
+          v.clientDocument &&
+          docSet.has(v.clientDocument) &&
+          v.status === "agendada"
+            ? { ...v, collectorId }
+            : v,
+        ),
+      );
+    }
+  };
+
+  const applyLocalRemoval = (
+    identifiers: { document?: string; clientName?: string }[],
+  ) => {
+    const { docSet, nameSet } = buildIdentifierSets(identifiers);
+    setAllCollections((prev) =>
+      prev.map((c) =>
+        collectionMatchesIdentifiers(c, docSet, nameSet)
+          ? { ...c, user_id: null }
+          : c,
+      ),
+    );
+  };
+
+  const applyLocalStatus = (idParcelas: number[], situacao: string | null) => {
+    if (idParcelas.length === 0) return;
+    const idSet = new Set(idParcelas);
+    setAllCollections((prev) =>
+      prev.map((c) => (idSet.has(c.id_parcela) ? { ...c, situacao } : c)),
+    );
   };
 
   // === SALE PAYMENT FUNCTIONS ===
@@ -3863,6 +3963,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     updateCollection,
     assignCollectorToClients,
     removeCollectorFromClients,
+    applyLocalAssignment,
+    applyLocalRemoval,
+    applyLocalStatus,
     addAttempt,
     addUser,
     updateUser,

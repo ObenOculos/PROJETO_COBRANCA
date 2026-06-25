@@ -40,7 +40,14 @@ const BulkAssignmentModal: React.FC<Props> = ({
   collectors,
   onComplete,
 }) => {
-  const { assignCollectorToClients, removeCollectorFromClients, refreshData, scheduledVisits } = useCollection();
+  const {
+    assignCollectorToClients,
+    removeCollectorFromClients,
+    applyLocalAssignment,
+    applyLocalRemoval,
+    applyLocalStatus,
+    scheduledVisits,
+  } = useCollection();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [showVisitPrompt, setShowVisitPrompt] = useState(false);
@@ -144,6 +151,8 @@ const BulkAssignmentModal: React.FC<Props> = ({
           },
           transferVisits,
         );
+        // Atualizacao otimista: reflete a atribuicao no estado local (sem refetch).
+        applyLocalAssignment(selectedCollector, identifiers, transferVisits);
         if (pendingVisitsCount > 0) {
           addLog(
             transferVisits
@@ -165,6 +174,8 @@ const BulkAssignmentModal: React.FC<Props> = ({
             addLog(`Lote ${batchDone}/${batchTotal} — clientes ${start}–${end}`);
           },
         );
+        // Atualizacao otimista: limpa o cobrador no estado local (sem refetch).
+        applyLocalRemoval(identifiers);
       }
 
       if (statusAction !== "skip") {
@@ -180,13 +191,16 @@ const BulkAssignmentModal: React.FC<Props> = ({
             .in("id_parcela", chunk);
           if (error) throw new Error(error.message);
         }
+        // Atualizacao otimista: reflete o novo status no estado local.
+        applyLocalStatus(allIds, statusValue);
         completed++;
         setProgressCompleted(completed);
         addLog(`Status atualizado em ${allIds.length} parcelas`);
       }
 
-      addLog("Sincronizando dados...", "info");
-      await refreshData();
+      // Sem refetch: o estado local ja foi atualizado de forma otimista, entao a
+      // tela reflete tudo preservando filtros, busca, paginacao e scroll.
+      addLog("Tela atualizada sem recarregar.", "info");
       addLog("Concluído com sucesso!");
       setDone(true);
       onComplete?.();
@@ -289,6 +303,8 @@ const BulkAssignmentModal: React.FC<Props> = ({
                   Selecionar Cobrador
                 </label>
                 <select
+                  id="bulk-collector"
+                  name="bulkCollector"
                   value={selectedCollector}
                   onChange={(e) => setSelectedCollector(e.target.value)}
                   className="w-full px-4 py-3 text-xs font-black border border-gray-200 dark:border-dark-border rounded-2xl bg-gray-50 dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-wide"
@@ -320,6 +336,8 @@ const BulkAssignmentModal: React.FC<Props> = ({
                 Status das Parcelas
               </label>
               <select
+                id="bulk-status"
+                name="bulkStatus"
                 value={statusAction}
                 onChange={(e) => setStatusAction(e.target.value)}
                 className="w-full px-4 py-3 text-xs font-black border border-gray-200 dark:border-dark-border rounded-2xl bg-gray-50 dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-wide"

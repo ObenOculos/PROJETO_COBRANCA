@@ -33,8 +33,12 @@ export interface ClientFilters {
   store?: string;
   /** Valor de situacao, ou a marca especial "empty" para sem situacao. */
   situacao?: string;
-  /** Status de pagamento agregado do cliente (pago | parcial | pendente | cancelado). */
-  paymentStatus?: string;
+  /**
+   * Status de pagamento agregado do cliente (pago | parcial | pendente | cancelado).
+   * Aceita um valor unico ou uma lista (multi-select): casa se o status do
+   * cliente bater com QUALQUER um dos selecionados.
+   */
+  paymentStatus?: string | string[];
   /** Intervalo de data de vencimento das parcelas. */
   dueFrom?: string;
   dueTo?: string;
@@ -53,16 +57,21 @@ export interface ClientFilters {
 
 const matchesPaymentStatus = (
   client: FilterableClient,
-  paymentStatus?: string,
+  paymentStatus?: string | string[],
 ): boolean => {
-  if (!paymentStatus) return true;
-  // A base de clientes da Atribuicao e a ativa (sem cancelados), entao nenhum
-  // cliente classifica como "cancelado" aqui.
-  if (paymentStatus.trim().toLowerCase() === "cancelado") return false;
-  return (
-    getClientPaymentStatus(client.collections) ===
-    normalizePaymentStatus(paymentStatus)
-  );
+  const list = (
+    Array.isArray(paymentStatus) ? paymentStatus : paymentStatus ? [paymentStatus] : []
+  ).filter(Boolean);
+  if (list.length === 0) return true;
+
+  const status = getClientPaymentStatus(client.collections);
+  // Multi-select: basta casar com QUALQUER status selecionado.
+  return list.some((p) => {
+    // A base de clientes da Atribuicao e a ativa (sem cancelados), entao nenhum
+    // cliente classifica como "cancelado" aqui.
+    if (p.trim().toLowerCase() === "cancelado") return false;
+    return status === normalizePaymentStatus(p);
+  });
 };
 
 const matchesLaunchRange = (
