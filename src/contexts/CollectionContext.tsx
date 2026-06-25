@@ -707,6 +707,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         password: user.password,
         type: user.type as UserType,
         createdAt: user.created_at || new Date().toISOString(),
+        active: user.active ?? true,
       }));
 
       setUsers(transformedUsers);
@@ -822,6 +823,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       if (updates.login !== undefined) dbUpdates.login = updates.login;
       if (updates.password !== undefined) dbUpdates.password = updates.password;
       if (updates.type !== undefined) dbUpdates.type = updates.type;
+      if (updates.active !== undefined) dbUpdates.active = updates.active;
 
       const { error: supabaseError } = await supabase
         .from("users")
@@ -1986,6 +1988,25 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         console.log(
           `Lote ${batchesCompleted}/${totalBatches} concluído. Parcelas atualizadas até agora: ${totalParcelasAtualizadas}`,
         );
+      }
+
+      // Os agendamentos seguem a carteira: as visitas AGENDADAS dos clientes
+      // reatribuidos passam para o novo cobrador. Visitas ja realizadas/canceladas
+      // sao historico e nao mudam.
+      const documentos = clientIdentifiers
+        .map((id) => id.document)
+        .filter((d): d is string => !!d);
+      const visitBatch = 300;
+      for (let i = 0; i < documentos.length; i += visitBatch) {
+        const docs = documentos.slice(i, i + visitBatch);
+        const { error: visitError } = await supabase
+          .from("scheduled_visits")
+          .update({ collector_id: collectorId })
+          .in("client_document", docs)
+          .eq("status", "agendada");
+        if (visitError) {
+          console.error("Erro ao migrar agendamentos da carteira:", visitError);
+        }
       }
 
       if (!skipRefresh) await refreshData();
