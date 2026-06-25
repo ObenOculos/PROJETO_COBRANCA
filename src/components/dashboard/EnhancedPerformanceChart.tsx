@@ -17,11 +17,12 @@ import { formatCurrency } from "../../utils/formatters";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
 import FilterBar from "../common/FilterBar";
-import { User, FilterOptions, isCollectorType } from "../../types";
+import { User, UserType, FilterOptions, isCollectorType } from "../../types";
 
 interface EnhancedCollectorPerformance {
   collectorId: string;
   collectorName: string;
+  collectorType: UserType;
   totalSales: number;
   pendingSales: number;
   clientsWithPending: number;
@@ -63,8 +64,10 @@ const EnhancedPerformanceChart: React.FC = () => {
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
   const [, startTransition] = useTransition();
-  const [sortBy, setSortBy] = useState<"receivedAmount" | "totalSales" | "clientsCount" | "pendingSales">("receivedAmount");
+  const [sortBy] = useState<"receivedAmount" | "totalSales" | "clientsCount" | "pendingSales">("receivedAmount");
     const [sortOrder] = useState<"asc" | "desc">("desc");
+  // Filtro por tipo de cobrador (Todos / Interno / Externo / Terceirizado).
+  const [typeFilter, setTypeFilter] = useState<UserType | "all">("all");
   const [selectedCollector, setSelectedCollector] = useState<EnhancedCollectorPerformance | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -267,6 +270,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       return {
         collectorId: collector.id,
         collectorName: collector.name,
+        collectorType: collector.type,
         totalSales,
         pendingSales,
         clientsWithPending,
@@ -300,6 +304,9 @@ const EnhancedPerformanceChart: React.FC = () => {
   // de recebimento. Ambos refletem no ranking e nos KPIs (fonte: rankedPerformance).
   const rankedPerformance = useMemo(() => {
     let list = enhancedPerformance;
+    if (typeFilter !== "all") {
+      list = list.filter((p) => p.collectorType === typeFilter);
+    }
     if (filters.collector) {
       list = list.filter((p) => p.collectorId === filters.collector);
     }
@@ -311,7 +318,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       });
     }
     return list;
-  }, [enhancedPerformance, filters.collector, goalSegment]);
+  }, [enhancedPerformance, typeFilter, filters.collector, goalSegment]);
 
   const filteredAndSortedPerformance = useMemo(() => {
     const filtered = [...rankedPerformance];
@@ -564,7 +571,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       </div>
       </FilterBar>
 
-      {/* Controles de lista: contagem + ordenação */}
+      {/* Controles de lista: contagem + tipo de cobrador */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-1">
         <span className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
           {filteredAndSortedPerformance.length}{" "}
@@ -572,17 +579,17 @@ const EnhancedPerformanceChart: React.FC = () => {
         </span>
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary">
-            Ordenar por
+            Tipo de cobrador
           </span>
           <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as UserType | "all")}
             className="px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium text-gray-700 dark:text-dark-text appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500/20 transition-all"
           >
-            <option value="receivedAmount">Valor recebido</option>
-            <option value="totalSales">Total de vendas</option>
-            <option value="clientsCount">Total de clientes</option>
-            <option value="pendingSales">Total de pendências</option>
+            <option value="all">Todos</option>
+            <option value="internal_collector">Interno</option>
+            <option value="collector">Externo</option>
+            <option value="third_party_collector">Terceirizado</option>
           </select>
         </div>
       </div>
