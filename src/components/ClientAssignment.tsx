@@ -624,8 +624,11 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     clientCreatedAtMap,
   ]);
 
+  // Ao mudar o filtro (muda o conjunto), volta p/ a 1a pagina e LIMPA a selecao —
+  // a selecao vale sempre para o conjunto filtrado atual (nunca clientes de fora).
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedClients(new Set());
   }, [filteredClients]);
 
   // Ordenação cumulativa: aplica os critérios na ordem em que foram clicados.
