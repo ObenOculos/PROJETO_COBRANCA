@@ -223,6 +223,29 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     );
   };
 
+  // Exclui visitas pelos ids (limpar pendentes de um cobrador desativado).
+  // O chamador define o escopo (atrasadas/agendadas/pendentes); aqui so apaga.
+  const deleteScheduledVisits = async (visitIds: string[]) => {
+    if (!visitIds || visitIds.length === 0) return;
+    try {
+      const chunkSize = 200;
+      for (let i = 0; i < visitIds.length; i += chunkSize) {
+        const chunk = visitIds.slice(i, i + chunkSize);
+        const { error } = await supabase
+          .from("scheduled_visits")
+          .delete()
+          .in("id", chunk);
+        if (error) throw error;
+      }
+      await fetchScheduledVisits(false);
+    } catch (err) {
+      console.error("Erro ao excluir visitas:", err);
+      const message = err instanceof Error ? err.message : "Erro ao excluir visitas";
+      setError(message);
+      throw err;
+    }
+  };
+
   // Fetch allowed visit dates
   const fetchAllowedVisitDates = React.useCallback(async () => {
     const cacheKey = "allowed-visit-dates";
@@ -3862,6 +3885,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     getCancellationHistory,
     getVisitsByDate,
     getVisitsByCollector,
+    deleteScheduledVisits,
     getClientDataForVisit,
     rescheduleVisit,
     deleteSalesFromClient,

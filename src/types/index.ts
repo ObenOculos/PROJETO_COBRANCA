@@ -365,6 +365,8 @@ export interface CollectionContextType {
   getCancellationHistory: (days?: number) => ScheduledVisit[];
   getVisitsByDate: (date: string, collectorId?: string) => ScheduledVisit[];
   getVisitsByCollector: (collectorId: string) => ScheduledVisit[];
+  /** Exclui visitas pelos ids (ex.: limpar pendentes de um cobrador). */
+  deleteScheduledVisits: (visitIds: string[]) => Promise<void>;
   getClientDataForVisit: (clientDocument: string) => Promise<{
     name: string;
     document: string;
