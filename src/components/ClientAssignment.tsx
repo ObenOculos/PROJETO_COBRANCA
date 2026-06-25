@@ -21,6 +21,7 @@ import { useCollection } from "../contexts/CollectionContext";
 import { supabase } from "../lib/supabase";
 import { Collection, isCollectorType } from "../types";
 import { countVendas } from "../filters/sales";
+import { getClientPending } from "../filters/clientStatus";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { parseAndNormalizeDate } from "../filters/dates";
 import { clientMatchesFilters } from "../filters/predicates";
@@ -649,7 +650,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     const clientRows = filteredClients.map((client) => {
       const totalValue = client.collections.reduce((sum, c) => sum + c.valor_original, 0);
       const receivedValue = client.collections.reduce((sum, c) => sum + c.valor_recebido, 0);
-      const pendingValue = totalValue - receivedValue;
+      const pendingValue = getClientPending(client.collections);
       const situacao = getSituacaoIndicator(client.collections);
 
       return {
@@ -753,12 +754,11 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     const assignedClients = clientsData.filter((c) => c.collectorId).length;
     const unassignedClients = totalClients - assignedClients;
     
-    // Calcular valor total pendente
-    const totalPendingValue = clientsData.reduce((sum, client) => {
-      const clientTotal = client.collections.reduce((s, c) => s + c.valor_original, 0);
-      const clientReceived = client.collections.reduce((s, c) => s + c.valor_recebido, 0);
-      return sum + (clientTotal - clientReceived);
-    }, 0);
+    // Valor em aberto (considera desconto, mesma regra do status do cliente).
+    const totalPendingValue = clientsData.reduce(
+      (sum, client) => sum + getClientPending(client.collections),
+      0,
+    );
 
     // Novos clientes (Mês Atual vs Mês Anterior) com base na existência prévia
     // na tabela `clientes` (created_at), não em títulos/data_lancamento.
@@ -789,11 +789,10 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     const assignedFiltered = filteredClients.filter((c) => c.collectorId).length;
     const unassignedFiltered = totalFiltered - assignedFiltered;
     
-    const totalPendingFiltered = filteredClients.reduce((sum, client) => {
-      const clientTotal = client.collections.reduce((s, c) => s + c.valor_original, 0);
-      const clientReceived = client.collections.reduce((s, c) => s + c.valor_recebido, 0);
-      return sum + (clientTotal - clientReceived);
-    }, 0);
+    const totalPendingFiltered = filteredClients.reduce(
+      (sum, client) => sum + getClientPending(client.collections),
+      0,
+    );
 
     // Novos clientes filtrados (Mês Atual vs Mês Anterior) — mesma fonte de
     // verdade (tabela `clientes`/created_at), respeitando o conjunto filtrado.
@@ -1406,7 +1405,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
                 {paginatedClients.map((client) => {
                   const totalValue = client.collections.reduce((sum, c) => sum + c.valor_original, 0);
-                  const pendingValue = totalValue - client.collections.reduce((sum, c) => sum + c.valor_recebido, 0);
+                  const pendingValue = getClientPending(client.collections);
                   const situacao = getSituacaoIndicator(client.collections);
 
                   return (
@@ -1498,7 +1497,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           {paginatedClients.map((client) => {
             const isWithoutCollector = !client.collectorId;
             const totalValue = client.collections.reduce((sum, c) => sum + c.valor_original, 0);
-            const pendingValue = totalValue - client.collections.reduce((sum, c) => sum + c.valor_recebido, 0);
+            const pendingValue = getClientPending(client.collections);
             const situacao = getSituacaoIndicator(client.collections);
             const isSelected = selectedClients.has(client.uniqueKey);
 

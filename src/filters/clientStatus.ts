@@ -50,6 +50,25 @@ export const getClientPaymentStatus = (
 };
 
 /**
+ * Valor em aberto (saldo devedor) do cliente: total - recebido - desconto,
+ * somando todas as vendas. Mesma regra do status (desconto quita), por isso um
+ * cliente "pago" tem pendente ~0. Nunca negativo. Use sempre que precisar do
+ * "valor em aberto" para nao divergir da classificacao de status.
+ */
+export const getClientPending = (collections: Collection[]): number => {
+  const totalValue = round2(
+    collections.reduce((sum, c) => sum + (c.valor_original || 0), 0),
+  );
+  const totalReceived = round2(
+    collections.reduce((sum, c) => sum + (c.valor_recebido || 0), 0),
+  );
+  const totalDiscount = round2(
+    collections.reduce((sum, c) => sum + (c.desconto || 0), 0),
+  );
+  return Math.max(0, round2(totalValue - totalReceived - totalDiscount));
+};
+
+/**
  * Normaliza o vocabulario de status para o valor canonico. O dropdown envia
  * "Em atraso"/"Pago"/"Pago Parcial" e os botoes enviam "pendente"/"pago"/"parcial".
  * O caso "cancelado" e tratado a parte (base de titulos cancelados), nao aqui.
