@@ -22,7 +22,7 @@ import {
 import { useCollection } from "../../contexts/CollectionContext";
 import * as XLSX from "xlsx";
 import { useAuth } from "../../contexts/AuthContext";
-import { ScheduledVisit, isCollectorType } from "../../types";
+import { ScheduledVisit, isCollectorType, UserType } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import VisitScheduler from "./VisitScheduler"; // Import the VisitScheduler component
 import AllowedVisitDatesManager from "./AllowedVisitDatesManager"; // Import the AllowedVisitDatesManager component
@@ -70,6 +70,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     "visits" | "cancellations" | "scheduledDates"
   >("visits");
   const [selectedCollector, setSelectedCollector] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<UserType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchFilter, setSearchFilter] = useState<string>("");
   const [cityFilter, setCityFilter] = useState<string>("all");
@@ -299,6 +300,19 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   }
 
   const collectors = users.filter((u) => isCollectorType(u.type));
+  // Tipo de cada cobrador (para o filtro por Tipo de Cobrador).
+  const collectorTypeById = useMemo(
+    () => Object.fromEntries(users.map((u) => [u.id, u.type])),
+    [users],
+  );
+  // Cobradores visíveis conforme o tipo selecionado.
+  const visibleCollectors = useMemo(
+    () =>
+      typeFilter === "all"
+        ? collectors
+        : collectors.filter((c) => c.type === typeFilter),
+    [collectors, typeFilter],
+  );
 
   const getCollectorName = (collectorId: string) => {
     const collector = users.find((u) => u.id === collectorId);
@@ -418,6 +432,13 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       )
         return false;
 
+      // Filtro por tipo de cobrador
+      if (
+        typeFilter !== "all" &&
+        collectorTypeById[visit.collectorId] !== typeFilter
+      )
+        return false;
+
       // Filtro por status
       if (statusFilter !== "all" && visit.status !== statusFilter) return false;
 
@@ -464,6 +485,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   }, [
     scheduledVisits,
     selectedCollector,
+    typeFilter,
+    collectorTypeById,
     statusFilter,
     dateFromFilter,
     dateToFilter,
@@ -478,7 +501,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     if (selectedCollector !== "all") {
       grouped[selectedCollector] = [];
     } else {
-      collectors.forEach((collector) => {
+      visibleCollectors.forEach((collector) => {
         grouped[collector.id] = [];
       });
     }
@@ -506,6 +529,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   // Função para limpar todos os filtros
   const clearAllFilters = () => {
     setSelectedCollector("all");
+    setTypeFilter("all");
     setStatusFilter("all");
     setDateFromFilter("");
     setDateToFilter("");
@@ -553,6 +577,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const getActiveFiltersCount = () => {
     let count = 0;
     if (selectedCollector !== "all") count++;
+    if (typeFilter !== "all") count++;
     if (statusFilter !== "all") count++;
     if (dateFromFilter) count++;
     if (dateToFilter) count++;
@@ -876,6 +901,23 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               <div className="mt-6 pt-6 border-t border-gray-50 dark:border-dark-border animate-in fade-in slide-in-from-top-4 duration-300">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                   <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-gray-400 dark:text-dark-text-secondary ml-1">Tipo de Cobrador</label>
+                    <select
+                      value={typeFilter}
+                      onChange={(e) => {
+                        setTypeFilter(e.target.value as UserType | "all");
+                        setSelectedCollector("all");
+                      }}
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">Todos</option>
+                      <option value="internal_collector">Interno</option>
+                      <option value="collector">Externo</option>
+                      <option value="third_party_collector">Terceirizado</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-gray-400 dark:text-dark-text-secondary ml-1">Cobrador</label>
                     <select
                       value={selectedCollector}
@@ -883,7 +925,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       className="w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="all">Todos os Cobradores</option>
-                      {collectors.map((collector) => (
+                      {visibleCollectors.map((collector) => (
                         <option key={collector.id} value={collector.id}>
                           {collector.name}
                         </option>
