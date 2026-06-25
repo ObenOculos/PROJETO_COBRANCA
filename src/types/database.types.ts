@@ -710,6 +710,7 @@ export type Database = {
       }
       users: {
         Row: {
+          active: boolean | null
           created_at: string | null
           id: string
           login: string
@@ -718,6 +719,7 @@ export type Database = {
           type: string
         }
         Insert: {
+          active?: boolean | null
           created_at?: string | null
           id?: string
           login: string
@@ -726,6 +728,7 @@ export type Database = {
           type: string
         }
         Update: {
+          active?: boolean | null
           created_at?: string | null
           id?: string
           login?: string

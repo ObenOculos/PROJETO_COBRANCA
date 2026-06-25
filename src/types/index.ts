@@ -25,6 +25,8 @@ export interface User {
   password: string;
   type: UserType;
   createdAt: string;
+  /** false = usuário desativado (login bloqueado). Ausente/true = ativo. */
+  active?: boolean;
 }
 
 // Monthly Goal types

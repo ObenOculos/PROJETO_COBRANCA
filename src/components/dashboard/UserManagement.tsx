@@ -1,10 +1,30 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Plus, Edit, Trash2, User, Shield, MoreVertical } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  User,
+  Shield,
+  MoreVertical,
+  Ban,
+  CheckCircle,
+} from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { User as UserType, UserType as UserRoleType } from "../../types";
 
 const UserManagement: React.FC = () => {
   const { users, addUser, updateUser, deleteUser } = useCollection();
+  const { user: currentUser } = useAuth();
+
+  const handleToggleActive = async (u: UserType) => {
+    setActiveDropdown(null);
+    try {
+      await updateUser(u.id, { active: !(u.active ?? true) });
+    } catch (err) {
+      console.error("Erro ao (des)ativar usuário:", err);
+    }
+  };
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
@@ -202,6 +222,11 @@ const UserManagement: React.FC = () => {
                         ? "Cobrança Terceirizada"
                         : "Cobrador"}
                     </span>
+                    {user.active === false && (
+                      <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600">
+                        <Ban className="h-3 w-3 mr-1" /> Inativo
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     {new Date(user.createdAt).toLocaleDateString("pt-BR")}
@@ -233,6 +258,30 @@ const UserManagement: React.FC = () => {
                         >
                           <Edit className="h-4 w-4 mr-2" /> Editar
                         </a>
+                        {currentUser?.id !== user.id && (
+                          <a
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleToggleActive(user);
+                            }}
+                            className={`flex items-center px-4 py-2 text-sm hover:bg-gray-100 ${
+                              user.active === false
+                                ? "text-green-600"
+                                : "text-amber-600"
+                            }`}
+                          >
+                            {user.active === false ? (
+                              <>
+                                <CheckCircle className="h-4 w-4 mr-2" /> Ativar
+                              </>
+                            ) : (
+                              <>
+                                <Ban className="h-4 w-4 mr-2" /> Desativar
+                              </>
+                            )}
+                          </a>
+                        )}
                         <a
                           href="#"
                           onClick={(e) => {

@@ -174,6 +174,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return false;
       }
 
+      // Usuário desativado: login bloqueado também offline.
+      if (foundUser.active === false) {
+        setError("Usuário desativado. Procure o gerente.");
+        return false;
+      }
+
       // Criar objeto do usuário
       const userObj: User = {
         id: foundUser.id,
@@ -182,6 +188,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         password: foundUser.password,
         type: foundUser.type as UserType,
         createdAt: foundUser.created_at || new Date().toISOString(),
+        active: foundUser.active ?? true,
       };
 
       // Salvar na sessão local
@@ -281,6 +288,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const foundUser = users[0];
         console.log("Usuário encontrado:", foundUser);
 
+        // Usuário desativado: login bloqueado (preserva histórico).
+        if (foundUser.active === false) {
+          setError("Usuário desativado. Procure o gerente.");
+          return false;
+        }
+
         // Sistema usa autenticação personalizada via tabela users
         // Não precisamos do Supabase Auth para este sistema
         console.log("Usando autenticação personalizada do sistema");
@@ -293,6 +306,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           password: foundUser.password,
           type: foundUser.type as UserType,
           createdAt: foundUser.created_at || new Date().toISOString(),
+          active: foundUser.active ?? true,
         };
 
         // Salvar na sessão local
