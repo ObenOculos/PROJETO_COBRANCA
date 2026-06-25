@@ -292,21 +292,26 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
-  // Ordenação CUMULATIVA da Lista de Clientes (clique nos cabeçalhos).
-  // Cada coluna adiciona um critério; clicar de novo: asc -> desc -> remove.
+  // Ordenação CUMULATIVA (estilo Excel): o ULTIMO clique vira o critério
+  // principal (indice 0); os anteriores viram desempate, na ordem em que estavam.
+  // Clicar na coluna que ja e a principal alterna asc -> desc -> remove.
   const [sortKeys, setSortKeys] = useState<
     { field: SortField; direction: "asc" | "desc" }[]
   >([]);
   const handleSort = (field: SortField) => {
     setSortKeys((keys) => {
-      const idx = keys.findIndex((k) => k.field === field);
-      if (idx === -1) return [...keys, { field, direction: "asc" }];
-      if (keys[idx].direction === "asc") {
-        const next = [...keys];
-        next[idx] = { field, direction: "desc" };
-        return next;
+      const existing = keys.find((k) => k.field === field);
+      const rest = keys.filter((k) => k.field !== field);
+      // Nova coluna -> entra como principal (asc).
+      if (!existing) return [{ field, direction: "asc" }, ...rest];
+      // Ja e a principal -> alterna direcao; se ja era desc, remove da ordenacao.
+      if (keys[0]?.field === field) {
+        return existing.direction === "asc"
+          ? [{ field, direction: "desc" }, ...rest]
+          : rest;
       }
-      return keys.filter((k) => k.field !== field); // desc -> remove
+      // Era desempate -> promove a principal mantendo a direcao atual.
+      return [existing, ...rest];
     });
     setCurrentPage(1);
   };
