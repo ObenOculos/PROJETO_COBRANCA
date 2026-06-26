@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, Filter } from "lucide-react";
+import { Search, Filter, ChevronDown } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import FilterPanel from "../filters/FilterPanel";
@@ -50,6 +50,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
     useCollection();
   const { user } = useAuth();
   const [isExpanded, setIsExpanded] = React.useState(false);
+  // Mobile: recolhe pills/children atrás de um chevron (no desktop ficam sempre visíveis).
+  const [mobileOpen, setMobileOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState(filters.search || "");
 
   // Debounce for search term
@@ -130,7 +132,13 @@ const FilterBar: React.FC<FilterBarProps> = ({
     onFilterChange({});
     setSearchTerm("");
     setIsExpanded(false);
+    setMobileOpen(false);
   };
+
+  const activeFilterCount = React.useMemo(
+    () => Object.values(filters).filter(Boolean).length,
+    [filters],
+  );
 
   const hasActiveFilters = React.useMemo(
     () => Object.values(filters).some(Boolean),
@@ -299,7 +307,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
     <div className="space-y-3 mb-4">
       {/* Barra de Filtros Unificada */}
       <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-150/80 dark:border-dark-border shadow-sm space-y-3">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+        <div className="flex flex-row items-center gap-3">
           {/* Busca */}
           {showSearch && (
             <div className="relative flex-1">
@@ -317,10 +325,33 @@ const FilterBar: React.FC<FilterBarProps> = ({
           )}
           {!showSearch && <div className="flex-1" />}
 
-          {/* Botão Filtros Avançados */}
+          {/* Mobile: chevron que recolhe/expande os demais filtros */}
+          <button
+            type="button"
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-expanded={mobileOpen}
+            aria-controls="filterbar-secondary"
+            aria-label={mobileOpen ? "Recolher filtros" : "Expandir filtros"}
+            className={`md:hidden px-3 py-2 rounded-xl border flex items-center justify-center gap-1.5 shrink-0 transition-all ${
+              mobileOpen || hasActiveFilters
+                ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border"
+            }`}
+          >
+            {hasActiveFilters && (
+              <span className="text-xs font-semibold leading-none">
+                {activeFilterCount}
+              </span>
+            )}
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${mobileOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {/* Desktop: botão Filtros Avançados */}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
+            className={`hidden md:flex px-4 py-2 rounded-xl text-sm font-medium transition-all border items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
               isExpanded || hasActiveFilters
                 ? "bg-blue-600 border-blue-600 text-white shadow-sm"
                 : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
@@ -329,42 +360,60 @@ const FilterBar: React.FC<FilterBarProps> = ({
             <Filter className="h-3.5 w-3.5" />
             <span>
               Filtros
-              {hasActiveFilters &&
-                ` (${Object.values(filters).filter(Boolean).length})`}
+              {hasActiveFilters && ` (${activeFilterCount})`}
             </span>
           </button>
         </div>
 
-        {/* Atalhos rápidos: status + faixa de atraso (componente compartilhado) */}
-        {(showStatusPills || showAgingPills) && (
-          <FilterPills
-            paymentStatus={selectedStatuses}
-            aging={dueToAgingSet(filters.dateFrom, filters.dateTo)}
-            onChange={handlePillsChange}
-            showPaymentStatus={showStatusPills}
-            showAging={showAgingPills}
-            multiPaymentStatus
-            multiAging
-          />
-        )}
+        {/* Demais filtros: no mobile ficam ocultos até expandir; no desktop sempre visíveis */}
+        <div
+          id="filterbar-secondary"
+          className={`${mobileOpen ? "block" : "hidden"} md:block space-y-3`}
+        >
+          {/* Mobile: acesso ao painel avançado (no desktop usa-se o botão do topo) */}
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className={`md:hidden w-full px-4 py-2 rounded-xl text-sm font-medium transition-all border flex items-center justify-center gap-1.5 ${
+              isExpanded
+                ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border"
+            }`}
+          >
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filtros avançados</span>
+          </button>
 
-        {/* Slot para pills/conteúdo próprio da tela (dentro do card) */}
-        {children}
+          {/* Atalhos rápidos: status + faixa de atraso (componente compartilhado) */}
+          {(showStatusPills || showAgingPills) && (
+            <FilterPills
+              paymentStatus={selectedStatuses}
+              aging={dueToAgingSet(filters.dateFrom, filters.dateTo)}
+              onChange={handlePillsChange}
+              showPaymentStatus={showStatusPills}
+              showAging={showAgingPills}
+              multiPaymentStatus
+              multiAging
+            />
+          )}
 
-        {/* Painel avançado compartilhado */}
-        {isExpanded && (
-          <FilterPanel
-            context={
-              context ??
-              (userType === "manager" ? "collections" : "collectionsCollector")
-            }
-            values={panelValues}
-            onChange={handlePanelChange}
-            onClear={clearFilters}
-            onClose={() => setIsExpanded(false)}
-            options={panelOptions}
-          />
-        )}
+          {/* Slot para pills/conteúdo próprio da tela (dentro do card) */}
+          {children}
+
+          {/* Painel avançado compartilhado */}
+          {isExpanded && (
+            <FilterPanel
+              context={
+                context ??
+                (userType === "manager" ? "collections" : "collectionsCollector")
+              }
+              values={panelValues}
+              onChange={handlePanelChange}
+              onClear={clearFilters}
+              onClose={() => setIsExpanded(false)}
+              options={panelOptions}
+            />
+          )}
+        </div>
       </div>
 
       {/* Active Filter Chips */}

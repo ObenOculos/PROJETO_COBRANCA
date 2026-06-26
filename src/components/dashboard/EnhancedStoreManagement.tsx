@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Store,
   AlertCircle,
@@ -8,6 +9,7 @@ import {
   Building,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   FileText,
   DollarSign,
   Award,
@@ -61,8 +63,15 @@ const EnhancedStoreManagement: React.FC = () => {
     useState<StoreStats | null>(null);
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
-  const collectors = users.filter((u) => isCollectorType(u.type));
-  const availableStores = getAvailableStores();
+  const collectors = useMemo(
+    () => users.filter((u) => isCollectorType(u.type)),
+    [users],
+  );
+  const availableStores = useMemo(
+    () => getAvailableStores(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [collections],
+  );
 
   // Calculate store statistics
   const storeStats = useMemo((): StoreStats[] => {
@@ -284,25 +293,25 @@ const EnhancedStoreManagement: React.FC = () => {
     <div className="space-y-6 text-gray-700 dark:text-dark-text">
       {/* Header */}
       <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-4 sm:p-5 transition-all duration-300">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl shrink-0">
               <Building className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight leading-none truncate">
                 Acompanhamento de Lojas
               </h2>
-              <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 tracking-wide">
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 tracking-wide truncate">
                 Performance e status de {overviewStats.totalStores} lojas cadastradas
               </p>
             </div>
           </div>
 
           {/* Ações Principais */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
             {overviewStats.unassignedStores > 0 && (
-              <div className="flex items-center text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full font-semibold border border-amber-100 dark:border-amber-900/35">
+              <div className="hidden sm:flex items-center text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full font-semibold border border-amber-100 dark:border-amber-900/35">
                 <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
                 {overviewStats.unassignedStores} sem atribuição
               </div>
@@ -310,7 +319,7 @@ const EnhancedStoreManagement: React.FC = () => {
 
             <button
               onClick={exportStoreData}
-              className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-dark-text bg-white dark:bg-dark-bg hover:text-blue-600 hover:dark:text-blue-400 border border-gray-200 dark:border-dark-border rounded-xl transition-all duration-200 text-sm font-medium shadow-sm"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 text-gray-700 dark:text-dark-text bg-white dark:bg-dark-bg hover:text-blue-600 hover:dark:text-blue-400 border border-gray-200 dark:border-dark-border rounded-xl transition-all duration-200 text-sm font-medium shadow-sm shrink-0"
               title="Exportar dados para CSV"
             >
               <Download className="h-4 w-4" />
@@ -320,68 +329,68 @@ const EnhancedStoreManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Grid de Cards Executivos — Scroll horizontal em mobile com padding vertical para evitar corte de sombras */}
-      <div className="flex overflow-x-auto pt-3 pb-5 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pt-0 sm:pb-0 sm:overflow-visible sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 custom-scrollbar snap-x">
+      {/* Grid de Cards Executivos — faixa horizontal deslizável no mobile, grid no desktop */}
+      <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 overflow-x-auto sm:overflow-visible snap-x snap-mandatory -mx-1 px-1 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {/* Card: Total de Lojas */}
-        <div className="min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow snap-start">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-              <Store className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+        <div className="shrink-0 snap-start min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 sm:p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-300">
+          <div className="flex items-center justify-between gap-1.5 mb-3 sm:mb-4">
+            <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl shrink-0">
+              <Store className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
             </div>
             {overviewStats.unassignedStores > 0 ? (
-              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-md tracking-wide border border-amber-150 dark:border-amber-900/30">
-                {overviewStats.unassignedStores} Pendentes
+              <span className="text-[8px] sm:text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-md tracking-wide border border-amber-150 dark:border-amber-900/30 shrink-0">
+                {overviewStats.unassignedStores} Pend.
               </span>
             ) : (
-              <span className="text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-md tracking-wide border border-green-150 dark:border-green-900/30">
-                100% Atribuídas
+              <span className="text-[8px] sm:text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded-md tracking-wide border border-green-150 dark:border-green-900/30 shrink-0">
+                OK
               </span>
             )}
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Total de Lojas</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.totalStores}</p>
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Total de Lojas</p>
+            <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.totalStores}</p>
           </div>
         </div>
 
         {/* Card: Taxa de Conversão */}
-        <div className="min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow snap-start">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
-              <Award className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+        <div className="shrink-0 snap-start min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 sm:p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-300">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div className="p-2 sm:p-2.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl shrink-0">
+              <Award className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 dark:text-indigo-400" />
             </div>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Conversão Média</p>
-            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 tracking-tight">{overviewStats.avgConversionRate.toFixed(1)}%</p>
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Conversão Média</p>
+            <p className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 tracking-tight">{overviewStats.avgConversionRate.toFixed(1)}%</p>
           </div>
         </div>
 
         {/* Card: Receita Total */}
-        <div className="min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow snap-start">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2.5 bg-green-50 dark:bg-green-900/20 rounded-xl">
-              <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
+        <div className="shrink-0 snap-start min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 sm:p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-300">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div className="p-2 sm:p-2.5 bg-green-50 dark:bg-green-900/20 rounded-xl shrink-0">
+              <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
             </div>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Receita Total</p>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400 tracking-tight">
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Receita Total</p>
+            <div className="text-lg sm:text-2xl font-bold text-green-600 dark:text-green-400 tracking-tight truncate">
               {formatCurrency(overviewStats.totalRevenue)}
             </div>
           </div>
         </div>
 
         {/* Card: Vendas Concluídas */}
-        <div className="min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow snap-start">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2.5 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
-              <FileText className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+        <div className="shrink-0 snap-start min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 sm:p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-300">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div className="p-2 sm:p-2.5 bg-purple-50 dark:bg-purple-900/20 rounded-xl shrink-0">
+              <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
             </div>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Fichas / Vendas</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.totalSales}</p>
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Fichas / Vendas</p>
+            <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.totalSales}</p>
           </div>
         </div>
       </div>
@@ -435,7 +444,7 @@ const EnhancedStoreManagement: React.FC = () => {
       </div>
 
       {/* Lista de Lojas com Cards Aprimorados */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 p-1">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6 p-1">
         {filteredAndSortedStores.map((store) => {
           const isUnassigned = !store.assignedCollector;
           
@@ -475,9 +484,46 @@ const EnhancedStoreManagement: React.FC = () => {
             <div
               key={store.storeName}
               onClick={() => setSelectedStoreForModal(store)}
-              className="group bg-white dark:bg-dark-bg-secondary rounded-2xl border border-gray-100 dark:border-dark-border p-5 hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-250/20 dark:hover:shadow-black/20 transition-all duration-300 cursor-pointer flex flex-col justify-between"
+              className="group bg-white dark:bg-dark-bg-secondary rounded-2xl border border-gray-100 dark:border-dark-border p-3 sm:p-5 hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-250/20 dark:hover:shadow-black/20 transition-all duration-300 cursor-pointer flex flex-col justify-between"
             >
-              <div>
+              {/* MOBILE: linha compacta (detalhe completo no modal ao tocar) */}
+              <div className="sm:hidden flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${statusBgLight} border ${statusBorderColor} shrink-0`}>
+                  <Store className={`h-4 w-4 ${statusTextColor}`} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-dark-text truncate leading-tight">
+                      {store.storeName}
+                    </h4>
+                    <span className={`text-xs font-bold shrink-0 ${statusTextColor}`}>
+                      {store.conversionRate.toFixed(1)}%
+                    </span>
+                  </div>
+                  <p className="flex items-center gap-1 mt-0.5 text-[11px] text-gray-400 dark:text-dark-text-secondary truncate">
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    {store.city}
+                  </p>
+                  {!isUnassigned ? (
+                    <p className="mt-1 text-[11px] font-semibold truncate">
+                      <span className="text-green-600 dark:text-green-400">{formatCurrency(store.receivedAmount)}</span>
+                      <span className="text-gray-300 dark:text-gray-600 mx-1.5">·</span>
+                      <span className={store.pendingAmount > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}>
+                        {formatCurrency(store.pendingAmount)} pend.
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      Sem cobrador atribuído
+                    </p>
+                  )}
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-300 dark:text-gray-600 shrink-0" />
+              </div>
+
+              {/* DESKTOP: card completo */}
+              <div className="hidden sm:block">
                 {/* Header do Card */}
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div className="flex items-center gap-3 min-w-0">
@@ -502,12 +548,12 @@ const EnhancedStoreManagement: React.FC = () => {
                 </div>
 
                 {/* Info do Cobrador */}
-                <div className="flex items-center justify-between mb-4 bg-gray-50/50 dark:bg-dark-bg/25 px-3 py-2 rounded-xl border border-gray-100/50 dark:border-dark-border/40">
-                  <span className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                <div className="flex items-center justify-between gap-2 mb-4 bg-gray-50/50 dark:bg-dark-bg/25 px-3 py-2 rounded-xl border border-gray-100/50 dark:border-dark-border/40 min-w-0">
+                  <span className="text-xs text-gray-500 dark:text-dark-text-secondary truncate">
                     Cobrador: <span className="font-semibold text-gray-700 dark:text-dark-text">{store.collectorName}</span>
                   </span>
                   {store.isFormalAssignment && !isUnassigned && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 shrink-0">
                       Formal
                     </span>
                   )}
@@ -515,29 +561,29 @@ const EnhancedStoreManagement: React.FC = () => {
 
                 {!isUnassigned ? (
                   <>
-                    {/* Grid de Métricas Principais - Limpo e sem bordas excessivas */}
-                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 mb-4">
-                      <div>
-                        <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-0.5">Vendas</span>
-                        <div className="text-sm font-bold text-gray-900 dark:text-dark-text">
-                          {store.totalSales} <span className="text-xs font-normal text-gray-500 dark:text-dark-text-secondary">fichas</span>
+                    {/* Grid de Métricas Principais - Visual e Moderno */}
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      <div className="p-2.5 bg-gray-50/50 dark:bg-dark-bg/40 rounded-xl border border-gray-100/50 dark:border-dark-border/30">
+                        <span className="text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-wider uppercase block mb-0.5">Vendas</span>
+                        <div className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-dark-text truncate">
+                          {store.totalSales} <span className="text-[9px] font-normal text-gray-500 dark:text-dark-text-secondary">fichas</span>
                         </div>
                       </div>
-                      <div>
-                        <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-0.5">Clientes</span>
-                        <div className="text-sm font-bold text-gray-900 dark:text-dark-text">
-                          {store.clientsCount} <span className="text-xs font-normal text-gray-500 dark:text-dark-text-secondary">base</span>
+                      <div className="p-2.5 bg-gray-50/50 dark:bg-dark-bg/40 rounded-xl border border-gray-100/50 dark:border-dark-border/30">
+                        <span className="text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-wider uppercase block mb-0.5">Clientes Base</span>
+                        <div className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-dark-text truncate">
+                          {store.clientsCount} <span className="text-[9px] font-normal text-gray-500 dark:text-dark-text-secondary">clientes</span>
                         </div>
                       </div>
-                      <div>
-                        <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-0.5">Recebido</span>
-                        <div className="text-sm font-bold text-green-600 dark:text-green-400">
+                      <div className="p-2.5 bg-green-50/30 dark:bg-green-950/10 rounded-xl border border-green-100/20 dark:border-green-900/10">
+                        <span className="text-[9px] font-bold text-green-700 dark:text-green-400 tracking-wider uppercase block mb-0.5">Recebido</span>
+                        <div className="text-xs sm:text-sm font-extrabold text-green-600 dark:text-green-400 truncate">
                           {formatCurrency(store.receivedAmount)}
                         </div>
                       </div>
-                      <div>
-                        <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wider block mb-0.5">Pendente</span>
-                        <div className={`text-sm font-bold ${store.pendingAmount > 0.01 ? 'text-red-600 dark:text-red-400' : 'text-gray-405 dark:text-dark-text-secondary'}`}>
+                      <div className={`p-2.5 rounded-xl border ${store.pendingAmount > 0.01 ? 'bg-red-50/30 dark:bg-red-950/10 border-red-100/20 dark:border-red-900/10' : 'bg-gray-50/30 dark:bg-dark-bg/30 border-gray-100/20 dark:border-dark-border/10'}`}>
+                        <span className={`text-[9px] font-bold tracking-wider uppercase block mb-0.5 ${store.pendingAmount > 0.01 ? 'text-red-700 dark:text-red-400' : 'text-gray-405 dark:text-dark-text-secondary'}`}>Pendente</span>
+                        <div className={`text-xs sm:text-sm font-extrabold truncate ${store.pendingAmount > 0.01 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-dark-text-secondary'}`}>
                           {formatCurrency(store.pendingAmount)}
                         </div>
                       </div>
@@ -681,93 +727,122 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                           statusColor === "blue" ? "text-blue-600 dark:text-blue-400" :
                           "text-red-600 dark:text-red-400";
 
-  return (
-    <div className="fixed inset-0 bg-gray-900/60 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-gray-100 dark:border-dark-border">
+  // Boas práticas de modal: trava o scroll do fundo enquanto aberto.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  // Fecha com a tecla ESC.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="store-modal-title"
+      onMouseDown={onClose}
+      className="fixed inset-0 bg-black/60 flex items-center justify-center p-2 sm:p-4 z-50 animate-in fade-in duration-300"
+    >
+      <div
+        onMouseDown={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-gray-100 dark:border-dark-border relative"
+      >
         {/* Header Elegante */}
-        <div className="p-6 border-b border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50 dark:bg-dark-bg">
-          <div className="flex items-center gap-4">
-            <div className={`h-14 w-14 rounded-xl ${statusBgLight} flex items-center justify-center`}>
-              <Store className={`h-7 w-7 ${statusTextColor}`} />
+        <div className="p-4 sm:p-6 border-b border-gray-100 dark:border-dark-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gray-50 dark:bg-dark-bg">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0 pr-10 sm:pr-0">
+            <div className={`h-12 w-12 sm:h-14 sm:w-14 rounded-xl ${statusBgLight} flex items-center justify-center shrink-0`}>
+              <Store className={`h-6 w-6 sm:h-7 sm:w-7 ${statusTextColor}`} />
             </div>
-            <div>
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+            <div className="min-w-0">
+              <h3 id="store-modal-title" className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight truncate">
                 {store.storeName}
               </h3>
-              <div className="flex items-center gap-3 mt-1.5">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
                 <span className="flex items-center text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
-                  <MapPin className="h-3.5 w-3.5 mr-1" />
+                  <MapPin className="h-3.5 w-3.5 mr-1 shrink-0 text-gray-400 dark:text-dark-text-secondary" />
                   {store.city}
                 </span>
-                <div className="h-1 w-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+                <span className="text-gray-300 dark:text-gray-600 hidden sm:inline">•</span>
                 <span className="text-xs font-semibold text-gray-600 dark:text-dark-text-secondary">
-                  Operado por: <span className="text-blue-600 dark:text-blue-400 font-semibold">{store.collectorName}</span>
+                  Operador: <span className="text-blue-600 dark:text-blue-400 font-semibold">{store.collectorName}</span>
                 </span>
               </div>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="h-10 w-10 flex items-center justify-center bg-gray-100 hover:bg-red-50 hover:text-red-500 dark:bg-dark-bg dark:hover:bg-red-950/20 dark:hover:text-red-400 text-gray-500 dark:text-dark-text-secondary rounded-xl transition-all active:scale-95 group"
+            aria-label="Fechar"
+            className="absolute top-4 right-4 sm:relative sm:top-0 sm:right-0 h-10 w-10 flex items-center justify-center bg-gray-100 hover:bg-red-50 hover:text-red-500 dark:bg-dark-bg dark:hover:bg-red-950/20 dark:hover:text-red-400 text-gray-500 dark:text-dark-text-secondary rounded-xl transition-all active:scale-95 group"
           >
             <X className="h-5 w-5 transition-transform group-hover:rotate-90" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto flex-1 minimal-scrollbar bg-white dark:bg-dark-bg-secondary">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 minimal-scrollbar bg-white dark:bg-dark-bg-secondary">
           {/* Dashboard de Performance no Modal */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-            <div className="p-5 bg-gradient-to-br from-blue-50/40 to-blue-50/10 dark:from-blue-950/20 dark:to-blue-950/5 rounded-2xl border border-blue-100/40 dark:border-blue-900/30 flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-2.5 bg-blue-100/80 dark:bg-blue-900/50 rounded-xl text-blue-600 dark:text-blue-400">
-                  <Award className="h-5 w-5" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+            <div className="p-3 sm:p-5 bg-gradient-to-br from-blue-50/40 to-blue-50/10 dark:from-blue-950/20 dark:to-blue-950/5 rounded-2xl border border-blue-100/40 dark:border-blue-900/30 flex flex-col justify-between min-w-0">
+              <div className="flex items-center justify-between gap-1 mb-2 sm:mb-4">
+                <div className="p-2 sm:p-2.5 bg-blue-100/80 dark:bg-blue-900/50 rounded-xl text-blue-600 dark:text-blue-400 shrink-0">
+                  <Award className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <span className="text-[10px] font-bold text-blue-500 dark:text-blue-400 tracking-wider">Taxa</span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-blue-500 dark:text-blue-400 tracking-wider uppercase">Taxa</span>
               </div>
-              <p className="text-2xl sm:text-3xl font-extrabold text-blue-950 dark:text-blue-200">
+              <p className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-blue-950 dark:text-blue-200 truncate">
                 {store.conversionRate.toFixed(1)}%
               </p>
-              <p className="text-xs text-blue-650/70 dark:text-blue-400/70 mt-1">Eficiência de Conversão</p>
+              <p className="text-[10px] sm:text-xs text-blue-650/70 dark:text-blue-400/70 mt-1 truncate">Eficiência de Conversão</p>
             </div>
 
-            <div className="p-5 bg-gradient-to-br from-green-50/40 to-green-50/10 dark:from-green-950/20 dark:to-green-950/5 rounded-2xl border border-green-100/40 dark:border-green-900/30 flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-2.5 bg-green-100/80 dark:bg-green-900/50 rounded-xl text-green-600 dark:text-green-400">
-                  <CheckCircle className="h-5 w-5" />
+            <div className="p-3 sm:p-5 bg-gradient-to-br from-green-50/40 to-green-50/10 dark:from-green-950/20 dark:to-green-950/5 rounded-2xl border border-green-100/40 dark:border-green-900/30 flex flex-col justify-between min-w-0">
+              <div className="flex items-center justify-between gap-1 mb-2 sm:mb-4">
+                <div className="p-2 sm:p-2.5 bg-green-100/80 dark:bg-green-900/50 rounded-xl text-green-600 dark:text-green-400 shrink-0">
+                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <span className="text-[10px] font-bold text-green-500 dark:text-green-400 tracking-wider">Pago</span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-green-500 dark:text-green-400 tracking-wider uppercase">Pago</span>
               </div>
-              <p className="text-2xl sm:text-3xl font-extrabold text-green-950 dark:text-green-200 truncate">
+              <p className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-green-950 dark:text-green-200 truncate">
                 {formatCurrency(store.receivedAmount)}
               </p>
-              <p className="text-xs text-green-650/70 dark:text-green-400/70 mt-1">Valor Recebido</p>
+              <p className="text-[10px] sm:text-xs text-green-650/70 dark:text-green-400/70 mt-1 truncate">Valor Recebido</p>
             </div>
 
-            <div className="p-5 bg-gradient-to-br from-red-50/40 to-red-50/10 dark:from-red-950/20 dark:to-red-950/5 rounded-2xl border border-red-100/40 dark:border-red-900/30 flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-2.5 bg-red-100/80 dark:bg-red-900/50 rounded-xl text-red-600 dark:text-red-400">
-                  <AlertCircle className="h-5 w-5" />
+            <div className="p-3 sm:p-5 bg-gradient-to-br from-red-50/40 to-red-50/10 dark:from-red-950/20 dark:to-red-950/5 rounded-2xl border border-red-100/40 dark:border-red-900/30 flex flex-col justify-between min-w-0">
+              <div className="flex items-center justify-between gap-1 mb-2 sm:mb-4">
+                <div className="p-2 sm:p-2.5 bg-red-100/80 dark:bg-red-900/50 rounded-xl text-red-600 dark:text-red-400 shrink-0">
+                  <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <span className="text-[10px] font-bold text-red-500 dark:text-red-400 tracking-wider">Aberto</span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-red-500 dark:text-red-400 tracking-wider uppercase">Aberto</span>
               </div>
-              <p className="text-2xl sm:text-3xl font-extrabold text-red-950 dark:text-red-200 truncate">
+              <p className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-red-950 dark:text-blue-200 truncate">
                 {formatCurrency(store.pendingAmount)}
               </p>
-              <p className="text-xs text-red-650/70 dark:text-red-400/70 mt-1">Valor Pendente</p>
+              <p className="text-[10px] sm:text-xs text-red-650/70 dark:text-red-400/70 mt-1 truncate">Valor Pendente</p>
             </div>
 
-            <div className="p-5 bg-gradient-to-br from-purple-50/40 to-purple-50/10 dark:from-purple-950/20 dark:to-purple-950/5 rounded-2xl border border-purple-100/40 dark:border-purple-900/30 flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-2.5 bg-purple-100/80 dark:bg-purple-900/50 rounded-xl text-purple-600 dark:text-purple-400">
-                  <DollarSign className="h-5 w-5" />
+            <div className="p-3 sm:p-5 bg-gradient-to-br from-purple-50/40 to-purple-50/10 dark:from-purple-950/20 dark:to-purple-950/5 rounded-2xl border border-purple-100/40 dark:border-purple-900/30 flex flex-col justify-between min-w-0">
+              <div className="flex items-center justify-between gap-1 mb-2 sm:mb-4">
+                <div className="p-2 sm:p-2.5 bg-purple-100/80 dark:bg-purple-900/50 rounded-xl text-purple-600 dark:text-purple-400 shrink-0">
+                  <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <span className="text-[10px] font-bold text-purple-505 dark:text-purple-400 tracking-wider">Média</span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-purple-500 dark:text-purple-400 tracking-wider uppercase">Média</span>
               </div>
-              <p className="text-2xl sm:text-3xl font-extrabold text-purple-950 dark:text-purple-200 truncate">
+              <p className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-purple-950 dark:text-purple-200 truncate">
                 {formatCurrency(store.averageTicket)}
               </p>
-              <p className="text-xs text-purple-650/70 dark:text-purple-400/70 mt-1">Ticket Médio</p>
+              <p className="text-[10px] sm:text-xs text-purple-650/70 dark:text-purple-400/70 mt-1 truncate">Ticket Médio</p>
             </div>
           </div>
 
@@ -787,12 +862,12 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-dark-bg border-b border-gray-100 dark:border-dark-border">
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Cidade</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-center">Clientes</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-center">Fichas</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">Valor Bruto</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">Valor Pago</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">Pendente</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Cidade</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-center">Clientes</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-center">Fichas</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">Valor Bruto</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">Valor Pago</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">Pendente</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
@@ -801,30 +876,30 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                     
                     return (
                       <tr key={item.city} className="group hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border flex items-center justify-center text-xs shadow-sm group-hover:border-blue-200">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border flex items-center justify-center text-xs shadow-sm group-hover:border-blue-200 shrink-0">
                               📍
                             </div>
-                            <span className="text-sm font-semibold text-gray-900 dark:text-dark-text group-hover:text-blue-700 dark:group-hover:text-blue-400">{item.city}</span>
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-dark-text group-hover:text-blue-700 dark:group-hover:text-blue-400 truncate max-w-[120px] sm:max-w-none">{item.city}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text border border-gray-200 dark:border-dark-border group-hover:bg-white dark:group-hover:bg-dark-bg-secondary">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-center">
+                          <span className="inline-flex items-center px-2 py-0.5 sm:px-2.5 rounded-full text-[10px] sm:text-xs font-semibold bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text border border-gray-200 dark:border-dark-border group-hover:bg-white dark:group-hover:bg-dark-bg-secondary">
                             {item.clients.size}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-center text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-center text-xs sm:text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
                           {item.sales.size}
                         </td>
-                        <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-dark-text text-right">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-gray-900 dark:text-dark-text text-right">
                           {formatCurrency(item.totalAmount)}
                         </td>
-                        <td className="px-6 py-4 text-sm font-semibold text-green-600 dark:text-green-400 text-right">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-green-600 dark:text-green-400 text-right">
                           {formatCurrency(item.receivedAmount)}
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className={`text-sm font-semibold ${pending > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
+                          <span className={`text-xs sm:text-sm font-semibold ${pending > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}>
                             {formatCurrency(pending)}
                           </span>
                         </td>
@@ -840,6 +915,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
         {/* Footer Moderno */}
         <div className="p-6 border-t border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg flex justify-end gap-4">
           <button
+            type="button"
             onClick={onClose}
             className="px-8 py-3 bg-gray-950 hover:bg-gray-800 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-xl transition-all font-semibold text-sm active:scale-95 shadow-sm"
           >
@@ -847,7 +923,8 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 export default EnhancedStoreManagement;

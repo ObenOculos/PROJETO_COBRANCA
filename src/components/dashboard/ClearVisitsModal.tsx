@@ -67,7 +67,10 @@ const ClearVisitsModal: React.FC<ClearVisitsModalProps> = ({
   ): ScheduledVisit[] => {
     const cv = scheduledVisits.filter((v) => v.collectorId === collectorId);
     if (s === "overdue") return cv.filter(isOverdue);
-    if (s === "scheduled") return cv.filter((v) => v.status === "agendada");
+    // "Agendadas" = somente as no prazo (sem atraso), para não sobrepor com
+    // "Atrasadas" — assim Pendentes = Atrasadas + Agendadas (+ demais não concluídas).
+    if (s === "scheduled")
+      return cv.filter((v) => v.status === "agendada" && !isOverdue(v));
     return cv.filter((v) => !DONE_VISIT_STATUSES.includes(v.status));
   };
 
@@ -96,7 +99,7 @@ const ClearVisitsModal: React.FC<ClearVisitsModalProps> = ({
     {
       value: "scheduled",
       label: "Apenas agendadas",
-      desc: "Todas com status agendada",
+      desc: "Agendadas dentro do prazo",
       count: scheduledCount,
     },
     {

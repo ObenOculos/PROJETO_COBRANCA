@@ -7,6 +7,7 @@ import {
   MapPin,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Award,
   HandCoins,
   Briefcase,
@@ -308,6 +309,8 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
     return { current, previous };
   }, [clientCreatedAtMap]);
   const [showFilters, setShowFilters] = useState(false);
+  // Mobile: recolhe controles/pills/painel atrás de um chevron (desktop sempre visível).
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // Modal states
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -1080,9 +1083,6 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
   // Rótulos explícitos dos períodos comparados no card "Novos Clientes".
   const now = new Date();
   const currentMonthLabel = monthLabel(now);
-  const prevMonthLabel = monthLabel(
-    new Date(now.getFullYear(), now.getMonth() - 1, 1),
-  );
 
   // Clique nos cards aplica/remove (toggle) o filtro correspondente.
   const currentMonthStartStr = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -1224,8 +1224,8 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         </div>
       </div>
 
-      {/* Grid de Cards Executivos — Scroll horizontal em mobile com padding vertical para evitar corte de sombras */}
-      <div className="flex overflow-x-auto pt-3 pb-5 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pt-0 sm:pb-0 sm:overflow-visible sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 custom-scrollbar snap-x">
+      {/* Grid de Cards Executivos — faixa horizontal deslizável no mobile, grid no desktop */}
+      <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 overflow-x-auto sm:overflow-visible snap-x snap-mandatory -mx-1 px-1 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {/* Card: Total de Clientes */}
         <div
           role="button"
@@ -1238,7 +1238,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             }
           }}
           title="Mostrar todos os clientes (limpar filtros)"
-          className={`min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
+          className={`shrink-0 snap-start min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all cursor-pointer ${
             isAllActive
               ? "border-blue-500 ring-2 ring-blue-500/10"
               : "border-gray-100 dark:border-dark-border"
@@ -1249,15 +1249,15 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
             {mainStats.unassigned > 0 && (
-              <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-md tracking-wide border border-amber-100 dark:border-amber-900/30">
-                {mainStats.unassigned} Pendentes
+              <span className="text-[8px] sm:text-[9px] font-semibold text-amber-700 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-md tracking-wide border border-amber-100 dark:border-amber-900/30 shrink-0">
+                {mainStats.unassigned} Pend.
               </span>
             )}
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Total Clientes</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{mainStats.total}</p>
-            <p className="text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5">
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Total Clientes</p>
+            <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{mainStats.total}</p>
+            <p className="text-[10px] sm:text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5 truncate">
               <span className="text-gray-600 dark:text-dark-text font-semibold">{mainStats.totalSales}</span> vendas
             </p>
           </div>
@@ -1275,7 +1275,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             }
           }}
           title={`Filtrar clientes criados em ${currentMonthLabel}`}
-          className={`min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
+          className={`shrink-0 snap-start min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all cursor-pointer ${
             isNewClientsFilterActive
               ? "border-green-500 ring-2 ring-green-500/10"
               : "border-gray-100 dark:border-dark-border"
@@ -1286,7 +1286,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
               <Zap className="h-4 w-4 text-green-600 dark:text-green-400" />
             </div>
             {mainStats.prevMonth > 0 ? (
-              <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md tracking-wide border ${
+              <span className={`text-[8px] sm:text-[9px] font-semibold px-1.5 py-0.5 rounded-md tracking-wide border shrink-0 ${
                 mainStats.newClients >= mainStats.prevMonth 
                   ? 'text-green-700 bg-green-50 border-green-150 dark:text-green-400 dark:bg-green-900/20 dark:border-green-900/30' 
                   : 'text-amber-700 bg-amber-50 border-amber-150 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-900/30'
@@ -1294,33 +1294,33 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
                 {mainStats.newClients >= mainStats.prevMonth ? '▲ +' : '▼ '}{((mainStats.newClients / mainStats.prevMonth - 1) * 100).toFixed(0)}%
               </span>
             ) : (
-              <span className="text-[9px] font-semibold text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20 px-2 py-0.5 rounded-md tracking-wide border border-green-100 dark:border-green-900/30">
+              <span className="text-[8px] sm:text-[9px] font-semibold text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20 px-1.5 py-0.5 rounded-md tracking-wide border border-green-100 dark:border-green-900/30 shrink-0">
                 {currentMonthLabel}
               </span>
             )}
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Novos Clientes</p>
-            <div className="flex items-baseline gap-1.5">
-              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{mainStats.newClients}</p>
-              <p className="text-[9px] font-semibold text-gray-400 tracking-tight shrink-0">{currentMonthLabel}</p>
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Novos Clientes</p>
+            <div className="flex items-baseline gap-1 mt-0.5 flex-wrap">
+              <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{mainStats.newClients}</p>
+              <p className="text-[8px] sm:text-[9px] font-semibold text-gray-400 tracking-tight shrink-0">{currentMonthLabel}</p>
             </div>
-            <p className="text-[10px] font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5 tracking-tight">
-              {prevMonthLabel}: <span className="text-gray-600 dark:text-dark-text font-semibold">{mainStats.prevMonth}</span>
+            <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5 tracking-tight truncate">
+              Ant: <span className="text-gray-600 dark:text-dark-text font-semibold">{mainStats.prevMonth}</span>
             </p>
           </div>
         </div>
 
         {/* Card: Valor em Aberto */}
-        <div className="min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow snap-start">
+        <div className="shrink-0 snap-start min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-3">
             <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
               <HandCoins className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
             </div>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Valor em Aberto</p>
-            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-450 tracking-tight">{formatCurrency(mainStats.pendingValue)}</p>
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Valor em Aberto</p>
+            <p className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-450 tracking-tight truncate">{formatCurrency(mainStats.pendingValue)}</p>
           </div>
         </div>
 
@@ -1336,7 +1336,7 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             }
           }}
           title="Filtrar clientes pendentes (sem cobrador)"
-          className={`min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
+          className={`shrink-0 snap-start min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all cursor-pointer ${
             isPendingFilterActive
               ? "border-amber-500 ring-2 ring-amber-500/10"
               : "border-gray-100 dark:border-dark-border"
@@ -1346,26 +1346,26 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
             <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
               <Award className="h-4 w-4 text-purple-600 dark:text-purple-400" />
             </div>
-            <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md tracking-wide border ${
+            <span className={`text-[8px] sm:text-[9px] font-semibold px-1.5 py-0.5 rounded-md tracking-wide border shrink-0 ${
               mainStats.assignmentRate > 90
                 ? 'text-green-700 bg-green-50 border-green-100 dark:text-green-400 dark:bg-green-900/20 dark:border-green-900/30'
                 : 'text-amber-700 bg-amber-50 border-amber-100 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-900/30'
             }`}>
-              {mainStats.assignmentRate > 90 ? 'Excelente' : 'Ajustar'}
+              {mainStats.assignmentRate > 90 ? 'OK' : 'Ajustar'}
             </span>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Taxa Atribuição</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{mainStats.assignmentRate.toFixed(1)}%</p>
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Taxa Atribuição</p>
+            <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{mainStats.assignmentRate.toFixed(1)}%</p>
           </div>
         </div>
       </div>
 
       {/* Barra de Filtros Unificada */}
       <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-150/80 dark:border-dark-border shadow-sm space-y-3">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+        <div className="flex flex-row flex-wrap items-center gap-3">
         {/* Busca */}
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-405 pointer-events-none" />
           <input
             type="text"
@@ -1378,7 +1378,29 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
           />
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch gap-2.5 shrink-0">
+        {/* Mobile: chevron que recolhe/expande os demais filtros */}
+        <button
+          type="button"
+          onClick={() => setMobileFiltersOpen((v) => !v)}
+          aria-expanded={mobileFiltersOpen}
+          aria-label={mobileFiltersOpen ? "Recolher filtros" : "Expandir filtros"}
+          className={`md:hidden px-3 py-2 rounded-xl border flex items-center justify-center gap-1.5 shrink-0 transition-all ${
+            mobileFiltersOpen || hasActiveFilters
+              ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+              : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border"
+          }`}
+        >
+          {hasActiveFilters && (
+            <span className="text-xs font-semibold leading-none">
+              {activeFilterChips.length}
+            </span>
+          )}
+          <ChevronDown
+            className={`h-4 w-4 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        <div className={`${mobileFiltersOpen ? "flex" : "hidden"} md:flex flex-col sm:flex-row items-stretch gap-2.5 w-full md:w-auto md:shrink-0`}>
           {/* Dropdown Visão */}
           <div className="relative flex-1 sm:flex-none">
             <select
@@ -1470,34 +1492,37 @@ export const ClientAssignment = React.memo(({ onViewClient }: ClientAssignmentPr
         </div>
         </div>
 
-        {/* Atalhos rápidos: status de pagamento + faixa de atraso */}
-        <FilterPills
-          paymentStatus={filterPaymentStatuses}
-          aging={filterAgings}
-          onChange={handlePillsChange}
-          showPaymentStatus
-          excludePaymentStatus={["cancelado"]}
-          showAging
-          multiPaymentStatus
-          multiAging
-        />
-
-        {/* Filtros Colapsáveis (painel compartilhado) */}
-        {showFilters && (
-          <FilterPanel
-            context="assignment"
-            values={filterPanelValues}
-            onChange={handleFilterPanelChange}
-            onClear={clearAllFilters}
-            onClose={() => setShowFilters(false)}
+        {/* Demais filtros: no mobile ocultos até expandir; no desktop sempre visíveis */}
+        <div className={`${mobileFiltersOpen ? "block" : "hidden"} md:block space-y-3`}>
+          {/* Atalhos rápidos: status de pagamento + faixa de atraso */}
+          <FilterPills
+            paymentStatus={filterPaymentStatuses}
+            aging={filterAgings}
+            onChange={handlePillsChange}
+            showPaymentStatus
             excludePaymentStatus={["cancelado"]}
-            options={{
-              cities: availableCities,
-              neighborhoods: availableNeighborhoods,
-              stores: availableStores,
-            }}
+            showAging
+            multiPaymentStatus
+            multiAging
           />
-        )}
+
+          {/* Filtros Colapsáveis (painel compartilhado) */}
+          {showFilters && (
+            <FilterPanel
+              context="assignment"
+              values={filterPanelValues}
+              onChange={handleFilterPanelChange}
+              onClear={clearAllFilters}
+              onClose={() => setShowFilters(false)}
+              excludePaymentStatus={["cancelado"]}
+              options={{
+                cities: availableCities,
+                neighborhoods: availableNeighborhoods,
+                stores: availableStores,
+              }}
+            />
+          )}
+        </div>
       </div>
 
       {/* Client List */}

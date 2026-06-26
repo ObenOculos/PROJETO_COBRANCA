@@ -757,6 +757,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   };
 
   const [showFilters, setShowFilters] = useState(false);
+  // Mobile: recolhe ações/pills/painel atrás de um chevron (desktop sempre visível).
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const handleExportToExcel = () => {
     const dataToExport = filteredVisitsFlat.map((visit) => ({
@@ -889,8 +891,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
         {/* Barra de Filtros — visual unificado (igual às demais telas) */}
         <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-150/80 dark:border-dark-border shadow-sm space-y-3">
           {/* Linha: busca + ações */}
-          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-            <div className="relative flex-1">
+          <div className="flex flex-row flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               <input
                 type="text"
@@ -902,28 +904,54 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-gray-450"
               />
             </div>
+
+            {/* Mobile: chevron que recolhe/expande ações e filtros */}
             <button
-              onClick={handleExportToExcel}
-              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-all shadow-sm whitespace-nowrap shrink-0"
-            >
-              <FileDown className="h-3.5 w-3.5" />
-              <span>Exportar</span>
-            </button>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
-                showFilters || activeFiltersCount > 0
+              type="button"
+              onClick={() => setMobileFiltersOpen((v) => !v)}
+              aria-expanded={mobileFiltersOpen}
+              aria-label={mobileFiltersOpen ? "Recolher filtros" : "Expandir filtros"}
+              className={`md:hidden px-3 py-2 rounded-xl border flex items-center justify-center gap-1.5 shrink-0 transition-all ${
+                mobileFiltersOpen || activeFiltersCount > 0
                   ? "bg-blue-600 border-blue-600 text-white shadow-sm"
-                  : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+                  : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border"
               }`}
             >
-              <Filter className="h-3.5 w-3.5" />
-              <span>
-                Filtros{activeFiltersCount > 0 && ` (${activeFiltersCount})`}
-              </span>
+              {activeFiltersCount > 0 && (
+                <span className="text-xs font-semibold leading-none">{activeFiltersCount}</span>
+              )}
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`}
+              />
             </button>
+
+            {/* Ações: no mobile aparecem só quando expandido */}
+            <div className={`${mobileFiltersOpen ? "flex" : "hidden"} md:flex items-center gap-3 w-full md:w-auto`}>
+              <button
+                onClick={handleExportToExcel}
+                className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-all shadow-sm whitespace-nowrap shrink-0"
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                <span>Exportar</span>
+              </button>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all border flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
+                  showFilters || activeFiltersCount > 0
+                    ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                    : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+                }`}
+              >
+                <Filter className="h-3.5 w-3.5" />
+                <span>
+                  Filtros{activeFiltersCount > 0 && ` (${activeFiltersCount})`}
+                </span>
+              </button>
+            </div>
           </div>
 
+          {/* Demais filtros: no mobile ocultos até expandir; no desktop sempre visíveis */}
+          <div className={`${mobileFiltersOpen ? "block" : "hidden"} md:block space-y-3`}>
           {/* Atalhos rápidos (pills) */}
           <div className="flex flex-wrap items-center gap-2">
             {quickFilters.map((q) => {
@@ -1181,6 +1209,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               </div>
             </div>
           )}
+          </div>
         </div>
 
         {/* Chips de filtros ativos */}
@@ -1231,11 +1260,17 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               const isExpanded = expandedCollectors.has(collectorId);
 
               // Calcular resumos de status para os "Color Dots"
+              // Buckets mutuamente exclusivos (mesma regra do modal de limpeza):
+              // agendada vencida conta como "atrasada", não como "agendada".
               const statusCounts = visits.reduce((acc, v) => {
-                const status = v.status;
-                acc[status] = (acc[status] || 0) + 1;
-                if (isVisitOverdue(v)) {
-                  acc.overdue = (acc.overdue || 0) + 1;
+                if (v.status === "agendada") {
+                  if (isVisitOverdue(v)) {
+                    acc.overdue = (acc.overdue || 0) + 1;
+                  } else {
+                    acc.agendada = (acc.agendada || 0) + 1;
+                  }
+                } else {
+                  acc[v.status] = (acc[v.status] || 0) + 1;
                 }
                 return acc;
               }, {} as Record<string, number>);
@@ -1245,9 +1280,11 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   key={collectorId}
                   className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden transition-all duration-300"
                 >
+                  {/* Linha: cabeçalho + barra de exclusão lateral (estilo Cobranças) */}
+                  <div className="flex items-stretch">
                   {/* Header do cobrador — Estilo Refinado e Responsivo */}
                   <div
-                    className="p-4 sm:p-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors flex items-center justify-between"
+                    className="flex-1 min-w-0 p-4 sm:p-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors flex items-center justify-between"
                     onClick={() => toggleCollectorExpansion(collectorId)}
                   >
                     <div className="flex items-center gap-3 sm:gap-4">
@@ -1278,7 +1315,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                             )}
                             {statusCounts.overdue > 0 && (
                               <div className="flex items-center gap-1" title={`${statusCounts.overdue} Atrasadas`}>
-                                <div className="h-1.5 w-1.5 rounded-full bg-red-505 animate-pulse"></div>
+                                <div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></div>
                                 <span className="text-[10px] font-bold text-red-500">{statusCounts.overdue}</span>
                               </div>
                             )}
@@ -1301,24 +1338,6 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                           <span className="hidden sm:inline text-xs font-semibold">Nova Visita</span>
                         </button>
                       )}
-                      {user?.type === "manager" &&
-                        pendingVisitsCount(scheduledVisits, collectorId) > 0 && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setClearTarget({
-                                id: collectorId,
-                                name:
-                                  users.find((u) => u.id === collectorId)?.name ||
-                                  "Cobrador",
-                              });
-                            }}
-                            className="flex items-center justify-center p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all shrink-0"
-                            title="Limpar visitas pendentes"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
                       <div className="bg-gray-50 dark:bg-dark-bg p-2 rounded-xl border border-gray-100 dark:border-dark-border">
                         {isExpanded ? (
                           <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
@@ -1327,6 +1346,39 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                         )}
                       </div>
                     </div>
+                  </div>
+                  {user?.type === "manager" &&
+                    (() => {
+                      const hasPending =
+                        pendingVisitsCount(scheduledVisits, collectorId) > 0;
+                      return (
+                        <button
+                          disabled={!hasPending}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!hasPending) return;
+                            setClearTarget({
+                              id: collectorId,
+                              name:
+                                users.find((u) => u.id === collectorId)?.name ||
+                                "Cobrador",
+                            });
+                          }}
+                          className={`flex items-center justify-center w-12 transition-colors flex-shrink-0 self-stretch ${
+                            hasPending
+                              ? "bg-red-500 text-white hover:bg-red-600 cursor-pointer"
+                              : "bg-gray-100 dark:bg-dark-bg text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                          }`}
+                          title={
+                            hasPending
+                              ? "Limpar visitas pendentes"
+                              : "Nenhuma visita pendente para limpar"
+                          }
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      );
+                    })()}
                   </div>
 
                   {/* Área Expandida — Tabela e Cards */}
@@ -1699,8 +1751,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       const totalVisits = filteredVisitsFlat.filter(
         (v) => v.status !== "reagendada",
       ).length;
+      // "Agendadas" = somente no prazo; as vencidas entram em "atrasadas"
+      // (buckets mutuamente exclusivos, igual aos dots e ao modal de limpeza).
       const agendadas = filteredVisitsFlat.filter(
-        (v) => v.status === "agendada",
+        (v) => v.status === "agendada" && !isVisitOverdue(v),
       ).length;
       const realizadas = filteredVisitsFlat.filter(
         (v) => v.status === "realizada",
@@ -1741,16 +1795,16 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       <div className="space-y-6">
         {/* Header */}
         <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-4 sm:p-5">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl shrink-0">
                 <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+              <div className="min-w-0">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight leading-none truncate">
                   Acompanhamento de Visitas
                 </h2>
-                <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 tracking-wide">
+                <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 tracking-wide truncate">
                   Gestão estratégica de rotas e cancelamentos
                 </p>
               </div>
@@ -1760,7 +1814,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             {onClose && (
               <button
                 onClick={onClose}
-                className="p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-dark-text bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl transition-all"
+                className="p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-dark-text bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl transition-all shrink-0"
                 title="Fechar"
               >
                 <X className="h-5 w-5" />
@@ -1830,7 +1884,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               }
             }}
             title="Mostrar todas as visitas (limpar filtros)"
-            className={`min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
+            className={`min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
               activeFiltersCount === 0 && activeTab === "visits"
                 ? "border-blue-500 ring-2 ring-blue-500/10"
                 : "border-gray-100 dark:border-dark-border"
@@ -1854,7 +1908,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             onClick={() => {
               setActiveTab("visits");
               setStatusFilter("agendada");
-              setOverdueFilter("all");
+              setOverdueFilter("not_overdue");
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
@@ -1865,8 +1919,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               }
             }}
             title="Filtrar visitas agendadas"
-            className={`min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
-              statusFilter === "agendada" && overdueFilter === "all" && activeTab === "visits"
+            className={`min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
+              statusFilter === "agendada" && overdueFilter === "not_overdue" && activeTab === "visits"
                 ? "border-blue-500 ring-2 ring-blue-500/10"
                 : "border-gray-100 dark:border-dark-border"
             }`}
@@ -1910,7 +1964,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               }
             }}
             title="Filtrar visitas realizadas"
-            className={`min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
+            className={`min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
               statusFilter === "realizada" && activeTab === "visits"
                 ? "border-green-500 ring-2 ring-green-500/10"
                 : "border-gray-100 dark:border-dark-border"
@@ -1941,7 +1995,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               }
             }}
             title="Ir para solicitações de cancelamento"
-            className={`min-w-[240px] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-5 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
+            className={`min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
               activeTab === "cancellations"
                 ? "border-amber-500 ring-2 ring-amber-500/10"
                 : "border-gray-100 dark:border-dark-border"
