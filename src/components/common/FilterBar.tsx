@@ -186,8 +186,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
   const selectedStatuses = Array.isArray(filters.status)
     ? filters.status
     : filters.status
-    ? [filters.status]
-    : [];
+      ? [filters.status]
+      : [];
 
   const handlePanelChange = (patch: Partial<FilterValues>) => {
     const next: FilterOptions = { ...filters };
@@ -207,7 +207,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
     // Periodo: arrays vazios viram undefined (= sem filtro), para nao contarem
     // como filtro ativo.
     if ("months" in patch)
-      next.months = patch.months && patch.months.length ? patch.months : undefined;
+      next.months =
+        patch.months && patch.months.length ? patch.months : undefined;
     if ("years" in patch)
       next.years = patch.years && patch.years.length ? patch.years : undefined;
     onFilterChange(next);
@@ -404,7 +405,9 @@ const FilterBar: React.FC<FilterBarProps> = ({
             <FilterPanel
               context={
                 context ??
-                (userType === "manager" ? "collections" : "collectionsCollector")
+                (userType === "manager"
+                  ? "collections"
+                  : "collectionsCollector")
               }
               values={panelValues}
               onChange={handlePanelChange}

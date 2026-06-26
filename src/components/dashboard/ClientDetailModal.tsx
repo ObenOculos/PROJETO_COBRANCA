@@ -573,12 +573,12 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     }
   };
 
-const handleEditPaymentClick = () => {
-  setShowAuthModal(true);
-  setAuthError("");
-  setAuthToken("");
-  setAuthRequestSent(false);
-};
+  const handleEditPaymentClick = () => {
+    setShowAuthModal(true);
+    setAuthError("");
+    setAuthToken("");
+    setAuthRequestSent(false);
+  };
 
   return (
     <>
@@ -620,7 +620,9 @@ const handleEditPaymentClick = () => {
 
           {/* Action Buttons */}
 
-          {(userType === "collector" || userType === "internal_collector" || userType === "manager") && (
+          {(userType === "collector" ||
+            userType === "internal_collector" ||
+            userType === "manager") && (
             <div className="mt-4 px-4 lg:px-6 py-0 grid grid-cols-2 sm:grid-cols-4 gap-3">
               <button
                 id="view-client-data"
@@ -964,7 +966,9 @@ const handleEditPaymentClick = () => {
                                             <span className="font-mono text-xs text-gray-500">
                                               #{installment.id_parcela}
                                             </span>
-                                            {isCancelado(installment.status) && (
+                                            {isCancelado(
+                                              installment.status,
+                                            ) && (
                                               <span className="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">
                                                 Cancelado
                                               </span>

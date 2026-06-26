@@ -74,7 +74,10 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
         if (error && error.code !== "PGRST116") throw error;
         setCurrentAddress(data);
       } catch (err) {
-        console.error("Error fetching current address for collection modal", err);
+        console.error(
+          "Error fetching current address for collection modal",
+          err,
+        );
       } finally {
         setAddressLoading(false);
       }
@@ -238,7 +241,9 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
           <span className="text-xs font-bold text-gray-500 dark:text-dark-text-secondary tracking-wide">
             DOC: {collection.documento}
           </span>
-          <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-tight ${getStatusColor(collection.status)}`}>
+          <span
+            className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-tight ${getStatusColor(collection.status)}`}
+          >
             {getStatusLabel(collection.status)}
           </span>
         </div>
@@ -273,49 +278,88 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                 {/* Section: Dados da Venda */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-bold text-gray-400 tracking-[0.15em] border-b border-gray-50 pb-2">Dados da Cobrança</h4>
+                    <h4 className="text-[10px] font-bold text-gray-400 tracking-[0.15em] border-b border-gray-50 pb-2">
+                      Dados da Cobrança
+                    </h4>
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-400 mb-0.5">Loja</label>
-                        <p className="text-sm font-semibold text-gray-800 dark:text-dark-text">{collection.nome_da_loja}</p>
+                        <label className="block text-[10px] font-bold text-gray-400 mb-0.5">
+                          Loja
+                        </label>
+                        <p className="text-sm font-semibold text-gray-800 dark:text-dark-text">
+                          {collection.nome_da_loja}
+                        </p>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-[10px] font-bold text-gray-400 mb-0.5">Venda</label>
-                          <p className="text-sm font-semibold text-gray-800 dark:text-dark-text">#{collection.venda_n}</p>
+                          <label className="block text-[10px] font-bold text-gray-400 mb-0.5">
+                            Venda
+                          </label>
+                          <p className="text-sm font-semibold text-gray-800 dark:text-dark-text">
+                            #{collection.venda_n}
+                          </p>
                         </div>
                         <div>
-                          <label className="block text-[10px] font-bold text-gray-400 mb-0.5">Parcela</label>
-                          <p className="text-sm font-semibold text-gray-800 dark:text-dark-text">{collection.parcela} ({collection.numero_titulo})</p>
+                          <label className="block text-[10px] font-bold text-gray-400 mb-0.5">
+                            Parcela
+                          </label>
+                          <p className="text-sm font-semibold text-gray-800 dark:text-dark-text">
+                            {collection.parcela} ({collection.numero_titulo})
+                          </p>
                         </div>
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-400 mb-0.5">Tipo</label>
-                        <p className="text-sm font-semibold text-gray-800 dark:text-dark-text">{collection.tipo_de_cobranca}</p>
+                        <label className="block text-[10px] font-bold text-gray-400 mb-0.5">
+                          Tipo
+                        </label>
+                        <p className="text-sm font-semibold text-gray-800 dark:text-dark-text">
+                          {collection.tipo_de_cobranca}
+                        </p>
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-bold text-gray-400 tracking-[0.15em] border-b border-gray-50 pb-2">Valores e Status</h4>
+                    <h4 className="text-[10px] font-bold text-gray-400 tracking-[0.15em] border-b border-gray-50 pb-2">
+                      Valores e Status
+                    </h4>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-bold text-gray-400">Original</label>
-                        <p className="text-sm font-bold text-gray-800 dark:text-dark-text">{formatCurrency(collection.valor_original)}</p>
+                        <label className="text-[10px] font-bold text-gray-400">
+                          Original
+                        </label>
+                        <p className="text-sm font-bold text-gray-800 dark:text-dark-text">
+                          {formatCurrency(collection.valor_original)}
+                        </p>
                       </div>
                       <div className="flex justify-between items-center bg-blue-50/50 dark:bg-blue-900/10 p-2 rounded-lg">
-                        <label className="text-[10px] font-bold text-blue-600">Valor Atual</label>
-                        <p className="text-sm font-black text-blue-700 dark:text-blue-400">{formatCurrency(collection.valor_reajustado || collection.valor_original)}</p>
+                        <label className="text-[10px] font-bold text-blue-600">
+                          Valor Atual
+                        </label>
+                        <p className="text-sm font-black text-blue-700 dark:text-blue-400">
+                          {formatCurrency(
+                            collection.valor_reajustado ||
+                              collection.valor_original,
+                          )}
+                        </p>
                       </div>
                       <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-bold text-gray-400">Recebido</label>
-                        <p className={`text-sm font-bold ${collection.valor_recebido > 0 ? "text-green-600" : "text-gray-400"}`}>
+                        <label className="text-[10px] font-bold text-gray-400">
+                          Recebido
+                        </label>
+                        <p
+                          className={`text-sm font-bold ${collection.valor_recebido > 0 ? "text-green-600" : "text-gray-400"}`}
+                        >
                           {formatCurrency(collection.valor_recebido)}
                         </p>
                       </div>
                       <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-bold text-gray-400">Vencimento</label>
-                        <p className="text-sm font-semibold text-gray-800 dark:text-dark-text">{formatDate(collection.data_vencimento || "")}</p>
+                        <label className="text-[10px] font-bold text-gray-400">
+                          Vencimento
+                        </label>
+                        <p className="text-sm font-semibold text-gray-800 dark:text-dark-text">
+                          {formatDate(collection.data_vencimento || "")}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -323,7 +367,9 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
 
                 {/* Section: Localização e Contato */}
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-bold text-gray-400 tracking-[0.15em] border-b border-gray-50 pb-2">Localização e Contato</h4>
+                  <h4 className="text-[10px] font-bold text-gray-400 tracking-[0.15em] border-b border-gray-50 pb-2">
+                    Localização e Contato
+                  </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-3">
                       <div className="p-3 border border-gray-100 dark:border-dark-border rounded-xl bg-gray-50/50 dark:bg-dark-bg/30">
@@ -334,11 +380,21 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                           ) : (
                             <div className="text-xs leading-relaxed text-gray-600 dark:text-dark-text-secondary">
                               <p className="font-bold text-gray-800 dark:text-dark-text">
-                                {currentAddress?.logradouro || collection.endereco}, {currentAddress?.numero || collection.numero}
+                                {currentAddress?.logradouro ||
+                                  collection.endereco}
+                                , {currentAddress?.numero || collection.numero}
                               </p>
-                              {collection.complemento && !currentAddress && <p>{collection.complemento}</p>}
-                              <p>{currentAddress?.bairro || collection.bairro} — {currentAddress?.cidade || collection.cidade}/{currentAddress?.estado || collection.estado}</p>
-                              <p className="font-mono">{currentAddress?.cep || collection.cep}</p>
+                              {collection.complemento && !currentAddress && (
+                                <p>{collection.complemento}</p>
+                              )}
+                              <p>
+                                {currentAddress?.bairro || collection.bairro} —{" "}
+                                {currentAddress?.cidade || collection.cidade}/
+                                {currentAddress?.estado || collection.estado}
+                              </p>
+                              <p className="font-mono">
+                                {currentAddress?.cep || collection.cep}
+                              </p>
                             </div>
                           )}
                         </div>
@@ -350,21 +406,45 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                         <div className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-dark-bg rounded-lg transition-colors">
                           <div className="flex items-center gap-2">
                             <Phone className="w-4 h-4 text-blue-500" />
-                            <span className="text-xs font-semibold">{collection.telefone}</span>
+                            <span className="text-xs font-semibold">
+                              {collection.telefone}
+                            </span>
                           </div>
-                          <button onClick={() => window.open(`tel:${collection.telefone}`)} className="text-[10px] font-bold text-blue-600">Ligar</button>
+                          <button
+                            onClick={() =>
+                              window.open(`tel:${collection.telefone}`)
+                            }
+                            className="text-[10px] font-bold text-blue-600"
+                          >
+                            Ligar
+                          </button>
                         </div>
                       )}
                       {collection.celular && (
                         <div className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-dark-bg rounded-lg transition-colors">
                           <div className="flex items-center gap-2">
                             <MessageCircle className="w-4 h-4 text-green-500" />
-                            <span className="text-xs font-semibold">{collection.celular}</span>
+                            <span className="text-xs font-semibold">
+                              {collection.celular}
+                            </span>
                           </div>
                           <div className="flex gap-2">
-                            <button onClick={() => window.open(`tel:${collection.celular}`)} className="text-[10px] font-bold text-blue-600">Ligar</button>
-                            <button 
-                              onClick={() => collection.celular && window.open(formatWhatsApp(collection.celular), "_blank")} 
+                            <button
+                              onClick={() =>
+                                window.open(`tel:${collection.celular}`)
+                              }
+                              className="text-[10px] font-bold text-blue-600"
+                            >
+                              Ligar
+                            </button>
+                            <button
+                              onClick={() =>
+                                collection.celular &&
+                                window.open(
+                                  formatWhatsApp(collection.celular),
+                                  "_blank",
+                                )
+                              }
                               className="text-[10px] font-bold text-green-600"
                             >
                               WhatsApp
@@ -379,7 +459,9 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                 {/* Observations */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-[10px] font-bold text-gray-400 tracking-[0.15em]">Observações Internas</h4>
+                    <h4 className="text-[10px] font-bold text-gray-400 tracking-[0.15em]">
+                      Observações Internas
+                    </h4>
                     {userType !== "manager" && (
                       <button
                         onClick={handleUpdateObservations}
@@ -473,7 +555,9 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-1.5">Novo Status</label>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1.5">
+                        Novo Status
+                      </label>
                       <select
                         value={newStatus}
                         onChange={(e) => setNewStatus(e.target.value)}
@@ -504,9 +588,13 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-1.5">Valor Recebido</label>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1.5">
+                        Valor Recebido
+                      </label>
                       <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">R$</span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">
+                          R$
+                        </span>
                         <input
                           type="number"
                           step="0.01"
@@ -517,7 +605,9 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-1.5">Data</label>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1.5">
+                        Data
+                      </label>
                       <input
                         type="date"
                         value={correctedDate}
@@ -527,9 +617,17 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                     </div>
                   </div>
                   <div className="p-3 bg-purple-50 dark:bg-purple-900/10 rounded-xl mb-4 flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-purple-600">Restante Projetado</span>
+                    <span className="text-[10px] font-bold text-purple-600">
+                      Restante Projetado
+                    </span>
                     <span className="text-sm font-black text-red-600">
-                      {formatCurrency(Math.max(0, collection.valor_original - (parseFloat(correctedValue) || 0)))}
+                      {formatCurrency(
+                        Math.max(
+                          0,
+                          collection.valor_original -
+                            (parseFloat(correctedValue) || 0),
+                        ),
+                      )}
                     </span>
                   </div>
                   <button
@@ -549,10 +647,17 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1.5">Canal</label>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1.5">
+                          Canal
+                        </label>
                         <select
                           value={newAttempt.type}
-                          onChange={(e) => setNewAttempt({ ...newAttempt, type: e.target.value as any })}
+                          onChange={(e) =>
+                            setNewAttempt({
+                              ...newAttempt,
+                              type: e.target.value as any,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-200 dark:border-dark-border rounded-lg text-sm dark:bg-dark-bg"
                         >
                           <option value="call">Ligação</option>
@@ -562,10 +667,17 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1.5">Resultado</label>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1.5">
+                          Resultado
+                        </label>
                         <select
                           value={newAttempt.result}
-                          onChange={(e) => setNewAttempt({ ...newAttempt, result: e.target.value as any })}
+                          onChange={(e) =>
+                            setNewAttempt({
+                              ...newAttempt,
+                              result: e.target.value as any,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-200 dark:border-dark-border rounded-lg text-sm dark:bg-dark-bg"
                         >
                           <option value="no_answer">Não atendeu</option>
@@ -578,10 +690,17 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-1.5">Relato</label>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1.5">
+                        Relato
+                      </label>
                       <textarea
                         value={newAttempt.notes}
-                        onChange={(e) => setNewAttempt({ ...newAttempt, notes: e.target.value })}
+                        onChange={(e) =>
+                          setNewAttempt({
+                            ...newAttempt,
+                            notes: e.target.value,
+                          })
+                        }
                         className="w-full px-3 py-2 border border-gray-200 dark:border-dark-border rounded-lg text-sm dark:bg-dark-bg min-h-[60px]"
                         placeholder="Descreva brevemente..."
                       />

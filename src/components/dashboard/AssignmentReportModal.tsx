@@ -117,9 +117,7 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
             .gte("assigned_at", fromIso)
             .lt("assigned_at", toIso);
           if (collectorId) q = q.eq("cobrador_novo_id", collectorId);
-          return q
-            .order("assigned_at", { ascending: false })
-            .range(from, to);
+          return q.order("assigned_at", { ascending: false }).range(from, to);
         },
         () => cancelled,
       );
@@ -195,7 +193,10 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
         {/* Filtros */}
         <div className="flex flex-wrap items-end gap-3 p-4 border-b border-gray-200 dark:border-dark-border shrink-0">
           <div className="flex flex-col">
-            <label htmlFor="report-date-from" className="text-[10px] font-black tracking-wide text-gray-400 mb-1">
+            <label
+              htmlFor="report-date-from"
+              className="text-[10px] font-black tracking-wide text-gray-400 mb-1"
+            >
               De
             </label>
             <input
@@ -209,7 +210,10 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
             />
           </div>
           <div className="flex flex-col">
-            <label htmlFor="report-date-to" className="text-[10px] font-black tracking-wide text-gray-400 mb-1">
+            <label
+              htmlFor="report-date-to"
+              className="text-[10px] font-black tracking-wide text-gray-400 mb-1"
+            >
               Até
             </label>
             <input
@@ -223,7 +227,10 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
             />
           </div>
           <div className="flex flex-col min-w-[180px] flex-1">
-            <label htmlFor="report-collector" className="text-[10px] font-black tracking-wide text-gray-400 mb-1">
+            <label
+              htmlFor="report-collector"
+              className="text-[10px] font-black tracking-wide text-gray-400 mb-1"
+            >
               Cobrador
             </label>
             <select
@@ -278,9 +285,7 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
                   className="border border-gray-200 dark:border-dark-border rounded-xl overflow-hidden"
                 >
                   <button
-                    onClick={() =>
-                      setExpandedKey(isOpenRow ? null : ev.key)
-                    }
+                    onClick={() => setExpandedKey(isOpenRow ? null : ev.key)}
                     className="w-full flex items-center justify-between gap-3 p-3 hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors text-left"
                   >
                     <div className="flex items-center gap-3 min-w-0">

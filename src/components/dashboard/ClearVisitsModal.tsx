@@ -81,8 +81,8 @@ const ClearVisitsModal: React.FC<ClearVisitsModalProps> = ({
     scope === "overdue"
       ? overdueCount
       : scope === "scheduled"
-      ? scheduledCount
-      : pendingCount;
+        ? scheduledCount
+        : pendingCount;
 
   const options: {
     value: "overdue" | "scheduled" | "pending";

@@ -143,8 +143,9 @@ const getQuickDateRanges = () => {
 const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const { users, salePayments, refreshData, getClientGroups } = useCollection();
   const { user } = useAuth();
-  
-  const [selectedClientForModal, setSelectedClientForModal] = useState<ClientGroup | null>(null);
+
+  const [selectedClientForModal, setSelectedClientForModal] =
+    useState<ClientGroup | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(getCurrentDateBR());
   const [endDate, setEndDate] = useState<string>(getCurrentDateBR());
   const [showDetails, setShowDetails] = useState(false);
@@ -438,25 +439,43 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         (c) =>
           c.documento === payment.clientDocument &&
           c.venda_n === payment.saleNumber &&
-          c.id_parcela.toString() === payment.distribution_details?.[0]?.installmentId?.toString()
+          c.id_parcela.toString() ===
+            payment.distribution_details?.[0]?.installmentId?.toString(),
       );
 
       // 2. Se não achou a específica (ex: venda 0 ou ajuste manual), buscar qualquer registro do cliente para pegar Nome/Loja
-      const anyClientRecord = collections.find(c => c.documento === payment.clientDocument);
+      const anyClientRecord = collections.find(
+        (c) => c.documento === payment.clientDocument,
+      );
 
       // 3. CALCULAR DÍVIDA TOTAL DO CLIENTE (para esta venda específica ou geral se venda 0)
       // Buscamos todas as parcelas desse cliente para ter o quadro completo
-      const clientInstallments = collections.filter(c => 
-        c.documento === payment.clientDocument && 
-        (payment.saleNumber && payment.saleNumber !== 0 ? c.venda_n === payment.saleNumber : true)
+      const clientInstallments = collections.filter(
+        (c) =>
+          c.documento === payment.clientDocument &&
+          (payment.saleNumber && payment.saleNumber !== 0
+            ? c.venda_n === payment.saleNumber
+            : true),
       );
 
-      const totalDebtValue = clientInstallments.reduce((sum, c) => sum + (c.valor_original || 0), 0);
-      const totalAlreadyPaidValue = clientInstallments.reduce((sum, c) => sum + (c.valor_recebido || 0), 0);
-      const totalDiscountValue = clientInstallments.reduce((sum, c) => sum + (c.desconto || 0), 0);
-      
+      const totalDebtValue = clientInstallments.reduce(
+        (sum, c) => sum + (c.valor_original || 0),
+        0,
+      );
+      const totalAlreadyPaidValue = clientInstallments.reduce(
+        (sum, c) => sum + (c.valor_recebido || 0),
+        0,
+      );
+      const totalDiscountValue = clientInstallments.reduce(
+        (sum, c) => sum + (c.desconto || 0),
+        0,
+      );
+
       // O pendente da dívida é o total original menos tudo que já foi recebido E descontos aplicados
-      const currentRemainingDebt = Math.max(0, totalDebtValue - (totalAlreadyPaidValue + totalDiscountValue));
+      const currentRemainingDebt = Math.max(
+        0,
+        totalDebtValue - (totalAlreadyPaidValue + totalDiscountValue),
+      );
 
       if (!salesPaymentMap.has(saleKey)) {
         salesPaymentMap.set(saleKey, {
@@ -466,13 +485,18 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             anyClientRecord?.cliente ||
             payment.clientDocument ||
             "Cliente não informado",
-          clientDocument: payment.clientDocument || anyClientRecord?.documento || "",
+          clientDocument:
+            payment.clientDocument || anyClientRecord?.documento || "",
           saleNumber: payment.saleNumber?.toString() || "",
           store: anyClientRecord?.nome_da_loja || "",
           totalOriginalValue: specificInstallment?.valor_original || 0,
           totalReceivedValue: payment.paymentAmount,
           totalPaidOnDebt: totalAlreadyPaidValue,
-          totalPendingValue: Math.max(0, (specificInstallment?.valor_original || 0) - (specificInstallment?.valor_recebido || 0)),
+          totalPendingValue: Math.max(
+            0,
+            (specificInstallment?.valor_original || 0) -
+              (specificInstallment?.valor_recebido || 0),
+          ),
           totalDiscount: totalDiscountValue,
           totalDebt: totalDebtValue,
           remainingDebt: currentRemainingDebt,
@@ -576,26 +600,45 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       [""],
       ["MÉTRICAS GERAIS"],
       ["Total Arrecadado", reportData.totalReceived],
-      ["Total de Descontos", reportData.payments.reduce((sum, p) => sum + p.totalDiscount, 0)],
+      [
+        "Total de Descontos",
+        reportData.payments.reduce((sum, p) => sum + p.totalDiscount, 0),
+      ],
       ["Quantidade de Vendas", reportData.totalTransactions],
       ["Cobradores Ativos", reportData.collectorSummary.length],
-      ["Ticket Médio", reportData.totalTransactions > 0 ? reportData.totalReceived / reportData.totalTransactions : 0],
+      [
+        "Ticket Médio",
+        reportData.totalTransactions > 0
+          ? reportData.totalReceived / reportData.totalTransactions
+          : 0,
+      ],
       [""],
       ["DESEMPENHO POR COBRADOR"],
-      ["Cobrador", "Valor Recebido", "Qtd Vendas", "% Participação", "Ticket Médio"]
+      [
+        "Cobrador",
+        "Valor Recebido",
+        "Qtd Vendas",
+        "% Participação",
+        "Ticket Médio",
+      ],
     ];
 
     const collectorRows = reportData.collectorSummary
       .sort((a, b) => b.receivedAmount - a.receivedAmount)
-      .map(c => [
+      .map((c) => [
         c.collectorName,
         c.receivedAmount,
         c.transactionCount,
-        reportData.totalReceived > 0 ? (c.receivedAmount / reportData.totalReceived) : 0,
-        c.transactionCount > 0 ? c.receivedAmount / c.transactionCount : 0
+        reportData.totalReceived > 0
+          ? c.receivedAmount / reportData.totalReceived
+          : 0,
+        c.transactionCount > 0 ? c.receivedAmount / c.transactionCount : 0,
       ]);
 
-    const summaryWS = XLSX.utils.aoa_to_sheet([...summaryHeader, ...collectorRows]);
+    const summaryWS = XLSX.utils.aoa_to_sheet([
+      ...summaryHeader,
+      ...collectorRows,
+    ]);
 
     // Configurar larguras das colunas do Resumo
     summaryWS["!cols"] = [
@@ -603,7 +646,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       { wch: 15 }, // Valor
       { wch: 12 }, // Vendas
       { wch: 15 }, // %
-      { wch: 15 }  // Ticket
+      { wch: 15 }, // Ticket
     ];
 
     // 2. Preparar Aba de Transações Detalhadas
@@ -611,22 +654,22 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       ["LISTAGEM DETALHADA DE RECEBIMENTOS"],
       [""],
       [
-        "Cliente", 
-        "CPF/CNPJ", 
-        "Venda", 
-        "Loja", 
-        "Cobrador", 
-        "Forma Pagamento", 
-        "Valor Recebido (Hoje)", 
+        "Cliente",
+        "CPF/CNPJ",
+        "Venda",
+        "Loja",
+        "Cobrador",
+        "Forma Pagamento",
+        "Valor Recebido (Hoje)",
         "Total Pago (Histórico)",
         "Desconto",
-        "Total da Dívida", 
+        "Total da Dívida",
         "Pendente Atual",
-        "Data Pagamento"
-      ]
+        "Data Pagamento",
+      ],
     ];
 
-    const detailRows = reportData.payments.map(p => [
+    const detailRows = reportData.payments.map((p) => [
       p.client,
       p.clientDocument,
       p.saleNumber ? `#${p.saleNumber}` : "-",
@@ -638,10 +681,13 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       p.totalDiscount,
       p.totalDebt,
       p.remainingDebt,
-      p.receivedDate
+      p.receivedDate,
     ]);
 
-    const detailsWS = XLSX.utils.aoa_to_sheet([...detailsHeader, ...detailRows]);
+    const detailsWS = XLSX.utils.aoa_to_sheet([
+      ...detailsHeader,
+      ...detailRows,
+    ]);
 
     // Configurar larguras das colunas de Detalhes
     detailsWS["!cols"] = [
@@ -656,7 +702,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       { wch: 12 }, // Desconto
       { wch: 15 }, // Total Dívida
       { wch: 15 }, // Pendente
-      { wch: 15 }  // Data
+      { wch: 15 }, // Data
     ];
 
     // Criar o Workbook e Salvar
@@ -664,7 +710,10 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     XLSX.utils.book_append_sheet(wb, summaryWS, "Resumo Executivo");
     XLSX.utils.book_append_sheet(wb, detailsWS, "Transações");
 
-    const filenameDate = dateRangeMode === "single" ? selectedDate : `${selectedDate}_a_${endDate}`;
+    const filenameDate =
+      dateRangeMode === "single"
+        ? selectedDate
+        : `${selectedDate}_a_${endDate}`;
     XLSX.writeFile(wb, `Relatorio_Caixa_${filenameDate}.xlsx`);
     setShowExportOptions(false);
   };
@@ -983,7 +1032,9 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               <div className="p-2 bg-white/20 rounded-lg backdrop-blur-md">
                 <TrendingUp className="h-4 w-4 text-emerald-100" />
               </div>
-              <p className="text-emerald-100 text-sm font-black tracking-wide">Arrecadação Total</p>
+              <p className="text-emerald-100 text-sm font-black tracking-wide">
+                Arrecadação Total
+              </p>
             </div>
             <p className="text-5xl font-black mt-1 tracking-tight">
               {formatCurrency(reportData.totalReceived)}
@@ -992,7 +1043,12 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm border border-white/10">
                 <Activity className="h-3.5 w-3.5 text-emerald-200" />
                 <p className="text-emerald-100 text-xs font-bold">
-                  Ticket médio: <span className="text-white">{formatCurrency(reportData.totalReceived / reportData.totalTransactions)}</span>
+                  Ticket médio:{" "}
+                  <span className="text-white">
+                    {formatCurrency(
+                      reportData.totalReceived / reportData.totalTransactions,
+                    )}
+                  </span>
                 </p>
               </div>
             )}
@@ -1004,19 +1060,27 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 <div className="p-1.5 bg-emerald-400/30 rounded-lg">
                   <Receipt className="h-4 w-4 text-white" />
                 </div>
-                <p className="text-emerald-50) text-[10px] font-black tracking-wide">Vendas</p>
+                <p className="text-emerald-50) text-[10px] font-black tracking-wide">
+                  Vendas
+                </p>
               </div>
-              <p className="text-2xl font-black">{reportData.totalTransactions}</p>
+              <p className="text-2xl font-black">
+                {reportData.totalTransactions}
+              </p>
             </div>
-            
+
             <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-inner">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-1.5 bg-teal-400/30 rounded-lg">
                   <User className="h-4 w-4 text-white" />
                 </div>
-                <p className="text-emerald-50) text-[10px] font-black tracking-wide">Cobradores</p>
+                <p className="text-emerald-50) text-[10px] font-black tracking-wide">
+                  Cobradores
+                </p>
               </div>
-              <p className="text-2xl font-black">{reportData.collectorSummary.length}</p>
+              <p className="text-2xl font-black">
+                {reportData.collectorSummary.length}
+              </p>
             </div>
           </div>
         </div>
@@ -1042,10 +1106,12 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             {reportData.collectorSummary
               .sort((a, b) => b.receivedAmount - a.receivedAmount)
               .map((collector, index) => {
-                const percentage = reportData.totalReceived > 0 
-                  ? (collector.receivedAmount / reportData.totalReceived) * 100 
-                  : 0;
-                
+                const percentage =
+                  reportData.totalReceived > 0
+                    ? (collector.receivedAmount / reportData.totalReceived) *
+                      100
+                    : 0;
+
                 return (
                   <div
                     key={collector.collectorId}
@@ -1053,9 +1119,13 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <div className={`h-12 w-12 rounded-full flex items-center justify-center font-black text-lg shadow-sm border-2 ${
-                          index === 0 ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-blue-50 border-blue-100 text-blue-700"
-                        }`}>
+                        <div
+                          className={`h-12 w-12 rounded-full flex items-center justify-center font-black text-lg shadow-sm border-2 ${
+                            index === 0
+                              ? "bg-amber-50 border-amber-200 text-amber-700"
+                              : "bg-blue-50 border-blue-100 text-blue-700"
+                          }`}
+                        >
                           {collector.collectorName.charAt(0)}
                         </div>
                         <div>
@@ -1063,7 +1133,9 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                             <h4 className="font-bold text-gray-900 leading-tight">
                               {collector.collectorName}
                             </h4>
-                            {index === 0 && <Award className="h-4 w-4 text-amber-500 fill-amber-500" />}
+                            {index === 0 && (
+                              <Award className="h-4 w-4 text-amber-500 fill-amber-500" />
+                            )}
                           </div>
                           <p className="text-[10px] font-black text-gray-400 tracking-wider">
                             {collector.transactionCount} Transações
@@ -1083,7 +1155,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     {/* Barra de Progresso */}
                     <div className="space-y-1.5">
                       <div className="h-1.5 w-full bg-gray-50 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className={`h-full transition-all duration-1000 ease-out ${
                             index === 0 ? "bg-amber-500" : "bg-blue-500"
                           }`}
@@ -1091,7 +1163,15 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                         />
                       </div>
                       <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 tracking-tighter">
-                        <span>Ticket: {formatCurrency(collector.transactionCount > 0 ? collector.receivedAmount / collector.transactionCount : 0)}</span>
+                        <span>
+                          Ticket:{" "}
+                          {formatCurrency(
+                            collector.transactionCount > 0
+                              ? collector.receivedAmount /
+                                  collector.transactionCount
+                              : 0,
+                          )}
+                        </span>
                         <span>{collector.clients.length} Clientes</span>
                       </div>
                     </div>
@@ -1102,8 +1182,11 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                           <Receipt className="h-3 w-3" /> Vendas Realizadas
                         </p>
                         <div className="flex flex-wrap gap-1">
-                          {collector.saleNumbers.slice(0, 5).map(num => (
-                            <span key={num} className="px-2 py-0.5 bg-gray-50 text-gray-600 rounded text-[10px] font-bold border border-gray-100">
+                          {collector.saleNumbers.slice(0, 5).map((num) => (
+                            <span
+                              key={num}
+                              className="px-2 py-0.5 bg-gray-50 text-gray-600 rounded text-[10px] font-bold border border-gray-100"
+                            >
                               #{num}
                             </span>
                           ))}
@@ -1164,12 +1247,15 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 <tbody className="divide-y divide-gray-100">
                   {reportData.payments.map((payment, index) => {
                     const method = payment.paymentMethod?.toLowerCase() || "";
-                    const methodColor = 
-                      method.includes("pix") ? "bg-indigo-50 text-indigo-700 border-indigo-100" :
-                      method.includes("dinheiro") ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
-                      method.includes("cart") ? "bg-blue-50 text-blue-700 border-blue-100" :
-                      method.includes("boleto") ? "bg-amber-50 text-amber-700 border-amber-100" :
-                      "bg-gray-50 text-gray-700 border-gray-100";
+                    const methodColor = method.includes("pix")
+                      ? "bg-indigo-50 text-indigo-700 border-indigo-100"
+                      : method.includes("dinheiro")
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                        : method.includes("cart")
+                          ? "bg-blue-50 text-blue-700 border-blue-100"
+                          : method.includes("boleto")
+                            ? "bg-amber-50 text-amber-700 border-amber-100"
+                            : "bg-gray-50 text-gray-700 border-gray-100";
 
                     return (
                       <tr
@@ -1180,14 +1266,18 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                         <td className="px-4 py-4">
                           <div className="flex flex-col">
                             <button
-                              onClick={() => handleOpenClientModal(payment.clientDocument)}
+                              onClick={() =>
+                                handleOpenClientModal(payment.clientDocument)
+                              }
                               className="text-sm font-bold text-gray-900 leading-none mb-1 text-left hover:text-blue-600 transition-colors"
                             >
                               {payment.client}
                             </button>
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded tracking-tighter">
-                                {payment.saleNumber ? `Venda #${payment.saleNumber}` : "Sem número"}
+                                {payment.saleNumber
+                                  ? `Venda #${payment.saleNumber}`
+                                  : "Sem número"}
                               </span>
                               <span className="text-[10px] font-medium text-gray-400 font-mono hidden sm:inline">
                                 {payment.clientDocument}
@@ -1196,10 +1286,14 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                           </div>
                         </td>
                         <td className="px-4 py-4 hidden 2xl:table-cell">
-                          <p className="text-xs font-semibold text-gray-500 truncate max-w-[120px]">{payment.store}</p>
+                          <p className="text-xs font-semibold text-gray-500 truncate max-w-[120px]">
+                            {payment.store}
+                          </p>
                         </td>
                         <td className="px-4 py-4 hidden xl:table-cell">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-black border tracking-tighter ${methodColor}`}>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-black border tracking-tighter ${methodColor}`}
+                          >
                             {payment.paymentMethod?.split(" ")[0]}
                           </span>
                         </td>
@@ -1214,8 +1308,12 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                           </p>
                         </td>
                         <td className="px-4 py-4 text-right hidden md:table-cell">
-                          <p className={`text-xs font-bold ${payment.totalDiscount > 0 ? "text-orange-600" : "text-gray-300"}`}>
-                            {payment.totalDiscount > 0 ? formatCurrency(payment.totalDiscount) : "-"}
+                          <p
+                            className={`text-xs font-bold ${payment.totalDiscount > 0 ? "text-orange-600" : "text-gray-300"}`}
+                          >
+                            {payment.totalDiscount > 0
+                              ? formatCurrency(payment.totalDiscount)
+                              : "-"}
                           </p>
                         </td>
                         <td className="px-4 py-4 text-right hidden lg:table-cell">
@@ -1224,8 +1322,12 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                           </p>
                         </td>
                         <td className="px-4 py-4 text-right">
-                          <p className={`text-sm font-black ${payment.remainingDebt > 0 ? "text-red-600" : "text-gray-400"}`}>
-                            {payment.remainingDebt > 0 ? formatCurrency(payment.remainingDebt) : "Quitado"}
+                          <p
+                            className={`text-sm font-black ${payment.remainingDebt > 0 ? "text-red-600" : "text-gray-400"}`}
+                          >
+                            {payment.remainingDebt > 0
+                              ? formatCurrency(payment.remainingDebt)
+                              : "Quitado"}
                           </p>
                         </td>
                       </tr>

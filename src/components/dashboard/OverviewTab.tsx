@@ -49,7 +49,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const [touchEnd, setTouchEnd] = useState(0);
   const sliderRef = useRef<HTMLDivElement>(null);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const autoPlayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoPlayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
   const [selectedCollector, setSelectedCollector] = useState<string>("all");
   const { getClientGroups } = useCollection();
   const [schedulesPage, setSchedulesPage] = useState(1);
@@ -745,7 +747,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     {overviewMetrics.internalClientsCount}
                   </div>
                   <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
-                    clientes | {overviewMetrics.internalCollectorsCount} cobrador(es)
+                    clientes | {overviewMetrics.internalCollectorsCount}{" "}
+                    cobrador(es)
                   </div>
                 </div>
               </div>

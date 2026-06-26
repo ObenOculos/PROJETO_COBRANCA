@@ -14,9 +14,8 @@ export const COLLECTOR_TYPES: UserType[] = [
 
 /** True quando o usuário é cobrador de qualquer tipo. Fonte única — use sempre
  * que precisar listar/contar cobradores, nunca compare so com "collector". */
-export const isCollectorType = (
-  type: UserType | null | undefined,
-): boolean => !!type && COLLECTOR_TYPES.includes(type);
+export const isCollectorType = (type: UserType | null | undefined): boolean =>
+  !!type && COLLECTOR_TYPES.includes(type);
 
 export interface User {
   id: string;

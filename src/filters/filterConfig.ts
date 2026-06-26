@@ -116,8 +116,18 @@ export interface SelectOption {
 
 /** Rotulos curtos de mes (0-11) para o campo de Periodo. */
 export const MONTHS_SHORT = [
-  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-  "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+  "Jan",
+  "Fev",
+  "Mar",
+  "Abr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Set",
+  "Out",
+  "Nov",
+  "Dez",
 ];
 
 /** Anos selecionaveis no filtro de periodo (atual -2 .. atual +2). */

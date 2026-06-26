@@ -20,10 +20,7 @@ export const SITUACAO_BY_PROFILE: Record<
  * The confirmed situacao set when a client is assigned to a specific user of
  * a given profile (i.e. user_id is set to a real collector).
  */
-export const PRIMARY_SITUACAO: Record<
-  Exclude<UserType, "manager">,
-  string
-> = {
+export const PRIMARY_SITUACAO: Record<Exclude<UserType, "manager">, string> = {
   collector: "Em mãos",
   internal_collector: "Cobrança Interna",
   third_party_collector: "Cobrança Terceirizada",

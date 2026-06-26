@@ -143,8 +143,8 @@ const Header: React.FC<HeaderProps> = ({
                       {user?.type === "manager"
                         ? "Gerente"
                         : user?.type === "internal_collector"
-                        ? "Cobrança Interna"
-                        : "Cobrador"}
+                          ? "Cobrança Interna"
+                          : "Cobrador"}
                     </p>
                   </div>
                 </div>

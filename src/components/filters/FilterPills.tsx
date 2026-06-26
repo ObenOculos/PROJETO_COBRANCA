@@ -1,8 +1,5 @@
 import React from "react";
-import {
-  PAYMENT_STATUS_PILLS,
-  AGING_PILLS,
-} from "../../filters/filterConfig";
+import { PAYMENT_STATUS_PILLS, AGING_PILLS } from "../../filters/filterConfig";
 
 /** Patch emitido pelas pills. Campos podem ser unicos ou lista (multi). */
 export interface PillPatch {
@@ -51,8 +48,8 @@ const FilterPills: React.FC<FilterPillsProps> = ({
   const selectedPayments = Array.isArray(paymentStatus)
     ? paymentStatus
     : paymentStatus
-    ? [paymentStatus]
-    : [];
+      ? [paymentStatus]
+      : [];
 
   const selectedAgings = Array.isArray(aging) ? aging : aging ? [aging] : [];
 
@@ -116,7 +113,10 @@ const FilterPills: React.FC<FilterPillsProps> = ({
             key={pill.value}
             type="button"
             onClick={() => toggleAging(pill.value)}
-            className={pillClass(selectedAgings.includes(pill.value), pill.active)}
+            className={pillClass(
+              selectedAgings.includes(pill.value),
+              pill.active,
+            )}
           >
             {pill.label}
           </button>

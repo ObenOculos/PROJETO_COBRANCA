@@ -51,12 +51,16 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const [showCityDropdown, setShowCityDropdown] = useState(false);
-  const [showNeighborhoodDropdown, setShowNeighborhoodDropdown] = useState(false);
+  const [showNeighborhoodDropdown, setShowNeighborhoodDropdown] =
+    useState(false);
 
   // Fechar dropdowns quando clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
+      if (
+        panelRef.current &&
+        !panelRef.current.contains(event.target as Node)
+      ) {
         setShowCityDropdown(false);
         setShowNeighborhoodDropdown(false);
       }
@@ -68,15 +72,18 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
 
   const updateFilter = <K extends keyof VisitFilters>(
     key: K,
-    value: VisitFilters[K]
+    value: VisitFilters[K],
   ) => {
     onFiltersChange({ ...filters, [key]: value });
   };
 
-  const toggleArrayFilter = (key: "cities" | "neighborhoods", value: string) => {
+  const toggleArrayFilter = (
+    key: "cities" | "neighborhoods",
+    value: string,
+  ) => {
     const currentArray = filters[key];
     const newArray = currentArray.includes(value)
-      ? currentArray.filter(item => item !== value)
+      ? currentArray.filter((item) => item !== value)
       : [...currentArray, value];
     updateFilter(key, newArray);
   };
@@ -106,12 +113,16 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
         <span className="text-sm font-medium">Filtros</span>
         {hasActiveFilters && (
           <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
-            {Object.values(filters).filter(value =>
-              Array.isArray(value) ? value.length > 0 : Boolean(value)
-            ).length}
+            {
+              Object.values(filters).filter((value) =>
+                Array.isArray(value) ? value.length > 0 : Boolean(value),
+              ).length
+            }
           </span>
         )}
-        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+        <ChevronDown
+          className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+        />
       </button>
 
       {/* Painel Expandido */}
@@ -119,7 +130,9 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
         <div className="absolute top-full mt-2 right-0 z-50 w-96 bg-white rounded-xl shadow-xl border border-gray-200 p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Filtros Avançados</h3>
+            <h3 className="text-lg font-semibold text-gray-900">
+              Filtros Avançados
+            </h3>
             {hasActiveFilters && (
               <button
                 onClick={onClearFilters}
@@ -150,7 +163,9 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
                   type="text"
                   placeholder="CPF/CNPJ..."
                   value={filters.searchDocument}
-                  onChange={(e) => updateFilter("searchDocument", e.target.value)}
+                  onChange={(e) =>
+                    updateFilter("searchDocument", e.target.value)
+                  }
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -170,9 +185,11 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
                     className="w-full flex items-center justify-between px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50"
                   >
                     <span className="truncate">
-                      {filters.cities.length === 0 ? "Cidades" :
-                       filters.cities.length === 1 ? filters.cities[0] :
-                       `${filters.cities.length} selecionadas`}
+                      {filters.cities.length === 0
+                        ? "Cidades"
+                        : filters.cities.length === 1
+                          ? filters.cities[0]
+                          : `${filters.cities.length} selecionadas`}
                     </span>
                     <ChevronDown className="h-4 w-4 text-gray-400" />
                   </button>
@@ -197,13 +214,17 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
                 {/* Bairros */}
                 <div className="relative">
                   <button
-                    onClick={() => setShowNeighborhoodDropdown(!showNeighborhoodDropdown)}
+                    onClick={() =>
+                      setShowNeighborhoodDropdown(!showNeighborhoodDropdown)
+                    }
                     className="w-full flex items-center justify-between px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50"
                   >
                     <span className="truncate">
-                      {filters.neighborhoods.length === 0 ? "Bairros" :
-                       filters.neighborhoods.length === 1 ? filters.neighborhoods[0] :
-                       `${filters.neighborhoods.length} selecionados`}
+                      {filters.neighborhoods.length === 0
+                        ? "Bairros"
+                        : filters.neighborhoods.length === 1
+                          ? filters.neighborhoods[0]
+                          : `${filters.neighborhoods.length} selecionados`}
                     </span>
                     <ChevronDown className="h-4 w-4 text-gray-400" />
                   </button>
@@ -212,7 +233,9 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
                       {availableNeighborhoods.map((neighborhood) => (
                         <button
                           key={neighborhood}
-                          onClick={() => toggleArrayFilter("neighborhoods", neighborhood)}
+                          onClick={() =>
+                            toggleArrayFilter("neighborhoods", neighborhood)
+                          }
                           className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50"
                         >
                           <span>{neighborhood}</span>
@@ -306,16 +329,22 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
                     onChange={(e) => updateFilter("onlyNew", e.target.checked)}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-700">Apenas clientes novos (últimos 30 dias)</span>
+                  <span className="text-sm text-gray-700">
+                    Apenas clientes novos (últimos 30 dias)
+                  </span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={filters.hasVisits}
-                    onChange={(e) => updateFilter("hasVisits", e.target.checked)}
+                    onChange={(e) =>
+                      updateFilter("hasVisits", e.target.checked)
+                    }
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-700">Com visitas agendadas</span>
+                  <span className="text-sm text-gray-700">
+                    Com visitas agendadas
+                  </span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
@@ -324,7 +353,9 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
                     onChange={(e) => updateFilter("noVisits", e.target.checked)}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-700">Sem visitas agendadas</span>
+                  <span className="text-sm text-gray-700">
+                    Sem visitas agendadas
+                  </span>
                 </label>
               </div>
             </div>

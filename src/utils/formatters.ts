@@ -254,7 +254,9 @@ export const calculateDaysSinceLastVisit = (
   }
 };
 
-export const calculateOverdueDays = (dueDateStr: string | null | undefined): number => {
+export const calculateOverdueDays = (
+  dueDateStr: string | null | undefined,
+): number => {
   if (!dueDateStr) return 0;
 
   try {
@@ -266,7 +268,13 @@ export const calculateOverdueDays = (dueDateStr: string | null | undefined): num
       const parts = cleanDateStr.split("/");
       if (parts.length === 3) {
         const [day, month, year] = parts.map(Number);
-        if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+        if (
+          day >= 1 &&
+          day <= 31 &&
+          month >= 1 &&
+          month <= 12 &&
+          year >= 1900
+        ) {
           dueDate = new Date(year, month - 1, day);
         } else {
           return 0;
@@ -274,7 +282,7 @@ export const calculateOverdueDays = (dueDateStr: string | null | undefined): num
       } else {
         return 0;
       }
-    } 
+    }
     // Formato ISO iniciando com YYYY-MM-DD (aceita "T..Z" ou " 00:00:00+00")
     else if (cleanDateStr.includes("-")) {
       const isoLeading = cleanDateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);

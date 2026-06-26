@@ -60,7 +60,11 @@ const matchesPaymentStatus = (
   paymentStatus?: string | string[],
 ): boolean => {
   const list = (
-    Array.isArray(paymentStatus) ? paymentStatus : paymentStatus ? [paymentStatus] : []
+    Array.isArray(paymentStatus)
+      ? paymentStatus
+      : paymentStatus
+        ? [paymentStatus]
+        : []
   ).filter(Boolean);
   if (list.length === 0) return true;
 

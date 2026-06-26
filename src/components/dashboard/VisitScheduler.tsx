@@ -213,9 +213,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const [rescheduleTime, setRescheduleTime] = useState("");
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [customObservation, setCustomObservation] = useState("");
-  const [showCustomObservationInput, setShowCustomObservationInput] = useState(false);
-  const [customNotFoundObservation, setCustomNotFoundObservation] = useState("");
-  const [showCustomNotFoundObservationInput, setShowCustomNotFoundObservationInput] = useState(false);
+  const [showCustomObservationInput, setShowCustomObservationInput] =
+    useState(false);
+  const [customNotFoundObservation, setCustomNotFoundObservation] =
+    useState("");
+  const [
+    showCustomNotFoundObservationInput,
+    setShowCustomNotFoundObservationInput,
+  ] = useState(false);
   const [showDateValidationModal, setShowDateValidationModal] = useState(false);
   const [dateValidationMessage, setDateValidationMessage] = useState("");
   const [showTimeWarningModal, setShowTimeWarningModal] = useState(false);
@@ -409,7 +414,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           .filter(
             (visit) =>
               visit.clientDocument === client.document &&
-              (visit.status === "realizada" || visit.status === "nao_encontrado"),
+              (visit.status === "realizada" ||
+                visit.status === "nao_encontrado"),
           )
           .sort((a, b) => {
             const dateA = a.dataVisitaRealizada || a.createdAt;
@@ -419,7 +425,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
         const daysSinceLastVisit = calculateDaysSinceLastVisit(
           clientVisits.length > 0
-            ? (clientVisits[0].dataVisitaRealizada || clientVisits[0].createdAt)
+            ? clientVisits[0].dataVisitaRealizada || clientVisits[0].createdAt
             : "",
           today,
         );
@@ -1932,7 +1938,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     const today = new Date();
     const daysSinceLastVisit = calculateDaysSinceLastVisit(
       clientVisits.length > 0
-        ? (clientVisits[0].dataVisitaRealizada || clientVisits[0].createdAt)
+        ? clientVisits[0].dataVisitaRealizada || clientVisits[0].createdAt
         : "",
       today,
     );
@@ -3154,7 +3160,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   </button>
                   <button
                     onClick={handleConfirmReschedule}
-                    disabled={!rescheduleDate || !rescheduleTime || isRescheduling}
+                    disabled={
+                      !rescheduleDate || !rescheduleTime || isRescheduling
+                    }
                     className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                   >
                     {isRescheduling ? (
@@ -3411,7 +3419,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       </label>
                       <textarea
                         value={customNotFoundObservation}
-                        onChange={(e) => setCustomNotFoundObservation(e.target.value)}
+                        onChange={(e) =>
+                          setCustomNotFoundObservation(e.target.value)
+                        }
                         placeholder="Descreva o motivo de não ter localizado o cliente..."
                         rows={3}
                         className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
@@ -3436,7 +3446,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       <button
                         onClick={() => {
                           if (customNotFoundObservation.trim()) {
-                            handleConfirmNotFound(customNotFoundObservation.trim());
+                            handleConfirmNotFound(
+                              customNotFoundObservation.trim(),
+                            );
                           }
                         }}
                         disabled={!customNotFoundObservation.trim()}
@@ -3727,30 +3739,32 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   </button>
                                   {showCityDropdown && (
                                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl sm:rounded-2xl shadow-lg max-h-60 overflow-y-auto">
-                                      {availableCities.map(({ city, count }) => (
-                                        <label
-                                          key={city}
-                                          className="flex items-center justify-between px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                                        >
-                                          <div className="flex items-center">
-                                            <input
-                                              id={`city-filter-${city}`}
-                                              type="checkbox"
-                                              checked={filters.city.includes(
-                                                city,
-                                              )}
-                                              onChange={() =>
-                                                handleCityFilterChange(city)
-                                              }
-                                              className="mr-2"
-                                            />
-                                            {city}
-                                          </div>
-                                          <span className="ml-3 text-xs text-gray-400 font-medium">
-                                            {count}
-                                          </span>
-                                        </label>
-                                      ))}
+                                      {availableCities.map(
+                                        ({ city, count }) => (
+                                          <label
+                                            key={city}
+                                            className="flex items-center justify-between px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                          >
+                                            <div className="flex items-center">
+                                              <input
+                                                id={`city-filter-${city}`}
+                                                type="checkbox"
+                                                checked={filters.city.includes(
+                                                  city,
+                                                )}
+                                                onChange={() =>
+                                                  handleCityFilterChange(city)
+                                                }
+                                                className="mr-2"
+                                              />
+                                              {city}
+                                            </div>
+                                            <span className="ml-3 text-xs text-gray-400 font-medium">
+                                              {count}
+                                            </span>
+                                          </label>
+                                        ),
+                                      )}
                                     </div>
                                   )}
                                 </div>

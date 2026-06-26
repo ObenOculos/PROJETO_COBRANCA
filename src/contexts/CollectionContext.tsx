@@ -102,7 +102,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     new Map(),
   );
 
-  const realtimeRefreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const realtimeRefreshTimer = React.useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
 
   // ✅ CORREÇÃO: Ref para mirror do cache para evitar dependências circulares em callbacks
   const clientDataCacheRef = React.useRef(clientDataCache);
@@ -239,7 +241,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       await fetchScheduledVisits(false);
     } catch (err) {
       console.error("Erro ao excluir visitas:", err);
-      const message = err instanceof Error ? err.message : "Erro ao excluir visitas";
+      const message =
+        err instanceof Error ? err.message : "Erro ao excluir visitas";
       setError(message);
       throw err;
     }
@@ -406,7 +409,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           },
           (payload) => {
             console.log("Mudança detectada na tabela BANCO_DADOS:", payload);
-            if (realtimeRefreshTimer.current) clearTimeout(realtimeRefreshTimer.current);
+            if (realtimeRefreshTimer.current)
+              clearTimeout(realtimeRefreshTimer.current);
             realtimeRefreshTimer.current = setTimeout(() => {
               realtimeRefreshTimer.current = null;
               refreshCollections();
@@ -829,7 +833,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       await fetchUsers(false); // Force fresh fetch
     } catch (err) {
       console.error("Erro ao adicionar usuário:", err);
-      const message = err instanceof Error ? err.message : "Erro ao adicionar usuário";
+      const message =
+        err instanceof Error ? err.message : "Erro ao adicionar usuário";
       setError(message);
       throw err;
     }
@@ -857,7 +862,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       await fetchUsers(false); // Force fresh fetch
     } catch (err) {
       console.error("Erro ao atualizar usuário:", err);
-      const message = err instanceof Error ? err.message : "Erro ao atualizar usuário";
+      const message =
+        err instanceof Error ? err.message : "Erro ao atualizar usuário";
       setError(message);
       throw err;
     }
@@ -878,7 +884,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       await fetchUsers(false); // Force fresh fetch
     } catch (err) {
       console.error("Erro ao deletar usuário:", err);
-      const message = err instanceof Error ? err.message : "Erro ao deletar usuário";
+      const message =
+        err instanceof Error ? err.message : "Erro ao deletar usuário";
       setError(message);
       throw err;
     }
@@ -1245,8 +1252,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     const rawStatusList = Array.isArray(filters.status)
       ? filters.status
       : filters.status
-      ? [filters.status]
-      : [];
+        ? [filters.status]
+        : [];
     // "cancelado" precisa ser detectado ANTES de normalizar: normalizePaymentStatus
     // so conhece pago/parcial/pendente (cancelado cairia em "pendente"). Os demais
     // sao normalizados para o vocabulario canonico.
@@ -1292,7 +1299,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
     }
 
-    let filtered: Collection[] = [...activeCollections, ...canceladoCollections];
+    let filtered: Collection[] = [
+      ...activeCollections,
+      ...canceladoCollections,
+    ];
 
     // Filtrar por cobrador se o usuário for cobrador
     if (userType !== "manager" && collectorId) {
@@ -1424,7 +1434,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         return targetClientKeys.has(key);
       });
     }
-
 
     // (O filtro de status de pagamento — incluindo multi-select e cancelado — ja
     // foi aplicado acima, na montagem da base `filtered`.)
@@ -1610,7 +1619,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             // External collectors don't see clients that moved to a later phase
             const movedToLaterPhase =
               c.situacao != null &&
-              (situacoesOutsideProfile("collector") as string[]).includes(c.situacao);
+              (situacoesOutsideProfile("collector") as string[]).includes(
+                c.situacao,
+              );
 
             return isAssigned && !movedToLaterPhase;
           });
@@ -1759,7 +1770,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         (c) => c.status?.toLowerCase() === "pendente",
       ).length;
       const totalOverdue = collections.filter((c) => {
-        const isPending = (c.valor_original || 0) - (c.valor_recebido || 0) > 0.01;
+        const isPending =
+          (c.valor_original || 0) - (c.valor_recebido || 0) > 0.01;
         return isPending && calculateOverdueDays(c.data_vencimento) > 0;
       }).length;
       const totalReceived = collections.filter(
@@ -1981,7 +1993,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const targetUser = users.find((u) => u.id === collectorId);
       const targetType = targetUser?.type;
       const situacaoUpdate =
-        targetType === "internal_collector" || targetType === "third_party_collector"
+        targetType === "internal_collector" ||
+        targetType === "third_party_collector"
           ? PRIMARY_SITUACAO[targetType]
           : undefined;
 
@@ -2004,13 +2017,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           .filter((id) => !id.document && id.clientName)
           .map((id) => id.clientName as string);
 
-        const { data, error } = await supabase.rpc("atribuir_clientes_em_lote", {
-          p_user_id: collectorId,
-          p_documentos: documentBatch,
-          p_clientes: clientNameBatch,
-          p_situacao: situacaoUpdate,
-          p_gerente_id: user?.id,
-        });
+        const { data, error } = await supabase.rpc(
+          "atribuir_clientes_em_lote",
+          {
+            p_user_id: collectorId,
+            p_documentos: documentBatch,
+            p_clientes: clientNameBatch,
+            p_situacao: situacaoUpdate,
+            p_gerente_id: user?.id,
+          },
+        );
 
         if (error) {
           console.error("Erro ao atribuir clientes (RPC):", error);
@@ -2281,19 +2297,19 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const convertedPayments = (payments || []).map(
         (payment) =>
           ({
-          id: payment.id,
-          saleNumber: payment.sale_number,
-          clientDocument: payment.client_document,
-          paymentAmount: payment.payment_amount,
-          paymentDate: payment.payment_date,
-          paymentMethod: payment.payment_method,
-          notes: payment.notes,
-          collectorId: payment.collector_id,
-          collectorName: payment.collector_name,
-          createdAt: payment.created_at,
-          distribution_details: payment.distribution_details || [], // Corrected casing
-          discountAmount: payment.discount_amount, // Added this line
-        }) as unknown as SalePayment,
+            id: payment.id,
+            saleNumber: payment.sale_number,
+            clientDocument: payment.client_document,
+            paymentAmount: payment.payment_amount,
+            paymentDate: payment.payment_date,
+            paymentMethod: payment.payment_method,
+            notes: payment.notes,
+            collectorId: payment.collector_id,
+            collectorName: payment.collector_name,
+            createdAt: payment.created_at,
+            distribution_details: payment.distribution_details || [], // Corrected casing
+            discountAmount: payment.discount_amount, // Added this line
+          }) as unknown as SalePayment,
       );
 
       setSalePayments(convertedPayments);
@@ -2904,12 +2920,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         console.error("❌ Erro ao pré-carregar dados dos clientes:", error);
       }
     },
-    [
-      activeAddressHistory,
-      getClientGroups,
-      getSalesByClient,
-      supabase,
-    ],
+    [activeAddressHistory, getClientGroups, getSalesByClient, supabase],
   );
 
   const scheduleVisit = async (
@@ -3021,7 +3032,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     try {
       console.log("Atualizando status da visita:", visitId, status);
 
-      const currentVisit = scheduledVisits.find((visit) => visit.id === visitId);
+      const currentVisit = scheduledVisits.find(
+        (visit) => visit.id === visitId,
+      );
       const clientDocument = currentVisit?.clientDocument;
       const isTransferToInternal = status === "nao_encontrado";
       // Para múltiplos internos, não atribuir automaticamente - deixar para o gerente decidir
@@ -3815,7 +3828,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         .select("id");
 
       if (originalError) {
-        console.error("Erro ao marcar visita original como reagendada:", originalError);
+        console.error(
+          "Erro ao marcar visita original como reagendada:",
+          originalError,
+        );
         throw originalError;
       }
 

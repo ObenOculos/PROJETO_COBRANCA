@@ -84,10 +84,15 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   const itemsPerPage = 10;
 
   const lastContacts = useMemo(() => {
-    const map: Record<string, { note: string; date: Date; status: string; rawStatus: string }> = {};
-    myVisits.forEach(v => {
+    const map: Record<
+      string,
+      { note: string; date: Date; status: string; rawStatus: string }
+    > = {};
+    myVisits.forEach((v) => {
       if (v.status === "realizada" && v.notes && v.clientDocument) {
-        const date = new Date(v.dataVisitaRealizada || v.updatedAt || v.createdAt);
+        const date = new Date(
+          v.dataVisitaRealizada || v.updatedAt || v.createdAt,
+        );
         const current = map[v.clientDocument];
         if (!current || date > current.date) {
           const statusMatch = v.notes.match(/^\[(.*?)\]/);
@@ -95,7 +100,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             note: v.notes,
             date: date,
             status: v.status,
-            rawStatus: statusMatch ? statusMatch[1].toLowerCase() : "outros"
+            rawStatus: statusMatch ? statusMatch[1].toLowerCase() : "outros",
           };
         }
       }
@@ -105,22 +110,27 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
   const cities = useMemo(() => {
     const set = new Set<string>();
-    clientGroups.forEach(g => { if (g.city) set.add(g.city); });
+    clientGroups.forEach((g) => {
+      if (g.city) set.add(g.city);
+    });
     return Array.from(set).sort();
   }, [clientGroups]);
 
   const filteredClientGroups = useMemo(() => {
     return clientGroups.filter((group) => {
       const lowerSearch = searchTerm.toLowerCase();
-      const matchesSearch = !searchTerm || [group.client, group.document, group.city, group.neighborhood]
-        .filter(Boolean)
-        .some((value) => value?.toLowerCase().includes(lowerSearch));
+      const matchesSearch =
+        !searchTerm ||
+        [group.client, group.document, group.city, group.neighborhood]
+          .filter(Boolean)
+          .some((value) => value?.toLowerCase().includes(lowerSearch));
       if (!matchesSearch) return false;
 
       let maxAtraso = 0;
       group.sales.forEach((sale: any) => {
         sale.installments.forEach((inst: any) => {
-          const isPending = (inst.valor_original || 0) - (inst.valor_recebido || 0) > 0.01;
+          const isPending =
+            (inst.valor_original || 0) - (inst.valor_recebido || 0) > 0.01;
           if (isPending) {
             const calculatedAtraso = calculateOverdueDays(inst.data_vencimento);
             if (calculatedAtraso > maxAtraso) maxAtraso = calculatedAtraso;
@@ -130,8 +140,10 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
       if (filterAging !== "all") {
         if (filterAging === "critical" && maxAtraso <= 90) return false;
-        if (filterAging === "high" && (maxAtraso <= 60 || maxAtraso > 90)) return false;
-        if (filterAging === "medium" && (maxAtraso <= 30 || maxAtraso > 60)) return false;
+        if (filterAging === "high" && (maxAtraso <= 60 || maxAtraso > 90))
+          return false;
+        if (filterAging === "medium" && (maxAtraso <= 30 || maxAtraso > 60))
+          return false;
         if (filterAging === "low" && maxAtraso > 30) return false;
       }
       if (filterCity !== "all" && group.city !== filterCity) return false;
@@ -139,30 +151,55 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         const last = lastContacts[group.document];
         if (filterStatus === "no_contact" && last) return false;
         if (filterStatus !== "no_contact") {
-          if (!last || !last.rawStatus.includes(filterStatus.replace("_", " "))) return false;
+          if (!last || !last.rawStatus.includes(filterStatus.replace("_", " ")))
+            return false;
         }
       }
       return true;
     });
-  }, [clientGroups, searchTerm, filterAging, filterCity, filterStatus, lastContacts]);
+  }, [
+    clientGroups,
+    searchTerm,
+    filterAging,
+    filterCity,
+    filterStatus,
+    lastContacts,
+  ]);
 
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, filterAging, filterCity, filterStatus]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterAging, filterCity, filterStatus]);
 
   const totalPages = Math.ceil(filteredClientGroups.length / itemsPerPage);
   const paginatedClients = useMemo(() => {
-    return filteredClientGroups.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    return filteredClientGroups.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage,
+    );
   }, [filteredClientGroups, currentPage]);
 
   const stats = useMemo(() => {
-    const totalReceived = filteredClientGroups.reduce((sum, g) => sum + g.totalReceived, 0);
-    const totalPending = filteredClientGroups.reduce((sum, g) => sum + g.pendingValue, 0);
+    const totalReceived = filteredClientGroups.reduce(
+      (sum, g) => sum + g.totalReceived,
+      0,
+    );
+    const totalPending = filteredClientGroups.reduce(
+      (sum, g) => sum + g.pendingValue,
+      0,
+    );
     const now = new Date();
-    const goal = monthlyGoals.find(g => g.user_id === user?.id && g.month.startsWith(now.toISOString().slice(0, 7)));
+    const goal = monthlyGoals.find(
+      (g) =>
+        g.user_id === user?.id &&
+        g.month.startsWith(now.toISOString().slice(0, 7)),
+    );
     const targetValue = goal?.payments_goal || 100000;
-    
-    let critical = 0, high = 0;
-    myCollections.forEach(c => {
-      const isPending = (c.valor_original || 0) - (c.valor_recebido || 0) > 0.01;
+
+    let critical = 0,
+      high = 0;
+    myCollections.forEach((c) => {
+      const isPending =
+        (c.valor_original || 0) - (c.valor_recebido || 0) > 0.01;
       if (isPending) {
         const actualAtraso = calculateOverdueDays(c.data_vencimento);
         if (actualAtraso > 90) critical++;
@@ -170,13 +207,24 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       }
     });
 
-    return { totalClients: filteredClientGroups.length, totalPending, totalReceived, progress: Math.min((totalReceived / targetValue) * 100, 100), targetValue, critical, high };
+    return {
+      totalClients: filteredClientGroups.length,
+      totalPending,
+      totalReceived,
+      progress: Math.min((totalReceived / targetValue) * 100, 100),
+      targetValue,
+      critical,
+      high,
+    };
   }, [filteredClientGroups, myCollections, monthlyGoals, user?.id]);
 
   const getPriorityColor = (days: number) => {
-    if (days > 90) return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
-    if (days > 60) return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
-    if (days > 30) return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
+    if (days > 90)
+      return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+    if (days > 60)
+      return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
+    if (days > 30)
+      return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
     return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
   };
 
@@ -186,18 +234,30 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-text">
-              Central de {USER_TYPE_LABELS[user?.type as keyof typeof USER_TYPE_LABELS] ?? "Cobrança"}
+              Central de{" "}
+              {USER_TYPE_LABELS[user?.type as keyof typeof USER_TYPE_LABELS] ??
+                "Cobrança"}
             </h1>
-            <p className="text-sm text-gray-500 dark:text-dark-text-secondary">Gestão de carteira ativa e recuperação de crédito.</p>
+            <p className="text-sm text-gray-500 dark:text-dark-text-secondary">
+              Gestão de carteira ativa e recuperação de crédito.
+            </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-900/30">
-              <span className="block text-xs text-red-600 dark:text-red-400 font-medium">Críticos (+90d)</span>
-              <span className="text-lg font-bold text-red-700 dark:text-red-300">{stats.critical}</span>
+              <span className="block text-xs text-red-600 dark:text-red-400 font-medium">
+                Críticos (+90d)
+              </span>
+              <span className="text-lg font-bold text-red-700 dark:text-red-300">
+                {stats.critical}
+              </span>
             </div>
             <div className="px-4 py-2 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-100 dark:border-orange-900/30">
-              <span className="block text-xs text-orange-600 dark:text-orange-400 font-medium">Alerta (+60d)</span>
-              <span className="text-lg font-bold text-orange-700 dark:text-orange-300">{stats.high}</span>
+              <span className="block text-xs text-orange-600 dark:text-orange-400 font-medium">
+                Alerta (+60d)
+              </span>
+              <span className="text-lg font-bold text-orange-700 dark:text-orange-300">
+                {stats.high}
+              </span>
             </div>
           </div>
         </div>
@@ -206,48 +266,118 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 shadow-sm">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-600"><TrendingUp className="w-4 h-4" /></div>
-            <p className="text-sm font-medium text-gray-500">Recuperação do Mês</p>
+            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-600">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <p className="text-sm font-medium text-gray-500">
+              Recuperação do Mês
+            </p>
           </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-dark-text">{formatCurrency(stats.totalReceived)}</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-dark-text">
+            {formatCurrency(stats.totalReceived)}
+          </p>
           <div className="mt-4 space-y-2">
-            <div className="flex justify-between text-xs font-medium"><span className="text-gray-500">Progresso</span><span className="text-indigo-600">{stats.progress.toFixed(1)}%</span></div>
-            <div className="h-2 bg-gray-100 dark:bg-dark-bg-secondary rounded-full overflow-hidden"><div className="h-full bg-indigo-600" style={{ width: `${stats.progress}%` }} /></div>
+            <div className="flex justify-between text-xs font-medium">
+              <span className="text-gray-500">Progresso</span>
+              <span className="text-indigo-600">
+                {stats.progress.toFixed(1)}%
+              </span>
+            </div>
+            <div className="h-2 bg-gray-100 dark:bg-dark-bg-secondary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-indigo-600"
+                style={{ width: `${stats.progress}%` }}
+              />
+            </div>
           </div>
         </div>
         <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 shadow-sm">
-          <div className="flex items-center gap-3 mb-2"><div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600"><Users className="w-4 h-4" /></div><p className="text-sm font-medium text-gray-500">Total de Clientes</p></div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-dark-text">{stats.totalClients}</p>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600">
+              <Users className="w-4 h-4" />
+            </div>
+            <p className="text-sm font-medium text-gray-500">
+              Total de Clientes
+            </p>
+          </div>
+          <p className="text-2xl font-bold text-gray-900 dark:text-dark-text">
+            {stats.totalClients}
+          </p>
         </div>
         <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 shadow-sm">
-          <div className="flex items-center gap-3 mb-2"><div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-600"><Zap className="w-4 h-4" /></div><p className="text-sm font-medium text-gray-500">Volume em Aberto</p></div>
-          <p className="text-2xl font-bold text-red-600 dark:text-red-400">{formatCurrency(stats.totalPending)}</p>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-600">
+              <Zap className="w-4 h-4" />
+            </div>
+            <p className="text-sm font-medium text-gray-500">
+              Volume em Aberto
+            </p>
+          </div>
+          <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+            {formatCurrency(stats.totalPending)}
+          </p>
         </div>
         <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 shadow-sm">
-          <div className="flex items-center gap-3 mb-2"><div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600"><Target className="w-4 h-4" /></div><p className="text-sm font-medium text-gray-500">Ticket Médio</p></div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-dark-text">{formatCurrency(stats.totalClients > 0 ? stats.totalPending / stats.totalClients : 0)}</p>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600">
+              <Target className="w-4 h-4" />
+            </div>
+            <p className="text-sm font-medium text-gray-500">Ticket Médio</p>
+          </div>
+          <p className="text-2xl font-bold text-gray-900 dark:text-dark-text">
+            {formatCurrency(
+              stats.totalClients > 0
+                ? stats.totalPending / stats.totalClients
+                : 0,
+            )}
+          </p>
         </div>
       </div>
 
       <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden">
         <div className="p-4 border-b border-gray-100 dark:border-dark-border space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h2 className="font-bold text-gray-900 dark:text-dark-text flex items-center gap-2"><Rocket className="w-5 h-5 text-indigo-600" />Fila de Atendimento</h2>
-            <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar cliente, CPF ou cidade..." className="w-full sm:w-80 pl-4 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none text-sm dark:bg-dark-bg-secondary dark:border-dark-border" />
+            <h2 className="font-bold text-gray-900 dark:text-dark-text flex items-center gap-2">
+              <Rocket className="w-5 h-5 text-indigo-600" />
+              Fila de Atendimento
+            </h2>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar cliente, CPF ou cidade..."
+              className="w-full sm:w-80 pl-4 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none text-sm dark:bg-dark-bg-secondary dark:border-dark-border"
+            />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <select value={filterAging} onChange={(e) => setFilterAging(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 text-xs font-medium focus:ring-2 focus:ring-indigo-100 outline-none dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text">
+            <select
+              value={filterAging}
+              onChange={(e) => setFilterAging(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 text-xs font-medium focus:ring-2 focus:ring-indigo-100 outline-none dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+            >
               <option value="all">Todos os Atrasos</option>
               <option value="critical">Crítico (+90 dias)</option>
               <option value="high">Alerta (60-90 dias)</option>
               <option value="medium">Médio (30-60 dias)</option>
               <option value="low">Em dia / Recente (0-30 dias)</option>
             </select>
-            <select value={filterCity} onChange={(e) => setFilterCity(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 text-xs font-medium focus:ring-2 focus:ring-indigo-100 outline-none dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text">
+            <select
+              value={filterCity}
+              onChange={(e) => setFilterCity(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 text-xs font-medium focus:ring-2 focus:ring-indigo-100 outline-none dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+            >
               <option value="all">Todas as Cidades</option>
-              {cities.map(city => (<option key={city} value={city}>{city}</option>))}
+              {cities.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
             </select>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 text-xs font-medium focus:ring-2 focus:ring-indigo-100 outline-none dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text">
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 text-xs font-medium focus:ring-2 focus:ring-indigo-100 outline-none dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+            >
               <option value="all">Todos os Status</option>
               <option value="no_contact">Sem Contato Registrado</option>
               <option value="promessa">Promessa de Pagamento</option>
@@ -275,52 +405,163 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                   let maxAtraso = 0;
                   group.sales?.forEach((sale: any) => {
                     sale?.installments?.forEach((inst: any) => {
-                      const isPending = (inst.valor_original || 0) - (inst.valor_recebido || 0) > 0.01;
+                      const isPending =
+                        (inst.valor_original || 0) -
+                          (inst.valor_recebido || 0) >
+                        0.01;
                       if (isPending) {
-                        const calculatedAtraso = calculateOverdueDays(inst.data_vencimento);
-                        if (calculatedAtraso > maxAtraso) maxAtraso = calculatedAtraso;
+                        const calculatedAtraso = calculateOverdueDays(
+                          inst.data_vencimento,
+                        );
+                        if (calculatedAtraso > maxAtraso)
+                          maxAtraso = calculatedAtraso;
                       }
                     });
                   });
                   const lastContact = lastContacts[group.document];
                   return (
-                    <tr key={group.clientId} className="group hover:bg-gray-50/80 dark:hover:bg-dark-bg-secondary transition-colors cursor-pointer">
-                      <td className="px-6 py-4" onClick={() => onOpenDetail(group)}>
-                        <div className="flex flex-col"><span className="font-bold text-gray-900 dark:text-dark-text group-hover:text-indigo-600 transition-colors">{group.client}</span><span className="text-xs text-gray-400">{group.document}</span></div>
+                    <tr
+                      key={group.clientId}
+                      className="group hover:bg-gray-50/80 dark:hover:bg-dark-bg-secondary transition-colors cursor-pointer"
+                    >
+                      <td
+                        className="px-6 py-4"
+                        onClick={() => onOpenDetail(group)}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-bold text-gray-900 dark:text-dark-text group-hover:text-indigo-600 transition-colors">
+                            {group.client}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {group.document}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 max-w-xs" onClick={() => onOpenDetail(group)}>
+                      <td
+                        className="px-6 py-4 max-w-xs"
+                        onClick={() => onOpenDetail(group)}
+                      >
                         {lastContact ? (
-                          <div className="flex flex-col gap-1"><span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">{new Date(lastContact.date).toLocaleDateString("pt-BR")}</span><p className="text-xs text-gray-600 dark:text-dark-text-secondary line-clamp-2 italic">"{lastContact.note}"</p></div>
-                        ) : (<span className="text-xs text-gray-300 italic">Sem registros</span>)}
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
+                              {new Date(lastContact.date).toLocaleDateString(
+                                "pt-BR",
+                              )}
+                            </span>
+                            <p className="text-xs text-gray-600 dark:text-dark-text-secondary line-clamp-2 italic">
+                              "{lastContact.note}"
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-300 italic">
+                            Sem registros
+                          </span>
+                        )}
                       </td>
-                      <td className="px-6 py-4 text-center" onClick={() => onOpenDetail(group)}>
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${getPriorityColor(maxAtraso)}`}>{maxAtraso} dias</span>
+                      <td
+                        className="px-6 py-4 text-center"
+                        onClick={() => onOpenDetail(group)}
+                      >
+                        <span
+                          className={`px-3 py-1 rounded-full text-[10px] font-bold ${getPriorityColor(maxAtraso)}`}
+                        >
+                          {maxAtraso} dias
+                        </span>
                       </td>
-                      <td className="px-6 py-4 text-right" onClick={() => onOpenDetail(group)}>
-                        <div className="flex flex-col"><span className="font-bold text-red-600 dark:text-red-400">{formatCurrency(group.pendingValue)}</span><span className="text-[10px] text-gray-400">Total: {formatCurrency(group.totalValue)}</span></div>
+                      <td
+                        className="px-6 py-4 text-right"
+                        onClick={() => onOpenDetail(group)}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-bold text-red-600 dark:text-red-400">
+                            {formatCurrency(group.pendingValue)}
+                          </span>
+                          <span className="text-[10px] text-gray-400">
+                            Total: {formatCurrency(group.totalValue)}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
-                          <button onClick={(e) => { e.stopPropagation(); handleWhatsApp(group, user, formatCurrency); }} className="p-2 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white rounded-xl transition-all border border-green-100"><Zap className="w-4 h-4 fill-current" /></button>
-                          <button onClick={(e) => { e.stopPropagation(); onOpenLog(group); }} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100"><MessageSquare className="w-4 h-4" /></button>
-                          <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(group.document); alert("Copiado!"); }} className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all border border-indigo-100"><CheckCircle className="w-4 h-4" /></button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleWhatsApp(group, user, formatCurrency);
+                            }}
+                            className="p-2 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white rounded-xl transition-all border border-green-100"
+                          >
+                            <Zap className="w-4 h-4 fill-current" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenLog(group);
+                            }}
+                            className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(group.document);
+                              alert("Copiado!");
+                            }}
+                            className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all border border-indigo-100"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
                   );
                 })
-              ) : (<tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">Nenhum cliente encontrado.</td></tr>)}
+              ) : (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-6 py-12 text-center text-sm text-gray-500"
+                  >
+                    Nenhum cliente encontrado.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
 
         {totalPages > 1 && (
           <div className="p-4 border-t border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50/30 dark:bg-dark-bg-secondary/30">
-            <p className="text-xs text-gray-500">Mostrando {paginatedClients.length} de {filteredClientGroups.length}</p>
+            <p className="text-xs text-gray-500">
+              Mostrando {paginatedClients.length} de{" "}
+              {filteredClientGroups.length}
+            </p>
             <div className="flex items-center gap-2">
-              <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40">Anterior</button>
-              <div className="flex items-center gap-1"><span className="w-8 h-8 flex items-center justify-center bg-indigo-600 text-white rounded-lg text-xs font-bold">{currentPage}</span><span className="text-xs text-gray-400 px-1">de</span><span className="text-xs text-gray-600 dark:text-dark-text font-bold">{totalPages}</span></div>
-              <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40">Próxima</button>
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40"
+              >
+                Anterior
+              </button>
+              <div className="flex items-center gap-1">
+                <span className="w-8 h-8 flex items-center justify-center bg-indigo-600 text-white rounded-lg text-xs font-bold">
+                  {currentPage}
+                </span>
+                <span className="text-xs text-gray-400 px-1">de</span>
+                <span className="text-xs text-gray-600 dark:text-dark-text font-bold">
+                  {totalPages}
+                </span>
+              </div>
+              <button
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                }
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40"
+              >
+                Próxima
+              </button>
             </div>
           </div>
         )}
@@ -331,8 +572,13 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
 const handleWhatsApp = (client: any, user: any, formatCurrency: any) => {
   const phone = (client.mobile || client.phone || "").replace(/\D/g, "");
-  if (!phone) { alert("Cliente sem telefone."); return; }
-  const message = encodeURIComponent(`Olá ${client.client}, sou o ${user?.name} do setor de cobrança. Gostaria de falar sobre sua pendência de ${formatCurrency(client.pendingValue)}. Podemos conversar?`);
+  if (!phone) {
+    alert("Cliente sem telefone.");
+    return;
+  }
+  const message = encodeURIComponent(
+    `Olá ${client.client}, sou o ${user?.name} do setor de cobrança. Gostaria de falar sobre sua pendência de ${formatCurrency(client.pendingValue)}. Podemos conversar?`,
+  );
   window.open(`https://wa.me/55${phone}?text=${message}`, "_blank");
 };
 
@@ -406,7 +652,8 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [selectedClientForLog, setSelectedClientForLog] = useState<any>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [selectedClientForDetail, setSelectedClientForDetail] = useState<any>(null);
+  const [selectedClientForDetail, setSelectedClientForDetail] =
+    useState<any>(null);
 
   // Usa a aba externa se fornecida, senão gerencia internamente
   const internalActiveTab: "overview" | "collections" | "route" | "visits" =
@@ -654,7 +901,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     if (percentage >= 30) return { text: "Vamos acelerar!", icon: Zap };
     return { text: "Hora de começar!", icon: Target };
   };
-
 
   // Card Content Components
   const ClientsCardContent = () => (
@@ -915,7 +1161,8 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     [user?.id],
   );
   const isWalletCollector =
-    user?.type === "internal_collector" || user?.type === "third_party_collector";
+    user?.type === "internal_collector" ||
+    user?.type === "third_party_collector";
 
   // Calcular métricas gamificadas
   const { metrics: periodMetrics, goals } = useMemo(
@@ -1114,11 +1361,12 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
     switch (activeTab) {
       case "overview":
-      if (isWalletCollector) {
-        return renderInternalWallet();
-      }
+        if (isWalletCollector) {
+          return renderInternalWallet();
+        }
 
-      return (          <div className="space-y-6">
+        return (
+          <div className="space-y-6">
             {/* Customize Button */}
             <div className="flex mb-4">
               <button
@@ -1550,7 +1798,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           return renderInternalWallet();
         }
         return <VisitScheduler />;
-        
 
       default:
         return null;
@@ -1564,11 +1811,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
       {/* Modais Globais (fora do TabTransition para evitar conflitos de stacking context) */}
       {isLogModalOpen && selectedClientForLog && (
-        <LogContactModal 
+        <LogContactModal
           client={selectedClientForLog}
-          onClose={() => { setIsLogModalOpen(false); setSelectedClientForLog(null); }}
-          onSuccess={() => { 
-            setIsLogModalOpen(false); 
+          onClose={() => {
+            setIsLogModalOpen(false);
+            setSelectedClientForLog(null);
+          }}
+          onSuccess={() => {
+            setIsLogModalOpen(false);
             setSelectedClientForLog(null);
             // Opcional: recarregar dados ou mostrar notificação
           }}
@@ -1579,7 +1829,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         <ClientDetailModal
           clientGroup={selectedClientForDetail}
           userType={user?.type || "collector"}
-          onClose={() => { setIsDetailModalOpen(false); setSelectedClientForDetail(null); }}
+          onClose={() => {
+            setIsDetailModalOpen(false);
+            setSelectedClientForDetail(null);
+          }}
         />
       )}
     </div>

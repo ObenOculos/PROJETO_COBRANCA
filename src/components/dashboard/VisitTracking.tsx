@@ -26,9 +26,7 @@ import { ScheduledVisit, isCollectorType, UserType } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import VisitScheduler from "./VisitScheduler"; // Import the VisitScheduler component
 import AllowedVisitDatesManager from "./AllowedVisitDatesManager"; // Import the AllowedVisitDatesManager component
-import ClearVisitsModal, {
-  pendingVisitsCount,
-} from "./ClearVisitsModal";
+import ClearVisitsModal, { pendingVisitsCount } from "./ClearVisitsModal";
 
 // Helper function to parse YYYY-MM-DD date strings safely
 const parseDateString = (dateString: string): Date | null => {
@@ -341,7 +339,6 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       return false;
     }
   };
-
 
   // Função para calcular dias de atraso
   const getOverdueDays = (visitDate: string): number => {
@@ -910,7 +907,9 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
               aria-expanded={mobileFiltersOpen}
-              aria-label={mobileFiltersOpen ? "Recolher filtros" : "Expandir filtros"}
+              aria-label={
+                mobileFiltersOpen ? "Recolher filtros" : "Expandir filtros"
+              }
               className={`md:hidden px-3 py-2 rounded-xl border flex items-center justify-center gap-1.5 shrink-0 transition-all ${
                 mobileFiltersOpen || activeFiltersCount > 0
                   ? "bg-blue-600 border-blue-600 text-white shadow-sm"
@@ -918,7 +917,9 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               }`}
             >
               {activeFiltersCount > 0 && (
-                <span className="text-xs font-semibold leading-none">{activeFiltersCount}</span>
+                <span className="text-xs font-semibold leading-none">
+                  {activeFiltersCount}
+                </span>
               )}
               <ChevronDown
                 className={`h-4 w-4 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`}
@@ -926,7 +927,9 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             </button>
 
             {/* Ações: no mobile aparecem só quando expandido */}
-            <div className={`${mobileFiltersOpen ? "flex" : "hidden"} md:flex items-center gap-3 w-full md:w-auto`}>
+            <div
+              className={`${mobileFiltersOpen ? "flex" : "hidden"} md:flex items-center gap-3 w-full md:w-auto`}
+            >
               <button
                 onClick={handleExportToExcel}
                 className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-all shadow-sm whitespace-nowrap shrink-0"
@@ -951,264 +954,296 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           </div>
 
           {/* Demais filtros: no mobile ocultos até expandir; no desktop sempre visíveis */}
-          <div className={`${mobileFiltersOpen ? "block" : "hidden"} md:block space-y-3`}>
-          {/* Atalhos rápidos (pills) */}
-          <div className="flex flex-wrap items-center gap-2">
-            {quickFilters.map((q) => {
-              const todayStr = formatDateToYYYYMMDD(new Date());
-              const isTodayActive =
-                dateFromFilter === todayStr &&
-                dateToFilter === todayStr &&
-                statusFilter === "agendada" &&
-                overdueFilter === "all";
-              const isOverdueActive =
-                !dateFromFilter &&
-                dateToFilter === todayStr &&
-                overdueFilter === "overdue" &&
-                statusFilter === "agendada";
-              const isPendingActive =
-                statusFilter === "agendada" && overdueFilter === "not_overdue";
-              const isAnyQuickFilterActive =
-                isTodayActive || isOverdueActive || isPendingActive;
+          <div
+            className={`${mobileFiltersOpen ? "block" : "hidden"} md:block space-y-3`}
+          >
+            {/* Atalhos rápidos (pills) */}
+            <div className="flex flex-wrap items-center gap-2">
+              {quickFilters.map((q) => {
+                const todayStr = formatDateToYYYYMMDD(new Date());
+                const isTodayActive =
+                  dateFromFilter === todayStr &&
+                  dateToFilter === todayStr &&
+                  statusFilter === "agendada" &&
+                  overdueFilter === "all";
+                const isOverdueActive =
+                  !dateFromFilter &&
+                  dateToFilter === todayStr &&
+                  overdueFilter === "overdue" &&
+                  statusFilter === "agendada";
+                const isPendingActive =
+                  statusFilter === "agendada" &&
+                  overdueFilter === "not_overdue";
+                const isAnyQuickFilterActive =
+                  isTodayActive || isOverdueActive || isPendingActive;
 
-              let isActive = false;
-              if (q.key === "all") {
-                isActive = !isAnyQuickFilterActive;
-              } else if (q.key === "today") {
-                isActive = isTodayActive;
-              } else if (q.key === "overdue") {
-                isActive = isOverdueActive;
-              } else if (q.key === "pending") {
-                isActive = isPendingActive;
-              }
+                let isActive = false;
+                if (q.key === "all") {
+                  isActive = !isAnyQuickFilterActive;
+                } else if (q.key === "today") {
+                  isActive = isTodayActive;
+                } else if (q.key === "overdue") {
+                  isActive = isOverdueActive;
+                } else if (q.key === "pending") {
+                  isActive = isPendingActive;
+                }
 
-              return (
-                <button
-                  key={q.key}
-                  type="button"
-                  onClick={() => applyQuickFilter(q.key)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-                    isActive
-                      ? "bg-blue-600 border-blue-600 text-white shadow-sm"
-                      : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
-                  }`}
-                >
-                  {q.label}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={q.key}
+                    type="button"
+                    onClick={() => applyQuickFilter(q.key)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                      isActive
+                        ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                        : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+                    }`}
+                  >
+                    {q.label}
+                  </button>
+                );
+              })}
 
-            <span className="w-px h-5 bg-gray-200 dark:bg-dark-border mx-1 hidden sm:block" />
+              <span className="w-px h-5 bg-gray-200 dark:bg-dark-border mx-1 hidden sm:block" />
 
-            {typePills.map((p) => {
-              const isActive = typeFilter === p.value;
-              return (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => {
-                    setTypeFilter(p.value);
-                    setSelectedCollector("all");
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-                    isActive
-                      ? "bg-blue-600 border-blue-600 text-white shadow-sm"
-                      : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
-                  }`}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
-
-            <span className="text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary ml-auto">
-              {filteredVisitsFlat.length}{" "}
-              {filteredVisitsFlat.length === 1 ? "registro" : "registros"}
-            </span>
-          </div>
-
-          {/* Painel avançado */}
-          {showFilters && (
-            <div className="pt-3 border-t border-gray-100 dark:border-dark-border animate-in fade-in slide-in-from-top-2 duration-200">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <label htmlFor="type-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
-                    Tipo de Cobrador
-                  </label>
-                  <select
-                    id="type-filter"
-                    name="typeFilter"
-                    value={typeFilter}
-                    onChange={(e) => {
-                      setTypeFilter(e.target.value as UserType | "all");
+              {typePills.map((p) => {
+                const isActive = typeFilter === p.value;
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => {
+                      setTypeFilter(p.value);
                       setSelectedCollector("all");
                     }}
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                      isActive
+                        ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                        : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+                    }`}
                   >
-                    <option value="all">Todos</option>
-                    <option value="internal_collector">Interno</option>
-                    <option value="collector">Externo</option>
-                    <option value="third_party_collector">Terceirizado</option>
-                  </select>
-                </div>
+                    {p.label}
+                  </button>
+                );
+              })}
 
-                <div className="space-y-2">
-                  <label htmlFor="collector-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
-                    Cobrador
-                  </label>
-                  <select
-                    id="collector-filter"
-                    name="collectorFilter"
-                    value={selectedCollector}
-                    onChange={(e) => setSelectedCollector(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  >
-                    <option value="all">Todos os Cobradores</option>
-                    {visibleCollectors.map((collector) => (
-                      <option key={collector.id} value={collector.id}>
-                        {collector.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="status-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
-                    Status
-                  </label>
-                  <select
-                    id="status-filter"
-                    name="statusFilter"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  >
-                    <option value="all">Todos os Status</option>
-                    <option value="agendada">Agendada</option>
-                    <option value="realizada">Realizada</option>
-                    <option value="cancelada">Cancelada</option>
-                    <option value="nao_encontrado">Não Encontrado</option>
-                    <option value="reagendada">Reagendada</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="overdue-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
-                    Atraso
-                  </label>
-                  <select
-                    id="overdue-filter"
-                    name="overdueFilter"
-                    value={overdueFilter}
-                    onChange={(e) => setOverdueFilter(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  >
-                    <option value="all">Todas as Visitas</option>
-                    <option value="overdue">Somente Atrasadas</option>
-                    <option value="not_overdue">Somente em Dia</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="city-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
-                    Cidade
-                  </label>
-                  <select
-                    id="city-filter"
-                    name="cityFilter"
-                    value={cityFilter}
-                    onChange={(e) => {
-                      setCityFilter(e.target.value);
-                      setNeighborhoodFilter("all");
-                    }}
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  >
-                    <option value="all">Todas as Cidades</option>
-                    {availableCities.map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="neighborhood-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
-                    Bairro
-                  </label>
-                  <select
-                    id="neighborhood-filter"
-                    name="neighborhoodFilter"
-                    value={neighborhoodFilter}
-                    onChange={(e) => setNeighborhoodFilter(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  >
-                    <option value="all">Todos os Bairros</option>
-                    {availableNeighborhoods.map((neighborhood) => (
-                      <option key={neighborhood} value={neighborhood}>
-                        {neighborhood}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="date-from-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
-                    Início
-                  </label>
-                  <input
-                    type="date"
-                    id="date-from-filter"
-                    name="dateFromFilter"
-                    value={dateFromFilter}
-                    onChange={(e) => setDateFromFilter(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="date-to-filter" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
-                    Fim
-                  </label>
-                  <input
-                    type="date"
-                    id="date-to-filter"
-                    name="dateToFilter"
-                    value={dateToFilter}
-                    onChange={(e) => setDateToFilter(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="visits-per-page" className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
-                    Registros
-                  </label>
-                  <select
-                    id="visits-per-page"
-                    name="visitsPerPage"
-                    value={visitsPerPage}
-                    onChange={handleVisitsPerPageChange}
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  >
-                    <option value={5}>5 por Página</option>
-                    <option value={10}>10 por Página</option>
-                    <option value={50}>50 por Página</option>
-                    <option value={100}>100 por Página</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end mt-4">
-                <button
-                  onClick={clearAllFilters}
-                  className="text-xs font-medium text-red-500 hover:text-red-600 hover:underline transition-colors"
-                >
-                  Limpar filtros
-                </button>
-              </div>
+              <span className="text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary ml-auto">
+                {filteredVisitsFlat.length}{" "}
+                {filteredVisitsFlat.length === 1 ? "registro" : "registros"}
+              </span>
             </div>
-          )}
+
+            {/* Painel avançado */}
+            {showFilters && (
+              <div className="pt-3 border-t border-gray-100 dark:border-dark-border animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="type-filter"
+                      className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary"
+                    >
+                      Tipo de Cobrador
+                    </label>
+                    <select
+                      id="type-filter"
+                      name="typeFilter"
+                      value={typeFilter}
+                      onChange={(e) => {
+                        setTypeFilter(e.target.value as UserType | "all");
+                        setSelectedCollector("all");
+                      }}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    >
+                      <option value="all">Todos</option>
+                      <option value="internal_collector">Interno</option>
+                      <option value="collector">Externo</option>
+                      <option value="third_party_collector">
+                        Terceirizado
+                      </option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="collector-filter"
+                      className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary"
+                    >
+                      Cobrador
+                    </label>
+                    <select
+                      id="collector-filter"
+                      name="collectorFilter"
+                      value={selectedCollector}
+                      onChange={(e) => setSelectedCollector(e.target.value)}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    >
+                      <option value="all">Todos os Cobradores</option>
+                      {visibleCollectors.map((collector) => (
+                        <option key={collector.id} value={collector.id}>
+                          {collector.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="status-filter"
+                      className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary"
+                    >
+                      Status
+                    </label>
+                    <select
+                      id="status-filter"
+                      name="statusFilter"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    >
+                      <option value="all">Todos os Status</option>
+                      <option value="agendada">Agendada</option>
+                      <option value="realizada">Realizada</option>
+                      <option value="cancelada">Cancelada</option>
+                      <option value="nao_encontrado">Não Encontrado</option>
+                      <option value="reagendada">Reagendada</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="overdue-filter"
+                      className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary"
+                    >
+                      Atraso
+                    </label>
+                    <select
+                      id="overdue-filter"
+                      name="overdueFilter"
+                      value={overdueFilter}
+                      onChange={(e) => setOverdueFilter(e.target.value)}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    >
+                      <option value="all">Todas as Visitas</option>
+                      <option value="overdue">Somente Atrasadas</option>
+                      <option value="not_overdue">Somente em Dia</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="city-filter"
+                      className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary"
+                    >
+                      Cidade
+                    </label>
+                    <select
+                      id="city-filter"
+                      name="cityFilter"
+                      value={cityFilter}
+                      onChange={(e) => {
+                        setCityFilter(e.target.value);
+                        setNeighborhoodFilter("all");
+                      }}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    >
+                      <option value="all">Todas as Cidades</option>
+                      {availableCities.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="neighborhood-filter"
+                      className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary"
+                    >
+                      Bairro
+                    </label>
+                    <select
+                      id="neighborhood-filter"
+                      name="neighborhoodFilter"
+                      value={neighborhoodFilter}
+                      onChange={(e) => setNeighborhoodFilter(e.target.value)}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    >
+                      <option value="all">Todos os Bairros</option>
+                      {availableNeighborhoods.map((neighborhood) => (
+                        <option key={neighborhood} value={neighborhood}>
+                          {neighborhood}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="date-from-filter"
+                      className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary"
+                    >
+                      Início
+                    </label>
+                    <input
+                      type="date"
+                      id="date-from-filter"
+                      name="dateFromFilter"
+                      value={dateFromFilter}
+                      onChange={(e) => setDateFromFilter(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="date-to-filter"
+                      className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary"
+                    >
+                      Fim
+                    </label>
+                    <input
+                      type="date"
+                      id="date-to-filter"
+                      name="dateToFilter"
+                      value={dateToFilter}
+                      onChange={(e) => setDateToFilter(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="visits-per-page"
+                      className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary"
+                    >
+                      Registros
+                    </label>
+                    <select
+                      id="visits-per-page"
+                      name="visitsPerPage"
+                      value={visitsPerPage}
+                      onChange={handleVisitsPerPageChange}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    >
+                      <option value={5}>5 por Página</option>
+                      <option value={10}>10 por Página</option>
+                      <option value={50}>50 por Página</option>
+                      <option value={100}>100 por Página</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end mt-4">
+                  <button
+                    onClick={clearAllFilters}
+                    className="text-xs font-medium text-red-500 hover:text-red-600 hover:underline transition-colors"
+                  >
+                    Limpar filtros
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1262,18 +1297,21 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               // Calcular resumos de status para os "Color Dots"
               // Buckets mutuamente exclusivos (mesma regra do modal de limpeza):
               // agendada vencida conta como "atrasada", não como "agendada".
-              const statusCounts = visits.reduce((acc, v) => {
-                if (v.status === "agendada") {
-                  if (isVisitOverdue(v)) {
-                    acc.overdue = (acc.overdue || 0) + 1;
+              const statusCounts = visits.reduce(
+                (acc, v) => {
+                  if (v.status === "agendada") {
+                    if (isVisitOverdue(v)) {
+                      acc.overdue = (acc.overdue || 0) + 1;
+                    } else {
+                      acc.agendada = (acc.agendada || 0) + 1;
+                    }
                   } else {
-                    acc.agendada = (acc.agendada || 0) + 1;
+                    acc[v.status] = (acc[v.status] || 0) + 1;
                   }
-                } else {
-                  acc[v.status] = (acc[v.status] || 0) + 1;
-                }
-                return acc;
-              }, {} as Record<string, number>);
+                  return acc;
+                },
+                {} as Record<string, number>,
+              );
 
               return (
                 <div
@@ -1282,103 +1320,121 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 >
                   {/* Linha: cabeçalho + barra de exclusão lateral (estilo Cobranças) */}
                   <div className="flex items-stretch">
-                  {/* Header do cobrador — Estilo Refinado e Responsivo */}
-                  <div
-                    className="flex-1 min-w-0 p-4 sm:p-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors flex items-center justify-between"
-                    onClick={() => toggleCollectorExpansion(collectorId)}
-                  >
-                    <div className="flex items-center gap-3 sm:gap-4">
-                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-900/30 shrink-0">
-                        <User className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-dark-text tracking-tight truncate">
-                          {collectorName}
-                        </h3>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <p className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary tracking-wider shrink-0">
-                            {visits.length} {visits.length === 1 ? "Visita" : "Visitas"}
-                          </p>
-                          {/* Color Dots Summary — Novo */}
-                          <div className="flex items-center gap-1.5 ml-1 border-l border-gray-100 dark:border-dark-border pl-2">
-                            {statusCounts.agendada > 0 && (
-                              <div className="flex items-center gap-1" title={`${statusCounts.agendada} Agendadas`}>
-                                <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
-                                <span className="text-[10px] font-bold text-blue-500">{statusCounts.agendada}</span>
-                              </div>
-                            )}
-                            {statusCounts.realizada > 0 && (
-                              <div className="flex items-center gap-1" title={`${statusCounts.realizada} Realizadas`}>
-                                <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
-                                <span className="text-[10px] font-bold text-green-500">{statusCounts.realizada}</span>
-                              </div>
-                            )}
-                            {statusCounts.overdue > 0 && (
-                              <div className="flex items-center gap-1" title={`${statusCounts.overdue} Atrasadas`}>
-                                <div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></div>
-                                <span className="text-[10px] font-bold text-red-500">{statusCounts.overdue}</span>
-                              </div>
-                            )}
+                    {/* Header do cobrador — Estilo Refinado e Responsivo */}
+                    <div
+                      className="flex-1 min-w-0 p-4 sm:p-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors flex items-center justify-between"
+                      onClick={() => toggleCollectorExpansion(collectorId)}
+                    >
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-900/30 shrink-0">
+                          <User className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-dark-text tracking-tight truncate">
+                            {collectorName}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary tracking-wider shrink-0">
+                              {visits.length}{" "}
+                              {visits.length === 1 ? "Visita" : "Visitas"}
+                            </p>
+                            {/* Color Dots Summary — Novo */}
+                            <div className="flex items-center gap-1.5 ml-1 border-l border-gray-100 dark:border-dark-border pl-2">
+                              {statusCounts.agendada > 0 && (
+                                <div
+                                  className="flex items-center gap-1"
+                                  title={`${statusCounts.agendada} Agendadas`}
+                                >
+                                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
+                                  <span className="text-[10px] font-bold text-blue-500">
+                                    {statusCounts.agendada}
+                                  </span>
+                                </div>
+                              )}
+                              {statusCounts.realizada > 0 && (
+                                <div
+                                  className="flex items-center gap-1"
+                                  title={`${statusCounts.realizada} Realizadas`}
+                                >
+                                  <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+                                  <span className="text-[10px] font-bold text-green-500">
+                                    {statusCounts.realizada}
+                                  </span>
+                                </div>
+                              )}
+                              {statusCounts.overdue > 0 && (
+                                <div
+                                  className="flex items-center gap-1"
+                                  title={`${statusCounts.overdue} Atrasadas`}
+                                >
+                                  <div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></div>
+                                  <span className="text-[10px] font-bold text-red-500">
+                                    {statusCounts.overdue}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 sm:gap-4">
-                      {user?.type === "manager" && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedCollectorForScheduler(collectorId);
-                            setShowSchedulerModal(true);
-                          }}
-                          className="flex items-center justify-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-sm shrink-0"
-                          title="Nova Visita"
-                        >
-                          <Calendar className="h-4 w-4" />
-                          <span className="hidden sm:inline text-xs font-semibold">Nova Visita</span>
-                        </button>
-                      )}
-                      <div className="bg-gray-50 dark:bg-dark-bg p-2 rounded-xl border border-gray-100 dark:border-dark-border">
-                        {isExpanded ? (
-                          <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                      <div className="flex items-center gap-2 sm:gap-4">
+                        {user?.type === "manager" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedCollectorForScheduler(collectorId);
+                              setShowSchedulerModal(true);
+                            }}
+                            className="flex items-center justify-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-sm shrink-0"
+                            title="Nova Visita"
+                          >
+                            <Calendar className="h-4 w-4" />
+                            <span className="hidden sm:inline text-xs font-semibold">
+                              Nova Visita
+                            </span>
+                          </button>
                         )}
+                        <div className="bg-gray-50 dark:bg-dark-bg p-2 rounded-xl border border-gray-100 dark:border-dark-border">
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  {user?.type === "manager" &&
-                    (() => {
-                      const hasPending =
-                        pendingVisitsCount(scheduledVisits, collectorId) > 0;
-                      return (
-                        <button
-                          disabled={!hasPending}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!hasPending) return;
-                            setClearTarget({
-                              id: collectorId,
-                              name:
-                                users.find((u) => u.id === collectorId)?.name ||
-                                "Cobrador",
-                            });
-                          }}
-                          className={`flex items-center justify-center w-12 transition-colors flex-shrink-0 self-stretch ${
-                            hasPending
-                              ? "bg-red-500 text-white hover:bg-red-600 cursor-pointer"
-                              : "bg-gray-100 dark:bg-dark-bg text-gray-300 dark:text-gray-600 cursor-not-allowed"
-                          }`}
-                          title={
-                            hasPending
-                              ? "Limpar visitas pendentes"
-                              : "Nenhuma visita pendente para limpar"
-                          }
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
-                      );
-                    })()}
+                    {user?.type === "manager" &&
+                      (() => {
+                        const hasPending =
+                          pendingVisitsCount(scheduledVisits, collectorId) > 0;
+                        return (
+                          <button
+                            disabled={!hasPending}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!hasPending) return;
+                              setClearTarget({
+                                id: collectorId,
+                                name:
+                                  users.find((u) => u.id === collectorId)
+                                    ?.name || "Cobrador",
+                              });
+                            }}
+                            className={`flex items-center justify-center w-12 transition-colors flex-shrink-0 self-stretch ${
+                              hasPending
+                                ? "bg-red-500 text-white hover:bg-red-600 cursor-pointer"
+                                : "bg-gray-100 dark:bg-dark-bg text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                            }`}
+                            title={
+                              hasPending
+                                ? "Limpar visitas pendentes"
+                                : "Nenhuma visita pendente para limpar"
+                            }
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        );
+                      })()}
                   </div>
 
                   {/* Área Expandida — Tabela e Cards */}
@@ -1394,8 +1450,13 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       ) : (
                         (() => {
                           const currentPage = collectorPages[collectorId] || 1;
-                          const totalPages = Math.ceil(visits.length / visitsPerPage);
-                          const paginatedVisits = visits.slice((currentPage - 1) * visitsPerPage, currentPage * visitsPerPage);
+                          const totalPages = Math.ceil(
+                            visits.length / visitsPerPage,
+                          );
+                          const paginatedVisits = visits.slice(
+                            (currentPage - 1) * visitsPerPage,
+                            currentPage * visitsPerPage,
+                          );
 
                           return (
                             <div className="space-y-6">
@@ -1404,29 +1465,48 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                 <table className="w-full text-left border-collapse">
                                   <thead>
                                     <tr className="border-b border-gray-100 dark:border-dark-border">
-                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Cliente / Documento</th>
-                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Agendamento</th>
-                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Localização</th>
-                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Status / Valor</th>
-                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">Ações</th>
+                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
+                                        Cliente / Documento
+                                      </th>
+                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
+                                        Agendamento
+                                      </th>
+                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
+                                        Localização
+                                      </th>
+                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
+                                        Status / Valor
+                                      </th>
+                                      <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">
+                                        Ações
+                                      </th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
                                     {paginatedVisits.map((visit) => {
                                       const isOverdue = isVisitOverdue(visit);
                                       return (
-                                        <tr key={visit.id} className={`group hover:bg-gray-50/50 dark:hover:bg-dark-bg/30 transition-colors ${isOverdue ? 'bg-red-50/20' : ''}`}>
+                                        <tr
+                                          key={visit.id}
+                                          className={`group hover:bg-gray-50/50 dark:hover:bg-dark-bg/30 transition-colors ${isOverdue ? "bg-red-50/20" : ""}`}
+                                        >
                                           <td className="py-4 pr-4">
                                             <div className="flex flex-col">
-                                              <span className="text-sm font-semibold text-gray-900 dark:text-dark-text leading-tight">{visit.clientName}</span>
-                                              <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5">{visit.clientDocument}</span>
+                                              <span className="text-sm font-semibold text-gray-900 dark:text-dark-text leading-tight">
+                                                {visit.clientName}
+                                              </span>
+                                              <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5">
+                                                {visit.clientDocument}
+                                              </span>
                                             </div>
                                           </td>
                                           <td className="py-4 pr-4">
                                             <div className="flex flex-col">
                                               <div className="flex items-center text-xs font-medium text-gray-700 dark:text-dark-text-secondary">
                                                 <Calendar className="h-3.5 w-3.5 mr-2 text-blue-500" />
-                                                {formatSafeDate(visit.scheduledDate)}
+                                                {formatSafeDate(
+                                                  visit.scheduledDate,
+                                                )}
                                               </div>
                                               <div className="flex items-center text-xs font-medium text-gray-400 mt-1">
                                                 <Clock className="h-3.5 w-3.5 mr-2" />
@@ -1438,7 +1518,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                             <div className="flex items-center text-xs font-medium text-gray-600 dark:text-dark-text-secondary max-w-[200px]">
                                               <MapPin className="h-4 w-4 mr-2 text-gray-400 shrink-0" />
                                               <span className="truncate">
-                                                {visit.clientNeighborhood}, {visit.clientCity}
+                                                {visit.clientNeighborhood},{" "}
+                                                {visit.clientCity}
                                               </span>
                                             </div>
                                           </td>
@@ -1447,23 +1528,36 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                               {getStatusBadge(visit.status)}
                                               {visit.totalPendingValue && (
                                                 <span className="text-xs font-semibold text-red-600 dark:text-red-400 tabular-nums">
-                                                  {formatCurrency(visit.totalPendingValue)}
+                                                  {formatCurrency(
+                                                    visit.totalPendingValue,
+                                                  )}
                                                 </span>
                                               )}
                                             </div>
                                           </td>
                                           <td className="py-4 text-right">
-                                            {visit.status === "cancelamento_solicitado" ? (
+                                            {visit.status ===
+                                            "cancelamento_solicitado" ? (
                                               <div className="flex items-center justify-end gap-2">
                                                 <button
-                                                  onClick={() => handleOpenApproval(visit, "approve")}
+                                                  onClick={() =>
+                                                    handleOpenApproval(
+                                                      visit,
+                                                      "approve",
+                                                    )
+                                                  }
                                                   className="p-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-100 transition-all border border-green-100 dark:border-green-900/30"
                                                   title="Aprovar"
                                                 >
                                                   <CheckCircle className="h-5 w-5" />
                                                 </button>
                                                 <button
-                                                  onClick={() => handleOpenApproval(visit, "reject")}
+                                                  onClick={() =>
+                                                    handleOpenApproval(
+                                                      visit,
+                                                      "reject",
+                                                    )
+                                                  }
                                                   className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 transition-all border border-red-100 dark:border-red-900/30"
                                                   title="Rejeitar"
                                                 >
@@ -1472,7 +1566,11 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                               </div>
                                             ) : isOverdue ? (
                                               <div className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-semibold border border-red-100 dark:border-red-950/30">
-                                                Atrasada {getOverdueDays(visit.scheduledDate)} Dias
+                                                Atrasada{" "}
+                                                {getOverdueDays(
+                                                  visit.scheduledDate,
+                                                )}{" "}
+                                                Dias
                                               </div>
                                             ) : null}
                                           </td>
@@ -1487,23 +1585,36 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                               <div className="md:hidden space-y-4">
                                 {paginatedVisits.map((visit) => {
                                   const isOverdue = isVisitOverdue(visit);
-                                  const statusColor = visit.status === 'realizada' ? 'border-green-500' : 
-                                                     visit.status === 'cancelada' ? 'border-gray-300' :
-                                                     isOverdue ? 'border-red-500' : 'border-blue-500';
+                                  const statusColor =
+                                    visit.status === "realizada"
+                                      ? "border-green-500"
+                                      : visit.status === "cancelada"
+                                        ? "border-gray-300"
+                                        : isOverdue
+                                          ? "border-red-500"
+                                          : "border-blue-500";
 
                                   return (
-                                    <div 
-                                      key={visit.id} 
-                                      className={`p-4 rounded-2xl border-l-4 border bg-white dark:bg-dark-bg-secondary shadow-sm transition-all ${statusColor} ${isOverdue ? 'bg-red-50/10 dark:bg-red-900/5' : ''}`}
+                                    <div
+                                      key={visit.id}
+                                      className={`p-4 rounded-2xl border-l-4 border bg-white dark:bg-dark-bg-secondary shadow-sm transition-all ${statusColor} ${isOverdue ? "bg-red-50/10 dark:bg-red-900/5" : ""}`}
                                     >
                                       <div className="flex justify-between items-start mb-4">
                                         <div className="min-w-0 pr-2">
-                                          <h4 className="text-sm font-semibold text-gray-900 dark:text-dark-text leading-tight truncate">{visit.clientName}</h4>
-                                          <p className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary mt-1">{visit.clientDocument}</p>
+                                          <h4 className="text-sm font-semibold text-gray-900 dark:text-dark-text leading-tight truncate">
+                                            {visit.clientName}
+                                          </h4>
+                                          <p className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary mt-1">
+                                            {visit.clientDocument}
+                                          </p>
                                         </div>
                                         <div className="shrink-0 flex flex-col items-end gap-1.5">
                                           {visit.totalPendingValue && (
-                                            <p className="text-xs font-semibold text-red-600 dark:text-red-400 tabular-nums">{formatCurrency(visit.totalPendingValue)}</p>
+                                            <p className="text-xs font-semibold text-red-600 dark:text-red-400 tabular-nums">
+                                              {formatCurrency(
+                                                visit.totalPendingValue,
+                                              )}
+                                            </p>
                                           )}
                                           {getStatusBadge(visit.status)}
                                         </div>
@@ -1512,36 +1623,59 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                       <div className="grid grid-cols-1 gap-3 mb-4">
                                         <div className="flex items-center text-xs font-medium text-gray-700 dark:text-dark-text-secondary">
                                           <Calendar className="h-3.5 w-3.5 mr-2.5 text-blue-500 shrink-0" />
-                                          {formatSafeDate(visit.scheduledDate)} {visit.scheduledTime && `ÀS ${visit.scheduledTime}`}
+                                          {formatSafeDate(visit.scheduledDate)}{" "}
+                                          {visit.scheduledTime &&
+                                            `ÀS ${visit.scheduledTime}`}
                                         </div>
                                         <div className="flex items-center text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
                                           <MapPin className="h-3.5 w-3.5 mr-2.5 text-gray-400 shrink-0" />
-                                          <span className="truncate">{visit.clientNeighborhood}, {visit.clientCity}</span>
+                                          <span className="truncate">
+                                            {visit.clientNeighborhood},{" "}
+                                            {visit.clientCity}
+                                          </span>
                                         </div>
                                       </div>
 
-                                      {visit.status === "cancelamento_solicitado" && (
+                                      {visit.status ===
+                                        "cancelamento_solicitado" && (
                                         <div className="flex gap-2 border-t border-gray-100 dark:border-dark-border pt-4 mt-2">
                                           <button
-                                            onClick={() => handleOpenApproval(visit, "approve")}
+                                            onClick={() =>
+                                              handleOpenApproval(
+                                                visit,
+                                                "approve",
+                                              )
+                                            }
                                             className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 text-white text-xs font-semibold rounded-xl shadow-sm"
                                           >
-                                            <CheckCircle className="h-4 w-4" /> Aprovar
+                                            <CheckCircle className="h-4 w-4" />{" "}
+                                            Aprovar
                                           </button>
                                           <button
-                                            onClick={() => handleOpenApproval(visit, "reject")}
+                                            onClick={() =>
+                                              handleOpenApproval(
+                                                visit,
+                                                "reject",
+                                              )
+                                            }
                                             className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 text-white text-xs font-semibold rounded-xl shadow-sm"
                                           >
-                                            <XCircle className="h-4 w-4" /> Rejeitar
+                                            <XCircle className="h-4 w-4" />{" "}
+                                            Rejeitar
                                           </button>
                                         </div>
                                       )}
-                                      
-                                      {isOverdue && visit.status === 'agendada' && (
-                                        <div className="mt-2 text-center py-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-semibold rounded-xl border border-red-100 dark:border-red-955/30">
-                                          Atrasada {getOverdueDays(visit.scheduledDate)} Dias
-                                        </div>
-                                      )}
+
+                                      {isOverdue &&
+                                        visit.status === "agendada" && (
+                                          <div className="mt-2 text-center py-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-semibold rounded-xl border border-red-100 dark:border-red-955/30">
+                                            Atrasada{" "}
+                                            {getOverdueDays(
+                                              visit.scheduledDate,
+                                            )}{" "}
+                                            Dias
+                                          </div>
+                                        )}
                                     </div>
                                   );
                                 })}
@@ -1556,42 +1690,81 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                         Pág {currentPage} / {totalPages}
                                       </div>
                                       <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary">
-                                        Exibindo {Math.min((currentPage - 1) * visitsPerPage + 1, visits.length)}–{Math.min(currentPage * visitsPerPage, visits.length)} de {visits.length}
+                                        Exibindo{" "}
+                                        {Math.min(
+                                          (currentPage - 1) * visitsPerPage + 1,
+                                          visits.length,
+                                        )}
+                                        –
+                                        {Math.min(
+                                          currentPage * visitsPerPage,
+                                          visits.length,
+                                        )}{" "}
+                                        de {visits.length}
                                       </span>
                                     </div>
 
                                     <div className="flex items-center gap-1">
                                       <button
-                                        onClick={() => setCollectorPages(prev => ({ ...prev, [collectorId]: Math.max(1, currentPage - 1) }))}
+                                        onClick={() =>
+                                          setCollectorPages((prev) => ({
+                                            ...prev,
+                                            [collectorId]: Math.max(
+                                              1,
+                                              currentPage - 1,
+                                            ),
+                                          }))
+                                        }
                                         disabled={currentPage === 1}
                                         className="p-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                                       >
                                         <ChevronLeft className="h-4 w-4" />
                                       </button>
                                       <div className="flex items-center gap-1">
-                                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                          let pNum;
-                                          if (totalPages <= 5) pNum = i + 1;
-                                          else if (currentPage <= 3) pNum = i + 1;
-                                          else if (currentPage >= totalPages - 2) pNum = totalPages - 4 + i;
-                                          else pNum = currentPage - 2 + i;
-                                          return (
-                                            <button
-                                              key={pNum}
-                                              onClick={() => setCollectorPages(prev => ({ ...prev, [collectorId]: pNum }))}
-                                              className={`w-9 h-9 flex items-center justify-center text-xs font-semibold rounded-xl transition-all border ${
-                                                pNum === currentPage
-                                                  ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                                                  : "bg-white dark:bg-dark-bg text-gray-400 border-gray-100 dark:border-dark-border hover:bg-gray-50"
-                                              }`}
-                                            >
-                                              {pNum}
-                                            </button>
-                                          );
-                                        })}
+                                        {Array.from(
+                                          { length: Math.min(5, totalPages) },
+                                          (_, i) => {
+                                            let pNum;
+                                            if (totalPages <= 5) pNum = i + 1;
+                                            else if (currentPage <= 3)
+                                              pNum = i + 1;
+                                            else if (
+                                              currentPage >=
+                                              totalPages - 2
+                                            )
+                                              pNum = totalPages - 4 + i;
+                                            else pNum = currentPage - 2 + i;
+                                            return (
+                                              <button
+                                                key={pNum}
+                                                onClick={() =>
+                                                  setCollectorPages((prev) => ({
+                                                    ...prev,
+                                                    [collectorId]: pNum,
+                                                  }))
+                                                }
+                                                className={`w-9 h-9 flex items-center justify-center text-xs font-semibold rounded-xl transition-all border ${
+                                                  pNum === currentPage
+                                                    ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                                                    : "bg-white dark:bg-dark-bg text-gray-400 border-gray-100 dark:border-dark-border hover:bg-gray-50"
+                                                }`}
+                                              >
+                                                {pNum}
+                                              </button>
+                                            );
+                                          },
+                                        )}
                                       </div>
                                       <button
-                                        onClick={() => setCollectorPages(prev => ({ ...prev, [collectorId]: Math.min(totalPages, currentPage + 1) }))}
+                                        onClick={() =>
+                                          setCollectorPages((prev) => ({
+                                            ...prev,
+                                            [collectorId]: Math.min(
+                                              totalPages,
+                                              currentPage + 1,
+                                            ),
+                                          }))
+                                        }
                                         disabled={currentPage === totalPages}
                                         className="p-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                                       >
@@ -1648,19 +1821,34 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50/50 dark:bg-dark-bg border-b border-gray-100 dark:border-dark-border">
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Cliente / Cobrador</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Agendamento</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Motivo do Cancelamento</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">Ações</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
+                    Cliente / Cobrador
+                  </th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
+                    Agendamento
+                  </th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
+                    Motivo do Cancelamento
+                  </th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">
+                    Ações
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
                 {pendingRequests.map((request) => (
-                  <tr key={request.id} className="hover:bg-gray-50/50 dark:hover:bg-dark-bg transition-colors">
+                  <tr
+                    key={request.id}
+                    className="hover:bg-gray-50/50 dark:hover:bg-dark-bg transition-colors"
+                  >
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-gray-900 dark:text-dark-text">{request.clientName}</span>
-                        <span className="text-xs font-semibold text-blue-500 tracking-tighter mt-0.5">Cobrador: {getCollectorName(request.collectorId)}</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-dark-text">
+                          {request.clientName}
+                        </span>
+                        <span className="text-xs font-semibold text-blue-500 tracking-tighter mt-0.5">
+                          Cobrador: {getCollectorName(request.collectorId)}
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -1669,14 +1857,19 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                           {formatSafeDate(request.scheduledDate)}
                         </span>
                         <span className="text-xs text-gray-400 mt-0.5">
-                          Solicitado em: {formatSafeDate(request.cancellationRequestDate || "")}
+                          Solicitado em:{" "}
+                          {formatSafeDate(
+                            request.cancellationRequestDate || "",
+                          )}
                         </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 max-w-xs">
                       <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20 rounded-lg p-2.5">
                         <p className="text-xs font-medium text-amber-800 dark:text-amber-400 italic leading-tight">
-                          "{request.cancellationRequestReason || "NÃO INFORMADO"}"
+                          "
+                          {request.cancellationRequestReason || "NÃO INFORMADO"}
+                          "
                         </p>
                       </div>
                     </td>
@@ -1705,12 +1898,19 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           {/* Visualização em Cards (Mobile) — Refinada */}
           <div className="md:hidden space-y-4">
             {pendingRequests.map((request) => (
-              <div key={request.id} className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30 overflow-hidden">
+              <div
+                key={request.id}
+                className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30 overflow-hidden"
+              >
                 <div className="p-4 sm:p-5">
                   <div className="flex justify-between items-start mb-4">
                     <div className="min-w-0 pr-2">
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-dark-text leading-tight truncate">{request.clientName}</h4>
-                      <p className="text-xs font-medium text-blue-500 mt-1">{getCollectorName(request.collectorId)}</p>
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-dark-text leading-tight truncate">
+                        {request.clientName}
+                      </h4>
+                      <p className="text-xs font-medium text-blue-500 mt-1">
+                        {getCollectorName(request.collectorId)}
+                      </p>
                     </div>
                     <span className="shrink-0 px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] font-semibold border border-amber-200 dark:border-amber-900/50">
                       Pendente
@@ -1718,8 +1918,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   </div>
 
                   <div className="bg-gray-50 dark:bg-dark-bg p-3.5 rounded-xl mb-4 border border-gray-100 dark:border-dark-border">
-                    <p className="text-[10px] font-semibold text-gray-400 tracking-wide mb-1.5">Motivo do Cancelamento</p>
-                    <p className="text-xs font-medium text-gray-750 dark:text-dark-text-secondary italic leading-relaxed">"{request.cancellationRequestReason || "Não informado"}"</p>
+                    <p className="text-[10px] font-semibold text-gray-400 tracking-wide mb-1.5">
+                      Motivo do Cancelamento
+                    </p>
+                    <p className="text-xs font-medium text-gray-750 dark:text-dark-text-secondary italic leading-relaxed">
+                      "{request.cancellationRequestReason || "Não informado"}"
+                    </p>
                   </div>
 
                   <div className="flex gap-2">
@@ -1896,8 +2100,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               </div>
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Total Geral</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.totalVisits}</p>
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
+                Total Geral
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+                {overviewStats.totalVisits}
+              </p>
             </div>
           </div>
 
@@ -1920,7 +2128,9 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             }}
             title="Filtrar visitas agendadas"
             className={`min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
-              statusFilter === "agendada" && overdueFilter === "not_overdue" && activeTab === "visits"
+              statusFilter === "agendada" &&
+              overdueFilter === "not_overdue" &&
+              activeTab === "visits"
                 ? "border-blue-500 ring-2 ring-blue-500/10"
                 : "border-gray-100 dark:border-dark-border"
             }`}
@@ -1941,8 +2151,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               )}
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Agendadas</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.agendadas}</p>
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
+                Agendadas
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+                {overviewStats.agendadas}
+              </p>
             </div>
           </div>
 
@@ -1976,8 +2190,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               </div>
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Realizadas</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.realizadas}</p>
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
+                Realizadas
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+                {overviewStats.realizadas}
+              </p>
             </div>
           </div>
 
@@ -2012,8 +2230,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               )}
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Solicitações</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.pendingRequests}</p>
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
+                Solicitações
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+                {overviewStats.pendingRequests}
+              </p>
             </div>
           </div>
         </div>
@@ -2129,7 +2351,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
               {approvalAction === "reject" && (
                 <div className="mb-4">
-                  <label htmlFor="rejection-reason" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="rejection-reason"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
                     Motivo da rejeição *
                   </label>
                   <textarea

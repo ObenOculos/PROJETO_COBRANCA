@@ -26,10 +26,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   activeTab: externalActiveTab,
   onTabChange,
 }) => {
-  const {
-    getFilteredCollections,
-    collections,
-  } = useCollection();
+  const { getFilteredCollections, collections } = useCollection();
 
   const [internalActiveTab, setInternalActiveTab] = useState<
     | "collections"

@@ -109,7 +109,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
       id={`filter-${field}`}
       name={field as string}
       value={(values[field] as string) || ""}
-      onChange={(e) => onChange({ [field]: e.target.value } as Partial<FilterValues>)}
+      onChange={(e) =>
+        onChange({ [field]: e.target.value } as Partial<FilterValues>)
+      }
       disabled={extra?.disabled}
       className={selectClass}
     >
@@ -267,10 +269,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         )}
 
         {fields.amount && (
-          <Field
-            icon={<DollarSign className="h-3 w-3 mr-1.5" />}
-            label="Valor"
-          >
+          <Field icon={<DollarSign className="h-3 w-3 mr-1.5" />} label="Valor">
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="number"
@@ -307,10 +306,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         )}
 
         {fields.visits && (
-          <Field
-            icon={<Calendar className="h-3 w-3 mr-1.5" />}
-            label="Visitas"
-          >
+          <Field icon={<Calendar className="h-3 w-3 mr-1.5" />} label="Visitas">
             <button
               type="button"
               onClick={() => onChange({ visitsOnly: !values.visitsOnly })}
@@ -320,7 +316,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
                   : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
               }`}
             >
-              {values.visitsOnly ? "✓ Apenas com visitas" : "Apenas com visitas"}
+              {values.visitsOnly
+                ? "✓ Apenas com visitas"
+                : "Apenas com visitas"}
             </button>
           </Field>
         )}

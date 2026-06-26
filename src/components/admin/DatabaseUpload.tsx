@@ -119,7 +119,9 @@ const ResultList: React.FC<{
       {visibleCount < items.length && (
         <button
           onClick={() =>
-            setVisibleCount((v) => Math.min(v + RESULTS_PAGE_SIZE, items.length))
+            setVisibleCount((v) =>
+              Math.min(v + RESULTS_PAGE_SIZE, items.length),
+            )
           }
           className="mt-2 w-full text-sm font-medium text-blue-600 hover:text-blue-800 py-2 border border-gray-200 rounded-md bg-white hover:bg-gray-50"
         >
@@ -156,7 +158,9 @@ const validateSituacao = (value: string | undefined | null): string | null => {
   return null;
 };
 
-const parseNullableNumber = (value: string | undefined | null): number | null => {
+const parseNullableNumber = (
+  value: string | undefined | null,
+): number | null => {
   if (value === undefined || value === null) {
     return null;
   }
@@ -771,7 +775,10 @@ const DatabaseUpload: React.FC = () => {
           updateObj.situacao = validatedSituacao;
         }
       } else if (situacao) {
-        return { updateObj: {}, error: `Valor de situacao inválido: "${situacao}".` };
+        return {
+          updateObj: {},
+          error: `Valor de situacao inválido: "${situacao}".`,
+        };
       }
 
       return { updateObj };
@@ -787,7 +794,11 @@ const DatabaseUpload: React.FC = () => {
       const { updateObj, error: buildError } = buildUpdateObj(row, current);
 
       if (buildError) {
-        updates.push({ id_parcela: idParcela, status: "error", error: buildError });
+        updates.push({
+          id_parcela: idParcela,
+          status: "error",
+          error: buildError,
+        });
       } else if (Object.keys(updateObj).length === 0) {
         updates.push({ id_parcela: idParcela, status: "unchanged" });
       } else {
@@ -813,7 +824,11 @@ const DatabaseUpload: React.FC = () => {
             .eq("id_parcela", Number(idParcela));
 
           if (error) {
-            return { id_parcela: idParcela, status: "error", error: error.message };
+            return {
+              id_parcela: idParcela,
+              status: "error",
+              error: error.message,
+            };
           }
           return { id_parcela: idParcela, status: "success" };
         }),
@@ -823,13 +838,18 @@ const DatabaseUpload: React.FC = () => {
         if (result.status === "fulfilled") {
           updates.push(result.value);
         } else {
-          updates.push({ id_parcela: "?", status: "error", error: String(result.reason) });
+          updates.push({
+            id_parcela: "?",
+            status: "error",
+            error: String(result.reason),
+          });
         }
       });
 
       if (onProgress) {
         const processed = Math.min(i + PARALLEL_SIZE, rowsNeedingUpdate.length);
-        const percentage = 30 + Math.round((processed / rowsNeedingUpdate.length) * 70);
+        const percentage =
+          30 + Math.round((processed / rowsNeedingUpdate.length) * 70);
         onProgress(
           percentage,
           `Atualizando ${processed} de ${rowsNeedingUpdate.length} registros...`,

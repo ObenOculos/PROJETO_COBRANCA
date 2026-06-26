@@ -227,10 +227,7 @@ export const useOffline = () => {
     }
 
     if (visitData.status === "nao_encontrado") {
-      const {
-        data: scheduledVisit,
-        error: visitFetchError,
-      } = await supabase
+      const { data: scheduledVisit, error: visitFetchError } = await supabase
         .from("scheduled_visits")
         .select("client_document")
         .eq("id", visitData.visitId)
@@ -244,9 +241,7 @@ export const useOffline = () => {
 
       const clientDocument = scheduledVisit?.client_document;
       if (clientDocument) {
-        const {
-          error: internalUsersError,
-        } = await supabase
+        const { error: internalUsersError } = await supabase
           .from("users")
           .select("id")
           .eq("type", "internal_collector")

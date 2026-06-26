@@ -32,7 +32,9 @@ export function Modal({
   };
 
   return (
-    <div className={`fixed inset-0 z-50 ${tallHeight ? "overflow-hidden" : "overflow-y-auto"}`}>
+    <div
+      className={`fixed inset-0 z-50 ${tallHeight ? "overflow-hidden" : "overflow-y-auto"}`}
+    >
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 transition-opacity z-modal-backdrop"
@@ -40,7 +42,9 @@ export function Modal({
       />
 
       {/* Modal */}
-      <div className={`flex ${tallHeight ? "h-full" : "min-h-full"} items-center justify-center p-4`}>
+      <div
+        className={`flex ${tallHeight ? "h-full" : "min-h-full"} items-center justify-center p-4`}
+      >
         <div
           className={`relative bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-xl dark:shadow-2xl w-full ${sizeClasses[size]} transform transition-all border border-gray-200 dark:border-dark-border z-modal ${tallHeight ? "flex flex-col max-h-[90vh] h-[90vh]" : ""}`}
         >
@@ -60,7 +64,9 @@ export function Modal({
           )}
 
           {/* Content */}
-          <div className={`text-gray-900 dark:text-dark-text ${tallHeight ? "flex flex-col flex-1 min-h-0" : "p-6"}`}>
+          <div
+            className={`text-gray-900 dark:text-dark-text ${tallHeight ? "flex flex-col flex-1 min-h-0" : "p-6"}`}
+          >
             {children}
           </div>
         </div>

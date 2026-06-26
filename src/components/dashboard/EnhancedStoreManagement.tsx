@@ -43,8 +43,13 @@ interface StoreStats {
 }
 
 const EnhancedStoreManagement: React.FC = () => {
-  const { users, collections, getAvailableStores, getFilteredCollections, loading } =
-    useCollection();
+  const {
+    users,
+    collections,
+    getAvailableStores,
+    getFilteredCollections,
+    loading,
+  } = useCollection();
 
   // Filtros compartilhados (status, cidade, vencimento, lancamento, valor) que
   // refinam a fonte de dados das lojas.
@@ -78,21 +83,31 @@ const EnhancedStoreManagement: React.FC = () => {
     const stats: StoreStats[] = [];
 
     availableStores.forEach((storeName) => {
-      const periodCollections = sourceCollections.filter(c => c.nome_da_loja === storeName);
+      const periodCollections = sourceCollections.filter(
+        (c) => c.nome_da_loja === storeName,
+      );
 
       if (periodCollections.length === 0) return;
 
-      const salesMap = new Map<string, {
-        totalValue: number;
-        paidValue: number;
-        discountValue: number;
-        clientDocument: string;
-      }>();
+      const salesMap = new Map<
+        string,
+        {
+          totalValue: number;
+          paidValue: number;
+          discountValue: number;
+          clientDocument: string;
+        }
+      >();
 
-      periodCollections.forEach(c => {
+      periodCollections.forEach((c) => {
         const key = `${c.venda_n}:::${c.documento}`;
         if (!salesMap.has(key)) {
-          salesMap.set(key, { totalValue: 0, paidValue: 0, discountValue: 0, clientDocument: c.documento || "" });
+          salesMap.set(key, {
+            totalValue: 0,
+            paidValue: 0,
+            discountValue: 0,
+            clientDocument: c.documento || "",
+          });
         }
         const s = salesMap.get(key)!;
         s.totalValue += Number(c.valor_original || 0);
@@ -104,29 +119,62 @@ const EnhancedStoreManagement: React.FC = () => {
 
       // TOTAL: soma original das fichas do período
       const totalAmount = salesArray.reduce((sum, s) => sum + s.totalValue, 0);
-      const totalDiscount = salesArray.reduce((sum, s) => sum + s.discountValue, 0);
+      const totalDiscount = salesArray.reduce(
+        (sum, s) => sum + s.discountValue,
+        0,
+      );
 
       // PENDENTE: saldo devedor atual das fichas do período
-      const pendingAmount = Math.max(0, salesArray.reduce((sum, s) => sum + (s.totalValue - s.paidValue - s.discountValue), 0));
+      const pendingAmount = Math.max(
+        0,
+        salesArray.reduce(
+          (sum, s) => sum + (s.totalValue - s.paidValue - s.discountValue),
+          0,
+        ),
+      );
 
       // PAGO: derivado de Total - Pendente - Desconto → garante Total = Pago + Pendente + Desconto
-      const receivedAmount = Math.max(0, totalAmount - pendingAmount - totalDiscount);
+      const receivedAmount = Math.max(
+        0,
+        totalAmount - pendingAmount - totalDiscount,
+      );
 
-      const completedSales = salesArray.filter(s => (s.totalValue - s.paidValue - s.discountValue) <= 0.01).length;
-      const conversionRate = salesArray.length > 0 ? (completedSales / salesArray.length) * 100 : 0;
+      const completedSales = salesArray.filter(
+        (s) => s.totalValue - s.paidValue - s.discountValue <= 0.01,
+      ).length;
+      const conversionRate =
+        salesArray.length > 0 ? (completedSales / salesArray.length) * 100 : 0;
 
-      const allStoreCollections = sourceCollections.filter(c => c.nome_da_loja === storeName);
+      const allStoreCollections = sourceCollections.filter(
+        (c) => c.nome_da_loja === storeName,
+      );
       const cityCounts = new Map<string, number>();
-      allStoreCollections.forEach(c => { if (c.cidade) cityCounts.set(c.cidade, (cityCounts.get(c.cidade) || 0) + 1); });
-      const storeCity = Array.from(cityCounts.entries()).sort((a,b) => b[1]-a[1])[0]?.[0] || "Não informada";
+      allStoreCollections.forEach((c) => {
+        if (c.cidade)
+          cityCounts.set(c.cidade, (cityCounts.get(c.cidade) || 0) + 1);
+      });
+      const storeCity =
+        Array.from(cityCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ||
+        "Não informada";
 
       let assignedCollector = "";
       const workingCollectors = new Map<string, number>();
-      allStoreCollections.forEach(c => { if (c.user_id) workingCollectors.set(c.user_id, (workingCollectors.get(c.user_id) || 0) + 1); });
-      const sortedCollectors = Array.from(workingCollectors.entries()).sort((a, b) => b[1] - a[1]);
-      if (sortedCollectors.length > 0) assignedCollector = sortedCollectors[0][0];
+      allStoreCollections.forEach((c) => {
+        if (c.user_id)
+          workingCollectors.set(
+            c.user_id,
+            (workingCollectors.get(c.user_id) || 0) + 1,
+          );
+      });
+      const sortedCollectors = Array.from(workingCollectors.entries()).sort(
+        (a, b) => b[1] - a[1],
+      );
+      if (sortedCollectors.length > 0)
+        assignedCollector = sortedCollectors[0][0];
 
-      const collectorName = collectors.find((c) => c.id === assignedCollector)?.name || "Não atribuído";
+      const collectorName =
+        collectors.find((c) => c.id === assignedCollector)?.name ||
+        "Não atribuído";
 
       stats.push({
         storeName,
@@ -138,13 +186,16 @@ const EnhancedStoreManagement: React.FC = () => {
         totalSales: salesArray.length,
         completedSales,
         pendingSales: salesArray.length - completedSales,
-        clientsWithPending: salesArray.filter(s => (s.totalValue - s.paidValue - s.discountValue) > 0.01).length,
+        clientsWithPending: salesArray.filter(
+          (s) => s.totalValue - s.paidValue - s.discountValue > 0.01,
+        ).length,
         totalAmount,
         receivedAmount,
         pendingAmount,
         conversionRate,
         efficiency: totalAmount > 0 ? (receivedAmount / totalAmount) * 100 : 0,
-        averageTicket: salesArray.length > 0 ? totalAmount / salesArray.length : 0,
+        averageTicket:
+          salesArray.length > 0 ? totalAmount / salesArray.length : 0,
         clientsCount: new Set(salesArray.map((s) => s.clientDocument)).size,
       });
     });
@@ -303,7 +354,8 @@ const EnhancedStoreManagement: React.FC = () => {
                 Acompanhamento de Lojas
               </h2>
               <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 tracking-wide truncate">
-                Performance e status de {overviewStats.totalStores} lojas cadastradas
+                Performance e status de {overviewStats.totalStores} lojas
+                cadastradas
               </p>
             </div>
           </div>
@@ -348,8 +400,12 @@ const EnhancedStoreManagement: React.FC = () => {
             )}
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Total de Lojas</p>
-            <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.totalStores}</p>
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
+              Total de Lojas
+            </p>
+            <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+              {overviewStats.totalStores}
+            </p>
           </div>
         </div>
 
@@ -361,8 +417,12 @@ const EnhancedStoreManagement: React.FC = () => {
             </div>
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Conversão Média</p>
-            <p className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 tracking-tight">{overviewStats.avgConversionRate.toFixed(1)}%</p>
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
+              Conversão Média
+            </p>
+            <p className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 tracking-tight">
+              {overviewStats.avgConversionRate.toFixed(1)}%
+            </p>
           </div>
         </div>
 
@@ -374,7 +434,9 @@ const EnhancedStoreManagement: React.FC = () => {
             </div>
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Receita Total</p>
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
+              Receita Total
+            </p>
             <div className="text-lg sm:text-2xl font-bold text-green-600 dark:text-green-400 tracking-tight truncate">
               {formatCurrency(overviewStats.totalRevenue)}
             </div>
@@ -389,8 +451,12 @@ const EnhancedStoreManagement: React.FC = () => {
             </div>
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">Fichas / Vendas</p>
-            <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">{overviewStats.totalSales}</p>
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
+              Fichas / Vendas
+            </p>
+            <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
+              {overviewStats.totalSales}
+            </p>
           </div>
         </div>
       </div>
@@ -432,7 +498,9 @@ const EnhancedStoreManagement: React.FC = () => {
                 ? "bg-blue-600 text-white shadow-sm"
                 : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text border border-gray-100 dark:border-dark-border hover:border-blue-200 hover:text-blue-500"
             }`}
-            title={sortOrder === "desc" ? "Ordem decrescente" : "Ordem crescente"}
+            title={
+              sortOrder === "desc" ? "Ordem decrescente" : "Ordem crescente"
+            }
           >
             {sortOrder === "desc" ? (
               <ChevronDown className="h-5 w-5" />
@@ -447,7 +515,7 @@ const EnhancedStoreManagement: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6 p-1">
         {filteredAndSortedStores.map((store) => {
           const isUnassigned = !store.assignedCollector;
-          
+
           const statusBgColor = isUnassigned
             ? "bg-amber-500"
             : store.conversionRate >= 70
@@ -488,7 +556,9 @@ const EnhancedStoreManagement: React.FC = () => {
             >
               {/* MOBILE: linha compacta (detalhe completo no modal ao tocar) */}
               <div className="sm:hidden flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${statusBgLight} border ${statusBorderColor} shrink-0`}>
+                <div
+                  className={`p-2 rounded-lg ${statusBgLight} border ${statusBorderColor} shrink-0`}
+                >
                   <Store className={`h-4 w-4 ${statusTextColor}`} />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -496,7 +566,9 @@ const EnhancedStoreManagement: React.FC = () => {
                     <h4 className="text-sm font-bold text-gray-900 dark:text-dark-text truncate leading-tight">
                       {store.storeName}
                     </h4>
-                    <span className={`text-xs font-bold shrink-0 ${statusTextColor}`}>
+                    <span
+                      className={`text-xs font-bold shrink-0 ${statusTextColor}`}
+                    >
                       {store.conversionRate.toFixed(1)}%
                     </span>
                   </div>
@@ -506,9 +578,19 @@ const EnhancedStoreManagement: React.FC = () => {
                   </p>
                   {!isUnassigned ? (
                     <p className="mt-1 text-[11px] font-semibold truncate">
-                      <span className="text-green-600 dark:text-green-400">{formatCurrency(store.receivedAmount)}</span>
-                      <span className="text-gray-300 dark:text-gray-600 mx-1.5">·</span>
-                      <span className={store.pendingAmount > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}>
+                      <span className="text-green-600 dark:text-green-400">
+                        {formatCurrency(store.receivedAmount)}
+                      </span>
+                      <span className="text-gray-300 dark:text-gray-600 mx-1.5">
+                        ·
+                      </span>
+                      <span
+                        className={
+                          store.pendingAmount > 0.01
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-gray-400 dark:text-dark-text-secondary"
+                        }
+                      >
                         {formatCurrency(store.pendingAmount)} pend.
                       </span>
                     </p>
@@ -527,7 +609,9 @@ const EnhancedStoreManagement: React.FC = () => {
                 {/* Header do Card */}
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={`p-2.5 rounded-xl ${statusBgLight} border ${statusBorderColor} transition-colors shrink-0`}>
+                    <div
+                      className={`p-2.5 rounded-xl ${statusBgLight} border ${statusBorderColor} transition-colors shrink-0`}
+                    >
                       <Store className={`h-5 w-5 ${statusTextColor}`} />
                     </div>
                     <div className="min-w-0">
@@ -542,7 +626,9 @@ const EnhancedStoreManagement: React.FC = () => {
                   </div>
 
                   {/* Destaque de Conversão como Pill Tag */}
-                  <div className={`inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-bold ${statusTextColor} ${statusBgLight} border ${statusBorderColor} shrink-0`}>
+                  <div
+                    className={`inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-bold ${statusTextColor} ${statusBgLight} border ${statusBorderColor} shrink-0`}
+                  >
                     {store.conversionRate.toFixed(1)}%
                   </div>
                 </div>
@@ -550,7 +636,10 @@ const EnhancedStoreManagement: React.FC = () => {
                 {/* Info do Cobrador */}
                 <div className="flex items-center justify-between gap-2 mb-4 bg-gray-50/50 dark:bg-dark-bg/25 px-3 py-2 rounded-xl border border-gray-100/50 dark:border-dark-border/40 min-w-0">
                   <span className="text-xs text-gray-500 dark:text-dark-text-secondary truncate">
-                    Cobrador: <span className="font-semibold text-gray-700 dark:text-dark-text">{store.collectorName}</span>
+                    Cobrador:{" "}
+                    <span className="font-semibold text-gray-700 dark:text-dark-text">
+                      {store.collectorName}
+                    </span>
                   </span>
                   {store.isFormalAssignment && !isUnassigned && (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 shrink-0">
@@ -564,26 +653,46 @@ const EnhancedStoreManagement: React.FC = () => {
                     {/* Grid de Métricas Principais - Visual e Moderno */}
                     <div className="grid grid-cols-2 gap-2 mb-4">
                       <div className="p-2.5 bg-gray-50/50 dark:bg-dark-bg/40 rounded-xl border border-gray-100/50 dark:border-dark-border/30">
-                        <span className="text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-wider uppercase block mb-0.5">Vendas</span>
+                        <span className="text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-wider uppercase block mb-0.5">
+                          Vendas
+                        </span>
                         <div className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-dark-text truncate">
-                          {store.totalSales} <span className="text-[9px] font-normal text-gray-500 dark:text-dark-text-secondary">fichas</span>
+                          {store.totalSales}{" "}
+                          <span className="text-[9px] font-normal text-gray-500 dark:text-dark-text-secondary">
+                            fichas
+                          </span>
                         </div>
                       </div>
                       <div className="p-2.5 bg-gray-50/50 dark:bg-dark-bg/40 rounded-xl border border-gray-100/50 dark:border-dark-border/30">
-                        <span className="text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-wider uppercase block mb-0.5">Clientes Base</span>
+                        <span className="text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-wider uppercase block mb-0.5">
+                          Clientes Base
+                        </span>
                         <div className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-dark-text truncate">
-                          {store.clientsCount} <span className="text-[9px] font-normal text-gray-500 dark:text-dark-text-secondary">clientes</span>
+                          {store.clientsCount}{" "}
+                          <span className="text-[9px] font-normal text-gray-500 dark:text-dark-text-secondary">
+                            clientes
+                          </span>
                         </div>
                       </div>
                       <div className="p-2.5 bg-green-50/30 dark:bg-green-950/10 rounded-xl border border-green-100/20 dark:border-green-900/10">
-                        <span className="text-[9px] font-bold text-green-700 dark:text-green-400 tracking-wider uppercase block mb-0.5">Recebido</span>
+                        <span className="text-[9px] font-bold text-green-700 dark:text-green-400 tracking-wider uppercase block mb-0.5">
+                          Recebido
+                        </span>
                         <div className="text-xs sm:text-sm font-extrabold text-green-600 dark:text-green-400 truncate">
                           {formatCurrency(store.receivedAmount)}
                         </div>
                       </div>
-                      <div className={`p-2.5 rounded-xl border ${store.pendingAmount > 0.01 ? 'bg-red-50/30 dark:bg-red-950/10 border-red-100/20 dark:border-red-900/10' : 'bg-gray-50/30 dark:bg-dark-bg/30 border-gray-100/20 dark:border-dark-border/10'}`}>
-                        <span className={`text-[9px] font-bold tracking-wider uppercase block mb-0.5 ${store.pendingAmount > 0.01 ? 'text-red-700 dark:text-red-400' : 'text-gray-405 dark:text-dark-text-secondary'}`}>Pendente</span>
-                        <div className={`text-xs sm:text-sm font-extrabold truncate ${store.pendingAmount > 0.01 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-dark-text-secondary'}`}>
+                      <div
+                        className={`p-2.5 rounded-xl border ${store.pendingAmount > 0.01 ? "bg-red-50/30 dark:bg-red-950/10 border-red-100/20 dark:border-red-900/10" : "bg-gray-50/30 dark:bg-dark-bg/30 border-gray-100/20 dark:border-dark-border/10"}`}
+                      >
+                        <span
+                          className={`text-[9px] font-bold tracking-wider uppercase block mb-0.5 ${store.pendingAmount > 0.01 ? "text-red-700 dark:text-red-400" : "text-gray-405 dark:text-dark-text-secondary"}`}
+                        >
+                          Pendente
+                        </span>
+                        <div
+                          className={`text-xs sm:text-sm font-extrabold truncate ${store.pendingAmount > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}
+                        >
                           {formatCurrency(store.pendingAmount)}
                         </div>
                       </div>
@@ -592,8 +701,14 @@ const EnhancedStoreManagement: React.FC = () => {
                     {/* Barra de Progresso Fina e Elegante */}
                     <div className="mt-3">
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-semibold tracking-wide text-gray-400 dark:text-dark-text-secondary">Eficiência</span>
-                        <span className={`text-xs font-bold ${statusTextColor}`}>{store.conversionRate.toFixed(0)}%</span>
+                        <span className="text-[10px] font-semibold tracking-wide text-gray-400 dark:text-dark-text-secondary">
+                          Eficiência
+                        </span>
+                        <span
+                          className={`text-xs font-bold ${statusTextColor}`}
+                        >
+                          {store.conversionRate.toFixed(0)}%
+                        </span>
                       </div>
                       <div className="w-full bg-gray-100 dark:bg-dark-bg rounded-full h-1.5">
                         <div
@@ -611,8 +726,12 @@ const EnhancedStoreManagement: React.FC = () => {
                     <div className="flex items-start gap-3">
                       <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
                       <div>
-                        <div className="font-bold text-xs tracking-wide mb-0.5 text-amber-800 dark:text-amber-400">Pendente</div>
-                        <div className="text-xs text-gray-500 dark:text-dark-text-secondary">Sem cobrador atribuído à unidade.</div>
+                        <div className="font-bold text-xs tracking-wide mb-0.5 text-amber-800 dark:text-amber-400">
+                          Pendente
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                          Sem cobrador atribuído à unidade.
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -697,15 +816,14 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
         }
 
         if (c.documento) breakdown[city].clients.add(c.documento);
-        if (c.venda_n)
-          breakdown[city].sales.add(`${c.venda_n}-${c.documento}`);
+        if (c.venda_n) breakdown[city].sales.add(`${c.venda_n}-${c.documento}`);
 
         breakdown[city].totalAmount += Number(c.valor_original || 0);
         breakdown[city].receivedAmount += Number(c.valor_recebido || 0);
       });
 
     return Object.values(breakdown).sort((a, b) =>
-      a.city.localeCompare(b.city)
+      a.city.localeCompare(b.city),
     );
   }, [collections, store.storeName]);
 
@@ -717,15 +835,23 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
         ? "blue"
         : "red";
 
-  const statusBgLight = statusColor === "amber" ? "bg-amber-50 dark:bg-amber-900/20" :
-                        statusColor === "green" ? "bg-green-50 dark:bg-green-900/20" :
-                        statusColor === "blue" ? "bg-blue-50 dark:bg-blue-900/20" :
-                        "bg-red-50 dark:bg-red-900/20";
+  const statusBgLight =
+    statusColor === "amber"
+      ? "bg-amber-50 dark:bg-amber-900/20"
+      : statusColor === "green"
+        ? "bg-green-50 dark:bg-green-900/20"
+        : statusColor === "blue"
+          ? "bg-blue-50 dark:bg-blue-900/20"
+          : "bg-red-50 dark:bg-red-900/20";
 
-  const statusTextColor = statusColor === "amber" ? "text-amber-600 dark:text-amber-400" :
-                          statusColor === "green" ? "text-green-600 dark:text-green-400" :
-                          statusColor === "blue" ? "text-blue-600 dark:text-blue-400" :
-                          "text-red-600 dark:text-red-400";
+  const statusTextColor =
+    statusColor === "amber"
+      ? "text-amber-600 dark:text-amber-400"
+      : statusColor === "green"
+        ? "text-green-600 dark:text-green-400"
+        : statusColor === "blue"
+          ? "text-blue-600 dark:text-blue-400"
+          : "text-red-600 dark:text-red-400";
 
   // Boas práticas de modal: trava o scroll do fundo enquanto aberto.
   useEffect(() => {
@@ -760,11 +886,16 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
         {/* Header Elegante */}
         <div className="p-4 sm:p-6 border-b border-gray-100 dark:border-dark-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gray-50 dark:bg-dark-bg">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0 pr-10 sm:pr-0">
-            <div className={`h-12 w-12 sm:h-14 sm:w-14 rounded-xl ${statusBgLight} flex items-center justify-center shrink-0`}>
+            <div
+              className={`h-12 w-12 sm:h-14 sm:w-14 rounded-xl ${statusBgLight} flex items-center justify-center shrink-0`}
+            >
               <Store className={`h-6 w-6 sm:h-7 sm:w-7 ${statusTextColor}`} />
             </div>
             <div className="min-w-0">
-              <h3 id="store-modal-title" className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight truncate">
+              <h3
+                id="store-modal-title"
+                className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight truncate"
+              >
                 {store.storeName}
               </h3>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
@@ -772,9 +903,14 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                   <MapPin className="h-3.5 w-3.5 mr-1 shrink-0 text-gray-400 dark:text-dark-text-secondary" />
                   {store.city}
                 </span>
-                <span className="text-gray-300 dark:text-gray-600 hidden sm:inline">•</span>
+                <span className="text-gray-300 dark:text-gray-600 hidden sm:inline">
+                  •
+                </span>
                 <span className="text-xs font-semibold text-gray-600 dark:text-dark-text-secondary">
-                  Operador: <span className="text-blue-600 dark:text-blue-400 font-semibold">{store.collectorName}</span>
+                  Operador:{" "}
+                  <span className="text-blue-600 dark:text-blue-400 font-semibold">
+                    {store.collectorName}
+                  </span>
                 </span>
               </div>
             </div>
@@ -798,12 +934,16 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                 <div className="p-2 sm:p-2.5 bg-blue-100/80 dark:bg-blue-900/50 rounded-xl text-blue-600 dark:text-blue-400 shrink-0">
                   <Award className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <span className="text-[9px] sm:text-[10px] font-bold text-blue-500 dark:text-blue-400 tracking-wider uppercase">Taxa</span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-blue-500 dark:text-blue-400 tracking-wider uppercase">
+                  Taxa
+                </span>
               </div>
               <p className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-blue-950 dark:text-blue-200 truncate">
                 {store.conversionRate.toFixed(1)}%
               </p>
-              <p className="text-[10px] sm:text-xs text-blue-650/70 dark:text-blue-400/70 mt-1 truncate">Eficiência de Conversão</p>
+              <p className="text-[10px] sm:text-xs text-blue-650/70 dark:text-blue-400/70 mt-1 truncate">
+                Eficiência de Conversão
+              </p>
             </div>
 
             <div className="p-3 sm:p-5 bg-gradient-to-br from-green-50/40 to-green-50/10 dark:from-green-950/20 dark:to-green-950/5 rounded-2xl border border-green-100/40 dark:border-green-900/30 flex flex-col justify-between min-w-0">
@@ -811,12 +951,16 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                 <div className="p-2 sm:p-2.5 bg-green-100/80 dark:bg-green-900/50 rounded-xl text-green-600 dark:text-green-400 shrink-0">
                   <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <span className="text-[9px] sm:text-[10px] font-bold text-green-500 dark:text-green-400 tracking-wider uppercase">Pago</span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-green-500 dark:text-green-400 tracking-wider uppercase">
+                  Pago
+                </span>
               </div>
               <p className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-green-950 dark:text-green-200 truncate">
                 {formatCurrency(store.receivedAmount)}
               </p>
-              <p className="text-[10px] sm:text-xs text-green-650/70 dark:text-green-400/70 mt-1 truncate">Valor Recebido</p>
+              <p className="text-[10px] sm:text-xs text-green-650/70 dark:text-green-400/70 mt-1 truncate">
+                Valor Recebido
+              </p>
             </div>
 
             <div className="p-3 sm:p-5 bg-gradient-to-br from-red-50/40 to-red-50/10 dark:from-red-950/20 dark:to-red-950/5 rounded-2xl border border-red-100/40 dark:border-red-900/30 flex flex-col justify-between min-w-0">
@@ -824,12 +968,16 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                 <div className="p-2 sm:p-2.5 bg-red-100/80 dark:bg-red-900/50 rounded-xl text-red-600 dark:text-red-400 shrink-0">
                   <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <span className="text-[9px] sm:text-[10px] font-bold text-red-500 dark:text-red-400 tracking-wider uppercase">Aberto</span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-red-500 dark:text-red-400 tracking-wider uppercase">
+                  Aberto
+                </span>
               </div>
               <p className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-red-950 dark:text-blue-200 truncate">
                 {formatCurrency(store.pendingAmount)}
               </p>
-              <p className="text-[10px] sm:text-xs text-red-650/70 dark:text-red-400/70 mt-1 truncate">Valor Pendente</p>
+              <p className="text-[10px] sm:text-xs text-red-650/70 dark:text-red-400/70 mt-1 truncate">
+                Valor Pendente
+              </p>
             </div>
 
             <div className="p-3 sm:p-5 bg-gradient-to-br from-purple-50/40 to-purple-50/10 dark:from-purple-950/20 dark:to-purple-950/5 rounded-2xl border border-purple-100/40 dark:border-purple-900/30 flex flex-col justify-between min-w-0">
@@ -837,12 +985,16 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                 <div className="p-2 sm:p-2.5 bg-purple-100/80 dark:bg-purple-900/50 rounded-xl text-purple-600 dark:text-purple-400 shrink-0">
                   <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
-                <span className="text-[9px] sm:text-[10px] font-bold text-purple-500 dark:text-purple-400 tracking-wider uppercase">Média</span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-purple-500 dark:text-purple-400 tracking-wider uppercase">
+                  Média
+                </span>
               </div>
               <p className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-purple-950 dark:text-purple-200 truncate">
                 {formatCurrency(store.averageTicket)}
               </p>
-              <p className="text-[10px] sm:text-xs text-purple-650/70 dark:text-purple-400/70 mt-1 truncate">Ticket Médio</p>
+              <p className="text-[10px] sm:text-xs text-purple-650/70 dark:text-purple-400/70 mt-1 truncate">
+                Ticket Médio
+              </p>
             </div>
           </div>
 
@@ -854,7 +1006,10 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                 Distribuição Geográfica Detalhada
               </h4>
               <span className="self-start sm:self-auto text-xs font-semibold text-gray-400 dark:text-dark-text-secondary bg-gray-50 dark:bg-dark-bg px-3 py-1 rounded-full border border-gray-100 dark:border-dark-border">
-                {cityBreakdown.length} {cityBreakdown.length === 1 ? "Cidade Identificada" : "Cidades Identificadas"}
+                {cityBreakdown.length}{" "}
+                {cityBreakdown.length === 1
+                  ? "Cidade Identificada"
+                  : "Cidades Identificadas"}
               </span>
             </div>
 
@@ -862,26 +1017,43 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-dark-bg border-b border-gray-100 dark:border-dark-border">
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">Cidade</th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-center">Clientes</th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-center">Fichas</th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">Valor Bruto</th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">Valor Pago</th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">Pendente</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
+                      Cidade
+                    </th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-center">
+                      Clientes
+                    </th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-center">
+                      Fichas
+                    </th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">
+                      Valor Bruto
+                    </th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">
+                      Valor Pago
+                    </th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">
+                      Pendente
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
                   {cityBreakdown.map((item) => {
                     const pending = item.totalAmount - item.receivedAmount;
-                    
+
                     return (
-                      <tr key={item.city} className="group hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-colors">
+                      <tr
+                        key={item.city}
+                        className="group hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-colors"
+                      >
                         <td className="px-3 sm:px-6 py-3 sm:py-4">
                           <div className="flex items-center gap-2 sm:gap-3">
                             <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border flex items-center justify-center text-xs shadow-sm group-hover:border-blue-200 shrink-0">
                               📍
                             </div>
-                            <span className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-dark-text group-hover:text-blue-700 dark:group-hover:text-blue-400 truncate max-w-[120px] sm:max-w-none">{item.city}</span>
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-dark-text group-hover:text-blue-700 dark:group-hover:text-blue-400 truncate max-w-[120px] sm:max-w-none">
+                              {item.city}
+                            </span>
                           </div>
                         </td>
                         <td className="px-3 sm:px-6 py-3 sm:py-4 text-center">
@@ -899,7 +1071,9 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                           {formatCurrency(item.receivedAmount)}
                         </td>
                         <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
-                          <span className={`text-xs sm:text-sm font-semibold ${pending > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}>
+                          <span
+                            className={`text-xs sm:text-sm font-semibold ${pending > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}
+                          >
                             {formatCurrency(pending)}
                           </span>
                         </td>

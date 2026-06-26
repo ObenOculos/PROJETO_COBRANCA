@@ -18,7 +18,12 @@ export interface NavItemConfig {
   collectorName?: string;
   managerIcon: LucideIcon;
   collectorIcon?: LucideIcon;
-  roles: ("manager" | "collector" | "internal_collector" | "third_party_collector")[];
+  roles: (
+    | "manager"
+    | "collector"
+    | "internal_collector"
+    | "third_party_collector"
+  )[];
 }
 
 export const navigationItems: NavItemConfig[] = [
@@ -28,7 +33,12 @@ export const navigationItems: NavItemConfig[] = [
     collectorName: "Minha Carteira",
     managerIcon: HandCoins,
     collectorIcon: HandCoins,
-    roles: ["manager", "collector", "internal_collector", "third_party_collector"],
+    roles: [
+      "manager",
+      "collector",
+      "internal_collector",
+      "third_party_collector",
+    ],
   },
   {
     id: "route",

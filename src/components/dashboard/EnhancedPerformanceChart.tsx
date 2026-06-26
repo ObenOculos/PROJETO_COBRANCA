@@ -17,7 +17,13 @@ import { getClientPaymentStatus } from "../../filters/clientStatus";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
 import FilterBar from "../common/FilterBar";
-import { User, UserType, FilterOptions, isCollectorType, Collection } from "../../types";
+import {
+  User,
+  UserType,
+  FilterOptions,
+  isCollectorType,
+  Collection,
+} from "../../types";
 
 interface EnhancedCollectorPerformance {
   collectorId: string;
@@ -79,7 +85,9 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
   setSelectedCollectorForGoals,
   setIsGoalModalOpen,
 }) => {
-  const [mobileTab, setMobileTab] = useState<"carteira" | "financeiro">("carteira");
+  const [mobileTab, setMobileTab] = useState<"carteira" | "financeiro">(
+    "carteira",
+  );
 
   const getSortMetricDisplay = () => {
     switch (sortBy) {
@@ -87,31 +95,31 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
         return {
           value: formatCurrency(collector.receivedAmount),
           label: "Valor Recebido",
-          color: "text-green-600 dark:text-green-400"
+          color: "text-green-600 dark:text-green-400",
         };
       case "totalSales":
         return {
           value: `${collector.totalSales}`,
           label: "Títulos Vendidos",
-          color: "text-blue-600 dark:text-blue-400"
+          color: "text-blue-600 dark:text-blue-400",
         };
       case "clientsCount":
         return {
           value: `${collector.clientsCount}`,
           label: "Total de Clientes",
-          color: "text-purple-600 dark:text-purple-400"
+          color: "text-purple-600 dark:text-purple-400",
         };
       case "pendingSales":
         return {
           value: `${collector.pendingSales}`,
           label: "Fichas Pendentes",
-          color: "text-rose-600 dark:text-rose-400"
+          color: "text-rose-600 dark:text-rose-400",
         };
       default:
         return {
           value: formatCurrency(collector.receivedAmount),
           label: "Valor Recebido",
-          color: "text-green-600 dark:text-green-400"
+          color: "text-green-600 dark:text-green-400",
         };
     }
   };
@@ -119,25 +127,27 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
   const scoreDisplay = getSortMetricDisplay();
 
   return (
-    <div 
-      className="group bg-white dark:bg-dark-bg-secondary rounded-2xl p-4 sm:p-5 border border-gray-100 dark:border-dark-border hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/20 dark:hover:shadow-black/20 transition-all duration-300 cursor-pointer flex flex-col justify-between"
-    >
+    <div className="group bg-white dark:bg-dark-bg-secondary rounded-2xl p-4 sm:p-5 border border-gray-100 dark:border-dark-border hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/20 dark:hover:shadow-black/20 transition-all duration-300 cursor-pointer flex flex-col justify-between">
       <div>
         {/* Header do Card */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-3 min-w-0">
             {/* Rank Badge Gamificado */}
-            <div className={`relative w-10 h-10 flex items-center justify-center rounded-xl text-sm font-bold shrink-0 transition-all ${
-              isTop3 
-                ? rank === 1 
-                  ? "bg-gradient-to-r from-amber-100 to-yellow-50 text-amber-700 dark:from-amber-950/40 dark:to-yellow-950/20 dark:text-amber-300 border border-amber-200/50" 
-                  : rank === 2 
-                    ? "bg-gradient-to-r from-slate-100 to-gray-50 text-slate-700 dark:from-slate-800/40 dark:to-gray-800/20 dark:text-slate-300 border border-slate-200/50"
-                    : "bg-gradient-to-r from-orange-100 to-orange-50 text-orange-700 dark:from-orange-950/40 dark:to-orange-900/20 dark:text-orange-300 border border-orange-200/50"
-                : "bg-gray-50 dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border"
-            }`}>
+            <div
+              className={`relative w-10 h-10 flex items-center justify-center rounded-xl text-sm font-bold shrink-0 transition-all ${
+                isTop3
+                  ? rank === 1
+                    ? "bg-gradient-to-r from-amber-100 to-yellow-50 text-amber-700 dark:from-amber-950/40 dark:to-yellow-950/20 dark:text-amber-300 border border-amber-200/50"
+                    : rank === 2
+                      ? "bg-gradient-to-r from-slate-100 to-gray-50 text-slate-700 dark:from-slate-800/40 dark:to-gray-800/20 dark:text-slate-300 border border-slate-200/50"
+                      : "bg-gradient-to-r from-orange-100 to-orange-50 text-orange-700 dark:from-orange-950/40 dark:to-orange-900/20 dark:text-orange-300 border border-orange-200/50"
+                  : "bg-gray-50 dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border"
+              }`}
+            >
               {rank}
-              {isTop3 && <Trophy className="absolute -top-1 -right-1 w-3.5 h-3.5 text-amber-500" />}
+              {isTop3 && (
+                <Trophy className="absolute -top-1 -right-1 w-3.5 h-3.5 text-amber-500" />
+              )}
             </div>
 
             <div className="min-w-0">
@@ -160,7 +170,9 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
 
           {/* Score de Ordenação Principal */}
           <div className="text-right shrink-0">
-            <div className={`text-base sm:text-lg font-bold tracking-tight leading-none mb-0.5 ${scoreDisplay.color}`}>
+            <div
+              className={`text-base sm:text-lg font-bold tracking-tight leading-none mb-0.5 ${scoreDisplay.color}`}
+            >
               {scoreDisplay.value}
             </div>
             <span className="text-[9px] font-semibold tracking-wide text-gray-400 dark:text-dark-text-secondary block">
@@ -175,7 +187,10 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
         <div className="flex sm:hidden p-0.5 bg-gray-100 dark:bg-dark-bg rounded-xl mb-4 border border-gray-200/50 dark:border-dark-border/40">
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); setMobileTab("carteira"); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMobileTab("carteira");
+            }}
             className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-all ${
               mobileTab === "carteira"
                 ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
@@ -186,7 +201,10 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
           </button>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); setMobileTab("financeiro"); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMobileTab("financeiro");
+            }}
             className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-all ${
               mobileTab === "financeiro"
                 ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
@@ -210,25 +228,45 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
                 <thead>
                   <tr className="bg-gray-50 dark:bg-dark-bg/50 border-b border-gray-100 dark:border-dark-border/40 text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider h-8">
                     <th className="px-3 py-2 whitespace-nowrap">Indicador</th>
-                    <th className="px-3 py-2 text-right whitespace-nowrap">Carteira</th>
-                    <th className="px-3 py-2 text-right whitespace-nowrap">Fichas/Venda</th>
+                    <th className="px-3 py-2 text-right whitespace-nowrap">
+                      Carteira
+                    </th>
+                    <th className="px-3 py-2 text-right whitespace-nowrap">
+                      Fichas/Venda
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-dark-border/20 text-gray-700 dark:text-dark-text">
                   <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
-                    <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">Pagos</td>
-                    <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">{collector.clientsPaid}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">{collector.salesPaid}</td>
+                    <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">
+                      Pagos
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">
+                      {collector.clientsPaid}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">
+                      {collector.salesPaid}
+                    </td>
                   </tr>
                   <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
-                    <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">Atrasados</td>
-                    <td className="px-3 py-2 text-right font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">{collector.clientsUnpaidOrPartial}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">{collector.salesUnpaidOrPartial}</td>
+                    <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">
+                      Atrasados
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                      {collector.clientsUnpaidOrPartial}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                      {collector.salesUnpaidOrPartial}
+                    </td>
                   </tr>
                   <tr className="bg-gray-50/40 dark:bg-dark-bg/30 font-bold text-gray-900 dark:text-dark-text h-10">
                     <td className="px-3 py-2.5 whitespace-nowrap">Total</td>
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">{collector.totalAssignedClients}</td>
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">{collector.salesTotalPeriod}</td>
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      {collector.totalAssignedClients}
+                    </td>
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      {collector.salesTotalPeriod}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -245,25 +283,47 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
                 <thead>
                   <tr className="bg-gray-50 dark:bg-dark-bg/50 border-b border-gray-100 dark:border-dark-border/40 text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider h-8">
                     <th className="px-3 py-2 whitespace-nowrap">Indicador</th>
-                    <th className="px-3 py-2 text-right whitespace-nowrap">Financeiro</th>
-                    <th className="px-3 py-2 text-right whitespace-nowrap">Visitas</th>
+                    <th className="px-3 py-2 text-right whitespace-nowrap">
+                      Financeiro
+                    </th>
+                    <th className="px-3 py-2 text-right whitespace-nowrap">
+                      Visitas
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-dark-border/20 text-gray-700 dark:text-dark-text">
                   <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
-                    <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">Realizadas</td>
-                    <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">{formatCurrency(collector.receivedAmount)}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">{collector.visitsRealizadas}</td>
+                    <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">
+                      Realizadas
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">
+                      {formatCurrency(collector.receivedAmount)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">
+                      {collector.visitsRealizadas}
+                    </td>
                   </tr>
                   <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
-                    <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">Agendadas</td>
-                    <td className="px-3 py-2 text-right font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">{formatCurrency(collector.pendingAmountScheduled)}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">{collector.visitsAgendadas}</td>
+                    <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">
+                      Agendadas
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                      {formatCurrency(collector.pendingAmountScheduled)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                      {collector.visitsAgendadas}
+                    </td>
                   </tr>
                   <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
-                    <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">Atrasadas</td>
-                    <td className="px-3 py-2 text-right font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">{formatCurrency(collector.pendingAmountOverdue)}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">{collector.visitsAtrasadas}</td>
+                    <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">
+                      Atrasadas
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
+                      {formatCurrency(collector.pendingAmountOverdue)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
+                      {collector.visitsAtrasadas}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -277,40 +337,66 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
             {/* Carteira Section */}
             <div>
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-dark-text-secondary">Clientes na Carteira</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-dark-text-secondary">
+                  Clientes na Carteira
+                </span>
                 <span className="text-xs font-bold text-gray-900 dark:text-dark-text">
-                  {collector.clientsPaid} / {collector.totalAssignedClients} pagos
+                  {collector.clientsPaid} / {collector.totalAssignedClients}{" "}
+                  pagos
                 </span>
               </div>
               <div className="w-full bg-gray-100 dark:bg-dark-bg rounded-full h-1.5 mb-1.5">
-                <div 
-                  className="h-1.5 rounded-full bg-green-500 transition-all duration-700" 
-                  style={{ width: `${collector.totalAssignedClients > 0 ? (collector.clientsPaid / collector.totalAssignedClients) * 100 : 0}%` }}
+                <div
+                  className="h-1.5 rounded-full bg-green-500 transition-all duration-700"
+                  style={{
+                    width: `${collector.totalAssignedClients > 0 ? (collector.clientsPaid / collector.totalAssignedClients) * 100 : 0}%`,
+                  }}
                 />
               </div>
               <div className="flex justify-between text-[10px] text-gray-500 dark:text-dark-text-secondary font-medium">
                 <span>{collector.clientsUnpaidOrPartial} pendentes</span>
-                <span>{collector.totalAssignedClients > 0 ? ((collector.clientsPaid / collector.totalAssignedClients) * 100).toFixed(0) : 0}% concluído</span>
+                <span>
+                  {collector.totalAssignedClients > 0
+                    ? (
+                        (collector.clientsPaid /
+                          collector.totalAssignedClients) *
+                        100
+                      ).toFixed(0)
+                    : 0}
+                  % concluído
+                </span>
               </div>
             </div>
 
             {/* Vendas Section */}
             <div>
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-dark-text-secondary">Títulos / Fichas</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-dark-text-secondary">
+                  Títulos / Fichas
+                </span>
                 <span className="text-xs font-bold text-gray-900 dark:text-dark-text">
                   {collector.salesPaid} / {collector.salesTotalPeriod} pagos
                 </span>
               </div>
               <div className="w-full bg-gray-100 dark:bg-dark-bg rounded-full h-1.5 mb-1.5">
-                <div 
-                  className="h-1.5 rounded-full bg-blue-500 transition-all duration-700" 
-                  style={{ width: `${collector.salesTotalPeriod > 0 ? (collector.salesPaid / collector.salesTotalPeriod) * 100 : 0}%` }}
+                <div
+                  className="h-1.5 rounded-full bg-blue-500 transition-all duration-700"
+                  style={{
+                    width: `${collector.salesTotalPeriod > 0 ? (collector.salesPaid / collector.salesTotalPeriod) * 100 : 0}%`,
+                  }}
                 />
               </div>
               <div className="flex justify-between text-[10px] text-gray-500 dark:text-dark-text-secondary font-medium">
                 <span>{collector.salesUnpaidOrPartial} pendentes</span>
-                <span>{collector.salesTotalPeriod > 0 ? ((collector.salesPaid / collector.salesTotalPeriod) * 100).toFixed(0) : 0}% concluído</span>
+                <span>
+                  {collector.salesTotalPeriod > 0
+                    ? (
+                        (collector.salesPaid / collector.salesTotalPeriod) *
+                        100
+                      ).toFixed(0)
+                    : 0}
+                  % concluído
+                </span>
               </div>
             </div>
           </div>
@@ -321,38 +407,66 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
           <div className="block sm:hidden space-y-4 mb-4">
             {/* Financeiro Section */}
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-dark-text-secondary block mb-1.5">Resumo Financeiro</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-dark-text-secondary block mb-1.5">
+                Resumo Financeiro
+              </span>
               <div className="grid grid-cols-3 gap-2">
                 <div className="p-2 bg-green-50/30 dark:bg-green-950/10 rounded-xl border border-green-100/20 dark:border-green-900/10 text-center">
-                  <span className="text-[8px] font-bold uppercase tracking-wider text-green-700 dark:text-green-400 block mb-0.5">Recebido</span>
-                  <span className="text-[10px] sm:text-xs font-bold text-green-600 dark:text-green-400 block truncate">{formatCurrency(collector.receivedAmount)}</span>
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-green-700 dark:text-green-400 block mb-0.5">
+                    Recebido
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-bold text-green-600 dark:text-green-400 block truncate">
+                    {formatCurrency(collector.receivedAmount)}
+                  </span>
                 </div>
                 <div className="p-2 bg-blue-50/30 dark:bg-blue-950/10 rounded-xl border border-blue-100/20 dark:border-blue-900/10 text-center">
-                  <span className="text-[8px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 block mb-0.5">Agendado</span>
-                  <span className="text-[10px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 block truncate">{formatCurrency(collector.pendingAmountScheduled)}</span>
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 block mb-0.5">
+                    Agendado
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 block truncate">
+                    {formatCurrency(collector.pendingAmountScheduled)}
+                  </span>
                 </div>
                 <div className="p-2 bg-red-50/30 dark:bg-red-950/10 rounded-xl border border-red-100/20 dark:border-red-900/10 text-center">
-                  <span className="text-[8px] font-bold uppercase tracking-wider text-red-700 dark:text-red-400 block mb-0.5">Atrasado</span>
-                  <span className="text-[10px] sm:text-xs font-bold text-red-600 dark:text-red-400 block truncate">{formatCurrency(collector.pendingAmountOverdue)}</span>
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-red-700 dark:text-red-400 block mb-0.5">
+                    Atrasado
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-bold text-red-600 dark:text-red-400 block truncate">
+                    {formatCurrency(collector.pendingAmountOverdue)}
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* Visitas Section — mesmo formato do Financeiro (Feitas/Agendadas/Atrasadas) */}
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-dark-text-secondary block mb-1.5">Resumo de Visitas</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-dark-text-secondary block mb-1.5">
+                Resumo de Visitas
+              </span>
               <div className="grid grid-cols-3 gap-2">
                 <div className="p-2 bg-green-50/30 dark:bg-green-950/10 rounded-xl border border-green-100/20 dark:border-green-900/10 text-center">
-                  <span className="text-[8px] font-bold uppercase tracking-wider text-green-700 dark:text-green-400 block mb-0.5">Realizadas</span>
-                  <span className="text-[10px] sm:text-xs font-bold text-green-600 dark:text-green-400 block truncate">{collector.visitsRealizadas}</span>
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-green-700 dark:text-green-400 block mb-0.5">
+                    Realizadas
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-bold text-green-600 dark:text-green-400 block truncate">
+                    {collector.visitsRealizadas}
+                  </span>
                 </div>
                 <div className="p-2 bg-blue-50/30 dark:bg-blue-950/10 rounded-xl border border-blue-100/20 dark:border-blue-900/10 text-center">
-                  <span className="text-[8px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 block mb-0.5">Agendadas</span>
-                  <span className="text-[10px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 block truncate">{collector.visitsAgendadas}</span>
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 block mb-0.5">
+                    Agendadas
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 block truncate">
+                    {collector.visitsAgendadas}
+                  </span>
                 </div>
                 <div className="p-2 bg-red-50/30 dark:bg-red-950/10 rounded-xl border border-red-100/20 dark:border-red-900/10 text-center">
-                  <span className="text-[8px] font-bold uppercase tracking-wider text-red-700 dark:text-red-400 block mb-0.5">Atrasadas</span>
-                  <span className="text-[10px] sm:text-xs font-bold text-red-600 dark:text-red-400 block truncate">{collector.visitsAtrasadas}</span>
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-red-700 dark:text-red-400 block mb-0.5">
+                    Atrasadas
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-bold text-red-600 dark:text-red-400 block truncate">
+                    {collector.visitsAtrasadas}
+                  </span>
                 </div>
               </div>
             </div>
@@ -363,7 +477,11 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
       {/* Botões de Ação Modernizados */}
       <div className="grid grid-cols-2 gap-3 mt-2">
         <button
-          onClick={(e) => { e.stopPropagation(); setSelectedCollector(collector); setIsModalOpen(true); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedCollector(collector);
+            setIsModalOpen(true);
+          }}
           className="flex items-center justify-center gap-2 py-2.5 bg-gray-950 hover:bg-gray-800 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-xl text-xs font-semibold tracking-wide transition-all shadow-sm active:scale-95 group/btn"
         >
           <Eye className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" />
@@ -372,8 +490,11 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            const user = users.find(u => u.id === collector.collectorId);
-            if (user) { setSelectedCollectorForGoals(user); setIsGoalModalOpen(true); }
+            const user = users.find((u) => u.id === collector.collectorId);
+            if (user) {
+              setSelectedCollectorForGoals(user);
+              setIsGoalModalOpen(true);
+            }
           }}
           className="flex items-center justify-center gap-2 py-2.5 bg-white hover:bg-gray-50 dark:bg-dark-bg text-gray-700 dark:text-dark-text border border-gray-200 dark:border-dark-border rounded-xl text-xs font-semibold tracking-wide transition-all active:scale-95 group/btn"
         >
@@ -395,18 +516,22 @@ const EnhancedPerformanceChart: React.FC = () => {
     refreshData,
     getFilteredCollections,
   } = useCollection();
-  
+
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
   const [, startTransition] = useTransition();
-  const [sortBy] = useState<"receivedAmount" | "totalSales" | "clientsCount" | "pendingSales">("receivedAmount");
-    const [sortOrder] = useState<"asc" | "desc">("desc");
+  const [sortBy] = useState<
+    "receivedAmount" | "totalSales" | "clientsCount" | "pendingSales"
+  >("receivedAmount");
+  const [sortOrder] = useState<"asc" | "desc">("desc");
   // Filtro por tipo de cobrador (Todos / Interno / Externo / Terceirizado).
   const [typeFilter, setTypeFilter] = useState<UserType | "all">("all");
-  const [selectedCollector, setSelectedCollector] = useState<EnhancedCollectorPerformance | null>(null);
+  const [selectedCollector, setSelectedCollector] =
+    useState<EnhancedCollectorPerformance | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
-  const [selectedCollectorForGoals, setSelectedCollectorForGoals] = useState<User | null>(null);
+  const [selectedCollectorForGoals, setSelectedCollectorForGoals] =
+    useState<User | null>(null);
 
   // Fonte unica: todos os filtros (incl. Periodo mes/ano) vivem em `filters`.
   // Default = mes/ano atual, mesmo comportamento de antes.
@@ -420,16 +545,38 @@ const EnhancedPerformanceChart: React.FC = () => {
   const selectedYears = useMemo(() => filters.years ?? [], [filters.years]);
 
   // Segmento de meta (lente de desempenho sobre o ranking, nao sobre a carteira).
-  const [goalSegment, setGoalSegment] = useState<"above" | "below" | null>(null);
+  const [goalSegment, setGoalSegment] = useState<"above" | "below" | null>(
+    null,
+  );
 
   // Atalhos rapidos de periodo (escrevem em months/years — mesma fonte de verdade).
   const periodPresets = useMemo(() => {
     const prev = new Date(currentYear, currentMonth - 1, 1);
     return [
-      { id: "thisMonth", label: "Este mês", months: [currentMonth], years: [currentYear] },
-      { id: "lastMonth", label: "Mês passado", months: [prev.getMonth()], years: [prev.getFullYear()] },
-      { id: "thisYear", label: "Este ano", months: [] as number[], years: [currentYear] },
-      { id: "all", label: "Tudo", months: [] as number[], years: [] as number[] },
+      {
+        id: "thisMonth",
+        label: "Este mês",
+        months: [currentMonth],
+        years: [currentYear],
+      },
+      {
+        id: "lastMonth",
+        label: "Mês passado",
+        months: [prev.getMonth()],
+        years: [prev.getFullYear()],
+      },
+      {
+        id: "thisYear",
+        label: "Este ano",
+        months: [] as number[],
+        years: [currentYear],
+      },
+      {
+        id: "all",
+        label: "Tudo",
+        months: [] as number[],
+        years: [] as number[],
+      },
     ];
   }, [currentMonth, currentYear]);
 
@@ -462,10 +609,16 @@ const EnhancedPerformanceChart: React.FC = () => {
   const enhancedPerformance = useMemo((): EnhancedCollectorPerformance[] => {
     const collectors = users.filter((u) => isCollectorType(u.type));
 
-    const parseDateSafely = (dateStr: string | null | undefined): Date | null => {
+    const parseDateSafely = (
+      dateStr: string | null | undefined,
+    ): Date | null => {
       if (!dateStr) return null;
       try {
-        const cleanDateStr = dateStr.toString().trim().split("T")[0].split(" ")[0];
+        const cleanDateStr = dateStr
+          .toString()
+          .trim()
+          .split("T")[0]
+          .split(" ")[0];
         if (cleanDateStr.includes("-")) {
           const parts = cleanDateStr.split("-");
           if (parts.length === 3) {
@@ -490,8 +643,10 @@ const EnhancedPerformanceChart: React.FC = () => {
       if (!date) return false;
       const dateMonth = date.getMonth();
       const dateYear = date.getFullYear();
-      const monthMatches = selectedMonths.length === 0 || selectedMonths.includes(dateMonth);
-      const yearMatches = selectedYears.length === 0 || selectedYears.includes(dateYear);
+      const monthMatches =
+        selectedMonths.length === 0 || selectedMonths.includes(dateMonth);
+      const yearMatches =
+        selectedYears.length === 0 || selectedYears.includes(dateYear);
       return monthMatches && yearMatches;
     };
 
@@ -520,26 +675,35 @@ const EnhancedPerformanceChart: React.FC = () => {
         if (c.user_id !== collector.id) return false;
         const dateVenc = parseDateSafely(c.data_vencimento);
         const dateLanc = parseDateSafely(c.data_lancamento);
-        return isDateInSelectedMonths(dateVenc) || isDateInSelectedMonths(dateLanc);
+        return (
+          isDateInSelectedMonths(dateVenc) || isDateInSelectedMonths(dateLanc)
+        );
       });
 
       const receivedAmount = salePayments
         .filter((p) => {
           if (p.collectorId !== collector.id || !p.paymentDate) return false;
           // Quando ha filtro ativo, conta apenas pagamentos de clientes no subconjunto filtrado.
-          if (hasSourceFilter && !allowedDocs.has(p.clientDocument)) return false;
+          if (hasSourceFilter && !allowedDocs.has(p.clientDocument))
+            return false;
           const paymentDate = parseDateSafely(p.paymentDate);
           return isDateInSelectedMonths(paymentDate);
         })
         .reduce((sum, p) => sum + p.paymentAmount, 0);
 
-      const totalAmount = filteredCollections.reduce((sum, c) => sum + Number(c.valor_original || 0), 0);
+      const totalAmount = filteredCollections.reduce(
+        (sum, c) => sum + Number(c.valor_original || 0),
+        0,
+      );
       const pendingAmount = Math.max(0, totalAmount - receivedAmount);
 
       // A receber total: toda a carteira (do subconjunto filtrado), sem filtro de período
-      const allCollectorCollections = sourceCollections.filter((c) => c.user_id === collector.id);
+      const allCollectorCollections = sourceCollections.filter(
+        (c) => c.user_id === collector.id,
+      );
       const pendingAmountTotal = allCollectorCollections.reduce((sum, c) => {
-        const diff = Number(c.valor_original || 0) - Number(c.valor_recebido || 0);
+        const diff =
+          Number(c.valor_original || 0) - Number(c.valor_recebido || 0);
         return sum + (diff > 0.01 ? diff : 0);
       }, 0);
 
@@ -601,21 +765,35 @@ const EnhancedPerformanceChart: React.FC = () => {
 
       // Total de títulos sem filtro de período
       const allSalesSet = new Set(
-        allCollectorCollections.map((c) => `${c.venda_n}-${c.documento}`)
+        allCollectorCollections.map((c) => `${c.venda_n}-${c.documento}`),
       );
       const totalSales = allSalesSet.size;
-      const clientsWithPending = new Set(salesArray.filter((s) => s.isPending).map((s) => s.clientDocument).filter(Boolean)).size;
-      const clientsCount = new Set(salesArray.map((s) => s.clientDocument)).size;
+      const clientsWithPending = new Set(
+        salesArray
+          .filter((s) => s.isPending)
+          .map((s) => s.clientDocument)
+          .filter(Boolean),
+      ).size;
+      const clientsCount = new Set(salesArray.map((s) => s.clientDocument))
+        .size;
 
       const currentMonthGoals = monthlyGoals.filter((g) => {
         const goalDate = parseDateSafely(g.month + "-01");
         return isDateInSelectedMonths(goalDate) && g.user_id === collector.id;
       });
 
-      const currentMonthVisitsGoal = currentMonthGoals.reduce((sum, goal) => sum + (goal.visits_goal ?? 0), 0);
-      const currentMonthPaymentsGoal = currentMonthGoals.reduce((sum, goal) => sum + (goal.payments_goal ?? 0), 0);
+      const currentMonthVisitsGoal = currentMonthGoals.reduce(
+        (sum, goal) => sum + (goal.visits_goal ?? 0),
+        0,
+      );
+      const currentMonthPaymentsGoal = currentMonthGoals.reduce(
+        (sum, goal) => sum + (goal.payments_goal ?? 0),
+        0,
+      );
 
-      const collectorVisits = scheduledVisits.filter((v) => v.collectorId === collector.id);
+      const collectorVisits = scheduledVisits.filter(
+        (v) => v.collectorId === collector.id,
+      );
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -632,7 +810,9 @@ const EnhancedPerformanceChart: React.FC = () => {
       let pendingAmountOverdue = 0;
 
       collectorVisits.forEach((v) => {
-        const visitDate = parseDateSafely(v.dataVisitaRealizada || v.scheduledDate);
+        const visitDate = parseDateSafely(
+          v.dataVisitaRealizada || v.scheduledDate,
+        );
         if (!isDateInSelectedMonths(visitDate)) return;
         const titleValue = Number(v.totalPendingValue || 0);
 
@@ -652,8 +832,13 @@ const EnhancedPerformanceChart: React.FC = () => {
           visitsAgendadas++;
           pendingAmountScheduled += titleValue;
         }
-        if (v.status === "cancelamento_solicitado") visitsCancelamentoSolicitado++;
-        if (v.status === "reagendada" || (v.rescheduleCount && v.rescheduleCount > 0)) visitsReagendadas++;
+        if (v.status === "cancelamento_solicitado")
+          visitsCancelamentoSolicitado++;
+        if (
+          v.status === "reagendada" ||
+          (v.rescheduleCount && v.rescheduleCount > 0)
+        )
+          visitsReagendadas++;
 
         if (isOverdue) {
           visitsAtrasadas++;
@@ -664,11 +849,29 @@ const EnhancedPerformanceChart: React.FC = () => {
       const currentMonthVisitsActual = visitsRealizadas;
       const pendingVisits = visitsAgendadas + visitsCancelamentoSolicitado;
 
-      const visitsPerformance = currentMonthVisitsGoal > 0 ? (currentMonthVisitsActual / currentMonthVisitsGoal) * 100 : 0;
-      const paymentsPerformance = currentMonthPaymentsGoal > 0 ? (receivedAmount / currentMonthPaymentsGoal) * 100 : 0;
+      const visitsPerformance =
+        currentMonthVisitsGoal > 0
+          ? (currentMonthVisitsActual / currentMonthVisitsGoal) * 100
+          : 0;
+      const paymentsPerformance =
+        currentMonthPaymentsGoal > 0
+          ? (receivedAmount / currentMonthPaymentsGoal) * 100
+          : 0;
 
       const allAssignedClients = clientsPaid + clientsUnpaidOrPartial;
-      const visitedClients = new Set(scheduledVisits.filter(v => v.collectorId === collector.id && v.status === "realizada" && isDateInSelectedMonths(parseDateSafely(v.dataVisitaRealizada || v.scheduledDate))).map(v => v.clientDocument).filter(Boolean)).size;
+      const visitedClients = new Set(
+        scheduledVisits
+          .filter(
+            (v) =>
+              v.collectorId === collector.id &&
+              v.status === "realizada" &&
+              isDateInSelectedMonths(
+                parseDateSafely(v.dataVisitaRealizada || v.scheduledDate),
+              ),
+          )
+          .map((v) => v.clientDocument)
+          .filter(Boolean),
+      ).size;
 
       return {
         collectorId: collector.id,
@@ -707,7 +910,17 @@ const EnhancedPerformanceChart: React.FC = () => {
         clientsUnpaidOrPartial,
       };
     });
-  }, [sourceCollections, allowedDocs, hasSourceFilter, users, monthlyGoals, salePayments, scheduledVisits, selectedMonths, selectedYears]);
+  }, [
+    sourceCollections,
+    allowedDocs,
+    hasSourceFilter,
+    users,
+    monthlyGoals,
+    salePayments,
+    scheduledVisits,
+    selectedMonths,
+    selectedYears,
+  ]);
 
   // Cobrador isola um cobrador; segmento de meta filtra por atingimento da meta
   // de recebimento. Ambos refletem no ranking e nos KPIs (fonte: rankedPerformance).
@@ -776,14 +989,36 @@ const EnhancedPerformanceChart: React.FC = () => {
   }, [rankedPerformance]);
 
   const exportPerformanceData = () => {
-    const headers = ["Cobrador", "Vendas", "Clientes", "Total (R$)", "Recebido (R$)", "Pendente (R$)", "Visitas OK", "Visitas Pend"];
+    const headers = [
+      "Cobrador",
+      "Vendas",
+      "Clientes",
+      "Total (R$)",
+      "Recebido (R$)",
+      "Pendente (R$)",
+      "Visitas OK",
+      "Visitas Pend",
+    ];
     const rows = filteredAndSortedPerformance.map((p) => [
-      p.collectorName, p.totalSales.toString(), p.clientsCount.toString(), p.totalAmount.toFixed(2),
-      p.receivedAmount.toFixed(2), p.pendingAmount.toFixed(2), p.currentMonthVisitsActual.toString(), p.pendingVisits.toString()
+      p.collectorName,
+      p.totalSales.toString(),
+      p.clientsCount.toString(),
+      p.totalAmount.toFixed(2),
+      p.receivedAmount.toFixed(2),
+      p.pendingAmount.toFixed(2),
+      p.currentMonthVisitsActual.toString(),
+      p.pendingVisits.toString(),
     ]);
-    const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell.toString().replace(/"/g, '""')}"`).join(","))].join("\n");
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) =>
+        row.map((cell) => `"${cell.toString().replace(/"/g, '""')}"`).join(","),
+      ),
+    ].join("\n");
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" }));
+    link.href = URL.createObjectURL(
+      new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" }),
+    );
     link.download = `ranking-${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
   };
@@ -846,7 +1081,9 @@ const EnhancedPerformanceChart: React.FC = () => {
               <div className="h-1.5 bg-gray-100 dark:bg-dark-bg rounded-full overflow-hidden">
                 <div
                   className="h-full bg-green-600 rounded-full transition-all duration-700"
-                  style={{ width: `${Math.min(100, teamStats.paymentGoalPct)}%` }}
+                  style={{
+                    width: `${Math.min(100, teamStats.paymentGoalPct)}%`,
+                  }}
                 />
               </div>
             </div>
@@ -916,7 +1153,9 @@ const EnhancedPerformanceChart: React.FC = () => {
                 <div className="h-1.5 bg-gray-100 dark:bg-dark-bg rounded-full overflow-hidden">
                   <div
                     className="h-full bg-blue-600 rounded-full transition-all duration-700"
-                    style={{ width: `${Math.min(100, teamStats.visitsGoalPct)}%` }}
+                    style={{
+                      width: `${Math.min(100, teamStats.visitsGoalPct)}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -955,59 +1194,61 @@ const EnhancedPerformanceChart: React.FC = () => {
         showStatusPills={false}
         showAgingPills={false}
       >
-      {/* Atalhos: Período (escopo de tempo) + Segmento de meta (lente de desempenho) */}
-      <div className="flex flex-wrap items-center gap-2">
-        {periodPresets.map((p) => (
+        {/* Atalhos: Período (escopo de tempo) + Segmento de meta (lente de desempenho) */}
+        <div className="flex flex-wrap items-center gap-2">
+          {periodPresets.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => applyPeriodPreset(p)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                activePreset === p.id
+                  ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                  : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+
+          <span className="w-px h-5 bg-gray-200 dark:bg-dark-border mx-1 hidden sm:block" />
+
           <button
-            key={p.id}
             type="button"
-            onClick={() => applyPeriodPreset(p)}
+            onClick={() =>
+              setGoalSegment((s) => (s === "below" ? null : "below"))
+            }
             className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-              activePreset === p.id
-                ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+              goalSegment === "below"
+                ? "bg-rose-600 border-rose-600 text-white shadow-sm"
                 : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
             }`}
           >
-            {p.label}
+            Abaixo da meta
           </button>
-        ))}
-
-        <span className="w-px h-5 bg-gray-200 dark:bg-dark-border mx-1 hidden sm:block" />
-
-        <button
-          type="button"
-          onClick={() =>
-            setGoalSegment((s) => (s === "below" ? null : "below"))
-          }
-          className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-            goalSegment === "below"
-              ? "bg-rose-600 border-rose-600 text-white shadow-sm"
-              : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
-          }`}
-        >
-          Abaixo da meta
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            setGoalSegment((s) => (s === "above" ? null : "above"))
-          }
-          className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-            goalSegment === "above"
-              ? "bg-green-600 border-green-600 text-white shadow-sm"
-              : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
-          }`}
-        >
-          Acima da meta
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() =>
+              setGoalSegment((s) => (s === "above" ? null : "above"))
+            }
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+              goalSegment === "above"
+                ? "bg-green-600 border-green-600 text-white shadow-sm"
+                : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+            }`}
+          >
+            Acima da meta
+          </button>
+        </div>
       </FilterBar>
 
       {/* Controles de lista: contagem + tipo de cobrador */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-1">
         <span className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
           {filteredAndSortedPerformance.length}{" "}
-          {filteredAndSortedPerformance.length === 1 ? "cobrador" : "cobradores"}
+          {filteredAndSortedPerformance.length === 1
+            ? "cobrador"
+            : "cobradores"}
         </span>
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary">
@@ -1050,8 +1291,13 @@ const EnhancedPerformanceChart: React.FC = () => {
           <div className="p-6 bg-gray-50 dark:bg-dark-bg rounded-full mb-4">
             <Users className="w-12 h-12 text-gray-300" />
           </div>
-          <h3 className="text-lg font-bold text-gray-800 dark:text-dark-text tracking-tight">Nenhum cobrador encontrado</h3>
-          <p className="text-sm text-gray-500 dark:text-dark-text-secondary mt-2 max-w-xs">Ajuste os filtros de período acima para visualizar o ranking de desempenho.</p>
+          <h3 className="text-lg font-bold text-gray-800 dark:text-dark-text tracking-tight">
+            Nenhum cobrador encontrado
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-dark-text-secondary mt-2 max-w-xs">
+            Ajuste os filtros de período acima para visualizar o ranking de
+            desempenho.
+          </p>
         </div>
       )}
 
@@ -1065,7 +1311,10 @@ const EnhancedPerformanceChart: React.FC = () => {
       />
       <MonthlyGoalEditModal
         isOpen={isGoalModalOpen}
-        onClose={() => { setIsGoalModalOpen(false); refreshData(); }}
+        onClose={() => {
+          setIsGoalModalOpen(false);
+          refreshData();
+        }}
         collector={selectedCollectorForGoals}
       />
     </div>

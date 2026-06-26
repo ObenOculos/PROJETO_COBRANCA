@@ -1,5 +1,12 @@
 import React, { useState, FormEvent, useEffect } from "react";
-import { DollarSign, Calendar, Save, Target, ChevronDown, Bell } from "lucide-react";
+import {
+  DollarSign,
+  Calendar,
+  Save,
+  Target,
+  ChevronDown,
+  Bell,
+} from "lucide-react";
 import { User } from "../../types";
 import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
@@ -33,7 +40,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
   const { scheduledVisits, salePayments } = useCollection();
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(["period", "goals"])
+    new Set(["period", "goals"]),
   );
   const [sendNotification, setSendNotification] = useState(false);
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
@@ -101,8 +108,12 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
   useEffect(() => {
     if (!collector || !isOpen) return;
 
-    const collectorVisits = scheduledVisits.filter((v) => v.collectorId === collector.id);
-    const collectorPayments = salePayments.filter((p) => p.collectorId === collector.id);
+    const collectorVisits = scheduledVisits.filter(
+      (v) => v.collectorId === collector.id,
+    );
+    const collectorPayments = salePayments.filter(
+      (p) => p.collectorId === collector.id,
+    );
 
     const buildWindow = (monthsBack: number) => {
       const keys: string[] = [];
@@ -166,7 +177,14 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
       setSuggestPayments3(null);
       setSuggestPayments6(null);
     }
-  }, [collector, scheduledVisits, salePayments, selectedMonth, selectedYear, isOpen]);
+  }, [
+    collector,
+    scheduledVisits,
+    salePayments,
+    selectedMonth,
+    selectedYear,
+    isOpen,
+  ]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -209,8 +227,18 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
   };
 
   const months = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
   ];
 
   const years = Array.from(
@@ -246,34 +274,46 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
             >
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-blue-500" />
-                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">Período</span>
+                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">
+                  Período
+                </span>
               </div>
-              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("period") ? "" : "-rotate-90"}`} />
+              <ChevronDown
+                className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("period") ? "" : "-rotate-90"}`}
+              />
             </button>
 
             {expandedSections.has("period") && (
               <div className="px-4 pb-4 grid grid-cols-2 gap-4 border-t border-gray-100 dark:border-dark-border bg-gray-50/30 dark:bg-dark-bg/30">
                 <div className="mt-4">
-                  <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">Mês</label>
+                  <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">
+                    Mês
+                  </label>
                   <select
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-200 dark:border-dark-border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg transition-all"
                   >
                     {months.map((month, index) => (
-                      <option key={index} value={index}>{month}</option>
+                      <option key={index} value={index}>
+                        {month}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div className="mt-4">
-                  <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">Ano</label>
+                  <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">
+                    Ano
+                  </label>
                   <select
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-200 dark:border-dark-border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg transition-all"
                   >
                     {years.map((year) => (
-                      <option key={year} value={year}>{year}</option>
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -290,16 +330,22 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
             >
               <div className="flex items-center gap-2">
                 <Target className="w-4 h-4 text-green-500" />
-                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">Objetivos</span>
+                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">
+                  Objetivos
+                </span>
               </div>
-              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("goals") ? "" : "-rotate-90"}`} />
+              <ChevronDown
+                className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("goals") ? "" : "-rotate-90"}`}
+              />
             </button>
 
             {expandedSections.has("goals") && (
               <div className="px-4 pb-4 space-y-4 border-t border-gray-100 dark:border-dark-border bg-gray-50/30 dark:bg-dark-bg/30">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">Meta de Visitas</label>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">
+                      Meta de Visitas
+                    </label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
@@ -312,18 +358,24 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">Meta de Pagamentos</label>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">
+                      Meta de Pagamentos
+                    </label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
                         type="number"
                         value={paymentsGoal}
-                        onChange={(e) => setPaymentsGoal(Number(e.target.value))}
+                        onChange={(e) =>
+                          setPaymentsGoal(Number(e.target.value))
+                        }
                         className="w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-dark-border rounded-lg text-sm font-bold text-green-600 focus:ring-2 focus:ring-green-500 dark:bg-dark-bg"
                         placeholder="0"
                       />
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1 font-medium">{formatCurrency(paymentsGoal)}</p>
+                    <p className="text-[10px] text-gray-400 mt-1 font-medium">
+                      {formatCurrency(paymentsGoal)}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -339,9 +391,13 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
             >
               <div className="flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-amber-500" />
-                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">Sugestões e Insights</span>
+                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">
+                  Sugestões e Insights
+                </span>
               </div>
-              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("insights") ? "" : "-rotate-90"}`} />
+              <ChevronDown
+                className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("insights") ? "" : "-rotate-90"}`}
+              />
             </button>
 
             {expandedSections.has("insights") && (
@@ -351,8 +407,12 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
                     <thead className="bg-gray-50 dark:bg-dark-bg text-gray-500">
                       <tr>
                         <th className="px-3 py-2 font-bold">Métrica</th>
-                        <th className="px-3 py-2 font-bold text-center">3 Meses</th>
-                        <th className="px-3 py-2 font-bold text-center">6 Meses</th>
+                        <th className="px-3 py-2 font-bold text-center">
+                          3 Meses
+                        </th>
+                        <th className="px-3 py-2 font-bold text-center">
+                          6 Meses
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-dark-border dark:text-dark-text">
@@ -382,19 +442,27 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
                         <td className="px-3 py-2 text-center">
                           <button
                             type="button"
-                            onClick={() => setPaymentsGoal(suggestPayments3 || 0)}
+                            onClick={() =>
+                              setPaymentsGoal(suggestPayments3 || 0)
+                            }
                             className="text-green-600 hover:bg-green-50 px-2 py-1 rounded transition-colors"
                           >
-                            {suggestPayments3 ? formatCurrency(suggestPayments3) : "—"}
+                            {suggestPayments3
+                              ? formatCurrency(suggestPayments3)
+                              : "—"}
                           </button>
                         </td>
                         <td className="px-3 py-2 text-center">
                           <button
                             type="button"
-                            onClick={() => setPaymentsGoal(suggestPayments6 || 0)}
+                            onClick={() =>
+                              setPaymentsGoal(suggestPayments6 || 0)
+                            }
                             className="text-green-600 hover:bg-green-50 px-2 py-1 rounded transition-colors"
                           >
-                            {suggestPayments6 ? formatCurrency(suggestPayments6) : "—"}
+                            {suggestPayments6
+                              ? formatCurrency(suggestPayments6)
+                              : "—"}
                           </button>
                         </td>
                       </tr>
@@ -405,8 +473,10 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      if (suggestVisits3) setVisitsGoal(Math.round(suggestVisits3 * 1.1));
-                      if (suggestPayments3) setPaymentsGoal(Math.round(suggestPayments3 * 1.1));
+                      if (suggestVisits3)
+                        setVisitsGoal(Math.round(suggestVisits3 * 1.1));
+                      if (suggestPayments3)
+                        setPaymentsGoal(Math.round(suggestPayments3 * 1.1));
                     }}
                     className="w-full py-2 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-lg text-xs font-bold tracking-wide hover:bg-blue-100 transition-colors"
                   >
@@ -426,9 +496,13 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
             >
               <div className="flex items-center gap-2">
                 <Bell className="w-4 h-4 text-gray-500" />
-                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">Configurações Extras</span>
+                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">
+                  Configurações Extras
+                </span>
               </div>
-              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("advanced") ? "" : "-rotate-90"}`} />
+              <ChevronDown
+                className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("advanced") ? "" : "-rotate-90"}`}
+              />
             </button>
 
             {expandedSections.has("advanced") && (
@@ -440,7 +514,9 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
                     onChange={(e) => setSendNotification(e.target.checked)}
                     className="rounded text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-xs font-medium text-gray-700 dark:text-dark-text">Notificar cobrador ao salvar</span>
+                  <span className="text-xs font-medium text-gray-700 dark:text-dark-text">
+                    Notificar cobrador ao salvar
+                  </span>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white dark:hover:bg-dark-bg rounded-lg transition-colors">
                   <input
@@ -449,7 +525,9 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
                     onChange={(e) => setSaveAsTemplate(e.target.checked)}
                     className="rounded text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-xs font-medium text-gray-700 dark:text-dark-text">Salvar como modelo reutilizável</span>
+                  <span className="text-xs font-medium text-gray-700 dark:text-dark-text">
+                    Salvar como modelo reutilizável
+                  </span>
                 </label>
               </div>
             )}
