@@ -17,6 +17,7 @@ import { ClientGroup, UserType } from "../../types";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import { isCancelado } from "../../types/status";
 import { useCollection } from "../../contexts/CollectionContext";
+import { useClientBirthDate } from "../../hooks/useClientBirthDate";
 import { useAuth } from "../../contexts/AuthContext";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 
@@ -225,6 +226,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [approvedToken, setApprovedToken] = useState("");
   const [processedApprovalToken, setProcessedApprovalToken] = useState("");
+  const birthDate = useClientBirthDate(clientGroup.document);
 
   // Monitorar aprovações e rejeições de token
   React.useEffect(() => {
@@ -725,6 +727,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       </span>
                       <span className="font-semibold text-gray-900 text-right">
                         {clientGroup.document || "-"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-600">
+                        Data de Nascimento:
+                      </span>
+                      <span className="font-semibold text-gray-900 text-right">
+                        {birthDate ? formatDate(birthDate) : "-"}
                       </span>
                     </div>
 

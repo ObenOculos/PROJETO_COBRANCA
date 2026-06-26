@@ -12,10 +12,12 @@ import {
   RefreshCcw,
   PlusCircle,
   Download,
+  User,
 } from "lucide-react"; // Importar ícones
 import AddTituloModal from "./AddTituloModal";
 import { Database } from "../../types/database.types";
 import { PRIMARY_SITUACAO } from "../../config/profiles";
+import { importClientesBirthDates } from "../../services/clientesImportService";
 
 type BancoDadosInsert = Database["public"]["Tables"]["BANCO_DADOS"]["Insert"];
 
@@ -37,6 +39,37 @@ interface InsertResult {
   duplicateRows?: FileData[];
   invalidRows?: FileData[];
 }
+
+// Rotulos do modal de resultados. O mesmo modal e reusado por diferentes
+// cargas (parcelas x clientes), entao as palavras variam por contexto.
+interface ResultLabels {
+  itemLabel: string; // identificador de cada item (ex.: "ID Parcela", "Documento")
+  successLabel: string; // card/secao de sucesso
+  unchangedLabel: string; // card/secao de inalterados/ignorados
+  errorLabel: string; // card/secao de falhas
+  successEmpty: string; // mensagem quando nao ha sucessos
+  unchangedEmpty: string; // mensagem quando nao ha inalterados
+}
+
+// Padrao: cargas de parcelas (Atualizar Status / Adicionar Novas Parcelas).
+const DEFAULT_RESULT_LABELS: ResultLabels = {
+  itemLabel: "ID Parcela",
+  successLabel: "Títulos Atualizados",
+  unchangedLabel: "Inalterados (ignorados)",
+  errorLabel: "Títulos com Falha",
+  successEmpty: "Nenhum título atualizado com sucesso.",
+  unchangedEmpty: "Nenhum registro inalterado.",
+};
+
+// Carga de Data de Nascimento (tabela clientes).
+const CLIENTES_RESULT_LABELS: ResultLabels = {
+  itemLabel: "Documento",
+  successLabel: "Clientes Atualizados",
+  unchangedLabel: "Não encontrados na base",
+  errorLabel: "Falhas",
+  successEmpty: "Nenhum cliente atualizado.",
+  unchangedEmpty: "Nenhum cliente fora da base.",
+};
 
 // Quantidade de itens renderizados por vez na Visão Analítica. Renderizar
 // milhares de <li> de uma vez trava a UI; mostramos em paginas incrementais.
@@ -68,7 +101,8 @@ const ResultList: React.FC<{
   items: UpdateResult[];
   emptyMessage: string;
   showError?: boolean;
-}> = ({ items, emptyMessage, showError = false }) => {
+  idLabel?: string;
+}> = ({ items, emptyMessage, showError = false, idLabel = "ID Parcela" }) => {
   const [visibleCount, setVisibleCount] = useState(RESULTS_PAGE_SIZE);
 
   // Reinicia a paginacao quando o conjunto de itens muda (novo upload).
@@ -107,7 +141,7 @@ const ResultList: React.FC<{
           {items.slice(0, visibleCount).map((result, index) => (
             <li key={index} className="py-2 px-2">
               <p className="text-sm font-medium text-gray-800">
-                ID Parcela: {result.id_parcela}
+                {idLabel}: {result.id_parcela}
               </p>
               {showError && result.error && (
                 <p className="text-sm text-red-600">Erro: {result.error}</p>
@@ -182,6 +216,7 @@ const DatabaseUpload: React.FC = () => {
   const { refreshData, users } = useCollection();
   const [statusFile, setStatusFile] = useState<File | null>(null);
   const [newParcelaFile, setNewParcelaFile] = useState<File | null>(null);
+  const [clientesFile, setClientesFile] = useState<File | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [uploadStatus, setUploadStatus] = useState<string>("");
   const [debugInfo, setDebugInfo] = useState<string>("");
@@ -199,6 +234,9 @@ const DatabaseUpload: React.FC = () => {
   );
   const [needsRefresh, setNeedsRefresh] = useState<boolean>(false);
   const [modalTitle, setModalTitle] = useState<string>("");
+  const [resultLabels, setResultLabels] = useState<ResultLabels>(
+    DEFAULT_RESULT_LABELS,
+  );
   const [showAddTituloModal, setShowAddTituloModal] = useState<boolean>(false);
 
   // Particiona os resultados uma unica vez por mudanca (em vez de filtrar a
@@ -291,6 +329,99 @@ const DatabaseUpload: React.FC = () => {
       "newParcelaFileInput",
     ) as HTMLInputElement;
     if (input) input.value = "";
+  };
+
+  const handleClientesFileChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    if (event.target.files) {
+      setClientesFile(event.target.files[0]);
+      setUploadStatus("");
+      setDebugInfo("");
+    }
+  };
+
+  const clearClientesFile = () => {
+    setClientesFile(null);
+    setUploadStatus("");
+    setDebugInfo("");
+    const input = document.getElementById(
+      "clientesFileInput",
+    ) as HTMLInputElement;
+    if (input) input.value = "";
+  };
+
+  // Importa a Data de Nascimento do relatorio de clientes. A regra de negocio
+  // (parsing, normalizacao, casamento por documento e update em lote) vive em
+  // clientesImportService; aqui cuidamos apenas da UI (progresso e resultado).
+  const handleUploadClientes = async () => {
+    if (!clientesFile) {
+      alert("Por favor, selecione o relatório de clientes (xlsx ou csv).");
+      return;
+    }
+
+    setLoading(true);
+    setShowProgressModal(true);
+    setProgressPercentage(0);
+    setProgressMessage("📤 Lendo planilha...");
+    setUploadStatus("");
+    setDebugInfo("");
+
+    try {
+      const { rows, totalValidos } = await importClientesBirthDates(
+        clientesFile,
+        (percentage, message) => {
+          setProgressPercentage(percentage);
+          setProgressMessage(message);
+        },
+      );
+
+      if (totalValidos === 0) {
+        setProgressMessage(
+          "ℹ️ Nenhuma linha com Documento e Data de Nascimento válidos.",
+        );
+        setUploadStatus(
+          "ℹ️ Nenhuma linha com Documento e Data de Nascimento válidos na planilha.",
+        );
+        return;
+      }
+
+      const results: UpdateResult[] = rows.map((r) => ({
+        id_parcela: r.documento,
+        status: r.status,
+        error: r.error,
+      }));
+
+      const successful = results.filter((r) => r.status === "success").length;
+      const naoEncontrados = results.filter(
+        (r) => r.status === "unchanged",
+      ).length;
+      const failed = results.filter((r) => r.status === "error").length;
+
+      setUploadStatus(
+        `Data de nascimento: ${successful} atualizada(s), ${naoEncontrados} não encontrado(s) na base, ${failed} falha(s).`,
+      );
+
+      // Abre o mesmo modal de resultados dos outros cards, com rotulos de
+      // clientes. Nao forca refresh: marca needsRefresh e atualiza ao fechar.
+      setResultLabels(CLIENTES_RESULT_LABELS);
+      setModalTitle("Resultado da Atualização de Data de Nascimento");
+      setUploadResults(results);
+      setActiveTab("sintetico");
+      if (successful > 0) {
+        setNeedsRefresh(true);
+      }
+      setShowResultsModal(true);
+    } catch (error) {
+      const errorMsg = (error as Error).message;
+      setUploadStatus(`❌ Erro: ${errorMsg}`);
+      setProgressMessage(`❌ Erro: ${errorMsg}`);
+      setProgressPercentage(0);
+      console.error("❌ Erro ao importar datas de nascimento:", error);
+    } finally {
+      setLoading(false);
+      setTimeout(() => setShowProgressModal(false), 2500);
+    }
   };
 
   const handleCloseResultsModal = async () => {
@@ -1246,6 +1377,7 @@ const DatabaseUpload: React.FC = () => {
       setProgressPercentage(100);
 
       // Armazenar resultados e preparar para abrir o modal
+      setResultLabels(DEFAULT_RESULT_LABELS);
       setModalTitle("Resultado da Atualização de Status");
       setUploadResults(results);
       setActiveTab("sintetico");
@@ -1330,6 +1462,7 @@ const DatabaseUpload: React.FC = () => {
         setProgressMessage("✅ Processo concluído!");
         setProgressPercentage(100);
 
+        setResultLabels(DEFAULT_RESULT_LABELS);
         setModalTitle("Resultado da Adição de Novas Parcelas");
         setUploadResults(resultsForModal);
         setActiveTab("sintetico");
@@ -1449,9 +1582,9 @@ const DatabaseUpload: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {/* Card: Atualizar Status de Parcelas */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transition-all hover:shadow-xl">
+        <div className="flex flex-col bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transition-all hover:shadow-xl">
           <div className="p-6">
             <div className="flex items-center gap-3">
               <div className="bg-blue-100 p-3 rounded-full">
@@ -1468,7 +1601,7 @@ const DatabaseUpload: React.FC = () => {
             </p>
           </div>
 
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-6 mt-auto">
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
               <div>
                 <label
@@ -1520,7 +1653,7 @@ const DatabaseUpload: React.FC = () => {
         </div>
 
         {/* Card: Adicionar Novas Parcelas */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transition-all hover:shadow-xl">
+        <div className="flex flex-col bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transition-all hover:shadow-xl">
           <div className="p-6">
             <div className="flex items-center gap-3">
               <div className="bg-green-100 p-3 rounded-full">
@@ -1536,7 +1669,7 @@ const DatabaseUpload: React.FC = () => {
             </p>
           </div>
 
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-6 mt-auto">
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
               <div>
                 <label
@@ -1582,6 +1715,82 @@ const DatabaseUpload: React.FC = () => {
                   <UploadCloud className="h-5 w-5 mr-2" />
                 )}
                 {loading ? "Processando..." : "Enviar e Adicionar"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Card: Atualizar Cadastro de Clientes (Data de Nascimento) */}
+        <div className="flex flex-col bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transition-all hover:shadow-xl">
+          <div className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="bg-purple-100 p-3 rounded-full">
+                <User className="h-6 w-6 text-purple-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">
+                Atualizar Data de Nascimento dos Clientes
+              </h3>
+            </div>
+            <p className="text-gray-500 mt-3 text-sm">
+              Envie o relatório de clientes (xlsx ou csv) com as colunas{" "}
+              <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
+                Documento
+              </code>{" "}
+              e{" "}
+              <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
+                Data de Nascimento
+              </code>
+              . A data é vinculada ao cliente pelo CPF/CNPJ. Apenas clientes já
+              existentes na base são atualizados.
+            </p>
+          </div>
+
+          <div className="px-6 pb-6 mt-auto">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
+              <div>
+                <label
+                  htmlFor="clientesFileInput"
+                  className="cursor-pointer block border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-500 transition-colors"
+                >
+                  <UploadCloud className="mx-auto h-10 w-10 text-gray-400" />
+                  <span className="mt-2 block text-sm font-semibold text-gray-700">
+                    {clientesFile
+                      ? clientesFile.name
+                      : "Clique para selecionar o arquivo"}
+                  </span>
+                  <span className="mt-1 block text-xs text-gray-500">
+                    Formato XLSX ou CSV, até 10MB
+                  </span>
+                  <input
+                    type="file"
+                    accept=".xlsx,.csv"
+                    onChange={handleClientesFileChange}
+                    disabled={loading}
+                    id="clientesFileInput"
+                    className="sr-only"
+                  />
+                </label>
+                {clientesFile && (
+                  <button
+                    onClick={clearClientesFile}
+                    className="mt-3 w-full text-sm text-red-600 hover:text-red-800 transition-colors font-semibold"
+                  >
+                    Remover arquivo
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={handleUploadClientes}
+                disabled={loading || !clientesFile}
+                className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {loading ? (
+                  <RefreshCcw className="h-5 w-5 mr-2 animate-spin" />
+                ) : (
+                  <UploadCloud className="h-5 w-5 mr-2" />
+                )}
+                {loading ? "Processando..." : "Enviar e Atualizar"}
               </button>
             </div>
           </div>
@@ -1632,7 +1841,7 @@ const DatabaseUpload: React.FC = () => {
                     <CheckCircle className="h-8 w-8 text-green-500" />
                     <div>
                       <p className="text-sm text-gray-600">
-                        Títulos Atualizados
+                        {resultLabels.successLabel}
                       </p>
                       <p className="text-2xl font-bold text-gray-900">
                         {successResults.length}
@@ -1643,7 +1852,7 @@ const DatabaseUpload: React.FC = () => {
                     <Info className="h-8 w-8 text-gray-500" />
                     <div>
                       <p className="text-sm text-gray-600">
-                        Inalterados (ignorados)
+                        {resultLabels.unchangedLabel}
                       </p>
                       <p className="text-2xl font-bold text-gray-900">
                         {unchangedResults.length}
@@ -1653,7 +1862,9 @@ const DatabaseUpload: React.FC = () => {
                   <div className="bg-red-50 p-4 rounded-lg flex items-center space-x-3">
                     <AlertCircle className="h-8 w-8 text-red-500" />
                     <div>
-                      <p className="text-sm text-gray-600">Títulos com Falha</p>
+                      <p className="text-sm text-gray-600">
+                        {resultLabels.errorLabel}
+                      </p>
                       <p className="text-2xl font-bold text-gray-900">
                         {errorResults.length}
                       </p>
@@ -1675,7 +1886,7 @@ const DatabaseUpload: React.FC = () => {
                   {/* Falhas */}
                   <div>
                     <h4 className="text-md font-semibold text-red-700 mb-2">
-                      Títulos com Falha ({errorResults.length})
+                      {resultLabels.errorLabel} ({errorResults.length})
                     </h4>
 
                     {/* Cards por tipo de erro (clicaveis para filtrar a lista) */}
@@ -1721,28 +1932,31 @@ const DatabaseUpload: React.FC = () => {
                       items={filteredErrors}
                       emptyMessage="Nenhuma falha registrada."
                       showError
+                      idLabel={resultLabels.itemLabel}
                     />
                   </div>
 
                   {/* Inalterados */}
                   <div>
                     <h4 className="text-md font-semibold text-gray-700 mb-2">
-                      Inalterados / ignorados ({unchangedResults.length})
+                      {resultLabels.unchangedLabel} ({unchangedResults.length})
                     </h4>
                     <ResultList
                       items={unchangedResults}
-                      emptyMessage="Nenhum registro inalterado."
+                      emptyMessage={resultLabels.unchangedEmpty}
+                      idLabel={resultLabels.itemLabel}
                     />
                   </div>
 
                   {/* Sucessos */}
                   <div>
                     <h4 className="text-md font-semibold text-green-700 mb-2">
-                      Títulos Atualizados com Sucesso ({successResults.length})
+                      {resultLabels.successLabel} ({successResults.length})
                     </h4>
                     <ResultList
                       items={successResults}
-                      emptyMessage="Nenhum título atualizado com sucesso."
+                      emptyMessage={resultLabels.successEmpty}
+                      idLabel={resultLabels.itemLabel}
                     />
                   </div>
                 </div>

@@ -391,18 +391,21 @@ export type Database = {
       clientes: {
         Row: {
           created_at: string | null;
+          data_nascimento: string | null;
           documento: string;
           id: number;
           nome: string;
         };
         Insert: {
           created_at?: string | null;
+          data_nascimento?: string | null;
           documento: string;
           id?: number;
           nome: string;
         };
         Update: {
           created_at?: string | null;
+          data_nascimento?: string | null;
           documento?: string;
           id?: number;
           nome?: string;

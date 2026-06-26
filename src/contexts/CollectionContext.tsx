@@ -2755,7 +2755,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           // Tentar com .in() primeiro
           const result = await supabase
             .from("clientes")
-            .select("documento, created_at")
+            .select("documento, created_at, data_nascimento")
             .in("documento", clientsToFetch);
 
           clientesData = result.data;
@@ -2770,7 +2770,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             // Fallback: usar OR com eq
             let query = supabase
               .from("clientes")
-              .select("documento, created_at");
+              .select("documento, created_at, data_nascimento");
 
             // Construir query com OR manualmente
             const orConditions = clientsToFetch
@@ -2905,6 +2905,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             overdueCount: overdueCount,
             addressUpdateDays,
             created_at: clienteInfo?.created_at,
+            data_nascimento: clienteInfo?.data_nascimento ?? null,
           };
 
           newEntries.set(doc, result);
@@ -3541,10 +3542,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         ? addressHistory.complemento || ""
         : clientGroup.complemento;
 
-      // Fetch created_at from clientes table
+      // Fetch created_at e data_nascimento from clientes table
       const { data: clienteData } = await supabase
         .from("clientes")
-        .select("created_at")
+        .select("created_at, data_nascimento")
         .eq("documento", clientDocument)
         .single();
 
@@ -3563,6 +3564,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         overdueCount: overdueCount,
         addressUpdateDays,
         created_at: clienteData?.created_at,
+        data_nascimento: clienteData?.data_nascimento ?? null,
       };
 
       // Cache the result

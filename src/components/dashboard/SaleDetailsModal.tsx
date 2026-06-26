@@ -19,6 +19,7 @@ import {
   getStatusLabel,
 } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
+import { useClientBirthDate } from "../../hooks/useClientBirthDate";
 
 interface SaleDetailsModalProps {
   collections: Collection[];
@@ -112,6 +113,8 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
         return dateB.getTime() - dateA.getTime(); // Mais recentes primeiro
       });
   }, [saleData, scheduledVisits]);
+
+  const birthDate = useClientBirthDate(saleData?.documento);
 
   const getCollectorName = (collectorId: string) => {
     const collector = users?.find((u) => u.id === collectorId);
@@ -339,6 +342,15 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                     {saleData.cliente}
                   </p>
                   <p className="text-sm text-gray-600">{saleData.documento}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">
+                    Data de Nascimento:
+                  </p>
+                  <p className="font-semibold text-gray-900">
+                    {birthDate ? formatDate(birthDate) : "-"}
+                  </p>
                 </div>
 
                 {saleData.apelido && (

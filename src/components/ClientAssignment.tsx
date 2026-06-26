@@ -240,12 +240,18 @@ export const ClientAssignment = React.memo(
     const [clientCreatedAtMap, setClientCreatedAtMap] = useState<
       Map<string, Date>
     >(new Map());
+    // Mapa documento -> data de nascimento (ISO), carregado junto do created_at
+    // na mesma varredura da tabela `clientes`. Usado na exportacao do Excel.
+    const [clientBirthDateMap, setClientBirthDateMap] = useState<
+      Map<string, string>
+    >(new Map());
 
     useEffect(() => {
       let cancelled = false;
 
-      const loadCreatedAt = async () => {
+      const loadClientesInfo = async () => {
         const map = new Map<string, Date>();
+        const birthMap = new Map<string, string>();
         const PAGE = 1000;
         let from = 0;
 
@@ -253,11 +259,11 @@ export const ClientAssignment = React.memo(
         while (!cancelled) {
           const { data, error } = await supabase
             .from("clientes")
-            .select("documento, created_at")
+            .select("documento, created_at, data_nascimento")
             .range(from, from + PAGE - 1);
 
           if (error) {
-            console.error("Erro ao carregar created_at dos clientes:", error);
+            console.error("Erro ao carregar dados dos clientes:", error);
             break;
           }
           if (!data || data.length === 0) break;
@@ -266,16 +272,22 @@ export const ClientAssignment = React.memo(
             if (row.documento && row.created_at) {
               map.set(row.documento, new Date(row.created_at));
             }
+            if (row.documento && row.data_nascimento) {
+              birthMap.set(row.documento, row.data_nascimento);
+            }
           }
 
           if (data.length < PAGE) break;
           from += PAGE;
         }
 
-        if (!cancelled) setClientCreatedAtMap(map);
+        if (!cancelled) {
+          setClientCreatedAtMap(map);
+          setClientBirthDateMap(birthMap);
+        }
       };
 
-      loadCreatedAt();
+      loadClientesInfo();
       return () => {
         cancelled = true;
       };
@@ -837,9 +849,12 @@ export const ClientAssignment = React.memo(
         const situacao = getSituacaoIndicator(client.collections);
         const firstCol = client.collections[0];
 
+        const birthDate = clientBirthDateMap.get(client.documento);
+
         return {
           Cliente: client.cliente ? client.cliente.toUpperCase() : "",
           Documento: client.documento || "",
+          "Data de Nascimento": birthDate ? formatDate(birthDate) : "",
           Apelido: client.apelido ? client.apelido.toUpperCase() : "",
           Telefone: getClientPhone(client.collections),
           CEP: firstCol?.cep || "",
@@ -862,6 +877,7 @@ export const ClientAssignment = React.memo(
       clientWS["!cols"] = [
         { wch: 35 }, // Cliente
         { wch: 18 }, // Documento
+        { wch: 18 }, // Data de Nascimento
         { wch: 20 }, // Apelido
         { wch: 16 }, // Telefone
         { wch: 12 }, // CEP

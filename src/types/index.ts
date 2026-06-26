@@ -392,6 +392,7 @@ export interface CollectionContextType {
     overdueCount: number;
     addressUpdateDays?: number;
     created_at?: string;
+    data_nascimento?: string | null;
   } | null>;
   rescheduleVisit: (
     visitId: string,
