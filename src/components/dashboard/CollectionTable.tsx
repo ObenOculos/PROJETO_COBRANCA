@@ -40,6 +40,7 @@ import {
   calculateOverdueDays,
 } from "../../utils/formatters";
 import { isCancelado } from "../../types/status";
+import { getClientPaymentStatus } from "../../filters/clientStatus";
 import { countVendas } from "../../filters/sales";
 import CollectionModal from "./CollectionModal";
 import ClientDetailModal from "./ClientDetailModal";
@@ -576,13 +577,9 @@ export const CollectionTable = React.forwardRef<
         const targetStatus = statusFilter.toLowerCase();
         filteredGroups = filteredGroups.filter((group) =>
           group.sales.some((sale) => {
-            // Optimize status computation - avoid re-computation
-            const status =
-              sale.totalReceived > 0 && sale.pendingValue > 0
-                ? "parcial"
-                : sale.pendingValue <= 0.01 && sale.totalReceived > 0
-                  ? "pago"
-                  : "pendente";
+            // Fonte unica de verdade (conta desconto como quitacao, igual ao
+            // resto do sistema) em vez de recomputar a regra inline aqui.
+            const status = getClientPaymentStatus(sale.installments);
             return status === targetStatus;
           }),
         );
