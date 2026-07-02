@@ -722,10 +722,8 @@ export const ClientAssignment = React.memo(
           case "loja": {
             const clientStores = Array.from(
               new Set(
-                client.collections
-                  .map((c) => c.nome_da_loja)
-                  .filter(Boolean)
-              )
+                client.collections.map((c) => c.nome_da_loja).filter(Boolean),
+              ),
             );
             return (clientStores.join(", ") || "").toLowerCase();
           }
@@ -864,10 +862,8 @@ export const ClientAssignment = React.memo(
         const firstCol = client.collections[0];
         const clientStores = Array.from(
           new Set(
-            client.collections
-              .map((c) => c.nome_da_loja)
-              .filter(Boolean)
-          )
+            client.collections.map((c) => c.nome_da_loja).filter(Boolean),
+          ),
         );
 
         const birthDate = clientBirthDateMap.get(client.documento);
@@ -1789,10 +1785,9 @@ export const ClientAssignment = React.memo(
                       new Set(
                         client.collections
                           .map((c) => c.nome_da_loja)
-                          .filter(Boolean)
-                      )
+                          .filter((s): s is string => Boolean(s)),
+                      ),
                     );
-                    const storeDisplay = clientStores.join(", ") || "—";
 
                     return (
                       <tr
@@ -1845,29 +1840,47 @@ export const ClientAssignment = React.memo(
                               </span>
                             )}
                           </div>
-                          
+
                           {/* Hover Actions */}
-                          <div 
+                          <div
                             className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-gradient-to-l from-white via-white pl-4 dark:from-dark-bg-secondary dark:via-dark-bg-secondary opacity-0 group-hover:opacity-100 transition-opacity duration-150"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <button
                               type="button"
-                              onClick={() => handleOpenClientModal(client.documento || "", client.cliente || "")}
+                              onClick={() =>
+                                handleOpenClientModal(
+                                  client.documento || "",
+                                  client.cliente || "",
+                                )
+                              }
                               title="Visualizar Detalhes"
                               className="p-1 rounded bg-gray-50 hover:bg-blue-50 text-gray-400 hover:text-blue-600 dark:bg-dark-bg dark:hover:bg-blue-900/30 dark:text-dark-text-secondary dark:hover:text-blue-400 border border-gray-200 dark:border-dark-border transition-colors"
                             >
                               <Eye className="h-3 w-3" />
                             </button>
                             {(() => {
-                              const phoneCol = client.collections.find(c => c.telefone || c.celular || c.celular1 || c.celular2);
-                              const phoneNumber = phoneCol ? (phoneCol.telefone || phoneCol.celular || phoneCol.celular1 || phoneCol.celular2) : "";
+                              const phoneCol = client.collections.find(
+                                (c) =>
+                                  c.telefone ||
+                                  c.celular ||
+                                  c.celular1 ||
+                                  c.celular2,
+                              );
+                              const phoneNumber = phoneCol
+                                ? phoneCol.telefone ||
+                                  phoneCol.celular ||
+                                  phoneCol.celular1 ||
+                                  phoneCol.celular2
+                                : "";
                               if (!phoneNumber) return null;
                               return (
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => navigator.clipboard.writeText(phoneNumber)}
+                                    onClick={() =>
+                                      navigator.clipboard.writeText(phoneNumber)
+                                    }
                                     title={`Copiar Telefone: ${phoneNumber}`}
                                     className="p-1 rounded bg-gray-50 hover:bg-blue-50 text-gray-400 hover:text-blue-600 dark:bg-dark-bg dark:hover:bg-blue-900/30 dark:text-dark-text-secondary dark:hover:text-blue-400 border border-gray-200 dark:border-dark-border transition-colors"
                                   >
@@ -1889,10 +1902,16 @@ export const ClientAssignment = React.memo(
                         </td>
                         <td className="px-2 py-3.5 text-center w-[8%] min-w-[96px]">
                           <div className="flex flex-col items-center gap-1">
-                            <span title="Vendas" className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-100/50 dark:border-indigo-900/30">
+                            <span
+                              title="Vendas"
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-100/50 dark:border-indigo-900/30"
+                            >
                               {countVendas(client.collections)} V
                             </span>
-                            <span title="Parcelas" className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border border-gray-150 dark:border-dark-border">
+                            <span
+                              title="Parcelas"
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border border-gray-150 dark:border-dark-border"
+                            >
                               {client.collections.length} P
                             </span>
                           </div>
@@ -1909,7 +1928,9 @@ export const ClientAssignment = React.memo(
                               </span>
                             ))}
                             {clientStores.length === 0 && (
-                              <span className="text-gray-450 dark:text-dark-text-secondary text-[10px]">—</span>
+                              <span className="text-gray-450 dark:text-dark-text-secondary text-[10px]">
+                                —
+                              </span>
                             )}
                           </div>
                         </td>
@@ -1946,13 +1967,20 @@ export const ClientAssignment = React.memo(
                         </td>
                         <td className="px-4 py-3.5 text-right w-[15%] min-w-[130px]">
                           <div className="flex flex-col gap-0.5">
-                            <span className={`text-xs font-bold tracking-tight ${
-                              pendingValue >= 2500 
-                                ? "text-red-700 dark:text-red-455 flex items-center justify-end gap-1" 
-                                : "text-red-600 dark:text-red-500"
-                            }`}>
+                            <span
+                              className={`text-xs font-bold tracking-tight ${
+                                pendingValue >= 2500
+                                  ? "text-red-700 dark:text-red-455 flex items-center justify-end gap-1"
+                                  : "text-red-600 dark:text-red-500"
+                              }`}
+                            >
                               {pendingValue >= 2500 && (
-                                <AlertCircle className="h-3.5 w-3.5 text-red-550 shrink-0" title="Valor Pendente Crítico (>= R$ 2.500)" />
+                                <span
+                                  className="inline-flex shrink-0"
+                                  title="Valor Pendente Crítico (>= R$ 2.500)"
+                                >
+                                  <AlertCircle className="h-3.5 w-3.5 text-red-550" />
+                                </span>
                               )}
                               {formatCurrency(pendingValue)}
                             </span>
@@ -1963,13 +1991,20 @@ export const ClientAssignment = React.memo(
                               Total: {formatCurrency(totalValue)}
                             </span>
                             {totalValue > 0 && (
-                              <div className="w-24 bg-gray-100 dark:bg-dark-bg/40 h-1 rounded-full overflow-hidden mt-1 ml-auto border border-gray-200/10" title={`Recebido: ${(((totalValue - pendingValue)/totalValue)*100).toFixed(0)}%`}>
+                              <div
+                                className="w-24 bg-gray-100 dark:bg-dark-bg/40 h-1 rounded-full overflow-hidden mt-1 ml-auto border border-gray-200/10"
+                                title={`Recebido: ${(((totalValue - pendingValue) / totalValue) * 100).toFixed(0)}%`}
+                              >
                                 {(() => {
-                                  const paidPercentage = ((totalValue - pendingValue) / totalValue) * 100;
+                                  const paidPercentage =
+                                    ((totalValue - pendingValue) / totalValue) *
+                                    100;
                                   return (
                                     <div
                                       className="bg-green-500 h-full rounded-full transition-all duration-300"
-                                      style={{ width: `${Math.min(100, Math.max(0, paidPercentage))}%` }}
+                                      style={{
+                                        width: `${Math.min(100, Math.max(0, paidPercentage))}%`,
+                                      }}
                                       title={`${paidPercentage.toFixed(0)}% recebido`}
                                     />
                                   );
@@ -2003,10 +2038,8 @@ export const ClientAssignment = React.memo(
               const isSelected = selectedClients.has(client.uniqueKey);
               const clientStores = Array.from(
                 new Set(
-                  client.collections
-                    .map((c) => c.nome_da_loja)
-                    .filter(Boolean)
-                )
+                  client.collections.map((c) => c.nome_da_loja).filter(Boolean),
+                ),
               );
               const storeDisplay = clientStores.join(", ") || "—";
 
@@ -2161,7 +2194,9 @@ export const ClientAssignment = React.memo(
                   Exibindo {startItem}–{endItem} de {filteredClients.length}
                 </span>
                 <div className="flex items-center gap-1.5 ml-1 sm:ml-2">
-                  <span className="text-[9px] text-gray-400 dark:text-dark-text-secondary font-semibold">Exibir:</span>
+                  <span className="text-[9px] text-gray-400 dark:text-dark-text-secondary font-semibold">
+                    Exibir:
+                  </span>
                   <select
                     value={itemsPerPage}
                     onChange={(e) => {
