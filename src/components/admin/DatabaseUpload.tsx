@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { supabase } from "../../lib/supabase";
 import { Modal } from "../Modal"; // Importar o componente Modal
@@ -212,6 +213,185 @@ const parseNullableNumber = (
   return Number.isNaN(parsedNumber) ? null : parsedNumber;
 };
 
+/**
+ * Converte um valor monetario para numero, tolerante a formatos comuns:
+ * - remove "R$", espacos e outros simbolos;
+ * - "1.234,56" (BR: ponto de milhar + virgula decimal) -> 1234.56;
+ * - "1234,56" (so virgula decimal) -> 1234.56;
+ * - "1234.56" (ponto decimal) -> 1234.56.
+ * Retorna null para vazio/invalido. Substitui o antigo Number(x.replace(",","."))
+ * que so trocava a PRIMEIRA virgula e quebrava com separador de milhar.
+ */
+const parseMoney = (value: string | undefined | null): number | null => {
+  if (value === undefined || value === null) return null;
+  let s = value.toString().trim();
+  if (s === "") return null;
+
+  // Mantem apenas digitos, virgula, ponto e sinal.
+  s = s.replace(/[^\d,.-]/g, "");
+  if (s === "" || s === "-") return null;
+
+  if (s.includes(",") && s.includes(".")) {
+    // Tem os dois: ponto e milhar, virgula e decimal (padrao BR).
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if (s.includes(",")) {
+    // So virgula: decimal BR.
+    s = s.replace(",", ".");
+  }
+  // So ponto (ou nenhum): ja esta no formato decimal.
+
+  const n = Number(s);
+  return Number.isNaN(n) ? null : n;
+};
+
+/**
+ * Normaliza uma data para ISO "YYYY-MM-DD", detectando o formato de origem:
+ * - "DD/MM/YYYY" (ou "DD/MM/YY") -> assume dia/mes/ano (padrao BR);
+ * - "YYYY-MM-DD..." (ISO, com ou sem hora) -> mantem a parte da data.
+ * Retorna null para vazio ou formato nao reconhecido (o chamador decide o
+ * fallback). Alinhado a logica que o calculateOverdueDays ja usa.
+ */
+const parseDateToISO = (value: string | undefined | null): string | null => {
+  if (value === undefined || value === null) return null;
+  const s = value.toString().trim();
+  if (s === "") return null;
+
+  // DD/MM/YYYY ou DD/MM/YY
+  if (s.includes("/")) {
+    const parts = s.split("/");
+    if (parts.length !== 3) return null;
+    const [d, m, y] = parts;
+    const day = d.padStart(2, "0");
+    const month = m.padStart(2, "0");
+    const year = y.length === 2 ? `20${y}` : y.padStart(4, "0");
+    const dayN = Number(day);
+    const monthN = Number(month);
+    if (dayN < 1 || dayN > 31 || monthN < 1 || monthN > 12) return null;
+    return `${year}-${month}-${day}`;
+  }
+
+  // ISO iniciando com YYYY-MM-DD (aceita "T..Z" ou " 00:00:00+00")
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  // Formato nao reconhecido: nao adivinhar (evita corromper).
+  return null;
+};
+
+// ---------------------------------------------------------------------------
+// Validacao pre-upload: barra arquivos incorretos ANTES de processar (falha
+// cedo e barato). Cobre: tamanho maximo, extensao/tipo e presenca das colunas
+// obrigatorias no cabecalho (detecta "arquivo errado no card errado").
+// ---------------------------------------------------------------------------
+
+// Limite de tamanho — guarda contra arquivos absurdos que travariam o browser
+// (o parse atual e em memoria/thread principal). Ajustavel; o streaming (item
+// #2 do roadmap) relaxa a pressao de memoria depois.
+const MAX_FILE_SIZE_MB = 50;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+// Colunas obrigatorias por tipo de carga (cargas de parcela sao casadas pelo
+// id_parcela; sem ele o arquivo quase certamente e de outro relatorio).
+const REQUIRED_COLUMNS_PARCELA = ["id_parcela"];
+
+type QuickValidation = { ok: boolean; error?: string };
+
+/** Checagens sincronas e baratas, feitas na SELECAO do arquivo. */
+const quickValidateCsv = (file: File): QuickValidation => {
+  const name = file.name.toLowerCase();
+  if (!name.endsWith(".csv")) {
+    return {
+      ok: false,
+      error: `Formato inválido: envie um arquivo .csv (recebido "${file.name}").`,
+    };
+  }
+  if (file.size === 0) {
+    return { ok: false, error: "O arquivo está vazio." };
+  }
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    const mb = (file.size / (1024 * 1024)).toFixed(1);
+    return {
+      ok: false,
+      error: `Arquivo muito grande (${mb}MB). O limite é ${MAX_FILE_SIZE_MB}MB.`,
+    };
+  }
+  return { ok: true };
+};
+
+/** Validacao do relatorio de clientes (aceita .csv, .xlsx, .xls). */
+const quickValidateClientes = (file: File): QuickValidation => {
+  const name = file.name.toLowerCase();
+  const allowed = [".csv", ".xlsx", ".xls"];
+  if (!allowed.some((ext) => name.endsWith(ext))) {
+    return {
+      ok: false,
+      error: `Formato inválido: envie .xlsx, .xls ou .csv (recebido "${file.name}").`,
+    };
+  }
+  if (file.size === 0) return { ok: false, error: "O arquivo está vazio." };
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    const mb = (file.size / (1024 * 1024)).toFixed(1);
+    return {
+      ok: false,
+      error: `Arquivo muito grande (${mb}MB). O limite é ${MAX_FILE_SIZE_MB}MB.`,
+    };
+  }
+  return { ok: true };
+};
+
+/** Detecta o separador a partir da primeira linha (mesma regra do parser). */
+const detectSeparator = (firstLine: string): string => {
+  if (firstLine.includes(";") && !firstLine.includes(",")) return ";";
+  if (firstLine.includes("\t")) return "\t";
+  return ",";
+};
+
+/** Le apenas o cabecalho (primeiros 64KB) sem carregar o arquivo inteiro. */
+const readCsvHeaders = async (file: File): Promise<string[]> => {
+  const slice = file.slice(0, 64 * 1024);
+  const text = await slice.text();
+  const nlIndex = text.search(/\r\n|\r|\n/);
+  const firstLine = nlIndex === -1 ? text : text.slice(0, nlIndex);
+  const separator = detectSeparator(firstLine);
+  return firstLine
+    .split(separator)
+    .map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
+};
+
+/** Validacao completa (assincrona): quick + presenca das colunas obrigatorias. */
+const validateCsvFile = async (
+  file: File,
+  requiredColumns: string[],
+): Promise<QuickValidation> => {
+  const quick = quickValidateCsv(file);
+  if (!quick.ok) return quick;
+
+  let headers: string[];
+  try {
+    headers = await readCsvHeaders(file);
+  } catch {
+    return { ok: false, error: "Não foi possível ler o cabeçalho do arquivo." };
+  }
+
+  if (headers.length === 0 || (headers.length === 1 && headers[0] === "")) {
+    return { ok: false, error: "O arquivo não tem cabeçalho reconhecível." };
+  }
+
+  const missing = requiredColumns.filter(
+    (col) => !headers.includes(col.toLowerCase()),
+  );
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      error: `O arquivo não contém a(s) coluna(s) obrigatória(s): ${missing.join(
+        ", ",
+      )}. Verifique se selecionou o relatório correto para este card.`,
+    };
+  }
+
+  return { ok: true };
+};
+
 const DatabaseUpload: React.FC = () => {
   const { refreshData, users } = useCollection();
   const [statusFile, setStatusFile] = useState<File | null>(null);
@@ -294,21 +474,35 @@ const DatabaseUpload: React.FC = () => {
   const handleStatusFileChange = (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    if (event.target.files) {
-      setStatusFile(event.target.files[0]);
-      setUploadStatus("");
-      setDebugInfo("");
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setDebugInfo("");
+    const v = quickValidateCsv(file);
+    if (!v.ok) {
+      setStatusFile(null);
+      event.target.value = "";
+      setUploadStatus(`❌ ${v.error}`);
+      return;
     }
+    setStatusFile(file);
+    setUploadStatus("");
   };
 
   const handleNewParcelaFileChange = (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    if (event.target.files) {
-      setNewParcelaFile(event.target.files[0]);
-      setUploadStatus("");
-      setDebugInfo("");
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setDebugInfo("");
+    const v = quickValidateCsv(file);
+    if (!v.ok) {
+      setNewParcelaFile(null);
+      event.target.value = "";
+      setUploadStatus(`❌ ${v.error}`);
+      return;
     }
+    setNewParcelaFile(file);
+    setUploadStatus("");
   };
 
   const clearStatusFile = () => {
@@ -334,11 +528,18 @@ const DatabaseUpload: React.FC = () => {
   const handleClientesFileChange = (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    if (event.target.files) {
-      setClientesFile(event.target.files[0]);
-      setUploadStatus("");
-      setDebugInfo("");
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setDebugInfo("");
+    const v = quickValidateClientes(file);
+    if (!v.ok) {
+      setClientesFile(null);
+      event.target.value = "";
+      setUploadStatus(`❌ ${v.error}`);
+      return;
     }
+    setClientesFile(file);
+    setUploadStatus("");
   };
 
   const clearClientesFile = () => {
@@ -356,7 +557,13 @@ const DatabaseUpload: React.FC = () => {
   // clientesImportService; aqui cuidamos apenas da UI (progresso e resultado).
   const handleUploadClientes = async () => {
     if (!clientesFile) {
-      alert("Por favor, selecione o relatório de clientes (xlsx ou csv).");
+      setUploadStatus("❌ Selecione o relatório de clientes (xlsx ou csv).");
+      return;
+    }
+
+    const validation = quickValidateClientes(clientesFile);
+    if (!validation.ok) {
+      setUploadStatus(`❌ ${validation.error}`);
       return;
     }
 
@@ -635,123 +842,50 @@ const DatabaseUpload: React.FC = () => {
     }
   };
 
-  // Função para processar arquivo CSV/Excel
-  const processFile = async (file: File): Promise<FileData[]> => {
+  // Processa CSV com PapaParse em STREAMING por chunks: o arquivo e lido e
+  // parseado em pedacos (nao vira uma unica string gigante em memoria) e o
+  // processamento cede a thread entre chunks, mantendo a UI responsiva mesmo
+  // com arquivos grandes. Parser robusto (aspas, \r\n, separador embutido) e
+  // progresso real por bytes lidos. As linhas sao acumuladas como objetos
+  // { header: valor } para o restante do fluxo.
+  // Obs.: worker:false de proposito -- o Web Worker do PapaParse e instavel sob
+  // bundlers (Vite/webpack). O streaming por chunks ja evita o congelamento.
+  const processFile = async (
+    file: File,
+    onProgress?: (percentage: number, message: string) => void,
+  ): Promise<FileData[]> => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+      const rows: FileData[] = [];
 
-      reader.onload = async (e: ProgressEvent<FileReader>) => {
-        try {
-          const text = e.target?.result as string;
-          if (!text || text.trim() === "") {
-            return reject(new Error("Arquivo CSV está vazio"));
+      Papa.parse<FileData>(file, {
+        worker: false,
+        header: true,
+        skipEmptyLines: "greedy",
+        transformHeader: (h) => h.trim(),
+        chunk: (results) => {
+          for (const row of results.data) rows.push(row);
+
+          if (onProgress && file.size > 0) {
+            const cursor = results.meta.cursor || 0;
+            const pct = Math.min(100, Math.round((cursor / file.size) * 100));
+            onProgress(pct, `Lendo arquivo... ${rows.length} linha(s)`);
           }
-
-          const isCSV = file.name.toLowerCase().endsWith(".csv");
-          if (!isCSV) {
-            return reject(
-              new Error("Formato Excel não implementado. Use CSV."),
-            );
-          }
-
-          console.log("📄 Processando CSV com parser robusto...");
-
-          // Detectar separador
-          const firstLine = text.substring(0, text.indexOf("\n"));
-          let separator = ",";
-          if (firstLine.includes(";") && !firstLine.includes(","))
-            separator = ";";
-          else if (firstLine.includes("\t")) separator = "\t";
-          console.log(`🔍 Separador detectado: "${separator}"`);
-
-          const rows = [];
-          let currentField = "";
-          let currentRow = [];
-          let inQuotedField = false;
-
-          for (let i = 0; i < text.length; i++) {
-            const char = text[i];
-
-            if (inQuotedField) {
-              if (char === '"') {
-                // Verifica se é uma aspa de escape (duas aspas)
-                if (i + 1 < text.length && text[i + 1] === '"') {
-                  currentField += '"';
-                  i++; // Pula a próxima aspa
-                } else {
-                  inQuotedField = false;
-                }
-              } else {
-                currentField += char;
-              }
-            } else {
-              if (char === '"') {
-                inQuotedField = true;
-              } else if (char === separator) {
-                currentRow.push(currentField);
-                currentField = "";
-              } else if (char === "\n" || char === "\r") {
-                // Fim da linha
-                if (text[i - 1] !== "\r" || char !== "\n") {
-                  // Lida com \r\n
-                  currentRow.push(currentField);
-                  rows.push(currentRow);
-                  currentRow = [];
-                  currentField = "";
-                }
-                if (char === "\r" && text[i + 1] === "\n") {
-                  i++; // Pula o \n
-                }
-              } else {
-                currentField += char;
-              }
-            }
-          }
-          // Adiciona o último campo e linha se houver
-          currentRow.push(currentField);
-          rows.push(currentRow);
-
-          if (rows.length < 2) {
-            return reject(
+        },
+        complete: () => {
+          if (rows.length === 0) {
+            reject(
               new Error(
-                "CSV não contém dados suficientes (cabeçalho + pelo menos uma linha).",
+                "CSV não contém dados (cabeçalho + pelo menos uma linha).",
               ),
             );
+            return;
           }
-
-          const headers = rows[0].map((h) => h.trim());
-          console.log("📋 Headers encontrados:", headers);
-
-          const data: FileData[] = [];
-          for (let i = 1; i < rows.length; i++) {
-            const values = rows[i];
-            // Ignora linhas em branco que podem ter sido adicionadas no final
-            if (values.length === 1 && values[0] === "") continue;
-
-            if (values.length >= headers.length) {
-              const row: FileData = {};
-              headers.forEach((header, index) => {
-                row[header] = values[index] || "";
-              });
-              data.push(row);
-            } else {
-              console.log(
-                `⚠️ Linha ${i + 1} ignorada (número de colunas incompatível com o cabeçalho):`,
-                values,
-              );
-            }
-          }
-
-          console.log(`✅ ${data.length} registros processados`);
-          resolve(data);
-        } catch (error) {
-          console.error("❌ Erro ao processar arquivo:", error);
-          reject(error);
-        }
-      };
-
-      reader.onerror = () => reject(new Error("Erro ao ler arquivo"));
-      reader.readAsText(file);
+          resolve(rows);
+        },
+        error: (err: Error) => {
+          reject(new Error(`Erro ao ler o arquivo: ${err.message}`));
+        },
+      });
     });
   };
 
@@ -789,7 +923,7 @@ const DatabaseUpload: React.FC = () => {
       const { data: chunkRecords, error: chunkError } = await supabase
         .from("BANCO_DADOS")
         .select(
-          "id_parcela, status, situacao, data_de_recebimento, valor_reajustado, multa, juros_por_dia, multa_aplicada, juros_aplicado, valor_recebido, desconto",
+          "id_parcela, status, situacao, data_de_recebimento, data_vencimento, valor_original, valor_reajustado, multa, juros_por_dia, multa_aplicada, juros_aplicado, valor_recebido, desconto",
         )
         .in("id_parcela", chunk.map(Number));
 
@@ -900,6 +1034,33 @@ const DatabaseUpload: React.FC = () => {
         }
       }
 
+      // valor_original: permite CORRIGIR titulos ja gravados. Comparacao
+      // numerica robusta (parseMoney trata "R$"/milhar/decimal BR). So altera
+      // se o arquivo trouxer um valor valido diferente do atual.
+      {
+        const raw = row.valor_original ?? row["valor_original"];
+        if (raw !== undefined && raw !== null && raw.toString().trim() !== "") {
+          const newVal = parseMoney(raw);
+          if (newVal !== null) {
+            const curVal = parseMoney(current?.valor_original);
+            if (newVal !== curVal) updateObj.valor_original = newVal;
+          }
+        }
+      }
+
+      // data_vencimento: normaliza para ISO e compara so a parte da data. So
+      // altera se o arquivo trouxer uma data reconhecida diferente da atual.
+      {
+        const raw = row.data_vencimento ?? row["data_vencimento"];
+        if (raw !== undefined && raw !== null && raw.toString().trim() !== "") {
+          const newIso = parseDateToISO(raw);
+          if (newIso) {
+            const curIso = parseDateToISO(current?.data_vencimento);
+            if (newIso !== curIso) updateObj.data_vencimento = newIso;
+          }
+        }
+      }
+
       const validatedSituacao = validateSituacao(situacao);
       if (situacao && validatedSituacao !== null) {
         if (validatedSituacao !== (current?.situacao ?? null)) {
@@ -942,53 +1103,94 @@ const DatabaseUpload: React.FC = () => {
       `🔄 ${rowsNeedingUpdate.length} registro(s) com alteracao real; ${unchangedCount} inalterado(s) (ignorados).`,
     );
 
-    // 6. Atualizar em lotes paralelos de 20 apenas o que realmente mudou.
-    const PARALLEL_SIZE = 20;
-    for (let i = 0; i < rowsNeedingUpdate.length; i += PARALLEL_SIZE) {
-      const batch = rowsNeedingUpdate.slice(i, i + PARALLEL_SIZE);
+    // 6. Atualizar em LOTE via upsert (ON CONFLICT DO UPDATE), no lugar de 1
+    // request por linha. Para nao sobrescrever colunas nao-alteradas, agrupamos
+    // as linhas por ASSINATURA (mesmo conjunto de colunas mudadas): dentro de
+    // cada grupo todas as linhas fornecem exatamente as mesmas colunas, entao o
+    // upsert em lote e seguro. Reduz de N requests para ~poucos por grupo.
+    const UPSERT_CHUNK = 500;
 
-      const batchResults = await Promise.allSettled(
-        batch.map(async ({ idParcela, updateObj }): Promise<UpdateResult> => {
-          const { error } = await supabase
+    const groups = new Map<string, { idParcela: string; updateObj: any }[]>();
+    for (const item of rowsNeedingUpdate) {
+      const signature = Object.keys(item.updateObj).sort().join(",");
+      const g = groups.get(signature);
+      if (g) g.push(item);
+      else groups.set(signature, [item]);
+    }
+
+    const total = rowsNeedingUpdate.length;
+    let processed = 0;
+
+    // Fallback: se um lote falhar (ex.: uma unica linha com valor recusado pelo
+    // banco), reprocessa o lote linha a linha para isolar a(s) linha(s) ruim(s)
+    // sem descartar as demais.
+    const updateRowByRow = async (
+      chunk: { idParcela: string; updateObj: any }[],
+    ) => {
+      const settled = await Promise.allSettled(
+        chunk.map(async ({ idParcela, updateObj }) => {
+          const { error: rowErr } = await supabase
             .from("BANCO_DADOS")
             .update(updateObj)
             .eq("id_parcela", Number(idParcela));
-
-          if (error) {
-            return {
-              id_parcela: idParcela,
-              status: "error",
-              error: error.message,
-            };
-          }
-          return { id_parcela: idParcela, status: "success" };
+          if (rowErr) throw new Error(rowErr.message);
+          return idParcela;
         }),
       );
-
-      batchResults.forEach((result) => {
-        if (result.status === "fulfilled") {
-          updates.push(result.value);
+      settled.forEach((r, idx) => {
+        const { idParcela } = chunk[idx];
+        if (r.status === "fulfilled") {
+          updates.push({ id_parcela: idParcela, status: "success" });
         } else {
           updates.push({
-            id_parcela: "?",
+            id_parcela: idParcela,
             status: "error",
-            error: String(result.reason),
+            error: String(
+              (r.reason as Error)?.message ?? r.reason ?? "Erro desconhecido",
+            ),
           });
         }
       });
+    };
 
-      if (onProgress) {
-        const processed = Math.min(i + PARALLEL_SIZE, rowsNeedingUpdate.length);
-        const percentage =
-          30 + Math.round((processed / rowsNeedingUpdate.length) * 70);
-        onProgress(
-          percentage,
-          `Atualizando ${processed} de ${rowsNeedingUpdate.length} registros...`,
-        );
+    for (const group of groups.values()) {
+      for (let i = 0; i < group.length; i += UPSERT_CHUNK) {
+        const chunk = group.slice(i, i + UPSERT_CHUNK);
+        // Payload homogeneo: mesmas colunas alteradas + a PK para casar o
+        // ON CONFLICT (id_parcela). Todas as linhas ja existem (dataToUpdate
+        // so contem ids presentes no banco), entao nunca ha INSERT real.
+        const payload = chunk.map(({ idParcela, updateObj }) => ({
+          ...updateObj,
+          id_parcela: Number(idParcela),
+        }));
+
+        const { error } = await supabase
+          .from("BANCO_DADOS")
+          .upsert(payload as BancoDadosInsert[], { onConflict: "id_parcela" });
+
+        if (error) {
+          console.warn(
+            `⚠️ Lote de ${chunk.length} falhou (${error.message}); tentando linha a linha...`,
+          );
+          await updateRowByRow(chunk);
+        } else {
+          chunk.forEach(({ idParcela }) =>
+            updates.push({ id_parcela: idParcela, status: "success" }),
+          );
+        }
+
+        processed += chunk.length;
+        if (onProgress && total > 0) {
+          const percentage = 30 + Math.round((processed / total) * 70);
+          onProgress(
+            percentage,
+            `Atualizando ${processed} de ${total} registros...`,
+          );
+        }
       }
     }
 
-    if (rowsNeedingUpdate.length === 0 && onProgress) {
+    if (total === 0 && onProgress) {
       onProgress(100, "Nenhum registro precisou ser atualizado.");
     }
 
@@ -1120,39 +1322,29 @@ const DatabaseUpload: React.FC = () => {
         newRow.parcela = newRow.parcela ? Number(newRow.parcela) : null;
         newRow.id_parcela = Number(row.id_parcela);
         newRow.venda_n = newRow.venda_n ? Number(newRow.venda_n) : null;
-        newRow.valor_original = newRow.valor_original
-          ? Number(newRow.valor_original.replace(",", "."))
-          : null;
-        newRow.valor_reajustado = newRow.valor_reajustado
-          ? Number(newRow.valor_reajustado.replace(",", "."))
-          : null;
-        newRow.multa = newRow.multa
-          ? Number(newRow.multa.replace(",", "."))
-          : null;
-        newRow.juros_por_dia = newRow.juros_por_dia
-          ? Number(newRow.juros_por_dia.replace(",", "."))
-          : null;
-        newRow.multa_aplicada = newRow.multa_aplicada
-          ? Number(newRow.multa_aplicada.replace(",", "."))
-          : null;
-        newRow.juros_aplicado = newRow.juros_aplicado
-          ? Number(newRow.juros_aplicado.replace(",", "."))
-          : null;
-        newRow.valor_recebido = newRow.valor_recebido
-          ? Number(newRow.valor_recebido.replace(",", "."))
-          : null;
-        newRow.desconto = newRow.desconto
-          ? Number(newRow.desconto.replace(",", "."))
-          : null;
-        newRow.acrescimo = newRow.acrescimo
-          ? Number(newRow.acrescimo.replace(",", "."))
-          : null;
-        newRow.multa_paga = newRow.multa_paga
-          ? Number(newRow.multa_paga.replace(",", "."))
-          : null;
-        newRow.juros_pago = newRow.juros_pago
-          ? Number(newRow.juros_pago.replace(",", "."))
-          : null;
+        // Valores: parser robusto (trata "R$", milhar e decimal BR).
+        newRow.valor_original = parseMoney(newRow.valor_original);
+        newRow.valor_reajustado = parseMoney(newRow.valor_reajustado);
+        newRow.multa = parseMoney(newRow.multa);
+        newRow.juros_por_dia = parseMoney(newRow.juros_por_dia);
+        newRow.multa_aplicada = parseMoney(newRow.multa_aplicada);
+        newRow.juros_aplicado = parseMoney(newRow.juros_aplicado);
+        newRow.valor_recebido = parseMoney(newRow.valor_recebido);
+        newRow.desconto = parseMoney(newRow.desconto);
+        newRow.acrescimo = parseMoney(newRow.acrescimo);
+        newRow.multa_paga = parseMoney(newRow.multa_paga);
+        newRow.juros_pago = parseMoney(newRow.juros_pago);
+        // Datas: normaliza para ISO "YYYY-MM-DD". Vazio -> null; formato nao
+        // reconhecido -> mantem o original (nao piora o comportamento atual).
+        const normDate = (v: string | undefined | null): string | null => {
+          const iso = parseDateToISO(v);
+          if (iso) return iso;
+          const t = (v ?? "").toString().trim();
+          return t === "" ? null : t;
+        };
+        newRow.data_vencimento = normDate(newRow.data_vencimento);
+        newRow.data_lancamento = normDate(newRow.data_lancamento);
+        newRow.data_de_recebimento = normDate(newRow.data_de_recebimento);
         if (newRow.user_id === "") newRow.user_id = null;
         if (newRow.situacao !== undefined) {
           newRow.situacao = validateSituacao(newRow.situacao);
@@ -1176,19 +1368,35 @@ const DatabaseUpload: React.FC = () => {
         return newRow;
       });
 
-      // upsert com ignoreDuplicates: rede de seguranca -- se algum id_parcela
-      // duplicado escapar da verificacao acima, o banco ignora a linha
-      // (ON CONFLICT DO NOTHING) em vez de abortar a importacao inteira.
-      const { error } = await supabase
-        .from("BANCO_DADOS")
-        .upsert(processedChunk as BancoDadosInsert[], {
-          onConflict: "id_parcela",
-          ignoreDuplicates: true,
-        });
+      // Insert em LOTES de 500 (em vez de um unico request gigante que poderia
+      // estourar limite de payload/timeout em arquivos grandes). ignoreDuplicates:
+      // rede de seguranca -- se algum id_parcela duplicado escapar da verificacao
+      // acima, o banco ignora a linha (ON CONFLICT DO NOTHING) em vez de abortar.
+      const INSERT_CHUNK = 500;
+      for (let i = 0; i < processedChunk.length; i += INSERT_CHUNK) {
+        const slice = processedChunk.slice(i, i + INSERT_CHUNK);
+        const { error } = await supabase
+          .from("BANCO_DADOS")
+          .upsert(slice as BancoDadosInsert[], {
+            onConflict: "id_parcela",
+            ignoreDuplicates: true,
+          });
 
-      if (error) {
-        console.error("❌ Erro ao inserir dados:", error);
-        return { success: false, error: error.message };
+        if (error) {
+          console.error("❌ Erro ao inserir dados:", error);
+          // Lotes anteriores ja gravados permanecem; reenviar e seguro (a
+          // verificacao de duplicatas ignora os ja inseridos).
+          return { success: false, error: error.message };
+        }
+
+        if (onProgress) {
+          const done = Math.min(i + INSERT_CHUNK, processedChunk.length);
+          const pct = 50 + Math.round((done / processedChunk.length) * 50);
+          onProgress(
+            pct,
+            `Inserindo ${done} de ${processedChunk.length} parcelas...`,
+          );
+        }
       }
 
       if (onProgress) onProgress(100, "Inserção concluída.");
@@ -1330,7 +1538,17 @@ const DatabaseUpload: React.FC = () => {
 
   const handleUploadStatus = async () => {
     if (!statusFile) {
-      alert("Por favor, selecione um arquivo para atualizar o status.");
+      setUploadStatus("❌ Selecione um arquivo para atualizar o status.");
+      return;
+    }
+
+    // Valida estrutura (tamanho, tipo e cabecalho) antes de qualquer processamento.
+    const validation = await validateCsvFile(
+      statusFile,
+      REQUIRED_COLUMNS_PARCELA,
+    );
+    if (!validation.ok) {
+      setUploadStatus(`❌ ${validation.error}`);
       return;
     }
 
@@ -1350,9 +1568,11 @@ const DatabaseUpload: React.FC = () => {
         return;
       }
 
-      setProgressMessage("📤 Processando arquivo...");
-      setProgressPercentage(20);
-      const data = await processFile(statusFile);
+      setProgressMessage("📤 Lendo arquivo...");
+      const data = await processFile(statusFile, (pct, msg) => {
+        setProgressPercentage(Math.round(pct * 0.4)); // parse ocupa 0-40%
+        setProgressMessage(msg);
+      });
       setProgressMessage(
         `📋 ${data.length} registros encontrados. Atualizando no Supabase...`,
       );
@@ -1404,7 +1624,17 @@ const DatabaseUpload: React.FC = () => {
 
   const handleUploadNewParcela = async () => {
     if (!newParcelaFile) {
-      alert("Por favor, selecione um arquivo para adicionar novas parcelas.");
+      setUploadStatus("❌ Selecione um arquivo para adicionar novas parcelas.");
+      return;
+    }
+
+    // Valida estrutura (tamanho, tipo e cabecalho) antes de qualquer processamento.
+    const validation = await validateCsvFile(
+      newParcelaFile,
+      REQUIRED_COLUMNS_PARCELA,
+    );
+    if (!validation.ok) {
+      setUploadStatus(`❌ ${validation.error}`);
       return;
     }
 
@@ -1416,8 +1646,11 @@ const DatabaseUpload: React.FC = () => {
     setDebugInfo("");
 
     try {
-      setProgressMessage("📤 Processando arquivo...");
-      const data = await processFile(newParcelaFile);
+      setProgressMessage("📤 Lendo arquivo...");
+      const data = await processFile(newParcelaFile, (pct, msg) => {
+        setProgressPercentage(Math.round(pct * 0.2)); // parse ocupa 0-20%
+        setProgressMessage(msg);
+      });
       setProgressPercentage(20);
       setProgressMessage(`Processando ${data.length} linhas...`);
 
@@ -1615,7 +1848,7 @@ const DatabaseUpload: React.FC = () => {
                       : "Clique para selecionar o arquivo"}
                   </span>
                   <span className="mt-1 block text-xs text-gray-500">
-                    Formato CSV, até 10MB
+                    Formato CSV, até 50MB
                   </span>
                   <input
                     type="file"
@@ -1683,7 +1916,7 @@ const DatabaseUpload: React.FC = () => {
                       : "Clique para selecionar o arquivo"}
                   </span>
                   <span className="mt-1 block text-xs text-gray-500">
-                    Formato CSV, até 10MB
+                    Formato CSV, até 50MB
                   </span>
                   <input
                     type="file"
@@ -1759,7 +1992,7 @@ const DatabaseUpload: React.FC = () => {
                       : "Clique para selecionar o arquivo"}
                   </span>
                   <span className="mt-1 block text-xs text-gray-500">
-                    Formato XLSX ou CSV, até 10MB
+                    Formato XLSX ou CSV, até 50MB
                   </span>
                   <input
                     type="file"
