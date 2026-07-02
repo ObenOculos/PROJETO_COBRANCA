@@ -17,6 +17,9 @@ import {
   Globe,
   FileText,
   FileSpreadsheet,
+  Eye,
+  Copy,
+  Phone,
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
 import { supabase } from "../lib/supabase";
@@ -64,6 +67,7 @@ type SortField =
   | "cliente"
   | "vendas"
   | "parcelas"
+  | "loja"
   | "cidade"
   | "pendente"
   | "cobrador";
@@ -327,7 +331,7 @@ export const ClientAssignment = React.memo(
 
     // Paginação
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     // Ordenação simples da Lista de Clientes: cada coluna ordena de forma
     // independente. Clicar numa coluna ordena por ela (asc); clicar de novo inverte.
@@ -715,6 +719,16 @@ export const ClientAssignment = React.memo(
             return countVendas(client.collections);
           case "parcelas":
             return client.collections.length;
+          case "loja": {
+            const clientStores = Array.from(
+              new Set(
+                client.collections
+                  .map((c) => c.nome_da_loja)
+                  .filter(Boolean)
+              )
+            );
+            return (clientStores.join(", ") || "").toLowerCase();
+          }
           case "pendente":
             return getClientPending(client.collections);
           default:
@@ -848,6 +862,13 @@ export const ClientAssignment = React.memo(
         const pendingValue = getClientPending(client.collections);
         const situacao = getSituacaoIndicator(client.collections);
         const firstCol = client.collections[0];
+        const clientStores = Array.from(
+          new Set(
+            client.collections
+              .map((c) => c.nome_da_loja)
+              .filter(Boolean)
+          )
+        );
 
         const birthDate = clientBirthDateMap.get(client.documento);
 
@@ -862,6 +883,7 @@ export const ClientAssignment = React.memo(
           Estado: toUF(firstCol?.estado),
           Bairro: client.bairro || "",
           Cobrador: client.collectorName || "Sem Cobrador",
+          Loja: clientStores.join(", ") || "—",
           "Qtd Vendas": countVendas(client.collections),
           "Qtd Parcelas": client.collections.length,
           "Total Original (R$)": totalValue,
@@ -885,6 +907,7 @@ export const ClientAssignment = React.memo(
         { wch: 8 }, // Estado
         { wch: 18 }, // Bairro
         { wch: 25 }, // Cobrador
+        { wch: 18 }, // Loja
         { wch: 12 }, // Qtd Vendas
         { wch: 12 }, // Qtd Parcelas
         { wch: 20 }, // Total Original
@@ -1687,7 +1710,7 @@ export const ClientAssignment = React.memo(
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50 dark:bg-dark-bg border-b border-gray-100 dark:border-dark-border">
-                    <th className="px-6 py-4 w-10">
+                    <th className="px-4 py-4 w-10">
                       <input
                         type="checkbox"
                         name="selectAllClients"
@@ -1703,37 +1726,48 @@ export const ClientAssignment = React.memo(
                     </th>
                     <th
                       onClick={() => handleSort("cliente")}
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors"
+                      className="px-3 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors w-[30%] min-w-[240px]"
                     >
                       Cliente / Documento{sortIndicator("cliente")}
                     </th>
-                    <th
-                      onClick={() => handleSort("vendas")}
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-center cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors"
-                    >
-                      Vendas{sortIndicator("vendas")}
+                    <th className="px-2 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-center select-none w-[8%] min-w-[96px]">
+                      <div className="flex items-center justify-center gap-1">
+                        <span
+                          onClick={() => handleSort("vendas")}
+                          className="cursor-pointer hover:text-gray-700 dark:hover:text-dark-text transition-colors"
+                        >
+                          Vnd{sortIndicator("vendas")}
+                        </span>
+                        <span className="text-gray-300">/</span>
+                        <span
+                          onClick={() => handleSort("parcelas")}
+                          className="cursor-pointer hover:text-gray-700 dark:hover:text-dark-text transition-colors"
+                        >
+                          Parc{sortIndicator("parcelas")}
+                        </span>
+                      </div>
                     </th>
                     <th
-                      onClick={() => handleSort("parcelas")}
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-center cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors"
+                      onClick={() => handleSort("loja")}
+                      className="px-3 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-left cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors w-[15%] min-w-[150px]"
                     >
-                      Parcelas{sortIndicator("parcelas")}
+                      Loja{sortIndicator("loja")}
                     </th>
                     <th
                       onClick={() => handleSort("cobrador")}
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors"
+                      className="px-3 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors w-[18%] min-w-[160px]"
                     >
                       Status / Cobrador{sortIndicator("cobrador")}
                     </th>
                     <th
                       onClick={() => handleSort("cidade")}
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors"
+                      className="px-3 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors w-[14%] min-w-[120px]"
                     >
                       Localização{sortIndicator("cidade")}
                     </th>
                     <th
                       onClick={() => handleSort("pendente")}
-                      className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-right cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors"
+                      className="px-4 py-4 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary tracking-wide text-right cursor-pointer select-none hover:text-gray-700 dark:hover:text-dark-text transition-colors w-[15%] min-w-[130px]"
                     >
                       Valores{sortIndicator("pendente")}
                     </th>
@@ -1745,8 +1779,20 @@ export const ClientAssignment = React.memo(
                       (sum, c) => sum + c.valor_original,
                       0,
                     );
+                    const receivedValue = client.collections.reduce(
+                      (sum, c) => sum + (c.valor_recebido || 0),
+                      0,
+                    );
                     const pendingValue = getClientPending(client.collections);
                     const situacao = getSituacaoIndicator(client.collections);
+                    const clientStores = Array.from(
+                      new Set(
+                        client.collections
+                          .map((c) => c.nome_da_loja)
+                          .filter(Boolean)
+                      )
+                    );
+                    const storeDisplay = clientStores.join(", ") || "—";
 
                     return (
                       <tr
@@ -1759,7 +1805,7 @@ export const ClientAssignment = React.memo(
                         onClick={() => handleSelectClient(client.uniqueKey)}
                       >
                         <td
-                          className="px-6 py-4"
+                          className="px-4 py-3.5"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <input
@@ -1772,7 +1818,7 @@ export const ClientAssignment = React.memo(
                             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded bg-white dark:bg-dark-bg"
                           />
                         </td>
-                        <td className="px-6 py-3.5">
+                        <td className="px-3 py-3.5 w-[30%] min-w-[240px] relative">
                           <div className="flex flex-col">
                             <button
                               type="button"
@@ -1783,10 +1829,12 @@ export const ClientAssignment = React.memo(
                                   client.cliente || "",
                                 );
                               }}
-                              title={`Ver cobranças de ${client.cliente}`}
-                              className="text-left text-sm font-semibold text-gray-900 dark:text-dark-text truncate max-w-[250px] hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
+                              title={client.cliente || ""}
+                              className="text-left text-sm font-semibold text-gray-900 dark:text-dark-text hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors truncate w-full"
                             >
-                              {client.cliente}
+                              {client.cliente && client.cliente.length > 40
+                                ? `${client.cliente.slice(0, 40)}...`
+                                : client.cliente}
                             </button>
                             <span className="text-[10px] font-medium text-gray-450 tracking-tight mt-0.5">
                               {client.documento}
@@ -1797,18 +1845,75 @@ export const ClientAssignment = React.memo(
                               </span>
                             )}
                           </div>
+                          
+                          {/* Hover Actions */}
+                          <div 
+                            className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-gradient-to-l from-white via-white pl-4 dark:from-dark-bg-secondary dark:via-dark-bg-secondary opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleOpenClientModal(client.documento || "", client.cliente || "")}
+                              title="Visualizar Detalhes"
+                              className="p-1 rounded bg-gray-50 hover:bg-blue-50 text-gray-400 hover:text-blue-600 dark:bg-dark-bg dark:hover:bg-blue-900/30 dark:text-dark-text-secondary dark:hover:text-blue-400 border border-gray-200 dark:border-dark-border transition-colors"
+                            >
+                              <Eye className="h-3 w-3" />
+                            </button>
+                            {(() => {
+                              const phoneCol = client.collections.find(c => c.telefone || c.celular || c.celular1 || c.celular2);
+                              const phoneNumber = phoneCol ? (phoneCol.telefone || phoneCol.celular || phoneCol.celular1 || phoneCol.celular2) : "";
+                              if (!phoneNumber) return null;
+                              return (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => navigator.clipboard.writeText(phoneNumber)}
+                                    title={`Copiar Telefone: ${phoneNumber}`}
+                                    className="p-1 rounded bg-gray-50 hover:bg-blue-50 text-gray-400 hover:text-blue-600 dark:bg-dark-bg dark:hover:bg-blue-900/30 dark:text-dark-text-secondary dark:hover:text-blue-400 border border-gray-200 dark:border-dark-border transition-colors"
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </button>
+                                  <a
+                                    href={`https://wa.me/55${phoneNumber.replace(/\D/g, "")}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Conversar no WhatsApp"
+                                    className="p-1 rounded bg-gray-50 hover:bg-green-50 text-gray-400 hover:text-green-600 dark:bg-dark-bg dark:hover:bg-green-900/30 dark:text-dark-text-secondary dark:hover:text-green-400 border border-gray-200 dark:border-dark-border transition-colors"
+                                  >
+                                    <Phone className="h-3 w-3" />
+                                  </a>
+                                </>
+                              );
+                            })()}
+                          </div>
                         </td>
-                        <td className="px-6 py-3.5 text-center">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-100/50 dark:border-indigo-900/30">
-                            {countVendas(client.collections)}
-                          </span>
+                        <td className="px-2 py-3.5 text-center w-[8%] min-w-[96px]">
+                          <div className="flex flex-col items-center gap-1">
+                            <span title="Vendas" className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border border-indigo-100/50 dark:border-indigo-900/30">
+                              {countVendas(client.collections)} V
+                            </span>
+                            <span title="Parcelas" className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border border-gray-150 dark:border-dark-border">
+                              {client.collections.length} P
+                            </span>
+                          </div>
                         </td>
-                        <td className="px-6 py-3.5 text-center">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border border-gray-150 dark:border-dark-border">
-                            {client.collections.length}
-                          </span>
+                        <td className="px-3 py-3.5 w-[15%] min-w-[150px]">
+                          <div className="flex flex-wrap gap-1 w-full">
+                            {clientStores.map((store, i) => (
+                              <span
+                                key={i}
+                                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100/30 truncate max-w-[140px]"
+                                title={store}
+                              >
+                                {store}
+                              </span>
+                            ))}
+                            {clientStores.length === 0 && (
+                              <span className="text-gray-450 dark:text-dark-text-secondary text-[10px]">—</span>
+                            )}
+                          </div>
                         </td>
-                        <td className="px-6 py-3.5">
+                        <td className="px-3 py-3.5 w-[18%] min-w-[160px]">
                           <div className="flex flex-col gap-1.5">
                             {client.collectorName ? (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-450 border border-green-100/50 dark:border-green-900/30 tracking-wide w-fit">
@@ -1829,24 +1934,48 @@ export const ClientAssignment = React.memo(
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-3.5">
-                          <div className="flex items-center text-[11px] font-medium text-gray-500 dark:text-dark-text-secondary">
-                            <MapPin className="h-3.5 w-3.5 mr-1.5 text-gray-400 shrink-0" />
-                            <span className="truncate max-w-[180px]">
+                        <td className="px-3 py-3.5 w-[14%] min-w-[120px]">
+                          <div className="flex items-start text-[11px] font-medium text-gray-500 dark:text-dark-text-secondary whitespace-normal break-words">
+                            <MapPin className="h-3.5 w-3.5 mr-1 text-gray-400 shrink-0 mt-0.5" />
+                            <span>
                               {client.bairro && client.cidade
                                 ? `${client.bairro}, ${client.cidade}`
                                 : client.cidade || client.bairro || "-"}
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-3.5 text-right">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-semibold text-red-600 dark:text-red-400 tracking-tight">
+                        <td className="px-4 py-3.5 text-right w-[15%] min-w-[130px]">
+                          <div className="flex flex-col gap-0.5">
+                            <span className={`text-xs font-bold tracking-tight ${
+                              pendingValue >= 2500 
+                                ? "text-red-700 dark:text-red-455 flex items-center justify-end gap-1" 
+                                : "text-red-600 dark:text-red-500"
+                            }`}>
+                              {pendingValue >= 2500 && (
+                                <AlertCircle className="h-3.5 w-3.5 text-red-550 shrink-0" title="Valor Pendente Crítico (>= R$ 2.500)" />
+                              )}
                               {formatCurrency(pendingValue)}
                             </span>
-                            <span className="text-[10px] font-semibold text-gray-400 tracking-tight">
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                              {formatCurrency(receivedValue)}
+                            </span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
                               Total: {formatCurrency(totalValue)}
                             </span>
+                            {totalValue > 0 && (
+                              <div className="w-24 bg-gray-100 dark:bg-dark-bg/40 h-1 rounded-full overflow-hidden mt-1 ml-auto border border-gray-200/10" title={`Recebido: ${(((totalValue - pendingValue)/totalValue)*100).toFixed(0)}%`}>
+                                {(() => {
+                                  const paidPercentage = ((totalValue - pendingValue) / totalValue) * 100;
+                                  return (
+                                    <div
+                                      className="bg-green-500 h-full rounded-full transition-all duration-300"
+                                      style={{ width: `${Math.min(100, Math.max(0, paidPercentage))}%` }}
+                                      title={`${paidPercentage.toFixed(0)}% recebido`}
+                                    />
+                                  );
+                                })()}
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1865,9 +1994,21 @@ export const ClientAssignment = React.memo(
                 (sum, c) => sum + c.valor_original,
                 0,
               );
+              const receivedValue = client.collections.reduce(
+                (sum, c) => sum + (c.valor_recebido || 0),
+                0,
+              );
               const pendingValue = getClientPending(client.collections);
               const situacao = getSituacaoIndicator(client.collections);
               const isSelected = selectedClients.has(client.uniqueKey);
+              const clientStores = Array.from(
+                new Set(
+                  client.collections
+                    .map((c) => c.nome_da_loja)
+                    .filter(Boolean)
+                )
+              );
+              const storeDisplay = clientStores.join(", ") || "—";
 
               return (
                 <div
@@ -1905,9 +2046,12 @@ export const ClientAssignment = React.memo(
                                   client.cliente || "",
                                 );
                               }}
-                              className="text-left text-[13px] font-semibold text-gray-900 dark:text-dark-text truncate tracking-tight leading-tight hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
+                              title={client.cliente || ""}
+                              className="text-left text-[13px] font-semibold text-gray-900 dark:text-dark-text hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
                             >
-                              {client.cliente}
+                              {client.cliente && client.cliente.length > 40
+                                ? `${client.cliente.slice(0, 40)}...`
+                                : client.cliente}
                             </button>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <p className="text-[9px] font-medium text-gray-455 leading-none">
@@ -1921,10 +2065,15 @@ export const ClientAssignment = React.memo(
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="text-[13px] font-semibold text-red-650 dark:text-red-400 tracking-tight leading-tight">
+                            <p className="text-[11px] font-semibold text-red-600 dark:text-red-400 tracking-tight leading-tight">
                               {formatCurrency(pendingValue)}
                             </p>
-                            <p className="text-[8px] font-semibold text-gray-400 tracking-tight leading-none">
+                            {receivedValue > 0 && (
+                              <p className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 tracking-tight leading-tight mt-0.5">
+                                {formatCurrency(receivedValue)}
+                              </p>
+                            )}
+                            <p className="text-[8px] font-semibold text-slate-500 dark:text-slate-400 tracking-tight leading-none mt-0.5">
                               T: {formatCurrency(totalValue)}
                             </p>
                           </div>
@@ -1961,10 +2110,18 @@ export const ClientAssignment = React.memo(
                         <div className="pt-2 border-t border-gray-50 dark:border-dark-border/40 flex items-center justify-between">
                           <div className="flex items-center text-[9px] font-medium text-gray-400 tracking-tight">
                             <MapPin className="h-2.5 w-2.5 mr-1 text-gray-300" />
-                            <span className="truncate max-w-[180px]">
+                            <span className="truncate max-w-[150px]">
                               {client.bairro ? `${client.bairro}, ` : ""}
                               {client.cidade || "-"}
                             </span>
+                            {storeDisplay && storeDisplay !== "—" && (
+                              <>
+                                <span className="mx-1.5 text-gray-300">•</span>
+                                <span className="bg-blue-50 dark:bg-blue-900/20 px-1 py-0.5 rounded text-[8px] font-semibold text-blue-700 dark:text-blue-400 border border-blue-100/30 truncate max-w-[100px]">
+                                  {storeDisplay}
+                                </span>
+                              </>
+                            )}
                           </div>
                           <ChevronRight className="h-3 w-3 text-gray-300" />
                         </div>
@@ -2003,6 +2160,22 @@ export const ClientAssignment = React.memo(
                 <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide hidden sm:inline">
                   Exibindo {startItem}–{endItem} de {filteredClients.length}
                 </span>
+                <div className="flex items-center gap-1.5 ml-1 sm:ml-2">
+                  <span className="text-[9px] text-gray-400 dark:text-dark-text-secondary font-semibold">Exibir:</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="text-[9px] font-semibold bg-gray-50 dark:bg-dark-bg border border-gray-250 dark:border-dark-border rounded px-1.5 py-0.5 text-gray-700 dark:text-dark-text focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
               </div>
 
               <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pt-2 pb-3 sm:pt-0 sm:pb-0 sm:overflow-visible custom-scrollbar">
