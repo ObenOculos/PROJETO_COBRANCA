@@ -75,6 +75,55 @@ const Field: React.FC<{
 );
 
 /**
+ * Input de data com estado local, para digitacao fluida.
+ *
+ * O <input type="date"> nativo e sensivel a reescrita da propriedade `value`
+ * durante a edicao: cada vez que o React grava um `value` no DOM, o segmento
+ * ativo/cursor volta para o fim. Como cada tecla dispara `onChange` -> estado do
+ * pai -> re-filtragem pesada -> novo `value` de volta, na digitacao rapida esse
+ * ciclo chega atrasado e sobrescreve o que o usuario esta digitando (cursor
+ * "salta" e o ano vira algo como 200021). Mantendo um estado local que so
+ * sincroniza com o `value` externo quando o campo NAO esta em foco, a digitacao
+ * fica imune a esse round-trip; mudancas externas (limpar filtros, pills de
+ * atraso) continuam refletidas quando o campo nao esta sendo editado.
+ */
+const DateInput: React.FC<{
+  name: string;
+  ariaLabel: string;
+  value: string;
+  onChange: (value: string) => void;
+  className: string;
+}> = ({ name, ariaLabel, value, onChange, className }) => {
+  const [local, setLocal] = React.useState(value);
+  const focused = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!focused.current) setLocal(value);
+  }, [value]);
+
+  return (
+    <input
+      type="date"
+      name={name}
+      aria-label={ariaLabel}
+      value={local}
+      onFocus={() => {
+        focused.current = true;
+      }}
+      onBlur={() => {
+        focused.current = false;
+        setLocal(value);
+      }}
+      onChange={(e) => {
+        setLocal(e.target.value);
+        onChange(e.target.value);
+      }}
+      className={className}
+    />
+  );
+};
+
+/**
  * Painel de filtros avancados compartilhado. Renderiza o grid de campos de
  * acordo com o contexto da pagina (FILTER_FIELDS). A UI e unica; as diferencas
  * entre telas ficam na config, nao em codigo duplicado.
@@ -222,20 +271,18 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             label="Vencimento"
           >
             <div className="grid grid-cols-2 gap-2">
-              <input
-                type="date"
+              <DateInput
                 name="dueFrom"
-                aria-label="Vencimento de"
+                ariaLabel="Vencimento de"
                 value={values.dueFrom || ""}
-                onChange={(e) => onChange({ dueFrom: e.target.value })}
+                onChange={(v) => onChange({ dueFrom: v })}
                 className={dateClass}
               />
-              <input
-                type="date"
+              <DateInput
                 name="dueTo"
-                aria-label="Vencimento até"
+                ariaLabel="Vencimento até"
                 value={values.dueTo || ""}
-                onChange={(e) => onChange({ dueTo: e.target.value })}
+                onChange={(v) => onChange({ dueTo: v })}
                 className={dateClass}
               />
             </div>
@@ -248,20 +295,18 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             label="Lançamento"
           >
             <div className="grid grid-cols-2 gap-2">
-              <input
-                type="date"
+              <DateInput
                 name="launchFrom"
-                aria-label="Lançamento de"
+                ariaLabel="Lançamento de"
                 value={values.launchFrom || ""}
-                onChange={(e) => onChange({ launchFrom: e.target.value })}
+                onChange={(v) => onChange({ launchFrom: v })}
                 className={dateClass}
               />
-              <input
-                type="date"
+              <DateInput
                 name="launchTo"
-                aria-label="Lançamento até"
+                ariaLabel="Lançamento até"
                 value={values.launchTo || ""}
-                onChange={(e) => onChange({ launchTo: e.target.value })}
+                onChange={(v) => onChange({ launchTo: v })}
                 className={dateClass}
               />
             </div>
@@ -329,20 +374,18 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             label="Criado em"
           >
             <div className="grid grid-cols-2 gap-2">
-              <input
-                type="date"
+              <DateInput
                 name="createdFrom"
-                aria-label="Criado de"
+                ariaLabel="Criado de"
                 value={values.createdFrom || ""}
-                onChange={(e) => onChange({ createdFrom: e.target.value })}
+                onChange={(v) => onChange({ createdFrom: v })}
                 className={dateClass}
               />
-              <input
-                type="date"
+              <DateInput
                 name="createdTo"
-                aria-label="Criado até"
+                ariaLabel="Criado até"
                 value={values.createdTo || ""}
-                onChange={(e) => onChange({ createdTo: e.target.value })}
+                onChange={(v) => onChange({ createdTo: v })}
                 className={dateClass}
               />
             </div>

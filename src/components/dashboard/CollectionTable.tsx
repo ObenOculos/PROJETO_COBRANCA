@@ -661,10 +661,10 @@ export const CollectionTable = React.forwardRef<
 
     if (loading) {
       return (
-        <div className="bg-white rounded-2xl shadow-sm p-8">
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-150 dark:border-dark-border p-8">
           <div className="flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mr-3" />
-            <span className="text-gray-600">Carregando dados...</span>
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400 mr-3" />
+            <span className="text-gray-600 dark:text-dark-text-secondary">Carregando dados...</span>
           </div>
         </div>
       );
@@ -673,14 +673,14 @@ export const CollectionTable = React.forwardRef<
     if (showGrouped && filteredClientGroups.length > 0) {
       return (
         <>
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-4 py-4 border-b border-gray-200">
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-150 dark:border-dark-border overflow-hidden">
+            <div className="px-4 py-4 border-b border-gray-200 dark:border-dark-border">
               {isDeleteMode ? (
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <input
                       type="checkbox"
-                      className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="h-5 w-5 rounded border-gray-300 dark:border-dark-border text-blue-600 focus:ring-blue-500 bg-white dark:bg-dark-bg"
                       checked={
                         selectedClients.size > 0 &&
                         selectedClients.size === paginatedClientGroups.length
@@ -689,7 +689,7 @@ export const CollectionTable = React.forwardRef<
                         handleToggleSelectAll(paginatedClientGroups)
                       }
                     />
-                    <h2 className="text-lg font-semibold text-red-700">
+                    <h2 className="text-lg font-semibold text-red-700 dark:text-red-400">
                       {selectedClients.size > 0
                         ? `${selectedClients.size} cliente(s) selecionado(s)`
                         : "Selecione os clientes para deletar"}
@@ -709,7 +709,7 @@ export const CollectionTable = React.forwardRef<
                         setIsDeleteMode(false);
                         setSelectedClients(new Set());
                       }}
-                      className="p-3 rounded-lg text-gray-700 bg-gray-200 hover:bg-gray-300 transition-all duration-200"
+                      className="p-3 rounded-lg text-gray-700 dark:text-dark-text bg-gray-200 dark:bg-dark-bg hover:bg-gray-300 dark:hover:bg-dark-bg-tertiary transition-all duration-200"
                       title="Sair do modo de exclusão"
                     >
                       <XCircle className="h-4 w-4" />
@@ -721,12 +721,12 @@ export const CollectionTable = React.forwardRef<
                   <div id="teste_nome_mudar">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <h2 className="text-lg font-semibold text-gray-900">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
                           {userType === "manager"
                             ? "Clientes e Cobranças"
                             : "Meus Clientes"}
                         </h2>
-                        <p className="text-sm text-gray-600 mt-1">
+                        <p className="text-sm text-gray-600 dark:text-dark-text-secondary mt-1">
                           {totalClientes} cliente
                           {totalClientes !== 1 ? "s" : ""} • {totalVendas} venda
                           {totalVendas !== 1 ? "s" : ""}
@@ -762,7 +762,7 @@ export const CollectionTable = React.forwardRef<
                           className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                             showFilterBar
                               ? "bg-blue-100 text-blue-700"
-                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
                           }`}
                           title={
                             showFilterBar
@@ -787,7 +787,7 @@ export const CollectionTable = React.forwardRef<
                           className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                             sortField === "cliente"
                               ? "bg-blue-100 text-blue-700"
-                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
                           }`}
                           title="Ordenar por Nome"
                         >
@@ -801,7 +801,7 @@ export const CollectionTable = React.forwardRef<
                           className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                             sortField === "valor"
                               ? "bg-blue-100 text-blue-700"
-                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
                           }`}
                           title="Ordenar por Valor"
                         >
@@ -815,7 +815,7 @@ export const CollectionTable = React.forwardRef<
                           className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                             sortField === "cidade"
                               ? "bg-blue-100 text-blue-700"
-                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
                           }`}
                           title="Ordenar por Cidade"
                         >
@@ -828,16 +828,17 @@ export const CollectionTable = React.forwardRef<
                     <div className="flex items-center gap-2">
                       {/* Selector de items por página */}
                       <div className="flex items-center gap-2">
-                        <Eye className="h-4 w-4 text-gray-600" />
+                        <Eye className="h-4 w-4 text-gray-600 dark:text-dark-text-secondary" />
                         <select
-                          id="items-per-page"
+                          id="items-per-page-grouped"
                           name="itemsPerPage"
+                          aria-label="Itens por página"
                           value={itemsPerPage}
                           onChange={(e) => {
                             setItemsPerPage(Number(e.target.value));
                             setCurrentPage(1);
                           }}
-                          className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="text-sm border border-gray-300 dark:border-dark-border rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-dark-bg-secondary text-gray-700 dark:text-dark-text"
                         >
                           <option value={10}>10</option>
                           <option value={20}>20</option>
@@ -851,17 +852,17 @@ export const CollectionTable = React.forwardRef<
               )}
             </div>
 
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-gray-200 dark:divide-dark-border">
               {paginatedClientGroups.map((clientGroup) => (
                 <div
                   key={clientGroup.clientId}
-                  className={`bg-white flex items-center ${isDeleteMode ? "pr-4" : ""}`}
+                  className={`bg-white dark:bg-dark-bg-secondary flex items-center ${isDeleteMode ? "pr-4" : ""}`}
                 >
                   {isDeleteMode && (
                     <div className="pl-4">
                       <input
                         type="checkbox"
-                        className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="h-5 w-5 rounded border-gray-300 dark:border-dark-border text-blue-600 focus:ring-blue-500 bg-white dark:bg-dark-bg"
                         checked={selectedClients.has(clientGroup.document)}
                         onChange={() =>
                           handleToggleClientSelection(clientGroup.document)
@@ -870,7 +871,7 @@ export const CollectionTable = React.forwardRef<
                     </div>
                   )}
                   <div
-                    className="flex-1 px-4 py-4 hover:bg-gray-50 cursor-pointer"
+                    className="flex-1 px-4 py-4 hover:bg-gray-50 dark:hover:bg-dark-bg cursor-pointer"
                     onClick={() =>
                       !isDeleteMode && handleViewClient(clientGroup)
                     }
@@ -882,15 +883,15 @@ export const CollectionTable = React.forwardRef<
                         </div>
 
                         <div className="flex-1 min-w-0 overflow-hidden">
-                          <h3 className="text-base font-medium text-gray-900">
+                          <h3 className="text-base font-medium text-gray-900 dark:text-dark-text">
                             {isMobile && clientGroup.client.length > 25
                               ? `${clientGroup.client.slice(0, 25)}...`
                               : clientGroup.client}
                           </h3>
-                          <p className="text-sm text-gray-500 truncate">
+                          <p className="text-sm text-gray-500 dark:text-dark-text-secondary truncate">
                             {clientGroup.document}
                           </p>
-                          <div className="flex items-center text-xs text-gray-500 mt-1">
+                          <div className="flex items-center text-xs text-gray-500 dark:text-dark-text-secondary mt-1">
                             <MapPin className="h-3 w-3 mr-1" />
                             <span className="truncate">
                               {isMobile &&
@@ -904,10 +905,10 @@ export const CollectionTable = React.forwardRef<
                       </div>
 
                       <div className="flex-shrink-0 text-right">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-gray-900 dark:text-dark-text">
                           {formatCurrency(clientGroup.totalValue)}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 dark:text-dark-text-secondary">
                           {clientGroup.sales.length} venda
                           {clientGroup.sales.length !== 1 ? "s" : ""}
                         </div>
@@ -942,7 +943,7 @@ export const CollectionTable = React.forwardRef<
 
             {filteredClientGroups.length === 0 && (
               <div className="py-12 text-center">
-                <div className="text-gray-500">
+                <div className="text-gray-500 dark:text-dark-text-secondary">
                   <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>Nenhuma cobrança encontrada</p>
                 </div>
@@ -951,13 +952,13 @@ export const CollectionTable = React.forwardRef<
           </div>
           {/* Controles de Paginação */}
           {totalPages > 1 && (
-            <div className="bg-gray-800 px-4 sm:px-6 py-4 rounded-2xl mt-4">
+            <div className="bg-gray-800 dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border px-4 sm:px-6 py-4 rounded-2xl mt-4">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-sm text-white text-center sm:text-left">
                   <span className="font-semibold">
                     Página {currentPage} de {totalPages}
                   </span>
-                  <span className="text-gray-300 ml-2">
+                  <span className="text-gray-300 dark:text-dark-text-secondary ml-2">
                     • Mostrando {startItem} a {endItem} de {totalClientes}{" "}
                     {totalClientes === 1 ? "cliente" : "clientes"} •{" "}
                     {totalVendas} {totalVendas === 1 ? "venda" : "vendas"}
@@ -1136,7 +1137,7 @@ export const CollectionTable = React.forwardRef<
       <>
         <div className="rounded-2xl">
           {/* Header Minimalista Refatorado */}
-          <div className="bg-white p-4 rounded-2xl mb-4">
+          <div className="bg-white dark:bg-dark-bg-secondary border border-gray-150 dark:border-dark-border p-4 rounded-2xl mb-4">
             <div className="flex flex-col gap-3">
               {" "}
               {/* Main vertical stack */}
@@ -1187,12 +1188,12 @@ export const CollectionTable = React.forwardRef<
                   <div className="flex items-center gap-3">
                     <DollarSign className="h-5 w-5 text-blue-600" />
                     <div>
-                      <h2 className="text-lg font-semibold text-gray-900">
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
                         {userType === "manager"
                           ? "Todas as Cobranças"
                           : "Minha Carteira"}
                       </h2>
-                      <p className="text-sm text-gray-600 mt-0.5">
+                      <p className="text-sm text-gray-600 dark:text-dark-text-secondary mt-0.5">
                         {totalClientes} cliente
                         {totalClientes !== 1 ? "s" : ""} • {totalVendas} venda
                         {totalVendas !== 1 ? "s" : ""}
@@ -1226,7 +1227,7 @@ export const CollectionTable = React.forwardRef<
                         className={`p-2 rounded-2xl transition-colors ${
                           showFilters
                             ? "bg-blue-600 text-white"
-                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
                         }`}
                         title="Filtros"
                       >
@@ -1280,7 +1281,7 @@ export const CollectionTable = React.forwardRef<
                       className={`p-2 rounded-2xl transition-colors ${
                         showSortOptions
                           ? "bg-blue-600 text-white"
-                          : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                          : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
                       }`}
                       title="Opções de Ordenação"
                     >
@@ -1294,7 +1295,7 @@ export const CollectionTable = React.forwardRef<
                         className={`p-2 rounded-2xl transition-colors ${
                           sortField === "cliente"
                             ? "bg-blue-600 text-white"
-                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
                         }
                                                     `}
                         title="Ordenar por Cliente"
@@ -1306,7 +1307,7 @@ export const CollectionTable = React.forwardRef<
                         className={`p-2 rounded-2xl transition-colors ${
                           sortField === "valor"
                             ? "bg-blue-600 text-white"
-                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
                         }
                                                     `}
                         title="Ordenar por Valor"
@@ -1318,7 +1319,7 @@ export const CollectionTable = React.forwardRef<
                         className={`p-2 rounded-2xl transition-colors ${
                           sortField === "cidade"
                             ? "bg-blue-600 text-white"
-                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
                         }
                                                     `}
                         title="Ordenar por Cidade"
@@ -1331,17 +1332,18 @@ export const CollectionTable = React.forwardRef<
 
                 {/* Exibição + Paginação */}
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 text-sm text-gray-500 rounded-2xl border border-gray-200 py-1 px-2">
-                    <EyeIcon className="h-4 w-4 text-gray-400" />
+                  <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-dark-text-secondary rounded-2xl border border-gray-200 dark:border-dark-border py-1 px-2">
+                    <EyeIcon className="h-4 w-4 text-gray-450 dark:text-dark-text-secondary" />
                     <select
                       id="items-per-page"
                       name="itemsPerPage"
+                      aria-label="Itens por página"
                       value={itemsPerPage}
                       onChange={(e) => {
                         setItemsPerPage(Number(e.target.value));
                         setCurrentPage(1);
                       }}
-                      className="text-sm border-0 bg-transparent focus:ring-0 text-gray-600"
+                      className="text-sm border-0 bg-transparent focus:ring-0 text-gray-600 dark:text-dark-text bg-white dark:bg-dark-bg-secondary"
                     >
                       <option value={10}>10</option>
                       <option value={20}>20</option>
@@ -1377,14 +1379,15 @@ export const CollectionTable = React.forwardRef<
               </div>{" "}
               {/* Expanded Filters (Conditional) */}
               {userType !== "manager" && showFilters && (
-                <div className="flex items-center gap-3 py-2 border-t border-gray-100">
-                  <Filter className="h-4 w-4 text-blue-600" />
+                <div className="flex items-center gap-3 py-2 border-t border-gray-100 dark:border-dark-border">
+                  <Filter className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   <select
                     id="status-filter"
                     name="statusFilter"
+                    aria-label="Filtrar por status"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="text-sm border border-gray-300 rounded-2xl px-3 py-1.5 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                    className="text-sm border border-gray-300 dark:border-dark-border rounded-2xl px-3 py-1.5 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-dark-bg text-gray-700 dark:text-dark-text"
                   >
                     <option value="">Todos</option>
                     <option value="pendente">Pendente</option>
@@ -1408,7 +1411,7 @@ export const CollectionTable = React.forwardRef<
           </div>
 
           {/* Lista de Clientes Agrupados */}
-          <div className="divide-y sm:px-0 divide-gray-100">
+          <div>
             {paginatedSalesGroups.map((clientGroup) => (
               <div
                 key={clientGroup.document}
@@ -1416,7 +1419,7 @@ export const CollectionTable = React.forwardRef<
               >
                 {/* Cabeçalho do Cliente */}
                 <div
-                  className={`flex items-center bg-white rounded-2xl border border-gray-200 ${isDeleteMode ? "" : "cursor-pointer"} overflow-hidden`}
+                  className={`flex items-center bg-white dark:bg-dark-bg-secondary rounded-2xl border border-gray-200 dark:border-dark-border ${isDeleteMode ? "" : "cursor-pointer"} overflow-hidden`}
                   onClick={() =>
                     !isDeleteMode && toggleClientExpansion(clientGroup.document)
                   }
@@ -1425,7 +1428,7 @@ export const CollectionTable = React.forwardRef<
                     <div className="p-4">
                       <input
                         type="checkbox"
-                        className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="h-5 w-5 rounded border-gray-300 dark:border-dark-border text-blue-600 focus:ring-blue-500 bg-white dark:bg-dark-bg"
                         checked={selectedClients.has(clientGroup.document)}
                         onChange={() =>
                           handleToggleClientSelection(clientGroup.document)
@@ -1436,24 +1439,24 @@ export const CollectionTable = React.forwardRef<
                   <div className="flex-1 px-4 sm:px-6 py-3">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                       {/* Client Info */}
-                      <div className="flex items-center flex-1 min-w-0 pb-4 sm:pb-0 border-b sm:border-0 border-gray-100">
+                      <div className="flex items-center flex-1 min-w-0 pb-4 sm:pb-0 border-b sm:border-0 border-gray-100 dark:border-dark-border">
                         <div className="hidden sm:block flex-shrink-0 mr-4">
-                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                            <User className="h-5 w-5 text-blue-600" />
+                          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+                            <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                           </div>
                         </div>
 
                         <div className="flex-1 min-w-0 overflow-hidden">
-                          <h3 className="text-base font-semibold text-gray-800">
+                          <h3 className="text-base font-semibold text-gray-800 dark:text-dark-text">
                             {isMobile && clientGroup.client.length > 25
                               ? `${clientGroup.client.slice(0, 25)}...`
                               : clientGroup.client}
                           </h3>
-                          <p className="text-sm text-gray-500 truncate font-mono">
+                          <p className="text-sm text-gray-500 dark:text-dark-text-secondary truncate font-mono">
                             {clientGroup.document}
                           </p>
-                          <div className="flex items-center text-xs text-gray-500 mt-1.5">
-                            <MapPin className="h-3 w-3 mr-1 text-gray-400" />
+                          <div className="flex items-center text-xs text-gray-500 dark:text-dark-text-secondary mt-1.5">
+                            <MapPin className="h-3 w-3 mr-1 text-gray-400 dark:text-dark-text-secondary" />
                             <span className="truncate">
                               {isMobile &&
                               `${clientGroup.bairro}, ${clientGroup.cidade}`
@@ -1468,34 +1471,34 @@ export const CollectionTable = React.forwardRef<
                       {/* Financial Info */}
                       <div className="w-full sm:w-auto flex-shrink-0">
                         <div className="flex items-baseline justify-between sm:justify-end sm:gap-4">
-                          <span className="text-sm sm:hidden text-gray-600">
+                          <span className="text-sm sm:hidden text-gray-600 dark:text-dark-text-secondary">
                             Valor Total
                           </span>
-                          <div className="text-2xl font-bold text-gray-800">
+                          <div className="text-2xl font-bold text-gray-800 dark:text-dark-text">
                             {formatCurrency(clientGroup.totalValue, !isMobile)}
                           </div>
                         </div>
-                        <div className="text-xs text-gray-500 sm:text-right mt-1">
+                        <div className="text-xs text-gray-500 dark:text-dark-text-secondary sm:text-right mt-1">
                           {clientGroup.sales.length} venda
                           {clientGroup.sales.length !== 1 ? "s" : ""}
                         </div>
                         <div className="flex flex-wrap justify-start sm:justify-end gap-2 mt-4">
                           {!!clientGroup.totalReceived && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 border border-green-200/20">
                               <TrendingUp className="h-3 w-3 mr-1.5" />
                               {formatCurrency(clientGroup.totalReceived)}
                             </span>
                           )}
                           {!!clientGroup.totalDiscount &&
                             clientGroup.totalDiscount > 0 && (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400 border border-blue-200/20">
                                 <TrendingDown className="h-3 w-3 mr-1.5" />
                                 {formatCurrency(clientGroup.totalDiscount)}
                               </span>
                             )}
                           {!!clientGroup.pendingValue &&
                             clientGroup.pendingValue > 0 && (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400 border border-red-200/20">
                                 <AlertCircle className="h-3 w-3 mr-1.5" />
                                 {formatCurrency(clientGroup.pendingValue)}
                               </span>
@@ -1505,12 +1508,12 @@ export const CollectionTable = React.forwardRef<
                     </div>
 
                     {/* Seta para Mobile - na parte inferior */}
-                    <div className="flex sm:hidden justify-center mt-3 pt-3 border-t border-gray-100">
-                      <button className="p-2 rounded-full bg-blue-50 hover:bg-blue-100 transition-colors">
+                    <div className="flex sm:hidden justify-center mt-3 pt-3 border-t border-gray-100 dark:border-dark-border">
+                      <button className="p-2 rounded-full bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
                         {expandedClients.has(clientGroup.document) ? (
-                          <ChevronUp className="h-4 w-4 text-blue-600" />
+                          <ChevronUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         ) : (
-                          <ChevronDown className="h-4 w-4 text-blue-600" />
+                          <ChevronDown className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         )}
                       </button>
                     </div>
@@ -1537,7 +1540,7 @@ export const CollectionTable = React.forwardRef<
 
                 {/* Lista de Vendas do Cliente - Condicional */}
                 {expandedClients.has(clientGroup.document) && (
-                  <div className="px-4 sm:px-6 py-4 mt-2 rounded-2xl border border-gray-200 bg-gray-50 animate-in slide-in-from-top-2 duration-200">
+                  <div className="px-4 sm:px-6 py-4 mt-2 rounded-2xl border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg/30 animate-in slide-in-from-top-2 duration-200">
                     <div className="space-y-3">
                       {clientGroup.sales.map((sale: SaleGroup) => {
                         // Determinar o status real da venda baseado nos valores.
@@ -1554,7 +1557,8 @@ export const CollectionTable = React.forwardRef<
 
                         if (allCancelled) {
                           displayStatus = "Cancelado";
-                          statusColor = "bg-gray-200 text-gray-600";
+                          statusColor =
+                            "bg-gray-200 text-gray-600 dark:bg-dark-bg-tertiary dark:text-dark-text-secondary";
                         } else if (
                           sale.totalReceived > 0 &&
                           sale.pendingValue > 0
@@ -1572,19 +1576,19 @@ export const CollectionTable = React.forwardRef<
                         return (
                           <div
                             key={sale.saleNumber}
-                            className="bg-white border border-gray-200 rounded-2xl hover:shadow-md transition-all duration-200"
+                            className="bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border rounded-2xl hover:shadow-md transition-all duration-200"
                           >
                             <div className="p-4">
                               {/* Header */}
                               <div className="flex items-start justify-between mb-4">
                                 <div>
-                                  <h4 className="font-semibold text-gray-800">
+                                  <h4 className="font-semibold text-gray-800 dark:text-dark-text">
                                     Venda #
                                     {sale.saleNumber === 0
                                       ? "Renegociada"
                                       : sale.saleNumber}
                                   </h4>
-                                  <p className="text-xs text-gray-500 mt-1">
+                                  <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-1">
                                     {sale.installments.length} parcela
                                     {sale.installments.length !== 1 ? "s" : ""}
                                   </p>
@@ -1604,19 +1608,19 @@ export const CollectionTable = React.forwardRef<
                               {/* Financial info */}
                               <div className="space-y-3">
                                 <div className="flex justify-between items-center">
-                                  <span className="text-sm text-gray-600">
+                                  <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
                                     Valor Total
                                   </span>
-                                  <span className="font-semibold text-gray-800">
+                                  <span className="font-semibold text-gray-800 dark:text-dark-text">
                                     {formatCurrency(sale.totalValue, !isMobile)}
                                   </span>
                                 </div>
                                 {!!sale.totalReceived && (
                                   <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">
+                                    <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
                                       Valor Recebido
                                     </span>
-                                    <span className="font-semibold text-green-600">
+                                    <span className="font-semibold text-green-600 dark:text-green-400">
                                       {formatCurrency(
                                         sale.totalReceived,
                                         !isMobile,
@@ -1626,10 +1630,10 @@ export const CollectionTable = React.forwardRef<
                                 )}
                                 {!!sale.totalDiscount && (
                                   <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">
+                                    <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
                                       Desconto
                                     </span>
-                                    <span className="font-semibold text-blue-600">
+                                    <span className="font-semibold text-blue-600 dark:text-blue-400">
                                       {formatCurrency(
                                         sale.totalDiscount,
                                         !isMobile,
@@ -1639,10 +1643,10 @@ export const CollectionTable = React.forwardRef<
                                 )}
                                 {sale.pendingValue > 0 && (
                                   <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">
+                                    <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
                                       Valor Pendente
                                     </span>
-                                    <span className="font-semibold text-red-600">
+                                    <span className="font-semibold text-red-600 dark:text-red-400">
                                       {formatCurrency(
                                         sale.pendingValue,
                                         !isMobile,
@@ -1653,7 +1657,7 @@ export const CollectionTable = React.forwardRef<
                               </div>
 
                               {/* Actions */}
-                              <div className="mt-5 pt-4 border-t border-gray-100 flex gap-3">
+                              <div className="mt-5 pt-4 border-t border-gray-100 dark:border-dark-border flex gap-3">
                                 <button
                                   id={`view-sale-${sale.saleNumber}`}
                                   name={`viewSale${sale.saleNumber}`}
@@ -1719,14 +1723,14 @@ export const CollectionTable = React.forwardRef<
 
           {filteredAndGroupedSales.length === 0 && (
             <div className="py-16 text-center">
-              <div className="text-gray-500">
-                <div className="mx-auto w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mb-6">
-                  <Clock className="h-8 w-8 text-gray-400" />
+              <div className="text-gray-500 dark:text-dark-text-secondary">
+                <div className="mx-auto w-20 h-20 bg-gray-100 dark:bg-dark-bg rounded-2xl flex items-center justify-center mb-6">
+                  <Clock className="h-8 w-8 text-gray-400 dark:text-dark-text-secondary" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-2">
                   Nenhum cliente com vendas encontrado
                 </h3>
-                <p className="text-gray-600 max-w-md mx-auto">
+                <p className="text-gray-600 dark:text-dark-text-secondary max-w-md mx-auto">
                   {userType !== "manager" && statusFilter
                     ? "Tente ajustar os filtros para ver mais resultados."
                     : "Não há clientes com vendas disponíveis no momento."}
@@ -1748,13 +1752,13 @@ export const CollectionTable = React.forwardRef<
 
         {/* Controles de Paginação */}
         {totalPages > 1 && (
-          <div className="bg-gray-800 mt-4 border border-gray-200 px-4 sm:px-6 py-4 rounded-2xl">
+          <div className="bg-gray-800 dark:bg-dark-bg-secondary mt-4 border border-gray-200 dark:border-dark-border px-4 sm:px-6 py-4 rounded-2xl">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-sm text-white text-center sm:text-left">
                 <span className="font-semibold">
                   Página {currentPage} de {totalPages}
                 </span>
-                <span className="text-gray-300 ml-2">
+                <span className="text-gray-300 dark:text-dark-text-secondary ml-2">
                   • Mostrando {startItem} a {endItem} de {totalClientes}{" "}
                   {totalClientes === 1 ? "cliente" : "clientes"} • {totalVendas}{" "}
                   {totalVendas === 1 ? "venda" : "vendas"}
@@ -1815,7 +1819,7 @@ export const CollectionTable = React.forwardRef<
                           onClick={() => setCurrentPage(pageNum)}
                           className={`px-2 sm:px-2 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[34px] ${
                             pageNum === currentPage
-                              ? "bg-white text-gray shadow-lg"
+                              ? "bg-white text-gray-800 shadow-lg"
                               : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
                           }`}
                         >

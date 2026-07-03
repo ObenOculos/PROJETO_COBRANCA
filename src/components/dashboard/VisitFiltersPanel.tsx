@@ -39,6 +39,55 @@ interface VisitFiltersPanelProps {
   hasActiveFilters: boolean;
 }
 
+/**
+ * Input de data com estado local, para digitacao fluida.
+ *
+ * O <input type="date"> nativo reposiciona o cursor/segmento sempre que o React
+ * grava sua propriedade `value` no DOM. Como cada tecla dispara updateFilter ->
+ * estado do pai -> re-render -> novo `value` de volta, na digitacao rapida esse
+ * ciclo chega atrasado e sobrescreve o que esta sendo digitado (o cursor
+ * "salta" e o ano vira algo como 200021). Mantendo estado local que so
+ * sincroniza com o `value` externo quando o campo NAO esta em foco, a digitacao
+ * fica imune ao round-trip; mudancas externas (limpar filtros) continuam
+ * refletidas quando o campo nao esta sendo editado.
+ */
+const DateInput: React.FC<{
+  name: string;
+  ariaLabel: string;
+  value: string;
+  onChange: (value: string) => void;
+  className: string;
+}> = ({ name, ariaLabel, value, onChange, className }) => {
+  const [local, setLocal] = useState(value);
+  const focused = useRef(false);
+
+  useEffect(() => {
+    if (!focused.current) setLocal(value);
+  }, [value]);
+
+  return (
+    <input
+      type="date"
+      id={name}
+      name={name}
+      aria-label={ariaLabel}
+      value={local}
+      onFocus={() => {
+        focused.current = true;
+      }}
+      onBlur={() => {
+        focused.current = false;
+        setLocal(value);
+      }}
+      onChange={(e) => {
+        setLocal(e.target.value);
+        onChange(e.target.value);
+      }}
+      className={className}
+    />
+  );
+};
+
 const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
   filters,
   onFiltersChange,
@@ -154,6 +203,8 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
               <div className="space-y-2">
                 <input
                   type="text"
+                  name="visitSearchName"
+                  aria-label="Nome do cliente"
                   placeholder="Nome do cliente..."
                   value={filters.searchName}
                   onChange={(e) => updateFilter("searchName", e.target.value)}
@@ -161,6 +212,8 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
                 />
                 <input
                   type="text"
+                  name="visitSearchDocument"
+                  aria-label="CPF/CNPJ"
                   placeholder="CPF/CNPJ..."
                   value={filters.searchDocument}
                   onChange={(e) =>
@@ -259,6 +312,8 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="number"
+                  name="visitMinValue"
+                  aria-label="Valor mínimo"
                   placeholder="Valor mínimo"
                   value={filters.minValue}
                   onChange={(e) => updateFilter("minValue", e.target.value)}
@@ -266,6 +321,8 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
                 />
                 <input
                   type="number"
+                  name="visitMaxValue"
+                  aria-label="Valor máximo"
                   placeholder="Valor máximo"
                   value={filters.maxValue}
                   onChange={(e) => updateFilter("maxValue", e.target.value)}
@@ -281,6 +338,8 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
                 Status de Visitas
               </div>
               <select
+                name="visitStatus"
+                aria-label="Status de visitas"
                 value={filters.visitStatus}
                 onChange={(e) => updateFilter("visitStatus", e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -300,16 +359,18 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
                 Período de Vencimento
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="date"
+                <DateInput
+                  name="visitDueDateStart"
+                  ariaLabel="Vencimento de"
                   value={filters.dueDateStart}
-                  onChange={(e) => updateFilter("dueDateStart", e.target.value)}
+                  onChange={(v) => updateFilter("dueDateStart", v)}
                   className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-                <input
-                  type="date"
+                <DateInput
+                  name="visitDueDateEnd"
+                  ariaLabel="Vencimento até"
                   value={filters.dueDateEnd}
-                  onChange={(e) => updateFilter("dueDateEnd", e.target.value)}
+                  onChange={(v) => updateFilter("dueDateEnd", v)}
                   className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -325,6 +386,7 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
+                    name="visitOnlyNew"
                     checked={filters.onlyNew}
                     onChange={(e) => updateFilter("onlyNew", e.target.checked)}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
@@ -336,6 +398,7 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
+                    name="visitHasVisits"
                     checked={filters.hasVisits}
                     onChange={(e) =>
                       updateFilter("hasVisits", e.target.checked)
@@ -349,6 +412,7 @@ const VisitFiltersPanel: React.FC<VisitFiltersPanelProps> = ({
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
+                    name="visitNoVisits"
                     checked={filters.noVisits}
                     onChange={(e) => updateFilter("noVisits", e.target.checked)}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"

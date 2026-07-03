@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useDeferredValue,
+} from "react";
 import {
   Calendar,
   Download,
@@ -8,6 +14,8 @@ import {
   Filter,
   RefreshCw,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   FileSpreadsheet,
   TrendingUp,
   User,
@@ -15,6 +23,7 @@ import {
   Activity,
   Receipt,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
 import { Collection, isCollectorType } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/formatters";
@@ -140,6 +149,9 @@ const getQuickDateRanges = () => {
   };
 };
 
+// Linhas por página na tabela "Transações Detalhadas".
+const DETAILS_PER_PAGE = 50;
+
 const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const { users, salePayments, refreshData, getClientGroups } = useCollection();
   const { user } = useAuth();
@@ -149,6 +161,9 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const [selectedDate, setSelectedDate] = useState<string>(getCurrentDateBR());
   const [endDate, setEndDate] = useState<string>(getCurrentDateBR());
   const [showDetails, setShowDetails] = useState(false);
+  // Paginação da tabela "Transações Detalhadas": intervalos grandes podem gerar
+  // milhares de linhas; renderizar tudo de uma vez trava o navegador.
+  const [detailsPage, setDetailsPage] = useState(1);
   const [dateRangeMode, setDateRangeMode] = useState<"single" | "range">(
     "single",
   );
@@ -163,6 +178,30 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const [showExportOptions, setShowExportOptions] = useState(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
   const [] = useState(false);
+
+  // Versões diferidas dos filtros que alimentam o cálculo pesado (reportData).
+  // Os inputs continuam usando o estado bruto (respondem na hora); o recálculo
+  // roda numa renderização de baixa prioridade, o que permite pintar o overlay
+  // de carregamento ANTES de travar a thread com o processamento do período.
+  const dfSelectedDate = useDeferredValue(selectedDate);
+  const dfEndDate = useDeferredValue(endDate);
+  const dfDateRangeMode = useDeferredValue(dateRangeMode);
+  const dfSelectedCollector = useDeferredValue(selectedCollector);
+  const dfSelectedStore = useDeferredValue(selectedStore);
+  const dfMinAmount = useDeferredValue(minAmount);
+  const dfMaxAmount = useDeferredValue(maxAmount);
+  const dfForceUpdate = useDeferredValue(forceUpdate);
+
+  // Enquanto o valor bruto e o diferido divergem, há um recálculo pendente.
+  const isCalculating =
+    selectedDate !== dfSelectedDate ||
+    endDate !== dfEndDate ||
+    dateRangeMode !== dfDateRangeMode ||
+    selectedCollector !== dfSelectedCollector ||
+    selectedStore !== dfSelectedStore ||
+    minAmount !== dfMinAmount ||
+    maxAmount !== dfMaxAmount ||
+    forceUpdate !== dfForceUpdate;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -256,6 +295,15 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
   const reportData = useMemo((): DailyReportData => {
     // Usar dados da tabela sale_payments em vez de collections
+
+    // Lê os filtros diferidos (o cálculo pesado roda em baixa prioridade).
+    const selectedDate = dfSelectedDate;
+    const endDate = dfEndDate;
+    const dateRangeMode = dfDateRangeMode;
+    const selectedCollector = dfSelectedCollector;
+    const selectedStore = dfSelectedStore;
+    const minAmount = dfMinAmount;
+    const maxAmount = dfMaxAmount;
 
     const filteredPayments = salePayments.filter((payment) => {
       // Filtro de data
@@ -561,16 +609,36 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   }, [
     salePayments,
     collections,
-    selectedDate,
-    endDate,
-    dateRangeMode,
-    selectedCollector,
-    selectedStore,
-    minAmount,
-    maxAmount,
+    dfSelectedDate,
+    dfEndDate,
+    dfDateRangeMode,
+    dfSelectedCollector,
+    dfSelectedStore,
+    dfMinAmount,
+    dfMaxAmount,
     users,
-    forceUpdate,
+    dfForceUpdate,
   ]);
+
+  const detailsTotalPages = Math.max(
+    1,
+    Math.ceil(reportData.payments.length / DETAILS_PER_PAGE),
+  );
+
+  const paginatedPayments = useMemo(
+    () =>
+      reportData.payments.slice(
+        (detailsPage - 1) * DETAILS_PER_PAGE,
+        detailsPage * DETAILS_PER_PAGE,
+      ),
+    [reportData.payments, detailsPage],
+  );
+
+  // Qualquer mudança de filtro gera um novo array de payments: volta à 1ª página
+  // para não ficar preso numa página inexistente após reduzir os resultados.
+  useEffect(() => {
+    setDetailsPage(1);
+  }, [reportData.payments]);
 
   const handleExportReport = () => {
     const reportContent = generateReportContent(
@@ -744,14 +812,45 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
   return (
     <div className="space-y-4">
+      {/* Overlay de carregamento fullscreen (via portal no body): cobre toda a
+          aplicação e bloqueia interações enquanto a consulta de um período longo
+          é processada, evitando a sensação de travamento. */}
+      {isCalculating &&
+        createPortal(
+          <div
+            className="flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm cursor-wait"
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              zIndex: 9999,
+            }}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary px-8 py-6 shadow-2xl">
+              <RefreshCw className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
+              <p className="text-sm font-semibold text-gray-700 dark:text-dark-text">
+                Processando consulta…
+              </p>
+              <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                Isso pode levar alguns segundos para períodos longos.
+              </p>
+            </div>
+          </div>,
+          document.body,
+        )}
+
       {/* Header Simplificado */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-dark-text">
               Relatório do Caixa
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-gray-600 dark:text-dark-text-secondary mt-1">
               {dateRangeMode === "single"
                 ? formatDate(selectedDate)
                 : `${formatDate(selectedDate)} até ${formatDate(endDate)}`}
@@ -765,7 +864,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 await refreshData();
                 setForceUpdate((prev) => prev + 1);
               }}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
+              className="p-2 text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 hover:dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-2xl transition-colors"
               title="Atualizar"
             >
               <RefreshCw className="h-5 w-5" />
@@ -773,7 +872,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors relative"
+              className="p-2 text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 hover:dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-2xl transition-colors relative"
             >
               <Filter className="h-5 w-5" />
               {activeFiltersCount > 0 && (
@@ -785,7 +884,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
             <button
               onClick={handlePrintReport}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
+              className="p-2 text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 hover:dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-2xl transition-colors"
               title="Imprimir"
             >
               <Printer className="h-5 w-5" />
@@ -795,7 +894,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             <div className="relative" ref={exportDropdownRef}>
               <button
                 onClick={() => setShowExportOptions(!showExportOptions)}
-                className="flex items-center gap-1 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-colors"
+                className="flex items-center gap-1 p-2 text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 hover:dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-2xl transition-colors"
                 title="Exportar"
               >
                 <Download className="h-5 w-5" />
@@ -805,17 +904,17 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               </button>
 
               {showExportOptions && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 animate-in fade-in zoom-in duration-200">
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-xl border border-gray-100 dark:border-dark-border py-2 z-50 animate-in fade-in zoom-in duration-200">
                   <button
                     onClick={handleExportReport}
-                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary transition-colors"
                   >
                     <FileText className="h-4 w-4 text-blue-500" />
                     Salvar em TXT
                   </button>
                   <button
                     onClick={handleExportExcel}
-                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary transition-colors"
                   >
                     <FileSpreadsheet className="h-4 w-4 text-green-600" />
                     Salvar em Excel
@@ -836,20 +935,20 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
       {/* Filtros Colapsáveis */}
       {showFilters && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 animate-in slide-in-from-top-2 duration-200">
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 animate-in slide-in-from-top-2 duration-200">
           <div className="space-y-4">
             {/* Date Range Mode Toggle */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <span className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2">
                 Período
-              </label>
-              <div className="flex bg-gray-100 rounded-2xl p-1 w-full sm:w-auto">
+              </span>
+              <div className="flex bg-gray-100 dark:bg-dark-bg rounded-2xl p-1 w-full sm:w-auto">
                 <button
                   onClick={() => setDateRangeMode("single")}
                   className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                     dateRangeMode === "single"
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:text-gray-900"
+                      ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
                   }`}
                 >
                   Data Única
@@ -858,8 +957,8 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                   onClick={() => setDateRangeMode("range")}
                   className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                     dateRangeMode === "range"
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:text-gray-900"
+                      ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
                   }`}
                 >
                   Período
@@ -869,9 +968,9 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
             {/* Quick Date Range Buttons */}
             <div>
-              <label className="block text-xs font-black text-gray-400 tracking-wider mb-2">
+              <span className="block text-xs font-black text-gray-400 dark:text-dark-text-secondary tracking-wider mb-2">
                 Ações Rápidas
-              </label>
+              </span>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(getQuickDateRanges()).map(([key, range]) => (
                   <button
@@ -881,7 +980,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                         key as keyof ReturnType<typeof getQuickDateRanges>,
                       )
                     }
-                    className="px-4 py-2 text-xs font-bold bg-gray-50 text-gray-600 rounded-full hover:bg-blue-50 hover:text-blue-600 border border-gray-100 transition-all duration-200 whitespace-nowrap active:scale-95 shadow-sm"
+                    className="px-4 py-2 text-xs font-bold bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-100 dark:border-dark-border transition-all duration-200 whitespace-nowrap active:scale-95 shadow-sm"
                   >
                     {range.label}
                   </button>
@@ -892,16 +991,21 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Date Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="cash-date-start"
+                  className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
+                >
                   {dateRangeMode === "single" ? "Data" : "Data Inicial"}
                 </label>
                 <div className="flex items-center">
-                  <Calendar className="h-4 w-4 text-gray-500 mr-2" />
+                  <Calendar className="h-4 w-4 text-gray-500 dark:text-dark-text-secondary mr-2" />
                   <input
                     type="date"
+                    id="cash-date-start"
+                    name="cashDateStart"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
                   />
                 </div>
               </div>
@@ -909,17 +1013,22 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               {/* End Date (only in range mode) */}
               {dateRangeMode === "range" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="cash-date-end"
+                    className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
+                  >
                     Data Final
                   </label>
                   <div className="flex items-center">
-                    <Calendar className="h-4 w-4 text-gray-500 mr-2" />
+                    <Calendar className="h-4 w-4 text-gray-500 dark:text-dark-text-secondary mr-2" />
                     <input
                       type="date"
+                      id="cash-date-end"
+                      name="cashDateEnd"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
                       min={selectedDate}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
                     />
                   </div>
                 </div>
@@ -927,13 +1036,18 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
               {/* Collector Filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="cash-collector"
+                  className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
+                >
                   Cobrador
                 </label>
                 <select
+                  id="cash-collector"
+                  name="cashCollector"
                   value={selectedCollector}
                   onChange={(e) => setSelectedCollector(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
                 >
                   <option value="all">Todos os Cobradores</option>
                   {availableCollectors.map((collector) => (
@@ -946,13 +1060,18 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
               {/* Store Filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="cash-store"
+                  className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
+                >
                   Loja
                 </label>
                 <select
+                  id="cash-store"
+                  name="cashStore"
                   value={selectedStore}
                   onChange={(e) => setSelectedStore(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
                 >
                   <option value="all">Todas as Lojas</option>
                   {availableStores.map((store) => (
@@ -965,37 +1084,47 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
               {/* Amount Range */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="cash-min-amount"
+                  className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
+                >
                   Valor Mínimo
                 </label>
                 <div className="flex items-center">
-                  <DollarSign className="h-4 w-4 text-gray-500 mr-2" />
+                  <DollarSign className="h-4 w-4 text-gray-500 dark:text-dark-text-secondary mr-2" />
                   <input
                     type="number"
+                    id="cash-min-amount"
+                    name="cashMinAmount"
                     step="0.01"
                     min="0"
                     value={minAmount}
                     onChange={(e) => setMinAmount(e.target.value)}
                     placeholder="0,00"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="cash-max-amount"
+                  className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
+                >
                   Valor Máximo
                 </label>
                 <div className="flex items-center">
-                  <DollarSign className="h-4 w-4 text-gray-500 mr-2" />
+                  <DollarSign className="h-4 w-4 text-gray-500 dark:text-dark-text-secondary mr-2" />
                   <input
                     type="number"
+                    id="cash-max-amount"
+                    name="cashMaxAmount"
                     step="0.01"
                     min="0"
                     value={maxAmount}
                     onChange={(e) => setMaxAmount(e.target.value)}
                     placeholder="∞"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
                   />
                 </div>
               </div>
@@ -1115,38 +1244,38 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 return (
                   <div
                     key={collector.collectorId}
-                    className="bg-white rounded-[1.5rem] border border-gray-100 p-5 hover:shadow-xl transition-all duration-300 group animate-in fade-in slide-in-from-bottom-2"
+                    className="bg-white dark:bg-dark-bg-secondary rounded-[1.5rem] border border-gray-100 dark:border-dark-border p-5 hover:shadow-xl dark:hover:shadow-black/25 transition-all duration-300 group animate-in fade-in slide-in-from-bottom-2"
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <div
                           className={`h-12 w-12 rounded-full flex items-center justify-center font-black text-lg shadow-sm border-2 ${
                             index === 0
-                              ? "bg-amber-50 border-amber-200 text-amber-700"
-                              : "bg-blue-50 border-blue-100 text-blue-700"
+                              ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/30 text-amber-700 dark:text-amber-400"
+                              : "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30 text-blue-700 dark:text-blue-400"
                           }`}
                         >
                           {collector.collectorName.charAt(0)}
                         </div>
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <h4 className="font-bold text-gray-900 leading-tight">
+                            <h4 className="font-bold text-gray-900 dark:text-dark-text leading-tight">
                               {collector.collectorName}
                             </h4>
                             {index === 0 && (
                               <Award className="h-4 w-4 text-amber-500 fill-amber-500" />
                             )}
                           </div>
-                          <p className="text-[10px] font-black text-gray-400 tracking-wider">
+                          <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wider">
                             {collector.transactionCount} Transações
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xl font-black text-gray-900">
+                        <p className="text-xl font-black text-gray-900 dark:text-dark-text">
                           {formatCurrency(collector.receivedAmount)}
                         </p>
-                        <p className="text-[10px] font-bold text-gray-400">
+                        <p className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary">
                           {percentage.toFixed(1)}% do total
                         </p>
                       </div>
@@ -1154,7 +1283,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
                     {/* Barra de Progresso */}
                     <div className="space-y-1.5">
-                      <div className="h-1.5 w-full bg-gray-50 rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-gray-50 dark:bg-dark-bg rounded-full overflow-hidden">
                         <div
                           className={`h-full transition-all duration-1000 ease-out ${
                             index === 0 ? "bg-amber-500" : "bg-blue-500"
@@ -1162,7 +1291,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
-                      <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 tracking-tighter">
+                      <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-tighter">
                         <span>
                           Ticket:{" "}
                           {formatCurrency(
@@ -1177,15 +1306,15 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     </div>
 
                     {collector.saleNumbers.length > 0 && showDetails && (
-                      <div className="mt-4 pt-4 border-t border-dashed border-gray-100">
-                        <p className="text-[10px] font-black text-gray-400 tracking-wider mb-2 flex items-center gap-1">
+                      <div className="mt-4 pt-4 border-t border-dashed border-gray-100 dark:border-dark-border">
+                        <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wider mb-2 flex items-center gap-1">
                           <Receipt className="h-3 w-3" /> Vendas Realizadas
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {collector.saleNumbers.slice(0, 5).map((num) => (
                             <span
                               key={num}
-                              className="px-2 py-0.5 bg-gray-50 text-gray-600 rounded text-[10px] font-bold border border-gray-100"
+                              className="px-2 py-0.5 bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary rounded text-[10px] font-bold border border-gray-100 dark:border-dark-border"
                             >
                               #{num}
                             </span>
@@ -1208,44 +1337,44 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       {/* Transações Detalhadas - Melhor organização */}
       {showDetails && reportData.payments.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
             Transações Detalhadas
           </h3>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-150 dark:border-dark-border overflow-hidden">
             <div className="overflow-x-auto">
               {/* Tabela Responsiva Otimizada */}
               <table className="w-full table-auto border-collapse">
-                <thead className="bg-gray-50/50 border-b border-gray-100">
+                <thead className="bg-gray-50/50 dark:bg-dark-bg/40 border-b border-gray-100 dark:border-dark-border">
                   <tr>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 tracking-wide min-w-[200px]">
+                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide min-w-[200px]">
                       Cliente / Venda
                     </th>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 tracking-wide hidden 2xl:table-cell">
+                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide hidden 2xl:table-cell">
                       Loja
                     </th>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 tracking-wide hidden xl:table-cell">
+                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide hidden xl:table-cell">
                       Forma
                     </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 tracking-wide">
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide">
                       Recebido
                     </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 tracking-wide hidden xl:table-cell">
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide hidden xl:table-cell">
                       Pago (Acum.)
                     </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 tracking-wide hidden md:table-cell">
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide hidden md:table-cell">
                       Desconto
                     </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 tracking-wide hidden lg:table-cell">
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide hidden lg:table-cell">
                       Total Dívida
                     </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 tracking-wide">
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide">
                       Pendente
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {reportData.payments.map((payment, index) => {
+                <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
+                  {paginatedPayments.map((payment, index) => {
                     const method = payment.paymentMethod?.toLowerCase() || "";
                     const methodColor = method.includes("pix")
                       ? "bg-indigo-50 text-indigo-700 border-indigo-100"
@@ -1260,7 +1389,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     return (
                       <tr
                         key={`${payment.saleKey}-${index}`}
-                        className="hover:bg-blue-50/30 transition-colors group animate-in fade-in slide-in-from-left-2"
+                        className="hover:bg-blue-50/30 dark:hover:bg-dark-bg/60 transition-colors group animate-in fade-in slide-in-from-left-2"
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
                         <td className="px-4 py-4">
@@ -1269,24 +1398,24 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                               onClick={() =>
                                 handleOpenClientModal(payment.clientDocument)
                               }
-                              className="text-sm font-bold text-gray-900 leading-none mb-1 text-left hover:text-blue-600 transition-colors"
+                              className="text-sm font-bold text-gray-900 dark:text-dark-text leading-none mb-1 text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors bg-transparent"
                             >
                               {payment.client}
                             </button>
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded tracking-tighter">
+                              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded tracking-tighter">
                                 {payment.saleNumber
                                   ? `Venda #${payment.saleNumber}`
                                   : "Sem número"}
                               </span>
-                              <span className="text-[10px] font-medium text-gray-400 font-mono hidden sm:inline">
+                              <span className="text-[10px] font-medium text-gray-400 dark:text-dark-text-secondary font-mono hidden sm:inline">
                                 {payment.clientDocument}
                               </span>
                             </div>
                           </div>
                         </td>
                         <td className="px-4 py-4 hidden 2xl:table-cell">
-                          <p className="text-xs font-semibold text-gray-500 truncate max-w-[120px]">
+                          <p className="text-xs font-semibold text-gray-500 dark:text-dark-text-secondary truncate max-w-[120px]">
                             {payment.store}
                           </p>
                         </td>
@@ -1298,18 +1427,18 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                           </span>
                         </td>
                         <td className="px-4 py-4 text-right">
-                          <p className="text-sm font-black text-emerald-600">
+                          <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">
                             {formatCurrency(payment.totalReceivedValue)}
                           </p>
                         </td>
                         <td className="px-4 py-4 text-right hidden xl:table-cell">
-                          <p className="text-xs font-bold text-gray-500">
+                          <p className="text-xs font-bold text-gray-500 dark:text-dark-text-secondary">
                             {formatCurrency(payment.totalPaidOnDebt)}
                           </p>
                         </td>
                         <td className="px-4 py-4 text-right hidden md:table-cell">
                           <p
-                            className={`text-xs font-bold ${payment.totalDiscount > 0 ? "text-orange-600" : "text-gray-300"}`}
+                            className={`text-xs font-bold ${payment.totalDiscount > 0 ? "text-orange-600" : "text-gray-350 dark:text-gray-650"}`}
                           >
                             {payment.totalDiscount > 0
                               ? formatCurrency(payment.totalDiscount)
@@ -1317,13 +1446,13 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                           </p>
                         </td>
                         <td className="px-4 py-4 text-right hidden lg:table-cell">
-                          <p className="text-xs font-bold text-gray-400">
+                          <p className="text-xs font-bold text-gray-400 dark:text-dark-text-secondary">
                             {formatCurrency(payment.totalDebt)}
                           </p>
                         </td>
                         <td className="px-4 py-4 text-right">
                           <p
-                            className={`text-sm font-black ${payment.remainingDebt > 0 ? "text-red-600" : "text-gray-400"}`}
+                            className={`text-sm font-black ${payment.remainingDebt > 0 ? "text-red-650 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}
                           >
                             {payment.remainingDebt > 0
                               ? formatCurrency(payment.remainingDebt)
@@ -1336,18 +1465,52 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                 </tbody>
               </table>
             </div>
+
+            {detailsTotalPages > 1 && (
+              <div className="flex items-center justify-between gap-4 px-4 py-3 border-t border-gray-100 dark:border-dark-border">
+                <span className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                  Mostrando {(detailsPage - 1) * DETAILS_PER_PAGE + 1}–
+                  {Math.min(
+                    detailsPage * DETAILS_PER_PAGE,
+                    reportData.payments.length,
+                  )}{" "}
+                  de {reportData.payments.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setDetailsPage((p) => Math.max(1, p - 1))}
+                    disabled={detailsPage === 1}
+                    className="flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="px-3 text-sm font-semibold text-gray-700 dark:text-dark-text tabular-nums">
+                    {detailsPage} / {detailsTotalPages}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setDetailsPage((p) => Math.min(detailsTotalPages, p + 1))
+                    }
+                    disabled={detailsPage === detailsTotalPages}
+                    className="flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* Empty State */}
       {reportData.totalTransactions === 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
-          <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-12 text-center">
+          <FileText className="h-12 w-12 text-gray-400 dark:text-dark-text-secondary mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-dark-text mb-2">
             Nenhum recebimento encontrado
           </h3>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-dark-text-secondary">
             Não há recebimentos registrados para{" "}
             {dateRangeMode === "single"
               ? formatDate(selectedDate)

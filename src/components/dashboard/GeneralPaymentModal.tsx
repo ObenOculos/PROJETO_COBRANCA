@@ -41,13 +41,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const { addNotification } = useNotifications();
     const [loading, setLoading] = useState(false);
     const [distributionAmount, setDistributionAmount] = useState<string>("");
-    const [distributionMode] = useState<"auto" | "manual">("auto");
     const [saleDistribution, setSaleDistribution] = useState<
       SaleDistributionItem[]
     >([]);
-    const [manualSaleEdits, setManualSaleEdits] = useState<
-      Record<number, string>
-    >({});
     const [paymentMethod, setPaymentMethod] = useState("dinheiro");
     const [withDiscount, setWithDiscount] = useState(false);
     const [showRescheduleModal, setShowRescheduleModal] = useState(false);
@@ -90,7 +86,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     // Calcular distribuição automática por venda
     const calculateSaleDistribution = React.useCallback(() => {
       const paymentAmount = parseFloat(distributionAmount) || 0;
-      if (paymentAmount <= 0 && !withDiscount) {
+      // Exige um pagamento positivo mesmo na quitação com desconto: não faz
+      // sentido "quitar" sem receber nada (desconto de 100%).
+      if (paymentAmount <= 0) {
         setSaleDistribution([]);
         return;
       }
@@ -130,42 +128,12 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       }
 
       setSaleDistribution(newDistribution);
-
-      const initialManualValues: Record<number, string> = {};
-      newDistribution.forEach((item) => {
-        initialManualValues[item.sale.saleNumber] = item.newAmount.toFixed(2);
-      });
-      setManualSaleEdits(initialManualValues);
     }, [distributionAmount, clientSales, withDiscount, totalPending]);
 
     // Recalcular distribuição quando o valor mudar
     useEffect(() => {
-      if (distributionMode === "auto") {
-        calculateSaleDistribution();
-      }
-    }, [distributionAmount, distributionMode, calculateSaleDistribution]);
-
-    const handleManualSaleEdit = (saleNumber: number, value: string) => {
-      setManualSaleEdits((prev) => ({
-        ...prev,
-        [saleNumber]: value,
-      }));
-
-      // Atualizar distribuição com valor manual
-      setSaleDistribution((prev) =>
-        prev.map((item) => {
-          if (item.sale.saleNumber === saleNumber) {
-            const newAmount = parseFloat(value) || 0;
-            return {
-              ...item,
-              newAmount,
-              appliedAmount: newAmount - item.currentReceived,
-            };
-          }
-          return item;
-        }),
-      );
-    };
+      calculateSaleDistribution();
+    }, [distributionAmount, calculateSaleDistribution]);
 
     // Função para notificar manager sobre pagamentos com desconto
     const notifyManagerAboutDiscount = (discountAmount: number) => {
@@ -175,10 +143,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
       const paymentAmount = parseFloat(distributionAmount) || 0;
       const originalPendingAmount = totalPending;
-      const discountPercentage = (
-        (discountAmount / originalPendingAmount) *
-        100
-      ).toFixed(1);
+      const discountPercentage =
+        originalPendingAmount > 0
+          ? ((discountAmount / originalPendingAmount) * 100).toFixed(1)
+          : "0";
 
       const notificationData = {
         type: "payment" as const,
@@ -211,8 +179,20 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       }
 
       const inputAmount = parseFloat(distributionAmount) || 0;
-      if (inputAmount <= 0 && !withDiscount) {
+      // Exige valor positivo mesmo na quitação com desconto (sem "desconto de 100%").
+      if (inputAmount <= 0) {
         alert("O valor a distribuir deve ser maior que zero.");
+        return;
+      }
+
+      // Sem desconto, não permite pagar mais que o saldo devedor (o excedente
+      // seria descartado silenciosamente na distribuição).
+      if (!withDiscount && inputAmount > totalPending + 0.01) {
+        showErrorNotification(
+          new Error(
+            `O valor não pode ser maior que o saldo devedor (${formatCurrency(totalPending)}).`,
+          ),
+        );
         return;
       }
 
@@ -504,18 +484,22 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
               {/* Campo de Valor para Distribuição */}
               <div className="mb-6">
-                <label className="block text-base font-semibold text-gray-900 mb-3">
+                <label
+                  htmlFor="distribution-amount"
+                  className="block text-base font-semibold text-gray-900 mb-3"
+                >
                   Valor a Distribuir
                 </label>
                 <div className="relative">
                   <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 h-6 w-6 text-gray-400" />
                   <input
                     id="distribution-amount"
+                    name="distributionAmount"
                     type="number"
                     step="0.01"
                     value={distributionAmount}
                     onChange={(e) => setDistributionAmount(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base sm:text-2xl font-size: 16px font-bold"
+                    className="w-full pl-12 pr-4 py-4 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base sm:text-2xl font-bold"
                     placeholder="0,00"
                     required
                   />
@@ -573,6 +557,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     <input
                       type="checkbox"
                       id="with-discount"
+                      name="withDiscount"
                       className="sr-only"
                       checked={withDiscount}
                       onChange={(e) => setWithDiscount(e.target.checked)}
@@ -587,10 +572,15 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
               {/* Forma de Pagamento */}
               <div className="mb-6">
-                <label className="block text-base font-semibold text-gray-900 mb-3">
+                <label
+                  htmlFor="payment-method"
+                  className="block text-base font-semibold text-gray-900 mb-3"
+                >
                   Forma de Pagamento
                 </label>
                 <select
+                  id="payment-method"
+                  name="paymentMethod"
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
@@ -604,10 +594,15 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
               {/* Campo de Observações (New) */}
               <div className="mb-6">
-                <label className="block text-base font-semibold text-gray-900 mb-3">
+                <label
+                  htmlFor="observations"
+                  className="block text-base font-semibold text-gray-900 mb-3"
+                >
                   Observações
                 </label>
                 <textarea
+                  id="observations"
+                  name="observations"
                   value={observations}
                   onChange={(e) => setObservations(e.target.value)}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
@@ -671,31 +666,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             <div className="text-xs text-gray-600 mb-1">
                               Novo Total Recebido
                             </div>
-                            {distributionMode === "manual" ? (
-                              <div className="flex items-center">
-                                <DollarSign className="h-4 w-4 text-gray-400 mr-1" />
-                                <input
-                                  id={`manual-sale-edit-${item.sale.saleNumber}`}
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={
-                                    manualSaleEdits[item.sale.saleNumber] || ""
-                                  }
-                                  onChange={(e) =>
-                                    handleManualSaleEdit(
-                                      item.sale.saleNumber,
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-semibold"
-                                />
-                              </div>
-                            ) : (
-                              <div className="font-semibold text-green-600 text-base">
-                                {formatCurrency(item.newAmount)}
-                              </div>
-                            )}
+                            <div className="font-semibold text-green-600 text-base">
+                              {formatCurrency(item.newAmount)}
+                            </div>
                           </div>
 
                           <div className="bg-purple-50 rounded-2xl p-3">
@@ -754,7 +727,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     disabled={
                       loading ||
                       saleDistribution.length === 0 ||
-                      (amountToDistribute <= 0 && !withDiscount)
+                      amountToDistribute <= 0
                     }
                     className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg text-base"
                   >
@@ -796,7 +769,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 </p>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="reschedule-date"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
                       Nova Data *
                     </label>
                     <div className="relative">
@@ -814,7 +790,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="reschedule-time"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
                       Novo Horário *
                     </label>
                     <div className="relative">
@@ -836,6 +815,15 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
                 <button
                   id="cancel-reschedule-button"
+                  type="button"
+                  onClick={() => setShowRescheduleModal(false)}
+                  disabled={loading}
+                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-base"
+                >
+                  Cancelar
+                </button>
+                <button
+                  id="confirm-reschedule-button"
                   type="button"
                   onClick={handleConfirmReschedule}
                   disabled={loading || !rescheduleDate || !rescheduleTime}

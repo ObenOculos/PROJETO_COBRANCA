@@ -152,29 +152,29 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       case "collections":
         return (
           <div className="space-y-3 sm:space-y-4">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 lg:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 lg:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center justify-between w-full sm:w-auto">
-                <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center">
-                  <FileText className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 flex-shrink-0" />
+                <h2 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-dark-text flex items-center">
+                  <FileText className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                   Cobranças
                 </h2>
                 {collectionsView !== "cash-report" && (
                   <button
                     onClick={() => setIsFilterVisible(!isFilterVisible)}
-                    className="md:hidden p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-colors"
+                    className="md:hidden p-2 text-gray-600 dark:text-dark-text-secondary hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-2xl transition-colors"
                     title="Filtros"
                   >
                     <Filter className="h-5 w-5" />
                   </button>
                 )}
               </div>
-              <div className="flex bg-gray-100 rounded-md p-0.5 w-full sm:w-auto">
+              <div className="flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5 w-full sm:w-auto">
                 <button
                   onClick={() => setCollectionsView("table")}
                   className={`flex-1 sm:flex-none px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
                     collectionsView === "table"
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:text-gray-900"
+                      ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
                   }`}
                 >
                   <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2 inline" />
@@ -185,8 +185,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   onClick={() => setCollectionsView("cash-report")}
                   className={`flex-1 sm:flex-none px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
                     collectionsView === "cash-report"
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:text-gray-900"
+                      ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
                   }`}
                 >
                   <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2 inline" />
