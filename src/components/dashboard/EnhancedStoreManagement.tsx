@@ -809,7 +809,7 @@ const EnhancedStoreManagement: React.FC = () => {
                         className={`p-2.5 rounded-xl border ${store.overdueAmount > 0.01 ? "bg-red-50/30 dark:bg-red-950/10 border-red-100/20 dark:border-red-900/10" : "bg-gray-50/30 dark:bg-dark-bg/30 border-gray-100/20 dark:border-dark-border/10"}`}
                       >
                         <span
-                          className={`text-[9px] font-bold tracking-wider uppercase block mb-0.5 flex items-center gap-1 ${store.overdueAmount > 0.01 ? "text-red-700 dark:text-red-400" : "text-gray-405 dark:text-dark-text-secondary"}`}
+                          className={`text-[9px] font-bold tracking-wider uppercase mb-0.5 flex items-center gap-1 ${store.overdueAmount > 0.01 ? "text-red-700 dark:text-red-400" : "text-gray-405 dark:text-dark-text-secondary"}`}
                         >
                           Atrasado
                           {store.overdueTitles > 0 && (
