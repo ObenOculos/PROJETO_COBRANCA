@@ -30,7 +30,8 @@ import { countVendas } from "../filters/sales";
 import { getClientPending } from "../filters/clientStatus";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { parseAndNormalizeDate } from "../filters/dates";
-import { clientMatchesFilters } from "../filters/predicates";
+import { clientMatchesFilters, ClientFilters } from "../filters/predicates";
+import { computeClientFacets } from "../filters/facets";
 import FilterPanel from "./filters/FilterPanel";
 import FilterPills from "./filters/FilterPills";
 import {
@@ -428,34 +429,6 @@ export const ClientAssignment = React.memo(
       return Array.from(clientsMap.values());
     }, [collections, users]);
 
-    const availableCities = useMemo(() => {
-      const cities = new Set<string>();
-      clientsData.forEach((client) => {
-        if (client.cidade) cities.add(client.cidade);
-      });
-      return Array.from(cities).sort();
-    }, [clientsData]);
-
-    const availableNeighborhoods = useMemo(() => {
-      const neighborhoods = new Set<string>();
-      clientsData.forEach((client) => {
-        if (client.bairro && (!filterCity || client.cidade === filterCity)) {
-          neighborhoods.add(client.bairro);
-        }
-      });
-      return Array.from(neighborhoods).sort();
-    }, [clientsData, filterCity]);
-
-    const availableStores = useMemo(() => {
-      const stores = new Set<string>();
-      clientsData.forEach((client) => {
-        client.collections.forEach((collection) => {
-          if (collection.nome_da_loja) stores.add(collection.nome_da_loja);
-        });
-      });
-      return Array.from(stores).sort();
-    }, [clientsData]);
-
     const activeFilterChips = useMemo(() => {
       const chips = [];
 
@@ -608,59 +581,68 @@ export const ClientAssignment = React.memo(
       collectors,
     ]);
 
+    // Conjunto atual de filtros no vocabulario do motor compartilhado
+    // (src/filters/predicates). Fonte unica reutilizada pela filtragem da lista
+    // e pelo faceting dos dropdowns. O "status de atribuicao" (com/sem cobrador)
+    // mora em `assignment`, distinto do status de pagamento (clientStatus).
+    const currentClientFilters = useMemo<ClientFilters>(
+      () => ({
+        search: searchTerm,
+        collector: filterCollector,
+        assignment: filterStatus as "" | "with_collector" | "without_collector",
+        city: filterCity,
+        neighborhood: filterNeighborhood,
+        store: filterStore,
+        situacao: filterSituacao,
+        paymentStatus: filterPaymentStatuses,
+        dueFrom: filterDateFrom,
+        dueTo: filterDateTo,
+        includeWithoutDue: includeWithoutDate,
+        launchFrom: filterLaunchFrom,
+        launchTo: filterLaunchTo,
+        minAmount: filterMinAmount,
+        maxAmount: filterMaxAmount,
+        createdFrom: filterCreatedFrom,
+        createdTo: filterCreatedTo,
+      }),
+      [
+        searchTerm,
+        filterCollector,
+        filterStatus,
+        filterCity,
+        filterNeighborhood,
+        filterStore,
+        filterSituacao,
+        filterPaymentStatuses,
+        filterDateFrom,
+        filterDateTo,
+        includeWithoutDate,
+        filterLaunchFrom,
+        filterLaunchTo,
+        filterMinAmount,
+        filterMaxAmount,
+        filterCreatedFrom,
+        filterCreatedTo,
+      ],
+    );
+
     const filteredClients = useMemo(() => {
-      // Filtros aplicados pelo motor compartilhado (src/filters/predicates).
-      // O vocabulario "status de atribuicao" (com/sem cobrador) mora em
-      // `assignment`, distinto do status de pagamento (src/filters/clientStatus).
       return clientsData.filter((client) =>
-        clientMatchesFilters(
-          client,
-          {
-            search: searchTerm,
-            collector: filterCollector,
-            assignment: filterStatus as
-              | ""
-              | "with_collector"
-              | "without_collector",
-            city: filterCity,
-            neighborhood: filterNeighborhood,
-            store: filterStore,
-            situacao: filterSituacao,
-            paymentStatus: filterPaymentStatuses,
-            dueFrom: filterDateFrom,
-            dueTo: filterDateTo,
-            includeWithoutDue: includeWithoutDate,
-            launchFrom: filterLaunchFrom,
-            launchTo: filterLaunchTo,
-            minAmount: filterMinAmount,
-            maxAmount: filterMaxAmount,
-            createdFrom: filterCreatedFrom,
-            createdTo: filterCreatedTo,
-          },
+        clientMatchesFilters(client, currentClientFilters, clientCreatedAtMap),
+      );
+    }, [clientsData, currentClientFilters, clientCreatedAtMap]);
+
+    // Opcoes dos dropdowns dependentes (faceting): cada lista mostra apenas os
+    // valores compativeis com os demais filtros ativos. Ver src/filters/facets.
+    const facetOptions = useMemo(
+      () =>
+        computeClientFacets(
+          clientsData,
+          currentClientFilters,
           clientCreatedAtMap,
         ),
-      );
-    }, [
-      clientsData,
-      searchTerm,
-      filterCollector,
-      filterStatus,
-      filterCity,
-      filterNeighborhood,
-      filterStore,
-      filterSituacao,
-      filterPaymentStatuses,
-      filterDateFrom,
-      filterDateTo,
-      includeWithoutDate,
-      filterLaunchFrom,
-      filterLaunchTo,
-      filterMinAmount,
-      filterMaxAmount,
-      filterCreatedFrom,
-      filterCreatedTo,
-      clientCreatedAtMap,
-    ]);
+      [clientsData, currentClientFilters, clientCreatedAtMap],
+    );
 
     // Assinatura dos filtros: muda SO quando o usuario altera um filtro/busca, e
     // nao quando os dados mudam (ex.: atribuicao otimista). Assim, ao mudar o
@@ -1618,9 +1600,10 @@ export const ClientAssignment = React.memo(
                 onClose={() => setShowFilters(false)}
                 excludePaymentStatus={["cancelado"]}
                 options={{
-                  cities: availableCities,
-                  neighborhoods: availableNeighborhoods,
-                  stores: availableStores,
+                  cities: facetOptions.cities,
+                  neighborhoods: facetOptions.neighborhoods,
+                  stores: facetOptions.stores,
+                  situacoes: facetOptions.situacoes,
                 }}
               />
             )}

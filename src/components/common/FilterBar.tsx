@@ -14,6 +14,7 @@ import {
   PAYMENT_STATUS_PILLS,
 } from "../../filters/filterConfig";
 import type { PillPatch } from "../filters/FilterPills";
+import { distinctSorted } from "../../filters/facets";
 
 import { FilterOptions, UserType, isCollectorType } from "../../types";
 
@@ -46,8 +47,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   showAgingPills = true,
   children,
 }) => {
-  const { getAvailableStores, users, getCollectorCollections, collections } =
-    useCollection();
+  const { users, getFilteredCollections } = useCollection();
   const { user } = useAuth();
   const [isExpanded, setIsExpanded] = React.useState(false);
   // Mobile: recolhe pills/children atrás de um chevron (no desktop ficam sempre visíveis).
@@ -72,60 +72,41 @@ const FilterBar: React.FC<FilterBarProps> = ({
     }
   }, [filters.search]);
 
-  const availableStores = getAvailableStores();
   const collectors = users.filter((u) => isCollectorType(u.type));
 
-  // Para cobradores, buscar apenas as lojas dos seus clientes
-  const getCollectorStores = () => {
-    if (userType === "manager" || !user) return availableStores;
-    const myCollections = getCollectorCollections(user.id);
-    const stores = Array.from(
-      new Set(myCollections.map((c) => c.nome_da_loja).filter(Boolean)),
-    );
-    return stores.sort();
-  };
+  // Filtros dependentes entre si (faceting): as opcoes de cada dimensao sao os
+  // valores que sobram ao aplicar TODOS os filtros ativos EXCETO o da propria
+  // dimensao. Reutiliza getFilteredCollections (mesmo predicado das telas
+  // consumidoras); para cobradores ele ja restringe ao escopo do usuario, entao
+  // as listas ficam naturalmente limitadas aos clientes dele. Opcoes sem
+  // resultado nao aparecem. `omit` zera a dimensao para permitir troca-la depois
+  // de selecionada (o valor atual e os demais compativeis continuam visiveis).
+  const facetCollections = React.useCallback(
+    (omit: keyof FilterOptions) =>
+      getFilteredCollections(
+        { ...filters, [omit]: undefined },
+        userType,
+        user?.id,
+      ),
+    [filters, userType, user, getFilteredCollections],
+  );
 
   const collectorStores = React.useMemo(
-    () => getCollectorStores(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [userType, user, getCollectorCollections, availableStores],
+    () => distinctSorted(facetCollections("store").map((c) => c.nome_da_loja)),
+    [facetCollections],
   );
-
-  // Para cobradores, buscar apenas as cidades e bairros dos seus clientes
-  const getCollectorCities = React.useCallback(() => {
-    if (userType === "manager" || !user) return [];
-    const myCollections = getCollectorCollections(user.id);
-    const cities = Array.from(
-      new Set(myCollections.map((c) => c.cidade).filter(Boolean)),
-    );
-    return cities.sort();
-  }, [userType, user, getCollectorCollections]);
-
-  const getCollectorNeighborhoods = React.useCallback(() => {
-    if (userType === "manager" || !user) return [];
-    const myCollections = getCollectorCollections(user.id);
-    const neighborhoods = Array.from(
-      new Set(myCollections.map((c) => c.bairro).filter(Boolean)),
-    );
-    return neighborhoods.sort();
-  }, [userType, user, getCollectorCollections]);
-
-  // Cidades para o gerente: derivadas de todas as collections (getCollectorCities
-  // retorna [] para manager). Usado pelos contextos de agregacao (Performance/Lojas).
-  const managerCities = React.useMemo(() => {
-    if (userType !== "manager") return [];
-    return Array.from(
-      new Set(collections.map((c) => c.cidade).filter(Boolean)),
-    ).sort() as string[];
-  }, [userType, collections]);
-
   const collectorCities = React.useMemo(
-    () => (userType === "manager" ? managerCities : getCollectorCities()),
-    [userType, managerCities, getCollectorCities],
+    () => distinctSorted(facetCollections("city").map((c) => c.cidade)),
+    [facetCollections],
   );
   const collectorNeighborhoods = React.useMemo(
-    () => getCollectorNeighborhoods(),
-    [getCollectorNeighborhoods],
+    () => distinctSorted(facetCollections("neighborhood").map((c) => c.bairro)),
+    [facetCollections],
+  );
+  // Ids de cobradores presentes no conjunto facetado (para narrar o dropdown).
+  const availableCollectorIds = React.useMemo(
+    () => new Set(facetCollections("collector").map((c) => c.user_id)),
+    [facetCollections],
   );
 
   const clearFilters = () => {
@@ -214,13 +195,24 @@ const FilterBar: React.FC<FilterBarProps> = ({
     onFilterChange(next);
   };
 
+  // Garante que o valor atualmente selecionado nunca some da propria lista
+  // (protege combinacoes degeneradas em que o faceting zeraria os resultados).
+  const withSelected = (list: string[], selected?: string): string[] =>
+    selected && !list.includes(selected)
+      ? [...list, selected].sort((a, b) => a.localeCompare(b, "pt-BR"))
+      : list;
+
   const panelOptions = {
-    stores: collectorStores.filter((s): s is string => Boolean(s)),
-    cities: collectorCities.filter((c): c is string => Boolean(c)),
-    neighborhoods: collectorNeighborhoods.filter((n): n is string =>
-      Boolean(n),
-    ),
-    collectors: collectors.map((c) => ({ value: c.id, label: c.name })),
+    stores: withSelected(collectorStores, filters.store),
+    cities: withSelected(collectorCities, filters.city),
+    neighborhoods: withSelected(collectorNeighborhoods, filters.neighborhood),
+    // Cobradores facetados: apenas os presentes no conjunto atual (mais o
+    // selecionado, para permitir troca-lo).
+    collectors: collectors
+      .filter(
+        (c) => availableCollectorIds.has(c.id) || c.id === filters.collector,
+      )
+      .map((c) => ({ value: c.id, label: c.name })),
   };
 
   // Chips de filtros ativos (mesmo padrao visual da Atribuicao).

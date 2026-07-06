@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Calendar,
   CalendarClock,
@@ -24,6 +24,7 @@ import * as XLSX from "xlsx";
 import { useAuth } from "../../contexts/AuthContext";
 import { ScheduledVisit, isCollectorType, UserType } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
+import { distinctSorted } from "../../filters/facets";
 import VisitScheduler from "./VisitScheduler"; // Import the VisitScheduler component
 import AllowedVisitDatesManager from "./AllowedVisitDatesManager"; // Import the AllowedVisitDatesManager component
 import ClearVisitsModal, { pendingVisitsCount } from "./ClearVisitsModal";
@@ -74,26 +75,6 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const [cityFilter, setCityFilter] = useState<string>("all");
   const [neighborhoodFilter, setNeighborhoodFilter] = useState<string>("all");
   const [showCityStats, setShowCityStats] = useState(false);
-
-  // Get available cities and neighborhoods from scheduled visits
-  const availableCities = useMemo(() => {
-    const cities = new Set<string>();
-    scheduledVisits.forEach((v) => {
-      if (v.clientCity) cities.add(v.clientCity);
-    });
-    return Array.from(cities).sort();
-  }, [scheduledVisits]);
-
-  const availableNeighborhoods = useMemo(() => {
-    const neighborhoods = new Set<string>();
-    scheduledVisits.forEach((v) => {
-      const cityMatch = cityFilter === "all" || v.clientCity === cityFilter;
-      if (cityMatch && v.clientNeighborhood) {
-        neighborhoods.add(v.clientNeighborhood);
-      }
-    });
-    return Array.from(neighborhoods).sort();
-  }, [scheduledVisits, cityFilter]);
 
   // Calculate city statistics
   const cityStats = useMemo(() => {
@@ -420,8 +401,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     }
   };
 
-  const filteredVisitsFlat = useMemo(() => {
-    return scheduledVisits.filter((visit) => {
+  // Predicado unico de filtragem de uma visita. `omit` ignora UMA dimensao ao
+  // avaliar — usado pelo faceting dos dropdowns (Cidade/Bairro dependentes entre
+  // si): as opcoes de cada um sao calculadas aplicando todos os filtros ativos
+  // exceto o da propria dimensao, o que mantem o valor atual trocavel.
+  const visitMatchesFilters = useCallback(
+    (visit: ScheduledVisit, omit?: "city" | "neighborhood"): boolean => {
       // Filtro por cobrador
       if (
         selectedCollector !== "all" &&
@@ -443,10 +428,16 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       if (!isDateInRange(visit.scheduledDate)) return false;
 
       // Filtro por cidade
-      if (cityFilter !== "all" && visit.clientCity !== cityFilter) return false;
+      if (
+        omit !== "city" &&
+        cityFilter !== "all" &&
+        visit.clientCity !== cityFilter
+      )
+        return false;
 
       // Filtro por bairro
       if (
+        omit !== "neighborhood" &&
         neighborhoodFilter !== "all" &&
         visit.clientNeighborhood !== neighborhoodFilter
       )
@@ -478,18 +469,57 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       }
 
       return true;
-    });
-  }, [
-    scheduledVisits,
-    selectedCollector,
-    typeFilter,
-    collectorTypeById,
-    statusFilter,
-    dateFromFilter,
-    dateToFilter,
-    overdueFilter,
-    searchFilter,
-  ]);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      selectedCollector,
+      typeFilter,
+      collectorTypeById,
+      statusFilter,
+      dateFromFilter,
+      dateToFilter,
+      overdueFilter,
+      cityFilter,
+      neighborhoodFilter,
+      searchFilter,
+    ],
+  );
+
+  const filteredVisitsFlat = useMemo(
+    () => scheduledVisits.filter((visit) => visitMatchesFilters(visit)),
+    [scheduledVisits, visitMatchesFilters],
+  );
+
+  // Opcoes dos dropdowns dependentes (faceting) sobre as visitas agendadas.
+  // Cidade e Bairro se estreitam mutuamente e respeitam os demais filtros da
+  // tela (cobrador, status, atraso, busca, periodo). O valor atualmente
+  // selecionado e sempre preservado na propria lista.
+  const availableCities = useMemo(() => {
+    const cities = distinctSorted(
+      scheduledVisits
+        .filter((v) => visitMatchesFilters(v, "city"))
+        .map((v) => v.clientCity),
+    );
+    if (cityFilter !== "all" && !cities.includes(cityFilter)) {
+      return distinctSorted([...cities, cityFilter]);
+    }
+    return cities;
+  }, [scheduledVisits, visitMatchesFilters, cityFilter]);
+
+  const availableNeighborhoods = useMemo(() => {
+    const neighborhoods = distinctSorted(
+      scheduledVisits
+        .filter((v) => visitMatchesFilters(v, "neighborhood"))
+        .map((v) => v.clientNeighborhood),
+    );
+    if (
+      neighborhoodFilter !== "all" &&
+      !neighborhoods.includes(neighborhoodFilter)
+    ) {
+      return distinctSorted([...neighborhoods, neighborhoodFilter]);
+    }
+    return neighborhoods;
+  }, [scheduledVisits, visitMatchesFilters, neighborhoodFilter]);
 
   // Agrupa visitas por cobrador com filtros avançados
   const getVisitsByCollectorGrouped = () => {

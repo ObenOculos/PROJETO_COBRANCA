@@ -664,7 +664,9 @@ export const CollectionTable = React.forwardRef<
         <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-150 dark:border-dark-border p-8">
           <div className="flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400 mr-3" />
-            <span className="text-gray-600 dark:text-dark-text-secondary">Carregando dados...</span>
+            <span className="text-gray-600 dark:text-dark-text-secondary">
+              Carregando dados...
+            </span>
           </div>
         </div>
       );

@@ -27,6 +27,12 @@ interface FilterPanelOptions {
   stores?: string[];
   /** Cobradores selecionaveis (contexto de cobranca do gerente). */
   collectors?: SelectOption[];
+  /**
+   * Values de situacao permitidos (faceting). Quando fornecido, o dropdown de
+   * Situacao lista apenas essas opcoes (mais o valor atualmente selecionado).
+   * Ausente = lista completa (comportamento dos contextos que nao facetam).
+   */
+  situacoes?: string[];
 }
 
 interface FilterPanelProps {
@@ -146,7 +152,17 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     neighborhoods = [],
     stores = [],
     collectors = [],
+    situacoes,
   } = options;
+
+  // Faceting da situacao: quando `situacoes` e fornecido, mantem apenas as opcoes
+  // presentes no conjunto filtrado (sempre preservando a que esta selecionada,
+  // para nao "sumir" com o valor ativo do dropdown).
+  const situacaoOptions = situacoes
+    ? SITUACAO_OPTIONS.filter(
+        (o) => situacoes.includes(o.value) || o.value === values.situacao,
+      )
+    : SITUACAO_OPTIONS;
 
   const renderSelect = (
     field: keyof FilterValues,
@@ -251,7 +267,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             label="Situação"
             htmlFor="filter-situacao"
           >
-            {renderSelect("situacao", "Todas as situações", SITUACAO_OPTIONS)}
+            {renderSelect("situacao", "Todas as situações", situacaoOptions)}
           </Field>
         )}
 
