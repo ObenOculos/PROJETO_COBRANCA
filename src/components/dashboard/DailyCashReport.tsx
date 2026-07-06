@@ -28,6 +28,7 @@ import * as XLSX from "xlsx";
 import { Collection, isCollectorType } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
+import { resolveSaleKey } from "../../filters/sales";
 import { useAuth } from "../../contexts/AuthContext";
 import ClientDetailModal from "./ClientDetailModal";
 import { ClientGroup } from "../../types";
@@ -329,7 +330,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         let relatedCollection = collections.find(
           (c) =>
             c.documento === payment.clientDocument &&
-            c.venda_n === payment.saleNumber,
+            resolveSaleKey(c) === payment.saleNumber,
         );
 
         // Fallback para buscar a loja por documento se não achar pela venda específica
@@ -377,7 +378,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       let relatedCollection = collections.find(
         (c) =>
           c.documento === payment.clientDocument &&
-          c.venda_n === payment.saleNumber,
+          resolveSaleKey(c) === payment.saleNumber,
       );
 
       if (!relatedCollection) {
@@ -486,7 +487,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       let specificInstallment = collections.find(
         (c) =>
           c.documento === payment.clientDocument &&
-          c.venda_n === payment.saleNumber &&
+          resolveSaleKey(c) === payment.saleNumber &&
           c.id_parcela.toString() ===
             payment.distribution_details?.[0]?.installmentId?.toString(),
       );
@@ -502,7 +503,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         (c) =>
           c.documento === payment.clientDocument &&
           (payment.saleNumber && payment.saleNumber !== 0
-            ? c.venda_n === payment.saleNumber
+            ? resolveSaleKey(c) === payment.saleNumber
             : true),
       );
 

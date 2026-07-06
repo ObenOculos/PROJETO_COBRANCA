@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Calendar,
   CalendarClock,
@@ -405,73 +405,78 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   // avaliar — usado pelo faceting dos dropdowns (Cidade/Bairro dependentes entre
   // si): as opcoes de cada um sao calculadas aplicando todos os filtros ativos
   // exceto o da propria dimensao, o que mantem o valor atual trocavel.
-  const visitMatchesFilters = useCallback(
-    (visit: ScheduledVisit, omit?: "city" | "neighborhood"): boolean => {
-      // Filtro por cobrador
+  // Funcao pura (nao-hook) de proposito: este componente ja tem hooks apos um
+  // early-return; adicionar useCallback/useMemo aqui so ampliaria esse problema.
+  const visitMatchesFilters = (
+    visit: ScheduledVisit,
+    omit?: "city" | "neighborhood",
+  ): boolean => {
+    // Filtro por cobrador
+    if (selectedCollector !== "all" && visit.collectorId !== selectedCollector)
+      return false;
+
+    // Filtro por tipo de cobrador
+    if (
+      typeFilter !== "all" &&
+      collectorTypeById[visit.collectorId] !== typeFilter
+    )
+      return false;
+
+    // Filtro por status
+    if (statusFilter !== "all" && visit.status !== statusFilter) return false;
+
+    // Filtro por período de data
+    if (!isDateInRange(visit.scheduledDate)) return false;
+
+    // Filtro por cidade
+    if (
+      omit !== "city" &&
+      cityFilter !== "all" &&
+      visit.clientCity !== cityFilter
+    )
+      return false;
+
+    // Filtro por bairro
+    if (
+      omit !== "neighborhood" &&
+      neighborhoodFilter !== "all" &&
+      visit.clientNeighborhood !== neighborhoodFilter
+    )
+      return false;
+
+    // Filtro por atraso
+    if (overdueFilter !== "all") {
+      const isOverdue = isVisitOverdue(visit);
+      if (overdueFilter === "overdue" && !isOverdue) return false;
+      if (overdueFilter === "not_overdue" && isOverdue) return false;
+    }
+
+    // Filtro por busca de cliente
+    if (searchFilter.trim()) {
+      const searchTerm = searchFilter.toLowerCase().trim();
+      const clientName = visit.clientName?.toLowerCase() || "";
+      const clientDocument = visit.clientDocument?.toLowerCase() || "";
+      const clientAddress = visit.clientAddress?.toLowerCase() || "";
+      const visitNotes = visit.notes?.toLowerCase() || "";
+
       if (
-        selectedCollector !== "all" &&
-        visit.collectorId !== selectedCollector
-      )
+        !clientName.includes(searchTerm) &&
+        !clientDocument.includes(searchTerm) &&
+        !clientAddress.includes(searchTerm) &&
+        !visitNotes.includes(searchTerm)
+      ) {
         return false;
-
-      // Filtro por tipo de cobrador
-      if (
-        typeFilter !== "all" &&
-        collectorTypeById[visit.collectorId] !== typeFilter
-      )
-        return false;
-
-      // Filtro por status
-      if (statusFilter !== "all" && visit.status !== statusFilter) return false;
-
-      // Filtro por período de data
-      if (!isDateInRange(visit.scheduledDate)) return false;
-
-      // Filtro por cidade
-      if (
-        omit !== "city" &&
-        cityFilter !== "all" &&
-        visit.clientCity !== cityFilter
-      )
-        return false;
-
-      // Filtro por bairro
-      if (
-        omit !== "neighborhood" &&
-        neighborhoodFilter !== "all" &&
-        visit.clientNeighborhood !== neighborhoodFilter
-      )
-        return false;
-
-      // Filtro por atraso
-      if (overdueFilter !== "all") {
-        const isOverdue = isVisitOverdue(visit);
-        if (overdueFilter === "overdue" && !isOverdue) return false;
-        if (overdueFilter === "not_overdue" && isOverdue) return false;
       }
+    }
 
-      // Filtro por busca de cliente
-      if (searchFilter.trim()) {
-        const searchTerm = searchFilter.toLowerCase().trim();
-        const clientName = visit.clientName?.toLowerCase() || "";
-        const clientDocument = visit.clientDocument?.toLowerCase() || "";
-        const clientAddress = visit.clientAddress?.toLowerCase() || "";
-        const visitNotes = visit.notes?.toLowerCase() || "";
+    return true;
+  };
 
-        if (
-          !clientName.includes(searchTerm) &&
-          !clientDocument.includes(searchTerm) &&
-          !clientAddress.includes(searchTerm) &&
-          !visitNotes.includes(searchTerm)
-        ) {
-          return false;
-        }
-      }
-
-      return true;
-    },
+  const filteredVisitsFlat = useMemo(
+    () => scheduledVisits.filter((visit) => visitMatchesFilters(visit)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
+      scheduledVisits,
       selectedCollector,
       typeFilter,
       collectorTypeById,
@@ -485,41 +490,31 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     ],
   );
 
-  const filteredVisitsFlat = useMemo(
-    () => scheduledVisits.filter((visit) => visitMatchesFilters(visit)),
-    [scheduledVisits, visitMatchesFilters],
-  );
-
   // Opcoes dos dropdowns dependentes (faceting) sobre as visitas agendadas.
   // Cidade e Bairro se estreitam mutuamente e respeitam os demais filtros da
   // tela (cobrador, status, atraso, busca, periodo). O valor atualmente
-  // selecionado e sempre preservado na propria lista.
-  const availableCities = useMemo(() => {
-    const cities = distinctSorted(
-      scheduledVisits
-        .filter((v) => visitMatchesFilters(v, "city"))
-        .map((v) => v.clientCity),
-    );
-    if (cityFilter !== "all" && !cities.includes(cityFilter)) {
-      return distinctSorted([...cities, cityFilter]);
-    }
-    return cities;
-  }, [scheduledVisits, visitMatchesFilters, cityFilter]);
+  // selecionado e sempre preservado na propria lista. Consts simples (nao-hook)
+  // para nao ampliar o problema de hooks-apos-early-return deste componente.
+  const facetedCities = distinctSorted(
+    scheduledVisits
+      .filter((v) => visitMatchesFilters(v, "city"))
+      .map((v) => v.clientCity),
+  );
+  const availableCities =
+    cityFilter !== "all" && !facetedCities.includes(cityFilter)
+      ? distinctSorted([...facetedCities, cityFilter])
+      : facetedCities;
 
-  const availableNeighborhoods = useMemo(() => {
-    const neighborhoods = distinctSorted(
-      scheduledVisits
-        .filter((v) => visitMatchesFilters(v, "neighborhood"))
-        .map((v) => v.clientNeighborhood),
-    );
-    if (
-      neighborhoodFilter !== "all" &&
-      !neighborhoods.includes(neighborhoodFilter)
-    ) {
-      return distinctSorted([...neighborhoods, neighborhoodFilter]);
-    }
-    return neighborhoods;
-  }, [scheduledVisits, visitMatchesFilters, neighborhoodFilter]);
+  const facetedNeighborhoods = distinctSorted(
+    scheduledVisits
+      .filter((v) => visitMatchesFilters(v, "neighborhood"))
+      .map((v) => v.clientNeighborhood),
+  );
+  const availableNeighborhoods =
+    neighborhoodFilter !== "all" &&
+    !facetedNeighborhoods.includes(neighborhoodFilter)
+      ? distinctSorted([...facetedNeighborhoods, neighborhoodFilter])
+      : facetedNeighborhoods;
 
   // Agrupa visitas por cobrador com filtros avançados
   const getVisitsByCollectorGrouped = () => {

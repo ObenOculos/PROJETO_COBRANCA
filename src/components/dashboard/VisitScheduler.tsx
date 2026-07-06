@@ -34,7 +34,10 @@ import {
 import ClientDetailModal from "./ClientDetailModal";
 import { DateValidationModal } from "../common/DateValidationModal";
 import ConfirmationModal from "../common/ConfirmationModal";
-import { getNextAllowedVisitDate } from "../../utils/visitScheduling";
+import {
+  getNextAllowedVisitDate,
+  resolveAllowedConfigs,
+} from "../../utils/visitScheduling";
 import { PAYABLE_STATUSES } from "../../types/status";
 
 interface VisitSchedulerProps {
@@ -1654,6 +1657,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         clientData.city,
         clientData.neighborhood,
         allowedVisitDates,
+        visit.collectorId,
       );
 
       if (allowedDate) {
@@ -1774,6 +1778,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
             client.city,
             client.neighborhood,
             allowedVisitDates,
+            effectiveCollectorId,
           );
 
           const scheduledDate = allowedDate || selectedDate;
@@ -1832,6 +1837,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           clientData.city,
           clientData.neighborhood,
           allowedVisitDates,
+          effectiveCollectorId,
         );
 
         if (allowedDate) {
@@ -3084,17 +3090,20 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       </label>
                       {(() => {
                         const clientData = rescheduleClientData;
-                        const hasAllowedDate =
-                          clientData &&
-                          allowedVisitDates.some(
-                            (d) => d.city === clientData.city,
-                          );
-                        const allowedDays = clientData
-                          ? allowedVisitDates
-                              .filter((d) => d.city === clientData.city)
-                              .map((d) => d.allowed_date)
-                              .sort((a, b) => a - b)
+                        // Datas permitidas por cobrador + bairro→cidade: usa a
+                        // regra do bairro do cliente se houver, senão a da cidade.
+                        const configs = clientData
+                          ? resolveAllowedConfigs(
+                              allowedVisitDates,
+                              clientData.city,
+                              clientData.neighborhood,
+                              selectedVisitForReschedule?.collectorId,
+                            )
                           : [];
+                        const hasAllowedDate = configs.length > 0;
+                        const allowedDays = configs
+                          .map((d) => d.allowed_date)
+                          .sort((a, b) => a - b);
 
                         return (
                           <>
@@ -4483,10 +4492,13 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
                             // Coletar TODAS as datas permitidas configuradas para os clientes
                             selectedClientsData.forEach((client) => {
-                              const clientAllowedDates =
-                                allowedVisitDates.filter(
-                                  (d) => d.city === client.city,
-                                );
+                              // Datas permitidas por cobrador + bairro→cidade.
+                              const clientAllowedDates = resolveAllowedConfigs(
+                                allowedVisitDates,
+                                client.city,
+                                client.neighborhood,
+                                effectiveCollectorId,
+                              );
 
                               clientAllowedDates.forEach((config) => {
                                 // Calcular as próximas 3 ocorrências do dia permitido

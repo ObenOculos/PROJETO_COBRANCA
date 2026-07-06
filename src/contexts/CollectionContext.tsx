@@ -42,6 +42,7 @@ import {
   getClientPaymentStatus,
   normalizePaymentStatus,
 } from "../filters/clientStatus";
+import { resolveSaleKey } from "../filters/sales";
 import {
   useRealtimeCacheInvalidation,
   useOfflineSyncCacheInvalidation,
@@ -282,7 +283,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const transformedDates = data.map((date) => ({
         id: date.id,
         city: date.city,
+        // Bairro opcional: NULL = regra de nivel cidade. collector_id e essencial:
+        // as datas sao POR COBRADOR; sem ele o agendamento nao respeita a config
+        // de cada cobrador. Ambos alimentam getNextAllowedVisitDate.
         neighborhood: date.neighborhood,
+        collector_id: date.collector_id,
         allowed_date: date.allowed_date,
         created_at: date.created_at,
         updated_at: date.updated_at,
@@ -906,24 +911,32 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         throw new Error("Não é possível deletar vendas offline.");
       }
 
-      // 1. Delete from BANCO_DADOS (collections/installments)
+      // 1. Delete from BANCO_DADOS (collections/installments).
+      // A identidade da venda é numero_titulo (com fallback venda_n); 0 = avulsa
+      // (sem título E sem venda_n). Montamos o filtro espelhando resolveSaleKey.
       const validSaleNumbers = saleNumbers.filter((num) => num > 0);
       const includesRenegotiated = saleNumbers.includes(0);
 
-      let collectionsQuery = supabase
+      const orParts: string[] = [];
+      if (validSaleNumbers.length > 0) {
+        const list = validSaleNumbers.join(",");
+        orParts.push(`numero_titulo.in.(${list})`);
+        orParts.push(`and(numero_titulo.is.null,venda_n.in.(${list}))`);
+      }
+      if (includesRenegotiated) {
+        orParts.push(`and(numero_titulo.is.null,venda_n.is.null)`);
+      }
+
+      // Segurança: sem alvo, não apagar nada (evita deletar todas as parcelas).
+      if (orParts.length === 0) {
+        throw new Error("Nenhuma venda válida informada para exclusão.");
+      }
+
+      const collectionsQuery = supabase
         .from("BANCO_DADOS")
         .delete()
-        .eq("documento", clientDocument);
-
-      if (validSaleNumbers.length > 0 && includesRenegotiated) {
-        collectionsQuery = collectionsQuery.or(
-          `venda_n.in.(${validSaleNumbers.join(",")}),venda_n.is.null`,
-        );
-      } else if (validSaleNumbers.length > 0) {
-        collectionsQuery = collectionsQuery.in("venda_n", validSaleNumbers);
-      } else if (includesRenegotiated) {
-        collectionsQuery = collectionsQuery.is("venda_n", null);
-      }
+        .eq("documento", clientDocument)
+        .or(orParts.join(","));
 
       const { error: collectionsError } = await collectionsQuery;
 
@@ -964,7 +977,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const { data: remainingSales, error: fetchRemainingSalesError } =
         await supabase
           .from("BANCO_DADOS")
-          .select("venda_n")
+          .select("id_parcela")
           .eq("documento", clientDocument)
           .limit(1); // Only need to know if at least one exists
 
@@ -1662,12 +1675,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
           const clientGroup = clientMap.get(clientId)!;
 
+          const saleKey = resolveSaleKey(collection);
           let saleGroup = clientGroup.sales.find(
-            (s) => s.saleNumber === (collection.venda_n || 0),
+            (s) => s.saleNumber === saleKey,
           );
           if (!saleGroup) {
             saleGroup = {
-              saleNumber: collection.venda_n || 0,
+              saleNumber: saleKey,
               titleNumber: collection.numero_titulo || 0,
               description: collection.descricao || "",
               installments: [],
@@ -1840,7 +1854,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         });
         const clientCount = uniqueClients.size;
 
-        // Agrupar por venda (venda_n + documento)
+        // Agrupar por venda (numero_titulo, fallback venda_n) + documento
         const salesMap = new Map<
           string,
           {
@@ -1852,7 +1866,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         >();
 
         collectorCollections.forEach((collection) => {
-          const saleKey = `${collection.venda_n}-${collection.documento}`;
+          const saleKey = `${resolveSaleKey(collection)}-${collection.documento}`;
           if (!salesMap.has(saleKey)) {
             salesMap.set(saleKey, {
               totalValue: 0,
@@ -2550,18 +2564,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     saleNumber: number,
     clientDocument: string,
   ): SaleBalance => {
-    const saleInstallments = collections.filter((collection) => {
-      if (saleNumber === 0) {
-        // Para vendas renegociadas (saleNumber = 0), buscar parcelas sem venda_n
-        return !collection.venda_n && collection.documento === clientDocument;
-      } else {
-        // Para vendas normais, buscar por venda_n
-        return (
-          collection.venda_n === saleNumber &&
-          collection.documento === clientDocument
-        );
-      }
-    });
+    const saleInstallments = collections.filter(
+      (collection) =>
+        collection.documento === clientDocument &&
+        // Identidade da venda = numero_titulo (fallback venda_n); 0 = avulsa.
+        resolveSaleKey(collection) === saleNumber,
+    );
 
     const roundTo2Decimals = (num: number) =>
       Math.round((num + Number.EPSILON) * 100) / 100;
@@ -2630,17 +2638,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       allCollections
         .filter((collection) => collection.documento === clientDocument)
         .forEach((collection) => {
-          const saleNumber = collection.venda_n;
+          // Identidade da venda = numero_titulo (com fallback venda_n). Ver
+          // src/filters/sales. Key 0 = parcela avulsa (sem título e sem venda_n).
+          const saleKey = resolveSaleKey(collection);
 
-          // Se não há número de venda, trata como parcela individual
-          if (!saleNumber) {
+          if (saleKey === 0) {
             individualInstallments.push(collection);
           } else {
-            // Agrupa por número de venda
-            if (!salesMap.has(saleNumber)) {
-              salesMap.set(saleNumber, []);
+            if (!salesMap.has(saleKey)) {
+              salesMap.set(saleKey, []);
             }
-            salesMap.get(saleNumber)!.push(collection);
+            salesMap.get(saleKey)!.push(collection);
           }
         });
 
@@ -2686,9 +2694,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         },
       );
 
-      // Converter parcelas individuais para uma única "Venda Renegociada".
-      // Totais ignoram parcelas canceladas; elas seguem em `installments`
-      // para aparecerem com selo no detalhe.
+      // Parcelas sem número de venda (sem numero_titulo E sem venda_n) viram uma
+      // única "Venda Renegociada" (#0). Totais ignoram parcelas canceladas; elas
+      // seguem em `installments` para aparecerem com selo no detalhe.
       const renegotiatedSaleGroups = (() => {
         if (individualInstallments.length === 0) return [];
         const activeIndividual = individualInstallments.filter(
@@ -2711,7 +2719,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               : ("partially_paid" as const);
         return [
           {
-            saleNumber: 0, // Usar 0 para identificar como renegociada
+            saleNumber: 0, // 0 identifica o balde de parcelas sem número de venda
             titleNumber: individualInstallments[0]?.numero_titulo || 0,
             description: `Renegociada (${individualInstallments.length} parcela${individualInstallments.length !== 1 ? "s" : ""})`,
             installments: individualInstallments,

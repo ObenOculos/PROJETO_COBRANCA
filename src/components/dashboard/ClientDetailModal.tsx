@@ -874,10 +874,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <h4 className="text-sm font-medium text-gray-900">
-                                    Venda #
                                     {sale.saleNumber === 0
-                                      ? "Renegociada"
-                                      : sale.saleNumber}
+                                      ? "Venda Renegociada"
+                                      : `Venda #${sale.saleNumber}`}
                                   </h4>
                                   {saleAllCancelled ? (
                                     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs border bg-gray-200 text-gray-600 border-gray-300">

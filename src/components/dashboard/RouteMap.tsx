@@ -20,6 +20,7 @@ import {
 import { ClientGroup, FilterOptions } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
+import { resolveSaleKey } from "../../filters/sales";
 import { useAuth } from "../../contexts/AuthContext";
 import FilterBar from "../common/FilterBar";
 
@@ -147,10 +148,10 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
       // Agrupar por número de venda para contar vendas únicas
       const salesMap = new Map();
       clientCollections.forEach((collection) => {
-        const saleKey = collection.venda_n;
+        const saleKey = resolveSaleKey(collection);
         if (!salesMap.has(saleKey)) {
           salesMap.set(saleKey, {
-            saleNumber: collection.venda_n,
+            saleNumber: saleKey,
             installments: [],
             totalValue: 0,
             totalReceived: 0,

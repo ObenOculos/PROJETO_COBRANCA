@@ -13,6 +13,7 @@ import {
   User,
 } from "lucide-react";
 import { Collection } from "../../types";
+import { resolveSaleKey } from "../../filters/sales";
 import {
   formatCurrency,
   formatDate,
@@ -91,7 +92,9 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
     return salePayments
       .filter(
         (p) =>
-          String(p.saleNumber ?? 0) === String(saleData.venda_n ?? 0) &&
+          // Identidade da venda = numero_titulo (fallback venda_n) — ver
+          // src/filters/sales. Pagamentos são gravados por essa chave.
+          (p.saleNumber ?? 0) === resolveSaleKey(saleData) &&
           p.clientDocument === saleData.documento,
       )
       .sort(
@@ -179,7 +182,10 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
           <div>
             <h2 className="text-xl font-semibold">{saleData.cliente}</h2>
             <p className="text-blue-100 text-sm">
-              Venda #{saleData.venda_n} • {saleData.nome_da_loja}
+              {resolveSaleKey(saleData) === 0
+                ? "Venda Renegociada"
+                : `Venda #${resolveSaleKey(saleData)}`}{" "}
+              • {saleData.nome_da_loja}
             </p>
           </div>
           <button
@@ -277,7 +283,9 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                     Número da Venda:
                   </span>
                   <span className="text-sm font-semibold text-gray-900">
-                    {saleData.venda_n}
+                    {resolveSaleKey(saleData) === 0
+                      ? "Renegociada"
+                      : resolveSaleKey(saleData)}
                   </span>
                 </div>
 

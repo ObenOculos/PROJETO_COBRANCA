@@ -19,6 +19,7 @@ import { useNotifications } from "../../contexts/NotificationContext";
 import { useCollection } from "../../contexts/CollectionContext";
 import type { Notification } from "../../contexts/NotificationContext";
 import SaleDetailsModal from "../dashboard/SaleDetailsModal";
+import { resolveSaleKey } from "../../filters/sales";
 
 const NotificationDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -65,7 +66,7 @@ const NotificationDropdown: React.FC = () => {
         // Find collections for this sale
         const saleCollections = collections.filter(
           (c) =>
-            String(c.venda_n ?? 0) === String(saleInfo.saleNumber) &&
+            String(resolveSaleKey(c)) === String(saleInfo.saleNumber) &&
             c.documento === saleInfo.clientDocument,
         );
 

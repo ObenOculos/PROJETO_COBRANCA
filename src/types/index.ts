@@ -118,6 +118,10 @@ export interface ScheduledVisit {
 export interface AllowedVisitDate {
   allowed_date: number; // Day of month (1-31)
   city: string;
+  // Bairro opcional: NULL/undefined = regra de nível cidade (cidade inteira);
+  // preenchido = regra específica do bairro (agendamento prefere o bairro e cai
+  // na cidade como fallback). Ver src/utils/visitScheduling.
+  neighborhood?: string | null;
   collector_id?: string | null; // ID do cobrador associado
   created_at: string | null;
   id: string;

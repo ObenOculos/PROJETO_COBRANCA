@@ -1,22 +1,63 @@
 import { AllowedVisitDate } from "../types";
 
 /**
- * Calcula a próxima data permitida para visita baseado nas configurações de allowed_visit_dates
+ * Resolve as configurações de datas permitidas aplicáveis a um cliente, com a
+ * precedência bairro → cidade.
+ *
+ * As datas são por cobrador + cidade + (bairro opcional):
+ *   - bairro NULL  = regra de nível cidade (vale para a cidade inteira);
+ *   - bairro != NULL = regra específica daquele bairro.
+ *
+ * Precedência: se o bairro do cliente tem regra própria, usa-a; caso contrário,
+ * cai nas regras de nível cidade (bairro NULL). Regras de OUTROS bairros da mesma
+ * cidade não se aplicam ao cliente. Quando `collectorId` é informado, considera
+ * apenas as regras daquele cobrador.
+ */
+export const resolveAllowedConfigs = (
+  allowedDates: AllowedVisitDate[],
+  city: string,
+  neighborhood?: string | null,
+  collectorId?: string,
+): AllowedVisitDate[] => {
+  const base = allowedDates.filter(
+    (d) => d.city === city && (!collectorId || d.collector_id === collectorId),
+  );
+
+  const specific = neighborhood
+    ? base.filter((d) => d.neighborhood === neighborhood)
+    : [];
+
+  // Bairro específico tem prioridade; senão, fallback para as regras de cidade
+  // (bairro NULL/vazio).
+  return specific.length > 0
+    ? specific
+    : base.filter((d) => !d.neighborhood);
+};
+
+/**
+ * Calcula a próxima data permitida para visita baseado nas configurações de
+ * allowed_visit_dates.
  * @param city - Cidade do cliente
- * @param _neighborhood - DEPRECATED - mantido por compatibilidade (não é mais usado)
+ * @param neighborhood - Bairro do cliente (usa a regra do bairro se houver; senão
+ *   cai na regra da cidade)
  * @param allowedDates - Lista de datas permitidas configuradas
+ * @param collectorId - Cobrador que fará a visita (respeita a config por cobrador)
  * @param startDate - Data de início para calcular (opcional, padrão é hoje)
  * @returns Data no formato YYYY-MM-DD ou null se não houver data configurada
  */
 export const getNextAllowedVisitDate = (
   city: string,
-  _neighborhood: string,
+  neighborhood: string | null | undefined,
   allowedDates: AllowedVisitDate[],
+  collectorId?: string,
   startDate?: Date,
 ): string | null => {
-  // Buscar TODOS os dias permitidos para esta cidade
-  // Nota: neighborhood é ignorado pois foi removido do schema de allowed_visit_dates
-  const configs = allowedDates.filter((d) => d.city === city);
+  const configs = resolveAllowedConfigs(
+    allowedDates,
+    city,
+    neighborhood,
+    collectorId,
+  );
 
   if (configs.length === 0) {
     return null; // Sem configuração, retorna null
@@ -99,30 +140,42 @@ const formatDateToYYYYMMDD = (date: Date): string => {
 };
 
 /**
- * Verifica se existe configuração de data permitida para uma cidade
+ * Verifica se existe configuração de data permitida aplicável (bairro → cidade).
  * @param city - Cidade do cliente
- * @param _neighborhood - DEPRECATED - mantido por compatibilidade (não é mais usado)
+ * @param neighborhood - Bairro do cliente
  * @param allowedDates - Lista de datas permitidas configuradas
+ * @param collectorId - Cobrador que fará a visita (respeita a config por cobrador)
  */
 export const hasAllowedVisitDate = (
   city: string,
-  _neighborhood: string,
+  neighborhood: string | null | undefined,
   allowedDates: AllowedVisitDate[],
-): boolean => {
-  return allowedDates.some((d) => d.city === city);
-};
+  collectorId?: string,
+): boolean =>
+  resolveAllowedConfigs(allowedDates, city, neighborhood, collectorId).length >
+  0;
 
 /**
- * Obtém o dia do mês configurado para uma cidade
+ * Obtém o primeiro dia do mês configurado aplicável (bairro → cidade).
  * @param city - Cidade do cliente
- * @param _neighborhood - DEPRECATED - mantido por compatibilidade (não é mais usado)
+ * @param neighborhood - Bairro do cliente
  * @param allowedDates - Lista de datas permitidas configuradas
+ * @param collectorId - Cobrador que fará a visita (respeita a config por cobrador)
  */
 export const getAllowedDayOfMonth = (
   city: string,
-  _neighborhood: string,
+  neighborhood: string | null | undefined,
   allowedDates: AllowedVisitDate[],
+  collectorId?: string,
 ): number | null => {
-  const config = allowedDates.find((d) => d.city === city);
-  return config ? config.allowed_date : null;
+  const configs = resolveAllowedConfigs(
+    allowedDates,
+    city,
+    neighborhood,
+    collectorId,
+  );
+  if (configs.length === 0) return null;
+  return configs
+    .map((c) => c.allowed_date)
+    .sort((a, b) => a - b)[0];
 };

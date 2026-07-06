@@ -21,7 +21,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import FilterBar from "../common/FilterBar";
 import { Collection, FilterOptions, isCollectorType } from "../../types";
-import { countVendas } from "../../filters/sales";
+import { countVendas, resolveSaleKey } from "../../filters/sales";
 import {
   clientKey,
   getClientPaymentStatus,
@@ -110,7 +110,7 @@ const EnhancedStoreManagement: React.FC = () => {
       >();
 
       periodCollections.forEach((c) => {
-        const key = `${c.venda_n}:::${c.documento}`;
+        const key = `${resolveSaleKey(c)}:::${c.documento}`;
         if (!salesMap.has(key)) {
           salesMap.set(key, {
             totalValue: 0,
@@ -991,7 +991,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
       }
 
       if (c.documento) breakdown[city].clients.add(c.documento);
-      if (c.venda_n) breakdown[city].sales.add(`${c.venda_n}-${c.documento}`);
+      breakdown[city].sales.add(`${resolveSaleKey(c)}-${c.documento}`);
 
       breakdown[city].totalAmount += Number(c.valor_original || 0);
       breakdown[city].receivedAmount += Number(c.valor_recebido || 0);
@@ -1030,7 +1030,8 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
       }
       const entry = byClient.get(key)!;
       entry.rows.push(c);
-      const saleKey = c.venda_n ? String(c.venda_n) : "sem-venda";
+      const rk = resolveSaleKey(c);
+      const saleKey = rk === 0 ? "sem-venda" : String(rk);
       if (!entry.sales.has(saleKey)) entry.sales.set(saleKey, []);
       entry.sales.get(saleKey)!.push(c);
     });

@@ -629,10 +629,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         <div className="flex items-center justify-between mb-3">
                           <div>
                             <h4 className="text-base font-semibold text-gray-900">
-                              Venda #
                               {item.sale.saleNumber === 0
-                                ? "Renegociada"
-                                : item.sale.saleNumber}
+                                ? "Venda Renegociada"
+                                : `Venda #${item.sale.saleNumber}`}
                             </h4>
                             <div className="text-sm text-gray-600">
                               {item.sale.installments?.length || 0} parcela

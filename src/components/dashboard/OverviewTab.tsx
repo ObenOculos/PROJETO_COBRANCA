@@ -21,6 +21,7 @@ import {
   FilterOptions,
 } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
+import { resolveSaleKey } from "../../filters/sales";
 
 interface OverviewTabProps {
   collections: Collection[];
@@ -134,7 +135,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       }
     >();
     overviewCollections.forEach((collection) => {
-      const saleKey = `${collection.venda_n}-${collection.documento}`;
+      const saleKey = `${resolveSaleKey(collection)}-${collection.documento}`;
       if (!map.has(saleKey)) {
         map.set(saleKey, {
           isPending: false,

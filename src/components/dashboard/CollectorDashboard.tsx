@@ -34,6 +34,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import { FilterOptions } from "../../types";
+import { resolveSaleKey } from "../../filters/sales";
 
 import LogContactModal from "./LogContactModal";
 import ClientDetailModal from "./ClientDetailModal";
@@ -1183,7 +1184,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     >();
 
     myCollections.forEach((collection) => {
-      const saleKey = `${collection.venda_n}-${collection.documento}`;
+      const saleKey = `${resolveSaleKey(collection)}-${collection.documento}`;
       if (!map.has(saleKey)) {
         map.set(saleKey, {
           totalValue: 0,

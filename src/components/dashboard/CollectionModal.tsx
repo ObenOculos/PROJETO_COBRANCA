@@ -13,6 +13,7 @@ import {
   Info,
 } from "lucide-react";
 import { Collection, UserType, CollectionAttempt } from "../../types";
+import { resolveSaleKey } from "../../filters/sales";
 import { useCollection } from "../../contexts/CollectionContext";
 import {
   formatCurrency,
@@ -296,7 +297,9 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                             Venda
                           </label>
                           <p className="text-sm font-semibold text-gray-800 dark:text-dark-text">
-                            #{collection.venda_n}
+                            {resolveSaleKey(collection) === 0
+                              ? "Renegociada"
+                              : `#${resolveSaleKey(collection)}`}
                           </p>
                         </div>
                         <div>

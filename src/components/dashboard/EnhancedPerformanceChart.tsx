@@ -14,6 +14,7 @@ import {
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
 import { getClientPaymentStatus } from "../../filters/clientStatus";
+import { resolveSaleKey } from "../../filters/sales";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
 import FilterBar from "../common/FilterBar";
@@ -720,7 +721,7 @@ const EnhancedPerformanceChart: React.FC = () => {
         }
       >();
       filteredCollections.forEach((collection) => {
-        const saleKey = `${collection.venda_n}-${collection.documento}`;
+        const saleKey = `${resolveSaleKey(collection)}-${collection.documento}`;
         if (!salesMap.has(saleKey)) {
           salesMap.set(saleKey, {
             clientDocument: collection.documento || "",
@@ -765,7 +766,9 @@ const EnhancedPerformanceChart: React.FC = () => {
 
       // Total de títulos sem filtro de período
       const allSalesSet = new Set(
-        allCollectorCollections.map((c) => `${c.venda_n}-${c.documento}`),
+        allCollectorCollections.map(
+          (c) => `${resolveSaleKey(c)}-${c.documento}`,
+        ),
       );
       const totalSales = allSalesSet.size;
       const clientsWithPending = new Set(

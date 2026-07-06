@@ -41,7 +41,7 @@ import {
 } from "../../utils/formatters";
 import { isCancelado } from "../../types/status";
 import { getClientPaymentStatus } from "../../filters/clientStatus";
-import { countVendas } from "../../filters/sales";
+import { countVendas, resolveSaleKey } from "../../filters/sales";
 import CollectionModal from "./CollectionModal";
 import ClientDetailModal from "./ClientDetailModal";
 import SaleDetailsModal from "./SaleDetailsModal";
@@ -289,7 +289,7 @@ export const CollectionTable = React.forwardRef<
         Cliente: c.cliente,
         Documento: c.documento,
         Cobrador: c.nome_da_loja,
-        "Venda Nº": c.venda_n,
+        "Venda Nº": resolveSaleKey(c) || "",
         "Parcela Nº": c.parcela,
         "Data de Lançamento": parseAndFormatDate(c.data_lancamento),
         "Data Vencimento": parseAndFormatDate(c.data_vencimento),
@@ -426,13 +426,14 @@ export const CollectionTable = React.forwardRef<
           }
 
           const clientGroup = groupsMap.get(key)!;
+          const saleKey = resolveSaleKey(collection);
           let saleGroup = clientGroup.sales.find(
-            (s) => s.saleNumber === (collection.venda_n || 0),
+            (s) => s.saleNumber === saleKey,
           );
 
           if (!saleGroup) {
             saleGroup = {
-              saleNumber: collection.venda_n || 0,
+              saleNumber: saleKey,
               titleNumber: collection.numero_titulo || 0,
               description: collection.descricao || "",
               installments: [],
@@ -1585,10 +1586,9 @@ export const CollectionTable = React.forwardRef<
                               <div className="flex items-start justify-between mb-4">
                                 <div>
                                   <h4 className="font-semibold text-gray-800 dark:text-dark-text">
-                                    Venda #
                                     {sale.saleNumber === 0
-                                      ? "Renegociada"
-                                      : sale.saleNumber}
+                                      ? "Venda Renegociada"
+                                      : `Venda #${sale.saleNumber}`}
                                   </h4>
                                   <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-1">
                                     {sale.installments.length} parcela

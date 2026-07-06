@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
+import { resolveSaleKey } from "../../filters/sales";
 import { Modal } from "../Modal";
 import TabTransition from "../common/TabTransition";
 import { supabase } from "../../lib/supabase";
@@ -476,7 +477,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
     collections
       .filter((c) => c.user_id === collector.collectorId && c.data_lancamento)
       .forEach((c) => {
-        const titleKey = `${c.venda_n}-${c.documento}`;
+        const titleKey = `${resolveSaleKey(c)}-${c.documento}`;
         if (seenTitles.has(titleKey)) return;
         seenTitles.add(titleKey);
         const d = parseDateSafely(c.data_lancamento);

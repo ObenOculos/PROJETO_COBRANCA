@@ -4,28 +4,47 @@ import { supabase } from "../../lib/supabase";
 import { AllowedVisitDate, isCollectorType } from "../../types";
 import {
   Calendar as CalendarIcon,
+  CalendarClock,
   ChevronLeft,
   ChevronRight,
   X,
+  Users,
+  MapPin,
+  Trash2,
+  Plus,
+  Info,
+  Building2,
 } from "lucide-react";
 import { dataCache } from "../../utils/cache";
+import { distinctSorted } from "../../filters/facets";
+
+// Classes reaproveitadas do padrao visual do sistema (ver FilterPanel), com dark
+// mode, para manter a tela consistente com o restante do app.
+const labelClass =
+  "block text-xs font-semibold text-gray-500 dark:text-dark-text-secondary mb-2 tracking-wide";
+const controlClass =
+  "w-full px-4 py-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium text-gray-900 dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all";
 
 const AllowedVisitDatesManager: React.FC = () => {
-  const { collections, users } = useCollection();
+  const { collections, users, fetchAllowedVisitDates } = useCollection();
 
   // Estados de dados
   const [allowedDates, setAllowedDates] = useState<AllowedVisitDate[]>([]);
   const [cities, setCities] = useState<string[]>([]);
 
-  // Estados de seleção do formulário (consolidados)
+  // Estados de seleção do formulário (consolidados). `neighborhoods` é opcional:
+  // vazio = regra de nível cidade (cidade inteira). Só se aplica quando UMA cidade
+  // está selecionada (bairros são específicos da cidade).
   const [formSelection, setFormSelection] = useState({
     cities: [] as string[],
+    neighborhoods: [] as string[],
     days: [] as string[],
   });
 
   // Estados de UI dos dropdowns (consolidados)
   const [dropdownsOpen, setDropdownsOpen] = useState({
     city: false,
+    neighborhood: false,
     day: false,
   });
 
@@ -52,6 +71,7 @@ const AllowedVisitDatesManager: React.FC = () => {
 
   // Refs
   const cityDropdownRef = useRef<HTMLDivElement>(null);
+  const neighborhoodDropdownRef = useRef<HTMLDivElement>(null);
   const dayDropdownRef = useRef<HTMLDivElement>(null);
   const calendarModalRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +83,12 @@ const AllowedVisitDatesManager: React.FC = () => {
         !cityDropdownRef.current.contains(event.target as Node)
       ) {
         setDropdownsOpen((prev) => ({ ...prev, city: false }));
+      }
+      if (
+        neighborhoodDropdownRef.current &&
+        !neighborhoodDropdownRef.current.contains(event.target as Node)
+      ) {
+        setDropdownsOpen((prev) => ({ ...prev, neighborhood: false }));
       }
       if (
         dayDropdownRef.current &&
@@ -88,14 +114,24 @@ const AllowedVisitDatesManager: React.FC = () => {
       }
     };
 
-    if (dropdownsOpen.city || dropdownsOpen.day || modals.calendar) {
+    if (
+      dropdownsOpen.city ||
+      dropdownsOpen.neighborhood ||
+      dropdownsOpen.day ||
+      modals.calendar
+    ) {
       document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [dropdownsOpen.city, dropdownsOpen.day, modals.calendar]);
+  }, [
+    dropdownsOpen.city,
+    dropdownsOpen.neighborhood,
+    dropdownsOpen.day,
+    modals.calendar,
+  ]);
 
   // Gerenciar scroll da página quando modal abre/fecha
   useEffect(() => {
@@ -110,14 +146,17 @@ const AllowedVisitDatesManager: React.FC = () => {
     };
   }, [modals.calendar]);
 
-  // Resetar bairros e paginação quando mudar a cidade
+  // Resetar bairros/dias e paginação quando mudar a seleção de cidades (bairros
+  // são específicos da cidade).
   useEffect(() => {
     setFormSelection((prev) => ({
       ...prev,
+      neighborhoods: [],
       days: [],
     }));
     setDropdownsOpen((prev) => ({
       ...prev,
+      neighborhood: false,
       day: false,
     }));
     setCurrentPage(1);
@@ -129,7 +168,7 @@ const AllowedVisitDatesManager: React.FC = () => {
   }, [filters.collector]);
 
   useEffect(() => {
-    const fetchAllowedDates = async () => {
+    const fetchAllowed = async () => {
       setLoading(true);
       setError(null);
       try {
@@ -158,7 +197,7 @@ const AllowedVisitDatesManager: React.FC = () => {
       setLoading(false);
     };
 
-    fetchAllowedDates();
+    fetchAllowed();
   }, []);
 
   useEffect(() => {
@@ -191,6 +230,16 @@ const AllowedVisitDatesManager: React.FC = () => {
       .filter((u) => isCollectorType(u.type))
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [users]);
+
+  const collectorName = (id?: string | null): string =>
+    collectors.find((c) => c.id === id)?.name || "Sem cobrador";
+
+  // Sincroniza a fonte compartilhada (contexto) apos mutacoes, para que o
+  // VisitScheduler passe a sugerir as datas atualizadas sem recarregar a pagina.
+  const refreshSharedDates = () => {
+    dataCache.invalidatePrefix("allowed-visit-dates");
+    fetchAllowedVisitDates();
+  };
 
   // Filtrar cidades baseado no cobrador selecionado
   const filteredCities = useMemo(() => {
@@ -226,6 +275,47 @@ const AllowedVisitDatesManager: React.FC = () => {
     }
   };
 
+  // Bairro só é aplicável quando UMA única cidade está selecionada (bairros são
+  // específicos da cidade). Com várias cidades, cria-se sempre no nível cidade.
+  const singleSelectedCity =
+    formSelection.cities.length === 1 ? formSelection.cities[0] : null;
+
+  // Bairros disponíveis: dos clientes do cobrador naquela cidade.
+  const availableNeighborhoods = useMemo(() => {
+    if (!singleSelectedCity || filters.collector === "all") return [];
+    return distinctSorted(
+      collections
+        .filter(
+          (c) =>
+            c.cidade === singleSelectedCity &&
+            c.user_id === filters.collector,
+        )
+        .map((c) => c.bairro),
+    );
+  }, [singleSelectedCity, filters.collector, collections]);
+
+  const neighborhoodEnabled =
+    !!singleSelectedCity && availableNeighborhoods.length > 0;
+
+  const handleToggleNeighborhood = (neighborhood: string) => {
+    setFormSelection((prev) => ({
+      ...prev,
+      neighborhoods: prev.neighborhoods.includes(neighborhood)
+        ? prev.neighborhoods.filter((n) => n !== neighborhood)
+        : [...prev.neighborhoods, neighborhood],
+    }));
+  };
+
+  const handleToggleAllNeighborhoods = () => {
+    setFormSelection((prev) => ({
+      ...prev,
+      neighborhoods:
+        prev.neighborhoods.length === availableNeighborhoods.length
+          ? []
+          : [...availableNeighborhoods],
+    }));
+  };
+
   const handleToggleDay = (day: string) => {
     setFormSelection((prev) => {
       if (prev.days.includes(day)) {
@@ -248,7 +338,23 @@ const AllowedVisitDatesManager: React.FC = () => {
   const isAllCitiesSelected =
     formSelection.cities.length === filteredCities.length &&
     filteredCities.length > 0;
+  const isAllNeighborhoodsSelected =
+    availableNeighborhoods.length > 0 &&
+    formSelection.neighborhoods.length === availableNeighborhoods.length;
   const isAllDaysSelected = formSelection.days.length === 31;
+
+  // Bairros efetivos ao adicionar: os selecionados (se houver uma única cidade)
+  // ou [null] (regra de nível cidade). Fonte única usada pelo resumo e pelo insert.
+  const effectiveNeighborhoods: (string | null)[] =
+    singleSelectedCity && formSelection.neighborhoods.length > 0
+      ? formSelection.neighborhoods
+      : [null];
+
+  // Nº de combinações (cidade × bairro × dia) que serão criadas — resumo.
+  const combinationsToCreate =
+    formSelection.cities.length *
+    effectiveNeighborhoods.length *
+    formSelection.days.length;
 
   // Filtrar datas permitidas baseado no cobrador selecionado
   const filteredAllowedDates = useMemo(() => {
@@ -259,6 +365,42 @@ const AllowedVisitDatesManager: React.FC = () => {
 
     return allowedDates.filter((d) => d.collector_id === filters.collector);
   }, [allowedDates, filters.collector]);
+
+  // "Carga" por dia do mês: quantas OUTRAS localidades (cidade/bairro) do cobrador
+  // já usam cada dia. Serve de alerta visual não-bloqueante no seletor de dias,
+  // ajudando a distribuir as visitas ao longo do mês. Exclui a(s) localidade(s)
+  // que estão sendo configuradas agora (essas já são cobertas pela checagem de
+  // duplicata) — o foco é a sobreposição ENTRE localidades diferentes.
+  const dayOccupancy = useMemo(() => {
+    const nbList: (string | null)[] =
+      singleSelectedCity && formSelection.neighborhoods.length > 0
+        ? formSelection.neighborhoods
+        : [null];
+    const targetKeys = new Set<string>();
+    formSelection.cities.forEach((city) => {
+      nbList.forEach((nb) => targetKeys.add(`${city}|${nb ?? ""}`));
+    });
+
+    const map = new Map<number, Set<string>>();
+    filteredAllowedDates.forEach((d) => {
+      if (targetKeys.has(`${d.city}|${d.neighborhood ?? ""}`)) return;
+      const label = d.neighborhood ? `${d.city} — ${d.neighborhood}` : d.city;
+      if (!map.has(d.allowed_date)) map.set(d.allowed_date, new Set());
+      map.get(d.allowed_date)!.add(label);
+    });
+    return map;
+  }, [
+    filteredAllowedDates,
+    formSelection.cities,
+    formSelection.neighborhoods,
+    singleSelectedCity,
+  ]);
+
+  // Dias já selecionados que colidem com outras localidades (aviso suave).
+  const overlappingSelectedDays = formSelection.days
+    .map(Number)
+    .filter((d) => (dayOccupancy.get(d)?.size ?? 0) > 0)
+    .sort((a, b) => a - b);
 
   // Agrupar datas por cidade
   const groupedByCity = useMemo(() => {
@@ -271,9 +413,7 @@ const AllowedVisitDatesManager: React.FC = () => {
     });
     // Ordenar as datas dentro de cada grupo
     groups.forEach((dates) => {
-      dates.sort((a, b) => {
-        return Number(a.allowed_date) - Number(b.allowed_date);
-      });
+      dates.sort((a, b) => Number(a.allowed_date) - Number(b.allowed_date));
     });
     return groups;
   }, [filteredAllowedDates]);
@@ -308,62 +448,61 @@ const AllowedVisitDatesManager: React.FC = () => {
     setError(null);
 
     try {
-      // Create potential insert data for all combinations com collector_id
+      // Combinações cidade × bairro × dia para o cobrador. `neighborhood` NULL =
+      // regra de nível cidade; bairros só se aplicam quando há uma única cidade.
       const insertData = formSelection.cities.flatMap((city) =>
-        formSelection.days.map((day) => ({
-          city: city,
-          allowed_date: parseInt(day),
-          collector_id: filters.collector, // Adicionar collector_id
-        })),
+        effectiveNeighborhoods.flatMap((neighborhood) =>
+          formSelection.days.map((day) => ({
+            city: city,
+            neighborhood: neighborhood,
+            allowed_date: parseInt(day),
+            collector_id: filters.collector,
+          })),
+        ),
       );
 
-      // Validação apenas para garantir que há dados para inserir
       if (insertData.length === 0) {
         setError("Nenhum dado para adicionar.");
         setLoading(false);
         return;
       }
 
-      // --- Pre-insertion validation ---
-      const conflicts: {
-        city: string;
-        allowed_date: number;
-      }[] = [];
+      // --- Validação pré-inserção (evita duplicatas com o que já existe) ---
+      // Chave inclui o bairro ("" = nível cidade), alinhada ao índice único
+      // (collector_id, city, COALESCE(neighborhood,''), allowed_date).
+      const label = (city: string, nb: string | null, day: number) =>
+        `${city}${nb ? ` / ${nb}` : ""} / Dia ${day}`;
+      const conflicts: string[] = [];
       const uniqueNewData: {
         city: string;
+        neighborhood: string | null;
         allowed_date: number;
         collector_id: string;
       }[] = [];
       const existingEntries = new Set(
         allowedDates
-          .filter((d) => d.collector_id === filters.collector) // Filtrar por cobrador
-          .map((d) => `${d.city}|${d.allowed_date}`),
+          .filter((d) => d.collector_id === filters.collector)
+          .map((d) => `${d.city}|${d.neighborhood ?? ""}|${d.allowed_date}`),
       );
       const newEntries = new Set<string>();
 
       for (const item of insertData) {
-        const key = `${item.city}|${item.allowed_date}`;
+        const key = `${item.city}|${item.neighborhood ?? ""}|${item.allowed_date}`;
         if (existingEntries.has(key)) {
-          // Conflict with existing DB data
-          if (!conflicts.find((c) => `${c.city}|${c.allowed_date}` === key)) {
-            conflicts.push(item);
-          }
+          const text = label(item.city, item.neighborhood, item.allowed_date);
+          if (!conflicts.includes(text)) conflicts.push(text);
         } else if (!newEntries.has(key)) {
-          // Not in DB and not a duplicate in this selection
           uniqueNewData.push(item);
           newEntries.add(key);
         }
       }
 
       if (conflicts.length > 0) {
-        const errorMessage = conflicts
-          .map((c) => `${c.city} / Dia ${c.allowed_date}`)
-          .join(", ");
         setError(
-          `Não é possível adicionar. As seguintes configurações já existem: ${errorMessage}`,
+          `Não é possível adicionar. As seguintes configurações já existem: ${conflicts.join(", ")}`,
         );
         setLoading(false);
-        return; // Stop entirely if there are any conflicts
+        return;
       }
 
       if (uniqueNewData.length === 0) {
@@ -383,17 +522,10 @@ const AllowedVisitDatesManager: React.FC = () => {
         setError(error.message);
       } else if (data) {
         setAllowedDates([...allowedDates, ...(data as AllowedVisitDate[])]);
-        // Invalidar o cache para forçar refresh em outras partes da aplicação
-        dataCache.invalidatePrefix("allowed-visit-dates");
+        refreshSharedDates();
         // Limpar seleção após adicionar
-        setFormSelection({
-          cities: [],
-          days: [],
-        });
-        setDropdownsOpen({
-          city: false,
-          day: false,
-        });
+        setFormSelection({ cities: [], neighborhoods: [], days: [] });
+        setDropdownsOpen({ city: false, neighborhood: false, day: false });
       }
     } catch (err) {
       const errorMessage =
@@ -406,7 +538,10 @@ const AllowedVisitDatesManager: React.FC = () => {
     setLoading(false);
   };
 
-  const handleDeleteNeighborhoodDates = async (ids: string[]) => {
+  // Exclui um conjunto específico de datas (por id). Usado tanto na linha por
+  // cobrador quanto no "excluir cidade" (que passa todos os ids da cidade).
+  const handleDeleteDates = async (ids: string[]) => {
+    if (ids.length === 0) return;
     setLoading(true);
     setError(null);
 
@@ -419,73 +554,38 @@ const AllowedVisitDatesManager: React.FC = () => {
       setError(error.message);
     } else {
       setAllowedDates(allowedDates.filter((d) => !ids.includes(d.id)));
-      // Invalidar o cache
-      dataCache.invalidatePrefix("allowed-visit-dates");
+      refreshSharedDates();
     }
 
     setLoading(false);
   };
 
-  const handleDeleteAllCityDates = async (city: string) => {
-    setModals({
-      deleteModal: true,
-      calendar: false,
-      cityToDelete: city,
-    });
+  const handleDeleteAllCityDates = (city: string) => {
+    setModals({ deleteModal: true, calendar: false, cityToDelete: city });
   };
 
   const confirmDeleteCity = async () => {
     if (!modals.cityToDelete) return;
 
-    setLoading(true);
-    setError(null);
+    // Exclui pelos ids do grupo da cidade no conjunto atualmente filtrado. Assim
+    // funciona tanto por cobrador quanto em "Todos os cobradores" (antes usava
+    // .eq collector_id = "all" e não apagava nada).
+    const ids = (groupedByCity.get(modals.cityToDelete) || []).map((d) => d.id);
+    const cityToClose = modals.cityToDelete;
 
-    try {
-      const { error } = await supabase
-        .from("allowed_visit_dates")
-        .delete()
-        .eq("city", modals.cityToDelete)
-        .eq("collector_id", filters.collector); // Filtrar por cobrador
+    await handleDeleteDates(ids);
 
-      if (error) {
-        setError(error.message);
-      } else {
-        setAllowedDates(
-          allowedDates.filter(
-            (d) =>
-              !(
-                d.city === modals.cityToDelete &&
-                d.collector_id === filters.collector
-              ),
-          ),
-        );
-        // Invalidar o cache
-        dataCache.invalidatePrefix("allowed-visit-dates");
-        // Fechar o accordion da cidade após deletar
-        setExpandedCities((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(modals.cityToDelete!);
-          return newSet;
-        });
-      }
-    } catch (err) {
-      setError("Erro ao excluir configurações da cidade");
-    }
-
-    setLoading(false);
-    setModals({
-      deleteModal: false,
-      calendar: false,
-      cityToDelete: null,
+    // Fechar o accordion da cidade após deletar
+    setExpandedCities((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(cityToClose);
+      return newSet;
     });
+    setModals({ deleteModal: false, calendar: false, cityToDelete: null });
   };
 
   const cancelDelete = () => {
-    setModals({
-      deleteModal: false,
-      calendar: false,
-      cityToDelete: null,
-    });
+    setModals({ deleteModal: false, calendar: false, cityToDelete: null });
   };
 
   // Funções do calendário
@@ -552,7 +652,6 @@ const AllowedVisitDatesManager: React.FC = () => {
       return cities;
     }
 
-    // Cidades dos clientes do cobrador
     const collectorCities = new Set(
       collections
         .filter((c) => c.user_id === filters.calendarCollector)
@@ -560,12 +659,13 @@ const AllowedVisitDatesManager: React.FC = () => {
         .filter(Boolean),
     );
 
-    // Cidades das datas permitidas (independente de ter clientes)
     const citiesWithAllowedDates = new Set(
-      allowedDates.map((d) => d.city).filter(Boolean),
+      allowedDates
+        .filter((d) => d.collector_id === filters.calendarCollector)
+        .map((d) => d.city)
+        .filter(Boolean),
     );
 
-    // Combinar ambas as fontes
     const allRelevantCities = new Set([
       ...collectorCities,
       ...citiesWithAllowedDates,
@@ -574,12 +674,7 @@ const AllowedVisitDatesManager: React.FC = () => {
     return cities.filter((city) => allRelevantCities.has(city));
   }, [filters.calendarCollector, cities, collections, allowedDates]);
 
-  // Bairros disponíveis para a cidade selecionada no filtro do calendário (REMOVIDO - não usamos mais neighborhoods)
-  // const calendarNeighborhoods = useMemo(() => {
-  //   return [];
-  // }, []);
-
-  // Obter dias permitidos considerando os filtros
+  // Obter dias permitidos considerando os filtros (dia -> conjunto de cidades)
   const allowedDaysForCalendar = useMemo(() => {
     let filtered = allowedDates;
 
@@ -593,46 +688,63 @@ const AllowedVisitDatesManager: React.FC = () => {
       filtered = filtered.filter((d) => d.city === filters.calendarCity);
     }
 
-    // Criar um mapa: dia -> array de cidades
     const daysMap = new Map<number, Set<string>>();
-
     filtered.forEach((d) => {
       if (!daysMap.has(d.allowed_date)) {
         daysMap.set(d.allowed_date, new Set());
       }
-      daysMap.get(d.allowed_date)!.add(d.city);
+      // Rótulo por área: "Cidade" ou "Cidade — Bairro" quando há bairro.
+      const areaLabel = d.neighborhood
+        ? `${d.city} — ${d.neighborhood}`
+        : d.city;
+      daysMap.get(d.allowed_date)!.add(areaLabel);
     });
 
     return daysMap;
   }, [filters.calendarCity, filters.calendarCollector, allowedDates]);
 
+  const isAllView = filters.collector === "all";
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Gerenciar Datas</h3>
+      {/* Cabeçalho */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl shrink-0">
+            <CalendarClock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-dark-text tracking-tight leading-none">
+              Datas Programadas
+            </h3>
+            <p className="text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary mt-1">
+              Dias de visita permitidos por cobrador e cidade
+            </p>
+          </div>
+        </div>
         <button
           onClick={openCalendarModal}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 shadow-sm transition-colors shrink-0"
         >
-          <CalendarIcon className="w-5 h-5" />
-          <span>Calendário</span>
+          <CalendarIcon className="w-4 h-4" />
+          <span>Ver calendário</span>
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4">
-          {error}
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-700 dark:text-red-400 p-3 rounded-xl mb-4 text-sm flex items-start gap-2">
+          <Info className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
 
-      <div className="bg-gray-50 border border-gray-200 rounded-lg shadow-sm p-5 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div className="md:col-span-1">
-            <label
-              htmlFor="collector-filter"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Cobrador
+      {/* Formulário de criação (Cobrador → Cidades → Bairro opcional → Dias → Adicionar) */}
+      <div className="bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-2xl p-5 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+          {/* Passo 1: Cobrador */}
+          <div>
+            <label htmlFor="collector-filter" className={labelClass}>
+              1 · Cobrador
             </label>
             <select
               id="collector-filter"
@@ -640,7 +752,7 @@ const AllowedVisitDatesManager: React.FC = () => {
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, collector: e.target.value }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-colors appearance-none cursor-pointer text-gray-900 text-sm"
+              className={`${controlClass} appearance-none cursor-pointer`}
               style={{
                 backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
                 backgroundPosition: "right 0.5rem center",
@@ -657,12 +769,11 @@ const AllowedVisitDatesManager: React.FC = () => {
               ))}
             </select>
           </div>
-          <div className="md:col-span-1">
-            <label
-              htmlFor="city-select"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Cidades
+
+          {/* Passo 2: Cidades */}
+          <div>
+            <label htmlFor="city-select" className={labelClass}>
+              2 · Cidades
             </label>
             <div className="relative" ref={cityDropdownRef}>
               <button
@@ -671,8 +782,8 @@ const AllowedVisitDatesManager: React.FC = () => {
                 onClick={() =>
                   setDropdownsOpen((prev) => ({ ...prev, city: !prev.city }))
                 }
-                disabled={filters.collector === "all"}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed bg-white text-left transition-colors appearance-none cursor-pointer text-gray-900 text-sm"
+                disabled={isAllView}
+                className={`${controlClass} appearance-none cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed`}
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
                   backgroundPosition: "right 0.5rem center",
@@ -681,56 +792,176 @@ const AllowedVisitDatesManager: React.FC = () => {
                   paddingRight: "2.5rem",
                 }}
               >
-                <span className="truncate block text-gray-900 text-sm">
-                  {formSelection.cities.length === 0
-                    ? "Selecione as cidades"
-                    : formSelection.cities.length === 1
-                      ? formSelection.cities[0]
-                      : `${formSelection.cities.length} cidades selecionadas`}
+                <span className="truncate block">
+                  {isAllView
+                    ? "Selecione um cobrador"
+                    : formSelection.cities.length === 0
+                      ? "Selecione as cidades"
+                      : formSelection.cities.length === 1
+                        ? formSelection.cities[0]
+                        : `${formSelection.cities.length} cidades selecionadas`}
                 </span>
               </button>
 
               {dropdownsOpen.city && (
-                <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                  <div className="sticky top-0 bg-gray-50 border-b border-gray-200 p-2">
-                    <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 rounded px-2 py-1">
+                <div className="absolute z-20 w-full mt-1 bg-white dark:bg-dark-bg-secondary border border-gray-100 dark:border-dark-border rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                  <div className="sticky top-0 bg-gray-50 dark:bg-dark-bg border-b border-gray-100 dark:border-dark-border p-2">
+                    <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary rounded-lg px-2 py-1.5">
                       <input
                         type="checkbox"
                         checked={isAllCitiesSelected}
                         onChange={handleToggleAllCities}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
-                      <span className="text-sm font-medium text-gray-700">
-                        Selecionar Todas ({filteredCities.length})
+                      <span className="text-sm font-medium text-gray-700 dark:text-dark-text">
+                        Selecionar todas ({filteredCities.length})
                       </span>
                     </label>
                   </div>
-                  <div className="p-2 space-y-1">
-                    {filteredCities.map((city) => (
+                  <div className="p-2 space-y-0.5">
+                    {filteredCities.length === 0 ? (
+                      <p className="px-2 py-2 text-xs text-gray-400 dark:text-dark-text-secondary">
+                        Nenhuma cidade para este cobrador.
+                      </p>
+                    ) : (
+                      filteredCities.map((city) => {
+                        // Cidade "configurada" = já possui dias programados para o
+                        // cobrador selecionado (groupedByCity é filtrado por ele).
+                        const configuredDays = groupedByCity.get(city);
+                        const isConfigured = !!configuredDays?.length;
+                        return (
+                          <label
+                            key={city}
+                            className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary rounded-lg px-2 py-1.5"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formSelection.cities.includes(city)}
+                              onChange={() => handleToggleCity(city)}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="flex-1 text-sm text-gray-700 dark:text-dark-text truncate">
+                              {city}
+                            </span>
+                            {isConfigured && (
+                              <span
+                                className="w-2 h-2 rounded-full bg-blue-500 shrink-0"
+                                title={`Já possui ${configuredDays!.length} ${
+                                  configuredDays!.length === 1 ? "dia" : "dias"
+                                } programado(s): ${configuredDays!
+                                  .map((d) => d.allowed_date)
+                                  .join(", ")}`}
+                                aria-label="Cidade já configurada"
+                              />
+                            )}
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                  {filteredCities.some((c) => groupedByCity.has(c)) && (
+                    <div className="sticky bottom-0 bg-gray-50 dark:bg-dark-bg border-t border-gray-100 dark:border-dark-border px-3 py-1.5 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                      <span className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
+                        Já possui dias programados
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Passo 3: Bairro (opcional) — só quando UMA cidade está selecionada */}
+          <div>
+            <label htmlFor="neighborhood-select" className={labelClass}>
+              3 · Bairro <span className="font-normal normal-case">(opcional)</span>
+            </label>
+            <div className="relative" ref={neighborhoodDropdownRef}>
+              <button
+                id="neighborhood-select"
+                type="button"
+                onClick={() =>
+                  setDropdownsOpen((prev) => ({
+                    ...prev,
+                    neighborhood: !prev.neighborhood,
+                  }))
+                }
+                disabled={!neighborhoodEnabled}
+                title={
+                  !singleSelectedCity
+                    ? "Selecione uma única cidade para segmentar por bairro"
+                    : undefined
+                }
+                className={`${controlClass} appearance-none cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed`}
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                  backgroundPosition: "right 0.5rem center",
+                  backgroundRepeat: "no-repeat",
+                  backgroundSize: "1.5em 1.5em",
+                  paddingRight: "2.5rem",
+                }}
+              >
+                <span className="truncate block">
+                  {!neighborhoodEnabled
+                    ? "Cidade inteira"
+                    : formSelection.neighborhoods.length === 0
+                      ? "Cidade inteira"
+                      : formSelection.neighborhoods.length === 1
+                        ? formSelection.neighborhoods[0]
+                        : `${formSelection.neighborhoods.length} bairros selecionados`}
+                </span>
+              </button>
+
+              {dropdownsOpen.neighborhood && neighborhoodEnabled && (
+                <div className="absolute z-20 w-full mt-1 bg-white dark:bg-dark-bg-secondary border border-gray-100 dark:border-dark-border rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                  <div className="sticky top-0 bg-gray-50 dark:bg-dark-bg border-b border-gray-100 dark:border-dark-border p-2">
+                    <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary rounded-lg px-2 py-1.5">
+                      <input
+                        type="checkbox"
+                        checked={isAllNeighborhoodsSelected}
+                        onChange={handleToggleAllNeighborhoods}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700 dark:text-dark-text">
+                        Todos os bairros ({availableNeighborhoods.length})
+                      </span>
+                    </label>
+                  </div>
+                  <div className="p-2 space-y-0.5">
+                    {availableNeighborhoods.map((neighborhood) => (
                       <label
-                        key={city}
-                        className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 rounded px-2 py-1"
+                        key={neighborhood}
+                        className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary rounded-lg px-2 py-1.5"
                       >
                         <input
                           type="checkbox"
-                          checked={formSelection.cities.includes(city)}
-                          onChange={() => handleToggleCity(city)}
+                          checked={formSelection.neighborhoods.includes(
+                            neighborhood,
+                          )}
+                          onChange={() => handleToggleNeighborhood(neighborhood)}
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
-                        <span className="text-sm text-gray-700">{city}</span>
+                        <span className="flex-1 text-sm text-gray-700 dark:text-dark-text truncate">
+                          {neighborhood}
+                        </span>
                       </label>
                     ))}
+                  </div>
+                  <div className="sticky bottom-0 bg-gray-50 dark:bg-dark-bg border-t border-gray-100 dark:border-dark-border px-3 py-1.5">
+                    <span className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
+                      Vazio = vale para a cidade inteira
+                    </span>
                   </div>
                 </div>
               )}
             </div>
           </div>
-          <div className="md:col-span-1">
-            <label
-              htmlFor="day-select"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Dia do Mês
+
+          {/* Passo 4: Dias do mês */}
+          <div>
+            <label htmlFor="day-select" className={labelClass}>
+              4 · Dias do mês
             </label>
             <div className="relative" ref={dayDropdownRef}>
               <button
@@ -739,11 +970,8 @@ const AllowedVisitDatesManager: React.FC = () => {
                 onClick={() =>
                   setDropdownsOpen((prev) => ({ ...prev, day: !prev.day }))
                 }
-                disabled={
-                  filters.collector === "all" ||
-                  formSelection.cities.length === 0
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed bg-white text-left transition-colors appearance-none cursor-pointer text-gray-900 text-sm"
+                disabled={isAllView || formSelection.cities.length === 0}
+                className={`${controlClass} appearance-none cursor-pointer text-left disabled:opacity-60 disabled:cursor-not-allowed`}
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
                   backgroundPosition: "right 0.5rem center",
@@ -752,7 +980,7 @@ const AllowedVisitDatesManager: React.FC = () => {
                   paddingRight: "2.5rem",
                 }}
               >
-                <span className="truncate block text-gray-900 text-sm">
+                <span className="truncate block">
                   {formSelection.days.length === 0
                     ? "Selecione os dias"
                     : formSelection.days.length === 1
@@ -762,60 +990,127 @@ const AllowedVisitDatesManager: React.FC = () => {
               </button>
 
               {dropdownsOpen.day &&
-                filters.collector !== "all" &&
+                !isAllView &&
                 formSelection.cities.length > 0 && (
-                  <div className="absolute z-10 w-80 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
-                    <div className="sticky top-0 bg-white border-b border-gray-200 p-2 flex justify-center">
+                  <div className="absolute z-10 w-80 mt-1 bg-white dark:bg-dark-bg-secondary border border-gray-100 dark:border-dark-border rounded-xl shadow-lg">
+                    <div className="sticky top-0 bg-white dark:bg-dark-bg-secondary border-b border-gray-100 dark:border-dark-border p-2">
                       <button
                         type="button"
                         onClick={handleToggleAllDays}
-                        className="px-3 py-1 text-xs font-medium rounded-md transition-colors w-full text-blue-600 bg-blue-50 hover:bg-blue-100"
+                        className="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors w-full text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30"
                       >
                         {isAllDaysSelected
-                          ? "Limpar Seleção"
-                          : "Selecionar Todos os 31 Dias"}
+                          ? "Limpar seleção"
+                          : "Selecionar todos os 31 dias"}
                       </button>
                     </div>
-                    <div className="p-3 grid grid-cols-7 gap-1">
-                      {Array.from({ length: 31 }, (_, i) =>
-                        (i + 1).toString(),
-                      ).map((day) => (
-                        <button
-                          key={day}
-                          type="button"
-                          onClick={() => handleToggleDay(day)}
-                          className={`w-9 h-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                            formSelection.days.includes(day)
-                              ? "bg-blue-600 text-white hover:bg-blue-700"
-                              : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                          }`}
-                        >
-                          {day}
-                        </button>
-                      ))}
+                    <div className="p-3 pt-4 grid grid-cols-7 gap-x-1 gap-y-2.5">
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map(
+                        (dayNum) => {
+                          const day = dayNum.toString();
+                          const isSelected = formSelection.days.includes(day);
+                          const occupants = dayOccupancy.get(dayNum);
+                          const occupiedCount = occupants?.size ?? 0;
+                          return (
+                            <button
+                              key={day}
+                              type="button"
+                              onClick={() => handleToggleDay(day)}
+                              title={
+                                occupiedCount > 0
+                                  ? `Dia ${day} já usado por: ${Array.from(
+                                      occupants!,
+                                    ).join(", ")}`
+                                  : `Dia ${day} — livre`
+                              }
+                              className={`relative w-9 h-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-dark-bg-secondary ${
+                                isSelected
+                                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                                  : occupiedCount > 0
+                                    ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 ring-1 ring-amber-300 dark:ring-amber-700/60 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                                    : "bg-gray-100 dark:bg-dark-bg text-gray-800 dark:text-dark-text hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary"
+                              }`}
+                            >
+                              {day}
+                              {occupiedCount > 0 && (
+                                <span
+                                  className={`absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold flex items-center justify-center ring-1 ring-white dark:ring-dark-bg-secondary ${
+                                    isSelected
+                                      ? "bg-amber-400 text-amber-950"
+                                      : "bg-amber-500 text-white"
+                                  }`}
+                                >
+                                  {occupiedCount}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        },
+                      )}
+                    </div>
+                    <div className="px-3 pb-3 flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-dark-text-secondary border-t border-gray-100 dark:border-dark-border pt-2">
+                      <span className="min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">
+                        N
+                      </span>
+                      N localidades já usam esse dia (não bloqueia)
                     </div>
                   </div>
                 )}
             </div>
           </div>
-          <div className="md:col-span-1">
+
+          {/* Passo 5: Adicionar */}
+          <div>
             <button
               onClick={handleAddAllowedDate}
-              disabled={loading}
-              className="w-full px-3 py-1.5 border text-white bg-blue-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-center transition-colors appearance-none cursor-pointer text-base"
+              disabled={loading || combinationsToCreate === 0}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? "Adicionando..." : "Adicionar Data"}
+              <Plus className="w-4 h-4" />
+              {loading ? "Adicionando..." : "Adicionar"}
             </button>
           </div>
         </div>
+
+        {/* Resumo do que será criado */}
+        {combinationsToCreate > 0 && (
+          <p className="mt-3 text-xs text-gray-500 dark:text-dark-text-secondary flex items-center gap-1.5">
+            <Info className="w-3.5 h-3.5 shrink-0" />
+            {combinationsToCreate}{" "}
+            {combinationsToCreate === 1 ? "configuração" : "configurações"} para{" "}
+            {collectorName(filters.collector)}
+            {singleSelectedCity && formSelection.neighborhoods.length > 0
+              ? ` — bairro(s): ${formSelection.neighborhoods.join(", ")}.`
+              : " — cidade inteira."}
+          </p>
+        )}
+        {isAllView && (
+          <p className="mt-3 text-xs text-gray-500 dark:text-dark-text-secondary flex items-center gap-1.5">
+            <Info className="w-3.5 h-3.5" />
+            Selecione um cobrador para cadastrar novas datas.
+          </p>
+        )}
+        {/* Aviso suave (não bloqueia): dias escolhidos que outras localidades já usam */}
+        {overlappingSelectedDays.length > 0 && (
+          <p className="mt-2 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
+            <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span>
+              Atenção: o(s) dia(s){" "}
+              <strong>{overlappingSelectedDays.join(", ")}</strong> já são usados
+              por outras localidades deste cobrador. Você ainda pode prosseguir —
+              é só um alerta para ajudar a distribuir as visitas.
+            </span>
+          </p>
+        )}
       </div>
 
+      {/* Lista de configurações por cidade */}
       <div className="space-y-2">
         {groupedByCity.size === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-lg p-8 text-center text-sm text-gray-500">
+          <div className="bg-white dark:bg-dark-bg-tertiary border border-gray-100 dark:border-dark-border rounded-2xl p-8 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
             {filters.collector !== "all"
-              ? `Nenhuma data permitida cadastrada onde ${collectors.find((c) => c.id === filters.collector)?.name} tem clientes.`
-              : "Nenhuma data permitida cadastrada. Configure as datas de visita para cada cidade/bairro."}
+              ? `Nenhuma data permitida cadastrada onde ${collectorName(filters.collector)} tem clientes.`
+              : "Nenhuma data permitida cadastrada. Selecione um cobrador e configure os dias de visita por cidade."}
           </div>
         ) : (
           (() => {
@@ -841,7 +1136,7 @@ const AllowedVisitDatesManager: React.FC = () => {
                 <div className="space-y-2">
                   {paginatedCities.map(([city, dates]) => {
                     const isExpanded = expandedCities.has(city);
-                    // Extrair dias únicos e ordenar numericamente
+                    // Dias únicos (agregados de todos os cobradores da cidade).
                     const uniqueDays = [
                       ...new Set(dates.map((d) => d.allowed_date)),
                     ].sort((a, b) => a - b);
@@ -860,103 +1155,147 @@ const AllowedVisitDatesManager: React.FC = () => {
                       daysText = `Dias ${otherDays.join(", ")}, ${lastDay}...`;
                     }
 
+                    // Subgrupos por cobrador + bairro (atribuição correta e
+                    // distinção cidade-inteira vs bairro específico).
+                    const subgroups = new Map<
+                      string,
+                      {
+                        collectorId: string | null | undefined;
+                        neighborhood: string | null | undefined;
+                        dates: AllowedVisitDate[];
+                      }
+                    >();
+                    dates.forEach((d) => {
+                      const key = `${d.collector_id ?? "none"}|${d.neighborhood ?? ""}`;
+                      if (!subgroups.has(key)) {
+                        subgroups.set(key, {
+                          collectorId: d.collector_id,
+                          neighborhood: d.neighborhood,
+                          dates: [],
+                        });
+                      }
+                      subgroups.get(key)!.dates.push(d);
+                    });
+                    // Cidade inteira (sem bairro) primeiro; depois por bairro; e
+                    // por cobrador.
+                    const subgroupList = Array.from(subgroups.values()).sort(
+                      (a, b) => {
+                        const an = a.neighborhood ?? "";
+                        const bn = b.neighborhood ?? "";
+                        if (!an && bn) return -1;
+                        if (an && !bn) return 1;
+                        if (an !== bn) return an.localeCompare(bn, "pt-BR");
+                        return collectorName(a.collectorId).localeCompare(
+                          collectorName(b.collectorId),
+                          "pt-BR",
+                        );
+                      },
+                    );
+                    const collectorCount = new Set(
+                      dates.map((d) => d.collector_id),
+                    ).size;
+                    const hasNeighborhoodConfigs = dates.some(
+                      (d) => d.neighborhood,
+                    );
+
                     return (
                       <div
                         key={city}
-                        className="bg-white border border-gray-200 rounded-lg overflow-hidden"
+                        className="bg-white dark:bg-dark-bg-tertiary border border-gray-100 dark:border-dark-border rounded-2xl overflow-hidden"
                       >
-                        <div className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                        <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-dark-bg/40 transition-colors">
                           <button
                             onClick={() => toggleCity(city)}
-                            className="flex items-center space-x-3 flex-1"
+                            className="flex items-center gap-3 flex-1 min-w-0 text-left"
                           >
-                            <svg
-                              className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? "transform rotate-90" : ""}`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 5l7 7-7 7"
-                              />
-                            </svg>
-                            <h4 className="text-base font-semibold text-gray-900">
+                            <ChevronRight
+                              className={`w-5 h-5 text-gray-400 shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                            />
+                            <MapPin className="w-4 h-4 text-blue-500 shrink-0" />
+                            <span className="text-sm font-semibold text-gray-900 dark:text-dark-text truncate">
                               {city}
-                            </h4>
-                            <span className="text-sm text-gray-500">
+                            </span>
+                            <span className="text-xs text-gray-400 dark:text-dark-text-secondary truncate hidden sm:inline">
                               ({daysText})
                             </span>
+                            {isAllView && collectorCount > 0 && (
+                              <span className="ml-1 shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 dark:text-dark-text-secondary bg-gray-100 dark:bg-dark-bg px-1.5 py-0.5 rounded-md">
+                                <Users className="w-3 h-3" />
+                                {collectorCount}
+                              </span>
+                            )}
+                            {hasNeighborhoodConfigs && (
+                              <span
+                                className="shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded-md"
+                                title="Possui configurações por bairro"
+                              >
+                                <Building2 className="w-3 h-3" />
+                                bairros
+                              </span>
+                            )}
                           </button>
 
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteAllCityDates(city);
-                              }}
-                              disabled={loading}
-                              className="p-2 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              title={`Excluir todas as configurações de ${city}`}
-                            >
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M6 18L18 6M6 6l12 12"
-                                />
-                              </svg>
-                            </button>
-                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteAllCityDates(city);
+                            }}
+                            disabled={loading}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                            title={`Excluir todas as configurações de ${city}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
 
                         {isExpanded && (
-                          <div className="border-t border-gray-200">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
-                                    Dias do Mês
-                                  </th>
-                                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 tracking-wide">
-                                    Ações
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                <tr className="hover:bg-gray-50">
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    Dias{" "}
-                                    {dates
-                                      .map((d) => d.allowed_date)
-                                      .sort((a, b) => a - b)
-                                      .join(", ")}{" "}
-                                    de cada mês
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                    <button
-                                      onClick={() =>
-                                        handleDeleteNeighborhoodDates(
-                                          dates.map((d) => d.id),
-                                        )
-                                      }
-                                      disabled={loading}
-                                      className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                                    >
-                                      Excluir
-                                    </button>
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
+                          <div className="border-t border-gray-100 dark:border-dark-border divide-y divide-gray-100 dark:divide-dark-border">
+                            {subgroupList.map((group) => {
+                              const days = group.dates
+                                .map((d) => d.allowed_date)
+                                .sort((a, b) => a - b);
+                              return (
+                                <div
+                                  key={`${group.collectorId ?? "none"}|${group.neighborhood ?? ""}`}
+                                  className="px-4 sm:px-5 py-3 flex items-center justify-between gap-3"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                                      {isAllView && (
+                                        <span className="text-xs font-semibold text-gray-700 dark:text-dark-text flex items-center gap-1.5">
+                                          <Users className="w-3.5 h-3.5 text-gray-400" />
+                                          {collectorName(group.collectorId)}
+                                        </span>
+                                      )}
+                                      {group.neighborhood ? (
+                                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded-md">
+                                          <Building2 className="w-3 h-3" />
+                                          {group.neighborhood}
+                                        </span>
+                                      ) : (
+                                        <span className="text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary">
+                                          Cidade inteira
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
+                                      Dias {days.join(", ")} de cada mês
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() =>
+                                      handleDeleteDates(
+                                        group.dates.map((d) => d.id),
+                                      )
+                                    }
+                                    disabled={loading}
+                                    className="text-xs font-semibold text-red-600 hover:text-red-700 dark:text-red-400 disabled:opacity-50 shrink-0"
+                                  >
+                                    Excluir
+                                  </button>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -965,18 +1304,18 @@ const AllowedVisitDatesManager: React.FC = () => {
                 </div>
 
                 {totalPages > 1 && (
-                  <div className="flex justify-between items-center mt-4 p-2 bg-white border border-gray-200 rounded-lg">
+                  <div className="flex justify-between items-center mt-4 p-2 bg-white dark:bg-dark-bg-tertiary border border-gray-100 dark:border-dark-border rounded-xl">
                     <button
                       onClick={() =>
                         setCurrentPage((prev) => Math.max(prev - 1, 1))
                       }
                       disabled={currentPage === 1}
-                      className="p-2 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2 rounded-lg text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg disabled:opacity-50 disabled:cursor-not-allowed"
                       aria-label="Página anterior"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-sm font-medium text-gray-600 dark:text-dark-text-secondary">
                       {currentPage} / {totalPages}
                     </span>
                     <button
@@ -984,7 +1323,7 @@ const AllowedVisitDatesManager: React.FC = () => {
                         setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                       }
                       disabled={currentPage === totalPages}
-                      className="p-2 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2 rounded-lg text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg disabled:opacity-50 disabled:cursor-not-allowed"
                       aria-label="Próxima página"
                     >
                       <ChevronRight className="w-5 h-5" />
@@ -999,58 +1338,36 @@ const AllowedVisitDatesManager: React.FC = () => {
 
       {/* Modal de Confirmação */}
       {modals.deleteModal && modals.cityToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-xl max-w-md w-full border border-gray-100 dark:border-dark-border">
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Confirmar Exclusão
+              <h3 className="text-lg font-bold text-gray-900 dark:text-dark-text mb-3">
+                Confirmar exclusão
               </h3>
-              <p className="text-gray-600 mb-6">
-                Tem certeza que deseja excluir <strong>TODAS</strong> as
-                configurações de <strong>{modals.cityToDelete}</strong>?
+              <p className="text-sm text-gray-600 dark:text-dark-text-secondary mb-2">
+                Excluir <strong>TODAS</strong> as configurações de{" "}
+                <strong>{modals.cityToDelete}</strong>
+                {filters.collector !== "all"
+                  ? ` para ${collectorName(filters.collector)}?`
+                  : " (todos os cobradores)?"}
               </p>
-              <p className="text-sm text-gray-500 mb-6">
+              <p className="text-xs text-gray-400 dark:text-dark-text-secondary mb-6">
                 Esta ação não pode ser desfeita.
               </p>
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={cancelDelete}
                   disabled={loading}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  className="px-4 py-2 border border-gray-200 dark:border-dark-border text-gray-700 dark:text-dark-text text-sm font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={confirmDeleteCity}
                   disabled={loading}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
-                  {loading ? (
-                    <>
-                      <svg
-                        className="animate-spin h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                      Excluindo...
-                    </>
-                  ) : (
-                    "Excluir Tudo"
-                  )}
+                  {loading ? "Excluindo..." : "Excluir tudo"}
                 </button>
               </div>
             </div>
@@ -1060,40 +1377,40 @@ const AllowedVisitDatesManager: React.FC = () => {
 
       {/* Modal do Calendário */}
       {modals.calendar && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50">
           <div
             ref={calendarModalRef}
-            className="bg-white rounded-2xl shadow-xl max-w-full md:max-w-4xl lg:max-w-6xl w-full max-h-[95vh] overflow-y-auto"
+            className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-xl max-w-full md:max-w-4xl lg:max-w-6xl w-full max-h-[95vh] overflow-y-auto border border-gray-100 dark:border-dark-border"
           >
             {/* Header */}
-            <div className="p-4 md:p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl z-10">
+            <div className="p-4 md:p-6 border-b border-gray-100 dark:border-dark-border flex items-center justify-between sticky top-0 bg-white dark:bg-dark-bg-secondary rounded-t-2xl z-10">
               <div>
-                <h3 className="text-lg md:text-xl font-semibold text-gray-900">
-                  Calendário de Datas Permitidas
+                <h3 className="text-lg md:text-xl font-bold text-gray-900 dark:text-dark-text">
+                  Calendário de datas permitidas
                 </h3>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-gray-500 dark:text-dark-text-secondary mt-1">
                   Visualize os dias configurados para visitas
                 </p>
               </div>
               <button
                 onClick={closeCalendarModal}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-xl transition-colors"
                 title="Fechar"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="p-6">
+            <div className="p-4 md:p-6">
               {/* Filtros */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 md:p-4 mb-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-3 md:gap-4">
+              <div className="bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 md:p-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   <div>
                     <label
                       htmlFor="calendar-collector-filter"
-                      className="block text-sm font-medium text-gray-700 mb-2"
+                      className={labelClass}
                     >
-                      Filtrar por Cobrador
+                      Filtrar por cobrador
                     </label>
                     <select
                       id="calendar-collector-filter"
@@ -1105,7 +1422,7 @@ const AllowedVisitDatesManager: React.FC = () => {
                           calendarCity: "all",
                         }));
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      className={controlClass}
                     >
                       <option value="all">Todos os cobradores</option>
                       {collectors.map((collector) => (
@@ -1119,9 +1436,9 @@ const AllowedVisitDatesManager: React.FC = () => {
                   <div>
                     <label
                       htmlFor="calendar-city-filter"
-                      className="block text-sm font-medium text-gray-700 mb-2"
+                      className={labelClass}
                     >
-                      Filtrar por Cidade
+                      Filtrar por cidade
                     </label>
                     <select
                       id="calendar-city-filter"
@@ -1132,7 +1449,7 @@ const AllowedVisitDatesManager: React.FC = () => {
                           calendarCity: e.target.value,
                         }));
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      className={controlClass}
                     >
                       <option value="all">Todas as cidades</option>
                       {calendarCities.map((city) => (
@@ -1147,71 +1464,66 @@ const AllowedVisitDatesManager: React.FC = () => {
                 {/* Info sobre filtros ativos */}
                 {(filters.calendarCollector !== "all" ||
                   filters.calendarCity !== "all") && (
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-blue-600">
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
                     <CalendarIcon className="w-4 h-4" />
                     <span>
                       Mostrando:{" "}
                       {[
                         filters.calendarCollector !== "all"
-                          ? collectors.find(
-                              (c) => c.id === filters.calendarCollector,
-                            )?.name
+                          ? collectorName(filters.calendarCollector)
                           : null,
                         filters.calendarCity !== "all"
                           ? filters.calendarCity
                           : null,
                       ]
                         .filter(Boolean)
-                        .join(" - ") || "Todas as configurações"}
+                        .join(" · ") || "Todas as configurações"}
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Calendar Navigation */}
+              {/* Navegação do calendário */}
               <div className="flex items-center justify-between mb-4">
                 <button
                   onClick={() => navigateMonth("prev")}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  className="p-2 text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-full transition-colors"
                   title="Mês anterior"
                 >
-                  <ChevronLeft className="h-5 w-5 text-gray-600" />
+                  <ChevronLeft className="h-5 w-5" />
                 </button>
-                <h4 className="text-base md:text-lg font-semibold text-gray-900">
+                <h4 className="text-base md:text-lg font-semibold text-gray-900 dark:text-dark-text">
                   {monthNames[currentMonth.getMonth()]}{" "}
                   {currentMonth.getFullYear()}
                 </h4>
                 <button
                   onClick={() => navigateMonth("next")}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  className="p-2 text-gray-600 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-full transition-colors"
                   title="Próximo mês"
                 >
-                  <ChevronRight className="h-5 w-5 text-gray-600" />
+                  <ChevronRight className="h-5 w-5" />
                 </button>
               </div>
 
-              {/* Calendar Grid */}
+              {/* Grade do calendário */}
               <div className="space-y-2">
-                {/* Week days header */}
                 <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-3 max-w-3xl mx-auto">
                   {weekDays.map((day) => (
                     <div
                       key={day}
-                      className="text-center text-sm font-medium text-gray-600 py-2 max-w-[45px] sm:max-w-[60px] md:max-w-[80px]"
+                      className="text-center text-sm font-medium text-gray-500 dark:text-dark-text-secondary py-2 max-w-[45px] sm:max-w-[60px] md:max-w-[80px]"
                     >
                       {day}
                     </div>
                   ))}
                 </div>
 
-                {/* Calendar days */}
                 <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-3 max-w-3xl mx-auto">
                   {(() => {
                     const { daysInMonth, startingDayOfWeek } =
                       getDaysInMonth(currentMonth);
                     const days = [];
 
-                    // Empty cells for days before month starts
                     for (let i = 0; i < startingDayOfWeek; i++) {
                       days.push(
                         <div
@@ -1221,7 +1533,6 @@ const AllowedVisitDatesManager: React.FC = () => {
                       );
                     }
 
-                    // Days of the month
                     for (let day = 1; day <= daysInMonth; day++) {
                       const dayInfo = allowedDaysForCalendar.get(day);
                       const isAllowed = dayInfo && dayInfo.size > 0;
@@ -1231,7 +1542,6 @@ const AllowedVisitDatesManager: React.FC = () => {
                           new Date().getFullYear() &&
                         day === new Date().getDate();
 
-                      // Criar tooltip com as cidades
                       let tooltipText = `Dia ${day}`;
                       if (isAllowed && dayInfo) {
                         tooltipText = `Dia ${day}\n${Array.from(dayInfo).join("\n")}`;
@@ -1243,9 +1553,11 @@ const AllowedVisitDatesManager: React.FC = () => {
                           className={`aspect-square max-w-[45px] sm:max-w-[60px] md:max-w-[80px] flex items-center justify-center rounded-lg text-sm font-medium transition-all cursor-default relative group ${
                             isAllowed
                               ? "bg-blue-600 text-white shadow-md hover:bg-blue-700"
-                              : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+                              : "bg-gray-50 dark:bg-dark-bg text-gray-400 dark:text-dark-text-secondary hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
                           } ${
-                            isToday && !isAllowed ? "ring-2 ring-blue-400" : ""
+                            isToday && !isAllowed
+                              ? "ring-2 ring-blue-400"
+                              : ""
                           }`}
                           title={tooltipText}
                         >
@@ -1264,21 +1576,21 @@ const AllowedVisitDatesManager: React.FC = () => {
                 </div>
               </div>
 
-              {/* Legend */}
-              <div className="mt-6 pt-4 md:pt-6 border-t border-gray-200">
-                <h5 className="text-sm font-medium text-gray-700 mb-3">
+              {/* Legenda */}
+              <div className="mt-6 pt-4 md:pt-6 border-t border-gray-100 dark:border-dark-border">
+                <h5 className="text-sm font-medium text-gray-700 dark:text-dark-text mb-3">
                   Legenda:
                 </h5>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   <div className="flex items-center space-x-2">
                     <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-600 rounded-lg"></div>
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
                       Visitas permitidas
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-50 border border-gray-200 rounded-lg"></div>
-                    <span className="text-sm text-gray-600">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-lg"></div>
+                    <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
                       Sem configuração
                     </span>
                   </div>
@@ -1288,8 +1600,8 @@ const AllowedVisitDatesManager: React.FC = () => {
                         2
                       </span>
                     </div>
-                    <span className="text-sm text-gray-600">
-                      Múltiplas configurações
+                    <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
+                      Múltiplas áreas no dia
                     </span>
                   </div>
                 </div>

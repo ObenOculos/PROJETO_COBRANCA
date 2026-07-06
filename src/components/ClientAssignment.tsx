@@ -20,13 +20,15 @@ import {
   Eye,
   Copy,
   Phone,
+  Check,
+  Minus,
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
 import { supabase } from "../lib/supabase";
 import { Collection, isCollectorType, ClientGroup } from "../types";
 import { createPortal } from "react-dom";
 import ClientDetailModal from "./dashboard/ClientDetailModal";
-import { countVendas } from "../filters/sales";
+import { countVendas, resolveSaleKey } from "../filters/sales";
 import { getClientPending } from "../filters/clientStatus";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { parseAndNormalizeDate } from "../filters/dates";
@@ -179,6 +181,36 @@ const getSituacaoIndicator = (collections: Collection[]) => {
 interface ClientAssignmentProps {
   onViewClient?: (clientIdentifier: string) => void;
 }
+
+interface SelectionIndicatorProps {
+  checked: boolean;
+  partial?: boolean;
+  onClick: (e: React.MouseEvent) => void;
+}
+
+const SelectionIndicator = ({ checked, partial, onClick }: SelectionIndicatorProps) => {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-1 dark:focus:ring-offset-dark-bg ${
+        checked
+          ? "bg-blue-600 border border-blue-600 text-white scale-105 shadow-sm shadow-blue-500/25"
+          : partial
+          ? "bg-blue-50 border border-blue-400 text-blue-600 dark:bg-blue-900/20 dark:border-blue-500"
+          : "bg-white border border-gray-300 dark:bg-dark-bg dark:border-dark-border text-transparent hover:border-blue-400 dark:hover:border-blue-500 hover:scale-105"
+      }`}
+      aria-checked={checked ? "true" : partial ? "mixed" : "false"}
+      role="checkbox"
+    >
+      {checked ? (
+        <Check className="h-3.5 w-3.5 stroke-[3.5] animate-in zoom-in-75 duration-100" />
+      ) : partial ? (
+        <Minus className="h-3 w-3 stroke-[3.5]" />
+      ) : null}
+    </button>
+  );
+};
 
 export const ClientAssignment = React.memo(
   ({ onViewClient }: ClientAssignmentProps) => {
@@ -904,7 +936,7 @@ export const ClientAssignment = React.memo(
             Documento: client.documento || "",
             "ID Parcela": col.id_parcela,
             Loja: col.nome_da_loja || "",
-            "Venda Nº": col.venda_n || "-",
+            "Venda Nº": resolveSaleKey(col) || "-",
             "Nº Título": col.numero_titulo || "-",
             Parcela: col.parcela || "-",
             "Data Lançamento": col.data_lancamento
@@ -1690,18 +1722,28 @@ export const ClientAssignment = React.memo(
                 <thead>
                   <tr className="bg-gray-50/50 dark:bg-dark-bg border-b border-gray-100 dark:border-dark-border">
                     <th className="px-4 py-4 w-10">
-                      <input
-                        type="checkbox"
-                        name="selectAllClients"
-                        checked={
-                          paginatedClients.length > 0 &&
-                          paginatedClients.every((c) =>
-                            selectedClients.has(c.uniqueKey),
-                          )
-                        }
-                        onChange={handleSelectAll}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded bg-white dark:bg-dark-bg"
-                      />
+                      <div className="flex justify-center">
+                        <SelectionIndicator
+                          checked={
+                            paginatedClients.length > 0 &&
+                            paginatedClients.every((c) =>
+                              selectedClients.has(c.uniqueKey),
+                            )
+                          }
+                          partial={
+                            paginatedClients.some((c) =>
+                              selectedClients.has(c.uniqueKey),
+                            ) &&
+                            !paginatedClients.every((c) =>
+                              selectedClients.has(c.uniqueKey),
+                            )
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectAll();
+                          }}
+                        />
+                      </div>
                     </th>
                     <th
                       onClick={() => handleSort("cliente")}
@@ -1783,18 +1825,19 @@ export const ClientAssignment = React.memo(
                         onClick={() => handleSelectClient(client.uniqueKey)}
                       >
                         <td
-                          className="px-4 py-3.5"
+                          className={`px-4 py-3.5 transition-all duration-200 ${
+                            selectedClients.has(client.uniqueKey)
+                              ? "border-l-[3px] border-l-blue-600 dark:border-l-blue-500 pl-[13px]"
+                              : "border-l-[3px] border-l-transparent pl-[13px]"
+                          }`}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <input
-                            type="checkbox"
-                            name={`select-client-${client.uniqueKey}`}
-                            checked={selectedClients.has(client.uniqueKey)}
-                            onChange={() =>
-                              handleSelectClient(client.uniqueKey)
-                            }
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded bg-white dark:bg-dark-bg"
-                          />
+                          <div className="flex justify-center">
+                            <SelectionIndicator
+                              checked={selectedClients.has(client.uniqueKey)}
+                              onClick={() => handleSelectClient(client.uniqueKey)}
+                            />
+                          </div>
                         </td>
                         <td className="px-3 py-3.5 w-[30%] min-w-[240px] relative">
                           <div className="flex flex-col">
@@ -1808,7 +1851,7 @@ export const ClientAssignment = React.memo(
                                 );
                               }}
                               title={client.cliente || ""}
-                              className="text-left text-sm font-semibold text-gray-900 dark:text-dark-text hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors truncate w-full"
+                              className="text-left text-sm font-semibold text-gray-900 dark:text-dark-text hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors block w-fit max-w-full truncate"
                             >
                               {client.cliente && client.cliente.length > 40
                                 ? `${client.cliente.slice(0, 40)}...`
@@ -2029,25 +2072,21 @@ export const ClientAssignment = React.memo(
               return (
                 <div
                   key={client.uniqueKey}
-                  className={`bg-white dark:bg-dark-bg-secondary rounded-xl shadow-sm border transition-all duration-200 cursor-pointer relative ${
+                  className={`bg-white dark:bg-dark-bg-secondary rounded-xl shadow-sm border transition-all duration-200 cursor-pointer relative border-l-[4px] ${
                     isSelected
-                      ? "ring-2 ring-blue-500/20 border-blue-500 bg-blue-50/5 shadow-md"
+                      ? "border-y-blue-500 border-r-blue-500 border-l-blue-600 dark:border-y-blue-500 dark:border-r-blue-500 dark:border-l-blue-500 bg-blue-50/10 dark:bg-blue-900/5 shadow-md shadow-blue-500/5"
                       : isWithoutCollector
-                        ? "border-amber-200 dark:border-amber-900/20 bg-amber-50/5"
-                        : "border-gray-100 dark:border-dark-border"
+                        ? "border-y-amber-200 border-r-amber-200 border-l-amber-400 dark:border-y-amber-900/20 dark:border-r-amber-900/20 dark:border-l-amber-600 bg-amber-50/5"
+                        : "border-gray-100 dark:border-dark-border border-l-transparent"
                   }`}
                   onClick={() => handleSelectClient(client.uniqueKey)}
                 >
                   <div className="p-3 sm:p-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex items-center h-5">
-                        <input
-                          type="checkbox"
-                          name={`select-client-card-${client.uniqueKey}`}
+                      <div className="flex items-center h-5" onClick={(e) => e.stopPropagation()}>
+                        <SelectionIndicator
                           checked={isSelected}
-                          onChange={() => handleSelectClient(client.uniqueKey)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="h-4.5 w-4.5 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-dark-border rounded bg-white dark:bg-dark-bg"
+                          onClick={() => handleSelectClient(client.uniqueKey)}
                         />
                       </div>
                       <div className="flex-1 min-w-0 space-y-2.5">
@@ -2063,7 +2102,7 @@ export const ClientAssignment = React.memo(
                                 );
                               }}
                               title={client.cliente || ""}
-                              className="text-left text-[13px] font-semibold text-gray-900 dark:text-dark-text hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
+                              className="text-left text-[13px] font-semibold text-gray-900 dark:text-dark-text hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors block w-fit max-w-full truncate"
                             >
                               {client.cliente && client.cliente.length > 40
                                 ? `${client.cliente.slice(0, 40)}...`
@@ -2274,22 +2313,26 @@ export const ClientAssignment = React.memo(
 
         {/* Barra de Ação Contextual — Mais compacta em mobile */}
         <div
-          className={`fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 transform w-[95%] sm:w-auto ${selectedClients.size > 0 ? "translate-y-0 opacity-100" : "translate-y-20 opacity-0 pointer-events-none"}`}
+          className={`fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 transform w-[95%] sm:w-auto ${
+            selectedClients.size > 0 
+              ? "translate-y-0 scale-100 opacity-100" 
+              : "translate-y-12 scale-95 opacity-0 pointer-events-none"
+          }`}
         >
-          <div className="bg-gray-900 dark:bg-dark-bg-secondary text-white p-2 sm:px-4 sm:py-3 rounded-2xl shadow-2xl flex items-center justify-between sm:justify-start gap-2 sm:gap-6 border border-gray-700 dark:border-dark-border overflow-hidden">
-            <div className="flex items-center gap-2 sm:gap-3 pr-2 sm:pr-6 border-r border-gray-700 dark:border-dark-border">
-              <div className="bg-blue-600 text-white w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-black text-xs sm:text-sm">
+          <div className="bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-md text-white p-2.5 sm:px-5 sm:py-3.5 rounded-2xl shadow-2xl flex items-center justify-between sm:justify-start gap-3 sm:gap-6 border border-white/10 dark:border-white/5 overflow-hidden">
+            <div className="flex items-center gap-2 sm:gap-3 pr-3 sm:pr-6 border-r border-white/10 dark:border-white/5">
+              <div className="bg-blue-600 text-white w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shadow-blue-500/25">
                 {selectedClients.size}
               </div>
-              <span className="text-[10px] sm:text-sm font-black text-gray-300 tracking-wide whitespace-nowrap hidden min-[400px]:inline">
-                {selectedClients.size === 1 ? "Selecionado" : "Selecionados"}
+              <span className="text-[11px] sm:text-sm font-semibold text-white tracking-wide whitespace-nowrap hidden min-[400px]:inline">
+                {selectedClients.size === 1 ? "cliente selecionado" : "clientes selecionados"}
               </span>
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 onClick={() => setSelectedClients(new Set())}
-                className="px-3 py-2 text-[10px] sm:text-sm font-black text-gray-400 hover:text-white transition-colors tracking-wide"
+                className="px-3 py-2 text-[11px] sm:text-sm font-semibold text-slate-300 hover:text-white transition-colors tracking-wide underline underline-offset-4 decoration-white/10 hover:decoration-white/30"
               >
                 Limpar
               </button>
@@ -2297,9 +2340,9 @@ export const ClientAssignment = React.memo(
                 onClick={() => setShowBulkModal(true)}
                 className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-lg active:scale-95"
               >
-                <Zap className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
-                <span className="text-[10px] sm:text-sm font-black tracking-wide whitespace-nowrap">
-                  Atribuir
+                <Zap className="w-3.5 h-3.5 text-yellow-400 shrink-0 fill-yellow-400" />
+                <span className="text-[11px] sm:text-sm font-semibold tracking-wide whitespace-nowrap">
+                  Atribuir Cobrador
                 </span>
               </button>
             </div>
