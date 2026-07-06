@@ -289,6 +289,17 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                   </span>
                 </div>
 
+                {/* Descrição (texto livre do banco) — apenas para consulta,
+                    útil em renegociações onde o usuário anota a venda original. */}
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-600">
+                    Descrição:
+                  </span>
+                  <span className="text-sm font-semibold text-gray-900 text-right break-words ml-4">
+                    {saleData.descricao?.trim() ? saleData.descricao : "—"}
+                  </span>
+                </div>
+
                 <div className="flex justify-between">
                   <span className="text-sm font-medium text-gray-600">
                     Número de Parcelas:
@@ -342,55 +353,63 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                 Informações do Cliente
               </h3>
               <div className="bg-gray-50 p-4 rounded-2xl space-y-4 text-sm border border-gray-200">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-600">
                     Cliente:
-                  </p>
-                  <p className="font-semibold text-gray-900">
+                  </span>
+                  <span className="text-sm font-semibold text-gray-900 text-right break-words ml-4">
                     {saleData.cliente}
-                  </p>
-                  <p className="text-sm text-gray-600">{saleData.documento}</p>
+                  </span>
                 </div>
 
-                <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-600">
+                    Documento:
+                  </span>
+                  <span className="text-sm font-semibold text-gray-900 text-right">
+                    {saleData.documento || "-"}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-600">
                     Data de Nascimento:
-                  </p>
-                  <p className="font-semibold text-gray-900">
+                  </span>
+                  <span className="text-sm font-semibold text-gray-900 text-right">
                     {birthDate ? formatDate(birthDate) : "-"}
-                  </p>
+                  </span>
                 </div>
 
                 {saleData.apelido && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-600">
                       Apelido:
-                    </p>
-                    <p className="font-semibold text-gray-900">
+                    </span>
+                    <span className="text-sm font-semibold text-gray-900 text-right break-words ml-4">
                       {saleData.apelido}
-                    </p>
+                    </span>
                   </div>
                 )}
 
                 {(saleData.telefone || saleData.celular) && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-600">
                       Contatos:
-                    </p>
-                    <div className="space-y-1">
+                    </span>
+                    <span className="flex flex-col items-end gap-1 text-sm font-semibold text-gray-900">
                       {saleData.telefone && (
-                        <div className="flex items-center text-sm">
-                          <Phone className="h-4 w-4 text-gray-400 mr-2" />
-                          <span>{saleData.telefone}</span>
-                        </div>
+                        <span className="flex items-center">
+                          <Phone className="h-4 w-4 text-gray-400 mr-1.5" />
+                          {saleData.telefone}
+                        </span>
                       )}
                       {saleData.celular && (
-                        <div className="flex items-center text-sm">
-                          <MessageCircle className="h-4 w-4 text-gray-400 mr-2" />
-                          <span>{saleData.celular}</span>
-                        </div>
+                        <span className="flex items-center">
+                          <MessageCircle className="h-4 w-4 text-gray-400 mr-1.5" />
+                          {saleData.celular}
+                        </span>
                       )}
-                    </div>
+                    </span>
                   </div>
                 )}
               </div>
