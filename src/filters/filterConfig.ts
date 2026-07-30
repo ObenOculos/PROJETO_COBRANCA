@@ -25,6 +25,8 @@ export interface FilterValues {
   visitsOnly?: boolean;
   // Observacao da ultima visita realizada -> ver src/config/visitOutcomes.
   visitOutcome?: string;
+  // Status da ultima visita -> ver src/config/visitStatus.
+  visitStatus?: string;
   includeWithoutDue?: boolean;
   // Faixa de atraso minima (dias) -> "30" | "60" | "90" | "120".
   aging?: string;
@@ -55,6 +57,7 @@ export interface FilterFieldFlags {
   amount?: boolean;
   visits?: boolean;
   visitOutcome?: boolean;
+  visitStatus?: boolean;
   createdRange?: boolean;
   period?: boolean;
 }
@@ -92,6 +95,7 @@ export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
     amount: true,
     createdRange: true,
     visitOutcome: true,
+    visitStatus: true,
   },
   // Ranking de Performance: foco em comparacao de desempenho. So filtros que
   // recortam de forma consistente (Periodo recorta todas as medidas pela mesma

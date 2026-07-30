@@ -58,6 +58,11 @@ export interface ClientFilters {
    * ex.: "spc". O mapa documento -> chave e passado a parte, como o createdAt.
    */
   visitOutcome?: string;
+  /**
+   * Status da ULTIMA visita do cliente (config/visitStatus), ex.: "realizada".
+   * Mapa documento -> status passado a parte, como o visitOutcome.
+   */
+  visitStatus?: string;
 }
 
 const matchesPaymentStatus = (
@@ -223,18 +228,40 @@ const matchesVisitOutcome = (
   return lastOutcome.get(client.documento) === outcome;
 };
 
+const matchesVisitStatus = (
+  client: FilterableClient,
+  status?: string,
+  lastStatus?: Map<string, string>,
+): boolean => {
+  if (!status) return true;
+  if (!lastStatus) return true;
+  return lastStatus.get(client.documento) === status;
+};
+
 /**
- * Aplica todos os filtros de cliente. `createdAt` mapeia documento -> data de
- * criacao (clientes.created_at), necessario apenas para o filtro "Criado em".
- * `lastVisitOutcome` mapeia documento -> chave da observacao da ultima visita
- * realizada, necessario apenas para o filtro "Observacao da visita".
+ * Dados auxiliares indexados por documento, usados por filtros que nao podem
+ * ser respondidos so com as collections do cliente.
+ *
+ * Ficam num objeto NOMEADO de proposito: `lastVisitOutcome` e `lastVisitStatus`
+ * sao ambos Map<string, string>, entao como parametros posicionais poderiam ser
+ * trocados entre si sem o compilador acusar nada.
  */
+export interface ClientFilterLookups {
+  /** documento -> clientes.created_at (filtro "Criado em"). */
+  createdAt?: Map<string, Date>;
+  /** documento -> chave da observacao da ultima visita realizada. */
+  lastVisitOutcome?: Map<string, string>;
+  /** documento -> status da ultima visita. */
+  lastVisitStatus?: Map<string, string>;
+}
+
+/** Aplica todos os filtros de cliente. */
 export const clientMatchesFilters = (
   client: FilterableClient,
   filters: ClientFilters,
-  createdAt?: Map<string, Date>,
-  lastVisitOutcome?: Map<string, string>,
+  lookups: ClientFilterLookups = {},
 ): boolean => {
+  const { createdAt, lastVisitOutcome, lastVisitStatus } = lookups;
   return (
     matchesSearch(client, filters.search) &&
     (!filters.collector || client.collectorId === filters.collector) &&
@@ -249,6 +276,7 @@ export const clientMatchesFilters = (
     matchesLaunchRange(client, filters) &&
     matchesAmount(client, filters) &&
     matchesCreatedRange(client, filters, createdAt) &&
-    matchesVisitOutcome(client, filters.visitOutcome, lastVisitOutcome)
+    matchesVisitOutcome(client, filters.visitOutcome, lastVisitOutcome) &&
+    matchesVisitStatus(client, filters.visitStatus, lastVisitStatus)
   );
 };

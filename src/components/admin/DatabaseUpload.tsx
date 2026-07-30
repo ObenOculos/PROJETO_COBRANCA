@@ -17,7 +17,7 @@ import {
 } from "lucide-react"; // Importar ícones
 import AddTituloModal from "./AddTituloModal";
 import { Database } from "../../types/database.types";
-import { PRIMARY_SITUACAO } from "../../config/profiles";
+import { PRIMARY_SITUACAO, ALL_SITUACOES } from "../../config/profiles";
 import { importClientesBirthDates } from "../../services/clientesImportService";
 
 type BancoDadosInsert = Database["public"]["Tables"]["BANCO_DADOS"]["Insert"];
@@ -167,13 +167,10 @@ const ResultList: React.FC<{
   );
 };
 
-// Valores válidos para a coluna situacao
-const VALID_SITUACAO_VALUES = [
-  "Em mãos",
-  "Em tratamento",
-  "Cobrança Interna",
-  "Aguardando Interno",
-];
+// Valores válidos para a coluna situacao. Deriva da fonte única (config/profiles)
+// para acompanhar automaticamente novos perfis: valor fora desta lista é
+// descartado como null, o que apagaria a fase do cliente na importação.
+const VALID_SITUACAO_VALUES = ALL_SITUACOES;
 
 // Função para validar e normalizar o valor de situacao
 const validateSituacao = (value: string | undefined | null): string | null => {

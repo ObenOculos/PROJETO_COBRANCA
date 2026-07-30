@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase";
 import { Database } from "../../types/database.types";
 import { ChevronDown } from "lucide-react";
 import { CollectionStatus } from "../../types/status";
+import { ALL_SITUACOES } from "../../config/profiles";
 
 type BancoDadosInsert = Database["public"]["Tables"]["BANCO_DADOS"]["Insert"];
 
@@ -346,13 +347,8 @@ const formFields: Record<
   situacao: {
     label: "Situação",
     type: "select",
-    options: [
-      "",
-      "Em mãos",
-      "Em tratamento",
-      "Cobrança Interna",
-      "Aguardando Interno",
-    ],
+    // Fonte única (config/profiles): acompanha novos perfis automaticamente.
+    options: ["", ...ALL_SITUACOES],
   },
   apelido: { label: "Apelido", type: "text" },
   bairro: { label: "Bairro", type: "text" },

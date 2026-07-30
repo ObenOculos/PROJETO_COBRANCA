@@ -79,16 +79,6 @@ export const VISIT_OUTCOMES: readonly VisitOutcome[] = [
 /** Chave usada para observacoes digitadas a mao (botao "Outro"). */
 export const OUTCOME_OTHER = "outra";
 
-/** Situacoes geradas por desfecho terminal de visita. */
-export const TERMINAL_SITUACOES: readonly string[] = VISIT_OUTCOMES.filter(
-  (o) => o.releasesTo,
-).map((o) => o.releasesTo as string);
-
-/** Textos das observacoes, na ordem de exibicao do modal de conclusao. */
-export const VISIT_OUTCOME_NOTES: readonly string[] = VISIT_OUTCOMES.map(
-  (o) => o.note,
-);
-
 /**
  * Desfecho correspondente a uma observacao, por texto EXATO.
  * Usado no gatilho de saida da carteira: so libera quando a observacao veio do
@@ -110,6 +100,27 @@ export const releaseSituacaoFor = (notes?: string | null): string | null =>
   exactVisitOutcome(notes)?.releasesTo ?? null;
 
 /**
+ * Situacao de liberacao da carteira para um desfecho de visita — ponto UNICO de
+ * decisao, consumido pelo caminho online (updateVisitStatus), pelo estado local
+ * e pela fila offline. Null = o cliente continua com o cobrador.
+ *
+ * Liberar significa sempre a mesma coisa: gravar esta situacao E zerar user_id,
+ * devolvendo o cliente a fila de Atribuicao. Os tres caminhos ja divergiram no
+ * passado (o "nao encontrado" gravava 'Aguardando Interno' no banco mas
+ * 'Cobrança Interna' no estado local e no sync offline, sem zerar user_id, o
+ * que prendia o cliente na carteira). Manter a decisao aqui evita repetir isso.
+ */
+export const visitReleaseSituacao = (
+  status: string,
+  notes?: string | null,
+): string | null => {
+  // Nao localizado: passa para a fila da Cobranca Interna.
+  if (status === "nao_encontrado") return "Aguardando Interno";
+  if (status === "realizada") return releaseSituacaoFor(notes);
+  return null;
+};
+
+/**
  * Classifica uma observacao gravada para fins de FILTRO. Mais tolerante que
  * `exactVisitOutcome`: o texto do catalogo pode aparecer concatenado a outros
  * (o reagendamento acumula observacoes anteriores separadas por \n), entao aqui
@@ -120,9 +131,18 @@ export const classifyVisitNote = (notes?: string | null): string | null => {
   if (!text) return null;
   const exact = VISIT_OUTCOMES.find((o) => o.note === text);
   if (exact) return exact.key;
-  const contained = VISIT_OUTCOMES.find((o) => text.includes(o.note));
-  if (contained) return contained.key;
-  return OUTCOME_OTHER;
+
+  // Varios desfechos no mesmo texto: vale o de posicao mais avancada, porque o
+  // reagendamento ACRESCENTA a observacao nova ao final. Usar o primeiro match
+  // devolveria a ordem do catalogo, nao a cronologica.
+  let latest: { key: string; at: number } | undefined;
+  for (const outcome of VISIT_OUTCOMES) {
+    const at = text.lastIndexOf(outcome.note);
+    if (at >= 0 && (!latest || at > latest.at)) {
+      latest = { key: outcome.key, at };
+    }
+  }
+  return latest ? latest.key : OUTCOME_OTHER;
 };
 
 /** Rotulo de uma chave de observacao (para chips de filtro ativo). */

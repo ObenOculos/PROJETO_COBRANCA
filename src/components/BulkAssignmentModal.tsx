@@ -13,6 +13,7 @@ import {
 import { Modal } from "./Modal";
 import { useCollection } from "../contexts/CollectionContext";
 import { supabase } from "../lib/supabase";
+import { ALL_SITUACOES } from "../config/profiles";
 
 interface ClientWithCollections {
   uniqueKey: string;
@@ -33,12 +34,10 @@ interface Props {
 
 type CollectorAction = "assign" | "remove" | "skip";
 
+// Situações da fonte única (config/profiles), entre os dois valores de controle.
 const STATUS_OPTIONS = [
   { value: "skip", label: "Não alterar status" },
-  { value: "Em mãos", label: "Em mãos" },
-  { value: "Em tratamento", label: "Em tratamento" },
-  { value: "Aguardando Interno", label: "Aguardando Interno" },
-  { value: "Cobrança Interna", label: "Cobrança Interna" },
+  ...ALL_SITUACOES.map((s) => ({ value: s, label: s })),
   { value: "empty", label: "Vazio (limpar)" },
 ];
 

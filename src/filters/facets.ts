@@ -9,6 +9,7 @@
 import {
   FilterableClient,
   ClientFilters,
+  ClientFilterLookups,
   clientMatchesFilters,
 } from "./predicates";
 
@@ -37,17 +38,11 @@ export interface ClientFacets {
 export const computeClientFacets = (
   clients: FilterableClient[],
   filters: ClientFilters,
-  createdAt?: Map<string, Date>,
-  lastVisitOutcome?: Map<string, string>,
+  lookups: ClientFilterLookups = {},
 ): ClientFacets => {
   const matching = (omit: keyof ClientFilters): FilterableClient[] =>
     clients.filter((c) =>
-      clientMatchesFilters(
-        c,
-        { ...filters, [omit]: undefined },
-        createdAt,
-        lastVisitOutcome,
-      ),
+      clientMatchesFilters(c, { ...filters, [omit]: undefined }, lookups),
     );
 
   const situacaoCollections = matching("situacao").flatMap(

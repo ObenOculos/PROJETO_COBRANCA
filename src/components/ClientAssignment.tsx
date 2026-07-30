@@ -49,6 +49,10 @@ import {
   lastVisitOutcomeByClient,
   visitOutcomeLabel,
 } from "../config/visitOutcomes";
+import {
+  lastVisitStatusByClient,
+  visitStatusLabel,
+} from "../config/visitStatus";
 import * as XLSX from "xlsx";
 import BulkAssignmentModal from "./BulkAssignmentModal";
 import AssignmentReportModal from "./dashboard/AssignmentReportModal";
@@ -92,114 +96,94 @@ interface ClientWithCollections {
   bairro?: string;
 }
 
+/**
+ * Indicadores de situação, em ORDEM DE PRECEDÊNCIA.
+ *
+ * Um cliente pode ter parcelas em situações diferentes (ex.: título novo
+ * importado depois de o cliente já ter mudado de fase). O badge mostra a
+ * PRIMEIRA situação desta lista presente em qualquer parcela — por isso a ordem
+ * é significativa e não deve ser reordenada por conveniência visual.
+ *
+ * "Falecido" vem primeiro por ser encerramento: sobrepõe qualquer fase de
+ * cobrança em que o cliente estivesse. As demais seguem a ordem do funil
+ * (campo → interna → terceirizada → jurídica).
+ *
+ * Nova situação: acrescente aqui e em ALL_SITUACOES (src/config/profiles).
+ */
+const SITUACAO_INDICATORS: {
+  situacao: string;
+  icon: typeof HandCoins;
+  label: string;
+  className: string;
+}[] = [
+  {
+    situacao: "Falecido",
+    icon: CircleSlash,
+    label: "Falecido",
+    className: "bg-slate-200 text-slate-700",
+  },
+  {
+    situacao: "Em mãos",
+    icon: HandCoins,
+    label: "Em mãos",
+    className: "bg-blue-100 text-blue-800",
+  },
+  {
+    situacao: "Em tratamento",
+    icon: Briefcase,
+    label: "Em tratamento",
+    className: "bg-yellow-100 text-yellow-800",
+  },
+  {
+    situacao: "Cobrança Interna",
+    icon: Building2,
+    label: "Cobrança Interna",
+    className: "bg-purple-100 text-purple-800",
+  },
+  {
+    situacao: "Aguardando Interno",
+    icon: AlertCircle,
+    label: "Aguardando Interno",
+    className: "bg-orange-100 text-orange-800",
+  },
+  {
+    situacao: "Cobrança Terceirizada",
+    icon: Globe,
+    label: "Cobrança Terceirizada",
+    className: "bg-red-100 text-red-800",
+  },
+  {
+    situacao: "Aguardando Terceirizado",
+    icon: Zap,
+    label: "Aguardando Terceirizado",
+    className: "bg-rose-100 text-rose-700",
+  },
+  {
+    situacao: "Cobrança Jurídica",
+    icon: Scale,
+    label: "Cobrança Jurídica",
+    className: "bg-amber-100 text-amber-800",
+  },
+  {
+    situacao: "Aguardando Jurídico",
+    icon: Scale,
+    label: "Aguardando Jurídico",
+    className: "bg-yellow-100 text-yellow-700",
+  },
+];
+
 // Helper function para obter indicador de situação
 const getSituacaoIndicator = (collections: Collection[]) => {
-  // Verificar se tem alguma parcela "Em mãos"
-  const hasEmMaos = collections.some((c) => c.situacao === "Em mãos");
-  if (hasEmMaos) {
-    return {
-      icon: HandCoins,
-      label: "Em mãos",
-      className: "bg-blue-100 text-blue-800",
-    };
-  }
-
-  // Verificar se tem alguma parcela "Em tratamento"
-  const hasEmTratamento = collections.some(
-    (c) => c.situacao === "Em tratamento",
+  const presentes = new Set(
+    collections.map((c) => c.situacao).filter((s): s is string => Boolean(s)),
   );
-  if (hasEmTratamento) {
-    return {
-      icon: Briefcase,
-      label: "Em tratamento",
-      className: "bg-yellow-100 text-yellow-800",
-    };
+
+  const match = SITUACAO_INDICATORS.find((i) => presentes.has(i.situacao));
+  if (match) {
+    return { icon: match.icon, label: match.label, className: match.className };
   }
 
-  // Verificar se tem alguma parcela "Cobrança Interna"
-  const hasCobrancaInterna = collections.some(
-    (c) => c.situacao === "Cobrança Interna",
-  );
-  if (hasCobrancaInterna) {
-    return {
-      icon: Building2,
-      label: "Cobrança Interna",
-      className: "bg-purple-100 text-purple-800",
-    };
-  }
-
-  // Verificar se tem alguma parcela "Aguardando Interno"
-  const hasAguardandoInterno = collections.some(
-    (c) => c.situacao === "Aguardando Interno",
-  );
-  if (hasAguardandoInterno) {
-    return {
-      icon: AlertCircle,
-      label: "Aguardando Interno",
-      className: "bg-orange-100 text-orange-800",
-    };
-  }
-
-  // Encerramento: nao e fase de cobranca e nao entra em fila de redistribuicao.
-  // Vem antes de tudo porque sobrepoe qualquer fase em que o cliente estivesse.
-  const hasFalecido = collections.some((c) => c.situacao === "Falecido");
-  if (hasFalecido) {
-    return {
-      icon: CircleSlash,
-      label: "Falecido",
-      className: "bg-slate-200 text-slate-700",
-    };
-  }
-
-  // Verificar se tem alguma parcela "Cobrança Terceirizada"
-  const hasCobrancaTerceirizada = collections.some(
-    (c) => c.situacao === "Cobrança Terceirizada",
-  );
-  if (hasCobrancaTerceirizada) {
-    return {
-      icon: Globe,
-      label: "Cobrança Terceirizada",
-      className: "bg-red-100 text-red-800",
-    };
-  }
-
-  // Verificar se tem alguma parcela "Aguardando Terceirizado"
-  const hasAguardandoTerceirizado = collections.some(
-    (c) => c.situacao === "Aguardando Terceirizado",
-  );
-  if (hasAguardandoTerceirizado) {
-    return {
-      icon: Zap,
-      label: "Aguardando Terceirizado",
-      className: "bg-rose-100 text-rose-700",
-    };
-  }
-
-  // Verificar se tem alguma parcela "Cobrança Jurídica"
-  const hasCobrancaJuridica = collections.some(
-    (c) => c.situacao === "Cobrança Jurídica",
-  );
-  if (hasCobrancaJuridica) {
-    return {
-      icon: Scale,
-      label: "Cobrança Jurídica",
-      className: "bg-amber-100 text-amber-800",
-    };
-  }
-
-  // Verificar se tem alguma parcela "Aguardando Jurídico"
-  const hasAguardandoJuridico = collections.some(
-    (c) => c.situacao === "Aguardando Jurídico",
-  );
-  if (hasAguardandoJuridico) {
-    return {
-      icon: Scale,
-      label: "Aguardando Jurídico",
-      className: "bg-yellow-100 text-yellow-700",
-    };
-  }
-
-  // Verificar se todas as parcelas têm situação vazia
+  // Todas as parcelas com situação vazia
   const allEmpty = collections.every(
     (c) => !c.situacao || c.situacao.trim() === "",
   );
@@ -211,7 +195,7 @@ const getSituacaoIndicator = (collections: Collection[]) => {
     };
   }
 
-  // Se tem mix de situações ou outras situações
+  // Situação desconhecida (fora do catálogo): sem badge.
   return null;
 };
 
@@ -287,6 +271,8 @@ export const ClientAssignment = React.memo(
     const [filterSituacao, setFilterSituacao] = useState<string>("");
     // Observacao da ultima visita realizada (ex.: "spc") — ver config/visitOutcomes.
     const [filterVisitOutcome, setFilterVisitOutcome] = useState<string>("");
+    // Status da ultima visita (ex.: "nao_encontrado") — ver config/visitStatus.
+    const [filterVisitStatus, setFilterVisitStatus] = useState<string>("");
     const [filterDateFrom, setFilterDateFrom] = useState<string>("");
     const [filterDateTo, setFilterDateTo] = useState<string>("");
     const [includeWithoutDate, setIncludeWithoutDate] = useState(false);
@@ -560,6 +546,12 @@ export const ClientAssignment = React.memo(
           onClear: () => setFilterVisitOutcome(""),
         });
       }
+      if (filterVisitStatus) {
+        chips.push({
+          label: `Visita: ${visitStatusLabel(filterVisitStatus)}`,
+          onClear: () => setFilterVisitStatus(""),
+        });
+      }
       if (filterAgings.length > 0) {
         // Vencimento controlado por atalhos de atraso: mostra as faixas, nao a data.
         // Remover uma faixa recalcula o intervalo a partir das restantes.
@@ -650,6 +642,7 @@ export const ClientAssignment = React.memo(
       filterStore,
       filterSituacao,
       filterVisitOutcome,
+      filterVisitStatus,
       filterPaymentStatuses,
       filterDateFrom,
       filterDateTo,
@@ -677,6 +670,7 @@ export const ClientAssignment = React.memo(
         store: filterStore,
         situacao: filterSituacao,
         visitOutcome: filterVisitOutcome,
+        visitStatus: filterVisitStatus,
         paymentStatus: filterPaymentStatuses,
         dueFrom: filterDateFrom,
         dueTo: filterDateTo,
@@ -697,6 +691,7 @@ export const ClientAssignment = React.memo(
         filterStore,
         filterSituacao,
         filterVisitOutcome,
+        filterVisitStatus,
         filterPaymentStatuses,
         filterDateFrom,
         filterDateTo,
@@ -710,46 +705,30 @@ export const ClientAssignment = React.memo(
       ],
     );
 
-    // Documento -> observacao da ultima visita realizada. Derivado das visitas ja
-    // carregadas no contexto (nao custa round-trip) e reutilizado pela filtragem
-    // e pelo faceting.
-    const lastVisitOutcomeMap = useMemo(
-      () => lastVisitOutcomeByClient(scheduledVisits),
-      [scheduledVisits],
+    // Dados auxiliares indexados por documento, derivados das visitas ja
+    // carregadas no contexto (sem round-trip) e reutilizados pela filtragem e
+    // pelo faceting.
+    const filterLookups = useMemo(
+      () => ({
+        createdAt: clientCreatedAtMap,
+        lastVisitOutcome: lastVisitOutcomeByClient(scheduledVisits),
+        lastVisitStatus: lastVisitStatusByClient(scheduledVisits),
+      }),
+      [clientCreatedAtMap, scheduledVisits],
     );
 
     const filteredClients = useMemo(() => {
       return clientsData.filter((client) =>
-        clientMatchesFilters(
-          client,
-          currentClientFilters,
-          clientCreatedAtMap,
-          lastVisitOutcomeMap,
-        ),
+        clientMatchesFilters(client, currentClientFilters, filterLookups),
       );
-    }, [
-      clientsData,
-      currentClientFilters,
-      clientCreatedAtMap,
-      lastVisitOutcomeMap,
-    ]);
+    }, [clientsData, currentClientFilters, filterLookups]);
 
     // Opcoes dos dropdowns dependentes (faceting): cada lista mostra apenas os
     // valores compativeis com os demais filtros ativos. Ver src/filters/facets.
     const facetOptions = useMemo(
       () =>
-        computeClientFacets(
-          clientsData,
-          currentClientFilters,
-          clientCreatedAtMap,
-          lastVisitOutcomeMap,
-        ),
-      [
-        clientsData,
-        currentClientFilters,
-        clientCreatedAtMap,
-        lastVisitOutcomeMap,
-      ],
+        computeClientFacets(clientsData, currentClientFilters, filterLookups),
+      [clientsData, currentClientFilters, filterLookups],
     );
 
     // Assinatura dos filtros: muda SO quando o usuario altera um filtro/busca, e
@@ -765,6 +744,7 @@ export const ClientAssignment = React.memo(
       filterStore,
       filterSituacao,
       filterVisitOutcome,
+      filterVisitStatus,
       filterPaymentStatuses,
       filterDateFrom,
       filterDateTo,
@@ -1285,6 +1265,7 @@ export const ClientAssignment = React.memo(
       setFilterStore("");
       setFilterSituacao("");
       setFilterVisitOutcome("");
+      setFilterVisitStatus("");
       setFilterPaymentStatuses([]);
       setFilterDateFrom("");
       setFilterDateTo("");
@@ -1308,6 +1289,7 @@ export const ClientAssignment = React.memo(
       store: filterStore,
       situacao: filterSituacao,
       visitOutcome: filterVisitOutcome,
+      visitStatus: filterVisitStatus,
       dueFrom: filterDateFrom,
       dueTo: filterDateTo,
       launchFrom: filterLaunchFrom,
@@ -1331,6 +1313,7 @@ export const ClientAssignment = React.memo(
       if ("situacao" in patch) setFilterSituacao(patch.situacao ?? "");
       if ("visitOutcome" in patch)
         setFilterVisitOutcome(patch.visitOutcome ?? "");
+      if ("visitStatus" in patch) setFilterVisitStatus(patch.visitStatus ?? "");
       if ("dueFrom" in patch) setFilterDateFrom(patch.dueFrom ?? "");
       if ("dueTo" in patch) setFilterDateTo(patch.dueTo ?? "");
       if ("launchFrom" in patch) setFilterLaunchFrom(patch.launchFrom ?? "");

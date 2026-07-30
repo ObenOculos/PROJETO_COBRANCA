@@ -33,6 +33,7 @@ import {
   classifyVisitNote,
   visitOutcomeLabel,
 } from "../../config/visitOutcomes";
+import { visitStatusLabel } from "../../config/visitStatus";
 
 // Helper function to parse YYYY-MM-DD date strings safely
 const parseDateString = (dateString: string): Date | null => {
@@ -843,13 +844,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     const groupedVisits = getVisitsByCollectorGrouped();
 
     // Labels e chips de filtros ativos (mesmo padrao visual da barra global).
-    const STATUS_LABELS: Record<string, string> = {
-      agendada: "Agendada",
-      realizada: "Realizada",
-      cancelada: "Cancelada",
-      nao_encontrado: "Não Encontrado",
-      reagendada: "Reagendada",
-    };
+    // Rotulos de status vem da fonte unica (config/visitStatus).
     const TYPE_LABELS: Record<string, string> = {
       internal_collector: "Interno",
       collector: "Externo",
@@ -879,7 +874,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       });
     if (statusFilter !== "all")
       filterChips.push({
-        label: `Status: ${STATUS_LABELS[statusFilter] ?? statusFilter}`,
+        label: `Status: ${visitStatusLabel(statusFilter)}`,
         onClear: () => setStatusFilter("all"),
       });
     if (outcomeFilter !== "all")

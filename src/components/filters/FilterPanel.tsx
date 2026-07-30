@@ -10,8 +10,10 @@ import {
   Calendar,
   CalendarRange,
   ClipboardList,
+  CalendarCheck,
 } from "lucide-react";
 import { VISIT_OUTCOME_OPTIONS } from "../../config/visitOutcomes";
+import { VISIT_STATUS_OPTIONS } from "../../config/visitStatus";
 import {
   FilterContext,
   FilterValues,
@@ -270,6 +272,20 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             htmlFor="filter-situacao"
           >
             {renderSelect("situacao", "Todas as situações", situacaoOptions)}
+          </Field>
+        )}
+
+        {fields.visitStatus && (
+          <Field
+            icon={<CalendarCheck className="h-3 w-3 mr-1.5" />}
+            label="Status da visita"
+            htmlFor="filter-visitStatus"
+          >
+            {renderSelect(
+              "visitStatus",
+              "Todos os status",
+              VISIT_STATUS_OPTIONS,
+            )}
           </Field>
         )}
 

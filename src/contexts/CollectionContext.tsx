@@ -31,7 +31,7 @@ import {
   resolveSituacaoOnAssign,
 } from "../config/profiles";
 import {
-  releaseSituacaoFor,
+  visitReleaseSituacao,
   lastVisitOutcomeByClient,
 } from "../config/visitOutcomes";
 import { useAuth } from "./AuthContext";
@@ -3063,12 +3063,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         (visit) => visit.id === visitId,
       );
       const clientDocument = currentVisit?.clientDocument;
-      const isTransferToInternal = status === "nao_encontrado";
-      // Desfecho terminal (SPC / falecido): cobranca presencial nao resolve
-      // mais o caso. O cliente sai da carteira do cobrador e volta a fila de
-      // Atribuicao marcado com a situacao do desfecho (ver config/visitOutcomes).
-      const releaseSituacao =
-        status === "realizada" ? releaseSituacaoFor(notes) : null;
+      // Desfecho que tira o cliente da carteira: "nao encontrado" (vai para a
+      // fila da Cobranca Interna) ou observacao terminal como SPC/falecido.
+      // A regra e unica (config/visitOutcomes) e liberar sempre significa
+      // gravar a situacao E zerar user_id — aqui, no estado local e no offline.
+      const releaseSituacao = visitReleaseSituacao(status, notes);
       // Para múltiplos internos, não atribuir automaticamente - deixar para o gerente decidir
       // const internalCollectorId = isTransferToInternal
       //   ? users.find((u) => u.type === "internal_collector")?.id || null
@@ -3139,33 +3138,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               `Cliente ${clientDocument} liberado da carteira como "${releaseSituacao}"`,
             );
           }
-        } else if (isTransferToInternal && clientDocument) {
-          const collectionUpdate: any = {
-            situacao: "Aguardando Interno",
-            user_id: null, // Remove do cobrador externo para que volte à "fila" geral de atribuição
-          };
-          // Não atribuir automaticamente a um internal_collector específico
-          // Deixar para o gerente decidir qual interno ficará responsável
-          // if (internalCollectorId) {
-          //   collectionUpdate.user_id = internalCollectorId;
-          // }
-
-          const { error: collectionError } = await supabase
-            .from("BANCO_DADOS")
-            .update(collectionUpdate)
-            .eq("documento", clientDocument);
-
-          if (collectionError) {
-            console.error(
-              "Erro ao transferir cobranças para Cobrança Interna:",
-              collectionError,
-            );
-          } else {
-            console.log(
-              "Cobranças transferidas para Cobrança Interna para",
-              clientDocument,
-            );
-          }
         }
       }
 
@@ -3186,21 +3158,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             : visit,
         ),
       );
-
-      if (isTransferToInternal && clientDocument) {
-        setAllCollections((prev) =>
-          prev.map((collection) =>
-            collection.documento === clientDocument
-              ? {
-                  ...collection,
-                  situacao: "Cobrança Interna",
-                  // Não definir user_id automaticamente - deixar para o gerente atribuir
-                  // user_id: internalCollectorId || collection.user_id,
-                }
-              : collection,
-          ),
-        );
-      }
 
       if (releaseSituacao && clientDocument) {
         setAllCollections((prev) =>

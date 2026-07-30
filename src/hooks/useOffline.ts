@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { ScheduledVisit } from "../types";
-import { releaseSituacaoFor } from "../config/visitOutcomes";
+import { visitReleaseSituacao } from "../config/visitOutcomes";
 
 // Variável de controle de sincronização no escopo do módulo
 let isSyncing = false;
@@ -227,13 +227,14 @@ export const useOffline = () => {
       );
     }
 
-    // Desfecho terminal (SPC / falecido) sincronizado depois do offline: repete
-    // a liberacao que o fluxo online faz em updateVisitStatus, senao o cliente
-    // voltaria a ficar preso na carteira do cobrador ao reconectar.
-    const releaseSituacao =
-      visitData.status === "realizada"
-        ? releaseSituacaoFor(visitData.notes)
-        : null;
+    // Liberacao da carteira ("nao encontrado" ou observacao terminal como
+    // SPC/falecido) sincronizada depois do offline. Usa a MESMA regra do fluxo
+    // online (config/visitOutcomes); antes este caminho gravava outra situacao
+    // e nao zerava user_id, deixando o cliente preso na carteira ao reconectar.
+    const releaseSituacao = visitReleaseSituacao(
+      visitData.status,
+      visitData.notes,
+    );
 
     if (releaseSituacao) {
       const { data: releasedVisit, error: releasedFetchError } = await supabase
@@ -258,51 +259,6 @@ export const useOffline = () => {
         if (releaseError) {
           throw new Error(
             `Erro ao liberar cliente da carteira (${releaseSituacao}): ${releaseError.message}`,
-          );
-        }
-      }
-    }
-
-    if (visitData.status === "nao_encontrado") {
-      const { data: scheduledVisit, error: visitFetchError } = await supabase
-        .from("scheduled_visits")
-        .select("client_document")
-        .eq("id", visitData.visitId)
-        .single();
-
-      if (visitFetchError) {
-        throw new Error(
-          `Erro ao buscar visita para transferência interna: ${visitFetchError.message}`,
-        );
-      }
-
-      const clientDocument = scheduledVisit?.client_document;
-      if (clientDocument) {
-        const { error: internalUsersError } = await supabase
-          .from("users")
-          .select("id")
-          .eq("type", "internal_collector")
-          .limit(1);
-
-        if (internalUsersError) {
-          console.warn(
-            "Erro ao buscar usuário de cobrança interna:",
-            internalUsersError,
-          );
-        }
-
-        const collectionUpdate: any = {
-          situacao: "Cobrança Interna",
-        };
-
-        const { error: collectionError } = await supabase
-          .from("BANCO_DADOS")
-          .update(collectionUpdate)
-          .eq("documento", clientDocument);
-
-        if (collectionError) {
-          throw new Error(
-            `Erro ao transferir cobranças para Cobrança Interna: ${collectionError.message}`,
           );
         }
       }

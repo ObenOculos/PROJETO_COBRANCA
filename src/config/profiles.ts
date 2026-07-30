@@ -81,6 +81,27 @@ export function resolveSituacaoOnAssign(
   return current && rule.keep.includes(current) ? current : rule.confirm;
 }
 
+/**
+ * Situacoes de encerramento: nao pertencem a perfil nenhum e nao entram em fila
+ * de redistribuicao (nao ha a quem atribuir). Ver src/config/visitOutcomes.
+ */
+export const ENCERRAMENTO_SITUACOES: readonly string[] = ["Falecido"];
+
+/**
+ * TODAS as situacoes validas de BANCO_DADOS.situacao — espelha a CHECK
+ * constraint do banco (ver supabase/migrations/*_situacao*.sql).
+ *
+ * Fonte unica para qualquer lista de situacao na UI (upload, cadastro de
+ * titulo, alteracao em lote). Antes cada tela mantinha sua propria copia e as
+ * tres ficaram defasadas quando o perfil Terceirizado foi criado — no upload
+ * isso apagava silenciosamente a situacao dos clientes dessas fases, porque
+ * valor desconhecido vira NULL.
+ */
+export const ALL_SITUACOES: readonly string[] = [
+  ...Object.values(SITUACAO_BY_PROFILE).flat(),
+  ...ENCERRAMENTO_SITUACOES,
+];
+
 /** All situacoes that exist outside the given profile's domain. */
 export function situacoesOutsideProfile(
   userType: Exclude<UserType, "manager">,

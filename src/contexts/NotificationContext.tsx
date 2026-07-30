@@ -10,6 +10,7 @@ import { useCollection } from "./CollectionContext";
 import { useAuth } from "./AuthContext";
 
 import { formatCurrency } from "../utils/formatters";
+import { UserType } from "../types";
 
 export interface Notification {
   id: string;
@@ -20,7 +21,9 @@ export interface Notification {
   read: boolean;
   priority: "low" | "medium" | "high";
   relatedId?: string;
-  targetUserType?: "manager" | "collector" | "internal_collector" | "all"; // Novo campo para direcionamento
+  // Direcionamento por perfil. Deriva de UserType para nao ficar defasado
+  // quando um perfil novo e criado (ja aconteceu com Terceirizado e Juridico).
+  targetUserType?: UserType | "all";
 }
 
 interface NotificationContextType {
