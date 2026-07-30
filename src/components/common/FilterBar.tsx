@@ -15,6 +15,7 @@ import {
 } from "../../filters/filterConfig";
 import type { PillPatch } from "../filters/FilterPills";
 import { distinctSorted } from "../../filters/facets";
+import { visitOutcomeLabel } from "../../config/visitOutcomes";
 
 import { FilterOptions, UserType, isCollectorType } from "../../types";
 
@@ -141,6 +142,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
     city: filters.city,
     neighborhood: filters.neighborhood,
     visitsOnly: filters.visitsOnly,
+    visitOutcome: filters.visitOutcome,
     months: filters.months,
     years: filters.years,
   };
@@ -185,6 +187,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
     if ("neighborhood" in patch)
       next.neighborhood = patch.neighborhood || undefined;
     if ("visitsOnly" in patch) next.visitsOnly = patch.visitsOnly || undefined;
+    if ("visitOutcome" in patch)
+      next.visitOutcome = patch.visitOutcome || undefined;
     // Periodo: arrays vazios viram undefined (= sem filtro), para nao contarem
     // como filtro ativo.
     if ("months" in patch)
@@ -260,6 +264,11 @@ const FilterBar: React.FC<FilterBarProps> = ({
     activeFilterChips.push({
       label: "Apenas com visitas",
       onClear: () => onFilterChange({ ...filters, visitsOnly: undefined }),
+    });
+  if (filters.visitOutcome)
+    activeFilterChips.push({
+      label: `Observação: ${visitOutcomeLabel(filters.visitOutcome)}`,
+      onClear: () => onFilterChange({ ...filters, visitOutcome: undefined }),
     });
   if (filters.months?.length || filters.years?.length)
     activeFilterChips.push({

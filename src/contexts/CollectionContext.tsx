@@ -26,6 +26,10 @@ import {
 } from "../types";
 import { supabase } from "../lib/supabase";
 import { PRIMARY_SITUACAO, situacoesOutsideProfile } from "../config/profiles";
+import {
+  releaseSituacaoFor,
+  lastVisitOutcomeByClient,
+} from "../config/visitOutcomes";
 import { useAuth } from "./AuthContext";
 import { useLoading } from "./LoadingContext";
 import { useOffline } from "../hooks/useOffline";
@@ -1584,6 +1588,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
     }
 
+    // Filtro por observacao da ULTIMA visita realizada do cliente. Recorta por
+    // CLIENTE (o desfecho e do cliente, nao do titulo), entao todos os titulos
+    // dos clientes cujo ultimo desfecho casa permanecem no resultado.
+    if (filters.visitOutcome) {
+      const outcomes = lastVisitOutcomeByClient(scheduledVisits);
+      filtered = filtered.filter((c) =>
+        c.documento
+          ? outcomes.get(c.documento) === filters.visitOutcome
+          : false,
+      );
+    }
+
     // Apply visitsOnly filter - show only clients with scheduled visits
     if (filters.visitsOnly && userType !== "manager" && collectorId) {
       const collectorVisits = getVisitsByCollector(collectorId).filter(
@@ -3046,6 +3062,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
       const clientDocument = currentVisit?.clientDocument;
       const isTransferToInternal = status === "nao_encontrado";
+      // Desfecho terminal (SPC / falecido): cobranca presencial nao resolve
+      // mais o caso. O cliente sai da carteira do cobrador e volta a fila de
+      // Atribuicao marcado com a situacao do desfecho (ver config/visitOutcomes).
+      const releaseSituacao =
+        status === "realizada" ? releaseSituacaoFor(notes) : null;
       // Para múltiplos internos, não atribuir automaticamente - deixar para o gerente decidir
       // const internalCollectorId = isTransferToInternal
       //   ? users.find((u) => u.type === "internal_collector")?.id || null
@@ -3095,6 +3116,27 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             type: "UPDATE_VISIT_STATUS",
             data: { visitId, status, notes },
           });
+        } else if (releaseSituacao && clientDocument) {
+          const { error: releaseError } = await supabase
+            .from("BANCO_DADOS")
+            .update({
+              situacao: releaseSituacao,
+              // Sai da carteira: volta para a fila geral de atribuicao para o
+              // gerente escolher o proximo responsavel.
+              user_id: null,
+            })
+            .eq("documento", clientDocument);
+
+          if (releaseError) {
+            console.error(
+              `Erro ao liberar cliente da carteira (${releaseSituacao}):`,
+              releaseError,
+            );
+          } else {
+            console.log(
+              `Cliente ${clientDocument} liberado da carteira como "${releaseSituacao}"`,
+            );
+          }
         } else if (isTransferToInternal && clientDocument) {
           const collectionUpdate: any = {
             situacao: "Aguardando Interno",
@@ -3156,6 +3198,23 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               : collection,
           ),
         );
+      }
+
+      if (releaseSituacao && clientDocument) {
+        setAllCollections((prev) =>
+          prev.map((collection) =>
+            collection.documento === clientDocument
+              ? {
+                  ...collection,
+                  situacao: releaseSituacao,
+                  user_id: null,
+                }
+              : collection,
+          ),
+        );
+        // A carteira do cobrador e derivada de user_id; sem invalidar, os grupos
+        // de cliente em cache continuariam mostrando o cliente ja liberado.
+        invalidateCollections();
       }
 
       // Invalidate cache

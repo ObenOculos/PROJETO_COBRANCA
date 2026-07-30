@@ -53,6 +53,11 @@ export interface ClientFilters {
   /** Intervalo sobre clientes.created_at (mapa passado a parte). */
   createdFrom?: string;
   createdTo?: string;
+  /**
+   * Chave da observacao da ultima visita realizada (config/visitOutcomes),
+   * ex.: "spc". O mapa documento -> chave e passado a parte, como o createdAt.
+   */
+  visitOutcome?: string;
 }
 
 const matchesPaymentStatus = (
@@ -206,14 +211,29 @@ const matchesCreatedRange = (
   return true;
 };
 
+const matchesVisitOutcome = (
+  client: FilterableClient,
+  outcome?: string,
+  lastOutcome?: Map<string, string>,
+): boolean => {
+  if (!outcome) return true;
+  // Sem o mapa nao ha como decidir; nao restringe (mesma politica do createdAt
+  // quando o filtro esta inativo) para nao esvaziar a tela silenciosamente.
+  if (!lastOutcome) return true;
+  return lastOutcome.get(client.documento) === outcome;
+};
+
 /**
  * Aplica todos os filtros de cliente. `createdAt` mapeia documento -> data de
  * criacao (clientes.created_at), necessario apenas para o filtro "Criado em".
+ * `lastVisitOutcome` mapeia documento -> chave da observacao da ultima visita
+ * realizada, necessario apenas para o filtro "Observacao da visita".
  */
 export const clientMatchesFilters = (
   client: FilterableClient,
   filters: ClientFilters,
   createdAt?: Map<string, Date>,
+  lastVisitOutcome?: Map<string, string>,
 ): boolean => {
   return (
     matchesSearch(client, filters.search) &&
@@ -228,6 +248,7 @@ export const clientMatchesFilters = (
     matchesDueRange(client, filters) &&
     matchesLaunchRange(client, filters) &&
     matchesAmount(client, filters) &&
-    matchesCreatedRange(client, filters, createdAt)
+    matchesCreatedRange(client, filters, createdAt) &&
+    matchesVisitOutcome(client, filters.visitOutcome, lastVisitOutcome)
   );
 };

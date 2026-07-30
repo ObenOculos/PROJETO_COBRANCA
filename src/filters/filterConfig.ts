@@ -23,6 +23,8 @@ export interface FilterValues {
   minAmount?: number;
   maxAmount?: number;
   visitsOnly?: boolean;
+  // Observacao da ultima visita realizada -> ver src/config/visitOutcomes.
+  visitOutcome?: string;
   includeWithoutDue?: boolean;
   // Faixa de atraso minima (dias) -> "30" | "60" | "90" | "120".
   aging?: string;
@@ -52,6 +54,7 @@ export interface FilterFieldFlags {
   launchRange?: boolean;
   amount?: boolean;
   visits?: boolean;
+  visitOutcome?: boolean;
   createdRange?: boolean;
   period?: boolean;
 }
@@ -64,6 +67,7 @@ export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
     amount: true,
     store: true,
     collector: true,
+    visitOutcome: true,
   },
   collectionsCollector: {
     // Status de pagamento fica nas pills (multi-select), nao no dropdown.
@@ -74,6 +78,7 @@ export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
     city: true,
     neighborhood: true,
     visits: true,
+    visitOutcome: true,
   },
   assignment: {
     assignment: true,
@@ -86,6 +91,7 @@ export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
     launchRange: true,
     amount: true,
     createdRange: true,
+    visitOutcome: true,
   },
   // Ranking de Performance: foco em comparacao de desempenho. So filtros que
   // recortam de forma consistente (Periodo recorta todas as medidas pela mesma
@@ -160,6 +166,10 @@ export const SITUACAO_OPTIONS: SelectOption[] = [
   { value: "Cobrança Interna", label: "Cobrança interna" },
   { value: "Aguardando Terceirizado", label: "Aguardando terceirizado" },
   { value: "Cobrança Terceirizada", label: "Cobrança terceirizada" },
+  // Desfechos terminais de visita (ver src/config/visitOutcomes): o cliente saiu
+  // da carteira do cobrador e aguarda o gerente redistribuir.
+  { value: "SPC", label: "SPC (dívida contestada)" },
+  { value: "Falecido", label: "Falecido" },
   { value: "empty", label: "Sem situação" },
 ];
 

@@ -39,6 +39,10 @@ import {
   resolveAllowedConfigs,
 } from "../../utils/visitScheduling";
 import { PAYABLE_STATUSES } from "../../types/status";
+import {
+  VISIT_OUTCOMES,
+  exactVisitOutcome,
+} from "../../config/visitOutcomes";
 
 interface VisitSchedulerProps {
   onClose?: () => void;
@@ -1345,16 +1349,15 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
     let shouldUpdateStatus = true; // Flag to control status update
 
+    const outcome = exactVisitOutcome(selectedNote);
+
     // Abrir modal do cliente imediatamente
-    if (
-      selectedNote === "Visitado e o cliente pagou tudo." ||
-      selectedNote === "Visitado, mas cliente pagou parcialmente."
-    ) {
+    if (outcome?.key === "pagou_tudo" || outcome?.key === "pagou_parcial") {
       setSelectedClientForModal(clientGroup); // Passar o objeto ClientGroup completo
       setShowClientModal(true);
     } else if (
-      selectedNote === "Visitado, mas cliente agendou pagamento." ||
-      selectedNote === "Visitado, mas cliente não estava em casa."
+      outcome?.key === "agendou_pagamento" ||
+      outcome?.key === "ausente"
     ) {
       handleOpenRescheduleModal(selectedVisitForCompletion);
       shouldUpdateStatus = false; // Prevent immediate status update
@@ -1362,17 +1365,25 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
     // Atualizar status da visita em background (conditionally)
     if (shouldUpdateStatus) {
+      const visitToComplete = selectedVisitForCompletion;
       setTimeout(async () => {
         try {
-          await updateVisitStatus(
-            selectedVisitForCompletion.id,
-            "realizada",
-            selectedNote,
-          );
-          triggerNotification(
-            `Visita marcada como ${getStatusLabel(selectedVisitForCompletion)}`,
-            "success",
-          );
+          await updateVisitStatus(visitToComplete.id, "realizada", selectedNote);
+          if (outcome?.releasesTo) {
+            // Desfecho terminal: o cliente saiu da carteira. Avisa com o motivo
+            // (a notificacao padrao de "visita realizada" nao deixaria claro
+            // por que o cliente sumiu da lista) e recarrega para refletir.
+            triggerNotification(
+              `${clientGroup.client} saiu da sua carteira (${outcome.releasesTo}) e voltou para o gerente redistribuir.`,
+              "success",
+            );
+            if (isOnline) await refreshData();
+          } else {
+            triggerNotification(
+              `Visita marcada como ${getStatusLabel(visitToComplete)}`,
+              "success",
+            );
+          }
         } catch (error) {
           console.error("Erro ao atualizar status da visita:", error);
           // Não mostrar alert para não interromper o fluxo do usuário
@@ -3209,27 +3220,23 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   </p>
 
                   <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 lg:gap-2 mb-4">
-                    {[
-                      "Visitado e o cliente pagou tudo.",
-                      "Visitado, mas cliente pagou parcialmente.",
-                      "Visitado, mas cliente agendou pagamento.",
-                      "Visitado, mas cliente não estava em casa.",
-                      "Visitado, mas cliente solicitou revisão.",
-                      "Visitado, mas cliente devolveu os óculos.",
-                      "Visitado, mas cliente faleceu.",
-                      "Visitado, mas cliente contestou a dívida - (SPC).",
-                    ].map((note, index) => (
+                    {VISIT_OUTCOMES.map((outcome) => (
                       <button
-                        key={index}
+                        key={outcome.key}
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          handleConfirmCompletion(note);
+                          handleConfirmCompletion(outcome.note);
                         }}
                         className="w-full text-left px-4 py-3 bg-gray-50 hover:bg-green-50 hover:border-green-200 border border-gray-200 rounded-2xl transition-colors text-sm"
                       >
-                        {note}
+                        {outcome.note}
+                        {outcome.releasesTo && (
+                          <span className="block mt-1 text-[10px] font-semibold text-orange-600">
+                            Sai da sua carteira
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>

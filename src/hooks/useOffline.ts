@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { ScheduledVisit } from "../types";
+import { releaseSituacaoFor } from "../config/visitOutcomes";
 
 // Variável de controle de sincronização no escopo do módulo
 let isSyncing = false;
@@ -224,6 +225,42 @@ export const useOffline = () => {
       throw new Error(
         `Erro ao sincronizar atualização de status de visita: ${error.message}`,
       );
+    }
+
+    // Desfecho terminal (SPC / falecido) sincronizado depois do offline: repete
+    // a liberacao que o fluxo online faz em updateVisitStatus, senao o cliente
+    // voltaria a ficar preso na carteira do cobrador ao reconectar.
+    const releaseSituacao =
+      visitData.status === "realizada"
+        ? releaseSituacaoFor(visitData.notes)
+        : null;
+
+    if (releaseSituacao) {
+      const { data: releasedVisit, error: releasedFetchError } = await supabase
+        .from("scheduled_visits")
+        .select("client_document")
+        .eq("id", visitData.visitId)
+        .single();
+
+      if (releasedFetchError) {
+        throw new Error(
+          `Erro ao buscar visita para liberar da carteira: ${releasedFetchError.message}`,
+        );
+      }
+
+      const clientDocument = releasedVisit?.client_document;
+      if (clientDocument) {
+        const { error: releaseError } = await supabase
+          .from("BANCO_DADOS")
+          .update({ situacao: releaseSituacao, user_id: null })
+          .eq("documento", clientDocument);
+
+        if (releaseError) {
+          throw new Error(
+            `Erro ao liberar cliente da carteira (${releaseSituacao}): ${releaseError.message}`,
+          );
+        }
+      }
     }
 
     if (visitData.status === "nao_encontrado") {

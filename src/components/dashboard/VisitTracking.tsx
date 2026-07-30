@@ -28,6 +28,11 @@ import { distinctSorted } from "../../filters/facets";
 import VisitScheduler from "./VisitScheduler"; // Import the VisitScheduler component
 import AllowedVisitDatesManager from "./AllowedVisitDatesManager"; // Import the AllowedVisitDatesManager component
 import ClearVisitsModal, { pendingVisitsCount } from "./ClearVisitsModal";
+import {
+  VISIT_OUTCOME_OPTIONS,
+  classifyVisitNote,
+  visitOutcomeLabel,
+} from "../../config/visitOutcomes";
 
 // Helper function to parse YYYY-MM-DD date strings safely
 const parseDateString = (dateString: string): Date | null => {
@@ -72,6 +77,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const [typeFilter, setTypeFilter] = useState<UserType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchFilter, setSearchFilter] = useState<string>("");
+  // Observacao registrada na conclusao da visita (ver config/visitOutcomes).
+  const [outcomeFilter, setOutcomeFilter] = useState<string>("all");
   const [cityFilter, setCityFilter] = useState<string>("all");
   const [neighborhoodFilter, setNeighborhoodFilter] = useState<string>("all");
   const [showCityStats, setShowCityStats] = useState(false);
@@ -425,6 +432,13 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     // Filtro por status
     if (statusFilter !== "all" && visit.status !== statusFilter) return false;
 
+    // Filtro por observação registrada na conclusão da visita. Diferente dos
+    // demais, atua sobre a observação da PRÓPRIA visita (não a última do
+    // cliente): aqui a linha da tabela é a visita.
+    if (outcomeFilter !== "all") {
+      if (classifyVisitNote(visit.notes) !== outcomeFilter) return false;
+    }
+
     // Filtro por período de data
     if (!isDateInRange(visit.scheduledDate)) return false;
 
@@ -481,6 +495,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       typeFilter,
       collectorTypeById,
       statusFilter,
+      outcomeFilter,
       dateFromFilter,
       dateToFilter,
       overdueFilter,
@@ -553,6 +568,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     setSelectedCollector("all");
     setTypeFilter("all");
     setStatusFilter("all");
+    setOutcomeFilter("all");
     setDateFromFilter("");
     setDateToFilter("");
     setSearchFilter("");
@@ -601,6 +617,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     if (selectedCollector !== "all") count++;
     if (typeFilter !== "all") count++;
     if (statusFilter !== "all") count++;
+    if (outcomeFilter !== "all") count++;
     if (dateFromFilter) count++;
     if (dateToFilter) count++;
     if (searchFilter.trim()) count++;
@@ -863,6 +880,11 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       filterChips.push({
         label: `Status: ${STATUS_LABELS[statusFilter] ?? statusFilter}`,
         onClear: () => setStatusFilter("all"),
+      });
+    if (outcomeFilter !== "all")
+      filterChips.push({
+        label: `Observação: ${visitOutcomeLabel(outcomeFilter)}`,
+        onClear: () => setOutcomeFilter("all"),
       });
     if (overdueFilter !== "all")
       filterChips.push({
@@ -1131,6 +1153,29 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       <option value="cancelada">Cancelada</option>
                       <option value="nao_encontrado">Não Encontrado</option>
                       <option value="reagendada">Reagendada</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="outcome-filter"
+                      className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary"
+                    >
+                      Observação
+                    </label>
+                    <select
+                      id="outcome-filter"
+                      name="outcomeFilter"
+                      value={outcomeFilter}
+                      onChange={(e) => setOutcomeFilter(e.target.value)}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    >
+                      <option value="all">Todas as Observações</option>
+                      {VISIT_OUTCOME_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

@@ -485,6 +485,11 @@ export interface FilterOptions {
   overdueOnly?: boolean;
   highValueOnly?: boolean;
   visitsOnly?: boolean;
+  /**
+   * Chave da observacao da ultima visita realizada (config/visitOutcomes).
+   * Ex.: "spc" | "falecido" | "outra". Vazio/ausente = sem filtro.
+   */
+  visitOutcome?: string;
   /** Periodo de analise por mes (0-11) e ano. Vazio/ausente = todos. */
   months?: number[];
   years?: number[];

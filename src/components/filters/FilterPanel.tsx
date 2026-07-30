@@ -9,7 +9,9 @@ import {
   DollarSign,
   Calendar,
   CalendarRange,
+  ClipboardList,
 } from "lucide-react";
+import { VISIT_OUTCOME_OPTIONS } from "../../config/visitOutcomes";
 import {
   FilterContext,
   FilterValues,
@@ -268,6 +270,20 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             htmlFor="filter-situacao"
           >
             {renderSelect("situacao", "Todas as situações", situacaoOptions)}
+          </Field>
+        )}
+
+        {fields.visitOutcome && (
+          <Field
+            icon={<ClipboardList className="h-3 w-3 mr-1.5" />}
+            label="Observação da visita"
+            htmlFor="filter-visitOutcome"
+          >
+            {renderSelect(
+              "visitOutcome",
+              "Todas as observações",
+              VISIT_OUTCOME_OPTIONS,
+            )}
           </Field>
         )}
 

@@ -38,10 +38,16 @@ export const computeClientFacets = (
   clients: FilterableClient[],
   filters: ClientFilters,
   createdAt?: Map<string, Date>,
+  lastVisitOutcome?: Map<string, string>,
 ): ClientFacets => {
   const matching = (omit: keyof ClientFilters): FilterableClient[] =>
     clients.filter((c) =>
-      clientMatchesFilters(c, { ...filters, [omit]: undefined }, createdAt),
+      clientMatchesFilters(
+        c,
+        { ...filters, [omit]: undefined },
+        createdAt,
+        lastVisitOutcome,
+      ),
     );
 
   const situacaoCollections = matching("situacao").flatMap(

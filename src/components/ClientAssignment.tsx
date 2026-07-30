@@ -12,6 +12,7 @@ import {
   HandCoins,
   Briefcase,
   CircleSlash,
+  Gavel,
   Building2,
   Zap,
   Globe,
@@ -44,6 +45,10 @@ import {
   PAYMENT_STATUS_PILLS,
 } from "../filters/filterConfig";
 import type { PillPatch } from "./filters/FilterPills";
+import {
+  lastVisitOutcomeByClient,
+  visitOutcomeLabel,
+} from "../config/visitOutcomes";
 import * as XLSX from "xlsx";
 import BulkAssignmentModal from "./BulkAssignmentModal";
 import AssignmentReportModal from "./dashboard/AssignmentReportModal";
@@ -135,6 +140,27 @@ const getSituacaoIndicator = (collections: Collection[]) => {
     };
   }
 
+  // Desfechos terminais de visita: o cliente saiu da carteira e aguarda o
+  // gerente redistribuir. Vem antes das fases de cobranca porque e o motivo
+  // mais acionavel para quem olha a fila de atribuicao.
+  const hasSPC = collections.some((c) => c.situacao === "SPC");
+  if (hasSPC) {
+    return {
+      icon: Gavel,
+      label: "SPC",
+      className: "bg-red-100 text-red-800",
+    };
+  }
+
+  const hasFalecido = collections.some((c) => c.situacao === "Falecido");
+  if (hasFalecido) {
+    return {
+      icon: CircleSlash,
+      label: "Falecido",
+      className: "bg-slate-200 text-slate-700",
+    };
+  }
+
   // Verificar se tem alguma parcela "Cobrança Terceirizada"
   const hasCobrancaTerceirizada = collections.some(
     (c) => c.situacao === "Cobrança Terceirizada",
@@ -214,7 +240,8 @@ const SelectionIndicator = ({ checked, partial, onClick }: SelectionIndicatorPro
 
 export const ClientAssignment = React.memo(
   ({ onViewClient }: ClientAssignmentProps) => {
-    const { collections, users, getClientGroups } = useCollection();
+    const { collections, users, getClientGroups, scheduledVisits } =
+      useCollection();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedClientGroup, setSelectedClientGroup] =
       useState<ClientGroup | null>(null);
@@ -244,6 +271,8 @@ export const ClientAssignment = React.memo(
     const [filterNeighborhood, setFilterNeighborhood] = useState<string>("");
     const [filterStore, setFilterStore] = useState<string>("");
     const [filterSituacao, setFilterSituacao] = useState<string>("");
+    // Observacao da ultima visita realizada (ex.: "spc") — ver config/visitOutcomes.
+    const [filterVisitOutcome, setFilterVisitOutcome] = useState<string>("");
     const [filterDateFrom, setFilterDateFrom] = useState<string>("");
     const [filterDateTo, setFilterDateTo] = useState<string>("");
     const [includeWithoutDate, setIncludeWithoutDate] = useState(false);
@@ -511,6 +540,12 @@ export const ClientAssignment = React.memo(
           onClear: () => setFilterSituacao(""),
         });
       }
+      if (filterVisitOutcome) {
+        chips.push({
+          label: `Observação: ${visitOutcomeLabel(filterVisitOutcome)}`,
+          onClear: () => setFilterVisitOutcome(""),
+        });
+      }
       if (filterAgings.length > 0) {
         // Vencimento controlado por atalhos de atraso: mostra as faixas, nao a data.
         // Remover uma faixa recalcula o intervalo a partir das restantes.
@@ -600,6 +635,7 @@ export const ClientAssignment = React.memo(
       filterNeighborhood,
       filterStore,
       filterSituacao,
+      filterVisitOutcome,
       filterPaymentStatuses,
       filterDateFrom,
       filterDateTo,
@@ -626,6 +662,7 @@ export const ClientAssignment = React.memo(
         neighborhood: filterNeighborhood,
         store: filterStore,
         situacao: filterSituacao,
+        visitOutcome: filterVisitOutcome,
         paymentStatus: filterPaymentStatuses,
         dueFrom: filterDateFrom,
         dueTo: filterDateTo,
@@ -645,6 +682,7 @@ export const ClientAssignment = React.memo(
         filterNeighborhood,
         filterStore,
         filterSituacao,
+        filterVisitOutcome,
         filterPaymentStatuses,
         filterDateFrom,
         filterDateTo,
@@ -658,11 +696,29 @@ export const ClientAssignment = React.memo(
       ],
     );
 
+    // Documento -> observacao da ultima visita realizada. Derivado das visitas ja
+    // carregadas no contexto (nao custa round-trip) e reutilizado pela filtragem
+    // e pelo faceting.
+    const lastVisitOutcomeMap = useMemo(
+      () => lastVisitOutcomeByClient(scheduledVisits),
+      [scheduledVisits],
+    );
+
     const filteredClients = useMemo(() => {
       return clientsData.filter((client) =>
-        clientMatchesFilters(client, currentClientFilters, clientCreatedAtMap),
+        clientMatchesFilters(
+          client,
+          currentClientFilters,
+          clientCreatedAtMap,
+          lastVisitOutcomeMap,
+        ),
       );
-    }, [clientsData, currentClientFilters, clientCreatedAtMap]);
+    }, [
+      clientsData,
+      currentClientFilters,
+      clientCreatedAtMap,
+      lastVisitOutcomeMap,
+    ]);
 
     // Opcoes dos dropdowns dependentes (faceting): cada lista mostra apenas os
     // valores compativeis com os demais filtros ativos. Ver src/filters/facets.
@@ -672,8 +728,14 @@ export const ClientAssignment = React.memo(
           clientsData,
           currentClientFilters,
           clientCreatedAtMap,
+          lastVisitOutcomeMap,
         ),
-      [clientsData, currentClientFilters, clientCreatedAtMap],
+      [
+        clientsData,
+        currentClientFilters,
+        clientCreatedAtMap,
+        lastVisitOutcomeMap,
+      ],
     );
 
     // Assinatura dos filtros: muda SO quando o usuario altera um filtro/busca, e
@@ -688,6 +750,7 @@ export const ClientAssignment = React.memo(
       filterNeighborhood,
       filterStore,
       filterSituacao,
+      filterVisitOutcome,
       filterPaymentStatuses,
       filterDateFrom,
       filterDateTo,
@@ -1207,6 +1270,7 @@ export const ClientAssignment = React.memo(
       setFilterNeighborhood("");
       setFilterStore("");
       setFilterSituacao("");
+      setFilterVisitOutcome("");
       setFilterPaymentStatuses([]);
       setFilterDateFrom("");
       setFilterDateTo("");
@@ -1229,6 +1293,7 @@ export const ClientAssignment = React.memo(
       neighborhood: filterNeighborhood,
       store: filterStore,
       situacao: filterSituacao,
+      visitOutcome: filterVisitOutcome,
       dueFrom: filterDateFrom,
       dueTo: filterDateTo,
       launchFrom: filterLaunchFrom,
@@ -1250,6 +1315,8 @@ export const ClientAssignment = React.memo(
         setFilterNeighborhood(patch.neighborhood ?? "");
       if ("store" in patch) setFilterStore(patch.store ?? "");
       if ("situacao" in patch) setFilterSituacao(patch.situacao ?? "");
+      if ("visitOutcome" in patch)
+        setFilterVisitOutcome(patch.visitOutcome ?? "");
       if ("dueFrom" in patch) setFilterDateFrom(patch.dueFrom ?? "");
       if ("dueTo" in patch) setFilterDateTo(patch.dueTo ?? "");
       if ("launchFrom" in patch) setFilterLaunchFrom(patch.launchFrom ?? "");
