@@ -34,6 +34,7 @@ import {
   visitReleaseSituacao,
   lastVisitOutcomeByClient,
 } from "../config/visitOutcomes";
+import { rescheduleReasonLabel } from "../config/rescheduleReasons";
 import { useAuth } from "./AuthContext";
 import { useLoading } from "./LoadingContext";
 import { useOffline } from "../hooks/useOffline";
@@ -90,6 +91,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [users, setUsers] = useState<User[]>([]);
   const [salePayments, setSalePayments] = useState<SalePayment[]>([]);
   const [scheduledVisits, setScheduledVisits] = useState<ScheduledVisit[]>([]);
+  // documento -> data em que o cliente zerou o saldo (clientes.reincidencia_reset_at).
+  // Fecha o ciclo de inadimplencia: remarcacoes anteriores nao contam para a
+  // reincidencia. So os clientes COM marco sao carregados (indice parcial).
+  const [reincidenciaResets, setReincidenciaResets] = useState<
+    Map<string, string>
+  >(new Map());
   const [monthlyGoals, setMonthlyGoals] = useState<MonthlyGoal[]>([]);
   const [allowedVisitDates, setAllowedVisitDates] = useState<
     AllowedVisitDate[]
@@ -124,6 +131,34 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Scheduled Visits Functions (Moved to earlier declaration)
+  const fetchReincidenciaResets = React.useCallback(async () => {
+    if (!isOnline) return;
+    try {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("documento, reincidencia_reset_at")
+        .not("reincidencia_reset_at", "is", null);
+
+      if (error) {
+        console.error("Erro ao buscar marcos de reincidência:", error);
+        return;
+      }
+
+      setReincidenciaResets(
+        new Map(
+          (data ?? [])
+            .filter((r) => r.documento && r.reincidencia_reset_at)
+            .map((r) => [
+              r.documento as string,
+              r.reincidencia_reset_at as string,
+            ]),
+        ),
+      );
+    } catch (err) {
+      console.error("Erro ao buscar marcos de reincidência:", err);
+    }
+  }, [isOnline]);
+
   const fetchScheduledVisits = React.useCallback(
     async (useCache = true) => {
       const cacheKey = "scheduled-visits";
@@ -207,6 +242,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             rescheduledTo: visit.rescheduled_to,
             rescheduledFromId: visit.rescheduled_from_id,
             rescheduledToId: visit.rescheduled_to_id,
+            rescheduleReason: visit.reschedule_reason ?? undefined,
           }),
         );
 
@@ -379,6 +415,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             fetchMonthlyGoals(),
             fetchAllowedVisitDates(),
             fetchActiveAddressHistory(),
+            fetchReincidenciaResets(),
           ]);
 
           // Now fetch collections
@@ -2006,6 +2043,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         fetchScheduledVisits(false), // Force fetch
         fetchMonthlyGoals(false), // Force fetch monthly goals
         fetchActiveAddressHistory(),
+        fetchReincidenciaResets(),
       ]);
     } finally {
       if (showLoading) setGlobalLoading(false);
@@ -3542,6 +3580,37 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         return;
       }
 
+      // Ciclo de inadimplência encerrado: o cliente zerou o saldo. Marca a data
+      // para que as remarcações deste ciclo parem de contar na reincidência —
+      // se ele voltar a dever, começa de ficha limpa.
+      //
+      // Fica ANTES do early-return de "sem visita agendada" de propósito: quem
+      // acabou de quitar tudo normalmente não tem mais visita aberta, que é
+      // exatamente o caso que precisa ser marcado.
+      if ((clientData.totalPendingValue ?? 0) <= 0) {
+        const resetAt = new Date().toISOString();
+        const { error: resetError } = await supabase
+          .from("clientes")
+          .update({ reincidencia_reset_at: resetAt })
+          .eq("documento", clientDocument);
+
+        if (resetError) {
+          // Não interrompe o fluxo de pagamento: o marco é um indicador de
+          // gestão, não parte da transação financeira.
+          console.error(
+            "Erro ao marcar fim de ciclo de reincidência:",
+            resetError,
+          );
+        } else {
+          setReincidenciaResets((prev) =>
+            new Map(prev).set(clientDocument, resetAt),
+          );
+          console.log(
+            `Ciclo de reincidência encerrado para ${clientDocument} (saldo zerado)`,
+          );
+        }
+      }
+
       // Buscar visitas agendadas deste cliente
       const clientVisits = scheduledVisits.filter(
         (visit) =>
@@ -3711,7 +3780,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
       const toDateTime = formatBrazilianDate(newDate, newTime);
 
-      const rescheduleNote = `• Reagendado de ${fromDateTime} para ${toDateTime}${reason ? `. Motivo: ${reason}` : ""}`;
+      // `reason` chega como CHAVE do catalogo (config/rescheduleReasons); na
+      // nota gravamos o rotulo legivel, e a chave vai para a coluna propria
+      // reschedule_reason — que e a fonte usada para agrupar/filtrar.
+      const reasonLabel = reason ? rescheduleReasonLabel(reason) : "";
+      const rescheduleNote = `• Reagendado de ${fromDateTime} para ${toDateTime}${reasonLabel ? `. Motivo: ${reasonLabel}` : ""}`;
 
       // Atualizar notas formatando as existentes e adicionando a nova
       let updatedNotes = rescheduleNote;
@@ -3758,6 +3831,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         notes: updatedNotes,
         updated_at: new Date().toISOString(),
         reschedule_count: newRescheduleCount,
+        // O motivo pertence ao elo que foi EMPURRADO, nao a visita nova: e esta
+        // visita que deixou de acontecer, e por este motivo.
+        reschedule_reason: reason ?? null,
       };
 
       // UPDATE condicional ao status "agendada": funciona como uma trava
@@ -3861,6 +3937,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
                 ...visit,
                 status: "reagendada" as const,
                 rescheduledTo: newDate,
+                rescheduledToId: newVisit.id,
+                rescheduleReason: reason ?? undefined,
                 notes: updatedNotes,
                 updatedAt: new Date().toISOString(),
                 rescheduleCount: newRescheduleCount,
@@ -3880,6 +3958,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           createdAt: newVisit.created_at,
           updatedAt: newVisit.updated_at,
           rescheduleCount: newVisit.reschedule_count,
+          // Sem isto a cadeia (rescheduleChain/countPriorReschedules) so voltaria
+          // a existir apos um refresh — o aviso de reincidencia ao cobrador
+          // deixaria de contar a remarcacao que ele acabou de fazer.
+          rescheduledFromId: newVisit.rescheduled_from_id ?? visitId,
           scheduled_by_manager_id: newVisit.scheduled_by_manager_id,
           clientAddress: newVisit.client_address,
           clientNumber: newVisit.client_number,
@@ -3905,6 +3987,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const value: CollectionContextType = {
     collections,
     users,
+    reincidenciaResets,
     salePayments,
     scheduledVisits,
     monthlyGoals,

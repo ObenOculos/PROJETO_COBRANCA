@@ -39,10 +39,11 @@ import {
   resolveAllowedConfigs,
 } from "../../utils/visitScheduling";
 import { PAYABLE_STATUSES } from "../../types/status";
+import { VISIT_OUTCOMES, exactVisitOutcome } from "../../config/visitOutcomes";
 import {
-  VISIT_OUTCOMES,
-  exactVisitOutcome,
-} from "../../config/visitOutcomes";
+  RESCHEDULE_REASONS,
+  countPriorReschedules,
+} from "../../config/rescheduleReasons";
 
 interface VisitSchedulerProps {
   onClose?: () => void;
@@ -218,6 +219,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     useState<ScheduledVisit | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
+  // Chave do motivo (config/rescheduleReasons). Obrigatório para reagendar.
+  const [rescheduleReason, setRescheduleReason] = useState("");
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [customObservation, setCustomObservation] = useState("");
   const [showCustomObservationInput, setShowCustomObservationInput] =
@@ -1368,7 +1371,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       const visitToComplete = selectedVisitForCompletion;
       setTimeout(async () => {
         try {
-          await updateVisitStatus(visitToComplete.id, "realizada", selectedNote);
+          await updateVisitStatus(
+            visitToComplete.id,
+            "realizada",
+            selectedNote,
+          );
           if (outcome?.releasesTo) {
             // Desfecho terminal: o cliente saiu da carteira. Avisa com o motivo
             // (a notificacao padrao de "visita realizada" nao deixaria claro
@@ -1693,13 +1700,24 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     setSelectedVisitForReschedule(null);
     setRescheduleDate("");
     setRescheduleTime("");
+    setRescheduleReason("");
     setIsRescheduling(false);
   };
+
+  // Quantas vezes ESTA cobrança já foi empurrada antes (cadeia para trás).
+  // Alimenta o aviso de reincidência do modal.
+  const rescheduleWarningCount = selectedVisitForReschedule
+    ? countPriorReschedules(selectedVisitForReschedule, scheduledVisits)
+    : 0;
 
   const handleConfirmReschedule = async () => {
     if (isRescheduling) return;
     if (!selectedVisitForReschedule || !rescheduleDate || !rescheduleTime) {
       alert("Por favor, selecione uma nova data e horário");
+      return;
+    }
+    if (!rescheduleReason) {
+      alert("Por favor, selecione o motivo do reagendamento");
       return;
     }
 
@@ -1719,6 +1737,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         selectedVisitForReschedule.id,
         rescheduleDate,
         rescheduleTime,
+        rescheduleReason,
       );
 
       triggerNotification("Visita reagendada com sucesso!", "success");
@@ -3168,6 +3187,50 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       </div>
                     </div>
                   </div>
+
+                  {/* Motivo: obrigatório e pré-programado. É o que transforma
+                      "reagendado 4x" em "reagendado 4x, 3 por ausência". */}
+                  <div className="mt-4">
+                    <label
+                      htmlFor="reschedule-reason"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
+                      Motivo do reagendamento *
+                    </label>
+                    <select
+                      id="reschedule-reason"
+                      name="reschedule-reason"
+                      value={rescheduleReason}
+                      onChange={(e) => setRescheduleReason(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    >
+                      <option value="">Selecione o motivo...</option>
+                      {RESCHEDULE_REASONS.map((r) => (
+                        <option key={r.key} value={r.key}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Aviso de reincidência: conscientiza, não bloqueia. */}
+                  {rescheduleWarningCount >= 2 && (
+                    <div className="mt-4 p-3 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-2">
+                      <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-xs text-amber-800">
+                        <p className="font-semibold mb-1">
+                          Atenção: esta cobrança já foi reagendada{" "}
+                          {rescheduleWarningCount}x
+                        </p>
+                        <p>
+                          Verifique se um novo reagendamento resolve, ou se
+                          outra ação é mais adequada — confirmar o endereço,
+                          marcar como não localizado ou acionar o gerente.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3 flex-shrink-0">
@@ -3181,7 +3244,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   <button
                     onClick={handleConfirmReschedule}
                     disabled={
-                      !rescheduleDate || !rescheduleTime || isRescheduling
+                      !rescheduleDate ||
+                      !rescheduleTime ||
+                      !rescheduleReason ||
+                      isRescheduling
                     }
                     className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                   >

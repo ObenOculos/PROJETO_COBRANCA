@@ -115,6 +115,8 @@ export interface ScheduledVisit {
   rescheduledTo?: string; // Data para onde foi reagendada (YYYY-MM-DD)
   rescheduledFromId?: string; // ID da visita de origem (quando esta foi gerada por reagendamento)
   rescheduledToId?: string; // ID da nova visita gerada ao reagendar esta
+  /** Motivo pelo qual ESTA visita foi empurrada (src/config/rescheduleReasons). */
+  rescheduleReason?: string;
 }
 
 export interface AllowedVisitDate {
@@ -269,6 +271,12 @@ export interface AuthContextType {
 export interface CollectionContextType {
   collections: Collection[];
   users: User[];
+  /**
+   * documento -> data em que o cliente zerou o saldo pendente
+   * (clientes.reincidencia_reset_at). Fecha o ciclo de inadimplência:
+   * reagendamentos anteriores não contam para a reincidência.
+   */
+  reincidenciaResets: Map<string, string>;
   salePayments: SalePayment[];
   scheduledVisits: ScheduledVisit[];
   monthlyGoals: MonthlyGoal[]; // Added

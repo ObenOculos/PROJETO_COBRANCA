@@ -12,9 +12,18 @@ import {
   Phone,
   MessageCircle,
   Clock,
+  RefreshCw,
 } from "lucide-react";
 import { ClientGroup, UserType, isCollectorType } from "../../types";
-import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
+import {
+  formatCurrency,
+  calculateOverdueDays,
+  parseAndFormatDate,
+} from "../../utils/formatters";
+import {
+  clientesReincidentes,
+  rescheduleReasonLabel,
+} from "../../config/rescheduleReasons";
 import { isCancelado } from "../../types/status";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useClientBirthDate } from "../../hooks/useClientBirthDate";
@@ -148,6 +157,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     refreshCollections,
     scheduledVisits,
     users,
+    reincidenciaResets,
   } = useCollection();
   const { user } = useAuth();
 
@@ -209,6 +219,17 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         return dateB.getTime() - dateA.getTime(); // Mais recentes primeiro
       });
   }, [clientGroup.document, scheduledVisits]);
+
+  // Reincidência de reagendamentos do cliente. Mesma regra da aba Reincidentes
+  // do Acompanhamento (config/rescheduleReasons): conta a MAIOR cadeia, isto é,
+  // quantas vezes a mesma cobrança foi empurrada — não remarcações avulsas.
+  const reincidencia = React.useMemo(() => {
+    if (!clientGroup?.document || !scheduledVisits) return null;
+    const doCliente = scheduledVisits.filter(
+      (v) => v.clientDocument === clientGroup.document,
+    );
+    return clientesReincidentes(doCliente, 2, reincidenciaResets)[0] ?? null;
+  }, [clientGroup.document, scheduledVisits, reincidenciaResets]);
 
   const [isGeneralPaymentModalOpen, setIsGeneralPaymentModalOpen] =
     useState(false);
@@ -773,6 +794,56 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   initialData={clientGroup}
                 />
               </div>
+              {/* Reincidência de reagendamentos — contexto rápido antes do
+                  histórico, para o gestor não precisar abrir visita por visita. */}
+              {reincidencia && (
+                <div className="mt-8 lg:col-span-2">
+                  <div className="border border-amber-200 rounded-2xl overflow-hidden">
+                    <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4 text-amber-600 shrink-0" />
+                      <span className="text-sm font-semibold text-amber-900">
+                        Reagendado {reincidencia.totalRemarcacoes}x
+                      </span>
+                      {reincidencia.maiorCadeia >= 2 && (
+                        <span
+                          className="text-[10px] font-medium text-amber-700 bg-white border border-amber-200 rounded-md px-1.5 py-0.5"
+                          title="Maior sequência da MESMA cobrança sendo empurrada."
+                        >
+                          seq. {reincidencia.maiorCadeia}x
+                        </span>
+                      )}
+                      <div className="flex flex-wrap gap-1.5 ml-auto">
+                        {reincidencia.motivos.map((m) => (
+                          <span
+                            key={m.key}
+                            className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-white text-amber-800 border border-amber-200"
+                          >
+                            {m.label} ({m.count})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <ol className="divide-y divide-amber-100 bg-white">
+                      {reincidencia.elos.map((step, i) => (
+                        <li
+                          key={step.visitId}
+                          className="px-4 py-2 text-xs text-gray-600 flex items-center gap-2"
+                        >
+                          <span className="w-5 shrink-0 text-gray-400 tabular-nums">
+                            {i + 1}.
+                          </span>
+                          <span className="font-semibold text-gray-800 tabular-nums">
+                            {parseAndFormatDate(step.date)}
+                          </span>
+                          <span className="text-gray-400">—</span>
+                          <span>{rescheduleReasonLabel(step.reasonKey)}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </div>
+              )}
+
               {/* Visit History */}
               {clientVisits.length > 0 && (
                 <div className="mt-8 space-y-4 lg:col-span-2">

@@ -395,6 +395,7 @@ export type Database = {
           documento: string;
           id: number;
           nome: string;
+          reincidencia_reset_at: string | null;
         };
         Insert: {
           created_at?: string | null;
@@ -402,6 +403,7 @@ export type Database = {
           documento: string;
           id?: number;
           nome: string;
+          reincidencia_reset_at?: string | null;
         };
         Update: {
           created_at?: string | null;
@@ -409,6 +411,7 @@ export type Database = {
           documento?: string;
           id?: number;
           nome?: string;
+          reincidencia_reset_at?: string | null;
         };
         Relationships: [];
       };
@@ -615,6 +618,7 @@ export type Database = {
           notes: string | null;
           overdue_count: number | null;
           reschedule_count: number | null;
+          reschedule_reason: string | null;
           rescheduled_from_id: string | null;
           rescheduled_to: string | null;
           rescheduled_to_id: string | null;
@@ -646,6 +650,7 @@ export type Database = {
           notes?: string | null;
           overdue_count?: number | null;
           reschedule_count?: number | null;
+          reschedule_reason?: string | null;
           rescheduled_from_id?: string | null;
           rescheduled_to?: string | null;
           rescheduled_to_id?: string | null;
@@ -677,6 +682,7 @@ export type Database = {
           notes?: string | null;
           overdue_count?: number | null;
           reschedule_count?: number | null;
+          reschedule_reason?: string | null;
           rescheduled_from_id?: string | null;
           rescheduled_to?: string | null;
           rescheduled_to_id?: string | null;

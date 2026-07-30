@@ -18,6 +18,7 @@ import {
   FileDown,
   Zap,
   Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import * as XLSX from "xlsx";
@@ -34,6 +35,24 @@ import {
   visitOutcomeLabel,
 } from "../../config/visitOutcomes";
 import { visitStatusLabel, visitEffectiveDate } from "../../config/visitStatus";
+import {
+  clientesReincidentes,
+  rescheduleReasonShort,
+} from "../../config/rescheduleReasons";
+
+/**
+ * A partir de quantas remarcações o cliente entra na aba Reincidentes.
+ * Alinhado ao limiar do card de Performance: abaixo disso é ruído, acima
+ * esconderia casos que já merecem ação.
+ */
+const REINCIDENCIA_MIN = 3;
+
+/** Faixa visual da reincidência. Duas faixas de propósito: a linha da tabela
+ *  já carrega badges de status, tipo e atraso — uma terceira escala competiria. */
+const reincidenciaTone = (n: number) =>
+  n >= 5
+    ? "bg-red-100 text-red-700 border-red-200"
+    : "bg-amber-100 text-amber-700 border-amber-200";
 
 // Helper function to parse YYYY-MM-DD date strings safely
 const parseDateString = (dateString: string): Date | null => {
@@ -62,6 +81,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     rejectVisitCancellation,
     fetchScheduledVisits,
     collections, // Add collections from context
+    reincidenciaResets,
   } = useCollection();
   const { user } = useAuth();
 
@@ -72,8 +92,16 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   } | null>(null);
 
   const [activeTab, setActiveTab] = useState<
-    "visits" | "cancellations" | "scheduledDates"
+    "visits" | "cancellations" | "scheduledDates" | "reincidentes"
   >("visits");
+  // Documentos expandidos na aba Reincidentes (mostra a cadeia completa).
+  const [expandedReincidentes, setExpandedReincidentes] = useState<Set<string>>(
+    new Set(),
+  );
+  const [reincidentesSort, setReincidentesSort] = useState<
+    "remarcacoes" | "sequencia" | "nome"
+  >("remarcacoes");
+  const [reincidentesPage, setReincidentesPage] = useState(1);
   const [selectedCollector, setSelectedCollector] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<UserType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -842,9 +870,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     XLSX.writeFile(workbook, "relatorio_visitas.xlsx");
   };
 
-  const renderVisitsTab = () => {
-    const groupedVisits = getVisitsByCollectorGrouped();
-
+  // Barra de filtros + chips ativos. Extraida de renderVisitsTab para ser
+  // compartilhada com a aba Reincidentes: os filtros ja recortavam aquela aba
+  // (ela deriva de filteredVisitsFlat), so nao estavam visiveis la.
+  const renderFilters = () => {
     // Labels e chips de filtros ativos (mesmo padrao visual da barra global).
     // Rotulos de status vem da fonte unica (config/visitStatus).
     const TYPE_LABELS: Record<string, string> = {
@@ -930,7 +959,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     ];
 
     return (
-      <div className="space-y-4">
+      <>
         {/* Barra de Filtros — visual unificado (igual às demais telas) */}
         <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-150/80 dark:border-dark-border shadow-sm space-y-3">
           {/* Linha: busca + ações */}
@@ -1346,6 +1375,16 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             </button>
           </div>
         )}
+      </>
+    );
+  };
+
+  const renderVisitsTab = () => {
+    const groupedVisits = getVisitsByCollectorGrouped();
+
+    return (
+      <div className="space-y-4">
+        {renderFilters()}
 
         {/* Visit Cards */}
         {Object.keys(groupedVisits).length === 0 ? (
@@ -1568,6 +1607,22 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                               <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5">
                                                 {visit.clientDocument}
                                               </span>
+                                              {(() => {
+                                                const n = visit.clientDocument
+                                                  ? reincidenciaPorCliente.get(
+                                                      visit.clientDocument,
+                                                    )
+                                                  : undefined;
+                                                if (!n) return null;
+                                                return (
+                                                  <span
+                                                    className={`mt-1 w-fit px-1.5 py-0.5 rounded-md text-[10px] font-bold border ${reincidenciaTone(n)}`}
+                                                    title={`Cobrança remarcada ${n}x. Veja a aba Reincidentes.`}
+                                                  >
+                                                    {n}x remarcada
+                                                  </span>
+                                                );
+                                              })()}
                                             </div>
                                           </td>
                                           <td className="py-4 pr-4">
@@ -1677,6 +1732,21 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                           <p className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary mt-1">
                                             {visit.clientDocument}
                                           </p>
+                                          {(() => {
+                                            const n = visit.clientDocument
+                                              ? reincidenciaPorCliente.get(
+                                                  visit.clientDocument,
+                                                )
+                                              : undefined;
+                                            if (!n) return null;
+                                            return (
+                                              <span
+                                                className={`mt-1.5 inline-block px-1.5 py-0.5 rounded-md text-[10px] font-bold border ${reincidenciaTone(n)}`}
+                                              >
+                                                {n}x remarcada
+                                              </span>
+                                            );
+                                          })()}
                                         </div>
                                         <div className="shrink-0 flex flex-col items-end gap-1.5">
                                           {visit.totalPendingValue && (
@@ -2019,6 +2089,62 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     </div>
   );
 
+  // Clientes com a MESMA cobrança empurrada várias vezes. Respeita os mesmos
+  // filtros da aba Visitas — o gestor vê a reincidência do recorte que está
+  // olhando, não do banco inteiro.
+  // Const simples, não useMemo: este componente já tem hooks depois de um
+  // early-return (ver comentário em visitMatchesFilters) e adicionar mais
+  // ampliaria o problema. Mesmo padrão de facetedCities/availableCities.
+  const reincidentes = clientesReincidentes(
+    filteredVisitsFlat,
+    REINCIDENCIA_MIN,
+    reincidenciaResets,
+  );
+
+  // documento -> maior cadeia, para o badge nas linhas da aba Visitas sem
+  // recalcular a cadeia por linha (seria O(n) por visita renderizada).
+  const reincidenciaPorCliente = new Map(
+    reincidentes.map((r) => [r.document, r.totalRemarcacoes]),
+  );
+
+  // Ordenação + paginação da aba Reincidentes.
+  const reincidentesOrdenados = [...reincidentes].sort((a, b) => {
+    if (reincidentesSort === "nome")
+      return a.name.localeCompare(b.name, "pt-BR");
+    if (reincidentesSort === "sequencia")
+      return (
+        b.maiorCadeia - a.maiorCadeia || b.totalRemarcacoes - a.totalRemarcacoes
+      );
+    return (
+      b.totalRemarcacoes - a.totalRemarcacoes || b.maiorCadeia - a.maiorCadeia
+    );
+  });
+
+  const REINCIDENTES_POR_PAGINA = 10;
+  const reincidentesTotalPaginas = Math.max(
+    1,
+    Math.ceil(reincidentesOrdenados.length / REINCIDENTES_POR_PAGINA),
+  );
+  // Clampa em vez de usar useEffect: ao mudar um filtro a lista encolhe e a
+  // página atual pode deixar de existir.
+  const reincidentesPaginaAtual = Math.min(
+    reincidentesPage,
+    reincidentesTotalPaginas,
+  );
+  const reincidentesPagina = reincidentesOrdenados.slice(
+    (reincidentesPaginaAtual - 1) * REINCIDENTES_POR_PAGINA,
+    reincidentesPaginaAtual * REINCIDENTES_POR_PAGINA,
+  );
+
+  const toggleReincidente = (document: string) => {
+    setExpandedReincidentes((prev) => {
+      const next = new Set(prev);
+      if (next.has(document)) next.delete(document);
+      else next.add(document);
+      return next;
+    });
+  };
+
   // Calculate overview statistics
   const overviewStats = useMemo(() => {
     try {
@@ -2139,6 +2265,29 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 Datas Programadas
               </button>
             )}
+
+            <button
+              onClick={() => setActiveTab("reincidentes")}
+              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all shrink-0 relative ${
+                activeTab === "reincidentes"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
+                  : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
+              }`}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Reincidentes
+              {reincidentes.length > 0 && (
+                <span
+                  className={`ml-2 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                    activeTab === "reincidentes"
+                      ? "bg-white/20 text-white"
+                      : "bg-amber-100 text-amber-700"
+                  }`}
+                >
+                  {reincidentes.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -2374,6 +2523,232 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           {activeTab === "scheduledDates" && (
             <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-6">
               <AllowedVisitDatesManager />
+            </div>
+          )}
+
+          {activeTab === "reincidentes" && (
+            <div className="space-y-4">
+              {renderFilters()}
+              <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100 dark:border-dark-border">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-dark-text">
+                    Clientes reincidentes
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-0.5">
+                    Clientes com {REINCIDENCIA_MIN} remarcações ou mais.
+                    Respeita os filtros aplicados acima. O selo <em>seq.</em>{" "}
+                    mostra a maior sequência da mesma cobrança — disponível
+                    apenas nos reagendamentos com vínculo registrado.
+                  </p>
+                </div>
+
+                {reincidentes.length > 0 && (
+                  <div className="px-5 py-3 border-b border-gray-100 dark:border-dark-border flex flex-wrap items-center justify-between gap-3 bg-gray-50/40 dark:bg-dark-bg/20">
+                    <span className="text-xs font-semibold text-gray-600 dark:text-dark-text">
+                      {reincidentes.length}{" "}
+                      {reincidentes.length === 1 ? "cliente" : "clientes"}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <label
+                        htmlFor="reincidentes-sort"
+                        className="text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary"
+                      >
+                        Ordenar por
+                      </label>
+                      <select
+                        id="reincidentes-sort"
+                        name="reincidentesSort"
+                        value={reincidentesSort}
+                        onChange={(e) => {
+                          setReincidentesSort(
+                            e.target.value as typeof reincidentesSort,
+                          );
+                          setReincidentesPage(1);
+                        }}
+                        className="px-3 py-1.5 bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      >
+                        <option value="remarcacoes">Mais remarcações</option>
+                        <option value="sequencia">Maior sequência</option>
+                        <option value="nome">Nome (A–Z)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {reincidentes.length === 0 ? (
+                  <div className="px-5 py-10 text-center">
+                    <RefreshCw className="h-8 w-8 text-gray-300 mx-auto mb-3" />
+                    <p className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
+                      Nenhum cliente reincidente no recorte atual
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      O cliente precisa ter {REINCIDENCIA_MIN} remarcações para
+                      aparecer aqui.
+                    </p>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-gray-100 dark:divide-dark-border">
+                    {reincidentesPagina.map((cliente) => {
+                      const aberto = expandedReincidentes.has(cliente.document);
+                      const cobrador = users.find(
+                        (u) => u.id === cliente.collectorId,
+                      );
+                      return (
+                        <li key={cliente.document} className="px-5 py-3.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-semibold text-gray-900 dark:text-dark-text truncate">
+                                  {cliente.name}
+                                </span>
+                                <span
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${reincidenciaTone(
+                                    cliente.totalRemarcacoes,
+                                  )}`}
+                                >
+                                  {cliente.totalRemarcacoes}x
+                                </span>
+                                {/* Sequência só existe onde o vínculo de cadeia
+                                    foi gravado; no histórico antigo vale 0. */}
+                                {cliente.maiorCadeia >= 2 && (
+                                  <span
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-gray-100 dark:bg-dark-bg text-gray-500"
+                                    title="Maior sequência da MESMA cobrança sendo empurrada."
+                                  >
+                                    seq. {cliente.maiorCadeia}x
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-gray-400 mt-0.5 tabular-nums">
+                                {cliente.document}
+                                {cobrador ? ` · ${cobrador.name}` : ""}
+                              </p>
+                              {/* Motivos agrupados: é isto que aponta a causa. */}
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {cliente.motivos.map((m) => (
+                                  <span
+                                    key={m.key}
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary"
+                                  >
+                                    {m.label} ({m.count})
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() =>
+                                toggleReincidente(cliente.document)
+                              }
+                              className="shrink-0 text-[11px] font-semibold text-blue-600 hover:text-blue-700 px-2 py-1"
+                            >
+                              {aberto ? "Ocultar" : "Ver cadeia"}
+                            </button>
+                          </div>
+
+                          {aberto && (
+                            <ol className="mt-3 ml-1 border-l-2 border-gray-150 dark:border-dark-border space-y-2 pl-4">
+                              {cliente.elos.map((step, i) => (
+                                <li
+                                  key={step.visitId}
+                                  className="text-[11px] text-gray-600 dark:text-dark-text-secondary"
+                                >
+                                  <span className="font-semibold text-gray-700 dark:text-dark-text">
+                                    {i + 1}. {formatSafeDate(step.date)}
+                                  </span>
+                                  {" — "}
+                                  {rescheduleReasonShort(step.reasonKey)}
+                                </li>
+                              ))}
+                            </ol>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+
+                {reincidentesTotalPaginas > 1 && (
+                  <div className="px-5 py-3 border-t border-gray-100 dark:border-dark-border flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-lg text-xs font-semibold border border-blue-100 dark:border-blue-900/30">
+                        Pág {reincidentesPaginaAtual} /{" "}
+                        {reincidentesTotalPaginas}
+                      </div>
+                      <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary">
+                        Exibindo{" "}
+                        {(reincidentesPaginaAtual - 1) *
+                          REINCIDENTES_POR_PAGINA +
+                          1}
+                        –
+                        {Math.min(
+                          reincidentesPaginaAtual * REINCIDENTES_POR_PAGINA,
+                          reincidentesOrdenados.length,
+                        )}{" "}
+                        de {reincidentesOrdenados.length}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() =>
+                          setReincidentesPage(
+                            Math.max(1, reincidentesPaginaAtual - 1),
+                          )
+                        }
+                        disabled={reincidentesPaginaAtual === 1}
+                        className="p-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        aria-label="Página anterior"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      {Array.from(
+                        { length: Math.min(5, reincidentesTotalPaginas) },
+                        (_, i) => {
+                          let pNum;
+                          if (reincidentesTotalPaginas <= 5) pNum = i + 1;
+                          else if (reincidentesPaginaAtual <= 3) pNum = i + 1;
+                          else if (
+                            reincidentesPaginaAtual >=
+                            reincidentesTotalPaginas - 2
+                          )
+                            pNum = reincidentesTotalPaginas - 4 + i;
+                          else pNum = reincidentesPaginaAtual - 2 + i;
+                          return (
+                            <button
+                              key={pNum}
+                              onClick={() => setReincidentesPage(pNum)}
+                              className={`w-9 h-9 flex items-center justify-center text-xs font-semibold rounded-xl transition-all border ${
+                                pNum === reincidentesPaginaAtual
+                                  ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                                  : "bg-white dark:bg-dark-bg text-gray-400 border-gray-100 dark:border-dark-border hover:bg-gray-50"
+                              }`}
+                            >
+                              {pNum}
+                            </button>
+                          );
+                        },
+                      )}
+                      <button
+                        onClick={() =>
+                          setReincidentesPage(
+                            Math.min(
+                              reincidentesTotalPaginas,
+                              reincidentesPaginaAtual + 1,
+                            ),
+                          )
+                        }
+                        disabled={
+                          reincidentesPaginaAtual === reincidentesTotalPaginas
+                        }
+                        className="p-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        aria-label="Próxima página"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
