@@ -35,6 +35,23 @@ export const visitStatusLabel = (status: string): string =>
   VISIT_STATUS_LABELS[status as ScheduledVisit["status"]] ?? status;
 
 /**
+ * A partir de quantas remarcacoes no periodo um cliente conta como reincidente.
+ *
+ * Remarcacao pontual e rotina; o que interessa ao gestor e a CONCENTRACAO —
+ * 40 remarcacoes espalhadas por 40 clientes e normal, 40 em 8 clientes indica
+ * endereco errado, cliente que evita o cobrador ou rota mal montada.
+ */
+export const REMARCACOES_REINCIDENTE = 3;
+
+/** Cliente remarcado repetidamente no periodo. */
+export interface ReincidenteCliente {
+  document: string;
+  name: string;
+  /** Quantas vezes foi remarcado no periodo. */
+  count: number;
+}
+
+/**
  * Data EFETIVA da visita: quando ela de fato aconteceu ou, se ainda nao
  * aconteceu, a data para a qual esta marcada.
  *

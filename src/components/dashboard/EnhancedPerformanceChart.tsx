@@ -15,7 +15,11 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
 import { getClientPaymentStatus } from "../../filters/clientStatus";
 import { resolveSaleKey } from "../../filters/sales";
-import { visitEffectiveDate } from "../../config/visitStatus";
+import {
+  visitEffectiveDate,
+  REMARCACOES_REINCIDENTE,
+  ReincidenteCliente,
+} from "../../config/visitStatus";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
 import FilterBar from "../common/FilterBar";
@@ -57,6 +61,17 @@ interface EnhancedCollectorPerformance {
   visitsCanceladas: number;
   visitsAtrasadas: number;
   visitsReagendadas: number;
+  /** Visitas que chegaram a um desfecho no periodo (base da taxa de remarcacao). */
+  visitsComDesfecho: number;
+  /** % de desfechos que foram remarcacao. Ver REMARCACOES_REINCIDENTE. */
+  remarcacaoRate: number;
+  /**
+   * Clientes com REMARCACOES_REINCIDENTE+ remarcacoes no periodo, do mais
+   * remarcado para o menos. Calculado aqui (e nao no modal de detalhes) para
+   * que card e modal mostrem exatamente o mesmo conjunto, sob o mesmo filtro
+   * de periodo.
+   */
+  reincidentes: ReincidenteCliente[];
   salesPaid: number;
   salesUnpaidOrPartial: number;
   salesTotalPeriod: number;
@@ -95,7 +110,7 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
     switch (sortBy) {
       case "receivedAmount":
         return {
-          value: formatCurrency(collector.receivedAmount),
+          value: formatCurrency(collector.receivedAmount, false),
           label: "Valor Recebido",
           color: "text-green-600 dark:text-green-400",
         };
@@ -119,7 +134,7 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
         };
       default:
         return {
-          value: formatCurrency(collector.receivedAmount),
+          value: formatCurrency(collector.receivedAmount, false),
           label: "Valor Recebido",
           color: "text-green-600 dark:text-green-400",
         };
@@ -285,8 +300,11 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
                 <thead>
                   <tr className="bg-gray-50 dark:bg-dark-bg/50 border-b border-gray-100 dark:border-dark-border/40 text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider h-8">
                     <th className="px-3 py-2 whitespace-nowrap">Indicador</th>
+                    {/* "Valor" e nao "Financeiro": a coluna mistura duas
+                        grandezas (recebido x a receber), entao o qualificador
+                        fica em cada linha. Mesmo vocabulario ja usado no mobile. */}
                     <th className="px-3 py-2 text-right whitespace-nowrap">
-                      Financeiro
+                      Valor
                     </th>
                     <th className="px-3 py-2 text-right whitespace-nowrap">
                       Visitas
@@ -294,34 +312,43 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-dark-border/20 text-gray-700 dark:text-dark-text">
-                  <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
+                  <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-11">
                     <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">
                       Realizadas
+                      <span className="block mt-0.5 text-[9px] leading-none font-normal text-gray-400/90 dark:text-dark-text-secondary/70">
+                        recebido
+                      </span>
                     </td>
                     <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">
-                      {formatCurrency(collector.receivedAmount)}
+                      {formatCurrency(collector.receivedAmount, false)}
                     </td>
                     <td className="px-3 py-2 text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">
                       {collector.visitsRealizadas}
                     </td>
                   </tr>
-                  <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
+                  <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-11">
                     <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">
                       Agendadas
+                      <span className="block mt-0.5 text-[9px] leading-none font-normal text-gray-400/90 dark:text-dark-text-secondary/70">
+                        a receber
+                      </span>
                     </td>
                     <td className="px-3 py-2 text-right font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                      {formatCurrency(collector.pendingAmountScheduled)}
+                      {formatCurrency(collector.pendingAmountScheduled, false)}
                     </td>
                     <td className="px-3 py-2 text-right font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">
                       {collector.visitsAgendadas}
                     </td>
                   </tr>
-                  <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-9">
+                  <tr className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors h-11">
                     <td className="px-3 py-2 font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">
                       Atrasadas
+                      <span className="block mt-0.5 text-[9px] leading-none font-normal text-gray-400/90 dark:text-dark-text-secondary/70">
+                        a receber
+                      </span>
                     </td>
                     <td className="px-3 py-2 text-right font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
-                      {formatCurrency(collector.pendingAmountOverdue)}
+                      {formatCurrency(collector.pendingAmountOverdue, false)}
                     </td>
                     <td className="px-3 py-2 text-right font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
                       {collector.visitsAtrasadas}
@@ -329,6 +356,45 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
                   </tr>
                 </tbody>
               </table>
+            </div>
+
+            {/* Remarcação: fica FORA da tabela de propósito. As linhas acima são
+                estados da visita e se excluem mutuamente; remarcação é um evento
+                que aconteceu com a visita — outro eixo. Vira linha própria, a
+                mesma cobrança contaria duas vezes (o registro remarcado E a nova
+                visita "agendada" que o fluxo cria), inflando visitas e dinheiro. */}
+            <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/40 dark:bg-dark-bg/20">
+              <span
+                className="text-[10px] font-medium text-gray-500 dark:text-dark-text-secondary whitespace-nowrap"
+                title="Percentual das visitas com desfecho (realizadas, não encontradas e remarcadas) que precisaram ser remarcadas."
+              >
+                Remarcação
+              </span>
+              <span className="flex items-baseline gap-1.5 min-w-0">
+                <span
+                  className={`text-xs font-bold tabular-nums ${
+                    collector.remarcacaoRate >= 30
+                      ? "text-red-600 dark:text-red-400"
+                      : collector.remarcacaoRate >= 15
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-gray-700 dark:text-dark-text"
+                  }`}
+                >
+                  {collector.remarcacaoRate.toFixed(0)}%
+                </span>
+                <span className="text-[10px] text-gray-400 dark:text-dark-text-secondary truncate">
+                  {collector.visitsReagendadas} de {collector.visitsComDesfecho}
+                </span>
+              </span>
+              {collector.reincidentes.length > 0 && (
+                <span
+                  className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 rounded-lg px-2 py-0.5 whitespace-nowrap"
+                  title={`Clientes remarcados ${REMARCACOES_REINCIDENTE} vezes ou mais no período. Abra "Detalhes" para ver quais. Concentração costuma indicar endereço errado, cliente que evita o cobrador ou rota mal montada.`}
+                >
+                  {collector.reincidentes.length} reincidente
+                  {collector.reincidentes.length > 1 ? "s" : ""}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -418,7 +484,7 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
                     Recebido
                   </span>
                   <span className="text-[10px] sm:text-xs font-bold text-green-600 dark:text-green-400 block truncate">
-                    {formatCurrency(collector.receivedAmount)}
+                    {formatCurrency(collector.receivedAmount, false)}
                   </span>
                 </div>
                 <div className="p-2 bg-blue-50/30 dark:bg-blue-950/10 rounded-xl border border-blue-100/20 dark:border-blue-900/10 text-center">
@@ -426,7 +492,7 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
                     Agendado
                   </span>
                   <span className="text-[10px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 block truncate">
-                    {formatCurrency(collector.pendingAmountScheduled)}
+                    {formatCurrency(collector.pendingAmountScheduled, false)}
                   </span>
                 </div>
                 <div className="p-2 bg-red-50/30 dark:bg-red-950/10 rounded-xl border border-red-100/20 dark:border-red-900/10 text-center">
@@ -434,7 +500,7 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
                     Atrasado
                   </span>
                   <span className="text-[10px] sm:text-xs font-bold text-red-600 dark:text-red-400 block truncate">
-                    {formatCurrency(collector.pendingAmountOverdue)}
+                    {formatCurrency(collector.pendingAmountOverdue, false)}
                   </span>
                 </div>
               </div>
@@ -470,6 +536,35 @@ const CollectorCard: React.FC<CollectorCardProps> = ({
                     {collector.visitsAtrasadas}
                   </span>
                 </div>
+              </div>
+
+              {/* Remarcação fora do grid de estados — ver comentário no desktop. */}
+              <div className="mt-2 flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/40 dark:bg-dark-bg/20">
+                <span className="text-[10px] font-medium text-gray-500 dark:text-dark-text-secondary">
+                  Remarcação
+                </span>
+                <span className="flex items-baseline gap-1.5">
+                  <span
+                    className={`text-[11px] font-bold tabular-nums ${
+                      collector.remarcacaoRate >= 30
+                        ? "text-red-600 dark:text-red-400"
+                        : collector.remarcacaoRate >= 15
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-gray-700 dark:text-dark-text"
+                    }`}
+                  >
+                    {collector.remarcacaoRate.toFixed(0)}%
+                  </span>
+                  <span className="text-[9px] text-gray-400 dark:text-dark-text-secondary">
+                    {collector.visitsReagendadas} de{" "}
+                    {collector.visitsComDesfecho}
+                  </span>
+                </span>
+                {collector.reincidentes.length > 0 && (
+                  <span className="text-[9px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 rounded-lg px-1.5 py-0.5 whitespace-nowrap">
+                    {collector.reincidentes.length} reinc.
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -808,6 +903,11 @@ const EnhancedPerformanceChart: React.FC = () => {
       let visitsCanceladas = 0;
       let visitsAtrasadas = 0;
       let visitsReagendadas = 0;
+      // documento -> nome + quantas vezes o cliente foi remarcado no periodo.
+      const remarcacoesPorCliente = new Map<
+        string,
+        { name: string; count: number }
+      >();
       // A receber (financeiro) por status de visita = soma do valor pendente dos
       // títulos das visitas, no período filtrado. Espelha as contagens abaixo.
       let pendingAmountScheduled = 0;
@@ -836,17 +936,54 @@ const EnhancedPerformanceChart: React.FC = () => {
         }
         if (v.status === "cancelamento_solicitado")
           visitsCancelamentoSolicitado++;
-        if (
-          v.status === "reagendada" ||
-          (v.rescheduleCount && v.rescheduleCount > 0)
-        )
+        // Cada registro "reagendada" e UMA remarcacao que aconteceu: ao remarcar,
+        // o fluxo congela a visita original nesse status e cria uma nova
+        // "agendada" (ver reagendarVisita no CollectionContext).
+        //
+        // Nao usar reschedule_count aqui: a visita nova nasce com 0 e so uma
+        // "agendada" pode ser remarcada, entao o contador vale sempre 0 ou 1 e
+        // nunca acumula ao longo da cadeia. A condicao antiga incluia
+        // `rescheduleCount > 0`, o que fazia uma visita "agendada" com contador
+        // restaurado (reversao de falha no reagendamento) contar em Agendadas E
+        // em Reagendadas ao mesmo tempo.
+        if (v.status === "reagendada") {
           visitsReagendadas++;
+          if (v.clientDocument) {
+            const atual = remarcacoesPorCliente.get(v.clientDocument);
+            remarcacoesPorCliente.set(v.clientDocument, {
+              name: atual?.name || v.clientName || v.clientDocument,
+              count: (atual?.count ?? 0) + 1,
+            });
+          }
+        }
 
         if (isOverdue) {
           visitsAtrasadas++;
           pendingAmountOverdue += titleValue;
         }
       });
+
+      // Taxa de remarcacao. A base sao as visitas que CHEGARAM A UM DESFECHO no
+      // periodo — a pergunta e "das vezes em que a visita teve um fim, quantas
+      // foram empurradas para outra data".
+      //
+      // Ficam de fora de proposito:
+      //  - agendadas/atrasadas: ainda em aberto, sem desfecho (inclui-las faria
+      //    a taxa cair sozinha so por haver agenda futura);
+      //  - canceladas: a visita foi cancelada, nao adiada — e outra decisao.
+      const visitsComDesfecho =
+        visitsRealizadas + visitsNaoEncontrado + visitsReagendadas;
+      const remarcacaoRate =
+        visitsComDesfecho > 0
+          ? (visitsReagendadas / visitsComDesfecho) * 100
+          : 0;
+
+      const reincidentes: ReincidenteCliente[] = Array.from(
+        remarcacoesPorCliente.entries(),
+      )
+        .filter(([, v]) => v.count >= REMARCACOES_REINCIDENTE)
+        .map(([document, v]) => ({ document, name: v.name, count: v.count }))
+        .sort((a, b) => b.count - a.count);
 
       const currentMonthVisitsActual = visitsRealizadas;
       const pendingVisits = visitsAgendadas + visitsCancelamentoSolicitado;
@@ -903,6 +1040,9 @@ const EnhancedPerformanceChart: React.FC = () => {
         visitsCanceladas,
         visitsAtrasadas,
         visitsReagendadas,
+        visitsComDesfecho,
+        remarcacaoRate,
+        reincidentes,
         salesPaid,
         salesUnpaidOrPartial,
         salesTotalPeriod: salesTotal,
