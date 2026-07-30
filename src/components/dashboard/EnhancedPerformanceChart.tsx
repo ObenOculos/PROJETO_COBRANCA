@@ -15,6 +15,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
 import { getClientPaymentStatus } from "../../filters/clientStatus";
 import { resolveSaleKey } from "../../filters/sales";
+import { visitEffectiveDate } from "../../config/visitStatus";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
 import FilterBar from "../common/FilterBar";
@@ -813,9 +814,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       let pendingAmountOverdue = 0;
 
       collectorVisits.forEach((v) => {
-        const visitDate = parseDateSafely(
-          v.dataVisitaRealizada || v.scheduledDate,
-        );
+        const visitDate = parseDateSafely(visitEffectiveDate(v));
         if (!isDateInSelectedMonths(visitDate)) return;
         const titleValue = Number(v.totalPendingValue || 0);
 
@@ -868,9 +867,7 @@ const EnhancedPerformanceChart: React.FC = () => {
             (v) =>
               v.collectorId === collector.id &&
               v.status === "realizada" &&
-              isDateInSelectedMonths(
-                parseDateSafely(v.dataVisitaRealizada || v.scheduledDate),
-              ),
+              isDateInSelectedMonths(parseDateSafely(visitEffectiveDate(v))),
           )
           .map((v) => v.clientDocument)
           .filter(Boolean),

@@ -35,16 +35,21 @@ export const visitStatusLabel = (status: string): string =>
   VISIT_STATUS_LABELS[status as ScheduledVisit["status"]] ?? status;
 
 /**
- * Data que posiciona a visita no tempo: a data em que foi realizada ou, se
- * ainda nao foi, a data para a qual esta marcada. Cai para os timestamps do
- * registro quando nenhuma das duas existe.
+ * Data EFETIVA da visita: quando ela de fato aconteceu ou, se ainda nao
+ * aconteceu, a data para a qual esta marcada.
+ *
+ * E a data que QUALQUER filtro de periodo sobre visitas deve usar. Filtrar por
+ * scheduledDate puro faz uma visita agendada para 28/07 e realizada em 02/08
+ * contar em julho, o que diverge de quem conta pelo dia em que o cobrador
+ * esteve no cliente. O Acompanhamento e o Ranking de Performance usavam campos
+ * diferentes e por isso os cards de "visitas realizadas" nao batiam.
  */
+export const visitEffectiveDate = (visit: ScheduledVisit): string =>
+  visit.dataVisitaRealizada || visit.scheduledDate;
+
+/** Posicao da visita no tempo, para ordenar/comparar. */
 const visitTime = (visit: ScheduledVisit): number => {
-  const raw =
-    visit.dataVisitaRealizada ||
-    visit.scheduledDate ||
-    visit.updatedAt ||
-    visit.createdAt;
+  const raw = visitEffectiveDate(visit) || visit.updatedAt || visit.createdAt;
   return raw ? new Date(raw).getTime() : 0;
 };
 

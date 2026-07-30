@@ -33,7 +33,7 @@ import {
   classifyVisitNote,
   visitOutcomeLabel,
 } from "../../config/visitOutcomes";
-import { visitStatusLabel } from "../../config/visitStatus";
+import { visitStatusLabel, visitEffectiveDate } from "../../config/visitStatus";
 
 // Helper function to parse YYYY-MM-DD date strings safely
 const parseDateString = (dateString: string): Date | null => {
@@ -440,8 +440,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       if (classifyVisitNote(visit.notes) !== outcomeFilter) return false;
     }
 
-    // Filtro por período de data
-    if (!isDateInRange(visit.scheduledDate)) return false;
+    // Filtro por período de data. Usa a data EFETIVA (realizada, ou agendada
+    // enquanto nao aconteceu) — mesma regra do Ranking de Performance, senao os
+    // cards de "visitas realizadas" das duas telas divergem no mesmo periodo.
+    if (!isDateInRange(visitEffectiveDate(visit))) return false;
 
     // Filtro por cidade
     if (
