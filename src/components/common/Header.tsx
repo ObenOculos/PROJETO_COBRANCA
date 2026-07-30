@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import NotificationDropdown from "./NotificationDropdown";
+import { USER_TYPE_LABELS } from "../../config/profiles";
 
 interface Tab {
   id: string;
@@ -140,11 +141,8 @@ const Header: React.FC<HeaderProps> = ({
                       {user?.name}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-dark-text-secondary capitalize">
-                      {user?.type === "manager"
-                        ? "Gerente"
-                        : user?.type === "internal_collector"
-                          ? "Cobrança Interna"
-                          : "Cobrador"}
+                      {(user?.type && USER_TYPE_LABELS[user.type]) ||
+                        "Cobrador"}
                     </p>
                   </div>
                 </div>

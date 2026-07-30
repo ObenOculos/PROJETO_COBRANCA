@@ -68,7 +68,11 @@ export const VISIT_OUTCOMES: readonly VisitOutcome[] = [
     key: "spc",
     note: "Visitado, mas cliente contestou a dívida - (SPC).",
     label: "Contestou a dívida (SPC)",
-    releasesTo: "SPC",
+    // Divida contestada e caso juridico: entra na fila do perfil Cobranca
+    // Juridica, exatamente como "nao encontrado" entra em "Aguardando Interno".
+    // O MOTIVO (SPC) fica na observacao da visita, que e filtravel — nao se
+    // duplica numa situacao propria que poderia divergir dela.
+    releasesTo: "Aguardando Jurídico",
   },
 ] as const;
 

@@ -1161,9 +1161,11 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     () => getVisitsByCollector(user?.id || ""),
     [user?.id],
   );
+  // Perfis de carteira (sem rota/visitas em campo): Interno, Terceirizado e Jurídico.
   const isWalletCollector =
     user?.type === "internal_collector" ||
-    user?.type === "third_party_collector";
+    user?.type === "third_party_collector" ||
+    user?.type === "legal_collector";
 
   // Calcular métricas gamificadas
   const { metrics: periodMetrics, goals } = useMemo(

@@ -788,6 +788,7 @@ export type Database = {
           p_clientes?: string[];
           p_documentos?: string[];
           p_gerente_id?: string;
+          p_manter_situacoes?: string[];
           p_situacao?: string;
           p_user_id: string;
         };

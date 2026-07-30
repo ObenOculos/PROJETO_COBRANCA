@@ -1266,6 +1266,7 @@ const EnhancedPerformanceChart: React.FC = () => {
             <option value="internal_collector">Interno</option>
             <option value="collector">Externo</option>
             <option value="third_party_collector">Terceirizado</option>
+            <option value="legal_collector">Jurídico</option>
           </select>
         </div>
       </div>

@@ -12,7 +12,7 @@ import {
   HandCoins,
   Briefcase,
   CircleSlash,
-  Gavel,
+  Scale,
   Building2,
   Zap,
   Globe,
@@ -140,18 +140,8 @@ const getSituacaoIndicator = (collections: Collection[]) => {
     };
   }
 
-  // Desfechos terminais de visita: o cliente saiu da carteira e aguarda o
-  // gerente redistribuir. Vem antes das fases de cobranca porque e o motivo
-  // mais acionavel para quem olha a fila de atribuicao.
-  const hasSPC = collections.some((c) => c.situacao === "SPC");
-  if (hasSPC) {
-    return {
-      icon: Gavel,
-      label: "SPC",
-      className: "bg-red-100 text-red-800",
-    };
-  }
-
+  // Encerramento: nao e fase de cobranca e nao entra em fila de redistribuicao.
+  // Vem antes de tudo porque sobrepoe qualquer fase em que o cliente estivesse.
   const hasFalecido = collections.some((c) => c.situacao === "Falecido");
   if (hasFalecido) {
     return {
@@ -182,6 +172,30 @@ const getSituacaoIndicator = (collections: Collection[]) => {
       icon: Zap,
       label: "Aguardando Terceirizado",
       className: "bg-rose-100 text-rose-700",
+    };
+  }
+
+  // Verificar se tem alguma parcela "Cobrança Jurídica"
+  const hasCobrancaJuridica = collections.some(
+    (c) => c.situacao === "Cobrança Jurídica",
+  );
+  if (hasCobrancaJuridica) {
+    return {
+      icon: Scale,
+      label: "Cobrança Jurídica",
+      className: "bg-amber-100 text-amber-800",
+    };
+  }
+
+  // Verificar se tem alguma parcela "Aguardando Jurídico"
+  const hasAguardandoJuridico = collections.some(
+    (c) => c.situacao === "Aguardando Jurídico",
+  );
+  if (hasAguardandoJuridico) {
+    return {
+      icon: Scale,
+      label: "Aguardando Jurídico",
+      className: "bg-yellow-100 text-yellow-700",
     };
   }
 

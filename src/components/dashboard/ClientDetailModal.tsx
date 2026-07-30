@@ -13,7 +13,7 @@ import {
   MessageCircle,
   Clock,
 } from "lucide-react";
-import { ClientGroup, UserType } from "../../types";
+import { ClientGroup, UserType, isCollectorType } from "../../types";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import { isCancelado } from "../../types/status";
 import { useCollection } from "../../contexts/CollectionContext";
@@ -622,9 +622,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
           {/* Action Buttons */}
 
-          {(userType === "collector" ||
-            userType === "internal_collector" ||
-            userType === "manager") && (
+          {/* Todo perfil de cobranca precisa consultar dados/vendas e registrar
+              recebimento na propria carteira — Terceirizado e Juridico ficavam
+              de fora por omissao de quando esses perfis foram criados. */}
+          {(isCollectorType(userType) || userType === "manager") && (
             <div className="mt-4 px-4 lg:px-6 py-0 grid grid-cols-2 sm:grid-cols-4 gap-3">
               <button
                 id="view-client-data"

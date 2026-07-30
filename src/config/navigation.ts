@@ -23,6 +23,7 @@ export interface NavItemConfig {
     | "collector"
     | "internal_collector"
     | "third_party_collector"
+    | "legal_collector"
   )[];
 }
 
@@ -38,6 +39,7 @@ export const navigationItems: NavItemConfig[] = [
       "collector",
       "internal_collector",
       "third_party_collector",
+      "legal_collector",
     ],
   },
   {

@@ -25,7 +25,11 @@ import {
   isCollectorType,
 } from "../types";
 import { supabase } from "../lib/supabase";
-import { PRIMARY_SITUACAO, situacoesOutsideProfile } from "../config/profiles";
+import {
+  situacoesOutsideProfile,
+  assignmentSituacaoRule,
+  resolveSituacaoOnAssign,
+} from "../config/profiles";
 import {
   releaseSituacaoFor,
   lastVisitOutcomeByClient,
@@ -2022,11 +2026,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       const targetUser = users.find((u) => u.id === collectorId);
       const targetType = targetUser?.type;
-      const situacaoUpdate =
-        targetType === "internal_collector" ||
-        targetType === "third_party_collector"
-          ? PRIMARY_SITUACAO[targetType]
-          : undefined;
+      // A situacao e confirmada por linha no servidor: mantem-se a atual quando
+      // ela ja pertence ao perfil de destino (ver assignmentSituacaoRule).
+      const situacaoRule = assignmentSituacaoRule(targetType);
 
       // Lotes grandes: a RPC recebe os identificadores no corpo da requisicao
       // (sem risco de URL gigante) e faz UPDATE + historico numa unica transacao
@@ -2053,8 +2055,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             p_user_id: collectorId,
             p_documentos: documentBatch,
             p_clientes: clientNameBatch,
-            p_situacao: situacaoUpdate,
+            p_situacao: situacaoRule.confirm,
             p_gerente_id: user?.id,
+            p_manter_situacoes: [...situacaoRule.keep],
           },
         );
 
@@ -2224,11 +2227,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   ) => {
     const { docSet, nameSet } = buildIdentifierSets(identifiers);
     const targetType = users.find((u) => u.id === collectorId)?.type;
-    const situacaoUpdate =
-      targetType === "internal_collector" ||
-      targetType === "third_party_collector"
-        ? PRIMARY_SITUACAO[targetType]
-        : undefined;
+    // Espelha exatamente a regra que a RPC aplica no servidor, para o estado
+    // otimista nao divergir do que sera persistido.
+    const situacaoRule = assignmentSituacaoRule(targetType);
 
     setAllCollections((prev) =>
       prev.map((c) =>
@@ -2236,7 +2237,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           ? {
               ...c,
               user_id: collectorId,
-              ...(situacaoUpdate ? { situacao: situacaoUpdate } : {}),
+              situacao:
+                resolveSituacaoOnAssign(c.situacao, situacaoRule) ?? null,
             }
           : c,
       ),

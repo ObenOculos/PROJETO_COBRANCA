@@ -3,13 +3,15 @@ export type UserType =
   | "manager"
   | "collector"
   | "internal_collector"
-  | "third_party_collector";
+  | "third_party_collector"
+  | "legal_collector";
 
-/** Tipos de usuário que são cobradores: Externo, Interno e Terceirizado. */
+/** Tipos de usuário que são cobradores: Externo, Interno, Terceirizado e Jurídico. */
 export const COLLECTOR_TYPES: UserType[] = [
   "collector",
   "internal_collector",
   "third_party_collector",
+  "legal_collector",
 ];
 
 /** True quando o usuário é cobrador de qualquer tipo. Fonte única — use sempre

@@ -166,9 +166,10 @@ export const SITUACAO_OPTIONS: SelectOption[] = [
   { value: "Cobrança Interna", label: "Cobrança interna" },
   { value: "Aguardando Terceirizado", label: "Aguardando terceirizado" },
   { value: "Cobrança Terceirizada", label: "Cobrança terceirizada" },
-  // Desfechos terminais de visita (ver src/config/visitOutcomes): o cliente saiu
-  // da carteira do cobrador e aguarda o gerente redistribuir.
-  { value: "SPC", label: "SPC (dívida contestada)" },
+  { value: "Aguardando Jurídico", label: "Aguardando jurídico" },
+  { value: "Cobrança Jurídica", label: "Cobrança jurídica" },
+  // Encerramento (ver src/config/visitOutcomes): nao pertence a perfil nenhum,
+  // nao entra em fila de redistribuicao — nao ha a quem atribuir.
   { value: "Falecido", label: "Falecido" },
   { value: "empty", label: "Sem situação" },
 ];

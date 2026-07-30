@@ -17,6 +17,7 @@ import {
   isCollectorType,
 } from "../../types";
 import ClearVisitsModal, { pendingVisitsCount } from "./ClearVisitsModal";
+import { USER_TYPE_LABELS } from "../../config/profiles";
 
 const UserManagement: React.FC = () => {
   const { users, addUser, updateUser, deleteUser, scheduledVisits } =
@@ -225,9 +226,11 @@ const UserManagement: React.FC = () => {
                           ? "bg-purple-100 text-purple-800"
                           : user.type === "third_party_collector"
                             ? "bg-red-100 text-red-800"
-                            : user.type === "internal_collector"
-                              ? "bg-orange-100 text-orange-800"
-                              : "bg-blue-100 text-blue-800"
+                            : user.type === "legal_collector"
+                              ? "bg-amber-100 text-amber-800"
+                              : user.type === "internal_collector"
+                                ? "bg-orange-100 text-orange-800"
+                                : "bg-blue-100 text-blue-800"
                       }`}
                     >
                       {user.type === "manager" ? (
@@ -235,13 +238,7 @@ const UserManagement: React.FC = () => {
                       ) : (
                         <User className="h-3 w-3 mr-1" />
                       )}
-                      {user.type === "manager"
-                        ? "Gerente"
-                        : user.type === "internal_collector"
-                          ? "Cobrança Interna"
-                          : user.type === "third_party_collector"
-                            ? "Cobrança Terceirizada"
-                            : "Cobrador"}
+                      {USER_TYPE_LABELS[user.type] ?? "Cobrador"}
                     </span>
                     {user.active === false && (
                       <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600">
@@ -420,6 +417,7 @@ const UserManagement: React.FC = () => {
                   <option value="third_party_collector">
                     Cobrança Terceirizada
                   </option>
+                  <option value="legal_collector">Cobrança Jurídica</option>
                   <option value="manager">Gerente</option>
                 </select>
               </div>

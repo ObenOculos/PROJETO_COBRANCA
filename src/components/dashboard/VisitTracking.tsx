@@ -854,6 +854,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       internal_collector: "Interno",
       collector: "Externo",
       third_party_collector: "Terceirizado",
+      legal_collector: "Jurídico",
     };
     const filterChips: { label: string; onClear: () => void }[] = [];
     if (searchFilter)
@@ -928,6 +929,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       { value: "internal_collector", label: "Interno" },
       { value: "collector", label: "Externo" },
       { value: "third_party_collector", label: "Terceirizado" },
+      { value: "legal_collector", label: "Jurídico" },
     ];
 
     return (
@@ -1107,6 +1109,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       <option value="third_party_collector">
                         Terceirizado
                       </option>
+                      <option value="legal_collector">Jurídico</option>
                     </select>
                   </div>
 
