@@ -14,6 +14,7 @@ import {
   PlusCircle,
   Download,
   User,
+  X,
 } from "lucide-react"; // Importar ícones
 import AddTituloModal from "./AddTituloModal";
 import { Database } from "../../types/database.types";
@@ -166,6 +167,203 @@ const ResultList: React.FC<{
     </div>
   );
 };
+
+// ---------------------------------------------------------------------------
+// Fila de arquivos. Cada card aceita VARIOS arquivos de uma vez e os processa em
+// sequencia, sem exigir que o usuario volte para escolher o proximo a cada
+// rodada. A logica de processamento de um arquivo continua exatamente a mesma --
+// aqui so muda a orquestracao (selecao, ordem e agregacao dos resultados).
+// ---------------------------------------------------------------------------
+
+/** Desfecho de um arquivo da fila (alimenta o progresso e o modal de resultados). */
+interface FileSummary {
+  name: string;
+  status: "success" | "error" | "skipped";
+  message: string;
+}
+
+/** Identidade de um arquivo na fila -- evita adicionar o mesmo duas vezes. */
+const fileKey = (file: File): string =>
+  `${file.name}-${file.size}-${file.lastModified}`;
+
+const formatFileSize = (bytes: number): string =>
+  bytes < 1024 * 1024
+    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+const countByStatus = (results: UpdateResult[]) => ({
+  success: results.filter((r) => r.status === "success").length,
+  unchanged: results.filter((r) => r.status === "unchanged").length,
+  error: results.filter((r) => r.status === "error").length,
+});
+
+// Classes por cor do card (o Tailwind precisa de strings estaticas).
+const DROPZONE_STYLES = {
+  blue: {
+    hover: "hover:border-blue-500",
+    active: "border-blue-500 bg-blue-50",
+  },
+  green: {
+    hover: "hover:border-green-500",
+    active: "border-green-500 bg-green-50",
+  },
+  purple: {
+    hover: "hover:border-purple-500",
+    active: "border-purple-500 bg-purple-50",
+  },
+} as const;
+
+// Area de selecao compartilhada pelos tres cards: aceita multiplos arquivos por
+// clique ou arrastar-e-soltar, acumula (nao substitui) a cada nova selecao e
+// deixa remover item a item antes de enviar.
+const FileDropzone: React.FC<{
+  id: string;
+  accept: string;
+  hint: string;
+  color: keyof typeof DROPZONE_STYLES;
+  files: File[];
+  disabled?: boolean;
+  onAdd: (files: File[]) => void;
+  onRemove: (key: string) => void;
+  onClear: () => void;
+}> = ({
+  id,
+  accept,
+  hint,
+  color,
+  files,
+  disabled = false,
+  onAdd,
+  onRemove,
+  onClear,
+}) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const styles = DROPZONE_STYLES[color];
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(event.target.files ?? []);
+    if (selected.length > 0) onAdd(selected);
+    // Zera o input para permitir reselecionar o mesmo arquivo depois.
+    event.target.value = "";
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+    if (disabled) return;
+    const dropped = Array.from(event.dataTransfer.files ?? []);
+    if (dropped.length > 0) onAdd(dropped);
+  };
+
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!disabled) setIsDragging(true);
+        }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleDrop}
+        className={`cursor-pointer block border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+          isDragging ? styles.active : `border-gray-300 ${styles.hover}`
+        } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+      >
+        <UploadCloud className="mx-auto h-10 w-10 text-gray-400" />
+        <span className="mt-2 block text-sm font-semibold text-gray-700">
+          {files.length === 0
+            ? "Clique ou arraste os arquivos"
+            : `Adicionar mais (${files.length} na fila)`}
+        </span>
+        <span className="mt-1 block text-xs text-gray-500">{hint}</span>
+        <span className="mt-1 block text-xs text-gray-400">
+          Pode selecionar vários — são processados em sequência
+        </span>
+        <input
+          type="file"
+          accept={accept}
+          multiple
+          onChange={handleChange}
+          disabled={disabled}
+          id={id}
+          className="sr-only"
+        />
+      </label>
+
+      {files.length > 0 && (
+        <div className="mt-3 space-y-2">
+          <ul className="max-h-40 overflow-y-auto divide-y divide-gray-200 border border-gray-200 rounded-md bg-white">
+            {files.map((file, index) => (
+              <li
+                key={fileKey(file)}
+                className="flex items-center gap-2 px-3 py-2"
+              >
+                <span className="w-5 shrink-0 text-xs font-medium text-gray-400">
+                  {index + 1}.
+                </span>
+                <FileText className="h-4 w-4 shrink-0 text-gray-400" />
+                <span
+                  className="flex-1 truncate text-sm text-gray-700"
+                  title={file.name}
+                >
+                  {file.name}
+                </span>
+                <span className="shrink-0 text-xs text-gray-400">
+                  {formatFileSize(file.size)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRemove(fileKey(file))}
+                  disabled={disabled}
+                  aria-label={`Remover ${file.name}`}
+                  className="shrink-0 text-gray-400 hover:text-red-600 disabled:opacity-50"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={onClear}
+            disabled={disabled}
+            className="w-full text-sm font-semibold text-red-600 transition-colors hover:text-red-800 disabled:opacity-50"
+          >
+            Limpar fila
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Linha de desfecho por arquivo, usada no modal de progresso (ao vivo) e no de
+// resultados (consolidado).
+const FileSummaryRow: React.FC<{ summary: FileSummary }> = ({ summary }) => (
+  <li className="flex items-start gap-2 px-3 py-2 text-left">
+    {summary.status === "success" ? (
+      <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+    ) : summary.status === "skipped" ? (
+      <Info className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+    ) : (
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+    )}
+    <div className="min-w-0 flex-1">
+      <p
+        className="truncate text-sm font-medium text-gray-800"
+        title={summary.name}
+      >
+        {summary.name}
+      </p>
+      <p
+        className={`text-xs ${
+          summary.status === "success" ? "text-gray-600" : "text-red-600"
+        }`}
+      >
+        {summary.message}
+      </p>
+    </div>
+  </li>
+);
 
 // Valores válidos para a coluna situacao. Deriva da fonte única (config/profiles)
 // para acompanhar automaticamente novos perfis: valor fora desta lista é
@@ -391,9 +589,11 @@ const validateCsvFile = async (
 
 const DatabaseUpload: React.FC = () => {
   const { refreshData, users } = useCollection();
-  const [statusFile, setStatusFile] = useState<File | null>(null);
-  const [newParcelaFile, setNewParcelaFile] = useState<File | null>(null);
-  const [clientesFile, setClientesFile] = useState<File | null>(null);
+  // Cada card mantem uma FILA de arquivos (processados em sequencia), no lugar
+  // do arquivo unico que obrigava o usuario a repetir o ciclo a cada envio.
+  const [statusFiles, setStatusFiles] = useState<File[]>([]);
+  const [newParcelaFiles, setNewParcelaFiles] = useState<File[]>([]);
+  const [clientesFiles, setClientesFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [uploadStatus, setUploadStatus] = useState<string>("");
   const [debugInfo, setDebugInfo] = useState<string>("");
@@ -402,6 +602,13 @@ const DatabaseUpload: React.FC = () => {
   const [showProgressModal, setShowProgressModal] = useState<boolean>(false);
   const [progressPercentage, setProgressPercentage] = useState<number>(0);
   const [progressMessage, setProgressMessage] = useState<string>("");
+
+  // Progresso da fila: qual arquivo esta sendo processado e o desfecho dos que
+  // ja terminaram (o usuario acompanha tudo sem precisar interagir).
+  const [queueIndex, setQueueIndex] = useState<number>(0);
+  const [queueTotal, setQueueTotal] = useState<number>(0);
+  const [queueFileName, setQueueFileName] = useState<string>("");
+  const [fileSummaries, setFileSummaries] = useState<FileSummary[]>([]);
 
   // Estados para o modal de resultados
   const [showResultsModal, setShowResultsModal] = useState<boolean>(false);
@@ -461,6 +668,13 @@ const DatabaseUpload: React.FC = () => {
     );
   }, [errorResults, errorGroups, selectedErrorCategory]);
 
+  // Progresso da fila inteira: arquivos concluidos + fracao do atual.
+  const overallProgress = useMemo(() => {
+    if (queueTotal === 0) return 0;
+    const done = queueIndex + progressPercentage / 100;
+    return Math.min(100, Math.round((done / queueTotal) * 100));
+  }, [queueIndex, queueTotal, progressPercentage]);
+
   const handleAddSuccess = () => {
     // Maybe show a success message
     setUploadStatus("✅ Título adicionado com sucesso!");
@@ -468,164 +682,64 @@ const DatabaseUpload: React.FC = () => {
     refreshData();
   };
 
-  const handleStatusFileChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
+  // Acrescenta arquivos a uma fila: valida cada um ainda na selecao, descarta
+  // repetidos e reporta os rejeitados de uma vez -- sem bloquear os validos.
+  const addFilesToQueue = (
+    incoming: File[],
+    current: File[],
+    setFiles: React.Dispatch<React.SetStateAction<File[]>>,
+    validate: (file: File) => QuickValidation,
   ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
     setDebugInfo("");
-    const v = quickValidateCsv(file);
-    if (!v.ok) {
-      setStatusFile(null);
-      event.target.value = "";
-      setUploadStatus(`❌ ${v.error}`);
-      return;
-    }
-    setStatusFile(file);
-    setUploadStatus("");
-  };
+    const known = new Set(current.map(fileKey));
+    const accepted: File[] = [];
+    const rejected: string[] = [];
+    let duplicates = 0;
 
-  const handleNewParcelaFileChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setDebugInfo("");
-    const v = quickValidateCsv(file);
-    if (!v.ok) {
-      setNewParcelaFile(null);
-      event.target.value = "";
-      setUploadStatus(`❌ ${v.error}`);
-      return;
-    }
-    setNewParcelaFile(file);
-    setUploadStatus("");
-  };
-
-  const clearStatusFile = () => {
-    setStatusFile(null);
-    setUploadStatus("");
-    setDebugInfo("");
-    const input = document.getElementById(
-      "statusFileInput",
-    ) as HTMLInputElement;
-    if (input) input.value = "";
-  };
-
-  const clearNewParcelaFile = () => {
-    setNewParcelaFile(null);
-    setUploadStatus("");
-    setDebugInfo("");
-    const input = document.getElementById(
-      "newParcelaFileInput",
-    ) as HTMLInputElement;
-    if (input) input.value = "";
-  };
-
-  const handleClientesFileChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setDebugInfo("");
-    const v = quickValidateClientes(file);
-    if (!v.ok) {
-      setClientesFile(null);
-      event.target.value = "";
-      setUploadStatus(`❌ ${v.error}`);
-      return;
-    }
-    setClientesFile(file);
-    setUploadStatus("");
-  };
-
-  const clearClientesFile = () => {
-    setClientesFile(null);
-    setUploadStatus("");
-    setDebugInfo("");
-    const input = document.getElementById(
-      "clientesFileInput",
-    ) as HTMLInputElement;
-    if (input) input.value = "";
-  };
-
-  // Importa a Data de Nascimento do relatorio de clientes. A regra de negocio
-  // (parsing, normalizacao, casamento por documento e update em lote) vive em
-  // clientesImportService; aqui cuidamos apenas da UI (progresso e resultado).
-  const handleUploadClientes = async () => {
-    if (!clientesFile) {
-      setUploadStatus("❌ Selecione o relatório de clientes (xlsx ou csv).");
-      return;
-    }
-
-    const validation = quickValidateClientes(clientesFile);
-    if (!validation.ok) {
-      setUploadStatus(`❌ ${validation.error}`);
-      return;
-    }
-
-    setLoading(true);
-    setShowProgressModal(true);
-    setProgressPercentage(0);
-    setProgressMessage("📤 Lendo planilha...");
-    setUploadStatus("");
-    setDebugInfo("");
-
-    try {
-      const { rows, totalValidos } = await importClientesBirthDates(
-        clientesFile,
-        (percentage, message) => {
-          setProgressPercentage(percentage);
-          setProgressMessage(message);
-        },
-      );
-
-      if (totalValidos === 0) {
-        setProgressMessage(
-          "ℹ️ Nenhuma linha com Documento e Data de Nascimento válidos.",
-        );
-        setUploadStatus(
-          "ℹ️ Nenhuma linha com Documento e Data de Nascimento válidos na planilha.",
-        );
-        return;
+    for (const file of incoming) {
+      if (known.has(fileKey(file))) {
+        duplicates++;
+        continue;
       }
+      const v = validate(file);
+      if (v.ok) {
+        known.add(fileKey(file));
+        accepted.push(file);
+      } else {
+        rejected.push(`${file.name} (${v.error})`);
+      }
+    }
 
-      const results: UpdateResult[] = rows.map((r) => ({
-        id_parcela: r.documento,
-        status: r.status,
-        error: r.error,
-      }));
+    if (accepted.length > 0) setFiles([...current, ...accepted]);
 
-      const successful = results.filter((r) => r.status === "success").length;
-      const naoEncontrados = results.filter(
-        (r) => r.status === "unchanged",
-      ).length;
-      const failed = results.filter((r) => r.status === "error").length;
-
+    if (rejected.length > 0) {
       setUploadStatus(
-        `Data de nascimento: ${successful} atualizada(s), ${naoEncontrados} não encontrado(s) na base, ${failed} falha(s).`,
+        `❌ ${rejected.length} arquivo(s) não adicionado(s): ${rejected.join(" | ")}`,
       );
-
-      // Abre o mesmo modal de resultados dos outros cards, com rotulos de
-      // clientes. Nao forca refresh: marca needsRefresh e atualiza ao fechar.
-      setResultLabels(CLIENTES_RESULT_LABELS);
-      setModalTitle("Resultado da Atualização de Data de Nascimento");
-      setUploadResults(results);
-      setActiveTab("sintetico");
-      if (successful > 0) {
-        setNeedsRefresh(true);
-      }
-      setShowResultsModal(true);
-    } catch (error) {
-      const errorMsg = (error as Error).message;
-      setUploadStatus(`❌ Erro: ${errorMsg}`);
-      setProgressMessage(`❌ Erro: ${errorMsg}`);
-      setProgressPercentage(0);
-      console.error("❌ Erro ao importar datas de nascimento:", error);
-    } finally {
-      setLoading(false);
-      setTimeout(() => setShowProgressModal(false), 2500);
+    } else if (duplicates > 0 && accepted.length === 0) {
+      // Sem este aviso, reselecionar o mesmo arquivo pareceria nao ter efeito.
+      setUploadStatus(
+        `ℹ️ ${duplicates} arquivo(s) já estava(m) na fila e foi(ram) ignorado(s).`,
+      );
+    } else {
+      setUploadStatus("");
     }
+  };
+
+  const removeFromQueue = (
+    key: string,
+    setFiles: React.Dispatch<React.SetStateAction<File[]>>,
+  ) => {
+    setFiles((prev) => prev.filter((file) => fileKey(file) !== key));
+    setUploadStatus("");
+  };
+
+  const clearQueue = (
+    setFiles: React.Dispatch<React.SetStateAction<File[]>>,
+  ) => {
+    setFiles([]);
+    setUploadStatus("");
+    setDebugInfo("");
   };
 
   const handleCloseResultsModal = async () => {
@@ -1533,78 +1647,145 @@ const DatabaseUpload: React.FC = () => {
     }
   };
 
-  const handleUploadStatus = async () => {
-    if (!statusFile) {
-      setUploadStatus("❌ Selecione um arquivo para atualizar o status.");
-      return;
-    }
-
-    // Valida estrutura (tamanho, tipo e cabecalho) antes de qualquer processamento.
-    const validation = await validateCsvFile(
-      statusFile,
-      REQUIRED_COLUMNS_PARCELA,
-    );
-    if (!validation.ok) {
-      setUploadStatus(`❌ ${validation.error}`);
+  // Executor da fila, comum aos tres cards: valida todos os arquivos primeiro,
+  // processa um a um SEM pedir interacao entre eles e abre um unico modal de
+  // resultados no fim, com os numeros somados e o desfecho por arquivo. O que
+  // roda dentro de `run` e exatamente a mesma logica de antes.
+  const runQueue = async (
+    files: File[],
+    options: {
+      validate: (file: File) => Promise<QuickValidation>;
+      run: (
+        file: File,
+        onProgress: (percentage: number, message: string) => void,
+      ) => Promise<UpdateResult[]>;
+      summarize: (results: UpdateResult[]) => string;
+      labels: ResultLabels;
+      title: string;
+      onFinish: () => void;
+      // Passo unico executado antes da fila (ex.: testar a conexao uma vez, e
+      // nao a cada arquivo). Retornar false aborta a fila.
+      beforeAll?: () => Promise<boolean>;
+    },
+  ) => {
+    if (files.length === 0) {
+      setUploadStatus("❌ Selecione ao menos um arquivo.");
       return;
     }
 
     setLoading(true);
     setShowProgressModal(true);
     setProgressPercentage(0);
-    setProgressMessage("Iniciando atualização...");
+    setProgressMessage(
+      files.length > 1
+        ? `Validando ${files.length} arquivos...`
+        : "Validando arquivo...",
+    );
     setUploadStatus("");
     setDebugInfo("");
+    setFileSummaries([]);
+    setQueueIndex(0);
+    setQueueTotal(files.length);
+    setQueueFileName(files[0].name);
+
+    const summaries: FileSummary[] = [];
+    const allResults: UpdateResult[] = [];
 
     try {
-      setProgressMessage("🔍 Testando conexão com Supabase...");
-      const connectionOk = await testSupabaseConnection();
-      if (!connectionOk) {
-        setProgressMessage("❌ Falha na conexão com Supabase");
-        setUploadStatus("❌ Falha na conexão com Supabase");
+      // 1. Valida a fila inteira antes de gravar qualquer coisa. Arquivo
+      // invalido nao interrompe os demais: entra como "ignorado" no relatorio.
+      const validFiles: File[] = [];
+      for (const file of files) {
+        const validation = await options.validate(file);
+        if (validation.ok) {
+          validFiles.push(file);
+        } else {
+          summaries.push({
+            name: file.name,
+            status: "skipped",
+            message: validation.error ?? "Arquivo inválido.",
+          });
+        }
+      }
+      setFileSummaries([...summaries]);
+      setQueueTotal(validFiles.length);
+
+      if (validFiles.length === 0) {
+        setProgressMessage("❌ Nenhum arquivo válido na fila.");
+        setUploadStatus(
+          `❌ Nenhum arquivo válido: ${summaries
+            .map((s) => `${s.name} (${s.message})`)
+            .join(" | ")}`,
+        );
         return;
       }
 
-      setProgressMessage("📤 Lendo arquivo...");
-      const data = await processFile(statusFile, (pct, msg) => {
-        setProgressPercentage(Math.round(pct * 0.4)); // parse ocupa 0-40%
-        setProgressMessage(msg);
-      });
-      setProgressMessage(
-        `📋 ${data.length} registros encontrados. Atualizando no Supabase...`,
-      );
-      setProgressPercentage(40);
+      if (options.beforeAll && !(await options.beforeAll())) return;
 
-      const results = await updateStatusInSupabase(
-        data,
-        (percentage, message) => {
-          setProgressPercentage(40 + percentage * 0.6); // 40% para processamento, 60% para upload
-          setProgressMessage(message);
-        },
-      );
+      // 2. Processa em sequencia. Falha em um arquivo nao derruba a fila: fica
+      // registrada e o proximo comeca automaticamente.
+      for (let index = 0; index < validFiles.length; index++) {
+        const file = validFiles[index];
+        setQueueIndex(index);
+        setQueueFileName(file.name);
+        setProgressPercentage(0);
+        setProgressMessage(`📤 Lendo ${file.name}...`);
 
-      const successful = results.filter((r) => r.status === "success").length;
-      const failed = results.filter((r) => r.status === "error").length;
-      const unchanged = results.filter((r) => r.status === "unchanged").length;
-      const finalProgressMessage = "✅ Atualização concluída!";
-      const statusMessage = `Status: ${successful} atualizado(s), ${unchanged} inalterado(s), ${failed} falha(s).`;
+        try {
+          const results = await options.run(file, (percentage, message) => {
+            setProgressPercentage(percentage);
+            setProgressMessage(message);
+          });
+          allResults.push(...results);
+          summaries.push({
+            name: file.name,
+            status: "success",
+            message: options.summarize(results),
+          });
+        } catch (error) {
+          const errorMsg = (error as Error).message;
+          summaries.push({
+            name: file.name,
+            status: "error",
+            message: errorMsg,
+          });
+          console.error(`❌ Erro ao processar "${file.name}":`, error);
+        }
+        setFileSummaries([...summaries]);
+      }
 
-      setUploadStatus(statusMessage);
-      setProgressMessage(finalProgressMessage);
+      setQueueIndex(validFiles.length);
       setProgressPercentage(100);
+      setProgressMessage(
+        validFiles.length > 1
+          ? `✅ ${validFiles.length} arquivos processados!`
+          : "✅ Processo concluído!",
+      );
 
-      // Armazenar resultados e preparar para abrir o modal
-      setResultLabels(DEFAULT_RESULT_LABELS);
-      setModalTitle("Resultado da Atualização de Status");
-      setUploadResults(results);
+      const processedFiles = summaries.filter(
+        (s) => s.status === "success",
+      ).length;
+      const problemFiles = summaries.length - processedFiles;
+      setUploadStatus(
+        `${files.length > 1 ? `${processedFiles}/${files.length} arquivo(s): ` : ""}` +
+          options.summarize(allResults) +
+          `${problemFiles > 0 ? ` — ${problemFiles} arquivo(s) com problema.` : ""}`,
+      );
+
+      setResultLabels(options.labels);
+      setModalTitle(
+        files.length > 1
+          ? `${options.title} (${processedFiles} arquivo(s))`
+          : options.title,
+      );
+      setUploadResults(allResults);
       setActiveTab("sintetico");
-      if (successful > 0) {
+      if (allResults.some((r) => r.status === "success")) {
         setNeedsRefresh(true);
       }
       setShowResultsModal(true);
-
-      // Limpar a informação de debug antiga
-      setDebugInfo("");
+      // Fila consumida: limpa a selecao para o proximo lote.
+      options.onFinish();
     } catch (error) {
       const errorMsg = (error as Error).message;
       setUploadStatus(`❌ Erro: ${errorMsg}`);
@@ -1615,49 +1796,89 @@ const DatabaseUpload: React.FC = () => {
     } finally {
       setLoading(false);
       // Manter o modal aberto por um breve período para o usuário ver o status final
-      setTimeout(() => setShowProgressModal(false), 3000);
+      setTimeout(() => setShowProgressModal(false), 2000);
     }
   };
 
-  const handleUploadNewParcela = async () => {
-    if (!newParcelaFile) {
-      setUploadStatus("❌ Selecione um arquivo para adicionar novas parcelas.");
-      return;
-    }
+  const handleUploadStatus = () =>
+    runQueue(statusFiles, {
+      // Valida estrutura (tamanho, tipo e cabecalho) antes de qualquer processamento.
+      validate: (file) => validateCsvFile(file, REQUIRED_COLUMNS_PARCELA),
+      beforeAll: async () => {
+        setProgressMessage("🔍 Testando conexão com Supabase...");
+        const connectionOk = await testSupabaseConnection();
+        if (!connectionOk) {
+          setProgressMessage("❌ Falha na conexão com Supabase");
+          setUploadStatus("❌ Falha na conexão com Supabase");
+        }
+        return connectionOk;
+      },
+      run: async (file, onProgress) => {
+        const data = await processFile(file, (pct, msg) => {
+          onProgress(Math.round(pct * 0.4), msg); // parse ocupa 0-40%
+        });
+        onProgress(
+          40,
+          `📋 ${data.length} registros encontrados. Atualizando no Supabase...`,
+        );
+        // 40% para processamento, 60% para upload
+        return updateStatusInSupabase(data, (percentage, message) =>
+          onProgress(40 + percentage * 0.6, message),
+        );
+      },
+      summarize: (results) => {
+        const { success, unchanged, error } = countByStatus(results);
+        return `Status: ${success} atualizado(s), ${unchanged} inalterado(s), ${error} falha(s).`;
+      },
+      labels: DEFAULT_RESULT_LABELS,
+      title: "Resultado da Atualização de Status",
+      onFinish: () => setStatusFiles([]),
+    });
 
-    // Valida estrutura (tamanho, tipo e cabecalho) antes de qualquer processamento.
-    const validation = await validateCsvFile(
-      newParcelaFile,
-      REQUIRED_COLUMNS_PARCELA,
-    );
-    if (!validation.ok) {
-      setUploadStatus(`❌ ${validation.error}`);
-      return;
-    }
+  // Importa a Data de Nascimento do relatorio de clientes. A regra de negocio
+  // (parsing, normalizacao, casamento por documento e update em lote) vive em
+  // clientesImportService; aqui cuidamos apenas da UI (progresso e resultado).
+  const handleUploadClientes = () =>
+    runQueue(clientesFiles, {
+      validate: async (file) => quickValidateClientes(file),
+      run: async (file, onProgress) => {
+        const { rows } = await importClientesBirthDates(file, onProgress);
+        return rows.map((r) => ({
+          id_parcela: r.documento,
+          status: r.status,
+          error: r.error,
+        }));
+      },
+      summarize: (results) => {
+        const { success, unchanged, error } = countByStatus(results);
+        return `Data de nascimento: ${success} atualizada(s), ${unchanged} não encontrado(s) na base, ${error} falha(s).`;
+      },
+      labels: CLIENTES_RESULT_LABELS,
+      title: "Resultado da Atualização de Data de Nascimento",
+      onFinish: () => setClientesFiles([]),
+    });
 
-    setLoading(true);
-    setShowProgressModal(true);
-    setProgressPercentage(0);
-    setProgressMessage("Iniciando inserção de novas parcelas...");
-    setUploadStatus("");
-    setDebugInfo("");
+  const handleUploadNewParcela = () =>
+    runQueue(newParcelaFiles, {
+      // Valida estrutura (tamanho, tipo e cabecalho) antes de qualquer processamento.
+      validate: (file) => validateCsvFile(file, REQUIRED_COLUMNS_PARCELA),
+      run: async (file, onProgress) => {
+        const data = await processFile(file, (pct, msg) => {
+          onProgress(Math.round(pct * 0.2), msg); // parse ocupa 0-20%
+        });
+        onProgress(20, `Processando ${data.length} linhas...`);
 
-    try {
-      setProgressMessage("📤 Lendo arquivo...");
-      const data = await processFile(newParcelaFile, (pct, msg) => {
-        setProgressPercentage(Math.round(pct * 0.2)); // parse ocupa 0-20%
-        setProgressMessage(msg);
-      });
-      setProgressPercentage(20);
-      setProgressMessage(`Processando ${data.length} linhas...`);
+        // 20% para processar, 80% para inserir
+        const result = await insertNewParcelasInSupabase(data, (p, m) =>
+          onProgress(20 + p * 0.8, m),
+        );
+        // Falha do arquivo: registrada no relatorio da fila, que segue para o
+        // proximo arquivo em vez de encerrar o lote inteiro.
+        if (!result.success) {
+          throw new Error(result.error ?? "Falha ao inserir as parcelas.");
+        }
 
-      const result = await insertNewParcelasInSupabase(data, (p, m) => {
-        setProgressPercentage(20 + p * 0.8); // 20% para processar, 80% para inserir
-        setProgressMessage(m);
-      });
-
-      const resultsForModal: UpdateResult[] = [];
-      if (result.success) {
+        const resultsForModal: UpdateResult[] = [];
         result.insertedRows?.forEach((row) => {
           resultsForModal.push({
             id_parcela: row.id_parcela || "N/A",
@@ -1678,45 +1899,16 @@ const DatabaseUpload: React.FC = () => {
             error: "Linha inválida ou id_parcela ausente.",
           });
         });
-
-        const successful = resultsForModal.filter(
-          (r) => r.status === "success",
-        ).length;
-        const failed = resultsForModal.filter(
-          (r) => r.status === "error",
-        ).length;
-
-        setUploadStatus(
-          `Status: ${successful} inserido(s), ${failed} falha(s)/duplicata(s).`,
-        );
-        setProgressMessage("✅ Processo concluído!");
-        setProgressPercentage(100);
-
-        setResultLabels(DEFAULT_RESULT_LABELS);
-        setModalTitle("Resultado da Adição de Novas Parcelas");
-        setUploadResults(resultsForModal);
-        setActiveTab("sintetico");
-        if (successful > 0) {
-          setNeedsRefresh(true);
-        }
-        setShowResultsModal(true);
-      } else {
-        setUploadStatus(`❌ Erro: ${result.error}`);
-        setProgressMessage(`❌ Erro: ${result.error}`);
-        setProgressPercentage(0);
-      }
-    } catch (error) {
-      const errorMsg = (error as Error).message;
-      setUploadStatus(`❌ Erro: ${errorMsg}`);
-      setDebugInfo(`❌ Erro detalhado: ${errorMsg}`);
-      setProgressMessage(`❌ Erro: ${errorMsg}`);
-      setProgressPercentage(0);
-      console.error("❌ Erro detalhado:", error);
-    } finally {
-      setLoading(false);
-      setTimeout(() => setShowProgressModal(false), 2000);
-    }
-  };
+        return resultsForModal;
+      },
+      summarize: (results) => {
+        const { success, error } = countByStatus(results);
+        return `Status: ${success} inserido(s), ${error} falha(s)/duplicata(s).`;
+      },
+      labels: DEFAULT_RESULT_LABELS,
+      title: "Resultado da Adição de Novas Parcelas",
+      onFinish: () => setNewParcelaFiles([]),
+    });
 
   return (
     <div className="bg-white rounded-2xl sm:rounded-2xl shadow-sm p-4 sm:p-6 border border-gray-200 space-y-6">
@@ -1833,42 +2025,28 @@ const DatabaseUpload: React.FC = () => {
 
           <div className="px-6 pb-6 mt-auto">
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
-              <div>
-                <label
-                  htmlFor="statusFileInput"
-                  className="cursor-pointer block border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors"
-                >
-                  <UploadCloud className="mx-auto h-10 w-10 text-gray-400" />
-                  <span className="mt-2 block text-sm font-semibold text-gray-700">
-                    {statusFile
-                      ? statusFile.name
-                      : "Clique para selecionar o arquivo"}
-                  </span>
-                  <span className="mt-1 block text-xs text-gray-500">
-                    Formato CSV, até 50MB
-                  </span>
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleStatusFileChange}
-                    disabled={loading}
-                    id="statusFileInput"
-                    className="sr-only"
-                  />
-                </label>
-                {statusFile && (
-                  <button
-                    onClick={clearStatusFile}
-                    className="mt-3 w-full text-sm text-red-600 hover:text-red-800 transition-colors font-semibold"
-                  >
-                    Remover arquivo
-                  </button>
-                )}
-              </div>
+              <FileDropzone
+                id="statusFileInput"
+                accept=".csv"
+                hint="Formato CSV, até 50MB por arquivo"
+                color="blue"
+                files={statusFiles}
+                disabled={loading}
+                onAdd={(files) =>
+                  addFilesToQueue(
+                    files,
+                    statusFiles,
+                    setStatusFiles,
+                    quickValidateCsv,
+                  )
+                }
+                onRemove={(key) => removeFromQueue(key, setStatusFiles)}
+                onClear={() => clearQueue(setStatusFiles)}
+              />
 
               <button
                 onClick={handleUploadStatus}
-                disabled={loading || !statusFile}
+                disabled={loading || statusFiles.length === 0}
                 className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {loading ? (
@@ -1876,7 +2054,11 @@ const DatabaseUpload: React.FC = () => {
                 ) : (
                   <UploadCloud className="h-5 w-5 mr-2" />
                 )}
-                {loading ? "Processando..." : "Enviar e Atualizar"}
+                {loading
+                  ? "Processando..."
+                  : statusFiles.length > 1
+                    ? `Enviar e Atualizar (${statusFiles.length} arquivos)`
+                    : "Enviar e Atualizar"}
               </button>
             </div>
           </div>
@@ -1901,42 +2083,28 @@ const DatabaseUpload: React.FC = () => {
 
           <div className="px-6 pb-6 mt-auto">
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
-              <div>
-                <label
-                  htmlFor="newParcelaFileInput"
-                  className="cursor-pointer block border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-500 transition-colors"
-                >
-                  <UploadCloud className="mx-auto h-10 w-10 text-gray-400" />
-                  <span className="mt-2 block text-sm font-semibold text-gray-700">
-                    {newParcelaFile
-                      ? newParcelaFile.name
-                      : "Clique para selecionar o arquivo"}
-                  </span>
-                  <span className="mt-1 block text-xs text-gray-500">
-                    Formato CSV, até 50MB
-                  </span>
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleNewParcelaFileChange}
-                    disabled={loading}
-                    id="newParcelaFileInput"
-                    className="sr-only"
-                  />
-                </label>
-                {newParcelaFile && (
-                  <button
-                    onClick={clearNewParcelaFile}
-                    className="mt-3 w-full text-sm text-red-600 hover:text-red-800 transition-colors font-semibold"
-                  >
-                    Remover arquivo
-                  </button>
-                )}
-              </div>
+              <FileDropzone
+                id="newParcelaFileInput"
+                accept=".csv"
+                hint="Formato CSV, até 50MB por arquivo"
+                color="green"
+                files={newParcelaFiles}
+                disabled={loading}
+                onAdd={(files) =>
+                  addFilesToQueue(
+                    files,
+                    newParcelaFiles,
+                    setNewParcelaFiles,
+                    quickValidateCsv,
+                  )
+                }
+                onRemove={(key) => removeFromQueue(key, setNewParcelaFiles)}
+                onClear={() => clearQueue(setNewParcelaFiles)}
+              />
 
               <button
                 onClick={handleUploadNewParcela}
-                disabled={loading || !newParcelaFile}
+                disabled={loading || newParcelaFiles.length === 0}
                 className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {loading ? (
@@ -1944,7 +2112,11 @@ const DatabaseUpload: React.FC = () => {
                 ) : (
                   <UploadCloud className="h-5 w-5 mr-2" />
                 )}
-                {loading ? "Processando..." : "Enviar e Adicionar"}
+                {loading
+                  ? "Processando..."
+                  : newParcelaFiles.length > 1
+                    ? `Enviar e Adicionar (${newParcelaFiles.length} arquivos)`
+                    : "Enviar e Adicionar"}
               </button>
             </div>
           </div>
@@ -1977,42 +2149,28 @@ const DatabaseUpload: React.FC = () => {
 
           <div className="px-6 pb-6 mt-auto">
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
-              <div>
-                <label
-                  htmlFor="clientesFileInput"
-                  className="cursor-pointer block border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-500 transition-colors"
-                >
-                  <UploadCloud className="mx-auto h-10 w-10 text-gray-400" />
-                  <span className="mt-2 block text-sm font-semibold text-gray-700">
-                    {clientesFile
-                      ? clientesFile.name
-                      : "Clique para selecionar o arquivo"}
-                  </span>
-                  <span className="mt-1 block text-xs text-gray-500">
-                    Formato XLSX ou CSV, até 50MB
-                  </span>
-                  <input
-                    type="file"
-                    accept=".xlsx,.csv"
-                    onChange={handleClientesFileChange}
-                    disabled={loading}
-                    id="clientesFileInput"
-                    className="sr-only"
-                  />
-                </label>
-                {clientesFile && (
-                  <button
-                    onClick={clearClientesFile}
-                    className="mt-3 w-full text-sm text-red-600 hover:text-red-800 transition-colors font-semibold"
-                  >
-                    Remover arquivo
-                  </button>
-                )}
-              </div>
+              <FileDropzone
+                id="clientesFileInput"
+                accept=".xlsx,.csv"
+                hint="Formato XLSX ou CSV, até 50MB por arquivo"
+                color="purple"
+                files={clientesFiles}
+                disabled={loading}
+                onAdd={(files) =>
+                  addFilesToQueue(
+                    files,
+                    clientesFiles,
+                    setClientesFiles,
+                    quickValidateClientes,
+                  )
+                }
+                onRemove={(key) => removeFromQueue(key, setClientesFiles)}
+                onClear={() => clearQueue(setClientesFiles)}
+              />
 
               <button
                 onClick={handleUploadClientes}
-                disabled={loading || !clientesFile}
+                disabled={loading || clientesFiles.length === 0}
                 className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {loading ? (
@@ -2020,7 +2178,11 @@ const DatabaseUpload: React.FC = () => {
                 ) : (
                   <UploadCloud className="h-5 w-5 mr-2" />
                 )}
-                {loading ? "Processando..." : "Enviar e Atualizar"}
+                {loading
+                  ? "Processando..."
+                  : clientesFiles.length > 1
+                    ? `Enviar e Atualizar (${clientesFiles.length} arquivos)`
+                    : "Enviar e Atualizar"}
               </button>
             </div>
           </div>
@@ -2104,6 +2266,24 @@ const DatabaseUpload: React.FC = () => {
                 <p className="text-xs text-gray-500 mt-4 text-center">
                   Total processado: {uploadResults.length} registro(s)
                 </p>
+
+                {/* Quebra por arquivo -- so faz sentido quando a fila teve mais
+                    de um arquivo (ou algum foi ignorado na validacao). */}
+                {fileSummaries.length > 1 && (
+                  <div className="mt-6">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                      Por arquivo ({fileSummaries.length})
+                    </h4>
+                    <ul className="max-h-60 overflow-y-auto divide-y divide-gray-200 border border-gray-200 rounded-md bg-gray-50">
+                      {fileSummaries.map((summary, index) => (
+                        <FileSummaryRow
+                          key={`${summary.name}-${index}`}
+                          summary={summary}
+                        />
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2203,6 +2383,29 @@ const DatabaseUpload: React.FC = () => {
         title="Processando Solicitação"
       >
         <div className="text-center p-4">
+          {/* Progresso da FILA: so aparece quando ha mais de um arquivo. */}
+          {queueTotal > 1 && (
+            <div className="mb-5 text-left">
+              <div className="flex justify-between items-baseline mb-1 gap-2">
+                <span className="text-sm font-semibold text-gray-700">
+                  Arquivo {Math.min(queueIndex + 1, queueTotal)} de {queueTotal}
+                </span>
+                <span
+                  className="text-xs text-gray-500 truncate max-w-[60%]"
+                  title={queueFileName}
+                >
+                  {queueFileName}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-green-500 h-2 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${overallProgress}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+
           <p className="text-lg font-medium mb-4 text-gray-800">
             {progressMessage}
           </p>
@@ -2215,6 +2418,18 @@ const DatabaseUpload: React.FC = () => {
           <p className="text-sm text-gray-600 mt-2">
             {progressPercentage < 100 ? "Por favor, aguarde..." : "Concluído!"}
           </p>
+
+          {/* Desfecho dos arquivos ja concluidos, ao vivo. */}
+          {fileSummaries.length > 0 && queueTotal > 1 && (
+            <ul className="mt-4 max-h-40 overflow-y-auto divide-y divide-gray-200 border border-gray-200 rounded-md bg-gray-50">
+              {fileSummaries.map((summary, index) => (
+                <FileSummaryRow
+                  key={`${summary.name}-${index}`}
+                  summary={summary}
+                />
+              ))}
+            </ul>
+          )}
         </div>
       </Modal>
       <AddTituloModal

@@ -97,7 +97,7 @@ const Header: React.FC<HeaderProps> = ({
                 <span className="text-white font-semibold text-sm">SC</span>
               </div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
-                Sistema de Cobrança
+                Quitto
               </h2>
             </div>
           )}

@@ -1,6 +1,6 @@
 {
-  "name": "Sistema de Gestão de Cobranças",
-  "short_name": "Cobranças Cobradores",
+  "name": "Quitto",
+  "short_name": "Quitto",
   "description": "Sistema de cobrança para cobradores móveis",
   "start_url": "/",
   "display": "standalone",
