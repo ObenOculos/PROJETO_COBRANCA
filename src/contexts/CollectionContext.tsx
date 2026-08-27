@@ -56,6 +56,95 @@ import {
   useRealtimeCacheInvalidation,
   useOfflineSyncCacheInvalidation,
 } from "../hooks/useCacheInvalidation";
+import {
+  fetchAllPages,
+  fetchPagesInParallel,
+  dedupeBy,
+} from "../utils/supabasePagination";
+
+// Linha crua de BANCO_DADOS. Nao ha tipos gerados para o schema, entao o alias
+// concentra num ponto so a falta de tipagem em vez de espalhar `any`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type BancoDadosRow = Record<string, any>;
+
+// Converte uma linha crua de BANCO_DADOS no formato usado pela aplicacao.
+// Vive no escopo do modulo para poder ser aplicada lote a lote durante o
+// carregamento progressivo, em vez de so no fim.
+const mapRowToCollection = (row: BancoDadosRow): Collection => ({
+  id_parcela: row.id_parcela,
+  nome_da_loja: row.nome_da_loja,
+  data_lancamento: row.data_lancamento,
+  data_vencimento: row.data_vencimento,
+  valor_original: parseFloat(
+    (row.valor_original || "0").toString().replace(",", "."),
+  ),
+  valor_reajustado: parseFloat(
+    (row.valor_reajustado || "0").toString().replace(",", "."),
+  ),
+  multa: parseFloat((row.multa || "0").toString().replace(",", ".")),
+  juros_por_dia: parseFloat(
+    (row.juros_por_dia || "0").toString().replace(",", "."),
+  ),
+  multa_aplicada: parseFloat(
+    (row.multa_aplicada || "0").toString().replace(",", "."),
+  ),
+  juros_aplicado: parseFloat(
+    (row.juros_aplicado || "0").toString().replace(",", "."),
+  ),
+  valor_recebido: parseFloat(
+    (row.valor_recebido || "0").toString().replace(",", "."),
+  ),
+  data_de_recebimento: row.data_de_recebimento,
+  dias_em_atraso: row.dias_em_atraso,
+  dias_carencia: parseFloat(row.dias_carencia || "0"),
+  desconto: parseFloat((row.desconto || "0").toString().replace(",", ".")),
+  acrescimo: parseFloat((row.acrescimo || "0").toString().replace(",", ".")),
+  multa_paga: parseFloat((row.multa_paga || "0").toString().replace(",", ".")),
+  juros_pago: parseFloat((row.juros_pago || "0").toString().replace(",", ".")),
+  tipo_de_cobranca: row.tipo_de_cobranca,
+  numero_titulo: row.numero_titulo,
+  parcela: row.parcela,
+  status: row.status,
+  cliente: row.cliente,
+  documento: row.documento,
+  apelido: row.apelido,
+  endereco: row.endereco,
+  numero: row.numero,
+  bairro: row.bairro,
+  complemento: row.complemento,
+  cep: row.cep,
+  cidade: row.cidade,
+  estado: row.estado,
+  obs: row.obs,
+  codigo_externo: row.codigo_externo,
+  descricao: row.descricao,
+  venda_n: row.venda_n,
+  convenio: row.convenio,
+  telefone: row.telefone,
+  celular: row.celular,
+  celular1: row.celular1,
+  celular2: row.celular2,
+  email: row.email,
+  user_id: row.user_id,
+  situacao: row.situacao,
+});
+
+// Tamanho da pagina do PostgREST e quantas paginas buscar em paralelo.
+const COLLECTIONS_PAGE_SIZE = 1000;
+const COLLECTIONS_CONCURRENCY = 8;
+
+// Intervalo minimo entre publicacoes parciais no estado durante a carga.
+// Cada publicacao redispara os consumidores de `collections` (notificacoes,
+// derivacoes), entao vale espacar em vez de publicar a cada lote.
+const PROGRESSIVE_FLUSH_MS = 2500;
+
+// Realtime: uma importacao em massa dispara centenas de eventos em BANCO_DADOS,
+// e cada recarga varre a tabela inteira. Em vez de recarregar por evento,
+// espera a rajada silenciar...
+const REALTIME_QUIET_MS = 8000;
+// ...mas nao adia para sempre se os eventos nunca param (importacao longa):
+// passado esse teto desde o primeiro evento da rajada, recarrega assim mesmo.
+const REALTIME_MAX_WAIT_MS = 60000;
 
 const CollectionContext = createContext<CollectionContextType | undefined>(
   undefined,
@@ -121,6 +210,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const realtimeRefreshTimer = React.useRef<ReturnType<
     typeof setTimeout
   > | null>(null);
+  // Inicio da rajada de eventos em andamento (null = sem rajada aberta).
+  const realtimeBurstStartRef = React.useRef<number | null>(null);
+  // Uma carga de BANCO_DADOS por vez: duas concorrentes escreveriam em
+  // setAllCollections fora de ordem, e a mais lenta sobrescreveria a mais nova.
+  const collectionsLoadInFlightRef = React.useRef(false);
+  const collectionsReloadQueuedRef = React.useRef(false);
+  // Só publica progresso enquanto a tela de loading do boot está no ar. Num
+  // refresh em segundo plano (realtime, pos-importacao) isso abriria o overlay
+  // de tela cheia por cima do app em uso.
+  const reportLoadProgressRef = React.useRef(false);
 
   // ✅ CORREÇÃO: Ref para mirror do cache para evitar dependências circulares em callbacks
   const clientDataCacheRef = React.useRef(clientDataCache);
@@ -134,15 +233,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const fetchReincidenciaResets = React.useCallback(async () => {
     if (!isOnline) return;
     try {
-      const { data, error } = await supabase
-        .from("clientes")
-        .select("documento, reincidencia_reset_at")
-        .not("reincidencia_reset_at", "is", null);
-
-      if (error) {
-        console.error("Erro ao buscar marcos de reincidência:", error);
-        return;
-      }
+      // Idem: paginar para nao truncar em ~1000 marcos.
+      const data = await fetchAllPages<{
+        documento: string | null;
+        reincidencia_reset_at: string | null;
+      }>((from, to) =>
+        supabase
+          .from("clientes")
+          .select("documento, reincidencia_reset_at")
+          .not("reincidencia_reset_at", "is", null)
+          .order("documento", { ascending: true })
+          .range(from, to),
+      );
 
       setReincidenciaResets(
         new Map(
@@ -354,19 +456,21 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     if (!isOnline) return;
 
     try {
-      const { data, error } = await supabase
-        .from("enderecos_historico")
-        .select(
-          "cliente_documento, created_at, logradouro, numero, bairro, cidade, estado, cep, complemento",
-        )
-        .eq("is_atual", true);
+      // Precisa paginar: sao mais enderecos atuais do que o teto de ~1000
+      // linhas por resposta do PostgREST, e o corte e silencioso (os clientes
+      // de fora do primeiro lote ficavam com o endereco antigo).
+      const data = await fetchAllPages((from, to) =>
+        supabase
+          .from("enderecos_historico")
+          .select(
+            "cliente_documento, created_at, logradouro, numero, bairro, cidade, estado, cep, complemento",
+          )
+          .eq("is_atual", true)
+          .order("cliente_documento", { ascending: true })
+          .range(from, to),
+      );
 
-      if (error) {
-        console.error("Erro ao buscar histórico de endereços:", error);
-        return;
-      }
-
-      setActiveAddressHistory((data || []) as typeof activeAddressHistory);
+      setActiveAddressHistory(data as typeof activeAddressHistory);
     } catch (err) {
       console.error("Erro ao carregar histórico de endereços:", err);
     }
@@ -426,15 +530,20 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         }
       };
 
-      // Define a timeout for the data fetching
+      // Valvula de emergencia para uma carga travada — NAO o caminho normal.
+      // Com 20s ela disparava no meio da carga de BANCO_DADOS e liberava a tela
+      // com `allCollections` ainda vazio: era a origem do "conteudo some por
+      // alguns segundos". Hoje a carga paralela leva ~12s; 60s so e atingido se
+      // a rede realmente empacou, e ai a tela ja tem os lotes parciais.
       const timeoutId = setTimeout(() => {
         console.warn(
           "Tempo limite excedido ao carregar dados. Liberando o estado de carregamento.",
         );
         setGlobalLoading(false);
         setLoading(false);
-      }, 20000); // 20 seconds timeout
+      }, 60000);
 
+      reportLoadProgressRef.current = true;
       fetchData()
         .catch((error) => {
           console.error("Erro ao carregar dados:", error);
@@ -442,6 +551,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         })
         .finally(() => {
           clearTimeout(timeoutId); // Clear the timeout
+          reportLoadProgressRef.current = false;
           setGlobalLoading(false);
           setLoading(false);
         });
@@ -459,12 +569,26 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           },
           (payload) => {
             console.log("Mudança detectada na tabela BANCO_DADOS:", payload);
+
+            const now = Date.now();
+            if (realtimeBurstStartRef.current === null) {
+              realtimeBurstStartRef.current = now;
+            }
+
+            // Recarrega so depois de REALTIME_QUIET_MS sem eventos novos —
+            // uma importacao inteira vira uma unica recarga no fim. O teto
+            // evita que uma importacao muito longa adie isso para sempre.
+            const waited = now - realtimeBurstStartRef.current;
+            const delay =
+              waited >= REALTIME_MAX_WAIT_MS ? 0 : REALTIME_QUIET_MS;
+
             if (realtimeRefreshTimer.current)
               clearTimeout(realtimeRefreshTimer.current);
             realtimeRefreshTimer.current = setTimeout(() => {
               realtimeRefreshTimer.current = null;
+              realtimeBurstStartRef.current = null;
               refreshCollections();
-            }, 2000);
+            }, delay);
           },
         )
         .on(
@@ -547,6 +671,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   }, []);
 
   const fetchCollections = async (useCache = true) => {
+    // Uma carga por vez. Duas concorrentes escreveriam em setAllCollections
+    // fora de ordem, e a mais lenta sobrescreveria o resultado mais novo.
+    // Enfileira e deixa o `finally` da carga atual disparar a recarga.
+    if (collectionsLoadInFlightRef.current) {
+      collectionsReloadQueuedRef.current = true;
+      console.log("Carga de collections em andamento; recarga enfileirada.");
+      return;
+    }
+
+    collectionsLoadInFlightRef.current = true;
     try {
       setError(null);
 
@@ -580,170 +714,137 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       console.log("Buscando dados da tabela BANCO_DADOS...");
 
-      let query = supabase.from("BANCO_DADOS").select("*");
+      // O escopo do cobrador precisa ser reaplicado em CADA requisicao (na
+      // contagem e em cada pagina), por isso e uma funcao e nao um builder
+      // guardado numa variavel.
+      const applyScope = <Q extends { or: (filter: string) => Q }>(
+        query: Q,
+      ): Q => {
+        if (user?.type !== "collector") return query;
 
-      if (user?.type === "collector") {
         const assignedStores: string[] = [];
         console.log(
           `Cobrador ${user.name} (${user.id}) tem lojas atribuídas:`,
           assignedStores,
         );
 
-        // Fetch collections assigned directly to the collector OR to their assigned stores
-        query = query.or(
+        // Titulos atribuidos direto ao cobrador OU as lojas dele
+        return query.or(
           `user_id.eq.${user.id},nome_da_loja.in.(${assignedStores.join(",")})`,
+        );
+      };
+
+      // Um builder NOVO por pagina. Reaproveitar o mesmo objeto entre paginas
+      // fazia o supabase-js concatenar o order a cada chamada, e a ultima
+      // pagina saia com "order=id_parcela.asc" repetido uma vez por pagina ja
+      // carregada.
+      const buildPage = (from: number, to: number) =>
+        applyScope(supabase.from("BANCO_DADOS").select("*"))
+          .order("id_parcela", { ascending: true })
+          .range(from, to);
+
+      // Contagem antecipada: sem saber quantas paginas existem nao da para
+      // dispara-las em paralelo. Se falhar, cai para a varredura sequencial.
+      const { count, error: countError } = await applyScope(
+        supabase
+          .from("BANCO_DADOS")
+          .select("id_parcela", { count: "exact", head: true }),
+      );
+
+      if (countError) {
+        console.warn(
+          "Nao foi possivel contar BANCO_DADOS; usando paginacao sequencial.",
+          countError,
         );
       }
 
-      // Carregar TODOS os dados sem limite (ou com limite para o cobrador)
-      let allData: any[] = [];
-      let from = 0;
-      const pageSize = 1000; // Still use pagination for large datasets, even with filters
-      let hasMore = true;
+      const total = countError ? null : (count ?? null);
 
-      while (hasMore) {
-        console.log(`Carregando registros ${from} a ${from + pageSize - 1}...`);
+      // Publica em lotes enquanto carrega. A tela de loading fica no ar ate o
+      // fim, mas se o timeout de seguranca estourar antes o app renderiza com
+      // os dados parciais em vez de uma tela vazia.
+      const buffer: Collection[] = [];
+      let lastFlush = Date.now();
 
-        const { data: pageData, error: pageError } = await query
-          .range(from, from + pageSize - 1)
-          .order("id_parcela", { ascending: true });
+      const onBatch = (batchRows: BancoDadosRow[], loadedCount: number) => {
+        for (const row of batchRows) buffer.push(mapRowToCollection(row));
 
-        if (pageError) {
-          console.error("Erro ao carregar página:", pageError);
-          throw pageError;
-        }
-
-        if (pageData && pageData.length > 0) {
-          allData = allData.concat(pageData);
-          console.log(
-            `Carregados ${pageData.length} registros. Total acumulado: ${allData.length}`,
+        if (total && reportLoadProgressRef.current) {
+          setGlobalLoading(
+            true,
+            `Carregando títulos... ${loadedCount.toLocaleString("pt-BR")} de ${total.toLocaleString("pt-BR")}`,
           );
-
-          if (pageData.length < pageSize) {
-            hasMore = false;
-          } else {
-            from += pageSize;
-          }
-        } else {
-          hasMore = false;
         }
+
+        // Publicacao parcial so no boot, onde a tela de loading esta por cima
+        // e o ganho e nao ficar vazio se o timeout estourar. Num refresh em
+        // segundo plano seria o oposto: os totais oscilariam na cara do usuario
+        // enquanto ele usa o app, entao ali so publicamos o conjunto final.
+        if (
+          reportLoadProgressRef.current &&
+          Date.now() - lastFlush >= PROGRESSIVE_FLUSH_MS
+        ) {
+          lastFlush = Date.now();
+          setAllCollections(buffer.slice());
+        }
+      };
+
+      const started = Date.now();
+
+      // `accumulate: false`: as linhas cruas viram Collection em `onBatch` e
+      // sao descartadas na hora — segurar as duas versoes de 111k linhas ao
+      // mesmo tempo pesa demais em celular.
+      if (total === null) {
+        await fetchAllPages<BancoDadosRow>(buildPage, {
+          pageSize: COLLECTIONS_PAGE_SIZE,
+          accumulate: false,
+          onBatch,
+        });
+      } else {
+        await fetchPagesInParallel<BancoDadosRow>(buildPage, total, {
+          pageSize: COLLECTIONS_PAGE_SIZE,
+          concurrency: COLLECTIONS_CONCURRENCY,
+          accumulate: false,
+          onBatch,
+        });
       }
 
-      console.log("TOTAL FINAL de registros carregados:", allData.length);
-      const data = allData;
+      // A paginacao por OFFSET nao e estavel: se uma importacao insere linhas
+      // durante a carga, as paginas seguintes escorregam e a mesma parcela
+      // pode vir duas vezes.
+      const transformedData = dedupeBy(buffer, (c) => c.id_parcela);
 
-      if (!data || data.length === 0) {
+      if (transformedData.length === 0) {
         console.warn("Nenhum dado retornado do Supabase");
         setAllCollections([]);
         return;
       }
-
-      console.log("Dados carregados:", data.length, "registros");
-
-      // Verificar quantos clientes únicos temos nos dados carregados
-      const uniqueDocuments = new Set();
-      data.forEach((row) => {
-        if (row.documento && row.documento.trim() !== "") {
-          uniqueDocuments.add(row.documento.trim());
-        }
-      });
-      console.log(
-        "Clientes únicos nos dados carregados:",
-        uniqueDocuments.size,
-      );
-      console.log(
-        "Primeiros 10 documentos:",
-        Array.from(uniqueDocuments).slice(0, 10),
-      );
-
-      // Debug: verificar formato das datas
-      const sampleDates = data.slice(0, 5).map((row) => ({
-        data_vencimento: row.data_vencimento,
-        data_lancamento: row.data_lancamento,
-        data_de_recebimento: row.data_de_recebimento,
-      }));
-      console.log("Amostras de datas:", sampleDates);
-
-      // Transformar os dados para corresponder à interface Collection
-
-      const transformedData: Collection[] = (data || []).map((row) => ({
-        id_parcela: row.id_parcela,
-        nome_da_loja: row.nome_da_loja,
-        data_lancamento: row.data_lancamento,
-        data_vencimento: row.data_vencimento,
-        valor_original: parseFloat(
-          (row.valor_original || "0").toString().replace(",", "."),
-        ),
-        valor_reajustado: parseFloat(
-          (row.valor_reajustado || "0").toString().replace(",", "."),
-        ),
-        multa: parseFloat((row.multa || "0").toString().replace(",", ".")),
-        juros_por_dia: parseFloat(
-          (row.juros_por_dia || "0").toString().replace(",", "."),
-        ),
-        multa_aplicada: parseFloat(
-          (row.multa_aplicada || "0").toString().replace(",", "."),
-        ),
-        juros_aplicado: parseFloat(
-          (row.juros_aplicado || "0").toString().replace(",", "."),
-        ),
-        valor_recebido: parseFloat(
-          (row.valor_recebido || "0").toString().replace(",", "."),
-        ),
-        data_de_recebimento: row.data_de_recebimento,
-        dias_em_atraso: row.dias_em_atraso,
-        dias_carencia: parseFloat(row.dias_carencia || "0"),
-        desconto: parseFloat(
-          (row.desconto || "0").toString().replace(",", "."),
-        ),
-        acrescimo: parseFloat(
-          (row.acrescimo || "0").toString().replace(",", "."),
-        ),
-        multa_paga: parseFloat(
-          (row.multa_paga || "0").toString().replace(",", "."),
-        ),
-        juros_pago: parseFloat(
-          (row.juros_pago || "0").toString().replace(",", "."),
-        ),
-        tipo_de_cobranca: row.tipo_de_cobranca,
-        numero_titulo: row.numero_titulo,
-        parcela: row.parcela,
-        status: row.status,
-        cliente: row.cliente,
-        documento: row.documento,
-        apelido: row.apelido,
-        endereco: row.endereco,
-        numero: row.numero,
-        bairro: row.bairro,
-        complemento: row.complemento,
-        cep: row.cep,
-        cidade: row.cidade,
-        estado: row.estado,
-        obs: row.obs,
-        codigo_externo: row.codigo_externo,
-        descricao: row.descricao,
-        venda_n: row.venda_n,
-        convenio: row.convenio,
-        telefone: row.telefone,
-        celular: row.celular,
-        celular1: row.celular1,
-        celular2: row.celular2,
-        email: row.email,
-        user_id: row.user_id,
-        situacao: row.situacao,
-      }));
 
       setAllCollections(transformedData);
 
       // Cache the data using dedicated collections cache
       collectionsCache.set(cacheKey, transformedData);
 
-      console.log("Collections carregadas:", transformedData.length);
+      // As derivacoes (client-groups, dashboard-stats, performance) se cacheiam
+      // sozinhas na primeira chamada. Se alguma rodou sobre um lote parcial,
+      // esse resultado ficaria valendo por minutos — descarta.
+      invalidateCollections();
+
+      console.log(
+        `Collections carregadas: ${transformedData.length} em ${Date.now() - started}ms`,
+      );
     } catch (err) {
       console.error("Erro ao carregar collections:", err);
       setError(err instanceof Error ? err.message : "Erro ao carregar dados");
     } finally {
       setLoading(false);
+      collectionsLoadInFlightRef.current = false;
+
+      // Eventos que chegaram durante esta carga viram uma unica recarga agora.
+      if (collectionsReloadQueuedRef.current) {
+        collectionsReloadQueuedRef.current = false;
+        void refreshCollections();
+      }
     }
   };
 

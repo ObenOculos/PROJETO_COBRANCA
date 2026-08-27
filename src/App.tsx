@@ -51,7 +51,9 @@ const AppContent: React.FC = () => {
     } else if (user && collectionLoading) {
       setLoadingState({
         show: true,
-        message: "Carregando dados...",
+        // A carga de collections publica o progresso ("X de Y títulos") pelo
+        // LoadingContext; sem isso a mensagem ficaria estatica o tempo todo.
+        message: loadingMessage || "Carregando dados...",
       });
     } else if (globalLoading) {
       setLoadingState({
