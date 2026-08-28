@@ -268,6 +268,9 @@ export interface AuthContextType {
 }
 
 // Collection context types
+/** Escopo da carga de BANCO_DADOS. Ver `CollectionContextType.collectionsScope`. */
+export type CollectionsScope = "active" | "all";
+
 export interface CollectionContextType {
   collections: Collection[];
   users: User[];
@@ -282,6 +285,26 @@ export interface CollectionContextType {
   monthlyGoals: MonthlyGoal[]; // Added
   allowedVisitDates: AllowedVisitDate[];
   loading: boolean;
+  /**
+   * Quanto de BANCO_DADOS está carregado em `collections`.
+   *
+   * - `"active"`: só os clientes que ainda têm algo em aberto (view
+   *   `banco_dados_clientes_ativos`). Escopo padrão do gestor — metade das
+   *   linhas, saldo de venda e histórico do cliente continuam exatos.
+   * - `"all"`: a tabela inteira. Necessário para Desempenho/Dashboard, que
+   *   somam recebimentos de clientes já quitados.
+   *
+   * Cobrador está sempre em `"all"`: o escopo dele já é a própria carteira.
+   */
+  collectionsScope: CollectionsScope;
+  /** Verdadeiro enquanto a promoção de `"active"` para `"all"` está em curso. */
+  loadingFullScope: boolean;
+  /**
+   * Garante que `collections` cobre a tabela inteira. No-op se já estiver em
+   * `"all"`. Telas que somam valores de clientes quitados (Desempenho,
+   * Dashboard, Lojas, Clientes) precisam chamar antes de exibir números.
+   */
+  ensureAllCollections: () => Promise<void>;
   error: string | null;
   isOnline: boolean;
   fetchCollections: () => Promise<void>;

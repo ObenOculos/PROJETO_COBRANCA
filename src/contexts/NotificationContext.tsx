@@ -10,6 +10,7 @@ import { useCollection } from "./CollectionContext";
 import { useAuth } from "./AuthContext";
 
 import { formatCurrency } from "../utils/formatters";
+import { parseAndNormalizeDate } from "../filters/dates";
 import { UserType } from "../types";
 
 export interface Notification {
@@ -186,8 +187,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       const overdue = userCollections.filter((c) => {
         if (c.status === "received") return false;
         if (!c.data_vencimento) return false; // Skip if no due date
-        const dueDate = new Date(c.data_vencimento);
-        return !isNaN(dueDate.getTime()) && dueDate < todayStart; // Validate date
+        // parseAndNormalizeDate e nao `new Date`: data_vencimento e text e 29%
+        // das linhas vem como DD/MM/YYYY, que `new Date` nao entende.
+        const dueDate = parseAndNormalizeDate(c.data_vencimento);
+        return dueDate !== null && dueDate < todayStart;
       });
 
       if (overdue.length > 0) {
@@ -203,11 +206,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       const dueToday = userCollections.filter((c) => {
         if (c.status === "received") return false;
         if (!c.data_vencimento) return false;
-        const dueDate = new Date(c.data_vencimento);
+        const dueDate = parseAndNormalizeDate(c.data_vencimento);
         return (
-          !isNaN(dueDate.getTime()) &&
-          dueDate >= todayStart &&
-          dueDate < tomorrowStart
+          dueDate !== null && dueDate >= todayStart && dueDate < tomorrowStart
         );
       });
 

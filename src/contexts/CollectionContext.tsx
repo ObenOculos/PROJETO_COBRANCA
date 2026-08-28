@@ -23,6 +23,7 @@ import {
   ScheduledVisit,
   AllowedVisitDate,
   isCollectorType,
+  CollectionsScope,
 } from "../types";
 import { supabase } from "../lib/supabase";
 import {
@@ -52,6 +53,7 @@ import {
   normalizePaymentStatus,
 } from "../filters/clientStatus";
 import { resolveSaleKey } from "../filters/sales";
+import { toYYYYMMDD } from "../filters/dates";
 import {
   useRealtimeCacheInvalidation,
   useOfflineSyncCacheInvalidation,
@@ -128,6 +130,14 @@ const mapRowToCollection = (row: BancoDadosRow): Collection => ({
   user_id: row.user_id,
   situacao: row.situacao,
 });
+
+// Fonte de cada escopo. A view devolve todas as parcelas dos clientes que ainda
+// tem algo em aberto — metade das linhas, sem quebrar saldo de venda nem
+// historico. Ver a migration 20260827000001.
+const COLLECTIONS_SOURCE = {
+  active: "banco_dados_clientes_ativos",
+  all: "BANCO_DADOS",
+} as const satisfies Record<CollectionsScope, string>;
 
 // Tamanho da pagina do PostgREST e quantas paginas buscar em paralelo.
 const COLLECTIONS_PAGE_SIZE = 1000;
@@ -220,6 +230,21 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   // refresh em segundo plano (realtime, pos-importacao) isso abriria o overlay
   // de tela cheia por cima do app em uso.
   const reportLoadProgressRef = React.useRef(false);
+
+  // Escopo carregado. O cobrador ja e naturalmente pequeno (maior carteira
+  // medida: 9.051 titulos), entao ele fica sempre em "all" e nunca toca a view.
+  const [collectionsScope, setCollectionsScope] =
+    useState<CollectionsScope>("active");
+  const [loadingFullScope, setLoadingFullScope] = useState(false);
+  // Espelho em ref: o callback do realtime e criado uma vez e capturaria um
+  // valor de estado velho na hora de recarregar.
+  const collectionsScopeRef = React.useRef<CollectionsScope>("active");
+  const loadingFullScopeRef = React.useRef(false);
+
+  const applyCollectionsScope = (scope: CollectionsScope) => {
+    collectionsScopeRef.current = scope;
+    setCollectionsScope(scope);
+  };
 
   // ✅ CORREÇÃO: Ref para mirror do cache para evitar dependências circulares em callbacks
   const clientDataCacheRef = React.useRef(clientDataCache);
@@ -670,7 +695,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     };
   }, []);
 
-  const fetchCollections = async (useCache = true) => {
+  const fetchCollections = async (
+    useCache = true,
+    requestedScope: CollectionsScope = collectionsScopeRef.current,
+  ) => {
+    // Cobrador nunca usa a view: a carteira dele ja e o recorte, e ele precisa
+    // do historico completo em maos para trabalhar offline.
+    const scope: CollectionsScope =
+      user?.type === "collector" ? "all" : requestedScope;
+
     // Uma carga por vez. Duas concorrentes escreveriam em setAllCollections
     // fora de ordem, e a mais lenta sobrescreveria o resultado mais novo.
     // Enfileira e deixa o `finally` da carga atual disparar a recarga.
@@ -684,7 +717,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     try {
       setError(null);
 
-      const cacheKey = `collections-${user?.id || "all"}-${user?.type || "manager"}`;
+      const cacheKey = `collections-${user?.id || "all"}-${user?.type || "manager"}-${scope}`;
 
       // Try to get from cache first
       if (useCache) {
@@ -712,12 +745,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         return;
       }
 
-      console.log("Buscando dados da tabela BANCO_DADOS...");
+      // A view expoe exatamente as colunas de BANCO_DADOS (SELECT b.*), entao o
+      // Row e o mesmo; o cast so resolve o fato de `from()` ter overloads
+      // separados para tabela e view, que uma uniao das duas nao satisfaz.
+      let effectiveScope = scope;
+      let source = COLLECTIONS_SOURCE[scope] as "BANCO_DADOS";
+      console.log(`Buscando dados de ${source} (escopo: ${scope})...`);
 
-      // O escopo do cobrador precisa ser reaplicado em CADA requisicao (na
+      // O recorte do cobrador precisa ser reaplicado em CADA requisicao (na
       // contagem e em cada pagina), por isso e uma funcao e nao um builder
       // guardado numa variavel.
-      const applyScope = <Q extends { or: (filter: string) => Q }>(
+      const applyCollectorFilter = <Q extends { or: (filter: string) => Q }>(
         query: Q,
       ): Q => {
         if (user?.type !== "collector") return query;
@@ -739,21 +777,38 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // pagina saia com "order=id_parcela.asc" repetido uma vez por pagina ja
       // carregada.
       const buildPage = (from: number, to: number) =>
-        applyScope(supabase.from("BANCO_DADOS").select("*"))
+        applyCollectorFilter(supabase.from(source).select("*"))
           .order("id_parcela", { ascending: true })
           .range(from, to);
 
+      const countFrom = () =>
+        applyCollectorFilter(
+          supabase.from(source).select("id_parcela", {
+            count: "exact",
+            head: true,
+          }),
+        );
+
       // Contagem antecipada: sem saber quantas paginas existem nao da para
       // dispara-las em paralelo. Se falhar, cai para a varredura sequencial.
-      const { count, error: countError } = await applyScope(
-        supabase
-          .from("BANCO_DADOS")
-          .select("id_parcela", { count: "exact", head: true }),
-      );
+      let { count, error: countError } = await countFrom();
+
+      // A view pode nao existir ainda (codigo publicado antes da migration).
+      // Subir o app com a tabela inteira e ruim, mas subir sem dado nenhum e
+      // pior — entao cai para "all" em vez de falhar.
+      if (countError && effectiveScope === "active") {
+        console.warn(
+          `Falha ao consultar ${source}; caindo para ${COLLECTIONS_SOURCE.all}. A migration 20260827000001 foi aplicada?`,
+          countError,
+        );
+        effectiveScope = "all";
+        source = COLLECTIONS_SOURCE.all;
+        ({ count, error: countError } = await countFrom());
+      }
 
       if (countError) {
         console.warn(
-          "Nao foi possivel contar BANCO_DADOS; usando paginacao sequencial.",
+          `Nao foi possivel contar ${source}; usando paginacao sequencial.`,
           countError,
         );
       }
@@ -830,8 +885,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // esse resultado ficaria valendo por minutos — descarta.
       invalidateCollections();
 
+      // So confirma o escopo depois que a carga deu certo, e usa o efetivo: se
+      // caiu para a tabela cheia, o estado nao pode dizer que esta em "active".
+      applyCollectionsScope(effectiveScope);
+
       console.log(
-        `Collections carregadas: ${transformedData.length} em ${Date.now() - started}ms`,
+        `Collections carregadas: ${transformedData.length} (${effectiveScope}) em ${Date.now() - started}ms`,
       );
     } catch (err) {
       console.error("Erro ao carregar collections:", err);
@@ -845,6 +904,33 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         collectionsReloadQueuedRef.current = false;
         void refreshCollections();
       }
+    }
+  };
+
+  // Promove o escopo para a tabela inteira.
+  //
+  // Desempenho, Dashboard, Lojas e Clientes somam recebimentos de clientes que
+  // ja quitaram tudo — inclusive quem quitou no mes corrente, que o escopo
+  // "active" exclui. Sem isso os numeros dessas telas ficam subestimados.
+  const ensureAllCollections = async () => {
+    // Cobrador ja carrega a carteira dele inteira; nao ha o que promover.
+    if (user?.type === "collector") return;
+    if (collectionsScopeRef.current === "all") return;
+    if (loadingFullScopeRef.current) return;
+
+    loadingFullScopeRef.current = true;
+    setLoadingFullScope(true);
+
+    // Assume o alvo antes de buscar: se uma recarga do realtime for drenada no
+    // meio desta carga, ela precisa buscar "all" tambem — nao voltar a "active"
+    // e desfazer a promocao.
+    collectionsScopeRef.current = "all";
+
+    try {
+      await fetchCollections(true, "all");
+    } finally {
+      loadingFullScopeRef.current = false;
+      setLoadingFullScope(false);
     }
   };
 
@@ -1598,7 +1684,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     // foi aplicado acima, na montagem da base `filtered`.)
 
     if (filters.dueDate) {
-      filtered = filtered.filter((c) => c.data_vencimento === filters.dueDate);
+      // Normaliza os dois lados: filters.dueDate vem do date picker (sempre
+      // YYYY-MM-DD), mas data_vencimento e text e 29% das linhas estao em
+      // DD/MM/YYYY — a igualdade textual crua nunca casava com elas.
+      const target = toYYYYMMDD(filters.dueDate);
+      filtered = filtered.filter(
+        (c) => toYYYYMMDD(c.data_vencimento) === target,
+      );
     }
 
     if (filters.collector) {
@@ -1619,37 +1711,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
     // Filtro por período de data de vencimento (dateFrom/dateTo)
     if (filters.dateFrom || filters.dateTo) {
-      const toYYYYMMDD = (dateStr: string): string | null => {
-        if (!dateStr || typeof dateStr !== "string") return null;
-
-        // Case 1: Already in YYYY-MM-DD format (from filter input or data)
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr.substring(0, 10))) {
-          return dateStr.substring(0, 10);
-        }
-
-        // Case 2: In DD/MM/YYYY or DD-MM-YYYY format (from data)
-        const parts = dateStr.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
-        if (parts) {
-          const [, day, month, year] = parts;
-          return `${year}-${month}-${day}`;
-        }
-
-        // Fallback for full Date objects that might have been created
-        try {
-          const d = new Date(dateStr);
-          if (!isNaN(d.getTime())) {
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, "0");
-            const day = String(d.getDate()).padStart(2, "0");
-            return `${year}-${month}-${day}`;
-          }
-        } catch (e) {
-          // Ignore errors from invalid date strings
-        }
-
-        return null; // Unknown/invalid format
-      };
-
+      // toYYYYMMDD vem de ../filters/dates (era duplicado inline aqui, com o
+      // mesmo corpo, em duas copias).
       filtered = filtered.filter((c) => {
         // Skip items where data_vencimento is null
         if (!c.data_vencimento) return false;
@@ -1670,34 +1733,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
     // Filtro por período de data de lançamento (launchDateFrom/launchDateTo)
     if (filters.launchDateFrom || filters.launchDateTo) {
-      const toYYYYMMDD = (dateStr: string): string | null => {
-        if (!dateStr || typeof dateStr !== "string") return null;
-
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr.substring(0, 10))) {
-          return dateStr.substring(0, 10);
-        }
-
-        const parts = dateStr.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
-        if (parts) {
-          const [, day, month, year] = parts;
-          return `${year}-${month}-${day}`;
-        }
-
-        try {
-          const d = new Date(dateStr);
-          if (!isNaN(d.getTime())) {
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, "0");
-            const day = String(d.getDate()).padStart(2, "0");
-            return `${year}-${month}-${day}`;
-          }
-        } catch (e) {
-          // Ignore errors from invalid date strings
-        }
-
-        return null;
-      };
-
       filtered = filtered.filter((c) => {
         if (!c.data_lancamento) return false;
 
@@ -4094,6 +4129,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     monthlyGoals,
     allowedVisitDates,
     loading,
+    collectionsScope,
+    loadingFullScope,
+    ensureAllCollections,
     error,
     isOnline,
     fetchCollections,

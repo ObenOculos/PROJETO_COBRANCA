@@ -39,6 +39,7 @@ import {
   resolveAllowedConfigs,
 } from "../../utils/visitScheduling";
 import { PAYABLE_STATUSES } from "../../types/status";
+import { parseAndNormalizeDate } from "../../filters/dates";
 import { VISIT_OUTCOMES, exactVisitOutcome } from "../../config/visitOutcomes";
 import {
   RESCHEDULE_REASONS,
@@ -460,12 +461,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     }
 
     if (filters.dueDateStart || filters.dueDateEnd) {
-      const startDate = filters.dueDateStart
-        ? new Date(filters.dueDateStart)
-        : null;
-      const endDate = filters.dueDateEnd ? new Date(filters.dueDateEnd) : null;
+      // parseAndNormalizeDate e nao `new Date(str)`: para "YYYY-MM-DD" o
+      // construtor cria meia-noite UTC e o setHours seguinte, no fuso local
+      // (UTC-3), recuava a borda em 1 dia — o intervalo pegava o dia errado.
+      const startDate = parseAndNormalizeDate(filters.dueDateStart);
+      const endDate = parseAndNormalizeDate(filters.dueDateEnd);
 
-      if (startDate) startDate.setHours(0, 0, 0, 0);
       if (endDate) endDate.setHours(23, 59, 59, 999);
 
       filteredClients = filteredClients.filter((client) => {

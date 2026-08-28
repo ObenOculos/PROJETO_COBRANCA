@@ -17,6 +17,12 @@ import { AuthorizationHistoryService } from "../../services/authorizationHistory
 import { CollectionTableRef } from "./CollectionTable";
 import { Notification } from "../../contexts/NotificationContext";
 
+// O gestor carrega por padrao so os clientes com algo em aberto (metade das
+// linhas). Estas telas somam recebimentos de clientes JA QUITADOS — inclusive
+// quem quitou no mes corrente — entao precisam da tabela inteira, carregada sob
+// demanda. Ver `collectionsScope` no CollectionContext.
+const TABS_NEEDING_FULL_SCOPE = new Set(["performance", "stores", "clients"]);
+
 interface ManagerDashboardProps {
   activeTab?: string;
   onTabChange?: (tabId: string) => void;
@@ -26,7 +32,12 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   activeTab: externalActiveTab,
   onTabChange,
 }) => {
-  const { getFilteredCollections, collections } = useCollection();
+  const {
+    getFilteredCollections,
+    collections,
+    ensureAllCollections,
+    loadingFullScope,
+  } = useCollection();
 
   const [internalActiveTab, setInternalActiveTab] = useState<
     | "collections"
@@ -145,7 +156,57 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   const filteredCollections = baseFilteredCollections;
 
+  // Filtrar Cobrancas por "Pago" busca justamente os clientes 100% quitados, que
+  // sao os que o escopo padrao exclui — sem promover, a categoria vem vazia.
+  // (getClientPaymentStatus so classifica como "pago" quem nao deve mais nada.)
+  const filterWantsSettledClients = (() => {
+    const status = filters.status;
+    if (!status) return false;
+    return Array.isArray(status) ? status.includes("pago") : status === "pago";
+  })();
+
+  // O Relatorio do Caixa vive dentro da aba de cobrancas, mas soma recebimentos
+  // do dia — inclui clientes que quitaram tudo. Entra na mesma regra.
+  const needsFullScope =
+    TABS_NEEDING_FULL_SCOPE.has(activeTab) ||
+    (activeTab === "collections" &&
+      (collectionsView === "cash-report" || filterWantsSettledClients));
+
+  useEffect(() => {
+    if (needsFullScope) void ensureAllCollections();
+    // ensureAllCollections e no-op quando o escopo ja e "all".
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsFullScope]);
+
   const renderTabContent = () => {
+    // Segurar e melhor do que exibir total subestimado: sem os clientes
+    // quitados, os numeros dessas telas ficam menores do que a realidade.
+    if (needsFullScope && loadingFullScope) {
+      return (
+        <div className="flex items-center justify-center py-16">
+          <div className="text-center">
+            <div className="flex items-center justify-center space-x-2 mb-3">
+              <div
+                className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce"
+                style={{ animationDelay: "0ms" }}
+              />
+              <div
+                className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce"
+                style={{ animationDelay: "150ms" }}
+              />
+              <div
+                className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce"
+                style={{ animationDelay: "300ms" }}
+              />
+            </div>
+            <p className="text-gray-600 dark:text-dark-text-secondary text-sm font-medium">
+              Carregando histórico completo...
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case "database-upload":
         return <DatabaseUpload />;

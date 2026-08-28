@@ -22,6 +22,7 @@ import {
 } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { resolveSaleKey } from "../../filters/sales";
+import { toYYYYMMDD } from "../../filters/dates";
 
 interface OverviewTabProps {
   collections: Collection[];
@@ -164,10 +165,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     const clientsWithPendingCount = new Set(
       pendingSales.map((s) => s.clientDocument).filter(Boolean),
     ).size;
-    const todayCollections = overviewCollections.filter((c) => {
-      const today = new Date().toISOString().split("T")[0];
-      return c.data_vencimento === today;
-    });
+    // Comparacao pela data NORMALIZADA, nao pela string crua: data_vencimento e
+    // text com dois formatos (YYYY-MM-DD e DD/MM/YYYY) e a igualdade direta
+    // silenciosamente nunca casava com as linhas em DD/MM/YYYY.
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const todayCollections = overviewCollections.filter(
+      (c) => toYYYYMMDD(c.data_vencimento) === today,
+    );
     const todayAmount = todayCollections.reduce(
       (sum, c) => sum + c.valor_original,
       0,
