@@ -55,6 +55,10 @@ import {
 import { resolveSaleKey } from "../filters/sales";
 import { toYYYYMMDD } from "../filters/dates";
 import {
+  ClientesRegistry,
+  fetchClientesRegistry,
+} from "../services/clientesRegistry";
+import {
   useRealtimeCacheInvalidation,
   useOfflineSyncCacheInvalidation,
 } from "../hooks/useCacheInvalidation";
@@ -72,7 +76,38 @@ type BancoDadosRow = Record<string, any>;
 // Converte uma linha crua de BANCO_DADOS no formato usado pela aplicacao.
 // Vive no escopo do modulo para poder ser aplicada lote a lote durante o
 // carregamento progressivo, em vez de so no fim.
-const mapRowToCollection = (row: BancoDadosRow): Collection => ({
+//
+// `registry` (tabela `clientes`) fornece os campos de cadastro do cliente:
+// apelido, telefones e e-mail nao existem mais em BANCO_DADOS (migration
+// 20260904000002), e `nome` prevalece sobre o `cliente` da nota.
+//
+// Todas as parcelas de um cliente apontam para a MESMA string do cadastro,
+// em vez de uma copia por linha vinda do JSON.
+const mapRowToCollection = (
+  row: BancoDadosRow,
+  registry?: ClientesRegistry,
+): Collection => {
+  const cadastro = registry?.get((row.documento ?? "").toString().trim());
+  return {
+    ...mapRowFields(row),
+    cliente: cadastro?.nome ?? row.cliente,
+    apelido: cadastro?.apelido ?? null,
+    telefone: cadastro?.telefone ?? null,
+    celular: cadastro?.celular ?? null,
+    celular1: cadastro?.celular1 ?? null,
+    celular2: cadastro?.celular2 ?? null,
+    email: cadastro?.email ?? null,
+  };
+};
+
+// Campos que vem da propria parcela. Os de cadastro do cliente sao aplicados
+// por `mapRowToCollection` a partir do registry.
+const mapRowFields = (
+  row: BancoDadosRow,
+): Omit<
+  Collection,
+  "apelido" | "telefone" | "celular" | "celular1" | "celular2" | "email"
+> => ({
   id_parcela: row.id_parcela,
   nome_da_loja: row.nome_da_loja,
   data_lancamento: row.data_lancamento,
@@ -109,7 +144,6 @@ const mapRowToCollection = (row: BancoDadosRow): Collection => ({
   status: row.status,
   cliente: row.cliente,
   documento: row.documento,
-  apelido: row.apelido,
   endereco: row.endereco,
   numero: row.numero,
   bairro: row.bairro,
@@ -122,11 +156,6 @@ const mapRowToCollection = (row: BancoDadosRow): Collection => ({
   descricao: row.descricao,
   venda_n: row.venda_n,
   convenio: row.convenio,
-  telefone: row.telefone,
-  celular: row.celular,
-  celular1: row.celular1,
-  celular2: row.celular2,
-  email: row.email,
   user_id: row.user_id,
   situacao: row.situacao,
 });
@@ -216,6 +245,19 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [clientDataCache, setClientDataCache] = useState<Map<string, any>>(
     new Map(),
   );
+  // Cadastro do cliente (tabela `clientes`), indexado por documento: nome,
+  // apelido, telefones, e-mail, nascimento, data de cadastro e o marco de
+  // reincidencia. E a fonte de verdade desses campos desde a migration
+  // 20260904000001; `mapRowToCollection` a sobrepoe sobre a linha de
+  // BANCO_DADOS.
+  const [clientesRegistry, setClientesRegistry] = useState<ClientesRegistry>(
+    new Map(),
+  );
+  // Espelho em ref: a carga de collections precisa do cadastro mais recente
+  // sem virar dependencia do callback (e sem esperar o re-render do state).
+  const clientesRegistryRef = React.useRef<ClientesRegistry>(clientesRegistry);
+  // Carga em voo, compartilhada entre os chamadores concorrentes.
+  const registryLoadRef = React.useRef<Promise<ClientesRegistry> | null>(null);
 
   const realtimeRefreshTimer = React.useRef<ReturnType<
     typeof setTimeout
@@ -246,6 +288,22 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     setCollectionsScope(scope);
   };
 
+  // O gestor NAO carrega BANCO_DADOS ao entrar: a Cobranca abre vazia e ele
+  // dispara a consulta quando quiser (requestCollections). Enquanto isso for
+  // false, `collections` esta vazio *por escolha*, nao por falha — a tela
+  // precisa saber a diferenca para nao mostrar "nenhum resultado".
+  //
+  // O cobrador segue carregando no login: a query dele ja e restrita a propria
+  // carteira (applyCollectorFilter) e ele abre o app justamente para ver a rota
+  // do dia — exigir uma consulta manual seria atrito diario sem ganho.
+  const [collectionsRequested, setCollectionsRequested] = useState(false);
+  const collectionsRequestedRef = React.useRef(false);
+
+  const markCollectionsRequested = () => {
+    collectionsRequestedRef.current = true;
+    setCollectionsRequested(true);
+  };
+
   // ✅ CORREÇÃO: Ref para mirror do cache para evitar dependências circulares em callbacks
   const clientDataCacheRef = React.useRef(clientDataCache);
   React.useEffect(() => {
@@ -254,37 +312,66 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Scheduled Visits Functions (Moved to earlier declaration)
+  /**
+   * Carrega o cadastro de clientes (uma linha por documento).
+   *
+   * `force` recarrega mesmo com o cadastro em maos -- e o que faz um refresh
+   * apos importacao enxergar os dados novos. A promessa em voo e compartilhada:
+   * a carga de collections e a de reincidencia sao disparadas juntas e nao
+   * podem virar duas varreduras da mesma tabela.
+   */
+  const loadClientesRegistry = React.useCallback(
+    async (force = false): Promise<ClientesRegistry> => {
+      if (!force && clientesRegistryRef.current.size > 0) {
+        return clientesRegistryRef.current;
+      }
+      if (registryLoadRef.current) return registryLoadRef.current;
+
+      const request = (async () => {
+        try {
+          const registry = await fetchClientesRegistry();
+          clientesRegistryRef.current = registry;
+          setClientesRegistry(registry);
+          return registry;
+        } catch (err) {
+          // Seguimos com o cadastro anterior (ou vazio): `mapRowToCollection`
+          // cai para os campos da propria linha de BANCO_DADOS.
+          console.warn(
+            "Nao foi possivel carregar o cadastro de clientes; usando os campos de BANCO_DADOS.",
+            err,
+          );
+          return clientesRegistryRef.current;
+        } finally {
+          registryLoadRef.current = null;
+        }
+      })();
+
+      registryLoadRef.current = request;
+      return request;
+    },
+    [],
+  );
+
+  // Marcos de reincidencia derivam do mesmo cadastro. Antes eram tres
+  // varreduras independentes da tabela `clientes` -- esta, a do
+  // ClientAssignment e a do clientDataCache; agora e uma so, e o resultado
+  // alimenta as tres.
   const fetchReincidenciaResets = React.useCallback(async () => {
     if (!isOnline) return;
     try {
-      // Idem: paginar para nao truncar em ~1000 marcos.
-      const data = await fetchAllPages<{
-        documento: string | null;
-        reincidencia_reset_at: string | null;
-      }>((from, to) =>
-        supabase
-          .from("clientes")
-          .select("documento, reincidencia_reset_at")
-          .not("reincidencia_reset_at", "is", null)
-          .order("documento", { ascending: true })
-          .range(from, to),
-      );
+      const registry = await loadClientesRegistry(true);
 
-      setReincidenciaResets(
-        new Map(
-          (data ?? [])
-            .filter((r) => r.documento && r.reincidencia_reset_at)
-            .map((r) => [
-              r.documento as string,
-              r.reincidencia_reset_at as string,
-            ]),
-        ),
-      );
+      const resets = new Map<string, string>();
+      registry.forEach((cliente, documento) => {
+        if (cliente.reincidencia_reset_at) {
+          resets.set(documento, cliente.reincidencia_reset_at);
+        }
+      });
+      setReincidenciaResets(resets);
     } catch (err) {
       console.error("Erro ao buscar marcos de reincidência:", err);
     }
-  }, [isOnline]);
+  }, [isOnline, loadClientesRegistry]);
 
   const fetchScheduledVisits = React.useCallback(
     async (useCache = true) => {
@@ -547,8 +634,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             fetchReincidenciaResets(),
           ]);
 
-          // Now fetch collections
-          await fetchCollections();
+          // Gestor: nada de BANCO_DADOS agora. Ver `collectionsRequested`.
+          // As abas que dependem de numeros agregados (Desempenho, Lojas,
+          // Clientes) continuam se servindo sozinhas via ensureAllCollections.
+          if (user.type !== "manager") {
+            markCollectionsRequested();
+            await fetchCollections();
+          }
         } catch (error) {
           console.error("Erro ao carregar dados iniciais:", error);
           setError("Erro ao carregar dados iniciais. Tente novamente.");
@@ -815,6 +907,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       const total = countError ? null : (count ?? null);
 
+      // O cadastro (tabela `clientes`) precisa estar em maos ANTES de mapear as
+      // linhas: e ele que preenche nome, apelido, telefones e e-mail de cada
+      // parcela. Num refresh forcado (pos-importacao) recarregamos o cadastro
+      // junto, senao as parcelas sairiam com os contatos antigos.
+      const registry = await loadClientesRegistry(!useCache);
+
       // Publica em lotes enquanto carrega. A tela de loading fica no ar ate o
       // fim, mas se o timeout de seguranca estourar antes o app renderiza com
       // os dados parciais em vez de uma tela vazia.
@@ -822,7 +920,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       let lastFlush = Date.now();
 
       const onBatch = (batchRows: BancoDadosRow[], loadedCount: number) => {
-        for (const row of batchRows) buffer.push(mapRowToCollection(row));
+        for (const row of batchRows)
+          buffer.push(mapRowToCollection(row, registry));
 
         if (total && reportLoadProgressRef.current) {
           setGlobalLoading(
@@ -912,9 +1011,33 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   // Desempenho, Dashboard, Lojas e Clientes somam recebimentos de clientes que
   // ja quitaram tudo — inclusive quem quitou no mes corrente, que o escopo
   // "active" exclui. Sem isso os numeros dessas telas ficam subestimados.
+  // Carga sob demanda da Cobranca do gestor. Idempotente: se os dados ja foram
+  // pedidos (por aqui ou por uma aba que promoveu o escopo), nao refaz nada.
+  const requestCollections = async () => {
+    if (collectionsRequestedRef.current) return;
+
+    // Trava a reentrada no ref (efeito imediato, ao contrario do estado), mas
+    // NAO publica `collectionsRequested` ainda: trocar a tela agora exibiria
+    // uma tabela vazia durante toda a carga. A troca acontece no fim.
+    collectionsRequestedRef.current = true;
+
+    // fetchCollections so baixa o loading no finally e nunca o sobe — sem isto
+    // o botao nao teria como indicar que a consulta esta em andamento.
+    setLoading(true);
+    try {
+      await fetchCollections();
+    } finally {
+      setCollectionsRequested(true);
+    }
+  };
+
   const ensureAllCollections = async () => {
     // Cobrador ja carrega a carteira dele inteira; nao ha o que promover.
     if (user?.type === "collector") return;
+    // Promover o escopo tambem conta como "os dados foram pedidos": sem isto a
+    // Cobranca voltaria a oferecer o botao de consulta depois de o gestor
+    // passar pelo Desempenho, que ja carregou tudo.
+    markCollectionsRequested();
     if (collectionsScopeRef.current === "all") return;
     if (loadingFullScopeRef.current) return;
 
@@ -2947,62 +3070,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           `🔄 Pré-carregando dados de ${clientsToFetch.length} clientes em batch...`,
         );
 
-        // ⭐ SOLUÇÃO ROBUSTA: Tentar .in() primeiro, se falhar usar OR
-        let clientesData: any[] | null = null;
-        let error: any = null;
-
-        try {
-          // Tentar com .in() primeiro
-          const result = await supabase
-            .from("clientes")
-            .select("documento, created_at, data_nascimento")
-            .in("documento", clientsToFetch);
-
-          clientesData = result.data;
-          error = result.error;
-
-          if (error) {
-            console.warn(
-              "⚠️ .in() falhou, tentando com OR query:",
-              error.message,
-            );
-
-            // Fallback: usar OR com eq
-            let query = supabase
-              .from("clientes")
-              .select("documento, created_at, data_nascimento");
-
-            // Construir query com OR manualmente
-            const orConditions = clientsToFetch
-              .map((doc) => `documento.eq.${doc}`)
-              .join(",");
-            const fallbackResult = await query.or(orConditions);
-
-            clientesData = fallbackResult.data;
-            error = fallbackResult.error;
-          }
-        } catch (queryError) {
-          console.error("❌ Erro na query:", queryError);
-          error = queryError;
-        }
-
-        if (error) {
-          console.error("❌ Erro ao pré-carregar clientes:", error);
-          // Mesmo com erro, marcar para evitar loop
-          setClientDataCache((prev) => {
-            const next = new Map(prev);
-            clientsToFetch.forEach((doc) => {
-              if (!next.has(doc)) next.set(doc, { error: true });
-            });
-            return next;
-          });
-          return;
-        }
-
-        // Criar um Map para acesso rápido - documento -> dados do cliente
-        const clientesMap = new Map(
-          (clientesData || []).map((c) => [c.documento, c]),
-        );
+        // O cadastro ja esta em memoria: `clientesRegistry` e carregado uma vez
+        // junto com as collections. Antes cada lote de clientes visiveis
+        // disparava um `.in()` na tabela `clientes` (com fallback em `.or()`
+        // quando a lista de documentos estourava o tamanho da URL).
+        const clientesMap = clientesRegistryRef.current;
 
         const newEntries = new Map();
         const clientGroups = getClientGroups();
@@ -3659,12 +3731,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         ? addressHistory.complemento || ""
         : clientGroup.complemento;
 
-      // Fetch created_at e data_nascimento from clientes table
-      const { data: clienteData } = await supabase
-        .from("clientes")
-        .select("created_at, data_nascimento")
-        .eq("documento", clientDocument)
-        .single();
+      // Data de cadastro e de nascimento saem do registro ja carregado, sem ida
+      // ao banco por cliente.
+      const clienteData = clientesRegistryRef.current.get(clientDocument);
 
       const result = {
         name: clientGroup.client,
@@ -4124,6 +4193,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     collections,
     users,
     reincidenciaResets,
+    clientesRegistry,
     salePayments,
     scheduledVisits,
     monthlyGoals,
@@ -4132,6 +4202,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     collectionsScope,
     loadingFullScope,
     ensureAllCollections,
+    collectionsRequested,
+    requestCollections,
     error,
     isOnline,
     fetchCollections,

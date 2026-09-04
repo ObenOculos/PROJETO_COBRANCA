@@ -5,8 +5,33 @@ import { Database } from "../../types/database.types";
 import { ChevronDown } from "lucide-react";
 import { CollectionStatus } from "../../types/status";
 import { ALL_SITUACOES } from "../../config/profiles";
+import {
+  CADASTRO_CONTATO_COLUMNS,
+  CadastroContatoColumn,
+} from "../../services/clientesRegistry";
 
 type BancoDadosInsert = Database["public"]["Tables"]["BANCO_DADOS"]["Insert"];
+
+// O formulario cria um titulo E, quando o cliente e novo, o cadastro dele.
+// Apelido, telefones e e-mail nao existem mais em BANCO_DADOS (migration
+// 20260904000002): sao campos de `clientes`, entao o formulario cobre a uniao
+// dos dois conjuntos e `handleSubmit` separa o que vai para cada tabela.
+type TituloFormField = keyof BancoDadosInsert | CadastroContatoColumn;
+type TituloFormData = Partial<Record<TituloFormField, string | number | null>>;
+
+const isCadastroField = (key: string): key is CadastroContatoColumn =>
+  (CADASTRO_CONTATO_COLUMNS as readonly string[]).includes(key);
+
+/** Separa o que foi digitado entre a parcela e o cadastro do cliente. */
+const splitFormData = (data: TituloFormData) => {
+  const titulo: Record<string, unknown> = {};
+  const cadastro: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (isCadastroField(key)) cadastro[key] = value;
+    else titulo[key] = value;
+  }
+  return { titulo, cadastro };
+};
 
 interface AddTituloModalProps {
   isOpen: boolean;
@@ -17,7 +42,7 @@ interface AddTituloModalProps {
 interface SectionType {
   id: string;
   title: string;
-  fields: Array<keyof BancoDadosInsert>;
+  fields: Array<TituloFormField>;
 }
 
 const AddTituloModal: React.FC<AddTituloModalProps> = ({
@@ -25,7 +50,7 @@ const AddTituloModal: React.FC<AddTituloModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const [formData, setFormData] = useState<Partial<BancoDadosInsert>>({});
+  const [formData, setFormData] = useState<TituloFormData>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
@@ -60,9 +85,11 @@ const AddTituloModal: React.FC<AddTituloModalProps> = ({
       return;
     }
 
+    const { titulo, cadastro } = splitFormData(formData);
+
     const dataToInsert: BancoDadosInsert = {
       ...sampleBancoDados,
-      ...formData,
+      ...titulo,
       id_parcela: Number(formData.id_parcela),
       dias_em_atraso: formData.dias_em_atraso
         ? Number(formData.dias_em_atraso)
@@ -78,15 +105,67 @@ const AddTituloModal: React.FC<AddTituloModalProps> = ({
       .from("BANCO_DADOS")
       .insert(dataToInsert);
 
-    setLoading(false);
-
     if (insertError) {
+      setLoading(false);
       setError(`Erro ao adicionar título: ${insertError.message}`);
       console.error(insertError);
-    } else {
-      onSuccess();
-      onClose();
-      setFormData({});
+      return;
+    }
+
+    await upsertCadastroCliente(dataToInsert.documento, dataToInsert.cliente, cadastro);
+
+    setLoading(false);
+    onSuccess();
+    onClose();
+    setFormData({});
+  };
+
+  // O cadastro do cliente mora em `clientes` (migration 20260904000001); as
+  // colunas homonimas de BANCO_DADOS sao legado. Sem isto, um titulo criado por
+  // aqui nasceria com o cadastro so no lugar antigo e a tela nao mostraria os
+  // dados digitados.
+  //
+  // Falha aqui nao desfaz o titulo: ele ja foi gravado e o cadastro pode ser
+  // corrigido pela importacao. So registramos o aviso.
+  const upsertCadastroCliente = async (
+    documentoRaw: string | null | undefined,
+    nomeRaw: string | null | undefined,
+    contatos: Record<string, unknown>,
+  ) => {
+    const documento = (documentoRaw ?? "").toString().trim();
+    if (!documento) return;
+
+    const cadastro = {
+      documento,
+      nome: (nomeRaw ?? "").toString().trim() || "Cliente sem nome",
+      ...contatos,
+    };
+
+    const { data: existente, error: selectError } = await supabase
+      .from("clientes")
+      .select("id")
+      .eq("documento", documento)
+      .maybeSingle();
+
+    if (selectError) {
+      console.warn("Não foi possível verificar o cadastro do cliente:", selectError);
+      return;
+    }
+
+    // Cliente ja cadastrado: nao mexemos. O formulario e de titulo, nao de
+    // cadastro, e sobrescrever com os campos em branco dele apagaria dados bons.
+    // Corrigir cadastro existente e papel da importacao.
+    if (existente) return;
+
+    const { error: insertCadastroError } = await supabase
+      .from("clientes")
+      .insert(cadastro);
+
+    if (insertCadastroError) {
+      console.warn(
+        "Título criado, mas o cadastro do cliente não foi gravado:",
+        insertCadastroError,
+      );
     }
   };
 
@@ -205,7 +284,7 @@ const AddTituloModal: React.FC<AddTituloModalProps> = ({
               {expandedSections.has(section.id) && (
                 <div className="px-4 pb-4 border-t border-gray-200 bg-gray-50">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                    {section.fields.map((fieldName: keyof BancoDadosInsert) => {
+                    {section.fields.map((fieldName: TituloFormField) => {
                       const field = formFields[fieldName];
                       if (!field) return null;
 
@@ -279,11 +358,7 @@ const AddTituloModal: React.FC<AddTituloModalProps> = ({
 
 const sampleBancoDados: Partial<BancoDadosInsert> = {
   acrescimo: null,
-  apelido: null,
   bairro: null,
-  celular: null,
-  celular1: null,
-  celular2: null,
   cep: null,
   cidade: null,
   cliente: null,
@@ -298,7 +373,6 @@ const sampleBancoDados: Partial<BancoDadosInsert> = {
   dias_carencia: null,
   dias_em_atraso: null,
   documento: null,
-  email: null,
   endereco: null,
   estado: null,
   juros_aplicado: null,
@@ -314,7 +388,6 @@ const sampleBancoDados: Partial<BancoDadosInsert> = {
   parcela: null,
   situacao: null,
   status: null,
-  telefone: null,
   tipo_de_cobranca: null,
   user_id: null,
   valor_original: null,
@@ -325,7 +398,7 @@ const sampleBancoDados: Partial<BancoDadosInsert> = {
 
 // Helper for form generation
 const formFields: Record<
-  keyof BancoDadosInsert,
+  TituloFormField,
   { label: string; type: string; placeholder?: string; options?: string[] }
 > = {
   id_parcela: { label: "ID Parcela", type: "number" },

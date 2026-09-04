@@ -25,7 +25,6 @@ import {
   Minus,
 } from "lucide-react";
 import { useCollection } from "../contexts/CollectionContext";
-import { supabase } from "../lib/supabase";
 import { Collection, isCollectorType, ClientGroup } from "../types";
 import { createPortal } from "react-dom";
 import ClientDetailModal from "./dashboard/ClientDetailModal";
@@ -238,8 +237,13 @@ const SelectionIndicator = ({ checked, partial, onClick }: SelectionIndicatorPro
 
 export const ClientAssignment = React.memo(
   ({ onViewClient }: ClientAssignmentProps) => {
-    const { collections, users, getClientGroups, scheduledVisits } =
-      useCollection();
+    const {
+      collections,
+      users,
+      getClientGroups,
+      scheduledVisits,
+      clientesRegistry,
+    } = useCollection();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedClientGroup, setSelectedClientGroup] =
       useState<ClientGroup | null>(null);
@@ -300,64 +304,26 @@ export const ClientAssignment = React.memo(
 
     // "Cliente novo" = registro inserido pela primeira vez na tabela `clientes`
     // (mesma fonte de verdade do badge "Novo" das visitas agendadas:
-    // clientes.created_at). Carregamos o mapa documento -> created_at de TODOS os
-    // clientes uma unica vez (paginado) e reutilizamos tanto no card "Novos
-    // Clientes" quanto no filtro "Criado em". Independe de titulos/cobrador.
-    const [clientCreatedAtMap, setClientCreatedAtMap] = useState<
-      Map<string, Date>
-    >(new Map());
-    // Mapa documento -> data de nascimento (ISO), carregado junto do created_at
-    // na mesma varredura da tabela `clientes`. Usado na exportacao do Excel.
-    const [clientBirthDateMap, setClientBirthDateMap] = useState<
-      Map<string, string>
-    >(new Map());
+    // clientes.created_at). Derivamos os mapas do `clientesRegistry` do
+    // contexto, que ja varre a tabela uma unica vez para o app inteiro -- antes
+    // esta tela fazia a propria varredura completa, em paralelo com a do
+    // contexto. Independe de titulos/cobrador.
+    const clientCreatedAtMap = useMemo(() => {
+      const map = new Map<string, Date>();
+      clientesRegistry.forEach((cliente, documento) => {
+        if (cliente.created_at) map.set(documento, new Date(cliente.created_at));
+      });
+      return map;
+    }, [clientesRegistry]);
 
-    useEffect(() => {
-      let cancelled = false;
-
-      const loadClientesInfo = async () => {
-        const map = new Map<string, Date>();
-        const birthMap = new Map<string, string>();
-        const PAGE = 1000;
-        let from = 0;
-
-        // Paginacao: o Supabase limita ~1000 linhas por requisicao.
-        while (!cancelled) {
-          const { data, error } = await supabase
-            .from("clientes")
-            .select("documento, created_at, data_nascimento")
-            .range(from, from + PAGE - 1);
-
-          if (error) {
-            console.error("Erro ao carregar dados dos clientes:", error);
-            break;
-          }
-          if (!data || data.length === 0) break;
-
-          for (const row of data) {
-            if (row.documento && row.created_at) {
-              map.set(row.documento, new Date(row.created_at));
-            }
-            if (row.documento && row.data_nascimento) {
-              birthMap.set(row.documento, row.data_nascimento);
-            }
-          }
-
-          if (data.length < PAGE) break;
-          from += PAGE;
-        }
-
-        if (!cancelled) {
-          setClientCreatedAtMap(map);
-          setClientBirthDateMap(birthMap);
-        }
-      };
-
-      loadClientesInfo();
-      return () => {
-        cancelled = true;
-      };
-    }, []);
+    // Mapa documento -> data de nascimento (ISO). Usado na exportacao do Excel.
+    const clientBirthDateMap = useMemo(() => {
+      const map = new Map<string, string>();
+      clientesRegistry.forEach((cliente, documento) => {
+        if (cliente.data_nascimento) map.set(documento, cliente.data_nascimento);
+      });
+      return map;
+    }, [clientesRegistry]);
 
     // Conjuntos de documentos criados no mes atual e no mes anterior, derivados
     // do mapa acima -- usados pelo card "Novos Clientes" (mes atual vs anterior).
@@ -479,9 +445,8 @@ export const ClientAssignment = React.memo(
               existingClient.collectorName = collectorName;
             }
           }
-          if (!existingClient.apelido && collection.apelido) {
-            existingClient.apelido = collection.apelido;
-          }
+          // O apelido nao precisa mais ser "cacado" entre as parcelas: ele vem
+          // do cadastro (tabela `clientes`), igual em todas elas.
         }
 
         clientsMap.get(key)!.collections.push(collection);
@@ -906,20 +871,49 @@ export const ClientAssignment = React.memo(
       return UF_MAP[key] ?? raw;
     };
 
-    // Melhor telefone disponivel do cliente (qualquer parcela).
-    const getClientPhone = (
-      collections: (typeof filteredClients)[number]["collections"],
-    ): string => {
-      for (const c of collections) {
-        const phone = c.telefone || c.celular || c.celular1 || c.celular2;
-        if (phone) return phone;
+    // Todos os telefones distintos do cliente, direto do cadastro.
+    // Antes isto varria TODAS as parcelas do cliente, porque cada uma podia
+    // ter um telefone diferente; hoje os quatro campos vivem numa linha so
+    // de `clientes` (migration 20260904000002). A deduplicacao continua:
+    // telefone e celular podem repetir o mesmo numero.
+    const getClientPhones = (documento: string): string[] => {
+      const cadastro = clientesRegistry.get((documento || "").trim());
+      if (!cadastro) return [];
+
+      const seen = new Set<string>();
+      const phones: string[] = [];
+      for (const raw of [
+        cadastro.telefone,
+        cadastro.celular,
+        cadastro.celular1,
+        cadastro.celular2,
+      ]) {
+        const phone = (raw || "").trim();
+        if (!phone) continue;
+        const key = phone.replace(/\D/g, "") || phone.toUpperCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        phones.push(phone);
       }
-      return "";
+      return phones;
     };
 
     const handleExportToExcel = () => {
       // 1. Planilha 1: Clientes (Resumo)
-      const clientRows = filteredClients.map((client) => {
+      // Uma coluna por telefone: "Telefone 1", "Telefone 2", ...
+      const clientPhoneLists = filteredClients.map((client) =>
+        getClientPhones(client.documento),
+      );
+      const phoneColumnCount = clientPhoneLists.reduce(
+        (max, phones) => Math.max(max, phones.length),
+        1,
+      );
+      const phoneColumns = Array.from(
+        { length: phoneColumnCount },
+        (_, i) => `Telefone ${i + 1}`,
+      );
+
+      const clientRows = filteredClients.map((client, clientIndex) => {
         const totalValue = client.collections.reduce(
           (sum, c) => sum + c.valor_original,
           0,
@@ -944,7 +938,12 @@ export const ClientAssignment = React.memo(
           Documento: client.documento || "",
           "Data de Nascimento": birthDate ? formatDate(birthDate) : "",
           Apelido: client.apelido ? client.apelido.toUpperCase() : "",
-          Telefone: getClientPhone(client.collections),
+          ...Object.fromEntries(
+            phoneColumns.map((label, i) => [
+              label,
+              clientPhoneLists[clientIndex][i] || "",
+            ]),
+          ),
           CEP: firstCol?.cep || "",
           Cidade: client.cidade || "",
           Estado: toUF(firstCol?.estado),
@@ -968,7 +967,7 @@ export const ClientAssignment = React.memo(
         { wch: 18 }, // Documento
         { wch: 18 }, // Data de Nascimento
         { wch: 20 }, // Apelido
-        { wch: 16 }, // Telefone
+        ...phoneColumns.map(() => ({ wch: 16 })), // Telefone 1..N
         { wch: 12 }, // CEP
         { wch: 18 }, // Cidade
         { wch: 8 }, // Estado
@@ -1950,19 +1949,10 @@ export const ClientAssignment = React.memo(
                               <Eye className="h-3 w-3" />
                             </button>
                             {(() => {
-                              const phoneCol = client.collections.find(
-                                (c) =>
-                                  c.telefone ||
-                                  c.celular ||
-                                  c.celular1 ||
-                                  c.celular2,
-                              );
-                              const phoneNumber = phoneCol
-                                ? phoneCol.telefone ||
-                                  phoneCol.celular ||
-                                  phoneCol.celular1 ||
-                                  phoneCol.celular2
-                                : "";
+                              // Primeiro telefone do cadastro (getClientPhones
+                              // ja resolve a ordem e a deduplicacao).
+                              const phoneNumber =
+                                getClientPhones(client.documento)[0] ?? "";
                               if (!phoneNumber) return null;
                               return (
                                 <>

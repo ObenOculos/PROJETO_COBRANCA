@@ -6,15 +6,18 @@ import { useCollection } from "../contexts/CollectionContext";
  * Retorna a data de nascimento (ISO YYYY-MM-DD ou null) de um cliente pelo
  * documento.
  *
- * Estrategia: reaproveita o `clientDataCache` do contexto (ja populado em lote
- * para os clientes visiveis). Se o cliente ja estiver no cache, usa o valor sem
- * nova requisicao; caso contrario, faz UMA consulta leve a tabela `clientes`.
+ * Estrategia: le do cadastro ja carregado (`clientesRegistry`) ou do
+ * `clientDataCache` do contexto; so cai para UMA consulta leve a tabela
+ * `clientes` se o cliente nao estiver em nenhum dos dois.
  *
  * Centraliza aqui a busca que antes vivia duplicada em cada modal de cliente.
  */
 export function useClientBirthDate(documento?: string | null): string | null {
-  const { clientDataCache } = useCollection();
+  const { clientDataCache, clientesRegistry } = useCollection();
   const [birthDate, setBirthDate] = useState<string | null>(null);
+
+  const registryRef = useRef(clientesRegistry);
+  registryRef.current = clientesRegistry;
 
   // Ref para ler o cache mais recente sem re-disparar o efeito a cada
   // atualizacao do Map (evita refetch enquanto o cache vai sendo populado).
@@ -26,6 +29,12 @@ export function useClientBirthDate(documento?: string | null): string | null {
 
     if (!documento) {
       setBirthDate(null);
+      return;
+    }
+
+    const cadastro = registryRef.current.get(documento);
+    if (cadastro) {
+      setBirthDate(cadastro.data_nascimento ?? null);
       return;
     }
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { DollarSign, FileText, Filter } from "lucide-react";
+import { DollarSign, FileText, Filter, Search } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable } from "./CollectionTable";
 import EnhancedPerformanceChart from "./EnhancedPerformanceChart";
@@ -23,6 +23,15 @@ import { Notification } from "../../contexts/NotificationContext";
 // demanda. Ver `collectionsScope` no CollectionContext.
 const TABS_NEEDING_FULL_SCOPE = new Set(["performance", "stores", "clients"]);
 
+// Telas que dependem das cobrancas mas nao tem uma consulta propria: como o
+// gestor nao carrega mais nada no login, elas precisam pedir os dados ao abrir.
+// A Cobranca fica DE FORA de proposito — e justamente onde o gestor escolhe o
+// que consultar. (Desempenho/Lojas/Clientes ja se resolvem pelo full scope.)
+const TABS_AUTOLOADING_COLLECTIONS = new Set([
+  "visit-tracking",
+  "authorization",
+]);
+
 interface ManagerDashboardProps {
   activeTab?: string;
   onTabChange?: (tabId: string) => void;
@@ -37,6 +46,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     collections,
     ensureAllCollections,
     loadingFullScope,
+    collectionsRequested,
+    requestCollections,
+    loading,
   } = useCollection();
 
   const [internalActiveTab, setInternalActiveTab] = useState<
@@ -178,6 +190,12 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needsFullScope]);
 
+  useEffect(() => {
+    if (TABS_AUTOLOADING_COLLECTIONS.has(activeTab)) void requestCollections();
+    // requestCollections e no-op se os dados ja foram pedidos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   const renderTabContent = () => {
     // Segurar e melhor do que exibir total subestimado: sem os clientes
     // quitados, os numeros dessas telas ficam menores do que a realidade.
@@ -268,12 +286,36 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                     userType="manager"
                   />
                 </div>
-                <CollectionTable
-                  ref={collectionTableRef}
-                  collections={filteredCollections}
-                  userType="manager"
-                  showGrouped={false}
-                />
+                {collectionsRequested ? (
+                  <CollectionTable
+                    ref={collectionTableRef}
+                    collections={filteredCollections}
+                    userType="manager"
+                    showGrouped={false}
+                  />
+                ) : (
+                  // Estado inicial do gestor: nada carregado ainda. Note que
+                  // isto NAO e "nenhum resultado" — os filtros acima continuam
+                  // utilizaveis e a consulta so parte no clique.
+                  <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border px-6 py-12 text-center">
+                    <Search className="h-10 w-10 mx-auto mb-4 text-gray-300 dark:text-dark-text-secondary" />
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-1">
+                      Nenhuma consulta feita ainda
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-dark-text-secondary max-w-md mx-auto mb-6">
+                      Ajuste os filtros acima e clique em consultar. As cobranças
+                      não são carregadas automaticamente para o gestor.
+                    </p>
+                    <button
+                      onClick={() => void requestCollections()}
+                      disabled={loading}
+                      className="inline-flex items-center px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors touch-manipulation"
+                    >
+                      <Search className="h-4 w-4 mr-2" />
+                      {loading ? "Consultando..." : "Consultar cobranças"}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <DailyCashReport collections={collections} />

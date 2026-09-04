@@ -1,3 +1,5 @@
+import type { ClientesRegistry } from "../services/clientesRegistry";
+
 // User types
 export type UserType =
   | "manager"
@@ -280,6 +282,14 @@ export interface CollectionContextType {
    * reagendamentos anteriores não contam para a reincidência.
    */
   reincidenciaResets: Map<string, string>;
+  /**
+   * Cadastro do cliente (tabela `clientes`) indexado por documento: nome,
+   * apelido, telefones, e-mail, nascimento, data de cadastro e o marco de
+   * reincidência. Fonte de verdade desses campos — em `collections` eles já
+   * vêm sobrepostos, então use este mapa só para o que não está lá
+   * (data de nascimento, data de cadastro).
+   */
+  clientesRegistry: ClientesRegistry;
   salePayments: SalePayment[];
   scheduledVisits: ScheduledVisit[];
   monthlyGoals: MonthlyGoal[]; // Added
@@ -305,6 +315,18 @@ export interface CollectionContextType {
    * Dashboard, Lojas, Clientes) precisam chamar antes de exibir números.
    */
   ensureAllCollections: () => Promise<void>;
+  /**
+   * Falso enquanto o gestor ainda não pediu os dados de cobrança. Nesse estado
+   * `collections` está vazio POR ESCOLHA — a tela deve oferecer a consulta, e
+   * não dizer que não há resultados. Já nasce verdadeiro para cobradores, que
+   * carregam a própria carteira no login.
+   */
+  collectionsRequested: boolean;
+  /**
+   * Dispara a carga de cobranças sob demanda (botão "Consultar" do gestor).
+   * Idempotente: não refaz nada se os dados já foram pedidos.
+   */
+  requestCollections: () => Promise<void>;
   error: string | null;
   isOnline: boolean;
   fetchCollections: () => Promise<void>;

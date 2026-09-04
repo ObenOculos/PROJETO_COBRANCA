@@ -242,11 +242,7 @@ export type Database = {
       BANCO_DADOS: {
         Row: {
           acrescimo: string | null;
-          apelido: string | null;
           bairro: string | null;
-          celular: string | null;
-          celular1: string | null;
-          celular2: string | null;
           cep: string | null;
           cidade: string | null;
           cliente: string | null;
@@ -261,7 +257,6 @@ export type Database = {
           dias_carencia: string | null;
           dias_em_atraso: number | null;
           documento: string | null;
-          email: string | null;
           endereco: string | null;
           estado: string | null;
           id_parcela: number;
@@ -278,7 +273,6 @@ export type Database = {
           parcela: number | null;
           situacao: string | null;
           status: string | null;
-          telefone: string | null;
           tipo_de_cobranca: string | null;
           user_id: string | null;
           valor_original: string | null;
@@ -288,11 +282,7 @@ export type Database = {
         };
         Insert: {
           acrescimo?: string | null;
-          apelido?: string | null;
           bairro?: string | null;
-          celular?: string | null;
-          celular1?: string | null;
-          celular2?: string | null;
           cep?: string | null;
           cidade?: string | null;
           cliente?: string | null;
@@ -307,7 +297,6 @@ export type Database = {
           dias_carencia?: string | null;
           dias_em_atraso?: number | null;
           documento?: string | null;
-          email?: string | null;
           endereco?: string | null;
           estado?: string | null;
           id_parcela: number;
@@ -324,7 +313,6 @@ export type Database = {
           parcela?: number | null;
           situacao?: string | null;
           status?: string | null;
-          telefone?: string | null;
           tipo_de_cobranca?: string | null;
           user_id?: string | null;
           valor_original?: string | null;
@@ -334,11 +322,7 @@ export type Database = {
         };
         Update: {
           acrescimo?: string | null;
-          apelido?: string | null;
           bairro?: string | null;
-          celular?: string | null;
-          celular1?: string | null;
-          celular2?: string | null;
           cep?: string | null;
           cidade?: string | null;
           cliente?: string | null;
@@ -353,7 +337,6 @@ export type Database = {
           dias_carencia?: string | null;
           dias_em_atraso?: number | null;
           documento?: string | null;
-          email?: string | null;
           endereco?: string | null;
           estado?: string | null;
           id_parcela?: number;
@@ -370,7 +353,6 @@ export type Database = {
           parcela?: number | null;
           situacao?: string | null;
           status?: string | null;
-          telefone?: string | null;
           tipo_de_cobranca?: string | null;
           user_id?: string | null;
           valor_original?: string | null;
@@ -390,28 +372,46 @@ export type Database = {
       };
       clientes: {
         Row: {
+          apelido: string | null;
+          celular: string | null;
+          celular1: string | null;
+          celular2: string | null;
           created_at: string | null;
           data_nascimento: string | null;
           documento: string;
+          email: string | null;
           id: number;
           nome: string;
           reincidencia_reset_at: string | null;
+          telefone: string | null;
         };
         Insert: {
+          apelido?: string | null;
+          celular?: string | null;
+          celular1?: string | null;
+          celular2?: string | null;
           created_at?: string | null;
           data_nascimento?: string | null;
           documento: string;
+          email?: string | null;
           id?: number;
           nome: string;
           reincidencia_reset_at?: string | null;
+          telefone?: string | null;
         };
         Update: {
+          apelido?: string | null;
+          celular?: string | null;
+          celular1?: string | null;
+          celular2?: string | null;
           created_at?: string | null;
           data_nascimento?: string | null;
           documento?: string;
+          email?: string | null;
           id?: number;
           nome?: string;
           reincidencia_reset_at?: string | null;
+          telefone?: string | null;
         };
         Relationships: [];
       };
@@ -752,11 +752,7 @@ export type Database = {
       banco_dados_clientes_ativos: {
         Row: {
           acrescimo: string | null;
-          apelido: string | null;
           bairro: string | null;
-          celular: string | null;
-          celular1: string | null;
-          celular2: string | null;
           cep: string | null;
           cidade: string | null;
           cliente: string | null;
@@ -771,7 +767,6 @@ export type Database = {
           dias_carencia: string | null;
           dias_em_atraso: number | null;
           documento: string | null;
-          email: string | null;
           endereco: string | null;
           estado: string | null;
           id_parcela: number;
@@ -788,7 +783,6 @@ export type Database = {
           parcela: number | null;
           situacao: string | null;
           status: string | null;
-          telefone: string | null;
           tipo_de_cobranca: string | null;
           user_id: string | null;
           valor_original: string | null;

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { supabase } from "../../lib/supabase";
@@ -15,13 +15,29 @@ import {
   Download,
   User,
   X,
+  ChevronDown,
 } from "lucide-react"; // Importar ícones
 import AddTituloModal from "./AddTituloModal";
 import { Database } from "../../types/database.types";
 import { PRIMARY_SITUACAO, ALL_SITUACOES } from "../../config/profiles";
-import { importClientesBirthDates } from "../../services/clientesImportService";
+import {
+  CLIENTE_IMPORT_FIELDS,
+  importClientesCadastro,
+} from "../../services/clientesImportService";
+import {
+  BANCO_DADOS_HEADERS,
+  CADASTRO_EXPORT_HEADERS,
+  UPLOAD_TEMPLATES,
+  UploadTemplate,
+  downloadUploadTemplate,
+} from "../../services/uploadTemplates";
+import {
+  CADASTRO_CONTATO_COLUMNS,
+  fetchClientesRegistry,
+} from "../../services/clientesRegistry";
 
 type BancoDadosInsert = Database["public"]["Tables"]["BANCO_DADOS"]["Insert"];
+type ClienteInsert = Database["public"]["Tables"]["clientes"]["Insert"];
 
 interface FileData {
   [key: string]: string;
@@ -63,14 +79,14 @@ const DEFAULT_RESULT_LABELS: ResultLabels = {
   unchangedEmpty: "Nenhum registro inalterado.",
 };
 
-// Carga de Data de Nascimento (tabela clientes).
+// Carga do cadastro de clientes (nome, apelido, nascimento e contatos).
 const CLIENTES_RESULT_LABELS: ResultLabels = {
   itemLabel: "Documento",
   successLabel: "Clientes Atualizados",
-  unchangedLabel: "Não encontrados na base",
+  unchangedLabel: "Sem alteração / não encontrados",
   errorLabel: "Falhas",
   successEmpty: "Nenhum cliente atualizado.",
-  unchangedEmpty: "Nenhum cliente fora da base.",
+  unchangedEmpty: "Nenhum cliente sem alteração.",
 };
 
 // Quantidade de itens renderizados por vez na Visão Analítica. Renderizar
@@ -623,6 +639,33 @@ const DatabaseUpload: React.FC = () => {
   );
   const [showAddTituloModal, setShowAddTituloModal] = useState<boolean>(false);
 
+  // Menu de modelos: cada card tem um modelo proprio, entao o botao abre a
+  // lista em vez de baixar direto um unico arquivo.
+  const [templateMenuOpen, setTemplateMenuOpen] = useState<boolean>(false);
+  const templateMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!templateMenuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!templateMenuRef.current?.contains(event.target as Node)) {
+        setTemplateMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setTemplateMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [templateMenuOpen]);
+
   // Particiona os resultados uma unica vez por mudanca (em vez de filtrar a
   // lista varias vezes a cada render do modal).
   const successResults = useMemo(
@@ -809,60 +852,28 @@ const DatabaseUpload: React.FC = () => {
         return;
       }
 
+      // Apelido, telefones e e-mail sairam de BANCO_DADOS (migration
+      // 20260904000002) e vivem em `clientes`. Reanexamos na exportacao para
+      // a planilha continuar completa -- sem isso o arquivo baixado perderia
+      // os contatos do cliente.
+      setUploadStatus("🔄 Carregando cadastro dos clientes...");
+      const registry = await fetchClientesRegistry();
+
       // Define headers in the desired order
-      const headers = [
-        "nome_da_loja",
-        "data_lancamento",
-        "data_vencimento",
-        "valor_original",
-        "valor_reajustado",
-        "multa",
-        "juros_por_dia",
-        "multa_aplicada",
-        "juros_aplicado",
-        "valor_recebido",
-        "data_de_recebimento",
-        "dias_em_atraso",
-        "dias_carencia",
-        "desconto",
-        "acrescimo",
-        "multa_paga",
-        "juros_pago",
-        "tipo_de_cobranca",
-        "numero_titulo",
-        "parcela",
-        "id_parcela",
-        "status",
-        "cliente",
-        "documento",
-        "endereco",
-        "numero",
-        "bairro",
-        "complemento",
-        "cep",
-        "cidade",
-        "estado",
-        "obs",
-        "codigo_externo",
-        "descricao",
-        "venda_n",
-        "convenio",
-        "telefone",
-        "celular",
-        "celular1",
-        "celular2",
-        "email",
-        "user_id",
-        "situacao",
-        "apelido",
-      ];
+      const headers = [...BANCO_DADOS_HEADERS, ...CADASTRO_EXPORT_HEADERS];
 
       // Create worksheet data, starting with headers
       const wsData = [headers];
 
       // Add rows
       allData.forEach((row) => {
-        const rowData = headers.map((header) => row[header] ?? "");
+        const cadastro = registry.get((row.documento ?? "").toString().trim());
+        const rowData = headers.map((header) =>
+          CADASTRO_EXPORT_HEADERS.includes(header)
+            ? ((cadastro as Record<string, unknown> | undefined)?.[header] ??
+              "")
+            : (row[header] ?? ""),
+        );
         wsData.push(rowData);
       });
 
@@ -884,72 +895,15 @@ const DatabaseUpload: React.FC = () => {
     }
   };
 
-  const handleDownloadTemplate = async () => {
-    setLoading(true);
-    setUploadStatus("🔄 Gerando modelo CSV...");
+  const handleDownloadTemplate = (template: UploadTemplate) => {
+    setTemplateMenuOpen(false);
     try {
-      const headers = [
-        "nome_da_loja",
-        "data_lancamento",
-        "data_vencimento",
-        "valor_original",
-        "valor_reajustado",
-        "multa",
-        "juros_por_dia",
-        "multa_aplicada",
-        "juros_aplicado",
-        "valor_recebido",
-        "data_de_recebimento",
-        "dias_em_atraso",
-        "dias_carencia",
-        "desconto",
-        "acrescimo",
-        "multa_paga",
-        "juros_pago",
-        "tipo_de_cobranca",
-        "numero_titulo",
-        "parcela",
-        "id_parcela",
-        "status",
-        "cliente",
-        "documento",
-        "endereco",
-        "numero",
-        "bairro",
-        "complemento",
-        "cep",
-        "cidade",
-        "estado",
-        "obs",
-        "codigo_externo",
-        "descricao",
-        "venda_n",
-        "convenio",
-        "telefone",
-        "celular",
-        "celular1",
-        "celular2",
-        "email",
-        "user_id",
-        "situacao",
-        "apelido",
-      ];
-
-      // Create worksheet with only headers
-      const ws = XLSX.utils.aoa_to_sheet([headers]);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Template");
-
-      // Trigger download as CSV
-      XLSX.writeFile(wb, "template_banco_dados.csv");
-
-      setUploadStatus("✅ Modelo CSV gerado com sucesso!");
+      downloadUploadTemplate(template);
+      setUploadStatus(`✅ Modelo "${template.label}" gerado com sucesso!`);
     } catch (error) {
       const errorMsg = (error as Error).message;
-      setUploadStatus(`❌ Erro ao gerar modelo CSV: ${errorMsg}`);
+      setUploadStatus(`❌ Erro ao gerar o modelo CSV: ${errorMsg}`);
       console.error("❌ Erro ao gerar modelo CSV:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -1461,6 +1415,11 @@ const DatabaseUpload: React.FC = () => {
           newRow.situacao = validateSituacao(newRow.situacao);
         }
 
+        // Apelido, telefones e e-mail nao sao mais colunas de BANCO_DADOS
+        // (migration 20260904000002). Mante-los aqui faria o INSERT inteiro
+        // falhar; eles seguem para o cadastro do cliente logo apos a carga.
+        for (const column of CADASTRO_CONTATO_COLUMNS) delete newRow[column];
+
         // Continuidade da carteira: se o cliente (documento) ja possui cobrador,
         // o novo titulo herda esse mesmo cobrador, independente dos dias em
         // atraso. Alinha a situacao ao perfil do cobrador para o titulo aparecer
@@ -1515,6 +1474,7 @@ const DatabaseUpload: React.FC = () => {
       // ✅ Registrar endereços no histórico após sucesso
       if (rowsToInsert.length > 0) {
         await insertAddressHistoryForNewClients(rowsToInsert);
+        await insertCadastroForNewClients(rowsToInsert);
       }
 
       return {
@@ -1526,6 +1486,86 @@ const DatabaseUpload: React.FC = () => {
     } catch (error) {
       console.error("❌ Exceção ao inserir dados:", error);
       return { success: false, error: (error as Error).message };
+    }
+  };
+
+  // Cria o cadastro dos clientes que ainda nao existem em `clientes`.
+  //
+  // O arquivo de Novas Parcelas costuma trazer apelido/telefones/e-mail, que
+  // desde a migration 20260904000002 nao cabem mais na parcela. Sem este passo
+  // um cliente novo entraria sem contato nenhum. Cliente ja cadastrado NAO e
+  // tocado: corrigir cadastro existente e papel do card "Atualizar Cadastro de
+  // Clientes", que compara campo a campo.
+  const insertCadastroForNewClients = async (
+    data: FileData[],
+  ): Promise<void> => {
+    try {
+      // Primeira ocorrencia de cada documento vence.
+      const byDocumento = new Map<string, FileData>();
+      data.forEach((row) => {
+        const documento = (row.documento || "").trim();
+        if (documento && !byDocumento.has(documento)) {
+          byDocumento.set(documento, row);
+        }
+      });
+      if (byDocumento.size === 0) return;
+
+      const documentos = Array.from(byDocumento.keys());
+      const existentes = new Set<string>();
+      const DOC_CHUNK = 300;
+
+      for (let i = 0; i < documentos.length; i += DOC_CHUNK) {
+        const chunk = documentos.slice(i, i + DOC_CHUNK);
+        const { data: found, error } = await supabase
+          .from("clientes")
+          .select("documento")
+          .in("documento", chunk);
+
+        if (error) {
+          console.warn(
+            "⚠️ Erro ao verificar cadastros existentes:",
+            error.message,
+          );
+          return; // sem a lista de existentes, nao arriscamos duplicar
+        }
+        found?.forEach((c) => existentes.add(c.documento));
+      }
+
+      const novos = documentos
+        .filter((documento) => !existentes.has(documento))
+        .map((documento) => {
+          const row = byDocumento.get(documento)!;
+          const cadastro: ClienteInsert = {
+            documento,
+            nome: (row.cliente || "").trim() || "Cliente sem nome",
+          };
+          for (const column of CADASTRO_CONTATO_COLUMNS) {
+            const value = (row[column] || "").trim();
+            (cadastro as Record<string, unknown>)[column] =
+              value === "" ? null : value;
+          }
+          return cadastro;
+        });
+
+      if (novos.length === 0) {
+        console.log("ℹ️ Nenhum cliente novo para cadastrar.");
+        return;
+      }
+
+      const INSERT_CHUNK = 500;
+      for (let i = 0; i < novos.length; i += INSERT_CHUNK) {
+        const chunk = novos.slice(i, i + INSERT_CHUNK);
+        const { error } = await supabase.from("clientes").insert(chunk);
+        if (error) {
+          // Parcelas ja gravadas continuam validas; o cadastro pode ser
+          // completado depois pela importacao de cadastro.
+          console.error("❌ Erro ao cadastrar clientes novos:", error);
+        }
+      }
+
+      console.log(`👤 ${novos.length} cliente(s) novo(s) cadastrado(s).`);
+    } catch (error) {
+      console.error("❌ Exceção ao cadastrar clientes novos:", error);
     }
   };
 
@@ -1835,26 +1875,40 @@ const DatabaseUpload: React.FC = () => {
       onFinish: () => setStatusFiles([]),
     });
 
-  // Importa a Data de Nascimento do relatorio de clientes. A regra de negocio
-  // (parsing, normalizacao, casamento por documento e update em lote) vive em
-  // clientesImportService; aqui cuidamos apenas da UI (progresso e resultado).
+  // Importa o cadastro de clientes (nome, apelido, nascimento e contatos). A
+  // regra de negocio (colunas aceitas, normalizacao, casamento por documento e
+  // update em lote) vive em clientesImportService; aqui cuidamos apenas da UI
+  // (progresso e resultado).
   const handleUploadClientes = () =>
     runQueue(clientesFiles, {
       validate: async (file) => quickValidateClientes(file),
       run: async (file, onProgress) => {
-        const { rows } = await importClientesBirthDates(file, onProgress);
+        const { rows, detectedFields, notFound, noChange } =
+          await importClientesCadastro(file, onProgress);
+
+        // Quais colunas o importador reconheceu e o que aconteceu com quem nao
+        // foi atualizado: sem isso o usuario nao tem como saber se a coluna que
+        // ele preencheu foi ignorada por causa do cabecalho.
+        setDebugInfo(
+          (prev) =>
+            `${prev}${prev ? "\n" : ""}📄 ${file.name}: colunas reconhecidas — ` +
+            `${detectedFields.join(", ")} | ${notFound} não encontrado(s), ` +
+            `${noChange} já estava(m) igual(is).`,
+        );
+
         return rows.map((r) => ({
           id_parcela: r.documento,
           status: r.status,
           error: r.error,
+          details: r.updatedFields,
         }));
       },
       summarize: (results) => {
         const { success, unchanged, error } = countByStatus(results);
-        return `Data de nascimento: ${success} atualizada(s), ${unchanged} não encontrado(s) na base, ${error} falha(s).`;
+        return `Cadastro: ${success} cliente(s) atualizado(s), ${unchanged} sem alteração/não encontrado(s), ${error} falha(s).`;
       },
       labels: CLIENTES_RESULT_LABELS,
-      title: "Resultado da Atualização de Data de Nascimento",
+      title: "Resultado da Atualização do Cadastro de Clientes",
       onFinish: () => setClientesFiles([]),
     });
 
@@ -1926,14 +1980,56 @@ const DatabaseUpload: React.FC = () => {
               <Download className="h-5 w-5 mr-2" />
               <span>Baixar Banco de Dados</span>
             </button>
-            <button
-              onClick={handleDownloadTemplate}
-              disabled={loading}
-              className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              <FileText className="h-5 w-5 mr-2" />
-              <span>Baixar Modelo CSV</span>
-            </button>
+            <div className="relative" ref={templateMenuRef}>
+              <button
+                type="button"
+                onClick={() => setTemplateMenuOpen((open) => !open)}
+                disabled={loading}
+                aria-haspopup="menu"
+                aria-expanded={templateMenuOpen}
+                className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              >
+                <FileText className="h-5 w-5 mr-2" />
+                <span>Baixar Modelo CSV</span>
+                <ChevronDown
+                  className={`h-4 w-4 ml-2 transition-transform ${
+                    templateMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {templateMenuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden"
+                >
+                  <p className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">
+                    Escolha o modelo
+                  </p>
+                  {UPLOAD_TEMPLATES.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => handleDownloadTemplate(template)}
+                      className="w-full text-left px-4 py-3 hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none border-b border-gray-100 last:border-b-0"
+                    >
+                      <span className="flex items-center text-sm font-medium text-gray-800">
+                        <Download className="h-4 w-4 mr-2 text-indigo-600 shrink-0" />
+                        {template.label}
+                      </span>
+                      <span className="block mt-1 text-xs text-gray-500">
+                        {template.description}
+                      </span>
+                      <span className="block mt-1 text-[11px] text-gray-400">
+                        {template.headers.length} coluna(s) ·{" "}
+                        {template.fileName}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <button
             onClick={() => setShowAddTituloModal(true)}
@@ -2122,7 +2218,7 @@ const DatabaseUpload: React.FC = () => {
           </div>
         </div>
 
-        {/* Card: Atualizar Cadastro de Clientes (Data de Nascimento) */}
+        {/* Card: Atualizar Cadastro de Clientes */}
         <div className="flex flex-col bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transition-all hover:shadow-xl">
           <div className="p-6">
             <div className="flex items-center gap-3">
@@ -2130,21 +2226,29 @@ const DatabaseUpload: React.FC = () => {
                 <User className="h-6 w-6 text-purple-600" />
               </div>
               <h3 className="text-xl font-bold text-gray-800">
-                Atualizar Data de Nascimento dos Clientes
+                Atualizar Cadastro de Clientes
               </h3>
             </div>
             <p className="text-gray-500 mt-3 text-sm">
-              Envie o relatório de clientes (xlsx ou csv) com as colunas{" "}
+              Envie o relatório de clientes (xlsx ou csv) com a coluna{" "}
               <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
-                Documento
+                documento
               </code>{" "}
-              e{" "}
-              <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
-                Data de Nascimento
-              </code>
-              . A data é vinculada ao cliente pelo CPF/CNPJ. Apenas clientes já
-              existentes na base são atualizados.
+              e as que quiser atualizar. Colunas desconhecidas ou vazias são
+              ignoradas, e apenas clientes já existentes na base são
+              atualizados.
             </p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {CLIENTE_IMPORT_FIELDS.map((field) => (
+                <code
+                  key={field.key}
+                  title={`Aceita também: ${field.label}`}
+                  className="text-[11px] bg-purple-50 text-purple-700 border border-purple-100 px-1.5 py-0.5 rounded"
+                >
+                  {field.key}
+                </code>
+              ))}
+            </div>
           </div>
 
           <div className="px-6 pb-6 mt-auto">
