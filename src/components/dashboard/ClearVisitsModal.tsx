@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Trash2, CheckCircle, Loader2 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { ScheduledVisit } from "../../types";
+import { isVisitOverdue as isOverdue } from "../../config/visitStatus";
 
 // Status "concluidos"/historicos — NUNCA removidos pela limpeza.
 export const DONE_VISIT_STATUSES = [
@@ -10,26 +11,6 @@ export const DONE_VISIT_STATUSES = [
   "nao_encontrado",
   "reagendada",
 ];
-
-const parseDateUTC = (dateString: string): Date | null => {
-  if (!dateString) return null;
-  try {
-    const [y, m, d] = dateString.split("-");
-    return new Date(Date.UTC(parseInt(y), parseInt(m) - 1, parseInt(d)));
-  } catch {
-    return null;
-  }
-};
-
-const isOverdue = (v: ScheduledVisit): boolean => {
-  if (v.status !== "agendada") return false;
-  const today = new Date();
-  const todayUTC = new Date(
-    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
-  );
-  const vd = parseDateUTC(v.scheduledDate);
-  return !!vd && vd < todayUTC;
-};
 
 /** Quantidade de visitas pendentes (nao concluidas) de um cobrador. */
 export const pendingVisitsCount = (
@@ -66,7 +47,7 @@ const ClearVisitsModal: React.FC<ClearVisitsModalProps> = ({
     s: "overdue" | "scheduled" | "pending",
   ): ScheduledVisit[] => {
     const cv = scheduledVisits.filter((v) => v.collectorId === collectorId);
-    if (s === "overdue") return cv.filter(isOverdue);
+    if (s === "overdue") return cv.filter((v) => isOverdue(v));
     // "Agendadas" = somente as no prazo (sem atraso), para não sobrepor com
     // "Atrasadas" — assim Pendentes = Atrasadas + Agendadas (+ demais não concluídas).
     if (s === "scheduled")

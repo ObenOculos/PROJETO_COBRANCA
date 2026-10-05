@@ -12,6 +12,7 @@ import { useAuth } from "./AuthContext";
 import { formatCurrency } from "../utils/formatters";
 import { parseAndNormalizeDate } from "../filters/dates";
 import { UserType } from "../types";
+import { isVisitOverdue } from "../config/visitStatus";
 
 export interface Notification {
   id: string;
@@ -129,13 +130,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           (v) => v.collectorId === user.id && v.status === "agendada",
         );
 
-        // Overdue scheduled visits (scheduled date already passed)
-        const overdueVisits = myActiveVisits.filter((v) => {
-          const visitDate = new Date(v.scheduledDate);
-          if (isNaN(visitDate.getTime())) return false; // Skip invalid dates
-          visitDate.setHours(23, 59, 59, 999); // End of the visit day
-          return visitDate < now;
-        });
+        // Overdue scheduled visits. Regra unica em config/visitStatus — a
+        // versao local fazia new Date("YYYY-MM-DD"), que e meia-noite UTC (21h
+        // da vespera em Brasilia), e contava as visitas de HOJE como atrasadas.
+        const overdueVisits = myActiveVisits.filter((v) => isVisitOverdue(v));
 
         if (overdueVisits.length > 0) {
           newNotifications.push({

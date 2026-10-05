@@ -34,7 +34,12 @@ import {
   classifyVisitNote,
   visitOutcomeLabel,
 } from "../../config/visitOutcomes";
-import { visitStatusLabel, visitEffectiveDate } from "../../config/visitStatus";
+import {
+  visitStatusLabel,
+  visitEffectiveDate,
+  isVisitOverdue as isVisitOverdueRule,
+  visitOverdueDays,
+} from "../../config/visitStatus";
 import {
   clientesReincidentes,
   rescheduleReasonShort,
@@ -192,6 +197,16 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const [showSchedulerModal, setShowSchedulerModal] = useState(false);
   const [selectedCollectorForScheduler, setSelectedCollectorForScheduler] =
     useState<string | null>(null);
+  // Visita em que o agendamento abre focado (clique no nome do cliente).
+  const [schedulerFocusVisitId, setSchedulerFocusVisitId] = useState<
+    string | null
+  >(null);
+
+  const openSchedulerAtVisit = (visit: ScheduledVisit) => {
+    setSelectedCollectorForScheduler(visit.collectorId);
+    setSchedulerFocusVisitId(visit.id);
+    setShowSchedulerModal(true);
+  };
 
   useEffect(() => {
     const anyModalOpen = showSchedulerModal || showApprovalModal;
@@ -334,52 +349,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     return collector?.name || "Cobrador não encontrado";
   };
 
-  // Função para verificar se uma visita está atrasada
-  const isVisitOverdue = (visit: ScheduledVisit): boolean => {
-    if (visit.status !== "agendada") return false;
+  // Regra de atraso: fonte unica em config/visitStatus.
+  const isVisitOverdue = (visit: ScheduledVisit): boolean =>
+    isVisitOverdueRule(visit);
 
-    try {
-      const today = new Date();
-      const todayUTC = new Date(
-        Date.UTC(
-          today.getUTCFullYear(),
-          today.getUTCMonth(),
-          today.getUTCDate(),
-        ),
-      );
-
-      const visitDate = parseDateString(visit.scheduledDate);
-      if (!visitDate) return false; // This is already a UTC date at midnight
-
-      return visitDate < todayUTC;
-    } catch {
-      return false;
-    }
-  };
-
-  // Função para calcular dias de atraso
-  const getOverdueDays = (visitDate: string): number => {
-    try {
-      const today = new Date();
-      const todayUTC = new Date(
-        Date.UTC(
-          today.getUTCFullYear(),
-          today.getUTCMonth(),
-          today.getUTCDate(),
-        ),
-      );
-
-      const date = parseDateString(visitDate);
-      if (!date) return 0; // This is already a UTC date at midnight
-
-      const diffTime = todayUTC.getTime() - date.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-      return Math.max(0, diffDays);
-    } catch {
-      return 0;
-    }
-  };
+  const getOverdueDays = (visit: ScheduledVisit): number =>
+    visitOverdueDays(visit);
 
   const formatSafeDateTime = (dateString: string, timeString?: string) => {
     try {
@@ -844,7 +819,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
         : "N/A",
       Atrasada: isVisitOverdue(visit) ? "Sim" : "Não",
       "Dias de Atraso": isVisitOverdue(visit)
-        ? getOverdueDays(visit.scheduledDate)
+        ? getOverdueDays(visit)
         : 0,
       Observações: visit.notes,
       "Motivo Cancelamento": visit.cancellationRequestReason,
@@ -1601,9 +1576,21 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                         >
                                           <td className="py-4 pr-4">
                                             <div className="flex flex-col">
-                                              <span className="text-sm font-semibold text-gray-900 dark:text-dark-text leading-tight">
-                                                {visit.clientName}
-                                              </span>
+                                              {user?.type === "manager" ? (
+                                                <button
+                                                  onClick={() =>
+                                                    openSchedulerAtVisit(visit)
+                                                  }
+                                                  className="text-sm font-semibold text-gray-900 dark:text-dark-text leading-tight text-left hover:text-blue-600 hover:underline"
+                                                  title="Abrir no agendamento"
+                                                >
+                                                  {visit.clientName}
+                                                </button>
+                                              ) : (
+                                                <span className="text-sm font-semibold text-gray-900 dark:text-dark-text leading-tight">
+                                                  {visit.clientName}
+                                                </span>
+                                              )}
                                               <span className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5">
                                                 {visit.clientDocument}
                                               </span>
@@ -1692,9 +1679,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                             ) : isOverdue ? (
                                               <div className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-semibold border border-red-100 dark:border-red-950/30">
                                                 Atrasada{" "}
-                                                {getOverdueDays(
-                                                  visit.scheduledDate,
-                                                )}{" "}
+                                                {getOverdueDays(visit)}{" "}
                                                 Dias
                                               </div>
                                             ) : null}
@@ -1727,7 +1712,19 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                       <div className="flex justify-between items-start mb-4">
                                         <div className="min-w-0 pr-2">
                                           <h4 className="text-sm font-semibold text-gray-900 dark:text-dark-text leading-tight truncate">
-                                            {visit.clientName}
+                                            {user?.type === "manager" ? (
+                                              <button
+                                                onClick={() =>
+                                                  openSchedulerAtVisit(visit)
+                                                }
+                                                className="text-left truncate max-w-full hover:text-blue-600 hover:underline"
+                                                title="Abrir no agendamento"
+                                              >
+                                                {visit.clientName}
+                                              </button>
+                                            ) : (
+                                              visit.clientName
+                                            )}
                                           </h4>
                                           <p className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary mt-1">
                                             {visit.clientDocument}
@@ -1810,9 +1807,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                         visit.status === "agendada" && (
                                           <div className="mt-2 text-center py-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-semibold rounded-xl border border-red-100 dark:border-red-955/30">
                                             Atrasada{" "}
-                                            {getOverdueDays(
-                                              visit.scheduledDate,
-                                            )}{" "}
+                                            {getOverdueDays(visit)}{" "}
                                             Dias
                                           </div>
                                         )}
@@ -2897,6 +2892,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           onClick={() => {
             setShowSchedulerModal(false);
             setSelectedCollectorForScheduler(null);
+            setSchedulerFocusVisitId(null);
           }}
         >
           <div
@@ -2905,9 +2901,11 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           >
             <VisitScheduler
               collectorId={selectedCollectorForScheduler}
+              initialVisitId={schedulerFocusVisitId ?? undefined}
               onClose={() => {
                 setShowSchedulerModal(false);
                 setSelectedCollectorForScheduler(null);
+                setSchedulerFocusVisitId(null);
               }}
             />
           </div>

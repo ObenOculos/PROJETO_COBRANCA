@@ -17,6 +17,7 @@ import { getClientPaymentStatus } from "../../filters/clientStatus";
 import { resolveSaleKey } from "../../filters/sales";
 import {
   visitEffectiveDate,
+  isVisitOverdue,
   REMARCACOES_REINCIDENTE,
   ReincidenteCliente,
 } from "../../config/visitStatus";
@@ -893,8 +894,6 @@ const EnhancedPerformanceChart: React.FC = () => {
       const collectorVisits = scheduledVisits.filter(
         (v) => v.collectorId === collector.id,
       );
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
 
       let visitsRealizadas = 0;
       let visitsNaoEncontrado = 0;
@@ -920,12 +919,8 @@ const EnhancedPerformanceChart: React.FC = () => {
 
         // Vencida (não concluída com data passada). "Agendados" e "Atrasado"
         // são mutuamente exclusivos — uma agendada vencida conta só como atrasada.
-        const isOverdue =
-          (v.status === "agendada" ||
-            v.status === "cancelamento_solicitado" ||
-            v.status === "pending_sync") &&
-          !!visitDate &&
-          visitDate < today;
+        // Regra única em config/visitStatus.
+        const isOverdue = isVisitOverdue(v);
 
         if (v.status === "realizada") visitsRealizadas++;
         if (v.status === "nao_encontrado") visitsNaoEncontrado++;

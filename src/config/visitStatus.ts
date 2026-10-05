@@ -100,3 +100,52 @@ export const lastVisitStatusByClient = (
   latest.forEach((value, doc) => result.set(doc, value.status));
   return result;
 };
+
+/**
+ * Hoje no fuso do aparelho, em YYYY-MM-DD (mesmo formato de scheduledDate).
+ *
+ * Nao usar toISOString()/getUTC*: no horario de Brasilia, das 21h a meia-noite
+ * a data UTC ja e o dia seguinte e as visitas de hoje viravam "atrasadas".
+ */
+export const todayLocalStr = (now: Date = new Date()): string =>
+  `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+/** Status de visita que ainda nao teve desfecho. */
+export const OPEN_VISIT_STATUSES: ReadonlyArray<ScheduledVisit["status"]> = [
+  "agendada",
+  "cancelamento_solicitado",
+  "pending_sync",
+];
+
+export const isVisitOpen = (visit: ScheduledVisit): boolean =>
+  OPEN_VISIT_STATUSES.includes(visit.status);
+
+/**
+ * Visita atrasada: sem desfecho e com a data ja passada. Fonte UNICA — havia
+ * sete versoes desta regra, com status e fusos diferentes, e o mesmo cobrador
+ * aparecia com contagens de atraso diferentes em cada tela.
+ *
+ * Compara as strings YYYY-MM-DD direto, sem montar Date, para nao depender de
+ * fuso. (O RouteMap tem outro conceito — "o horario ja passou" — e nao usa
+ * esta funcao.)
+ */
+export const isVisitOverdue = (
+  visit: ScheduledVisit,
+  today: string = todayLocalStr(),
+): boolean =>
+  isVisitOpen(visit) && !!visit.scheduledDate && visit.scheduledDate < today;
+
+/** Dias de atraso de uma visita (0 se nao estiver atrasada). */
+export const visitOverdueDays = (
+  visit: ScheduledVisit,
+  today: string = todayLocalStr(),
+): number => {
+  if (!isVisitOverdue(visit, today)) return 0;
+  const toUTC = (s: string) => {
+    const [y, m, d] = s.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round(
+    (toUTC(today) - toUTC(visit.scheduledDate)) / (1000 * 60 * 60 * 24),
+  );
+};

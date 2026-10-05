@@ -42,6 +42,12 @@ import { PAYABLE_STATUSES } from "../../types/status";
 import { parseAndNormalizeDate } from "../../filters/dates";
 import { VISIT_OUTCOMES, exactVisitOutcome } from "../../config/visitOutcomes";
 import {
+  visitStatusLabel,
+  isVisitOverdue,
+  isVisitOpen,
+  visitOverdueDays,
+} from "../../config/visitStatus";
+import {
   RESCHEDULE_REASONS,
   countPriorReschedules,
 } from "../../config/rescheduleReasons";
@@ -49,11 +55,14 @@ import {
 interface VisitSchedulerProps {
   onClose?: () => void;
   collectorId?: string;
+  /** Abre ja no dia desta visita, com o card destacado. */
+  initialVisitId?: string;
 }
 
 const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   onClose,
   collectorId,
+  initialVisitId,
 }) => {
   const {
     getClientGroups,
@@ -256,14 +265,26 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   >({});
 
   // NEW STATE: To track if the overdue modal has been shown.
-  const [hasOverdueModalBeenShown, setHasOverdueModalBeenShown] =
-    useState(false);
+  // Aberto ja focado numa visita: o aviso de atrasadas cobriria justamente o
+  // dia que o gestor pediu para ver, entao nao e mostrado.
+  const [hasOverdueModalBeenShown, setHasOverdueModalBeenShown] = useState(
+    Boolean(initialVisitId),
+  );
 
   // Estados para filtro das visitas do dia selecionado
   const [visitsSortBy, setVisitsSortBy] = useState<
     "name" | "city" | "value" | "address"
   >("name");
   const [visitsSortOrder, setVisitsSortOrder] = useState<"asc" | "desc">("asc");
+
+  // Busca de agendados em TODAS as datas — sem ela o cobrador precisava
+  // adivinhar o dia e abrir o calendario dia por dia ate achar o cliente.
+  const [visitSearch, setVisitSearch] = useState("");
+  // Visita escolhida na busca: o dia e aberto, a pagina certa e selecionada e
+  // o card fica destacado ate o efeito abaixo rolar ate ele.
+  const [highlightedVisitId, setHighlightedVisitId] = useState<string | null>(
+    null,
+  );
 
   // Listen for visits scheduled by a manager to refresh data
   useEffect(() => {
@@ -659,18 +680,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     // Only proceed if the modal hasn't been shown yet
     if (!user || !allVisits || hasOverdueModalBeenShown) return;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split("T")[0];
-
-    // Filtrar visitas atrasadas
-    const overdueVisits = allVisits.filter((visit) => {
-      return (
-        visit.scheduledDate < todayStr &&
-        (visit.status === "agendada" ||
-          visit.status === "cancelamento_solicitado")
-      );
-    });
+    // Filtrar visitas atrasadas (regra unica em config/visitStatus)
+    const overdueVisits = allVisits.filter((visit) => isVisitOverdue(visit));
 
     // Agrupar por data
     const groupedByDate: Record<string, ScheduledVisit[]> = {};
@@ -867,28 +878,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     if (!selectedCalendarDate) return [];
     const visits = getVisitsForDate(selectedCalendarDate);
 
-    // Verificar se a data selecionada é passada para marcar como atrasada
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const selectedDate = new Date(selectedCalendarDate);
-    selectedDate.setHours(0, 0, 0, 0);
-    const isOverdue = selectedDate < today;
-
-    // Calcular dias de atraso
-    const daysDiff = isOverdue
-      ? Math.floor(
-          (today.getTime() - selectedDate.getTime()) / (1000 * 60 * 60 * 24),
-        )
-      : 0;
-
-    // Adicionar flag de atrasada nas visitas
+    // Flag de atrasada (regra unica em config/visitStatus)
     const visitsWithOverdueFlag = visits.map((visit) => ({
       ...visit,
-      isOverdue:
-        isOverdue &&
-        (visit.status === "agendada" ||
-          visit.status === "cancelamento_solicitado"),
-      overdueDays: daysDiff,
+      isOverdue: isVisitOverdue(visit),
+      overdueDays: visitOverdueDays(visit),
     }));
 
     // Ordenar visitas
@@ -930,6 +924,102 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const totalSelectedDatePages = Math.ceil(
     selectedDateVisits.length / visitsPerPage,
   );
+
+  // Resultados da busca de agendados. Mesmo universo de status que o
+  // calendario mostra (getVisitsForDate), para que todo resultado leve a um
+  // dia onde a visita de fato aparece.
+  const visitSearchResults = useMemo(() => {
+    const normalize = (s: string) =>
+      s
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase();
+    const term = normalize(visitSearch.trim());
+    if (term.length < 2) return [];
+    const termDigits = visitSearch.replace(/\D/g, "");
+
+    const pending = isVisitOpen;
+
+    return allVisits
+      .filter((visit) => {
+        if (
+          visit.status !== "agendada" &&
+          visit.status !== "realizada" &&
+          visit.status !== "nao_encontrado" &&
+          visit.status !== "cancelamento_solicitado" &&
+          visit.status !== "pending_sync"
+        ) {
+          return false;
+        }
+        const apelido = clientDataCache.get(visit.clientDocument)?.apelido;
+        const haystack = normalize(
+          [
+            visit.clientName,
+            apelido,
+            visit.clientAddress,
+            visit.clientNeighborhood,
+            visit.clientCity,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        );
+        if (haystack.includes(term)) return true;
+        // Documento: compara so os digitos, para "123.456" achar "123456..."
+        return (
+          termDigits.length >= 3 &&
+          visit.clientDocument.replace(/\D/g, "").includes(termDigits)
+        );
+      })
+      .sort((a, b) => {
+        // Pendentes primeiro; dentro de cada grupo, data mais proxima antes.
+        if (pending(a) !== pending(b)) return pending(a) ? -1 : 1;
+        return pending(a)
+          ? a.scheduledDate.localeCompare(b.scheduledDate)
+          : b.scheduledDate.localeCompare(a.scheduledDate);
+      });
+  }, [visitSearch, allVisits, clientDataCache]);
+
+  const goToSearchedVisit = (visit: ScheduledVisit) => {
+    const [year, month, day] = visit.scheduledDate.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+    setCurrentMonth(new Date(year, month - 1, 1));
+    selectDate(date);
+    setHighlightedVisitId(visit.id);
+    setVisitSearch("");
+  };
+
+  // Abertura focada (ex.: clique no nome do cliente no Acompanhamento). As
+  // visitas podem chegar depois do mount, entao espera ate encontrar a visita
+  // e aplica uma vez so.
+  const initialVisitAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!initialVisitId || initialVisitAppliedRef.current) return;
+    const visit = allVisits.find((v) => v.id === initialVisitId);
+    if (!visit) return;
+    initialVisitAppliedRef.current = true;
+    goToSearchedVisit(visit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialVisitId, allVisits]);
+
+  // Depois que o dia abre: vai para a pagina da visita, rola ate o card e
+  // tira o destaque alguns segundos depois.
+  useEffect(() => {
+    if (!highlightedVisitId) return;
+    const index = selectedDateVisits.findIndex(
+      (v) => v.id === highlightedVisitId,
+    );
+    if (index === -1) return;
+    const page = Math.floor(index / visitsPerPage) + 1;
+    if (page !== currentPage) {
+      setCurrentPage(page);
+      return;
+    }
+    document
+      .getElementById(`visit-card-${highlightedVisitId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timer = setTimeout(() => setHighlightedVisitId(null), 3000);
+    return () => clearTimeout(timer);
+  }, [highlightedVisitId, selectedDateVisits, currentPage, visitsPerPage]);
 
   // ✅ CORREÇÃO: Memoizar a lista de documentos para evitar re-execuções desnecessárias
   const clientsToPrefetch = useMemo(() => {
@@ -2122,6 +2212,94 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   </div>
                 </div>
 
+                {/* Busca de agendados (todas as datas) */}
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={visitSearch}
+                    onChange={(e) => setVisitSearch(e.target.value)}
+                    placeholder="Buscar agendado por nome, apelido, documento ou endereço..."
+                    className="w-full pl-9 pr-9 py-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  {visitSearch && (
+                    <button
+                      onClick={() => setVisitSearch("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 rounded-full"
+                      title="Limpar busca"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+
+                  {visitSearch.trim().length >= 2 && (
+                    <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-80 overflow-y-auto">
+                      {visitSearchResults.length === 0 ? (
+                        <p className="px-4 py-3 text-sm text-gray-500">
+                          Nenhum agendamento encontrado para "{visitSearch}".
+                        </p>
+                      ) : (
+                        visitSearchResults.slice(0, 30).map((visit) => {
+                          const [y, m, d] = visit.scheduledDate.split("-");
+                          const isPending = isVisitOpen(visit);
+                          const isLate = isVisitOverdue(visit);
+                          const apelido = clientDataCache.get(
+                            visit.clientDocument,
+                          )?.apelido;
+                          return (
+                            <button
+                              key={visit.id}
+                              onClick={() => goToSearchedVisit(visit)}
+                              className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-gray-800 truncate">
+                                  {visit.clientName}
+                                  {apelido && (
+                                    <span className="font-normal text-gray-500">
+                                      {" "}
+                                      ({apelido})
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-gray-500 truncate">
+                                  {[visit.clientAddress, visit.clientCity]
+                                    .filter(Boolean)
+                                    .join(" - ")}
+                                </p>
+                              </div>
+                              <div className="flex flex-col items-end shrink-0">
+                                <span className="text-sm font-bold text-blue-700">
+                                  {d}/{m}/{y}
+                                </span>
+                                <span
+                                  className={`text-[11px] font-medium ${
+                                    isLate
+                                      ? "text-red-600"
+                                      : isPending
+                                        ? "text-yellow-700"
+                                        : "text-green-700"
+                                  }`}
+                                >
+                                  {isLate
+                                    ? "Atrasada"
+                                    : visitStatusLabel(visit.status)}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                      {visitSearchResults.length > 30 && (
+                        <p className="px-4 py-2 text-xs text-gray-500 bg-gray-50">
+                          Mostrando 30 de {visitSearchResults.length}. Refine a
+                          busca.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Grade do Calendário */}
                 <div className="grid grid-cols-7 gap-2 sm:gap-2 md:gap-3">
                   {/* Cabeçalho dos dias da semana */}
@@ -2170,41 +2348,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       ) => {
                         if (visits.length === 0) return "";
 
-                        const today = new Date();
-                        const todayUTC = new Date(
-                          Date.UTC(
-                            today.getUTCFullYear(),
-                            today.getUTCMonth(),
-                            today.getUTCDate(),
-                          ),
-                        );
-
-                        const hasPending = visits.some(
-                          (v) =>
-                            v.status === "agendada" ||
-                            v.status === "cancelamento_solicitado",
-                        );
-
-                        if (!hasPending) {
+                        // Regra unica em config/visitStatus. A versao
+                        // anterior usava a data UTC e pintava o dia de hoje
+                        // de vermelho a partir das 21h.
+                        if (!visits.some((v) => isVisitOpen(v))) {
                           return "bg-green-500"; // Verde: Todas as visitas concluídas ou finalizadas
                         }
 
-                        const hasOverdue = visits.some((v) => {
-                          const visitDate = new Date(
-                            Date.UTC(
-                              parseInt(v.scheduledDate.split("-")[0]),
-                              parseInt(v.scheduledDate.split("-")[1]) - 1,
-                              parseInt(v.scheduledDate.split("-")[2]),
-                            ),
-                          );
-                          return (
-                            (v.status === "agendada" ||
-                              v.status === "cancelamento_solicitado") &&
-                            visitDate < todayUTC
-                          );
-                        });
-
-                        if (hasOverdue) {
+                        if (visits.some((v) => isVisitOverdue(v))) {
                           return "bg-red-500"; // Vermelho: Há visitas pendentes e atrasadas
                         }
 
@@ -2456,10 +2607,15 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       return (
                         <div
                           key={visit.id}
-                          className={`bg-white rounded-2xl shadow-sm border overflow-hidden ${
+                          id={`visit-card-${visit.id}`}
+                          className={`bg-white rounded-2xl shadow-sm border overflow-hidden transition-shadow ${
                             visit.isOverdue
                               ? "border-red-300 bg-red-50"
                               : "border-gray-200"
+                          } ${
+                            highlightedVisitId === visit.id
+                              ? "ring-4 ring-blue-400"
+                              : ""
                           }`}
                         >
                           {/* Card Header */}
