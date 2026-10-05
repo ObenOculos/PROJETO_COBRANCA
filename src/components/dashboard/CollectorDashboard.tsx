@@ -35,6 +35,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import { FilterOptions } from "../../types";
 import { resolveSaleKey } from "../../filters/sales";
+import { hasOpenBalance } from "../../filters/clientStatus";
 
 import LogContactModal from "./LogContactModal";
 import ClientDetailModal from "./ClientDetailModal";
@@ -109,16 +110,23 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return map;
   }, [myVisits]);
 
+  // Lista de trabalho: so quem ainda deve. Quem quitou segue atribuido e conta
+  // no recebido (meta), mas sai da carteira.
+  const openClientGroups = useMemo(
+    () => clientGroups.filter((g) => hasOpenBalance(g.pendingValue)),
+    [clientGroups],
+  );
+
   const cities = useMemo(() => {
     const set = new Set<string>();
-    clientGroups.forEach((g) => {
+    openClientGroups.forEach((g) => {
       if (g.city) set.add(g.city);
     });
     return Array.from(set).sort();
-  }, [clientGroups]);
+  }, [openClientGroups]);
 
   const filteredClientGroups = useMemo(() => {
-    return clientGroups.filter((group) => {
+    return openClientGroups.filter((group) => {
       const lowerSearch = searchTerm.toLowerCase();
       const matchesSearch =
         !searchTerm ||
@@ -159,7 +167,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       return true;
     });
   }, [
-    clientGroups,
+    openClientGroups,
     searchTerm,
     filterAging,
     filterCity,
@@ -180,7 +188,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   }, [filteredClientGroups, currentPage]);
 
   const stats = useMemo(() => {
-    const totalReceived = filteredClientGroups.reduce(
+    // Recebido de TODA a carteira atribuida, inclusive quem ja quitou: e o
+    // progresso da meta, nao pode cair quando o cliente paga tudo.
+    const totalReceived = clientGroups.reduce(
       (sum, g) => sum + g.totalReceived,
       0,
     );
@@ -217,7 +227,13 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       critical,
       high,
     };
-  }, [filteredClientGroups, myCollections, monthlyGoals, user?.id]);
+  }, [
+    clientGroups,
+    filteredClientGroups,
+    myCollections,
+    monthlyGoals,
+    user?.id,
+  ]);
 
   const getPriorityColor = (days: number) => {
     if (days > 90)
@@ -1157,6 +1173,12 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     [filters, user?.id],
   );
   const clientGroups = useMemo(() => getClientGroups(user?.id), [user?.id]);
+  // Carteira ativa (quem ainda deve). clientGroups completo continua indo para
+  // as metricas de recebido.
+  const openClientGroups = useMemo(
+    () => clientGroups.filter((g) => hasOpenBalance(g.pendingValue)),
+    [clientGroups],
+  );
   const myVisits = useMemo(
     () => getVisitsByCollector(user?.id || ""),
     [user?.id],
@@ -1213,7 +1235,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   }, [myCollections]);
 
   const clientsByCity = useMemo(() => {
-    return clientGroups.reduce(
+    return openClientGroups.reduce(
       (acc, group) => {
         const city = group.city || "Sem cidade";
         acc[city] = (acc[city] || 0) + 1;
@@ -1221,7 +1243,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       },
       {} as Record<string, number>,
     );
-  }, [clientGroups]);
+  }, [openClientGroups]);
 
   const schedulesByCity = useMemo(() => {
     const scheduled = myVisits.filter((v) => v.status === "agendada");

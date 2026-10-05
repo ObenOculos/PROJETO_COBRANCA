@@ -69,6 +69,17 @@ export const getClientPending = (collections: Collection[]): number => {
 };
 
 /**
+ * O cliente ainda deve? Regra unica de "carteira ativa": o cobrador so trabalha
+ * (lista, rota, agendamento) quem tem saldo acima de 1 centavo. O cliente
+ * quitado CONTINUA atribuido (user_id) — o Desempenho credita o que ele pagou ao
+ * cobrador por esse campo —, so sai da lista de trabalho.
+ * Espelho no banco: cliente_tem_saldo_aberto (migration 20261005000001), que
+ * cancela as visitas em aberto de quem quita.
+ */
+export const hasOpenBalance = (pendingValue: number): boolean =>
+  round2(pendingValue) > 0.01;
+
+/**
  * Normaliza o vocabulario de status para o valor canonico. O dropdown envia
  * "Em atraso"/"Pago"/"Pago Parcial" e os botoes enviam "pendente"/"pago"/"parcial".
  * O caso "cancelado" e tratado a parte (base de titulos cancelados), nao aqui.

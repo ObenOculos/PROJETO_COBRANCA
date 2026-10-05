@@ -50,6 +50,8 @@ import { isCancelado } from "../types/status";
 import {
   clientKey,
   getClientPaymentStatus,
+  getClientPending,
+  hasOpenBalance,
   normalizePaymentStatus,
 } from "../filters/clientStatus";
 import { resolveSaleKey } from "../filters/sales";
@@ -1686,6 +1688,24 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           c.user_id === collectorId ||
           assignedStores.includes(c.nome_da_loja || ""),
       );
+
+      // Carteira ativa: sem filtro de status, o cobrador ve so quem ainda deve
+      // (hasOpenBalance). Quem quitou continua atribuido e aparece se ele pedir
+      // explicitamente o status "Pago".
+      if (rawStatusList.length === 0) {
+        const byClient = new Map<string, Collection[]>();
+        filtered.forEach((c) => {
+          const key = clientKey(c);
+          if (!byClient.has(key)) byClient.set(key, []);
+          byClient.get(key)!.push(c);
+        });
+        const openClients = new Set(
+          [...byClient]
+            .filter(([, cols]) => hasOpenBalance(getClientPending(cols)))
+            .map(([key]) => key),
+        );
+        filtered = filtered.filter((c) => openClients.has(clientKey(c)));
+      }
     }
 
     // Helper function to parse date strings (supports multiple formats)

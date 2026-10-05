@@ -40,6 +40,7 @@ import {
 } from "../../utils/visitScheduling";
 import { PAYABLE_STATUSES } from "../../types/status";
 import { parseAndNormalizeDate } from "../../filters/dates";
+import { hasOpenBalance } from "../../filters/clientStatus";
 import { VISIT_OUTCOMES, exactVisitOutcome } from "../../config/visitOutcomes";
 import {
   visitStatusLabel,
@@ -402,7 +403,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
     const availableClientGroups = clientGroups.filter(
       (client) =>
-        !activeClientDocuments.has(client.document) && client.pendingValue > 0,
+        !activeClientDocuments.has(client.document) &&
+        hasOpenBalance(client.pendingValue),
     );
 
     let filteredClients = availableClientGroups;
