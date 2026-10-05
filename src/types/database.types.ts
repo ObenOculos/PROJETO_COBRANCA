@@ -97,30 +97,33 @@ export type Database = {
           assigned_at: string;
           cliente_nome: string | null;
           cobrador_anterior_id: string | null;
-          cobrador_novo_id: string;
+          cobrador_novo_id: string | null;
           documento: string;
           gerente_id: string;
           id: string;
+          motivo: string | null;
           nome_da_loja: string | null;
         };
         Insert: {
           assigned_at?: string;
           cliente_nome?: string | null;
           cobrador_anterior_id?: string | null;
-          cobrador_novo_id: string;
+          cobrador_novo_id?: string | null;
           documento: string;
           gerente_id: string;
           id?: string;
+          motivo?: string | null;
           nome_da_loja?: string | null;
         };
         Update: {
           assigned_at?: string;
           cliente_nome?: string | null;
           cobrador_anterior_id?: string | null;
-          cobrador_novo_id?: string;
+          cobrador_novo_id?: string | null;
           documento?: string;
           gerente_id?: string;
           id?: string;
+          motivo?: string | null;
           nome_da_loja?: string | null;
         };
         Relationships: [];
@@ -531,6 +534,27 @@ export type Database = {
           },
         ];
       };
+      recebimentos_historico: {
+        Row: {
+          chave_venda: number;
+          cobrador_carteira_id: string | null;
+          data_de_recebimento: string | null;
+          desconto_antes: number | null;
+          desconto_depois: number | null;
+          documento: string | null;
+          id: number;
+          id_parcela: number;
+          origem: "app" | "erp_ou_manual" | "foto_inicial";
+          recebido_antes: number | null;
+          recebido_depois: number | null;
+          registrado_em: string;
+          sale_payment_id: string | null;
+        };
+        // Append-only: gravado so por gatilho no banco.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       sale_payments: {
         Row: {
           client_document: string;
@@ -911,6 +935,22 @@ export type Database = {
         Returns: undefined;
       };
       remover_cobrador: { Args: { p_documento: string }; Returns: undefined };
+      remover_cobrador_em_lote: {
+        Args: {
+          p_documentos?: string[];
+          p_clientes?: string[];
+          p_usuario_id?: string;
+        };
+        Returns: number;
+      };
+      liberar_cliente_da_carteira: {
+        Args: {
+          p_documento: string;
+          p_situacao: string;
+          p_usuario_id?: string;
+        };
+        Returns: number;
+      };
       transferir_clientes: {
         Args: { p_cobrador_destino: string; p_cobrador_origem: string };
         Returns: {

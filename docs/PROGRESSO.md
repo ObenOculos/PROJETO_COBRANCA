@@ -8,9 +8,11 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | # | Item | Gravidade | Esforço |
 |---|------|-----------|---------|
 | 1 | Segurança: RLS desligado + login em texto puro | **Crítica** | Grande, em etapas |
-| 1b | Desempenho credita pela atribuição atual, não por quem recebeu | **Alta** | Médio |
+| 0 | **Aplicar migration `20261005000002` ANTES do push do front** | — | Pequeno |
+| 1b | Desempenho credita pela atribuição atual — Fase 2 (telas) | **Alta** | Médio |
+| 1f | "Excluir vendas" apaga os pagamentos (`sale_payments`) | **Alta** | Pequeno |
+| 1g | Estorno/ajuste do gerente não desconta do cobrador | Média | Pequeno/médio |
 | 1c | Regras de "pendente/pago" divergentes (desconto, coluna `status`) | Média | Pequeno/médio |
-| 1d | `process_payment` reescreve valor de visitas já fechadas | Média | Pequeno |
 | 1e | Data de visita realizada gravada em UTC | Média | Pequeno |
 | 2 | Reagendamento atômico (RPC) | Média | Pequeno/médio |
 | 3 | Trocar exclusão de visitas por cancelamento | Média | Pequeno |
@@ -19,20 +21,69 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 6 | `RouteMap` não detecta reagendadas | Baixa | Pequeno |
 | 7 | Vulnerabilidades restantes (só dev) | Baixa | — |
 
+### 0. Migration `20261005000002` — aplicar antes do front
+
+O front do commit da Fase 1 chama `remover_cobrador_em_lote` e
+`liberar_cliente_da_carteira`, que só existem depois dela. Se o front for
+publicado antes, remover cobrador e "não encontrado" passam a falhar.
+`npx supabase db push --dry-run` → `npx supabase db push --yes`.
+Testada em Postgres 17 local (cenários de app, planilha, atribuição, remoção,
+liberação, append-only; importação de 127 mil parcelas: +4 s com os gatilhos).
+
 ### 1b. Desempenho por atribuição atual — ALTA
 
 `getCollectorPerformance`, `CollectorPerformanceModal` e
 `EnhancedPerformanceChart` creditam vendas pagas e valor recebido a quem tem
-**hoje** o `user_id` do cliente. Toda reatribuição (`atribuir_clientes_em_lote`),
-remoção manual (`removeCollectorFromClients`) e liberação por "não encontrado"/SPC
-(`updateVisitStatus`) move o histórico de recebimento junto: o cobrador antigo
-perde e o novo herda. Medido em 2026-10-05: **368 de 1.062 pagamentos
+**hoje** o `user_id` do cliente. Toda reatribuição, remoção e liberação move o
+histórico de recebimento junto. Medido em 2026-10-05: **368 de 1.062 pagamentos
 (R$ 44 mil de R$ 150 mil) foram recebidos por um cobrador diferente do atual.**
-Foi por isso que "cliente quitado" **não** zera `user_id` (ver Concluído).
-**Fazer:** recebido/vendas pagas a partir do fato — `sale_payments.collector_id`
-(quem recebeu) e `atribuicoes_historico` (quem tinha a carteira em cada período).
-A importação de planilha não grava `sale_payments`; definir a quem creditar essas
-baixas antes de migrar.
+
+**Modelo decidido com o usuário (2026-10-05):**
+- Mérito do cobrador = o que ele registrou no app (`sale_payments`): é ele quem
+  negocia; o pagamento é processado depois na loja.
+- ERP = confirmação oficial, chega com atraso (quase todo dia) e **repete** os
+  pagamentos do app. Visão separada; não soma no mérito (contaria duas vezes).
+- Passado congelado: foto de hoje com o dono atual da carteira.
+
+**Fase 1 — fundação (migration `20261005000002`, pendente de aplicar):**
+- `atribuicoes_historico` registra toda mudança de carteira por gatilho, com
+  `motivo` e usuário; `cobrador_novo_id` NULL = saiu da carteira. Append-only.
+- `recebimentos_historico`: cada mudança de `valor_recebido`/`desconto` por
+  parcela, com antes/depois, origem (`app` | `erp_ou_manual` | `foto_inicial`),
+  `sale_payment_id` e dono da carteira no momento. Append-only.
+- RPCs `remover_cobrador_em_lote` e `liberar_cliente_da_carteira` (front e
+  fila offline já usam).
+- `process_payment`: marca origem `app`, data de Brasília, e só atualiza
+  `total_pending_value` de visitas em aberto (era o antigo item 1d).
+
+**Fase 2 — telas (a fazer):**
+- Função única no banco de desempenho por período: recebido = `sale_payments`
+  do cobrador; carteira no período = `atribuicoes_historico`; quitações com o
+  dono da carteira no momento = `recebimentos_historico`. Desconto quita (1c).
+- Trocar `getCollectorPerformance`, `CollectorPerformanceModal`,
+  `EnhancedPerformanceChart` e o progresso da meta no `CollectorDashboard`
+  (hoje é o recebido de toda a vida da carteira, não do mês).
+- Tela "Baixas do ERP" a partir de `recebimentos_historico`.
+- A origem `erp_ou_manual` não distingue a planilha da edição manual na
+  parcela. Para separar, a importação precisa passar por uma RPC.
+
+### 1f. "Excluir vendas" apaga os pagamentos
+
+`deleteSalesFromClient` (`CollectionContext`, usado em `CollectionTable`) e
+`bulkDeleteClients`/`deleteClient` dão `DELETE` em `BANCO_DADOS`,
+`sale_payments` e `scheduled_visits`. Apagar `sale_payments` tira do cobrador o
+mérito do que ele recebeu, em todos os períodos. `recebimentos_historico`
+sobrevive (sem FK), mas o mérito vem de `sale_payments`.
+**Fazer:** não apagar `sale_payments`. Decidir com o usuário o que "excluir
+venda" significa (título lançado por engano? cancelado no ERP?).
+
+### 1g. Estorno/ajuste do gerente
+
+`GeneralPaymentEditModal` reescreve `valor_recebido` das parcelas e
+`recordPaymentAdjustment` grava a diferença em `sale_payments` com
+`collector_id` = **gerente**. Um estorno de pagamento do cobrador não sai do
+crédito dele; um ajuste positivo não entra. Pela regra do domínio, a correção
+deve referenciar o pagamento original (e o cobrador dele) com motivo.
 
 ### 1c. Regras de "pendente/pago" divergentes
 
@@ -44,19 +95,15 @@ baixas antes de migrar.
   O front e `cliente_tem_saldo_aberto` decidem pelos valores. Em 2026-10-05:
   13 parcelas `Pago` com saldo e 27 `Pago Parcial` sem saldo.
 
-### 1d. `process_payment` reescreve visitas fechadas
-
-O fim da função faz `UPDATE scheduled_visits SET total_pending_value = ...`
-em **todas** as visitas do cliente, inclusive `realizada`/`cancelada` antigas.
-O valor "no momento da visita" é apagado. Restringir às visitas em aberto (ou
-remover a cópia; ver item 4).
-
 ### 1e. Data de visita realizada em UTC
 
 `updateVisitStatus` grava `data_visita_realizada` com
 `new Date().toISOString().split("T")[0]`. Depois das 21h (Brasília), a visita
 fica com a data do dia seguinte e cai no dia/mês errado no Desempenho.
-`CollectorDashboard` (contador "hoje") faz o mesmo. Usar `todayLocalStr()`.
+`CollectorDashboard` (contador "hoje"), a fila offline (`useOffline`),
+`GeneralPaymentEditModal` e `recordPaymentAdjustment` fazem o mesmo. Usar
+`todayLocalStr()`. (No banco, `process_payment` já foi corrigida na
+migration `20261005000002`.)
 
 ### 1. Segurança — CRÍTICO
 

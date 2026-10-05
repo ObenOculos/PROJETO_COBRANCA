@@ -21,16 +21,20 @@ interface AssignmentReportModalProps {
 }
 
 // Espelha a tabela atribuicoes_historico (1 registro por cliente por evento).
-interface AssignmentRecord {
+interface AssignmentRow {
   id: string;
   documento: string;
   cliente_nome: string | null;
   nome_da_loja: string | null;
-  cobrador_novo_id: string;
+  // NULL = saiu da carteira (remocao ou liberacao).
+  cobrador_novo_id: string | null;
   cobrador_anterior_id: string | null;
   gerente_id: string;
   assigned_at: string;
 }
+
+// Entrada na carteira: o relatorio so trata linhas com cobrador novo.
+type AssignmentRecord = AssignmentRow & { cobrador_novo_id: string };
 
 // Um "evento" de atribuição = um lote gravado numa única transação da RPC.
 // Como o now() é constante por transação, todas as linhas do lote compartilham
@@ -109,13 +113,16 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
       toExclusive.setDate(toExclusive.getDate() + 1);
       const toIso = toExclusive.toISOString();
 
-      const rows = await fetchAllRows<AssignmentRecord>(
+      const rows = await fetchAllRows<AssignmentRow>(
         (from, to) => {
           let q = supabase
             .from("atribuicoes_historico")
             .select("*")
             .gte("assigned_at", fromIso)
-            .lt("assigned_at", toIso);
+            .lt("assigned_at", toIso)
+            // Remocoes/liberacoes (novo cobrador vazio) tambem ficam no
+            // historico; este relatorio e so de entradas na carteira.
+            .not("cobrador_novo_id", "is", null);
           if (collectorId) q = q.eq("cobrador_novo_id", collectorId);
           // Atribuicao em lote grava o mesmo assigned_at em varias linhas:
           // sem desempate a paginacao pula/repete registros.
@@ -128,7 +135,9 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
       );
 
       if (!cancelled) {
-        setRecords(rows);
+        setRecords(
+          rows.filter((r): r is AssignmentRecord => !!r.cobrador_novo_id),
+        );
         setLoading(false);
       }
     };

@@ -40,7 +40,8 @@ interface AssignmentRecord {
   documento: string;
   cliente_nome: string | null;
   nome_da_loja: string | null;
-  cobrador_novo_id: string;
+  // NULL = saiu da carteira (remocao ou liberacao).
+  cobrador_novo_id: string | null;
   cobrador_anterior_id: string | null;
   gerente_id: string;
   assigned_at: string;

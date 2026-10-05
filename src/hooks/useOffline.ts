@@ -239,7 +239,7 @@ export const useOffline = () => {
     if (releaseSituacao) {
       const { data: releasedVisit, error: releasedFetchError } = await supabase
         .from("scheduled_visits")
-        .select("client_document")
+        .select("client_document, collector_id")
         .eq("id", visitData.visitId)
         .single();
 
@@ -251,10 +251,14 @@ export const useOffline = () => {
 
       const clientDocument = releasedVisit?.client_document;
       if (clientDocument) {
-        const { error: releaseError } = await supabase
-          .from("BANCO_DADOS")
-          .update({ situacao: releaseSituacao, user_id: null })
-          .eq("documento", clientDocument);
+        const { error: releaseError } = await supabase.rpc(
+          "liberar_cliente_da_carteira",
+          {
+            p_documento: clientDocument,
+            p_situacao: releaseSituacao,
+            p_usuario_id: releasedVisit?.collector_id ?? undefined,
+          },
+        );
 
         if (releaseError) {
           throw new Error(

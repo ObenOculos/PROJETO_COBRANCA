@@ -2463,30 +2463,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           .filter((id) => !id.document && id.clientName)
           .map((id) => id.clientName);
 
-        // Remove o cobrador filtrando direto por documento/cliente. Nao precisa
-        // buscar antes a lista de id_parcela (sem historico aqui), o que elimina
-        // um round-trip por lote e a lista gigante de ids na URL. O total
-        // afetado vem do count: "exact" do proprio UPDATE.
-        let updateError: any = null;
-        let parcelasAfetadas = 0;
-
-        if (documentBatch.length > 0) {
-          const { error, count } = await supabase
-            .from("BANCO_DADOS")
-            .update({ user_id: null }, { count: "exact" })
-            .in("documento", documentBatch as string[]);
-          if (error) updateError = error;
-          else parcelasAfetadas += count ?? 0;
-        }
-
-        if (clientNameBatch.length > 0 && !updateError) {
-          const { error, count } = await supabase
-            .from("BANCO_DADOS")
-            .update({ user_id: null }, { count: "exact" })
-            .in("cliente", clientNameBatch as string[]);
-          if (error) updateError = error;
-          else parcelasAfetadas += count ?? 0;
-        }
+        // A RPC remove numa transacao e o gatilho registra em
+        // atribuicoes_historico o cobrador anterior e quem removeu. Sem esse
+        // registro o Desempenho nao reconstroi a carteira de meses passados.
+        const { data, error: updateError } = await supabase.rpc(
+          "remover_cobrador_em_lote",
+          {
+            p_documentos: documentBatch as string[],
+            p_clientes: clientNameBatch as string[],
+            p_usuario_id: user?.id,
+          },
+        );
+        const parcelasAfetadas = data ?? 0;
 
         if (updateError) {
           console.error("Erro ao atualizar parcelas do lote:", updateError);
@@ -3392,15 +3380,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             data: { visitId, status, notes },
           });
         } else if (releaseSituacao && clientDocument) {
-          const { error: releaseError } = await supabase
-            .from("BANCO_DADOS")
-            .update({
-              situacao: releaseSituacao,
-              // Sai da carteira: volta para a fila geral de atribuicao para o
-              // gerente escolher o proximo responsavel.
-              user_id: null,
-            })
-            .eq("documento", clientDocument);
+          // Sai da carteira: volta para a fila geral de atribuicao para o
+          // gerente escolher o proximo responsavel. A RPC registra o motivo
+          // no historico de carteira.
+          const { error: releaseError } = await supabase.rpc(
+            "liberar_cliente_da_carteira",
+            {
+              p_documento: clientDocument,
+              p_situacao: releaseSituacao,
+              p_usuario_id: user?.id,
+            },
+          );
 
           if (releaseError) {
             console.error(
