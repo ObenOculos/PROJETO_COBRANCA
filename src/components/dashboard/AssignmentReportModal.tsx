@@ -117,7 +117,12 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
             .gte("assigned_at", fromIso)
             .lt("assigned_at", toIso);
           if (collectorId) q = q.eq("cobrador_novo_id", collectorId);
-          return q.order("assigned_at", { ascending: false }).range(from, to);
+          // Atribuicao em lote grava o mesmo assigned_at em varias linhas:
+          // sem desempate a paginacao pula/repete registros.
+          return q
+            .order("assigned_at", { ascending: false })
+            .order("id", { ascending: true })
+            .range(from, to);
         },
         () => cancelled,
       );

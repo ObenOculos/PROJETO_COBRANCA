@@ -832,6 +832,7 @@ const DatabaseUpload: React.FC = () => {
         const { data, error } = await supabase
           .from("BANCO_DADOS")
           .select("*")
+          .order("id_parcela", { ascending: true })
           .range(from, from + BATCH_SIZE - 1);
 
         if (error) {

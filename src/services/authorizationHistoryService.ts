@@ -288,6 +288,7 @@ export class AuthorizationHistoryService {
 
     const { data, error, count } = await query
       .order("requested_at", { ascending: false })
+      .order("id", { ascending: true })
       .range(from, to);
 
     if (error) {

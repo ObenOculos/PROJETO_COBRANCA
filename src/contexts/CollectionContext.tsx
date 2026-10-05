@@ -405,8 +405,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           const { data: pageData, error: pageError } = await supabase
             .from("scheduled_visits")
             .select("*")
-            .range(from, from + pageSize - 1)
-            .order("scheduled_date", { ascending: true });
+            .order("scheduled_date", { ascending: true })
+            // Desempate unico: so por data a ordem entre paginas nao e
+            // estavel e visitas podiam ser puladas ou vir repetidas.
+            .order("id", { ascending: true })
+            .range(from, from + pageSize - 1);
 
           if (pageError) {
             console.error("Erro ao carregar página de visitas:", pageError);
@@ -579,6 +582,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           )
           .eq("is_atual", true)
           .order("cliente_documento", { ascending: true })
+          .order("id", { ascending: true })
           .range(from, to),
       );
 
@@ -1543,6 +1547,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           const { data: pageData, error } = await supabase
             .from("monthly_goals")
             .select("*")
+            .order("id", { ascending: true })
             .range(from, from + pageSize - 1);
 
           if (error) {
@@ -2605,6 +2610,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             .from("sale_payments")
             .select("*")
             .order("payment_date", { ascending: false })
+            // Desempate unico: varios pagamentos na mesma data deixavam a
+            // ordem entre paginas instavel (pagamento pulado ou duplicado).
+            .order("id", { ascending: true })
             .range(from, from + pageSize - 1);
 
           if (error) {

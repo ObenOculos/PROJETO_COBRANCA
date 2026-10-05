@@ -164,6 +164,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
               `cobrador_novo_id.eq.${collector.collectorId},cobrador_anterior_id.eq.${collector.collectorId}`,
             )
             .order("assigned_at", { ascending: false })
+            .order("id", { ascending: true })
             .range(from, to),
         () => cancelled,
       );
@@ -203,6 +204,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
             .select("documento, created_at")
             .gte("created_at", prevMonthStart.toISOString())
             .lte("created_at", prevMonthEnd.toISOString())
+            .order("id", { ascending: true })
             .range(from, to),
         () => cancelled,
       );
