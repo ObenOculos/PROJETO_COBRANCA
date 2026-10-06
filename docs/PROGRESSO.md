@@ -225,6 +225,11 @@ O override de `tar` em `package.json` ainda é necessário.
   causa do Francisco ter 932 vendas na Atribuição e 931 no app dele.
   - Cliente com mais de um cobrador não herda (sem dono claro); hoje não há
     nenhum.
+- **Lista de visitas atrasadas na agenda** (`07343cb`, só front): o aviso que
+  abria uma vez e só levava a um dia por vez virou lista de todas as atrasadas
+  (busca, cidade, ordenação por atraso/cidade/nome) com Reagendar e "Ver no dia"
+  em cada visita; o botão "Atrasadas N" no calendário reabre. Em 2026-10-06 o
+  Francisco tinha 248 visitas atrasadas.
 
 ### 2026-10-05
 
