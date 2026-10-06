@@ -9,8 +9,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 |---|------|-----------|---------|
 | 1 | Segurança: RLS desligado + login em texto puro | **Crítica** | Grande, em etapas |
 | 1b | Desempenho credita pela atribuição atual — Fase 2 (telas) | **Alta** | Médio |
-| 1f | "Excluir vendas" apaga os pagamentos (`sale_payments`) | **Alta** | Pequeno |
-| 0 | **Aplicar migration `20261006000001` antes do push** (estorno) | — | Pequeno |
+| 0 | **Aplicar migration `20261006000002` antes do push** (cancelar venda) | — | Pequeno |
 | 1c | Regras de "pendente/pago" divergentes (desconto, coluna `status`) | Média | Pequeno/médio |
 | 2 | Reagendamento atômico (RPC) | Média | Pequeno/médio |
 | 3 | Trocar exclusão de visitas por cancelamento | Média | Pequeno |
@@ -56,21 +55,10 @@ histórico de recebimento junto. Medido em 2026-10-05: **368 de 1.062 pagamentos
 - A origem `erp_ou_manual` não distingue a planilha da edição manual na
   parcela. Para separar, a importação precisa passar por uma RPC.
 
-### 1f. "Excluir vendas" apaga os pagamentos
+### 0. Migration `20261006000002` — aplicar antes do push
 
-`deleteSalesFromClient` (`CollectionContext`, usado em `CollectionTable`) e
-`bulkDeleteClients`/`deleteClient` dão `DELETE` em `BANCO_DADOS`,
-`sale_payments` e `scheduled_visits`. Apagar `sale_payments` tira do cobrador o
-mérito do que ele recebeu, em todos os períodos. `recebimentos_historico`
-sobrevive (sem FK), mas o mérito vem de `sale_payments`.
-**Fazer:** não apagar `sale_payments`. Decidir com o usuário o que "excluir
-venda" significa (título lançado por engano? cancelado no ERP?).
-
-### 0. Migration `20261006000001` — aplicar antes do push
-
-O modal "Editar Pagamentos" chama `registrar_ajuste_recebimento`, que só existe
-depois dela. `npx supabase db push --dry-run` → `npx supabase db push --yes`.
-Testada em Postgres 17 local.
+O front chama `cancelar_vendas`/`cancelar_clientes`, que só existem depois
+dela. Testada em Postgres 17 local.
 
 ### 1c. Regras de "pendente/pago" divergentes
 
@@ -220,6 +208,18 @@ O override de `tar` em `package.json` ainda é necessário.
     autorização) ainda entra no recebido dele nas telas atuais, que somam todo
     `sale_payments` por `collector_id`. A Fase 2 conta só pagamentos do app e
     estornos ligados (`isAjusteOuEstorno` em `filters/sales`).
+- **"Excluir venda/cliente" virou cancelar** (`d91ce40`, antigo item 1f;
+  migration `20261006000002`): o caso real é venda cancelada no ERP. As parcelas
+  ficam com status `Cancelado` (já tratado em todo o app por `isCancelado`), o
+  cancelamento vai para `vendas_canceladas` (append-only: motivo obrigatório,
+  autor, valor em aberto no momento) e nada é apagado — antes saíam parcelas,
+  pagamentos (mérito do cobrador), visitas e histórico de autorização. Cliente
+  sem nenhuma parcela ativa tem as visitas em aberto canceladas. `deleteClient`
+  (sem uso) removido.
+  - A observar: se a planilha do ERP trouxer de volta uma parcela cancelada com
+    outro status, a importação sobrescreve o `Cancelado` (é o ERP dizendo que a
+    venda não foi cancelada). Reativar uma venda cancelada por engano ainda não
+    tem tela.
 
 ### 2026-10-05
 
