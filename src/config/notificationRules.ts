@@ -34,7 +34,7 @@ export interface NotificacaoGerada {
 }
 
 const plural = (n: number, um: string, varios: string) =>
-  `${n} ${n === 1 ? um : varios}`;
+  `${n.toLocaleString("pt-BR")} ${n === 1 ? um : varios}`;
 
 // Ajuste/estorno do gerente (recordPaymentAdjustment) tambem vai para
 // sale_payments; nao e recebimento do dia.
