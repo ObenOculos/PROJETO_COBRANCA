@@ -5,14 +5,17 @@ import React, {
   useEffect,
   ReactNode,
   useMemo,
+  useRef,
 } from "react";
 import { useCollection } from "./CollectionContext";
 import { useAuth } from "./AuthContext";
 
-import { formatCurrency } from "../utils/formatters";
-import { parseAndNormalizeDate } from "../filters/dates";
 import { UserType } from "../types";
-import { isVisitOverdue } from "../config/visitStatus";
+import { todayLocalStr } from "../config/visitStatus";
+import {
+  NotificacaoGerada,
+  gerarNotificacoes,
+} from "../config/notificationRules";
 
 export interface Notification {
   id: string;
@@ -54,6 +57,45 @@ export const useNotifications = () => {
   return context;
 };
 
+// ---------------------------------------------------------------------------
+// Lida/dispensada por usuario, com o dia em que foi marcada (para podar).
+// ---------------------------------------------------------------------------
+
+type Marcas = Record<string, string>; // id da notificacao -> dia (YYYY-MM-DD)
+
+interface EstadoSalvo {
+  lidas: Marcas;
+  dispensadas: Marcas;
+}
+
+const storageKey = (userId: string) => `notificacoes:${userId}`;
+const DIAS_GUARDADOS = 3;
+
+const carregarEstado = (userId: string): EstadoSalvo => {
+  try {
+    const raw = localStorage.getItem(storageKey(userId));
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<EstadoSalvo>;
+      return {
+        lidas: parsed.lidas ?? {},
+        dispensadas: parsed.dispensadas ?? {},
+      };
+    }
+  } catch {
+    // armazenamento indisponivel: segue sem memoria
+  }
+  return { lidas: {}, dispensadas: {} };
+};
+
+const podar = (marcas: Marcas, hoje: string): Marcas => {
+  const limite = new Date();
+  limite.setDate(limite.getDate() - DIAS_GUARDADOS);
+  const corte = todayLocalStr(limite);
+  return Object.fromEntries(
+    Object.entries(marcas).filter(([, dia]) => dia >= corte && dia <= hoje),
+  );
+};
+
 interface NotificationProviderProps {
   children: ReactNode;
 }
@@ -61,323 +103,151 @@ interface NotificationProviderProps {
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   children,
 }) => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [dismissedNotifications, setDismissedNotifications] = useState<
-    Set<string>
-  >(() => {
-    // Carregar notificações dispensadas do localStorage
-    try {
-      const saved = localStorage.getItem("dismissedNotifications");
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
-  const { collections, salePayments, scheduledVisits } = useCollection();
+  const { collections, salePayments, scheduledVisits, getClientGroups } =
+    useCollection();
   const { user } = useAuth();
 
-  // Salvar notificações dispensadas no localStorage sempre que mudarem
+  const [geradas, setGeradas] = useState<NotificacaoGerada[]>([]);
+  const [manuais, setManuais] = useState<Notification[]>([]);
+  // `dono` evita gravar o estado de um usuario na chave de outro ao trocar
+  // de login (o efeito de salvar roda antes do estado novo ser aplicado).
+  const [estado, setEstado] = useState<EstadoSalvo & { dono: string | null }>({
+    lidas: {},
+    dispensadas: {},
+    dono: null,
+  });
+  // Hora em que cada notificacao apareceu pela primeira vez nesta sessao.
+  const vistaEm = useRef(new Map<string, Date>());
+
+  // Versao antiga guardava dispensas para sempre, sem separar por usuario.
   useEffect(() => {
     try {
+      localStorage.removeItem("dismissedNotifications");
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const hoje = todayLocalStr();
+    const salvo = carregarEstado(user.id);
+    setEstado({
+      lidas: podar(salvo.lidas, hoje),
+      dispensadas: podar(salvo.dispensadas, hoje),
+      dono: user.id,
+    });
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || estado.dono !== user.id) return;
+    try {
+      const { lidas, dispensadas } = estado;
       localStorage.setItem(
-        "dismissedNotifications",
-        JSON.stringify(Array.from(dismissedNotifications)),
+        storageKey(user.id),
+        JSON.stringify({ lidas, dispensadas }),
       );
     } catch (error) {
-      console.error("Erro ao salvar notificações dispensadas:", error);
+      console.error("Erro ao salvar estado das notificações:", error);
     }
-  }, [dismissedNotifications]);
+  }, [estado, user?.id]);
 
-  // Generate notifications based on system data with debouncing
+  // Debounce: a carga progressiva publica `collections` varias vezes.
   useEffect(() => {
     if (!collections || !user || !salePayments || !scheduledVisits) return;
 
-    // Debounce notifications generation
     const timeoutId = setTimeout(() => {
-      generateAndSetNotifications();
+      const agora = new Date();
+      const grupos =
+        user.type === "manager" ? getClientGroups() : getClientGroups(user.id);
+      setGeradas(
+        gerarNotificacoes({
+          user,
+          grupos,
+          salePayments,
+          scheduledVisits,
+          hoje: todayLocalStr(agora),
+          agora,
+        }),
+      );
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [collections, user?.id, salePayments, scheduledVisits]); // Only depend on user.id, not entire user object
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- so o id do usuario importa
+  }, [collections, user?.id, salePayments, scheduledVisits, getClientGroups]);
 
-  const generateAndSetNotifications = () => {
-    if (!user) return; // Guard clause for null user
+  const notifications = useMemo(() => {
+    if (!user) return [];
 
-    const generateNotifications = () => {
-      const newNotifications: Omit<
-        Notification,
-        "id" | "timestamp" | "read"
-      >[] = [];
-      const now = new Date();
-      const todayStart = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-      );
-      const tomorrowStart = new Date(todayStart);
-      tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-
-      // Filter collections based on user type
-      const userCollections =
-        user.type === "manager"
-          ? collections
-          : collections.filter((c) => c.user_id === user.id);
-
-      // For collectors: visit-related notifications (based on scheduled_visits)
-      if (user.type !== "manager") {
-        // Active (pending) visits owned by this collector
-        const myActiveVisits = scheduledVisits.filter(
-          (v) => v.collectorId === user.id && v.status === "agendada",
-        );
-
-        // Overdue scheduled visits. Regra unica em config/visitStatus — a
-        // versao local fazia new Date("YYYY-MM-DD"), que e meia-noite UTC (21h
-        // da vespera em Brasilia), e contava as visitas de HOJE como atrasadas.
-        const overdueVisits = myActiveVisits.filter((v) => isVisitOverdue(v));
-
-        if (overdueVisits.length > 0) {
-          newNotifications.push({
-            type: "visit",
-            title: "Visitas Atrasadas",
-            message: `${overdueVisits.length} visita${overdueVisits.length > 1 ? "s agendadas" : " agendada"} em atraso`,
-            priority: "high",
-          });
-        }
-
-        // Visits scheduled for today
-        const visitsToday = myActiveVisits.filter((v) => {
-          const visitDate = new Date(v.scheduledDate);
-          if (isNaN(visitDate.getTime())) return false; // Skip invalid dates
-          return visitDate >= todayStart && visitDate < tomorrowStart;
-        });
-
-        if (visitsToday.length > 0) {
-          newNotifications.push({
-            type: "visit",
-            title: "Visitas de Hoje",
-            message: `${visitsToday.length} visita${visitsToday.length > 1 ? "s agendadas" : " agendada"} para hoje`,
-            priority: "medium",
-          });
-        }
-
-        // Pending collections whose client has no active scheduled visit
-        const scheduledDocs = new Set(
-          myActiveVisits.map((v) => v.clientDocument),
-        );
-        const unscheduledCollections = userCollections.filter(
-          (c) =>
-            c.status !== "received" &&
-            !!c.documento &&
-            !scheduledDocs.has(c.documento),
-        );
-
-        if (unscheduledCollections.length > 0) {
-          newNotifications.push({
-            type: "visit",
-            title: "Visitas Não Agendadas",
-            message: `${unscheduledCollections.length} cobrança${unscheduledCollections.length > 1 ? "s" : ""} sem visita agendada`,
-            priority: "medium",
-          });
-        }
-      }
-
-      // 1. Overdue payments (with date validation)
-      const overdue = userCollections.filter((c) => {
-        if (c.status === "received") return false;
-        if (!c.data_vencimento) return false; // Skip if no due date
-        // parseAndNormalizeDate e nao `new Date`: data_vencimento e text e 29%
-        // das linhas vem como DD/MM/YYYY, que `new Date` nao entende.
-        const dueDate = parseAndNormalizeDate(c.data_vencimento);
-        return dueDate !== null && dueDate < todayStart;
+    const automaticas: Notification[] = geradas
+      .filter((n) => !estado.dispensadas[n.id])
+      .map((n) => {
+        if (!vistaEm.current.has(n.id)) vistaEm.current.set(n.id, new Date());
+        return {
+          ...n,
+          timestamp: vistaEm.current.get(n.id)!,
+          read: !!estado.lidas[n.id],
+        };
       });
 
-      if (overdue.length > 0) {
-        newNotifications.push({
-          type: "overdue",
-          title: "Pagamentos em Atraso",
-          message: `${overdue.length} pagamento${overdue.length > 1 ? "s" : ""} em atraso`,
-          priority: "high",
-        });
-      }
-
-      // 2. Due today (with date validation)
-      const dueToday = userCollections.filter((c) => {
-        if (c.status === "received") return false;
-        if (!c.data_vencimento) return false;
-        const dueDate = parseAndNormalizeDate(c.data_vencimento);
-        return (
-          dueDate !== null && dueDate >= todayStart && dueDate < tomorrowStart
-        );
-      });
-
-      if (dueToday.length > 0) {
-        newNotifications.push({
-          type: "payment",
-          title: "Vencimentos de Hoje",
-          message: `${dueToday.length} pagamento${dueToday.length > 1 ? "s vencem" : " vence"} hoje`,
-          priority: "medium",
-        });
-      }
-
-      // 3. Recent payments (last 24 hours) — based on sale_payments
-      const recentPayments = salePayments.filter((p) => {
-        // Collectors only see their own payments; managers see all
-        if (user.type !== "manager" && p.collectorId !== user.id) return false;
-        const paymentDateStr = p.paymentDate || p.createdAt;
-        if (!paymentDateStr) return false; // Skip if no payment date
-        const paymentDate = new Date(paymentDateStr);
-        if (isNaN(paymentDate.getTime())) return false; // Skip invalid dates
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        return paymentDate >= yesterday;
-      });
-
-      if (recentPayments.length > 0) {
-        newNotifications.push({
-          type: "payment",
-          title: "Pagamentos Recebidos",
-          message: `${recentPayments.length} pagamento${recentPayments.length > 1 ? "s recebidos" : " recebido"} nas últimas 24h`,
-          priority: "low",
-        });
-      }
-
-      // 4. Manager-specific: Unassigned collections
-      if (user.type === "manager") {
-        const unassigned = collections.filter((c) => !c.user_id);
-        if (unassigned.length > 0) {
-          newNotifications.push({
-            type: "assignment",
-            title: "Cobranças Não Atribuídas",
-            message: `${unassigned.length} cobrança${unassigned.length > 1 ? "s" : ""} sem cobrador atribuído`,
-            priority: "medium",
-          });
-        }
-      }
-
-      // 5. High value pending payments
-      const highValuePending = userCollections.filter((c) => {
-        return c.status !== "received" && c.valor_original > 5000;
-      });
-
-      if (highValuePending.length > 0) {
-        newNotifications.push({
-          type: "payment",
-          title: "Valores Altos Pendentes",
-          message: `${highValuePending.length} cobrança${
-            highValuePending.length > 1 ? "s de alto valor" : " de alto valor"
-          } pendente${highValuePending.length > 1 ? "s" : ""}`,
-          priority: "high",
-        });
-      }
-
-      // 6. Manager-specific: Recent payments with discounts
-      if (user.type === "manager") {
-        const recentDiscountedPayments = salePayments.filter((p) => {
-          if (!p.createdAt || !p.discountAmount || p.discountAmount <= 0) {
-            return false;
-          }
-          const paymentDate = new Date(p.createdAt);
-          const yesterday = new Date(now);
-          yesterday.setDate(yesterday.getDate() - 1);
-          return paymentDate >= yesterday;
-        });
-
-        recentDiscountedPayments.forEach((p) => {
-          const saleNumber = p.saleNumber;
-          const clientDoc = p.clientDocument;
-          const discountAmount = p.discountAmount;
-
-          if (
-            saleNumber !== null &&
-            saleNumber !== undefined &&
-            clientDoc &&
-            discountAmount
-          ) {
-            const title =
-              saleNumber === 0
-                ? "Desconto na Venda Renegociada"
-                : `Desconto na Venda #${saleNumber}`;
-            const message = `Um desconto de ${formatCurrency(
-              discountAmount,
-            )} foi aplicado na venda ${saleNumber === 0 ? "Renegociada" : `#${saleNumber}`}. Clique para ver detalhes.`;
-
-            newNotifications.push({
-              type: "payment",
-              title: title,
-              message: message,
-              priority: "medium",
-              targetUserType: "manager",
-              relatedId: `sale-${saleNumber}-client-${clientDoc}`,
-            });
-          }
-        });
-      }
-      return newNotifications;
-    };
-
-    const generatedNotifications = generateNotifications();
-
-    // Only update if notifications changed
-    if (generatedNotifications.length > 0) {
-      setNotifications((prev) => {
-        // Remove old auto-generated notifications (keep manual notifications)
-        // Manual notifications are those with specific relatedId patterns or type "system"
-        const manualNotifications = prev.filter(
-          (n) =>
-            n.type === "system" ||
-            (n.relatedId &&
-              (n.relatedId.startsWith("discount-") ||
-                n.relatedId.startsWith("manual-"))),
-        );
-
-        const newOnes = generatedNotifications
-          .filter((n) => !dismissedNotifications.has(`${n.type}-${n.title}`))
-          .map((n, index) => ({
-            ...n,
-            id: `${n.type}-${n.title}-${Date.now()}-${index}`, // More unique ID
-            timestamp: new Date(),
-            read: false,
-          }));
-
-        // Limit total notifications to prevent memory issues
-        const allNotifications = [...manualNotifications, ...newOnes];
-        return allNotifications.slice(0, 50); // Max 50 notifications
-      });
-    }
-  };
+    return [...manuais, ...automaticas]
+      .filter(
+        (n) =>
+          !n.targetUserType ||
+          n.targetUserType === "all" ||
+          n.targetUserType === user.type,
+      )
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  }, [geradas, manuais, estado, user]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  const isManual = (id: string) => manuais.some((n) => n.id === id);
+
+  const marcar = (campo: keyof EstadoSalvo, ids: string[]) => {
+    if (ids.length === 0) return;
+    const hoje = todayLocalStr();
+    setEstado((prev) => ({
+      ...prev,
+      [campo]: {
+        ...prev[campo],
+        ...Object.fromEntries(ids.map((id) => [id, hoje])),
+      },
+    }));
+  };
+
   const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    );
+    if (isManual(id)) {
+      setManuais((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      );
+    } else {
+      marcar("lidas", [id]);
+    }
   };
 
   const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setManuais((prev) => prev.map((n) => ({ ...n, read: true })));
+    marcar(
+      "lidas",
+      notifications.filter((n) => !isManual(n.id)).map((n) => n.id),
+    );
   };
 
   const clearNotification = (id: string) => {
-    const notification = notifications.find((n) => n.id === id);
-    if (notification && notification.type !== "system") {
-      const newDismissed = new Set(dismissedNotifications);
-      newDismissed.add(`${notification.type}-${notification.title}`);
-      setDismissedNotifications(newDismissed);
+    if (isManual(id)) {
+      setManuais((prev) => prev.filter((n) => n.id !== id));
+    } else {
+      marcar("dispensadas", [id]);
     }
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
   const clearAllNotifications = () => {
-    // Mark all system notifications as dismissed
-    const newDismissed = new Set(dismissedNotifications);
-    notifications.forEach((n) => {
-      if (n.type !== "system") {
-        newDismissed.add(`${n.type}-${n.title}`);
-      }
-    });
-    setDismissedNotifications(newDismissed);
-    setNotifications([]);
+    setManuais([]);
+    marcar(
+      "dispensadas",
+      notifications.filter((n) => !isManual(n.id)).map((n) => n.id),
+    );
   };
 
   const addNotification = (
@@ -385,41 +255,15 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   ) => {
     const newNotification: Notification = {
       ...notification,
-      id: `${Date.now()}-${Math.random()}`,
+      id: `manual|${Date.now()}-${Math.random()}`,
       timestamp: new Date(),
       read: false,
     };
-
-    setNotifications((prev) => {
-      const updated = [newNotification, ...prev];
-      return updated;
-    });
+    setManuais((prev) => [newNotification, ...prev].slice(0, 50));
   };
 
-  // Memoize sorted and filtered notifications to avoid sorting on every render
-  const sortedNotifications = useMemo(() => {
-    if (!user) return [];
-
-    const filtered = notifications.filter((notification) => {
-      // Se não tem targetUserType, mostra para todos (comportamento antigo)
-      if (
-        !notification.targetUserType ||
-        notification.targetUserType === "all"
-      ) {
-        return true;
-      }
-
-      // Filtra por tipo de usuário específico
-      return notification.targetUserType === user.type;
-    });
-
-    return filtered.sort(
-      (a, b) => b.timestamp.getTime() - a.timestamp.getTime(),
-    );
-  }, [notifications, user?.type]);
-
   const value: NotificationContextType = {
-    notifications: sortedNotifications,
+    notifications,
     unreadCount,
     markAsRead,
     markAllAsRead,

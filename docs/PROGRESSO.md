@@ -8,7 +8,6 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | # | Item | Gravidade | Esforço |
 |---|------|-----------|---------|
 | 1 | Segurança: RLS desligado + login em texto puro | **Crítica** | Grande, em etapas |
-| 0 | **Aplicar migration `20261005000002` ANTES do push do front** | — | Pequeno |
 | 1b | Desempenho credita pela atribuição atual — Fase 2 (telas) | **Alta** | Médio |
 | 1f | "Excluir vendas" apaga os pagamentos (`sale_payments`) | **Alta** | Pequeno |
 | 1g | Estorno/ajuste do gerente não desconta do cobrador | Média | Pequeno/médio |
@@ -20,15 +19,6 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 5 | Quebrar componentes gigantes | Baixa | Contínuo |
 | 6 | `RouteMap` não detecta reagendadas | Baixa | Pequeno |
 | 7 | Vulnerabilidades restantes (só dev) | Baixa | — |
-
-### 0. Migration `20261005000002` — aplicar antes do front
-
-O front do commit da Fase 1 chama `remover_cobrador_em_lote` e
-`liberar_cliente_da_carteira`, que só existem depois dela. Se o front for
-publicado antes, remover cobrador e "não encontrado" passam a falhar.
-`npx supabase db push --dry-run` → `npx supabase db push --yes`.
-Testada em Postgres 17 local (cenários de app, planilha, atribuição, remoção,
-liberação, append-only; importação de 127 mil parcelas: +4 s com os gatilhos).
 
 ### 1b. Desempenho por atribuição atual — ALTA
 
@@ -45,7 +35,7 @@ histórico de recebimento junto. Medido em 2026-10-05: **368 de 1.062 pagamentos
   pagamentos do app. Visão separada; não soma no mérito (contaria duas vezes).
 - Passado congelado: foto de hoje com o dono atual da carteira.
 
-**Fase 1 — fundação (migration `20261005000002`, pendente de aplicar):**
+**Fase 1 — fundação (migration `20261005000002`, aplicada em 2026-10-06):**
 - `atribuicoes_historico` registra toda mudança de carteira por gatilho, com
   `motivo` e usuário; `cobrador_novo_id` NULL = saiu da carteira. Append-only.
 - `recebimentos_historico`: cada mudança de `valor_recebido`/`desconto` por
@@ -188,6 +178,35 @@ O override de `tar` em `package.json` ainda é necessário.
 ---
 
 ## Concluído
+
+### 2026-10-06
+
+- **Fase 1 do Desempenho por fato** (`59eae18`, migration `20261005000002`
+  aplicada): históricos de carteira e de recebimentos, RPCs de remoção e
+  liberação. Testado no app: remoção e "não encontrado" registram motivo e quem fez.
+- **Aba Histórico no detalhe do cliente** (só gestor): linha do tempo de
+  carteira e baixas a partir dos dois históricos.
+- **Notificações refeitas** (`config/notificationRules.ts`, regras testadas com
+  casos sintéticos). Antes:
+  - `status !== "received"` (status inexistente) fazia parcela paga contar como
+    pendente: o gestor via 54.757 "pagamentos em atraso" (corretos: 4.669
+    clientes) e 24.888 "não atribuídas" (corretos: 1.975 clientes);
+  - contava parcelas, não clientes;
+  - "Visitas de Hoje" mostrava as de amanhã (`new Date("YYYY-MM-DD")`);
+  - "Recebidos 24h" era "data de hoje até as 21h", com estornos;
+  - Interno/Terceirizado/Jurídico recebiam aviso de visita;
+  - dispensar silenciava aquele título para sempre (localStorage, sem usuário);
+  - toda atualização de dados recriava tudo como não lido; contagem zerada não
+    sumia.
+  Agora: clientes da carteira ativa, regras únicas (`hasInstallmentBalance`,
+  `isVisitOverdue`, `todayLocalStr`), visitas só para o Cobrador externo, id
+  estável (chave + dia + valor) com lida/dispensada por usuário — volta quando o
+  número muda ou vira o dia. "Valores altos" removida (limite de R$ 5 mil por
+  parcela nunca disparava).
+  - Pendência menor: o aviso de desconto que `GeneralPaymentModal` cria no
+    aparelho do cobrador (destinado ao gestor) nunca chega a ninguém; o gestor
+    já recebe o aviso gerado a partir de `sale_payments`. Remover ou levar para
+    o banco.
 
 ### 2026-10-05
 

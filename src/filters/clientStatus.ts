@@ -80,6 +80,18 @@ export const hasOpenBalance = (pendingValue: number): boolean =>
   round2(pendingValue) > 0.01;
 
 /**
+ * A PARCELA ainda tem saldo (original - recebido - desconto)? Mesma regra e
+ * tolerancia de hasOpenBalance, aplicada a uma parcela so. Nao use a coluna
+ * `status` para isso: ela diverge dos valores (ver docs/PROGRESSO.md, 1c).
+ */
+export const hasInstallmentBalance = (
+  c: Pick<Collection, "valor_original" | "valor_recebido" | "desconto">,
+): boolean =>
+  hasOpenBalance(
+    (c.valor_original || 0) - (c.valor_recebido || 0) - (c.desconto || 0),
+  );
+
+/**
  * Normaliza o vocabulario de status para o valor canonico. O dropdown envia
  * "Em atraso"/"Pago"/"Pago Parcial" e os botoes enviam "pendente"/"pago"/"parcial".
  * O caso "cancelado" e tratado a parte (base de titulos cancelados), nao aqui.
