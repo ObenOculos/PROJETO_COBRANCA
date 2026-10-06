@@ -214,6 +214,17 @@ O override de `tar` em `package.json` ainda é necessário.
     outro status, a importação sobrescreve o `Cancelado` (é o ERP dizendo que a
     venda não foi cancelada). Reativar uma venda cancelada por engano ainda não
     tem tela.
+- **Parcela nova herda o cobrador do cliente** (migration `20261006000003`,
+  **a aplicar**): gatilho `parcela_herda_cobrador` (BEFORE INSERT) — parcela
+  sem cobrador de cliente com um único cobrador recebe esse cobrador e a
+  situação da parcela mais recente dele. Vale para qualquer caminho de
+  inserção, não só a importação (que já herdava no navegador desde 2026-06-15).
+  A migration também corrige 10 parcelas antigas sem cobrador (6 clientes: 6 do
+  Francisco, 4 do Luís; 9 em atraso, invisíveis para o cobrador), registradas
+  em `atribuicoes_historico` com motivo `heranca: parcela sem cobrador`. Era a
+  causa do Francisco ter 932 vendas na Atribuição e 931 no app dele.
+  - Cliente com mais de um cobrador não herda (sem dono claro); hoje não há
+    nenhum.
 
 ### 2026-10-05
 
