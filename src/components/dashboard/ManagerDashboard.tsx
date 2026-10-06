@@ -89,7 +89,31 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const [, setPendingAuthorizations] = useState(0);
   const collectionTableRef = useRef<CollectionTableRef>(null);
 
+  // Preset da Atribuicao vindo de notificacao; o nonce remonta a tela para
+  // o filtro valer mesmo se ela ja estiver aberta.
+  const [assignmentPreset, setAssignmentPreset] = useState<{
+    status: "without_collector";
+    nonce: number;
+  } | null>(null);
+
   const handleNotificationClick = (notification: Notification) => {
+    // A aba ja foi trocada pelo App; aqui so os filtros da tela de destino.
+    const destino = notification.destino;
+    if (destino) {
+      if (destino.filtros) {
+        setFilters(destino.filtros);
+        setIsFilterVisible(true);
+      }
+      if (destino.aba === "collections") {
+        setCollectionsView(destino.visao ?? "table");
+        void requestCollections();
+      }
+      if (destino.atribuicao) {
+        setAssignmentPreset({ status: destino.atribuicao, nonce: Date.now() });
+      }
+      return;
+    }
+
     if (notification.relatedId && notification.relatedId.startsWith("sale-")) {
       const parts = notification.relatedId.split("-");
       const saleNumber = parseInt(parts[1], 10);
@@ -106,10 +130,15 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     }
   };
 
+  // O listener e registrado uma vez; o ref aponta sempre para o handler atual
+  // (requestCollections e os setters mudam a cada render).
+  const notificationHandlerRef = useRef(handleNotificationClick);
+  notificationHandlerRef.current = handleNotificationClick;
+
   useEffect(() => {
     const listener = (e: Event) => {
       const customEvent = e as CustomEvent;
-      handleNotificationClick(customEvent.detail);
+      notificationHandlerRef.current(customEvent.detail);
     };
     window.addEventListener("notificationClick", listener);
     return () => {
@@ -332,6 +361,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       case "clients":
         return (
           <ClientAssignment
+            key={assignmentPreset?.nonce}
+            initialAssignmentFilter={assignmentPreset?.status}
             onViewClient={(clientIdentifier) => {
               setFilters({ search: clientIdentifier });
               setActiveTab("collections");

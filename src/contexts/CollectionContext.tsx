@@ -51,6 +51,7 @@ import {
   clientKey,
   getClientPaymentStatus,
   getClientPending,
+  hasInstallmentBalance,
   hasOpenBalance,
   normalizePaymentStatus,
 } from "../filters/clientStatus";
@@ -1766,8 +1767,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         dueDate.setHours(0, 0, 0, 0);
 
         const isOverdue = dueDate < today;
-        const isPending = (c.valor_recebido || 0) < (c.valor_original || 0);
-        return isOverdue && isPending;
+        // Desconto quita (mesma regra das notificacoes e da carteira).
+        return isOverdue && hasInstallmentBalance(c);
       });
     }
 

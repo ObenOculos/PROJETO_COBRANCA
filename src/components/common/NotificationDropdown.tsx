@@ -79,7 +79,9 @@ const NotificationDropdown: React.FC = () => {
         }
       }
 
-      // Default behavior for other notifications
+      // Demais notificacoes: o App troca a aba e o dashboard aplica os filtros
+      // (ver `destino`). Clicar ja conta como lida.
+      markAsRead(notification.id);
       window.dispatchEvent(
         new CustomEvent("notificationClick", { detail: notification }),
       );

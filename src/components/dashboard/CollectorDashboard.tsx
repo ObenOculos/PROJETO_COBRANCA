@@ -34,6 +34,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import { FilterOptions } from "../../types";
+import { Notification } from "../../contexts/NotificationContext";
 import { resolveSaleKey } from "../../filters/sales";
 import { hasOpenBalance } from "../../filters/clientStatus";
 
@@ -683,6 +684,19 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [showFilterBar, setShowFilterBar] = useState(false);
+
+  // Clique em notificacao: o App ja trocou a aba; aqui so os filtros da
+  // Minha Carteira (ex.: so clientes em atraso, vencimentos de hoje).
+  useEffect(() => {
+    const listener = (e: Event) => {
+      const filtros = (e as CustomEvent<Notification>).detail?.destino?.filtros;
+      if (!filtros) return;
+      setFilters(filtros);
+      setShowFilterBar(true);
+    };
+    window.addEventListener("notificationClick", listener);
+    return () => window.removeEventListener("notificationClick", listener);
+  }, []);
   const [isAutoSliding, setIsAutoSliding] = useState(true);
   const [showAllCities, setShowAllCities] = useState(false);
   const [showAllSchedules, setShowAllSchedules] = useState(false);

@@ -3,6 +3,7 @@ import { parseAndNormalizeDate } from "../filters/dates";
 import { hasInstallmentBalance, hasOpenBalance } from "../filters/clientStatus";
 import {
   ClientGroup,
+  FilterOptions,
   SalePayment,
   ScheduledVisit,
   User,
@@ -23,6 +24,20 @@ import { isVisitOpen, isVisitOverdue, todayLocalStr } from "./visitStatus";
 // dia) e outra notificacao, que aparece de novo. Quando a contagem zera, ela
 // simplesmente deixa de ser gerada.
 
+/**
+ * Para onde o clique leva. `aba` e o id de config/navigation; o App troca a
+ * aba e o dashboard aplica o resto.
+ */
+export interface NotificacaoDestino {
+  aba: string;
+  /** Filtros da tela de Cobrancas / Minha Carteira. */
+  filtros?: FilterOptions;
+  /** Cobrancas do gestor: abrir no Relatorio do Caixa. */
+  visao?: "cash-report";
+  /** Atribuicao de Cobradores: filtro de cobrador. */
+  atribuicao?: "without_collector";
+}
+
 export interface NotificacaoGerada {
   id: string;
   type: "payment" | "overdue" | "assignment" | "visit";
@@ -31,6 +46,7 @@ export interface NotificacaoGerada {
   priority: "low" | "medium" | "high";
   relatedId?: string;
   targetUserType?: UserType | "all";
+  destino?: NotificacaoDestino;
 }
 
 const plural = (n: number, um: string, varios: string) =>
@@ -87,6 +103,7 @@ export const gerarNotificacoes = (params: {
         title: "Visitas Atrasadas",
         message: `${plural(atrasadas, "visita", "visitas")} sem desfecho com data passada`,
         priority: "high",
+        destino: { aba: "visits" },
       });
     }
 
@@ -100,6 +117,7 @@ export const gerarNotificacoes = (params: {
         title: "Visitas de Hoje",
         message: `${plural(deHoje, "visita agendada", "visitas agendadas")} para hoje`,
         priority: "medium",
+        destino: { aba: "visits" },
       });
     }
 
@@ -116,6 +134,7 @@ export const gerarNotificacoes = (params: {
         title: "Clientes Sem Visita",
         message: `${plural(semVisita, "cliente da carteira", "clientes da carteira")} sem visita agendada`,
         priority: "medium",
+        destino: { aba: "visits" },
       });
     }
   }
@@ -130,6 +149,7 @@ export const gerarNotificacoes = (params: {
       title: "Clientes em Atraso",
       message: `${plural(emAtraso, "cliente", "clientes")} com parcela vencida em aberto`,
       priority: "high",
+      destino: { aba: "collections", filtros: { overdueOnly: true } },
     });
   }
 
@@ -143,6 +163,11 @@ export const gerarNotificacoes = (params: {
       title: "Vencimentos de Hoje",
       message: `${plural(vencemHoje, "cliente tem", "clientes têm")} parcela vencendo hoje`,
       priority: "medium",
+      // Status = clientes que ainda devem (pendente ou parcial).
+      destino: {
+        aba: "collections",
+        filtros: { dueDate: hoje, status: ["pendente", "parcial"] },
+      },
     });
   }
 
@@ -161,6 +186,10 @@ export const gerarNotificacoes = (params: {
       title: "Recebidos Hoje",
       message: `${plural(recebidosHoje.length, "pagamento", "pagamentos")} registrado${recebidosHoje.length === 1 ? "" : "s"} no app hoje, total de ${formatCurrency(total)}`,
       priority: "low",
+      // So o gestor tem o Relatorio do Caixa.
+      destino: isManager
+        ? { aba: "collections", visao: "cash-report" }
+        : undefined,
     });
   }
 
@@ -176,6 +205,7 @@ export const gerarNotificacoes = (params: {
         title: "Clientes Sem Cobrador",
         message: `${plural(semCobrador, "cliente devendo", "clientes devendo")} sem cobrador atribuído`,
         priority: "medium",
+        destino: { aba: "clients", atribuicao: "without_collector" },
       });
     }
 

@@ -6,7 +6,10 @@ import {
   useCollection,
 } from "./contexts/CollectionContext";
 import { LoadingProvider, useLoading } from "./contexts/LoadingContext";
-import { NotificationProvider } from "./contexts/NotificationContext";
+import {
+  Notification,
+  NotificationProvider,
+} from "./contexts/NotificationContext";
 import LoginForm from "./components/auth/LoginForm";
 import Header from "./components/common/Header";
 import ManagerDashboard from "./components/dashboard/ManagerDashboard";
@@ -88,6 +91,24 @@ const AppContent: React.FC = () => {
             : item.collectorIcon || item.managerIcon;
         return { id: item.id, name, icon };
       });
+  }, [user]);
+
+  // Clique em notificacao com destino: troca a aba aqui (dono da aba ativa);
+  // o dashboard aberto aplica os filtros ao ouvir o mesmo evento.
+  useEffect(() => {
+    const listener = (e: Event) => {
+      const aba = (e as CustomEvent<Notification>).detail?.destino?.aba;
+      if (!aba || !user) return;
+      if (user.type === "manager") {
+        setManagerActiveTab(aba);
+        localStorage.setItem("managerActiveTab", aba);
+      } else {
+        setCollectorActiveTab(aba);
+        localStorage.setItem("collectorActiveTab", aba);
+      }
+    };
+    window.addEventListener("notificationClick", listener);
+    return () => window.removeEventListener("notificationClick", listener);
   }, [user]);
 
   // Mostra loading baseado no estado controlado

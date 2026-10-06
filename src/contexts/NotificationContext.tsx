@@ -13,6 +13,7 @@ import { useAuth } from "./AuthContext";
 import { UserType } from "../types";
 import { todayLocalStr } from "../config/visitStatus";
 import {
+  NotificacaoDestino,
   NotificacaoGerada,
   gerarNotificacoes,
 } from "../config/notificationRules";
@@ -29,6 +30,8 @@ export interface Notification {
   // Direcionamento por perfil. Deriva de UserType para nao ficar defasado
   // quando um perfil novo e criado (ja aconteceu com Terceirizado e Juridico).
   targetUserType?: UserType | "all";
+  // Para onde o clique leva (aba + filtros). Ver config/notificationRules.
+  destino?: NotificacaoDestino;
 }
 
 interface NotificationContextType {

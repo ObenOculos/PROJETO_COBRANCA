@@ -203,6 +203,8 @@ const getSituacaoIndicator = (collections: Collection[]) => {
 // (mesma regra usada em getSalesByClient/getClientGroups no contexto).
 interface ClientAssignmentProps {
   onViewClient?: (clientIdentifier: string) => void;
+  /** Filtro de cobrador inicial (ex.: clique na notificacao "sem cobrador"). */
+  initialAssignmentFilter?: "with_collector" | "without_collector";
 }
 
 interface SelectionIndicatorProps {
@@ -236,7 +238,7 @@ const SelectionIndicator = ({ checked, partial, onClick }: SelectionIndicatorPro
 };
 
 export const ClientAssignment = React.memo(
-  ({ onViewClient }: ClientAssignmentProps) => {
+  ({ onViewClient, initialAssignmentFilter }: ClientAssignmentProps) => {
     const {
       collections,
       users,
@@ -268,7 +270,9 @@ export const ClientAssignment = React.memo(
 
     // Novos filtros
     const [filterCollector, setFilterCollector] = useState<string>("");
-    const [filterStatus, setFilterStatus] = useState<string>(""); // 'with_collector', 'without_collector', ''
+    const [filterStatus, setFilterStatus] = useState<string>(
+      initialAssignmentFilter ?? "",
+    ); // 'with_collector', 'without_collector', ''
     const [filterCity, setFilterCity] = useState<string>("");
     const [filterNeighborhood, setFilterNeighborhood] = useState<string>("");
     const [filterStore, setFilterStore] = useState<string>("");
