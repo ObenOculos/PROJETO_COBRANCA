@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import AddressHistoryViewer from "./AddressHistoryViewer";
+import ClientHistoryViewer from "./ClientHistoryViewer";
 import {
   X,
   ChevronDown,
@@ -13,6 +14,7 @@ import {
   MessageCircle,
   Clock,
   RefreshCw,
+  History,
 } from "lucide-react";
 import { ClientGroup, UserType, isCollectorType } from "../../types";
 import {
@@ -234,7 +236,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   const [isGeneralPaymentModalOpen, setIsGeneralPaymentModalOpen] =
     useState(false);
   const [isGeneralEditModalOpen, setIsGeneralEditModalOpen] = useState(false);
-  const [showClientData, setShowClientData] = useState(false);
+  const [view, setView] = useState<"vendas" | "dados" | "historico">("vendas");
   const [expandedSales, setExpandedSales] = useState<Set<number>>(new Set());
   const [refreshKey, setRefreshKey] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -647,11 +649,15 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               recebimento na propria carteira — Terceirizado e Juridico ficavam
               de fora por omissao de quando esses perfis foram criados. */}
           {(isCollectorType(userType) || userType === "manager") && (
-            <div className="mt-4 px-4 lg:px-6 py-0 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div
+              className={`mt-4 px-4 lg:px-6 py-0 grid grid-cols-2 gap-3 ${
+                userType === "manager" ? "sm:grid-cols-5" : "sm:grid-cols-4"
+              }`}
+            >
               <button
                 id="view-client-data"
                 name="viewClientData"
-                onClick={() => setShowClientData(true)}
+                onClick={() => setView("dados")}
                 className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
                 title="Ver todos os dados de cadastro do cliente"
               >
@@ -664,7 +670,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               <button
                 id="view-client-sales"
                 name="viewClientSales"
-                onClick={() => setShowClientData(false)}
+                onClick={() => setView("vendas")}
                 className="flex items-center px-3 py-2 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-colors text-sm font-medium shadow-sm"
                 title="Ver vendas do cliente"
               >
@@ -674,6 +680,20 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   <span className="hidden sm:inline">Ver Vendas</span>
                 </span>
               </button>
+              {/* Linha do tempo de carteira e baixas: so gestor, pois mostra
+                  outros cobradores e quem fez cada mudanca. */}
+              {userType === "manager" && (
+                <button
+                  id="view-client-history"
+                  name="viewClientHistory"
+                  onClick={() => setView("historico")}
+                  className="flex items-center px-3 py-2 bg-slate-700 text-white rounded-2xl hover:bg-slate-800 transition-colors text-sm font-medium shadow-sm"
+                  title="Quem teve o cliente na carteira e cada baixa registrada"
+                >
+                  <History className="h-5 w-5 mr-2" />
+                  <span className="text-xs sm:text-sm">Histórico</span>
+                </button>
+              )}
               {hasRealPendingValue && (
                 <button
                   id="distribute-payment"
@@ -715,8 +735,15 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             </div>
           )}
 
-          {/* Sales and Collections or Client Data */}
-          {showClientData ? (
+          {/* Sales and Collections, Client Data or History */}
+          {view === "historico" ? (
+            <div className="overflow-y-auto max-h-[60vh] p-4 lg:p-6">
+              <ClientHistoryViewer
+                clientDocument={clientGroup.document}
+                users={users ?? []}
+              />
+            </div>
+          ) : view === "dados" ? (
             <div className="overflow-y-auto max-h-[60vh] p-4 lg:p-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Column 1: Basic and Contact Info */}
