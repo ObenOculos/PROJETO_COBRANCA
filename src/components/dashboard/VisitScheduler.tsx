@@ -34,6 +34,7 @@ import {
 import ClientDetailModal from "./ClientDetailModal";
 import { DateValidationModal } from "../common/DateValidationModal";
 import ConfirmationModal from "../common/ConfirmationModal";
+import Pagination from "../common/Pagination";
 import {
   getNextAllowedVisitDate,
   resolveAllowedConfigs,
@@ -53,6 +54,9 @@ import {
   RESCHEDULE_REASONS,
   countPriorReschedules,
 } from "../../config/rescheduleReasons";
+
+// Visitas por pagina na lista de atrasadas.
+const OVERDUE_PER_PAGE = 10;
 
 interface VisitSchedulerProps {
   onClose?: () => void;
@@ -268,6 +272,8 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   const [overdueSortBy, setOverdueSortBy] = useState<
     "atraso" | "cidade" | "nome"
   >("atraso");
+  const [overduePage, setOverduePage] = useState(1);
+  const overdueListRef = useRef<HTMLDivElement>(null);
 
   // NEW STATE: To track if the overdue modal has been shown.
   // Aberto ja focado numa visita: o aviso de atrasadas cobriria justamente o
@@ -746,6 +752,34 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       setOverdueCity("");
     }
   }, [overdueCity, overdueCities]);
+
+  // Filtro novo volta para a primeira pagina.
+  useEffect(() => {
+    setOverduePage(1);
+  }, [overdueSearch, overdueCity, overdueSortBy]);
+
+  // Reagendar a ultima visita da ultima pagina encolhe a lista: recua a pagina.
+  const overdueTotalPages = Math.max(
+    1,
+    Math.ceil(filteredOverdueVisits.length / OVERDUE_PER_PAGE),
+  );
+  useEffect(() => {
+    if (overduePage > overdueTotalPages) setOverduePage(overdueTotalPages);
+  }, [overduePage, overdueTotalPages]);
+
+  const pagedOverdueVisits = useMemo(
+    () =>
+      filteredOverdueVisits.slice(
+        (overduePage - 1) * OVERDUE_PER_PAGE,
+        overduePage * OVERDUE_PER_PAGE,
+      ),
+    [filteredOverdueVisits, overduePage],
+  );
+
+  const changeOverduePage = (page: number) => {
+    setOverduePage(page);
+    overdueListRef.current?.scrollTo({ top: 0 });
+  };
 
   // Abre a lista de atrasadas uma vez, ao entrar na agenda.
   React.useEffect(() => {
@@ -3192,14 +3226,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                 </div>
 
                 {/* Lista */}
-                <div className="px-4 lg:px-6 py-3 overflow-y-auto flex-1">
+                <div
+                  ref={overdueListRef}
+                  className="px-4 lg:px-6 py-3 overflow-y-auto flex-1"
+                >
                   {filteredOverdueVisits.length === 0 ? (
                     <p className="text-sm text-gray-500 text-center py-8">
                       Nenhuma visita atrasada com esses filtros.
                     </p>
                   ) : (
                     <ul className="space-y-2">
-                      {filteredOverdueVisits.map((visit) => {
+                      {pagedOverdueVisits.map((visit) => {
                         const days = visitOverdueDays(visit);
                         const place = [
                           visit.clientNeighborhood,
@@ -3269,6 +3306,15 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                 </div>
 
                 <div className="px-4 lg:px-6 py-3 border-t border-gray-200">
+                  {/* O rodape ja tem a linha divisoria; tira a do componente. */}
+                  <div className="[&>div]:mt-0 [&>div]:pt-0 [&>div]:border-0 [&>div]:mb-3">
+                    <Pagination
+                      page={overduePage}
+                      total={filteredOverdueVisits.length}
+                      perPage={OVERDUE_PER_PAGE}
+                      onChange={changeOverduePage}
+                    />
+                  </div>
                   <button
                     onClick={() => setShowOverdueNotificationModal(false)}
                     className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-2xl hover:bg-gray-300 transition-colors font-medium"
