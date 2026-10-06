@@ -10,7 +10,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 1 | Segurança: RLS desligado + login em texto puro | **Crítica** | Grande, em etapas |
 | 1b | Desempenho credita pela atribuição atual — Fase 2 (telas) | **Alta** | Médio |
 | 1f | "Excluir vendas" apaga os pagamentos (`sale_payments`) | **Alta** | Pequeno |
-| 1g | Estorno/ajuste do gerente não desconta do cobrador | Média | Pequeno/médio |
+| 0 | **Aplicar migration `20261006000001` antes do push** (estorno) | — | Pequeno |
 | 1c | Regras de "pendente/pago" divergentes (desconto, coluna `status`) | Média | Pequeno/médio |
 | 2 | Reagendamento atômico (RPC) | Média | Pequeno/médio |
 | 3 | Trocar exclusão de visitas por cancelamento | Média | Pequeno |
@@ -66,13 +66,11 @@ sobrevive (sem FK), mas o mérito vem de `sale_payments`.
 **Fazer:** não apagar `sale_payments`. Decidir com o usuário o que "excluir
 venda" significa (título lançado por engano? cancelado no ERP?).
 
-### 1g. Estorno/ajuste do gerente
+### 0. Migration `20261006000001` — aplicar antes do push
 
-`GeneralPaymentEditModal` reescreve `valor_recebido` das parcelas e
-`recordPaymentAdjustment` grava a diferença em `sale_payments` com
-`collector_id` = **gerente**. Um estorno de pagamento do cobrador não sai do
-crédito dele; um ajuste positivo não entra. Pela regra do domínio, a correção
-deve referenciar o pagamento original (e o cobrador dele) com motivo.
+O modal "Editar Pagamentos" chama `registrar_ajuste_recebimento`, que só existe
+depois dela. `npx supabase db push --dry-run` → `npx supabase db push --yes`.
+Testada em Postgres 17 local.
 
 ### 1c. Regras de "pendente/pago" divergentes
 
@@ -209,6 +207,19 @@ O override de `tar` em `package.json` ainda é necessário.
   agendamento. As de tela: "hoje" e "mês atual" no painel do cobrador (depois
   das 21h os pagamentos/visitas de hoje deixavam de contar) e na visão geral.
   Nenhum `toISOString()` sobrou como data de calendário.
+- **Estorno ligado ao pagamento** (antigo item 1g; migration
+  `20261006000001`): ao reduzir o recebido de uma venda, quem edita escolhe o
+  pagamento do app estornado; o estorno é registro novo com `estorno_de`,
+  crédito do cobrador original, `motivo` obrigatório e `registrado_por_id`.
+  Nunca passa do disponível do original (o excesso vira ajuste administrativo).
+  Em 2026-10-06 havia 7 estornos antigos (R$ 1.859) sem vínculo — mantidos.
+  - Junto: a edição **zerava o desconto** de todas as parcelas da venda e
+    regravava a data de recebimento de parcelas sem mudança; agora mantém o
+    desconto e só grava parcelas alteradas.
+  - Interino até a Fase 2: ajuste administrativo feito por um cobrador (com
+    autorização) ainda entra no recebido dele nas telas atuais, que somam todo
+    `sale_payments` por `collector_id`. A Fase 2 conta só pagamentos do app e
+    estornos ligados (`isAjusteOuEstorno` em `filters/sales`).
 
 ### 2026-10-05
 

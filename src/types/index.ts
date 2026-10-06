@@ -392,15 +392,21 @@ export interface CollectionContextType {
     discountAmount?: number,
     saleNumber?: number | null,
   ) => Promise<void>;
-  recordPaymentAdjustment: (
-    saleNumber: number,
-    clientDocument: string,
-    clientName: string, // Added clientName
-    adjustmentAmount: number,
-    managerId: string,
-    managerName: string,
-    notes?: string,
-  ) => Promise<void>;
+  /**
+   * Registra a diferenca de uma correcao manual do recebido de uma venda.
+   * Negativa com `pagamentoEstornadoId`: estorno ligado ao pagamento do app
+   * (sai do credito do cobrador dele). Sem ele, ou positiva: ajuste
+   * administrativo de quem editou. Motivo obrigatorio.
+   */
+  registrarAjusteRecebimento: (params: {
+    saleNumber: number;
+    clientDocument: string;
+    clientName: string;
+    diferenca: number;
+    motivo: string;
+    usuarioId: string;
+    pagamentoEstornadoId?: string | null;
+  }) => Promise<void>;
   getSalePayments: (
     saleNumber: number,
     clientDocument: string,
@@ -489,6 +495,10 @@ export interface SalePayment {
   isAgreement?: boolean;
   storeName?: string;
   updatedAt?: string;
+  /** Pagamento que este registro estorna (valor negativo). */
+  estornoDe?: string | null;
+  /** Motivo de estorno/ajuste. */
+  motivo?: string | null;
 }
 
 export interface PaymentDistribution {

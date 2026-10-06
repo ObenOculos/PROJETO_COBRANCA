@@ -564,12 +564,15 @@ export type Database = {
           created_at: string | null;
           discount_amount: number | null;
           distribution_details: Json | null;
+          estorno_de: string | null;
           id: string;
           is_agreement: boolean | null;
+          motivo: string | null;
           notes: string | null;
           payment_amount: number;
           payment_date: string;
           payment_method: string | null;
+          registrado_por_id: string | null;
           sale_number: number | null;
           store_name: string | null;
           updated_at: string | null;
@@ -921,6 +924,18 @@ export type Database = {
           total_parcelas: number;
           valor_total: number;
         }[];
+      };
+      registrar_ajuste_recebimento: {
+        Args: {
+          p_client_document: string;
+          p_client_name: string;
+          p_sale_number: number;
+          p_diferenca: number;
+          p_motivo: string;
+          p_usuario_id: string;
+          p_pagamento_estornado?: string;
+        };
+        Returns: undefined;
       };
       process_payment: {
         Args: {

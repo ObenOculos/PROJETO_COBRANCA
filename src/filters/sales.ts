@@ -16,6 +16,20 @@ import { clientKey } from "./clientStatus";
  * Fonte única: todo agrupamento de vendas (contexto, tabelas, modais) deve usar
  * esta função para não divergir.
  */
+/**
+ * Registro de sale_payments que NAO e pagamento registrado no app: estorno
+ * (valor negativo / estorno_de) ou ajuste administrativo. Espelha a checagem
+ * de registrar_ajuste_recebimento (migration 20261006000001).
+ */
+export const isAjusteOuEstorno = (p: {
+  paymentAmount: number;
+  paymentMethod?: string | null;
+  estornoDe?: string | null;
+}): boolean =>
+  p.paymentAmount < 0 ||
+  !!p.estornoDe ||
+  /^(ajuste|estorno)/i.test(p.paymentMethod ?? "");
+
 export const resolveSaleKey = (c: Collection): number =>
   c.numero_titulo ?? c.venda_n ?? 0;
 

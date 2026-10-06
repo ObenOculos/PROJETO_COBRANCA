@@ -10,6 +10,7 @@ import {
   UserType,
 } from "../types";
 import { isVisitOpen, isVisitOverdue, todayLocalStr } from "./visitStatus";
+import { isAjusteOuEstorno } from "../filters/sales";
 
 // ---------------------------------------------------------------------------
 // Regras das notificacoes automaticas
@@ -51,11 +52,6 @@ export interface NotificacaoGerada {
 
 const plural = (n: number, um: string, varios: string) =>
   `${n.toLocaleString("pt-BR")} ${n === 1 ? um : varios}`;
-
-// Ajuste/estorno do gerente (recordPaymentAdjustment) tambem vai para
-// sale_payments; nao e recebimento do dia.
-const isAjusteAdministrativo = (p: SalePayment) =>
-  /^(Ajuste|Estorno)/.test(p.paymentMethod ?? "");
 
 const vencimentoLocal = (raw: string | null | undefined): string | null => {
   const d = parseAndNormalizeDate(raw);
@@ -175,8 +171,8 @@ export const gerarNotificacoes = (params: {
     (p) =>
       (isManager || p.collectorId === user.id) &&
       (p.paymentDate ?? "").slice(0, 10) === hoje &&
-      p.paymentAmount > 0 &&
-      !isAjusteAdministrativo(p),
+      // Estorno/ajuste tambem vai para sale_payments; nao e recebimento.
+      !isAjusteOuEstorno(p),
   );
   if (recebidosHoje.length > 0) {
     const total = recebidosHoje.reduce((s, p) => s + p.paymentAmount, 0);

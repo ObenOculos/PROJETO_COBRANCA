@@ -2656,6 +2656,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             createdAt: payment.created_at,
             distribution_details: payment.distribution_details || [], // Corrected casing
             discountAmount: payment.discount_amount, // Added this line
+            clientName: payment.client_name,
+            estornoDe: payment.estorno_de,
+            motivo: payment.motivo,
           }) as unknown as SalePayment,
       );
 
@@ -2807,80 +2810,45 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
-  const recordPaymentAdjustment = async (
-    saleNumber: number,
-    clientDocument: string,
-    clientName: string, // Added clientName
-    adjustmentAmount: number,
-    managerId: string,
-    managerName: string,
-    notes?: string,
-  ) => {
-    setGlobalLoading(true, "Registrando ajuste de pagamento...");
-    try {
-      // This try block should encompass all the logic that can throw errors
-      console.log("Registrando ajuste de pagamento na tabela sale_payments:", {
-        saleNumber,
-        clientDocument,
-        adjustmentAmount,
-        managerId,
-        managerName,
-        notes,
-      });
-
-      if (adjustmentAmount === 0) {
-        console.log("Ajuste de pagamento é zero, ignorando registro.");
-        return; // Exit early if no adjustment
-      }
-
-      const isNegativeAdjustment = adjustmentAmount < 0;
-      const finalPaymentMethod = isNegativeAdjustment
-        ? "Estorno/Ajuste Negativo"
-        : "Ajuste Administrativo";
-      const finalNotes =
-        notes ||
-        (isNegativeAdjustment
-          ? "Estorno/Redução de valor recebido via edição do gerente"
-          : "Ajuste de valor recebido via edição do gerente");
-
-      const { error } = await supabase.from("sale_payments").insert({
-        sale_number: saleNumber,
-        client_document: clientDocument,
-        client_name: clientName, // Added client_name
-        payment_amount: adjustmentAmount, // Directly use adjustmentAmount (can be negative)
-        payment_date: todayLocalStr(), // Current date
-        payment_method: finalPaymentMethod,
-        notes: finalNotes,
-        collector_id: managerId,
-        collector_name: managerName,
-        created_at: new Date().toISOString(),
-        distribution_details: [], // No specific distribution for an adjustment
-        is_agreement: false,
-      });
-
-      if (error) {
-        console.error("Erro ao registrar ajuste de pagamento:", error);
-        throw new Error(
-          `Erro ao registrar ajuste de pagamento: ${error.message}`,
+  const registrarAjusteRecebimento: CollectionContextType["registrarAjusteRecebimento"] =
+    async ({
+      saleNumber,
+      clientDocument,
+      clientName,
+      diferenca,
+      motivo,
+      usuarioId,
+      pagamentoEstornadoId,
+    }) => {
+      if (Math.abs(diferenca) < 0.01) return;
+      setGlobalLoading(true, "Registrando correção do recebido...");
+      try {
+        // A RPC valida motivo, cliente e o saldo disponivel do pagamento
+        // estornado, e grava tudo numa transacao.
+        const { error } = await supabase.rpc("registrar_ajuste_recebimento", {
+          p_client_document: clientDocument,
+          p_client_name: clientName,
+          p_sale_number: saleNumber,
+          p_diferenca: Math.round(diferenca * 100) / 100,
+          p_motivo: motivo,
+          p_usuario_id: usuarioId,
+          p_pagamento_estornado: pagamentoEstornadoId ?? undefined,
+        });
+        if (error) {
+          throw new Error(`Erro ao registrar correção: ${error.message}`);
+        }
+        invalidatePayments();
+        await fetchSalePayments(false);
+      } catch (err) {
+        console.error("Erro ao registrar correção do recebido:", err);
+        setError(
+          err instanceof Error ? err.message : "Erro ao registrar correção",
         );
+        throw err;
+      } finally {
+        setGlobalLoading(false);
       }
-
-      console.log("✅ Ajuste de pagamento registrado com sucesso.");
-      invalidatePayments(); // Invalidate cache to force refresh of sale payments
-      await fetchSalePayments(false); // Force fresh fetch
-    } catch (err) {
-      // This catch block handles errors from the entire try block
-      console.error("Erro ao processar ajuste de pagamento:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Erro ao registrar ajuste de pagamento",
-      );
-      throw err;
-    } finally {
-      setGlobalLoading(false);
-    }
-  };
+    };
 
   const getSalePayments = (
     saleNumber: number,
@@ -4250,7 +4218,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     // Sale payment methods
     processSalePayment,
     processGeneralPayment,
-    recordPaymentAdjustment, // Added
+    registrarAjusteRecebimento,
     getSalePayments,
     calculateSaleBalance,
     getSalesByClient,

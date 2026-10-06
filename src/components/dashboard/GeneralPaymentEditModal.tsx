@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo } from "react";
+import React, { useState, useEffect, useMemo, memo } from "react";
 import {
   X,
   Edit,
@@ -10,12 +10,17 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { ClientGroup, SaleGroup } from "../../types";
+import { ClientGroup, SaleGroup, SalePayment } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { formatCurrency } from "../../utils/formatters";
 import { CollectionStatus } from "../../types/status";
 import { todayLocalStr } from "../../config/visitStatus";
+import { isAjusteOuEstorno } from "../../filters/sales";
+import { round2 } from "../../filters/clientStatus";
+
+// Valor da escolha "a reducao nao corrige pagamento do app".
+const SEM_PAGAMENTO_APP = "nenhum";
 
 interface GeneralPaymentEditModalProps {
   clientGroup: ClientGroup;
@@ -26,8 +31,43 @@ interface GeneralPaymentEditModalProps {
 
 const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
   ({ clientGroup, clientSales, onClose, onSuccess }) => {
-    const { updateCollection, recordPaymentAdjustment } = useCollection();
+    const { updateCollection, registrarAjusteRecebimento, salePayments } =
+      useCollection();
     const { user } = useAuth();
+    // Motivo obrigatorio de toda correcao (vai para sale_payments.motivo).
+    const [motivo, setMotivo] = useState("");
+    // Venda -> pagamento do app que a reducao estorna (ou SEM_PAGAMENTO_APP).
+    const [estornos, setEstornos] = useState<Record<number, string>>({});
+
+    // Pagamentos do app deste cliente que ainda tem saldo para estornar.
+    const pagamentosEstornaveis = useMemo(() => {
+      const doCliente = (salePayments ?? []).filter(
+        (p) => p.clientDocument === clientGroup.document,
+      );
+      const jaEstornado = new Map<string, number>();
+      doCliente.forEach((p) => {
+        if (p.estornoDe) {
+          jaEstornado.set(
+            p.estornoDe,
+            (jaEstornado.get(p.estornoDe) ?? 0) - p.paymentAmount,
+          );
+        }
+      });
+      return doCliente
+        .filter((p) => !isAjusteOuEstorno(p))
+        .map((p) => ({
+          ...p,
+          disponivel: round2(p.paymentAmount - (jaEstornado.get(p.id) ?? 0)),
+        }))
+        .filter((p) => p.disponivel >= 0.01)
+        .sort((a, b) =>
+          (b.paymentDate ?? "").localeCompare(a.paymentDate ?? ""),
+        );
+    }, [salePayments, clientGroup.document]);
+
+    // Recebido maximo de uma venda: o desconto ja quita parte dela.
+    const saleNetValue = (sale: SaleGroup) =>
+      Math.max(0, (sale.totalValue || 0) - (sale.totalDiscount || 0));
     const [loading, setLoading] = useState(false);
     const [salePaymentEdits, setSalePaymentEdits] = useState<
       Record<number, string>
@@ -98,8 +138,8 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
       handleSaleValueChange(saleNumber, newValue.toFixed(2));
     };
 
-    const setSaleFullValue = (saleNumber: number, totalValue: number) => {
-      handleSaleValueChange(saleNumber, totalValue.toFixed(2));
+    const setSaleFullValue = (saleNumber: number, netValue: number) => {
+      handleSaleValueChange(saleNumber, netValue.toFixed(2));
     };
 
     const clearSaleValue = (saleNumber: number) => {
@@ -182,9 +222,26 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
         return;
       }
 
-      // Confirmar se há valores maiores que o valor total da venda
+      if (!motivo.trim()) {
+        alert("Informe o motivo da correção.");
+        return;
+      }
+
+      const semEscolha = changes.filter(
+        (c) => c.difference < 0 && !estornos[c.sale.saleNumber],
+      );
+      if (semEscolha.length > 0) {
+        alert(
+          `Escolha qual pagamento é estornado na venda ${semEscolha
+            .map((c) => `#${c.sale.saleNumber}`)
+            .join(", ")} (ou indique que não foi pagamento do app).`,
+        );
+        return;
+      }
+
+      // Confirmar se há valores maiores que o valor da venda (já com desconto)
       const hasExcessiveValues = changes.some(
-        (change) => change.newValue > change.sale.totalValue,
+        (change) => change.newValue > saleNetValue(change.sale) + 0.01,
       );
 
       if (hasExcessiveValues) {
@@ -199,6 +256,24 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
 
         console.log("Aplicando edições de pagamento por venda:", changes);
 
+        // Primeiro o registro da correcao: a RPC valida motivo e o saldo do
+        // pagamento estornado; se recusar, nenhuma parcela foi alterada.
+        for (const change of changes) {
+          const escolha = estornos[change.sale.saleNumber];
+          await registrarAjusteRecebimento({
+            saleNumber: change.sale.saleNumber,
+            clientDocument: clientGroup.document,
+            clientName: clientGroup.client,
+            diferenca: change.difference,
+            motivo: motivo.trim(),
+            usuarioId: user.id,
+            pagamentoEstornadoId:
+              change.difference < 0 && escolha && escolha !== SEM_PAGAMENTO_APP
+                ? escolha
+                : null,
+          });
+        }
+
         // Aplicar cada mudança de venda
         for (const change of changes) {
           const { sale, newValue } = change;
@@ -210,28 +285,35 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
             ) || [];
           let remainingAmount = newValue;
 
-          // Itera sobre as parcelas para aplicar o novo valor e zerar o desconto
+          // Distribui o novo recebido pelas parcelas. O desconto negociado e
+          // mantido (antes era zerado em toda a venda) e ja quita parte de
+          // cada parcela.
           for (const installment of installments) {
             if (!installment.id_parcela) continue;
 
             const installmentValue = installment.valor_original || 0;
-            const appliedAmount = Math.min(remainingAmount, installmentValue);
+            const discount = installment.desconto || 0;
+            const capacity = Math.max(0, installmentValue - discount);
+            const appliedAmount = round2(Math.min(remainingAmount, capacity));
+            remainingAmount = round2(remainingAmount - appliedAmount);
+
+            // Parcela sem mudanca nao e regravada (nem a data de recebimento).
+            if (
+              Math.abs(appliedAmount - (installment.valor_recebido || 0)) < 0.01
+            )
+              continue;
 
             const updates: any = {
               valor_recebido: appliedAmount,
-              desconto: "0", // Changed from 0 to "0"
+              data_de_recebimento: appliedAmount > 0 ? todayLocalStr() : null,
             };
 
-            // Atualizar status baseado no valor
-            if (appliedAmount === 0) {
-              updates.status = CollectionStatus.PENDENTE;
-              updates.data_de_recebimento = null;
-            } else if (appliedAmount >= installmentValue) {
+            if (appliedAmount + discount >= installmentValue - 0.01) {
               updates.status = CollectionStatus.PAGO;
-              updates.data_de_recebimento = todayLocalStr();
-            } else {
+            } else if (appliedAmount + discount > 0) {
               updates.status = CollectionStatus.PARCIAL;
-              updates.data_de_recebimento = todayLocalStr();
+            } else {
+              updates.status = CollectionStatus.PENDENTE;
             }
 
             console.log(
@@ -239,23 +321,6 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
               updates,
             );
             await updateCollection(installment.id_parcela, updates);
-
-            remainingAmount -= appliedAmount;
-          }
-        }
-
-        // Registrar ajustes na tabela sale_payments
-        for (const change of changes) {
-          if (change.difference !== 0) {
-            await recordPaymentAdjustment(
-              change.sale.saleNumber,
-              clientGroup.document,
-              clientGroup.client, // Added clientName
-              change.difference,
-              user.id,
-              user.name,
-              `Ajuste de valor recebido para venda #${change.sale.saleNumber}. Diferença: ${formatCurrency(change.difference)}`,
-            );
           }
         }
 
@@ -540,7 +605,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
                                     onClick={() =>
                                       setSaleFullValue(
                                         sale.saleNumber,
-                                        sale.totalValue,
+                                        saleNetValue(sale),
                                       )
                                     }
                                     className="flex-1 p-2 text-sm bg-green-100 text-green-700 rounded-2xl hover:bg-green-200 transition-colors font-medium"
@@ -568,11 +633,22 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
                                       {formatCurrency(currentSaleValue)}
                                     </span>
                                   </div>
+                                  {(sale.totalDiscount || 0) > 0 && (
+                                    <div className="flex justify-between">
+                                      <span>Desconto (mantido):</span>
+                                      <span className="font-medium text-blue-600">
+                                        {formatCurrency(
+                                          sale.totalDiscount || 0,
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
                                   <div className="flex justify-between">
                                     <span>Saldo devedor:</span>
                                     <span
                                       className={`font-medium ${
-                                        sale.totalValue - currentSaleValue > 0
+                                        saleNetValue(sale) - currentSaleValue >
+                                        0.01
                                           ? "text-red-600"
                                           : "text-green-600"
                                       }`}
@@ -580,7 +656,7 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
                                       {formatCurrency(
                                         Math.max(
                                           0,
-                                          sale.totalValue - currentSaleValue,
+                                          saleNetValue(sale) - currentSaleValue,
                                         ),
                                       )}
                                     </span>
@@ -589,14 +665,16 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
                                     <span>Status:</span>
                                     <span
                                       className={`font-medium ${
-                                        currentSaleValue >= sale.totalValue
+                                        currentSaleValue >=
+                                        saleNetValue(sale) - 0.01
                                           ? "text-green-600"
                                           : currentSaleValue > 0
                                             ? "text-yellow-600"
                                             : "text-red-600"
                                       }`}
                                     >
-                                      {currentSaleValue >= sale.totalValue
+                                      {currentSaleValue >=
+                                      saleNetValue(sale) - 0.01
                                         ? "Quitada"
                                         : currentSaleValue > 0
                                           ? "Parcial"
@@ -637,11 +715,47 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
                                 )}
                               </div>
                             </div>
+
+                            {currentSaleValue < originalSaleReceived - 0.01 && (
+                              <EstornoPicker
+                                saleNumber={sale.saleNumber}
+                                valor={originalSaleReceived - currentSaleValue}
+                                pagamentos={pagamentosEstornaveis}
+                                escolha={estornos[sale.saleNumber] ?? ""}
+                                onChange={(id) =>
+                                  setEstornos((prev) => ({
+                                    ...prev,
+                                    [sale.saleNumber]: id,
+                                  }))
+                                }
+                              />
+                            )}
                           </div>
                         </div>
                       );
                     })}
                   </div>
+
+                  {/* Motivo obrigatorio da correcao */}
+                  {changes.length > 0 && (
+                    <div className="mt-6">
+                      <label
+                        htmlFor="motivo-correcao"
+                        className="block text-sm font-semibold text-gray-700 mb-1"
+                      >
+                        Motivo da correção{" "}
+                        <span className="text-red-600">*</span>
+                      </label>
+                      <textarea
+                        id="motivo-correcao"
+                        value={motivo}
+                        onChange={(e) => setMotivo(e.target.value)}
+                        rows={2}
+                        placeholder="Ex.: pagamento lançado em duplicidade"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                      />
+                    </div>
+                  )}
 
                   {/* Botões de Ação */}
                   <div className="mt-6 pt-4 sm:pt-6 border-t border-gray-200">
@@ -717,5 +831,78 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
     );
   },
 );
+
+type PagamentoEstornavel = SalePayment & { disponivel: number };
+
+// Escolha do pagamento do app que uma reducao do recebido estorna. O estorno
+// sai do credito do cobrador desse pagamento; o que passar do disponivel vira
+// ajuste administrativo de quem editou.
+const EstornoPicker: React.FC<{
+  saleNumber: number;
+  valor: number;
+  pagamentos: PagamentoEstornavel[];
+  escolha: string;
+  onChange: (id: string) => void;
+}> = ({ saleNumber, valor, pagamentos, escolha, onChange }) => {
+  // Pagamentos desta venda primeiro.
+  const ordenados = [
+    ...pagamentos.filter((p) => p.saleNumber === saleNumber),
+    ...pagamentos.filter((p) => p.saleNumber !== saleNumber),
+  ];
+  const escolhido = pagamentos.find((p) => p.id === escolha);
+  const doCobrador = escolhido ? Math.min(valor, escolhido.disponivel) : 0;
+  const resto = valor - doCobrador;
+  const dataBR = (iso?: string) =>
+    iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—";
+
+  return (
+    <div className="mt-4 p-3 rounded-2xl border border-red-200 bg-red-50">
+      <label className="block text-sm font-semibold text-red-800 mb-2">
+        Redução de {formatCurrency(valor)}: qual pagamento está sendo estornado?
+      </label>
+      <select
+        value={escolha}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-3 py-2 border border-red-200 rounded-xl text-sm bg-white"
+      >
+        <option value="" disabled>
+          Escolha o pagamento…
+        </option>
+        {ordenados.map((p) => (
+          <option key={p.id} value={p.id}>
+            {dataBR(p.paymentDate)} · {p.collectorName || "Cobrador"} ·{" "}
+            {formatCurrency(p.paymentAmount)}
+            {p.saleNumber ? ` (venda #${p.saleNumber})` : " (pagamento geral)"}
+            {p.disponivel < p.paymentAmount
+              ? ` — disponível ${formatCurrency(p.disponivel)}`
+              : ""}
+          </option>
+        ))}
+        <option value={SEM_PAGAMENTO_APP}>
+          Não foi pagamento do app (ERP ou correção de lançamento)
+        </option>
+      </select>
+      {pagamentos.length === 0 && (
+        <p className="text-xs text-red-700 mt-2">
+          Este cliente não tem pagamento do app com saldo para estornar.
+        </p>
+      )}
+      {escolhido && (
+        <p className="text-xs text-red-800 mt-2">
+          {formatCurrency(doCobrador)} sai do crédito de{" "}
+          <strong>{escolhido.collectorName || "cobrador"}</strong>
+          {resto >= 0.01 &&
+            `; ${formatCurrency(resto)} passa do disponível e fica como ajuste administrativo`}
+          .
+        </p>
+      )}
+      {escolha === SEM_PAGAMENTO_APP && (
+        <p className="text-xs text-red-800 mt-2">
+          Registrado como ajuste administrativo, em nome de quem está editando.
+        </p>
+      )}
+    </div>
+  );
+};
 
 export default GeneralPaymentEditModal;
