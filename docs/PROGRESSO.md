@@ -9,7 +9,6 @@ uma etapa (mova o item para "Concluído", com data e commit).
 |---|------|-----------|---------|
 | 1 | Segurança: RLS desligado + login em texto puro | **Crítica** | Grande, em etapas |
 | 1b | Desempenho credita pela atribuição atual — Fase 2 (telas) | **Alta** | Médio |
-| 0 | **Aplicar migration `20261006000002` antes do push** (cancelar venda) | — | Pequeno |
 | 1c | Regras de "pendente/pago" divergentes (desconto, coluna `status`) | Média | Pequeno/médio |
 | 2 | Reagendamento atômico (RPC) | Média | Pequeno/médio |
 | 3 | Trocar exclusão de visitas por cancelamento | Média | Pequeno |
@@ -54,11 +53,6 @@ histórico de recebimento junto. Medido em 2026-10-05: **368 de 1.062 pagamentos
 - Tela "Baixas do ERP" a partir de `recebimentos_historico`.
 - A origem `erp_ou_manual` não distingue a planilha da edição manual na
   parcela. Para separar, a importação precisa passar por uma RPC.
-
-### 0. Migration `20261006000002` — aplicar antes do push
-
-O front chama `cancelar_vendas`/`cancelar_clientes`, que só existem depois
-dela. Testada em Postgres 17 local.
 
 ### 1c. Regras de "pendente/pago" divergentes
 
@@ -209,7 +203,7 @@ O override de `tar` em `package.json` ainda é necessário.
     `sale_payments` por `collector_id`. A Fase 2 conta só pagamentos do app e
     estornos ligados (`isAjusteOuEstorno` em `filters/sales`).
 - **"Excluir venda/cliente" virou cancelar** (`d91ce40`, antigo item 1f;
-  migration `20261006000002`): o caso real é venda cancelada no ERP. As parcelas
+  migration `20261006000002`, aplicada em 2026-10-06): o caso real é venda cancelada no ERP. As parcelas
   ficam com status `Cancelado` (já tratado em todo o app por `isCancelado`), o
   cancelamento vai para `vendas_canceladas` (append-only: motivo obrigatório,
   autor, valor em aberto no momento) e nada é apagado — antes saíam parcelas,
