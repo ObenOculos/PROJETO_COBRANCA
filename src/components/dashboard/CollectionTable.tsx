@@ -78,12 +78,8 @@ export const CollectionTable = React.forwardRef<
     },
     ref,
   ) => {
-    const {
-      getClientGroups,
-      loading,
-      deleteSalesFromClient,
-      bulkDeleteClients,
-    } = useCollection();
+    const { getClientGroups, loading, cancelarVendas, cancelarClientes } =
+      useCollection();
     const [currentAddresses, setCurrentAddresses] = useState<Map<string, any>>(
       new Map(),
     );
@@ -136,6 +132,8 @@ export const CollectionTable = React.forwardRef<
     );
     const [showActivationModal, setShowActivationModal] = useState(false);
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+    const [bulkMotivo, setBulkMotivo] = useState("");
+    const [bulkMotivoErro, setBulkMotivoErro] = useState(false);
 
     useImperativeHandle(ref, () => ({
       openSaleDetails: (saleNumber: number, clientDocument: string) => {
@@ -166,15 +164,19 @@ export const CollectionTable = React.forwardRef<
       },
     }));
 
-    const handleConfirmDeleteSales = async (selectedSaleNumbers: number[]) => {
-      if (clientToDelete && selectedSaleNumbers.length > 0) {
+    const handleConfirmDeleteSales = async (
+      selectedSaleNumbers: number[],
+      motivo: string,
+    ) => {
+      if (clientToDelete && selectedSaleNumbers.length > 0 && motivo) {
         try {
-          await deleteSalesFromClient(
+          await cancelarVendas(
             clientToDelete.document,
             selectedSaleNumbers,
+            motivo,
           );
         } catch (error) {
-          console.error("Erro ao deletar vendas:", error);
+          console.error("Erro ao cancelar vendas:", error);
         }
         setClientToDelete(null);
         setShowDeleteConfirmation(false);
@@ -356,16 +358,48 @@ export const CollectionTable = React.forwardRef<
 
     const handleBulkDeleteConfirm = async () => {
       if (selectedClients.size === 0) return;
+      if (!bulkMotivo.trim()) {
+        setBulkMotivoErro(true);
+        return;
+      }
       try {
-        await bulkDeleteClients(Array.from(selectedClients));
+        await cancelarClientes(Array.from(selectedClients), bulkMotivo.trim());
         setSelectedClients(new Set());
         setIsDeleteMode(false);
       } catch (error) {
-        console.error("Erro ao deletar clientes em massa:", error);
+        console.error("Erro ao cancelar clientes em massa:", error);
       } finally {
         setShowBulkDeleteModal(false);
+        setBulkMotivo("");
+        setBulkMotivoErro(false);
       }
     };
+
+    // Mensagem do cancelamento em massa, com o motivo obrigatorio.
+    const bulkCancelMessage = (
+      <div className="space-y-3">
+        <p>
+          As vendas ativas de {selectedClients.size} cliente(s) ficam como{" "}
+          <strong>Canceladas</strong> (canceladas no ERP) e saem da cobrança.
+          Pagamentos recebidos, visitas realizadas e histórico são mantidos.
+        </p>
+        <label className="block text-sm font-semibold text-gray-700">
+          Motivo do cancelamento <span className="text-red-600">*</span>
+          <textarea
+            value={bulkMotivo}
+            onChange={(e) => {
+              setBulkMotivo(e.target.value);
+              setBulkMotivoErro(false);
+            }}
+            rows={2}
+            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-2xl text-sm font-normal"
+          />
+        </label>
+        {bulkMotivoErro && (
+          <p className="text-sm text-red-600">Informe o motivo.</p>
+        )}
+      </div>
+    );
 
     const getStatusIcon = (status: string | null) => {
       if (!status) return <Clock className="h-4 w-4 text-gray-600" />;
@@ -695,7 +729,7 @@ export const CollectionTable = React.forwardRef<
                     <h2 className="text-lg font-semibold text-red-700 dark:text-red-400">
                       {selectedClients.size > 0
                         ? `${selectedClients.size} cliente(s) selecionado(s)`
-                        : "Selecione os clientes para deletar"}
+                        : "Selecione os clientes para cancelar"}
                     </h2>
                   </div>
                   <div className="flex items-center gap-2">
@@ -705,7 +739,7 @@ export const CollectionTable = React.forwardRef<
                       className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 transition-all duration-200"
                     >
                       <Trash2 className="h-4 w-4" />
-                      <span>Deletar Selecionados</span>
+                      <span>Cancelar Selecionados</span>
                     </button>
                     <button
                       onClick={() => {
@@ -1114,8 +1148,8 @@ export const CollectionTable = React.forwardRef<
               setIsDeleteMode(true);
               setShowActivationModal(false);
             }}
-            title="Ativar Modo de Exclusão em Massa?"
-            message="Ao ativar esta função, você poderá selecionar e deletar múltiplos clientes e todos os seus dados associados de uma só vez. Deseja continuar?"
+            title="Ativar Cancelamento em Massa?"
+            message="Ao ativar esta função, você poderá selecionar vários clientes e cancelar todas as vendas ativas deles de uma vez (vendas canceladas no ERP). Nada é apagado. Deseja continuar?"
             confirmButtonText="Ativar"
             cancelButtonText="Cancelar"
             isDestructive={true}
@@ -1125,9 +1159,9 @@ export const CollectionTable = React.forwardRef<
             isOpen={showBulkDeleteModal}
             onClose={() => setShowBulkDeleteModal(false)}
             onConfirm={handleBulkDeleteConfirm}
-            title={`Deletar ${selectedClients.size} Clientes?`}
-            message={`Você tem certeza que deseja deletar permanentemente ${selectedClients.size} clientes e todos os seus dados? Esta ação não pode ser desfeita.`}
-            confirmButtonText="Sim, Deletar"
+            title={`Cancelar vendas de ${selectedClients.size} cliente(s)?`}
+            message={bulkCancelMessage}
+            confirmButtonText="Sim, Cancelar"
             cancelButtonText="Cancelar"
             isDestructive={true}
           />{" "}
@@ -1162,7 +1196,7 @@ export const CollectionTable = React.forwardRef<
                     <h2 className="text-lg font-semibold text-red-700">
                       {selectedClients.size > 0
                         ? `${selectedClients.size} cliente(s) selecionado(s)`
-                        : "Selecione os clientes para deletar"}
+                        : "Selecione os clientes para cancelar"}
                     </h2>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1172,7 +1206,7 @@ export const CollectionTable = React.forwardRef<
                       className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 transition-all duration-200"
                     >
                       <Trash2 className="h-4 w-4" />
-                      <span className="hidden sm:inline">Deletar</span>
+                      <span className="hidden sm:inline">Cancelar</span>
                     </button>
                     <button
                       onClick={() => {
@@ -1534,7 +1568,7 @@ export const CollectionTable = React.forwardRef<
                         }
                       }}
                       className="flex items-center justify-center w-12 bg-red-500 text-white hover:bg-red-600 transition-colors flex-shrink-0 self-stretch rounded-r-2xl"
-                      title="Deletar Cliente"
+                      title="Cancelar vendas do cliente"
                     >
                       <Trash2 className="h-5 w-5" />
                     </button>
@@ -1905,8 +1939,8 @@ export const CollectionTable = React.forwardRef<
             setIsDeleteMode(true);
             setShowActivationModal(false);
           }}
-          title="Ativar Modo de Exclusão em Massa?"
-          message="Ao ativar esta função, você poderá selecionar e deletar múltiplos clientes e todos os seus dados associados de uma só vez. Deseja continuar?"
+          title="Ativar Cancelamento em Massa?"
+          message="Ao ativar esta função, você poderá selecionar vários clientes e cancelar todas as vendas ativas deles de uma vez (vendas canceladas no ERP). Nada é apagado. Deseja continuar?"
           confirmButtonText="Ativar"
           cancelButtonText="Cancelar"
           isDestructive={true}
@@ -1917,9 +1951,9 @@ export const CollectionTable = React.forwardRef<
           isOpen={showBulkDeleteModal}
           onClose={() => setShowBulkDeleteModal(false)}
           onConfirm={handleBulkDeleteConfirm}
-          title={`Deletar ${selectedClients.size} Clientes?`}
-          message={`Você tem certeza que deseja deletar permanentemente ${selectedClients.size} clientes e todos os seus dados? Esta ação não pode ser desfeita.`}
-          confirmButtonText="Sim, Deletar"
+          title={`Cancelar vendas de ${selectedClients.size} cliente(s)?`}
+          message={bulkCancelMessage}
+          confirmButtonText="Sim, Cancelar"
           cancelButtonText="Cancelar"
           isDestructive={true}
         />

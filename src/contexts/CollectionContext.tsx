@@ -1259,273 +1259,66 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
-  const deleteSalesFromClient = async (
-    clientDocument: string,
-    saleNumbers: number[],
+  // Venda cancelada no ERP: as parcelas ficam como 'Cancelado' (saem da
+  // cobranca ativa) e o cancelamento e registrado com motivo. Nada e apagado:
+  // antes, "excluir" dava DELETE em parcelas, pagamentos (merito do cobrador)
+  // e visitas. Ver migration 20261006000002.
+  const cancelarVendas: CollectionContextType["cancelarVendas"] = async (
+    clientDocument,
+    saleNumbers,
+    motivo,
   ) => {
-    try {
-      setGlobalLoading(
-        true,
-        `Deletando ${saleNumbers.length} venda(s) do cliente ${clientDocument}...`,
-      );
-      setLoading(true);
-
-      if (!isOnline) {
-        throw new Error("Não é possível deletar vendas offline.");
-      }
-
-      // 1. Delete from BANCO_DADOS (collections/installments).
-      // A identidade da venda é numero_titulo (com fallback venda_n); 0 = avulsa
-      // (sem título E sem venda_n). Montamos o filtro espelhando resolveSaleKey.
-      const validSaleNumbers = saleNumbers.filter((num) => num > 0);
-      const includesRenegotiated = saleNumbers.includes(0);
-
-      const orParts: string[] = [];
-      if (validSaleNumbers.length > 0) {
-        const list = validSaleNumbers.join(",");
-        orParts.push(`numero_titulo.in.(${list})`);
-        orParts.push(`and(numero_titulo.is.null,venda_n.in.(${list}))`);
-      }
-      if (includesRenegotiated) {
-        orParts.push(`and(numero_titulo.is.null,venda_n.is.null)`);
-      }
-
-      // Segurança: sem alvo, não apagar nada (evita deletar todas as parcelas).
-      if (orParts.length === 0) {
-        throw new Error("Nenhuma venda válida informada para exclusão.");
-      }
-
-      const collectionsQuery = supabase
-        .from("BANCO_DADOS")
-        .delete()
-        .eq("documento", clientDocument)
-        .or(orParts.join(","));
-
-      const { error: collectionsError } = await collectionsQuery;
-
-      if (collectionsError) {
-        throw collectionsError;
-      }
-
-      // 2. Delete from sale_payments
-      let paymentsQuery = supabase
-        .from("sale_payments")
-        .delete()
-        .eq("client_document", clientDocument);
-
-      if (validSaleNumbers.length > 0 && includesRenegotiated) {
-        paymentsQuery = paymentsQuery.or(
-          `sale_number.in.(${validSaleNumbers.join(",")}),sale_number.eq.0`,
-        );
-      } else if (validSaleNumbers.length > 0) {
-        paymentsQuery = paymentsQuery.in("sale_number", validSaleNumbers);
-      } else if (includesRenegotiated) {
-        paymentsQuery = paymentsQuery.eq("sale_number", 0);
-      }
-
-      const { error: paymentsError } = await paymentsQuery;
-
-      if (paymentsError) {
-        console.warn(
-          `Aviso: Erro ao deletar pagamentos das vendas ${saleNumbers} do cliente ${clientDocument}:`,
-          paymentsError.message,
-        );
-      }
-
-      console.log(
-        `✅ ${saleNumbers.length} venda(s) do cliente ${clientDocument} e pagamentos relacionados deletados.`,
-      );
-
-      // After deleting sales, check if the client still has any remaining sales
-      const { data: remainingSales, error: fetchRemainingSalesError } =
-        await supabase
-          .from("BANCO_DADOS")
-          .select("id_parcela")
-          .eq("documento", clientDocument)
-          .limit(1); // Only need to know if at least one exists
-
-      if (fetchRemainingSalesError) {
-        console.error(
-          "Erro ao verificar vendas restantes do cliente:",
-          fetchRemainingSalesError,
-        );
-        // Continue without deleting other client data if we can't verify remaining sales
-      } else if (!remainingSales || remainingSales.length === 0) {
-        console.log(
-          `Cliente ${clientDocument} não possui mais vendas. Deletando dados relacionados (visitas, histórico de autorização).`,
-        );
-
-        // 3. Delete from scheduled_visits
-        const { error: visitsError } = await supabase
-          .from("scheduled_visits")
-          .delete()
-          .eq("client_document", clientDocument);
-
-        if (visitsError) {
-          console.warn(
-            `Aviso: Erro ao deletar visitas agendadas do cliente ${clientDocument}:`,
-            visitsError.message,
-          );
-        }
-
-        // 4. Delete from authorization_history
-        const { error: authHistoryError } = await supabase
-          .from("authorization_history")
-          .delete()
-          .eq("client_document", clientDocument);
-
-        if (authHistoryError) {
-          console.warn(
-            `Aviso: Erro ao deletar histórico de autorização do cliente ${clientDocument}:`,
-            authHistoryError.message,
-          );
-        }
-      }
-
-      await refreshData(); // Refresh all data after deletion
-    } catch (err) {
-      console.error(
-        `Erro ao deletar vendas ${saleNumbers} do cliente ${clientDocument}:`,
-        err,
-      );
-      setError(err instanceof Error ? err.message : "Erro ao deletar vendas");
-      throw err;
-    } finally {
-      setLoading(false);
-      setGlobalLoading(false);
+    if (!isOnline) {
+      throw new Error("Não é possível cancelar vendas offline.");
     }
-  };
-
-  const bulkDeleteClients = async (clientDocuments: string[]) => {
+    if (saleNumbers.length === 0) return;
+    setGlobalLoading(true, `Cancelando ${saleNumbers.length} venda(s)...`);
     try {
-      setGlobalLoading(true, `Deletando ${clientDocuments.length} clientes...`);
-      setLoading(true);
-
-      if (!isOnline) {
-        throw new Error("Não é possível deletar clientes offline.");
-      }
-
-      // 1. Delete from BANCO_DADOS (collections)
-      const { error: collectionsError } = await supabase
-        .from("BANCO_DADOS")
-        .delete()
-        .in("documento", clientDocuments);
-
-      if (collectionsError) throw collectionsError;
-
-      // 2. Delete from sale_payments
-      const { error: paymentsError } = await supabase
-        .from("sale_payments")
-        .delete()
-        .in("client_document", clientDocuments);
-      if (paymentsError)
-        console.warn(
-          `Aviso: Erro ao deletar pagamentos:`,
-          paymentsError.message,
-        );
-
-      // 3. Delete from scheduled_visits
-      const { error: visitsError } = await supabase
-        .from("scheduled_visits")
-        .delete()
-        .in("client_document", clientDocuments);
-      if (visitsError)
-        console.warn(`Aviso: Erro ao deletar visitas:`, visitsError.message);
-
-      // 4. Delete from authorization_history
-      const { error: authHistoryError } = await supabase
-        .from("authorization_history")
-        .delete()
-        .in("client_document", clientDocuments);
-      if (authHistoryError)
-        console.warn(
-          `Aviso: Erro ao deletar histórico de autorização:`,
-          authHistoryError.message,
-        );
-
-      console.log(
-        `✅ ${clientDocuments.length} clientes e dados relacionados deletados.`,
-      );
+      const { error } = await supabase.rpc("cancelar_vendas", {
+        p_documento: clientDocument,
+        p_motivo: motivo,
+        p_usuario_id: user?.id,
+        p_chaves: saleNumbers,
+      });
+      if (error) throw new Error(`Erro ao cancelar vendas: ${error.message}`);
       await refreshData();
     } catch (err) {
-      console.error(`Erro ao deletar clientes em massa:`, err);
-      setError(err instanceof Error ? err.message : "Erro ao deletar clientes");
+      console.error("Erro ao cancelar vendas:", err);
+      setError(err instanceof Error ? err.message : "Erro ao cancelar vendas");
       throw err;
     } finally {
-      setLoading(false);
       setGlobalLoading(false);
     }
   };
 
-  const deleteClient = async (clientDocument: string) => {
+  // Cancela todas as vendas ativas dos clientes (todos cancelados no ERP).
+  const cancelarClientes: CollectionContextType["cancelarClientes"] = async (
+    clientDocuments,
+    motivo,
+  ) => {
+    if (!isOnline) {
+      throw new Error("Não é possível cancelar clientes offline.");
+    }
+    if (clientDocuments.length === 0) return;
+    setGlobalLoading(
+      true,
+      `Cancelando as vendas de ${clientDocuments.length} cliente(s)...`,
+    );
     try {
-      setGlobalLoading(true, `Deletando cliente ${clientDocument}...`);
-      setLoading(true);
-
-      if (!isOnline) {
-        throw new Error("Não é possível deletar clientes offline.");
-      }
-
-      // 1. Delete from BANCO_DADOS (collections)
-      const { error: collectionsError } = await supabase
-        .from("BANCO_DADOS")
-        .delete()
-        .eq("documento", clientDocument);
-
-      if (collectionsError) {
-        throw collectionsError;
-      }
-
-      // 2. Delete from sale_payments
-      const { error: paymentsError } = await supabase
-        .from("sale_payments")
-        .delete()
-        .eq("client_document", clientDocument);
-
-      if (paymentsError) {
-        console.warn(
-          `Aviso: Erro ao deletar pagamentos do cliente ${clientDocument}:`,
-          paymentsError.message,
-        );
-        // Don't throw, as collections might have been deleted successfully
-      }
-
-      // 3. Delete from scheduled_visits
-      const { error: visitsError } = await supabase
-        .from("scheduled_visits")
-        .delete()
-        .eq("client_document", clientDocument);
-
-      if (visitsError) {
-        console.warn(
-          `Aviso: Erro ao deletar visitas agendadas do cliente ${clientDocument}:`,
-          visitsError.message,
-        );
-      }
-
-      // 4. Delete from authorization_history
-      const { error: authHistoryError } = await supabase
-        .from("authorization_history")
-        .delete()
-        .eq("client_document", clientDocument);
-
-      if (authHistoryError) {
-        console.warn(
-          `Aviso: Erro ao deletar histórico de autorização do cliente ${clientDocument}:`,
-          authHistoryError.message,
-        );
-      }
-
-      console.log(
-        `✅ Cliente ${clientDocument} e dados relacionados deletados.`,
-      );
-      await refreshData(); // Refresh all data after deletion
+      const { error } = await supabase.rpc("cancelar_clientes", {
+        p_documentos: clientDocuments,
+        p_motivo: motivo,
+        p_usuario_id: user?.id,
+      });
+      if (error) throw new Error(`Erro ao cancelar clientes: ${error.message}`);
+      await refreshData();
     } catch (err) {
-      console.error(`Erro ao deletar cliente ${clientDocument}:`, err);
-      setError(err instanceof Error ? err.message : "Erro ao deletar cliente");
+      console.error("Erro ao cancelar clientes:", err);
+      setError(
+        err instanceof Error ? err.message : "Erro ao cancelar clientes",
+      );
       throw err;
     } finally {
-      setLoading(false);
       setGlobalLoading(false);
     }
   };
@@ -4236,9 +4029,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     deleteScheduledVisits,
     getClientDataForVisit,
     rescheduleVisit,
-    deleteSalesFromClient,
-    bulkDeleteClients,
-    deleteClient,
+    cancelarVendas,
+    cancelarClientes,
     updateScheduledVisitsAfterPayment,
     // NOVOS CAMPOS PARA OTIMIZAÇÃO:
     prefetchClientsData,

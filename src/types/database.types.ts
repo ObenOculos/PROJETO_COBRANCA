@@ -925,6 +925,23 @@ export type Database = {
           valor_total: number;
         }[];
       };
+      cancelar_vendas: {
+        Args: {
+          p_documento: string;
+          p_motivo: string;
+          p_usuario_id?: string;
+          p_chaves?: number[];
+        };
+        Returns: number;
+      };
+      cancelar_clientes: {
+        Args: {
+          p_documentos: string[];
+          p_motivo: string;
+          p_usuario_id?: string;
+        };
+        Returns: number;
+      };
       registrar_ajuste_recebimento: {
         Args: {
           p_client_document: string;

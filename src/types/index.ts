@@ -466,12 +466,17 @@ export interface CollectionContextType {
     reason?: string,
   ) => Promise<void>;
   updateScheduledVisitsAfterPayment: (clientDocument: string) => Promise<void>;
-  deleteClient: (clientDocument: string) => Promise<void>;
-  deleteSalesFromClient: (
+  /** Marca as vendas como canceladas (no ERP), com motivo. Nada e apagado. */
+  cancelarVendas: (
     clientDocument: string,
     saleNumbers: number[],
+    motivo: string,
   ) => Promise<void>;
-  bulkDeleteClients: (clientDocuments: string[]) => Promise<void>;
+  /** Cancela todas as vendas ativas dos clientes, com motivo. */
+  cancelarClientes: (
+    clientDocuments: string[],
+    motivo: string,
+  ) => Promise<void>;
   // NOVOS CAMPOS PARA OTIMIZAÇÃO:
   prefetchClientsData: (clientDocuments: string[]) => Promise<void>;
   clientDataCache: Map<string, any>;
