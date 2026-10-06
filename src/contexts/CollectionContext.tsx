@@ -70,6 +70,7 @@ import {
   fetchPagesInParallel,
   dedupeBy,
 } from "../utils/supabasePagination";
+import { todayLocalStr } from "../config/visitStatus";
 
 // Linha crua de BANCO_DADOS. Nao ha tipos gerados para o schema, entao o alias
 // concentra num ponto so a falta de tipagem em vez de espalhar `any`.
@@ -2847,7 +2848,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         client_document: clientDocument,
         client_name: clientName, // Added client_name
         payment_amount: adjustmentAmount, // Directly use adjustmentAmount (can be negative)
-        payment_date: new Date().toISOString().split("T")[0], // Current date
+        payment_date: todayLocalStr(), // Current date
         payment_method: finalPaymentMethod,
         notes: finalNotes,
         collector_id: managerId,
@@ -3348,9 +3349,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Se o status for "realizada" ou "nao_encontrado", sempre definir a data atual como data da visita realizada
       if (status === "realizada" || status === "nao_encontrado") {
-        updateData.data_visita_realizada = new Date()
-          .toISOString()
-          .split("T")[0];
+        updateData.data_visita_realizada = todayLocalStr();
       }
 
       // Se estiver offline, adicionar à fila e retornar
@@ -3417,7 +3416,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
                 updatedAt: new Date().toISOString(),
                 // Se o status for "realizada" ou "nao_encontrado", definir a data atual como data da visita realizada
                 ...((status === "realizada" || status === "nao_encontrado") && {
-                  dataVisitaRealizada: new Date().toISOString().split("T")[0],
+                  dataVisitaRealizada: todayLocalStr(),
                 }),
               }
             : visit,

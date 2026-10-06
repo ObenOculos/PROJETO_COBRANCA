@@ -40,6 +40,7 @@ import { hasOpenBalance } from "../../filters/clientStatus";
 
 import LogContactModal from "./LogContactModal";
 import ClientDetailModal from "./ClientDetailModal";
+import { todayLocalStr } from "../../config/visitStatus";
 
 const toDate = (dateInput: string | Date | null | undefined): Date | null => {
   if (!dateInput) return null;
@@ -203,7 +204,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     const goal = monthlyGoals.find(
       (g) =>
         g.user_id === user?.id &&
-        g.month.startsWith(now.toISOString().slice(0, 7)),
+        g.month.startsWith(todayLocalStr(now).slice(0, 7)),
     );
     const targetValue = goal?.payments_goal || 100000;
 
@@ -774,7 +775,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const currentMonthStr = now.toISOString().slice(0, 7); // "YYYY-MM"
+    const currentMonthStr = todayLocalStr(now).slice(0, 7); // "YYYY-MM"
 
     // Find the goal for the current month
     const currentMonthGoal = monthlyGoals.find(
@@ -818,9 +819,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       const date1 = toDate(d1);
       const date2 = toDate(d2);
       if (!date1 || !date2) return false;
-      return (
-        date1.toISOString().split("T")[0] === date2.toISOString().split("T")[0]
-      );
+      return todayLocalStr(date1) === todayLocalStr(date2);
     };
 
     const today = new Date();
@@ -1295,7 +1294,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
     // Calcular métricas de visitas
     const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
+    const todayStr = todayLocalStr(today);
 
     const visitStats = {
       today: myVisits.filter((v) => {

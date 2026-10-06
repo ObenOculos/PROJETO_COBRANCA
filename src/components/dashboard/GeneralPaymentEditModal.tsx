@@ -15,6 +15,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { formatCurrency } from "../../utils/formatters";
 import { CollectionStatus } from "../../types/status";
+import { todayLocalStr } from "../../config/visitStatus";
 
 interface GeneralPaymentEditModalProps {
   clientGroup: ClientGroup;
@@ -227,14 +228,10 @@ const GeneralPaymentEditModal: React.FC<GeneralPaymentEditModalProps> = memo(
               updates.data_de_recebimento = null;
             } else if (appliedAmount >= installmentValue) {
               updates.status = CollectionStatus.PAGO;
-              updates.data_de_recebimento = new Date()
-                .toISOString()
-                .split("T")[0];
+              updates.data_de_recebimento = todayLocalStr();
             } else {
               updates.status = CollectionStatus.PARCIAL;
-              updates.data_de_recebimento = new Date()
-                .toISOString()
-                .split("T")[0];
+              updates.data_de_recebimento = todayLocalStr();
             }
 
             console.log(

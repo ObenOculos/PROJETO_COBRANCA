@@ -23,6 +23,7 @@ import {
 } from "../../utils/formatters";
 import { Modal } from "../Modal";
 import TabTransition from "../common/TabTransition";
+import { todayLocalStr } from "../../config/visitStatus";
 
 interface CollectionModalProps {
   collection: Collection;
@@ -149,14 +150,14 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
     collection.valor_recebido.toString(),
   );
   const [correctedDate, setCorrectedDate] = useState(
-    collection.data_de_recebimento || new Date().toISOString().split("T")[0],
+    collection.data_de_recebimento || todayLocalStr(),
   );
 
   const handleStatusUpdate = async () => {
     const updates: Partial<Collection> = { status: newStatus };
     if (newStatus.toLowerCase() === "recebido") {
       updates.valor_recebido = collection.valor_original;
-      updates.data_de_recebimento = new Date().toISOString().split("T")[0];
+      updates.data_de_recebimento = todayLocalStr();
     }
     await updateCollection(collection.id_parcela, updates);
     onClose();
@@ -166,7 +167,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
     if (!newAttempt.notes.trim()) return;
     await addAttempt(collection.id_parcela, {
       ...newAttempt,
-      date: new Date().toISOString().split("T")[0],
+      date: todayLocalStr(),
     });
     await fetchAttempts();
     setNewAttempt({

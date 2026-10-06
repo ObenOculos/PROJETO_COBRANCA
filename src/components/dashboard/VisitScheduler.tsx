@@ -47,6 +47,7 @@ import {
   isVisitOverdue,
   isVisitOpen,
   visitOverdueDays,
+  todayLocalStr,
 } from "../../config/visitStatus";
 import {
   RESCHEDULE_REASONS,
@@ -138,7 +139,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
 
   useEffect(() => {
     if (selectedCalendarDate) {
-      setSelectedDate(selectedCalendarDate.toISOString().split("T")[0]);
+      setSelectedDate(todayLocalStr(selectedCalendarDate));
     }
   }, [selectedCalendarDate]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -1951,7 +1952,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       );
 
       let scheduledDate = selectedCalendarDate
-        ? selectedCalendarDate.toISOString().split("T")[0]
+        ? todayLocalStr(selectedCalendarDate)
         : selectedDate;
 
       // Verificar se existe data permitida configurada para esta cidade/bairro
@@ -4747,9 +4748,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                     config.allowed_date,
                                   );
                                   if (date.getDate() === config.allowed_date) {
-                                    const dateStr = date
-                                      .toISOString()
-                                      .split("T")[0];
+                                    const dateStr = todayLocalStr(date);
                                     suggestedDates.set(
                                       dateStr,
                                       (suggestedDates.get(dateStr) || 0) + 1,
@@ -4767,9 +4766,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   nextMonthDate.getDate() ===
                                   config.allowed_date
                                 ) {
-                                  const dateStr = nextMonthDate
-                                    .toISOString()
-                                    .split("T")[0];
+                                  const dateStr = todayLocalStr(nextMonthDate);
                                   suggestedDates.set(
                                     dateStr,
                                     (suggestedDates.get(dateStr) || 0) + 1,
@@ -4786,9 +4783,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   nextNextMonthDate.getDate() ===
                                   config.allowed_date
                                 ) {
-                                  const dateStr = nextNextMonthDate
-                                    .toISOString()
-                                    .split("T")[0];
+                                  const dateStr = todayLocalStr(nextNextMonthDate);
                                   suggestedDates.set(
                                     dateStr,
                                     (suggestedDates.get(dateStr) || 0) + 1,

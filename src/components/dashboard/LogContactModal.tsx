@@ -3,6 +3,7 @@ import { X, Save, Calendar, MessageSquare, AlertCircle } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCollection } from "../../contexts/CollectionContext";
+import { todayLocalStr } from "../../config/visitStatus";
 
 interface LogContactModalProps {
   client: any;
@@ -53,13 +54,13 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
             collector_id: user.id,
             client_document: client.document,
             client_name: client.client,
-            scheduled_date: new Date().toISOString().split("T")[0],
+            scheduled_date: todayLocalStr(),
             status: "realizada", // Marcamos como realizada para entrar no histórico
             notes: finalNotes,
             client_address: client.address || "",
             client_city: client.city || "",
             total_pending_value: client.pendingValue,
-            data_visita_realizada: new Date().toISOString().split("T")[0],
+            data_visita_realizada: todayLocalStr(),
           },
         ]);
 
@@ -140,7 +141,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
                   value={promiseDate}
                   onChange={(e) => setPromiseDate(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none transition-all dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-                  min={new Date().toISOString().split("T")[0]}
+                  min={todayLocalStr()}
                 />
               </div>
             </div>

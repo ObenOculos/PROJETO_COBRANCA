@@ -12,7 +12,6 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 1f | "Excluir vendas" apaga os pagamentos (`sale_payments`) | **Alta** | Pequeno |
 | 1g | Estorno/ajuste do gerente não desconta do cobrador | Média | Pequeno/médio |
 | 1c | Regras de "pendente/pago" divergentes (desconto, coluna `status`) | Média | Pequeno/médio |
-| 1e | Data de visita realizada gravada em UTC | Média | Pequeno |
 | 2 | Reagendamento atômico (RPC) | Média | Pequeno/médio |
 | 3 | Trocar exclusão de visitas por cancelamento | Média | Pequeno |
 | 4 | Modelagem de `scheduled_visits` | Baixa/média | Médio, incremental |
@@ -84,16 +83,6 @@ deve referenciar o pagamento original (e o cobrador dele) com motivo.
 - A view `banco_dados_clientes_ativos` decide "em aberto" pela coluna `status`.
   O front e `cliente_tem_saldo_aberto` decidem pelos valores. Em 2026-10-05:
   13 parcelas `Pago` com saldo e 27 `Pago Parcial` sem saldo.
-
-### 1e. Data de visita realizada em UTC
-
-`updateVisitStatus` grava `data_visita_realizada` com
-`new Date().toISOString().split("T")[0]`. Depois das 21h (Brasília), a visita
-fica com a data do dia seguinte e cai no dia/mês errado no Desempenho.
-`CollectorDashboard` (contador "hoje"), a fila offline (`useOffline`),
-`GeneralPaymentEditModal` e `recordPaymentAdjustment` fazem o mesmo. Usar
-`todayLocalStr()`. (No banco, `process_payment` já foi corrigida na
-migration `20261005000002`.)
 
 ### 1. Segurança — CRÍTICO
 
@@ -207,6 +196,19 @@ O override de `tar` em `package.json` ainda é necessário.
     aparelho do cobrador (destinado ao gestor) nunca chega a ninguém; o gestor
     já recebe o aviso gerado a partir de `sale_payments`. Remover ou levar para
     o banco.
+- **Clique nas notificações** (`e5290ab`): cada uma leva à tela certa já
+  filtrada (atraso, vencimento de hoje, sem cobrador, caixa, agendamento).
+  Filtro "só em atraso" passou a considerar o desconto.
+- **Modal da loja** (`7dc38de`): clientes paginados (20/página), filtros (busca,
+  situação, cidade, só atraso, ordenação), valores compactos legíveis; paginação
+  extraída para `components/common/Pagination`.
+- **Datas de calendário em UTC** (antigo item 1e): 28 trocas para
+  `todayLocalStr()` em 12 arquivos. As que mudavam dado gravado: data da visita
+  realizada (online, offline e "registrar contato"), data do ajuste do gerente,
+  data de recebimento na edição manual de parcela/pagamento, data sugerida no
+  agendamento. As de tela: "hoje" e "mês atual" no painel do cobrador (depois
+  das 21h os pagamentos/visitas de hoje deixavam de contar) e na visão geral.
+  Nenhum `toISOString()` sobrou como data de calendário.
 
 ### 2026-10-05
 

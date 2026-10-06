@@ -23,6 +23,7 @@ import {
 import { useCollection } from "../../contexts/CollectionContext";
 import { resolveSaleKey } from "../../filters/sales";
 import { toYYYYMMDD } from "../../filters/dates";
+import { todayLocalStr } from "../../config/visitStatus";
 
 interface OverviewTabProps {
   collections: Collection[];
@@ -268,7 +269,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       };
 
     const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
+    const todayStr = todayLocalStr(today);
 
     // Start of week (Monday)
     const startOfWeek = new Date(today);

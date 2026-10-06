@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { ScheduledVisit } from "../types";
 import { visitReleaseSituacao } from "../config/visitOutcomes";
+import { todayLocalStr } from "../config/visitStatus";
 
 // Variável de controle de sincronização no escopo do módulo
 let isSyncing = false;
@@ -207,7 +208,7 @@ export const useOffline = () => {
       visitData.status === "realizada" ||
       visitData.status === "nao_encontrado"
     ) {
-      updateData.data_visita_realizada = new Date().toISOString().split("T")[0];
+      updateData.data_visita_realizada = todayLocalStr();
     }
 
     const { error } = await supabase

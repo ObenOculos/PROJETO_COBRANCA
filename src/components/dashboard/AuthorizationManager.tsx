@@ -14,6 +14,7 @@ import {
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 import { AuthorizationHistory } from "../../types";
 import { useAuth } from "../../contexts/AuthContext";
+import { todayLocalStr } from "../../config/visitStatus";
 
 // Remove the old interface since we're using AuthorizationHistory from types
 
@@ -279,7 +280,7 @@ const AuthorizationManager: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `historico-autorizacoes-${new Date().toISOString().split("T")[0]}.csv`;
+      a.download = `historico-autorizacoes-${todayLocalStr()}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {

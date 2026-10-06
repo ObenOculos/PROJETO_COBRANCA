@@ -33,6 +33,7 @@ import {
   getClientPaymentStatus,
   getClientPending,
 } from "../../filters/clientStatus";
+import { todayLocalStr } from "../../config/visitStatus";
 
 interface StoreStats {
   storeName: string;
@@ -400,7 +401,7 @@ const EnhancedStoreManagement: React.FC = () => {
 
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `relatorio-lojas-${new Date().toISOString().split("T")[0]}.csv`;
+    link.download = `relatorio-lojas-${todayLocalStr()}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   };

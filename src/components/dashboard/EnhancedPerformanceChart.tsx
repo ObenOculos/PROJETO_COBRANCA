@@ -20,6 +20,7 @@ import {
   isVisitOverdue,
   REMARCACOES_REINCIDENTE,
   ReincidenteCliente,
+  todayLocalStr,
 } from "../../config/visitStatus";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
@@ -1154,7 +1155,7 @@ const EnhancedPerformanceChart: React.FC = () => {
     link.href = URL.createObjectURL(
       new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" }),
     );
-    link.download = `ranking-${new Date().toISOString().split("T")[0]}.csv`;
+    link.download = `ranking-${todayLocalStr()}.csv`;
     link.click();
   };
 

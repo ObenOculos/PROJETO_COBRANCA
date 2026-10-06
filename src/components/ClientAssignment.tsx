@@ -51,6 +51,7 @@ import {
 import {
   lastVisitStatusByClient,
   visitStatusLabel,
+  todayLocalStr,
 } from "../config/visitStatus";
 import * as XLSX from "xlsx";
 import BulkAssignmentModal from "./BulkAssignmentModal";
@@ -1047,7 +1048,7 @@ export const ClientAssignment = React.memo(
       XLSX.utils.book_append_sheet(wb, clientWS, "Resumo por Cliente");
       XLSX.utils.book_append_sheet(wb, installmentWS, "Parcelas Detalhadas");
 
-      const dateStr = new Date().toISOString().slice(0, 10);
+      const dateStr = todayLocalStr();
       XLSX.writeFile(wb, `Relatorio_Clientes_Filtrados_${dateStr}.xlsx`);
     };
 
@@ -1216,9 +1217,7 @@ export const ClientAssignment = React.memo(
     const currentMonthLabel = monthLabel(now);
 
     // Clique nos cards aplica/remove (toggle) o filtro correspondente.
-    const currentMonthStartStr = new Date(now.getFullYear(), now.getMonth(), 1)
-      .toISOString()
-      .split("T")[0];
+    const currentMonthStartStr = todayLocalStr(new Date(now.getFullYear(), now.getMonth(), 1));
     const isNewClientsFilterActive =
       filterCreatedFrom === currentMonthStartStr && !filterCreatedTo;
     const isPendingFilterActive = filterStatus === "without_collector";
