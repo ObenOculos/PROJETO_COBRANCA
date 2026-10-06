@@ -93,6 +93,22 @@ export const formatCurrency = (
   }).format(value);
 };
 
+/**
+ * Moeda curta para cartoes e espacos estreitos: ate R$ 99.999,99 mostra o
+ * valor cheio; acima, "R$ 1,2 mi" / "R$ 350 mil". Use com o valor completo
+ * (formatCurrency) no title, para nao perder precisao.
+ */
+export const formatCurrencyCompact = (value: number): string => {
+  if (Math.abs(value) < 100_000) return formatCurrency(value);
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    notation: "compact",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  }).format(value);
+};
+
 export const formatSafeDate = (
   date: string | Date | null | undefined,
 ): string => {

@@ -16,9 +16,15 @@ import {
   MapPin,
   Users,
   X,
+  Search,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
-import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
+import {
+  formatCurrency,
+  formatCurrencyCompact,
+  calculateOverdueDays,
+} from "../../utils/formatters";
+import Pagination from "../common/Pagination";
 import FilterBar from "../common/FilterBar";
 import { Collection, FilterOptions, isCollectorType } from "../../types";
 import { countVendas, resolveSaleKey } from "../../filters/sales";
@@ -78,6 +84,18 @@ const EnhancedStoreManagement: React.FC = () => {
     useState<StoreStats | null>(null);
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
+  // Memo: filtrar inline criava um array novo a cada render da pagina e o
+  // modal refazia todos os agrupamentos (milhares de titulos) a cada vez.
+  const selectedStoreCollections = useMemo(
+    () =>
+      selectedStoreForModal
+        ? sourceCollections.filter(
+            (c) => c.nome_da_loja === selectedStoreForModal.storeName,
+          )
+        : [],
+    [selectedStoreForModal, sourceCollections],
+  );
+
   const collectors = useMemo(
     () => users.filter((u) => isCollectorType(u.type)),
     [users],
@@ -929,9 +947,7 @@ const EnhancedStoreManagement: React.FC = () => {
       {selectedStoreForModal && (
         <StoreDetailModal
           store={selectedStoreForModal}
-          storeCollections={sourceCollections.filter(
-            (c) => c.nome_da_loja === selectedStoreForModal.storeName,
-          )}
+          storeCollections={selectedStoreCollections}
           onClose={() => setSelectedStoreForModal(null)}
         />
       )}
@@ -958,6 +974,25 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
     new Set(),
   );
 
+  // Lista de clientes: filtros + paginacao. Renderizar todos de uma vez (lojas
+  // com milhares de clientes) era o que travava a abertura do modal.
+  const PAGE_SIZE = 20;
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "" | "pendente" | "parcial" | "pago"
+  >("");
+  const [cityFilter, setCityFilter] = useState("");
+  const [onlyOverdue, setOnlyOverdue] = useState(false);
+  const [clientSort, setClientSort] = useState<"pending" | "overdue" | "name">(
+    "pending",
+  );
+  const [clientPage, setClientPage] = useState(1);
+  const [cityPage, setCityPage] = useState(1);
+
+  useEffect(() => {
+    setClientPage(1);
+  }, [search, statusFilter, cityFilter, onlyOverdue, clientSort]);
+
   const toggleClient = (key: string) =>
     setExpandedClients((prev) => {
       const next = new Set(prev);
@@ -975,6 +1010,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
         sales: Set<string>;
         totalAmount: number;
         receivedAmount: number;
+        discountAmount: number;
       }
     > = {};
 
@@ -987,6 +1023,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
           sales: new Set(),
           totalAmount: 0,
           receivedAmount: 0,
+          discountAmount: 0,
         };
       }
 
@@ -995,6 +1032,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
 
       breakdown[city].totalAmount += Number(c.valor_original || 0);
       breakdown[city].receivedAmount += Number(c.valor_recebido || 0);
+      breakdown[city].discountAmount += Number(c.desconto || 0);
     });
 
     return Object.values(breakdown).sort((a, b) =>
@@ -1011,6 +1049,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
         key: string;
         name: string;
         document: string;
+        city: string;
         rows: Collection[];
         sales: Map<string, Collection[]>;
       }
@@ -1024,6 +1063,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
           key,
           name: c.cliente || c.documento || "Sem nome",
           document: c.documento || "",
+          city: c.cidade || "Não informada",
           rows: [],
           sales: new Map(),
         });
@@ -1062,6 +1102,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
         key: entry.key,
         name: entry.name,
         document: entry.document,
+        city: entry.city,
         status: getClientPaymentStatus(entry.rows),
         clientPending: getClientPending(entry.rows),
         ...summarize(entry.rows),
@@ -1074,6 +1115,46 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
       }))
       .sort((a, b) => b.pending - a.pending || b.gross - a.gross);
   }, [storeCollections]);
+
+  const filteredClients = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const digits = term.replace(/\D/g, "");
+    const list = clientBreakdown.filter((c) => {
+      if (statusFilter && c.status !== statusFilter) return false;
+      if (cityFilter && c.city !== cityFilter) return false;
+      if (onlyOverdue && c.overdue <= 0.01) return false;
+      if (!term) return true;
+      return (
+        c.name.toLowerCase().includes(term) ||
+        (digits.length > 0 && c.document.replace(/\D/g, "").includes(digits))
+      );
+    });
+    if (clientSort === "name") {
+      return [...list].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    if (clientSort === "overdue") {
+      return [...list].sort((a, b) => b.overdue - a.overdue);
+    }
+    return list; // clientBreakdown ja vem por maior em aberto
+  }, [
+    clientBreakdown,
+    search,
+    statusFilter,
+    cityFilter,
+    onlyOverdue,
+    clientSort,
+  ]);
+
+  const pagedClients = filteredClients.slice(
+    (clientPage - 1) * PAGE_SIZE,
+    clientPage * PAGE_SIZE,
+  );
+  const pagedCities = cityBreakdown.slice(
+    (cityPage - 1) * PAGE_SIZE,
+    cityPage * PAGE_SIZE,
+  );
+  const hasClientFilters =
+    !!search || !!statusFilter || !!cityFilter || onlyOverdue;
 
   const statusColor = !store.assignedCollector
     ? "amber"
@@ -1193,15 +1274,17 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                 <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-wider uppercase mb-1 truncate">
                   {c.label}
                 </p>
-                <p className="text-base sm:text-xl font-extrabold text-gray-900 dark:text-dark-text tracking-tight truncate">
-                  {c.value}
+                <p className="text-base sm:text-xl font-extrabold text-gray-900 dark:text-dark-text tracking-tight">
+                  {typeof c.value === "number"
+                    ? c.value.toLocaleString("pt-BR")
+                    : c.value}
                 </p>
               </div>
             ))}
           </div>
 
           {/* Dashboard de Performance no Modal */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
             <div className="p-3 sm:p-5 bg-gradient-to-br from-blue-50/40 to-blue-50/10 dark:from-blue-950/20 dark:to-blue-950/5 rounded-2xl border border-blue-100/40 dark:border-blue-900/30 flex flex-col justify-between min-w-0">
               <div className="flex items-center justify-between gap-1 mb-2 sm:mb-4">
                 <div className="p-2 sm:p-2.5 bg-blue-100/80 dark:bg-blue-900/50 rounded-xl text-blue-600 dark:text-blue-400 shrink-0">
@@ -1211,7 +1294,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                   Taxa
                 </span>
               </div>
-              <p className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-blue-950 dark:text-blue-200 truncate">
+              <p className="text-base sm:text-xl font-extrabold whitespace-nowrap text-blue-950 dark:text-blue-200">
                 {store.conversionRate.toFixed(1)}%
               </p>
               <p className="text-[10px] sm:text-xs text-blue-650/70 dark:text-blue-400/70 mt-1 truncate">
@@ -1228,8 +1311,11 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                   Pago
                 </span>
               </div>
-              <p className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-green-950 dark:text-green-200 truncate">
-                {formatCurrency(store.receivedAmount)}
+              <p
+                className="text-base sm:text-xl font-extrabold whitespace-nowrap text-green-950 dark:text-green-200"
+                title={formatCurrency(store.receivedAmount)}
+              >
+                {formatCurrencyCompact(store.receivedAmount)}
               </p>
               <p className="text-[10px] sm:text-xs text-green-650/70 dark:text-green-400/70 mt-1 truncate">
                 Valor Recebido
@@ -1245,8 +1331,11 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                   Aberto
                 </span>
               </div>
-              <p className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-amber-950 dark:text-amber-200 truncate">
-                {formatCurrency(store.pendingAmount)}
+              <p
+                className="text-base sm:text-xl font-extrabold whitespace-nowrap text-amber-950 dark:text-amber-200"
+                title={formatCurrency(store.pendingAmount)}
+              >
+                {formatCurrencyCompact(store.pendingAmount)}
               </p>
               <p className="text-[10px] sm:text-xs text-amber-650/70 dark:text-amber-400/70 mt-1 truncate">
                 Em Aberto
@@ -1264,8 +1353,11 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                     : "Atraso"}
                 </span>
               </div>
-              <p className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-red-950 dark:text-red-200 truncate">
-                {formatCurrency(store.overdueAmount)}
+              <p
+                className="text-base sm:text-xl font-extrabold whitespace-nowrap text-red-950 dark:text-red-200"
+                title={formatCurrency(store.overdueAmount)}
+              >
+                {formatCurrencyCompact(store.overdueAmount)}
               </p>
               <p className="text-[10px] sm:text-xs text-red-650/70 dark:text-red-400/70 mt-1 truncate">
                 Total Atrasado
@@ -1281,8 +1373,11 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                   Média
                 </span>
               </div>
-              <p className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-purple-950 dark:text-purple-200 truncate">
-                {formatCurrency(store.averageTicket)}
+              <p
+                className="text-base sm:text-xl font-extrabold whitespace-nowrap text-purple-950 dark:text-purple-200"
+                title={formatCurrency(store.averageTicket)}
+              >
+                {formatCurrencyCompact(store.averageTicket)}
               </p>
               <p className="text-[10px] sm:text-xs text-purple-650/70 dark:text-purple-400/70 mt-1 truncate">
                 Ticket Médio
@@ -1305,8 +1400,10 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                   : "Distribuição Geográfica"}
                 <span className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary bg-gray-50 dark:bg-dark-bg px-2.5 py-0.5 rounded-full border border-gray-100 dark:border-dark-border">
                   {detailView === "clients"
-                    ? clientBreakdown.length
-                    : cityBreakdown.length}
+                    ? hasClientFilters
+                      ? `${filteredClients.length.toLocaleString("pt-BR")} de ${clientBreakdown.length.toLocaleString("pt-BR")}`
+                      : clientBreakdown.length.toLocaleString("pt-BR")
+                    : cityBreakdown.length.toLocaleString("pt-BR")}
                 </span>
               </h4>
               {/* Alternador de visão */}
@@ -1337,13 +1434,92 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
             </div>
 
             {detailView === "clients" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                <label className="relative lg:col-span-2">
+                  <span className="sr-only">Buscar cliente</span>
+                  <Search className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Nome ou CPF/CNPJ"
+                    className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </label>
+                <select
+                  aria-label="Situação do cliente"
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as typeof statusFilter)
+                  }
+                  className="px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
+                >
+                  <option value="">Todas as situações</option>
+                  <option value="pendente">Pendente</option>
+                  <option value="parcial">Parcial</option>
+                  <option value="pago">Pago</option>
+                </select>
+                <select
+                  aria-label="Cidade"
+                  value={cityFilter}
+                  onChange={(e) => setCityFilter(e.target.value)}
+                  className="px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
+                >
+                  <option value="">Todas as cidades</option>
+                  {cityBreakdown.map((c) => (
+                    <option key={c.city} value={c.city}>
+                      {c.city}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Ordenar clientes"
+                  value={clientSort}
+                  onChange={(e) =>
+                    setClientSort(e.target.value as typeof clientSort)
+                  }
+                  className="px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
+                >
+                  <option value="pending">Maior em aberto</option>
+                  <option value="overdue">Maior atraso</option>
+                  <option value="name">Nome (A–Z)</option>
+                </select>
+                <div className="sm:col-span-2 lg:col-span-5 flex items-center justify-between gap-2">
+                  <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-dark-text-secondary cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={onlyOverdue}
+                      onChange={(e) => setOnlyOverdue(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    Só clientes com valor em atraso
+                  </label>
+                  {hasClientFilters && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearch("");
+                        setStatusFilter("");
+                        setCityFilter("");
+                        setOnlyOverdue(false);
+                      }}
+                      className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      Limpar filtros
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {detailView === "clients" && (
               <div className="rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm divide-y divide-gray-50 dark:divide-dark-border overflow-hidden">
-                {clientBreakdown.length === 0 ? (
+                {filteredClients.length === 0 ? (
                   <div className="p-8 text-center text-xs font-medium text-gray-400 dark:text-dark-text-secondary">
                     Nenhum cliente para os filtros aplicados.
                   </div>
                 ) : (
-                  clientBreakdown.map((client) => {
+                  pagedClients.map((client) => {
                     const isOpen = expandedClients.has(client.key);
                     const statusMeta =
                       client.status === "pago"
@@ -1473,6 +1649,14 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                 )}
               </div>
             )}
+            {detailView === "clients" && (
+              <Pagination
+                page={clientPage}
+                total={filteredClients.length}
+                perPage={PAGE_SIZE}
+                onChange={setClientPage}
+              />
+            )}
 
             {detailView === "cities" && (
               <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm">
@@ -1500,8 +1684,13 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
-                    {cityBreakdown.map((item) => {
-                      const pending = item.totalAmount - item.receivedAmount;
+                    {pagedCities.map((item) => {
+                      const pending = Math.max(
+                        0,
+                        item.totalAmount -
+                          item.receivedAmount -
+                          item.discountAmount,
+                      );
 
                       return (
                         <tr
@@ -1545,6 +1734,14 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                   </tbody>
                 </table>
               </div>
+            )}
+            {detailView === "cities" && (
+              <Pagination
+                page={cityPage}
+                total={cityBreakdown.length}
+                perPage={PAGE_SIZE}
+                onChange={setCityPage}
+              />
             )}
           </div>
         </div>
