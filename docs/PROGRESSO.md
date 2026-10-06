@@ -215,7 +215,7 @@ O override de `tar` em `package.json` ainda é necessário.
     venda não foi cancelada). Reativar uma venda cancelada por engano ainda não
     tem tela.
 - **Parcela nova herda o cobrador do cliente** (migration `20261006000003`,
-  **a aplicar**): gatilho `parcela_herda_cobrador` (BEFORE INSERT) — parcela
+  aplicada em 2026-10-06): gatilho `parcela_herda_cobrador` (BEFORE INSERT) — parcela
   sem cobrador de cliente com um único cobrador recebe esse cobrador e a
   situação da parcela mais recente dele. Vale para qualquer caminho de
   inserção, não só a importação (que já herdava no navegador desde 2026-06-15).
