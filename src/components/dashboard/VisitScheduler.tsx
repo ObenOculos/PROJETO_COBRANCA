@@ -262,9 +262,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
   // Estado para o modal de notificação de visitas atrasadas
   const [showOverdueNotificationModal, setShowOverdueNotificationModal] =
     useState(false);
-  const [overdueVisitsByDate, setOverdueVisitsByDate] = useState<
-    Record<string, ScheduledVisit[]>
-  >({});
+  // Filtros da lista de atrasadas
+  const [overdueSearch, setOverdueSearch] = useState("");
+  const [overdueCity, setOverdueCity] = useState("");
+  const [overdueSortBy, setOverdueSortBy] = useState<
+    "atraso" | "cidade" | "nome"
+  >("atraso");
 
   // NEW STATE: To track if the overdue modal has been shown.
   // Aberto ja focado numa visita: o aviso de atrasadas cobriria justamente o
@@ -678,31 +681,80 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     return { upcomingVisits, allVisits };
   }, [user, getVisitsByCollector, scheduledVisits]);
 
-  // Detectar e agrupar visitas atrasadas
-  React.useEffect(() => {
-    // Only proceed if the modal hasn't been shown yet
-    if (!user || !allVisits || hasOverdueModalBeenShown) return;
+  // Visitas atrasadas (regra unica em config/visitStatus). Derivada das
+  // visitas, entao quem e reagendado sai da lista sozinho.
+  const overdueVisits = useMemo(
+    () => allVisits.filter((visit) => isVisitOverdue(visit)),
+    [allVisits],
+  );
 
-    // Filtrar visitas atrasadas (regra unica em config/visitStatus)
-    const overdueVisits = allVisits.filter((visit) => isVisitOverdue(visit));
+  const overdueCities = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          overdueVisits.map((v) => (v.clientCity || "").trim()).filter(Boolean),
+        ),
+      ).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [overdueVisits],
+  );
 
-    // Agrupar por data
-    const groupedByDate: Record<string, ScheduledVisit[]> = {};
-    overdueVisits.forEach((visit) => {
-      if (!groupedByDate[visit.scheduledDate]) {
-        groupedByDate[visit.scheduledDate] = [];
+  const filteredOverdueVisits = useMemo(() => {
+    const term = overdueSearch.trim().toLocaleLowerCase("pt-BR");
+    const list = overdueVisits.filter((v) => {
+      if (overdueCity && (v.clientCity || "").trim() !== overdueCity) {
+        return false;
       }
-      groupedByDate[visit.scheduledDate].push(visit);
+      if (!term) return true;
+      return [
+        v.clientName,
+        v.clientDocument,
+        v.clientNeighborhood,
+        v.clientCity,
+      ]
+        .filter(Boolean)
+        .some((s) => String(s).toLocaleLowerCase("pt-BR").includes(term));
     });
 
-    setOverdueVisitsByDate(groupedByDate);
+    // Mais atrasada primeiro = data agendada mais antiga.
+    const byDelay = (a: ScheduledVisit, b: ScheduledVisit) =>
+      a.scheduledDate.localeCompare(b.scheduledDate) ||
+      (a.scheduledTime || "").localeCompare(b.scheduledTime || "");
 
-    // Mostrar modal se houver visitas atrasadas e ainda não foi mostrado
-    if (Object.keys(groupedByDate).length > 0) {
-      setShowOverdueNotificationModal(true);
-      setHasOverdueModalBeenShown(true); // Mark as shown
+    return list.sort((a, b) => {
+      if (overdueSortBy === "nome") {
+        return (
+          a.clientName.localeCompare(b.clientName, "pt-BR") || byDelay(a, b)
+        );
+      }
+      if (overdueSortBy === "cidade") {
+        return (
+          (a.clientCity || "").localeCompare(b.clientCity || "", "pt-BR") ||
+          (a.clientNeighborhood || "").localeCompare(
+            b.clientNeighborhood || "",
+            "pt-BR",
+          ) ||
+          byDelay(a, b)
+        );
+      }
+      return byDelay(a, b);
+    });
+  }, [overdueVisits, overdueSearch, overdueCity, overdueSortBy]);
+
+  // A cidade escolhida pode sumir da lista (todas dela reagendadas).
+  useEffect(() => {
+    if (overdueCity && !overdueCities.includes(overdueCity)) {
+      setOverdueCity("");
     }
-  }, [user, allVisits, hasOverdueModalBeenShown]);
+  }, [overdueCity, overdueCities]);
+
+  // Abre a lista de atrasadas uma vez, ao entrar na agenda.
+  React.useEffect(() => {
+    if (!user || hasOverdueModalBeenShown) return;
+    if (overdueVisits.length > 0) {
+      setShowOverdueNotificationModal(true);
+      setHasOverdueModalBeenShown(true);
+    }
+  }, [user, overdueVisits.length, hasOverdueModalBeenShown]);
 
   const handleScheduleVisit = async () => {
     return handleScheduleMultipleVisits();
@@ -2190,6 +2242,17 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                       </div>
                     </h3>
                   </div>
+                  {overdueVisits.length > 0 && (
+                    <button
+                      onClick={() => setShowOverdueNotificationModal(true)}
+                      className="mr-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-600 text-white text-xs sm:text-sm font-semibold hover:bg-red-700 transition-colors"
+                      title="Ver e reagendar as visitas atrasadas"
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                      <span className="hidden sm:inline">Atrasadas</span>
+                      <span>{overdueVisits.length}</span>
+                    </button>
+                  )}
                   <div className="flex items-center">
                     <button
                       onClick={() => navigateMonth("prev")}
@@ -3033,24 +3096,34 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         </div>
 
         {/* Modal de Notificação de Visitas Atrasadas - Renderizado via Portal */}
+        {/* Lista de visitas atrasadas: abre sozinha ao entrar na agenda e
+            pelo botao "Atrasadas" do calendario. */}
         {showOverdueNotificationModal &&
-          Object.keys(overdueVisitsByDate).length > 0 &&
+          overdueVisits.length > 0 &&
           createPortal(
             <div
-              className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center p-4 z-50"
+              className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center p-2 sm:p-4 z-50"
               onClick={() => setShowOverdueNotificationModal(false)}
             >
               <div
-                className="bg-white rounded-2xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden"
+                className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="px-4 lg:px-6 py-4 border-b border-gray-200 bg-red-50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <AlertTriangle className="h-6 w-6 text-red-600 mr-2" />
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Visitas Atrasadas
-                      </h3>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Visitas Atrasadas
+                        </h3>
+                        <p className="text-xs text-red-700">
+                          {overdueVisits.length}{" "}
+                          {overdueVisits.length === 1
+                            ? "visita passou da data sem desfecho"
+                            : "visitas passaram da data sem desfecho"}
+                        </p>
+                      </div>
                     </div>
                     <button
                       onClick={() => setShowOverdueNotificationModal(false)}
@@ -3061,81 +3134,141 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                   </div>
                 </div>
 
-                <div className="px-4 lg:px-6 py-4 overflow-y-auto max-h-[calc(90vh-120px)]">
-                  <p className="text-sm text-gray-600 mb-4">
-                    Você possui{" "}
-                    {Object.values(overdueVisitsByDate).flat().length} visita
-                    {Object.values(overdueVisitsByDate).flat().length > 1
-                      ? "s"
-                      : ""}{" "}
-                    atrasada
-                    {Object.values(overdueVisitsByDate).flat().length > 1
-                      ? "s"
-                      : ""}
-                    .
-                  </p>
-
-                  <div className="space-y-3">
-                    {Object.entries(overdueVisitsByDate)
-                      .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
-                      .map(([date, visits]) => {
-                        const formattedDate = new Date(
-                          date + "T00:00:00",
-                        ).toLocaleDateString("pt-BR");
-                        const daysDiff = Math.floor(
-                          (new Date().getTime() -
-                            new Date(date + "T00:00:00").getTime()) /
-                            (1000 * 60 * 60 * 24),
-                        );
-
-                        return (
-                          <div
-                            key={date}
-                            className="border border-red-200 rounded-lg p-3 bg-red-50"
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <div>
-                                <p className="font-semibold text-gray-900">
-                                  {formattedDate}
-                                </p>
-                                <p className="text-xs text-red-600">
-                                  {daysDiff} {daysDiff === 1 ? "dia" : "dias"}{" "}
-                                  de atraso - {visits.length} visita
-                                  {visits.length > 1 ? "s" : ""}
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => navigateToOverdueDate(date)}
-                                className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
-                              >
-                                Ver Visitas
-                              </button>
-                            </div>
-
-                            <div className="text-xs text-gray-600 space-y-1">
-                              {visits.slice(0, 3).map((visit) => (
-                                <div
-                                  key={visit.id}
-                                  className="flex items-center"
-                                >
-                                  <User className="h-3 w-3 mr-1" />
-                                  {visit.clientName}
-                                </div>
-                              ))}
-                              {visits.length > 3 && (
-                                <div className="text-gray-500 italic">
-                                  ... e mais {visits.length - 3} cliente
-                                  {visits.length - 3 > 1 ? "s" : ""}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                {/* Filtros */}
+                <div className="px-4 lg:px-6 py-3 border-b border-gray-200 space-y-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                      <Search className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={overdueSearch}
+                        onChange={(e) => setOverdueSearch(e.target.value)}
+                        placeholder="Buscar cliente, CPF, bairro..."
+                        className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                      />
+                    </div>
+                    {overdueCities.length > 1 && (
+                      <select
+                        value={overdueCity}
+                        onChange={(e) => setOverdueCity(e.target.value)}
+                        className="sm:w-48 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                      >
+                        <option value="">Todas as cidades</option>
+                        {overdueCities.map((city) => (
+                          <option key={city} value={city}>
+                            {city}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1 text-xs">
+                    <span className="text-gray-500 mr-1">Ordenar:</span>
+                    {(
+                      [
+                        ["atraso", "Mais atrasadas"],
+                        ["cidade", "Cidade / bairro"],
+                        ["nome", "Nome"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setOverdueSortBy(key)}
+                        className={`px-2.5 py-1 rounded-full font-medium transition-colors ${
+                          overdueSortBy === key
+                            ? "bg-red-600 text-white"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                    {(overdueSearch || overdueCity) && (
+                      <span className="ml-auto text-gray-500">
+                        {filteredOverdueVisits.length} de {overdueVisits.length}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="px-4 lg:px-6 py-4 border-t border-gray-200">
+                {/* Lista */}
+                <div className="px-4 lg:px-6 py-3 overflow-y-auto flex-1">
+                  {filteredOverdueVisits.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-8">
+                      Nenhuma visita atrasada com esses filtros.
+                    </p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {filteredOverdueVisits.map((visit) => {
+                        const days = visitOverdueDays(visit);
+                        const place = [
+                          visit.clientNeighborhood,
+                          visit.clientCity,
+                        ]
+                          .filter(Boolean)
+                          .join(" - ");
+                        return (
+                          <li
+                            key={visit.id}
+                            className="border border-red-200 rounded-lg p-3 bg-red-50/50"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="font-semibold text-gray-900 text-sm truncate">
+                                  {visit.clientName}
+                                </p>
+                                {place && (
+                                  <p className="text-xs text-gray-600 flex items-center mt-0.5">
+                                    <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                                    <span className="truncate">{place}</span>
+                                  </p>
+                                )}
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  Agendada para{" "}
+                                  {formatSafeDateTime(
+                                    visit.scheduledDate,
+                                    visit.scheduledTime,
+                                  )}
+                                  {(visit.rescheduleCount || 0) > 0 &&
+                                    ` · já reagendada ${visit.rescheduleCount}x`}
+                                </p>
+                              </div>
+                              <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-red-600 text-white text-xs font-semibold">
+                                {days} {days === 1 ? "dia" : "dias"}
+                              </span>
+                            </div>
+                            <div className="flex gap-2 mt-2">
+                              {visit.status === "agendada" ? (
+                                <button
+                                  onClick={() =>
+                                    handleOpenRescheduleModal(visit)
+                                  }
+                                  className="flex-1 px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                  Reagendar
+                                </button>
+                              ) : (
+                                <span className="flex-1 px-3 py-2 text-xs text-center text-gray-600 bg-gray-100 rounded-lg">
+                                  {visitStatusLabel(visit.status)}
+                                </span>
+                              )}
+                              <button
+                                onClick={() =>
+                                  navigateToOverdueDate(visit.scheduledDate)
+                                }
+                                className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                              >
+                                Ver no dia
+                              </button>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="px-4 lg:px-6 py-3 border-t border-gray-200">
                   <button
                     onClick={() => setShowOverdueNotificationModal(false)}
                     className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-2xl hover:bg-gray-300 transition-colors font-medium"
