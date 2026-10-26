@@ -8,6 +8,7 @@
 import { Collection } from "../types";
 import { parseAndNormalizeDate, toYYYYMMDD } from "./dates";
 import { getClientPaymentStatus, normalizePaymentStatus } from "./clientStatus";
+import { NOT_SCHEDULED_FILTER_VALUE } from "../config/visitStatus";
 
 /** Forma minima de cliente que os predicados precisam para filtrar. */
 export interface FilterableClient {
@@ -235,6 +236,11 @@ const matchesVisitStatus = (
 ): boolean => {
   if (!status) return true;
   if (!lastStatus) return true;
+  // "Nao agendado": sem visita registrada ou cuja ultima visita nao esta com
+  // status "agendada" (ex.: ja realizada/cancelada, sem compromisso futuro).
+  if (status === NOT_SCHEDULED_FILTER_VALUE) {
+    return lastStatus.get(client.documento) !== "agendada";
+  }
   return lastStatus.get(client.documento) === status;
 };
 

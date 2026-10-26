@@ -16,6 +16,14 @@ export const VISIT_STATUS_LABELS: Record<ScheduledVisit["status"], string> = {
 };
 
 /**
+ * Valor sintetico do filtro de Status da visita: cliente sem visita agendada
+ * no momento (ultima visita, se houver, com status != "agendada") ou sem
+ * nenhuma visita registrada. Nao e um status de ScheduledVisit — existe so
+ * para a UI do filtro (ver matchesVisitStatus em src/filters/predicates).
+ */
+export const NOT_SCHEDULED_FILTER_VALUE = "nao_agendado";
+
+/**
  * Status oferecidos nos filtros. Exclui "pending_sync", que e estado interno da
  * fila offline e nao um desfecho que o gestor filtraria.
  */
@@ -28,11 +36,18 @@ export const VISIT_STATUS_OPTIONS: { value: string; label: string }[] = (
     "cancelamento_solicitado",
     "cancelada",
   ] as ScheduledVisit["status"][]
-).map((s) => ({ value: s, label: VISIT_STATUS_LABELS[s] }));
+)
+  .map((s): { value: string; label: string } => ({
+    value: s,
+    label: VISIT_STATUS_LABELS[s],
+  }))
+  .concat({ value: NOT_SCHEDULED_FILTER_VALUE, label: "Não agendado" });
 
 /** Rotulo de um status (para chips de filtro ativo). */
 export const visitStatusLabel = (status: string): string =>
-  VISIT_STATUS_LABELS[status as ScheduledVisit["status"]] ?? status;
+  status === NOT_SCHEDULED_FILTER_VALUE
+    ? "Não agendado"
+    : VISIT_STATUS_LABELS[status as ScheduledVisit["status"]] ?? status;
 
 /**
  * A partir de quantas remarcacoes no periodo um cliente conta como reincidente.
