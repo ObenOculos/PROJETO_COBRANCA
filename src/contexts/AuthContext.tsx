@@ -24,6 +24,26 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
+/** Linha de public.users relevante para montar o User da sessão. */
+interface UserProfileRow {
+  id: string;
+  name: string;
+  login: string;
+  type: string;
+  active: boolean | null;
+  created_at: string | null;
+  auth_email: string | null;
+}
+
+const buildUser = (row: UserProfileRow): User => ({
+  id: row.id,
+  name: row.name,
+  login: row.login,
+  type: row.type as UserType,
+  createdAt: row.created_at || new Date().toISOString(),
+  active: row.active ?? true,
+});
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,7 +53,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     useState(false);
   const { withLoading } = useLoading();
 
-  // Função para limpar o erro de autenticação
   const clearError = () => {
     setError(null);
   };
@@ -42,7 +61,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutos
   let inactivityTimer: ReturnType<typeof setTimeout>;
 
-  // Função para resetar o timer de inatividade
+  const clearLocalSession = () => {
+    sessionStorage.removeItem("sistema_user");
+    dataCache.clear();
+    statsCache.clear();
+    userCache.clear();
+    collectionsCache.clear();
+    quickCache.clear();
+  };
+
   const resetInactivityTimer = () => {
     if (inactivityTimer) {
       clearTimeout(inactivityTimer);
@@ -50,63 +77,63 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     if (user) {
       inactivityTimer = setTimeout(() => {
-        console.log(
-          "Tempo de inatividade atingido, fazendo logout automático...",
-        );
-
-        // Limpar sessão imediatamente
-        sessionStorage.removeItem("sistema_user");
-
-        // Limpar localStorage (exceto dados essenciais)
-        const keysToKeep = [
-          "cached_users",
-          "managerActiveTab",
-          "collectorActiveTab",
-        ];
-        const allKeys = Object.keys(localStorage);
-        allKeys.forEach((key) => {
-          if (!keysToKeep.includes(key)) {
-            localStorage.removeItem(key);
-          }
-        });
-
-        // Limpar todos os caches
-        dataCache.clear();
-        statsCache.clear();
-        userCache.clear();
-        collectionsCache.clear();
-        quickCache.clear();
-
-        // Resetar estado do usuário
+        clearLocalSession();
+        void supabase.auth.signOut();
         setUser(null);
-
-        // Mostrar modal informativo
         setShowInactivityModal(true);
       }, INACTIVITY_TIMEOUT);
     }
   };
 
   useEffect(() => {
-    // Check for existing session
+    // Restaura a sessão ao abrir o app. supabase.auth.getSession() lê a
+    // sessão persistida localmente — não depende de rede, então funciona
+    // offline enquanto o token de acesso ainda for válido.
     const checkSession = async () => {
       try {
         setIsLoading(true);
 
-        // Verificar sessionStorage para usuário logado
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) {
+          clearLocalSession();
+          setUser(null);
+          return;
+        }
+
+        // Espelho local (gravado no login) evita depender de rede para
+        // restaurar o perfil — é só exibição, a sessão de verdade é a do
+        // Supabase Auth.
         const savedUser = sessionStorage.getItem("sistema_user");
         if (savedUser) {
           try {
-            const userData = JSON.parse(savedUser);
-            setUser(userData);
-            console.log("Usuário recuperado da sessão:", userData);
-          } catch (parseError) {
-            console.error("Erro ao parsear dados do usuário:", parseError);
+            setUser(JSON.parse(savedUser));
+            return;
+          } catch {
             sessionStorage.removeItem("sistema_user");
           }
         }
-      } catch (err) {
-        console.error("Error checking session:", err);
-        sessionStorage.removeItem("sistema_user");
+
+        // Sem espelho local (ex.: outra aba) — busca o perfil pelo vínculo
+        // com a sessão autenticada. Exige rede.
+        const { data: row, error: profileError } = await supabase
+          .from("users")
+          .select("id, name, login, type, active, created_at, auth_email")
+          .eq("auth_user_id", data.session.user.id)
+          .single();
+
+        if (profileError || !row) {
+          await supabase.auth.signOut();
+          clearLocalSession();
+          setUser(null);
+          return;
+        }
+
+        const userObj = buildUser(row);
+        sessionStorage.setItem("sistema_user", JSON.stringify(userObj));
+        setUser(userObj);
+      } catch {
+        clearLocalSession();
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -114,9 +141,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     checkSession();
 
-    // Sistema usa autenticação personalizada via sessionStorage
-    // Não precisamos do listener do Supabase Auth
-    console.log("Sistema de autenticação personalizada inicializado");
+    // Desloga em qualquer aba se a sessão expirar/for revogada em outra.
+    const { data: subscription } = supabase.auth.onAuthStateChange(
+      (event) => {
+        if (event === "SIGNED_OUT") {
+          clearLocalSession();
+          setUser(null);
+        }
+      },
+    );
+
+    return () => subscription.subscription.unsubscribe();
   }, []);
 
   // Configurar listeners de atividade quando o usuário estiver logado
@@ -128,15 +163,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         resetInactivityTimer();
       };
 
-      // Adicionar listeners
       events.forEach((event) => {
         document.addEventListener(event, handleActivity);
       });
 
-      // Iniciar o timer
       resetInactivityTimer();
 
-      // Cleanup
       return () => {
         events.forEach((event) => {
           document.removeEventListener(event, handleActivity);
@@ -148,82 +180,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [user]);
 
-  // Função para realizar login offline usando dados em cache
-  const performOfflineLogin = async (
-    login: string,
-    password: string,
-  ): Promise<boolean> => {
-    try {
-      // Verificar se há dados de usuários em cache (localStorage)
-      const cachedUsers = localStorage.getItem("cached_users");
-
-      if (!cachedUsers) {
-        setError(
-          "Sem conexão e nenhum dado de login em cache. Conecte-se à internet para fazer o primeiro login.",
-        );
-        return false;
-      }
-
-      const users = JSON.parse(cachedUsers);
-      const foundUser = users.find(
-        (user: any) => user.login === login && user.password === password,
-      );
-
-      if (!foundUser) {
-        setError(
-          "Credenciais inválidas ou usuário não encontrado no cache offline.",
-        );
-        return false;
-      }
-
-      // Usuário desativado: login bloqueado também offline.
-      if (foundUser.active === false) {
-        setShowInactiveAccountModal(true);
-        return false;
-      }
-
-      // Criar objeto do usuário
-      const userObj: User = {
-        id: foundUser.id,
-        name: foundUser.name,
-        login: foundUser.login,
-        password: foundUser.password,
-        type: foundUser.type as UserType,
-        createdAt: foundUser.created_at || new Date().toISOString(),
-        active: foundUser.active ?? true,
-      };
-
-      // Salvar na sessão local
-      sessionStorage.setItem("sistema_user", JSON.stringify(userObj));
-
-      console.log("Login offline realizado com sucesso:", userObj);
-      setUser(userObj);
-      return true;
-    } catch (error) {
-      console.error("Erro no login offline:", error);
-      setError("Erro ao processar login offline. Tente novamente.");
-      return false;
-    }
-  };
-
   const login = async (login: string, password: string): Promise<boolean> => {
     try {
-      // Limpa qualquer erro anterior ao tentar fazer login
       clearError();
 
-      console.log("Tentando fazer login com:", { login });
-
-      // Verificar se está offline
       if (!navigator.onLine) {
-        console.log(
-          "Modo offline detectado - tentando login com dados em cache",
+        setError(
+          "Sem conexão com a internet. É preciso estar online para entrar pela primeira vez na sessão.",
         );
-        return await performOfflineLogin(login, password);
+        return false;
       }
 
-      // Função interna para realizar o login
       const performLogin = async (): Promise<boolean> => {
-        // Validações básicas
         if (!login || !password) {
           setError("Por favor, preencha todos os campos.");
           return false;
@@ -239,121 +207,65 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return false;
         }
 
-        // Primeiro, buscar usuário na tabela users para validar credenciais
-        const { data: users, error: userError } = await supabase
+        // Resolve o login (não é e-mail) para o e-mail sintético usado no
+        // Supabase Auth. Não revela nada sobre a senha nesta consulta.
+        const { data: row, error: lookupError } = await supabase
           .from("users")
-          .select("*")
+          .select("id, name, login, type, active, created_at, auth_email")
           .eq("login", login)
-          .eq("password", password)
-          .limit(1);
+          .maybeSingle();
 
-        console.log("Resultado da consulta:", { users, userError });
-
-        if (userError) {
-          console.error("Erro ao consultar usuários:", userError);
+        if (lookupError) {
           setError(
             "Erro de conexão com o banco de dados. Verifique sua conexão com a internet.",
           );
-          throw new Error("Erro ao consultar banco de dados");
+          throw lookupError;
         }
 
-        if (!users || users.length === 0) {
-          console.log("Usuário não encontrado com essas credenciais");
+        if (!row || !row.auth_email) {
           setError("Login ou senha incorretos. Verifique suas credenciais.");
-          return false; // Retorna false explicitamente para credenciais inválidas
+          return false;
         }
 
-        // Cache dos usuários para login offline (buscar todos os usuários)
-        try {
-          const { data: allUsers, error: cacheError } = await supabase
-            .from("users")
-            .select("*");
+        const { error: signInError } = await supabase.auth.signInWithPassword(
+          { email: row.auth_email, password },
+        );
 
-          if (!cacheError && allUsers) {
-            // Não armazenar senhas em cache por segurança
-            const usersWithoutPasswords = allUsers.map((user) => ({
-              ...user,
-              password: "", // Limpar senha antes do cache
-            }));
-            localStorage.setItem(
-              "cached_users",
-              JSON.stringify(usersWithoutPasswords),
-            );
-            console.log(
-              "Usuários armazenados em cache para login offline (sem senhas)",
-            );
-          }
-        } catch (cacheErr) {
-          console.log("Erro ao cachear usuários (não crítico):", cacheErr);
+        if (signInError) {
+          setError("Login ou senha incorretos. Verifique suas credenciais.");
+          return false;
         }
 
-        const foundUser = users[0];
-        console.log("Usuário encontrado:", foundUser);
-
-        // Usuário desativado: login bloqueado (preserva histórico).
-        if (foundUser.active === false) {
+        // Usuário desativado: login bloqueado (preserva histórico). Checa
+        // DEPOIS de validar a senha, pra não revelar o status a quem não
+        // tem a senha.
+        if (row.active === false) {
+          await supabase.auth.signOut();
           setShowInactiveAccountModal(true);
           return false;
         }
 
-        // Sistema usa autenticação personalizada via tabela users
-        // Não precisamos do Supabase Auth para este sistema
-        console.log("Usando autenticação personalizada do sistema");
-
-        // Criar objeto do usuário
-        const userObj: User = {
-          id: foundUser.id,
-          name: foundUser.name,
-          login: foundUser.login,
-          password: foundUser.password,
-          type: foundUser.type as UserType,
-          createdAt: foundUser.created_at || new Date().toISOString(),
-          active: foundUser.active ?? true,
-        };
-
-        // Salvar na sessão local
+        const userObj = buildUser(row);
         sessionStorage.setItem("sistema_user", JSON.stringify(userObj));
-
-        console.log("Login realizado com sucesso:", userObj);
         setUser(userObj);
-        return true; // Retorna true para login bem-sucedido
+        return true;
       };
 
-      // Usa withLoading para mostrar loading durante o login
-      const success = await withLoading(
-        performLogin(),
-        "Fazendo login...", // Mensagem personalizada
-      );
-
-      console.log("Resultado final do login:", success);
-      return success;
+      return await withLoading(performLogin(), "Fazendo login...");
     } catch (err) {
       console.error("Erro no login:", err);
-      // Importante: retornar false em caso de erro, não undefined
       return false;
     }
   };
 
   const logout = async () => {
     try {
-      // Usa withLoading para logout se necessário
       await withLoading(
         (async () => {
-          // Limpar sessão do sistema personalizado
-          sessionStorage.removeItem("sistema_user");
-
-          // Limpar todos os caches
-          dataCache.clear();
-          statsCache.clear();
-          userCache.clear();
-          collectionsCache.clear();
-          quickCache.clear();
-
-          console.log("Cache limpo e logout realizado com sucesso");
-
+          await supabase.auth.signOut();
+          clearLocalSession();
           setUser(null);
 
-          // Limpa o timer de inatividade
           if (inactivityTimer) {
             clearTimeout(inactivityTimer);
           }
@@ -368,8 +280,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const handleInactivityLogout = () => {
     setShowInactivityModal(false);
-    // Não precisa chamar logout() pois já foi feito no timer
-    // Apenas fecha o modal
   };
 
   const value: AuthContextType = {

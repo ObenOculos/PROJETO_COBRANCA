@@ -747,29 +747,35 @@ export type Database = {
       users: {
         Row: {
           active: boolean | null;
+          auth_email: string | null;
+          auth_user_id: string | null;
           created_at: string | null;
           id: string;
           login: string;
           name: string;
-          password: string;
+          password: string | null;
           type: string;
         };
         Insert: {
           active?: boolean | null;
+          auth_email?: string | null;
+          auth_user_id?: string | null;
           created_at?: string | null;
           id?: string;
           login: string;
           name: string;
-          password: string;
+          password?: string | null;
           type: string;
         };
         Update: {
           active?: boolean | null;
+          auth_email?: string | null;
+          auth_user_id?: string | null;
           created_at?: string | null;
           id?: string;
           login?: string;
           name?: string;
-          password?: string;
+          password?: string | null;
           type?: string;
         };
         Relationships: [];

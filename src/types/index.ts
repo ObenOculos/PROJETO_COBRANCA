@@ -25,7 +25,6 @@ export interface User {
   id: string;
   name: string;
   login: string;
-  password: string;
   type: UserType;
   createdAt: string;
   /** false = usuário desativado (login bloqueado). Ausente/true = ativo. */

@@ -58,7 +58,6 @@ const UserManagement: React.FC = () => {
   const [formData, setFormData] = useState({
     name: "",
     login: "",
-    password: "",
     type: "collector" as UserRoleType,
   });
 
@@ -69,12 +68,11 @@ const UserManagement: React.FC = () => {
       setFormData({
         name: user.name,
         login: user.login,
-        password: "",
         type: user.type,
       });
     } else {
       setEditingUser(null);
-      setFormData({ name: "", login: "", password: "", type: "collector" });
+      setFormData({ name: "", login: "", type: "collector" });
     }
     setIsModalOpen(true);
   };
@@ -95,9 +93,6 @@ const UserManagement: React.FC = () => {
           login: formData.login,
           type: formData.type,
         };
-        if (formData.password.trim()) {
-          updates.password = formData.password;
-        }
         await updateUser(editingUser.id, updates);
       } else {
         await addUser(formData);
@@ -379,25 +374,13 @@ const UserManagement: React.FC = () => {
                   required
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {editingUser ? "Nova Senha" : "Senha"}
-                </label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required={!editingUser}
-                />
-                {editingUser && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Deixe em branco para manter a senha atual.
-                  </p>
-                )}
-              </div>
+              {!editingUser && (
+                <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md p-2">
+                  Isto cria só o perfil. O acesso de login (senha) é
+                  provisionado separadamente — avise quem administra o
+                  sistema para liberar o acesso deste usuário.
+                </p>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Tipo

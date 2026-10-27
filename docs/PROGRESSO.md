@@ -90,6 +90,51 @@ foi testado).
 - Efeito colateral bom: com RLS, cada cobrador baixa só os próprios dados
   (hoje todos baixam o histórico inteiro de visitas de todos).
 
+**Concluído (2026-10-27) — Etapa 1 (Auth), passo 1 de uma reorganização maior
+do banco (auditoria completa feita nesta data, decisão: refatorar em etapas
+com o sistema no ar, não reconstruir do zero):**
+- Migration `20261027000001_users_auth_link.sql` aplicada: `users.auth_user_id`
+  (FK para `auth.users`), `users.auth_email`, `password` deixou de ser
+  `NOT NULL`.
+- `scripts/migrate-users-to-auth.mjs` rodado com `--apply`: os 15 usuários
+  criados no Supabase Auth (senha atual copiada, sem forçar reset — decidido
+  com o usuário), e-mail sintético gerado (login não é e-mail — só 1 dos 15
+  tinha "@"). Idempotente, testado (reexecução deu "0 pendentes").
+- `AuthContext.tsx` reescrito: login via `supabase.auth.signInWithPassword`,
+  sessão persistida pelo SDK (`persistSession`/`autoRefreshToken` religados em
+  `lib/supabase.ts`). `performOfflineLogin`/cache de senha em `localStorage`
+  removidos (já não funcionavam pra senha real — não era regressão).
+  `users.password` parou de ser lida/escrita em `CollectionContext.tsx` e
+  `UserManagement.tsx`; criar usuário na tela agora só cria o perfil, aviso na
+  UI de que o acesso de login é provisionado separadamente (decidido: fica
+  manual por enquanto — rodar o script pra cada novo usuário — até uma Edge
+  Function existir).
+- **Testado em produção pelo usuário**: login de usuário ativo e inativo (modal
+  de bloqueio ok) em pelo menos um perfil, logout, e um pagamento + agendamento
+  de teste (ver limpeza abaixo). Tudo funcionou.
+- Dados de teste limpos: o teste de pagamento/agendamento foi feito na cliente
+  real Antônia Santana Menezes do Nascimento (824.272.323-00). Usando o
+  antes/depois já registrado em `recebimentos_historico`, revertido: pagamento
+  de teste (R$990) e seus 9 registros de histórico apagados; as 9 parcelas
+  voltaram a `recebido=0`/sem data/status original (5 "Em atraso", 4 "A
+  vencer", deduzido do `dias_em_atraso` já calculado pelo import); a visita
+  nova de teste (23/11) apagada; a visita original (23/05 00:00) restaurada
+  para "agendada", sem o vínculo de reagendamento. Nada do histórico real da
+  cliente (desde abril/2026) foi tocado.
+- **Achados do teste, registrados para depois (não investigados ainda):**
+  - Reagendamento "parece lento" (observação do usuário, sem medição).
+  - `scheduled_visits.reschedule_reason` grava a chave crua (ex.
+    `pediu_outra_data`); a nota (`notes`) já mostra o rótulo certo ("Cliente
+    pediu outra data"), então o problema é alguma tela exibindo o campo
+    estruturado direto em vez do rótulo de `config/rescheduleReasons.ts`. O
+    horário do reagendamento (14h) foi confirmado salvo certo no banco
+    (`scheduled_time`) — o "ficou 00h" relatado era tela desatualizada ou a
+    visita antiga (que corretamente continua em 00h).
+- Fora do escopo desta etapa (continua pendente): as RPCs
+  (`cancelar_vendas`, `process_payment`, etc.) continuam confiando em
+  `p_usuario_id`/`p_collector_id` vindo do cliente sem checagem no servidor —
+  só fica seguro de verdade na Etapa 2, com `auth.uid()`.
+
 ### 2. Reagendamento atômico
 
 `rescheduleVisit` (`CollectionContext.tsx` ~3900–4130) faz 3 escritas separadas

@@ -1095,7 +1095,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         id: user.id,
         name: user.name,
         login: user.login,
-        password: user.password,
         type: user.type as UserType,
         createdAt: user.created_at || new Date().toISOString(),
         active: user.active ?? true,
@@ -1186,10 +1185,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   const addUser = async (user: Omit<User, "id" | "createdAt">) => {
     try {
+      // Só cria o perfil (nome/login/tipo). O acesso de login (conta no
+      // Supabase Auth) é provisionado separadamente — ver
+      // scripts/migrate-users-to-auth.ts e docs/PROGRESSO.md.
       const { error: supabaseError } = await supabase.from("users").insert({
         name: user.name,
         login: user.login,
-        password: user.password,
         type: user.type,
       });
 
@@ -1213,7 +1214,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
       if (updates.login !== undefined) dbUpdates.login = updates.login;
-      if (updates.password !== undefined) dbUpdates.password = updates.password;
       if (updates.type !== undefined) dbUpdates.type = updates.type;
       if (updates.active !== undefined) dbUpdates.active = updates.active;
 

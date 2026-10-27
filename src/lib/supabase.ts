@@ -14,8 +14,10 @@ try {
 
 export const supabase = createClient<Database>(config.url, config.anonKey, {
   auth: {
-    autoRefreshToken: false,
-    persistSession: false,
+    // Login passa pelo Supabase Auth (Etapa 1 da reorganização) — a sessão
+    // precisa persistir e se renovar sozinha para sobreviver a reload/offline.
+    autoRefreshToken: true,
+    persistSession: true,
     detectSessionInUrl: false,
   },
 });
