@@ -2154,6 +2154,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           {
             totalValue: number;
             receivedValue: number;
+            discountValue: number;
             status: "pendente" | "parcial" | "pago";
             installments: Collection[];
           }
@@ -2165,6 +2166,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             salesMap.set(saleKey, {
               totalValue: 0,
               receivedValue: 0,
+              discountValue: 0,
               status: "pendente",
               installments: [],
             });
@@ -2175,21 +2177,23 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             Number(sale.totalValue) + Number(collection.valor_original);
           sale.receivedValue =
             Number(sale.receivedValue) + Number(collection.valor_recebido);
+          sale.discountValue =
+            Number(sale.discountValue) + Number(collection.desconto || 0);
           sale.installments.push(collection);
         });
 
-        // Determinar status das vendas
+        // Determinar status das vendas. Desconto quita junto com o recebido
+        // (mesma regra de getClientPaymentStatus/calculateSaleBalance) — sem
+        // isso, venda quitada com desconto ficava presa em "parcial/pendente".
         salesMap.forEach((sale) => {
-          const pendingValue = Math.max(
-            0,
-            sale.totalValue - sale.receivedValue,
-          );
-          if (sale.receivedValue > 0 && pendingValue > 0) {
-            sale.status = "parcial";
-          } else if (pendingValue <= 0.01 && sale.receivedValue > 0) {
-            sale.status = "pago";
-          } else {
+          const effectivePaid = sale.receivedValue + sale.discountValue;
+          const pendingValue = Math.max(0, sale.totalValue - effectivePaid);
+          if (effectivePaid === 0) {
             sale.status = "pendente";
+          } else if (pendingValue > 0.01) {
+            sale.status = "parcial";
+          } else {
+            sale.status = "pago";
           }
         });
 

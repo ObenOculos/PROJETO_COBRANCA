@@ -9,7 +9,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 |---|------|-----------|---------|
 | 1 | Segurança: RLS desligado + login em texto puro | **Crítica** | Grande, em etapas |
 | 1b | Desempenho credita pela atribuição atual — Fase 2 (telas) | **Alta** | Médio |
-| 1c | Regras de "pendente/pago" divergentes (desconto, coluna `status`) | Média | Pequeno/médio |
+| 1c | ~~Regras de "pendente/pago" divergentes (desconto, coluna `status`)~~ | Média | Pequeno/médio |
 | 2 | Reagendamento atômico (RPC) | Média | Pequeno/médio |
 | 3 | Trocar exclusão de visitas por cancelamento | Média | Pequeno |
 | 4 | Modelagem de `scheduled_visits` | Baixa/média | Médio, incremental |
@@ -17,6 +17,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 6 | `RouteMap` não detecta reagendadas | Baixa | Pequeno |
 | 7 | Vulnerabilidades restantes (só dev) | Baixa | — |
 | 8 | Escopo completo do gestor baixa `BANCO_DADOS` inteiro pro navegador | Média | Médio |
+| 9 | Status "A Vencer" não existe hoje — avaliar relação com os demais | Baixa | A analisar |
 
 ### 1b. Desempenho por atribuição atual — ALTA
 
@@ -57,11 +58,18 @@ histórico de recebimento junto. Medido em 2026-10-05: **368 de 1.062 pagamentos
 
 ### 1c. Regras de "pendente/pago" divergentes
 
-- `getCollectorPerformance` e `CollectorDashboard` (`isPending`, `salesMap`)
-  calculam saldo como `original - recebido`, **sem desconto**. Uma venda quitada
-  com desconto continua "parcial/pendente" e derruba a conversão de quem negociou.
-  A regra certa (desconto quita) está em `getClientPending`/`calculateSaleBalance`.
-  **Ainda em aberto** — fica para quando o item 8 mexer no Desempenho.
+- ~~`getCollectorPerformance` e `CollectorDashboard` (`isPending`, `salesMap`)
+  calculavam saldo como `original - recebido`, **sem desconto**. Uma venda quitada
+  com desconto continuava "parcial/pendente" e derrubava a conversão de quem
+  negociou.~~ **Corrigido em 2026-10-27**: `getCollectorPerformance`
+  (`CollectionContext.tsx`) e o `salesMap` de conversão do `CollectorDashboard`
+  passaram a quitar por `recebido + desconto`, igual a
+  `getClientPaymentStatus`/`calculateSaleBalance`. De caminho, os outros 3
+  trechos do `CollectorDashboard` que calculavam "parcela pendente" só por
+  `valor_original - valor_recebido` (filtro de atraso da lista, contadores
+  "Críticos/Alerta" e o atraso máximo exibido na tabela) passaram a usar
+  `hasInstallmentBalance` (`filters/clientStatus.ts`) em vez de duplicar a
+  conta sem desconto.
 - ~~A view `banco_dados_clientes_ativos` decide "em aberto" pela coluna
   `status`. O front e `cliente_tem_saldo_aberto` decidem pelos valores.~~
   **Corrigido em 2026-10-27** (migration `20261029000003`, junto do item 8): a
@@ -345,8 +353,6 @@ nenhum código novo de agregação.
   `id_parcela > última_id` em vez de `OFFSET`) na carga de qualquer escopo —
   não voltar a cogitar `GROUP BY` por tela, que exigiria duplicar a lógica
   do `FilterBar` em SQL.
-- `getCollectorPerformance`/`CollectorDashboard`: resto do item 1c
-  (`isPending`/`salesMap` somam saldo sem desconto).
 - Modais de detalhe (cobrador/loja/cliente): hoje ainda leem tudo via
   `collections` em memória; poderiam virar fetch sob demanda filtrado
   (`WHERE user_id=X` etc.), só quando o gestor clica — ganho pequeno agora
@@ -355,6 +361,15 @@ nenhum código novo de agregação.
 A mensagem de loading (`ManagerDashboard.tsx`) já diz o motivo da carga
 ("...para mostrar os clientes que já quitaram tudo", etc.) em vez do
 genérico "Carregando histórico completo...".
+
+### 9. Status "A Vencer"
+
+Levantado pelo usuário em 2026-10-27, só para registro — **não analisar
+ainda**. Hoje o sistema não tem um status "A Vencer"; falta mapear como ele
+se relacionaria com os status/regras existentes (`status` da parcela,
+`hasInstallmentBalance`/`hasOpenBalance` em `filters/clientStatus.ts`,
+`isVisitOverdue` em `config/visitStatus.ts`) antes de decidir se é uma nova
+categoria ou um recorte dos valores atuais.
 
 ---
 

@@ -36,7 +36,10 @@ import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import { FilterOptions } from "../../types";
 import { Notification } from "../../contexts/NotificationContext";
 import { resolveSaleKey } from "../../filters/sales";
-import { hasOpenBalance } from "../../filters/clientStatus";
+import {
+  hasOpenBalance,
+  hasInstallmentBalance,
+} from "../../filters/clientStatus";
 
 import LogContactModal from "./LogContactModal";
 import ClientDetailModal from "./ClientDetailModal";
@@ -140,8 +143,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       let maxAtraso = 0;
       group.sales.forEach((sale: any) => {
         sale.installments.forEach((inst: any) => {
-          const isPending =
-            (inst.valor_original || 0) - (inst.valor_recebido || 0) > 0.01;
+          const isPending = hasInstallmentBalance(inst);
           if (isPending) {
             const calculatedAtraso = calculateOverdueDays(inst.data_vencimento);
             if (calculatedAtraso > maxAtraso) maxAtraso = calculatedAtraso;
@@ -211,8 +213,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     let critical = 0,
       high = 0;
     myCollections.forEach((c) => {
-      const isPending =
-        (c.valor_original || 0) - (c.valor_recebido || 0) > 0.01;
+      const isPending = hasInstallmentBalance(c);
       if (isPending) {
         const actualAtraso = calculateOverdueDays(c.data_vencimento);
         if (actualAtraso > 90) critical++;
@@ -424,10 +425,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                   let maxAtraso = 0;
                   group.sales?.forEach((sale: any) => {
                     sale?.installments?.forEach((inst: any) => {
-                      const isPending =
-                        (inst.valor_original || 0) -
-                          (inst.valor_recebido || 0) >
-                        0.01;
+                      const isPending = hasInstallmentBalance(inst);
                       if (isPending) {
                         const calculatedAtraso = calculateOverdueDays(
                           inst.data_vencimento,
@@ -1215,6 +1213,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       {
         totalValue: number;
         receivedValue: number;
+        discountValue: number;
         isPending: boolean;
         clientDocument: string;
       }
@@ -1226,6 +1225,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         map.set(saleKey, {
           totalValue: 0,
           receivedValue: 0,
+          discountValue: 0,
           isPending: false,
           clientDocument: collection.documento || "",
         });
@@ -1236,11 +1236,17 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         Number(sale.totalValue) + Number(collection.valor_original);
       sale.receivedValue =
         Number(sale.receivedValue) + Number(collection.valor_recebido);
+      sale.discountValue =
+        Number(sale.discountValue) + Number(collection.desconto || 0);
     });
 
-    // Determine if each sale is pending (has any amount left to receive)
+    // Desconto quita junto com o recebido (mesma regra de
+    // getClientPaymentStatus/calculateSaleBalance) — sem isso, venda quitada
+    // com desconto ficava presa em "pendente" e derrubava a conversão de quem
+    // negociou com desconto.
     map.forEach((sale) => {
-      const pendingAmount = sale.totalValue - sale.receivedValue;
+      const pendingAmount =
+        sale.totalValue - sale.receivedValue - sale.discountValue;
       sale.isPending = pendingAmount > 0.01; // Consider amounts > 1 cent as pending
     });
 
