@@ -347,12 +347,42 @@ linhas em duas buscas de 58 e 70 mil cada corta esse custo quase pela
 metade (58.075² + 69.902² ≈ 8,3 bi contra 127.977² ≈ 16,4 bi) de graça, sem
 nenhum código novo de agregação.
 
+**Regressão encontrada e corrigida em 2026-10-30 (migration
+`20261030000001`, aplicada em produção via `db push` do usuário e
+confirmada: contagem das views voltou a ~2s):** a migration
+`20261029000003` (Passo 1/2 acima) trocou o `WHERE` das duas views da
+coluna `status` para `cliente_tem_saldo_aberto(b.documento)` — uma função
+chamada **uma vez por linha** de `BANCO_DADOS` (127.977 vezes), cada
+chamada reagregando do zero as parcelas daquele documento. Confirmado no
+banco (leitura, via Management API): a contagem da view sozinha estoura o
+`statement_timeout` (2min), com o erro apontando pra essa função. Efeito em
+produção, desde 2026-10-27: **todo login de gestor provavelmente cai pro
+fallback de `BANCO_DADOS` inteiro** (`CollectionContext.tsx`, "Falha ao
+consultar banco_dados_clientes_ativos"), e às vezes nem isso — a paginação
+por `OFFSET` profunda no fallback também estourou o mesmo timeout num teste
+(ver abaixo), piorando o item 8 em vez de resolver.
+Correção: `saldo_por_documento` (view nova, `GROUP BY documento`) calcula o
+saldo **uma vez por cliente**; as duas views passaram a dar `JOIN` nela em
+vez de chamar a função por linha. Mesma regra de negócio, testado no banco
+(leitura + transação com `ROLLBACK`, nada gravado em produção): 1,8s
+(ativos) e 1,2s (quitados), batendo exatamente 58.075 + 69.902 = 127.977.
+`cliente_tem_saldo_aberto(text)` continua existindo sem mudança (usada em
+contextos de poucas linhas — cancelamento de visita, gatilho de importação
+— onde o custo por chamada nunca foi o problema).
+
 **Ainda em aberto:**
 - **A causa raiz (paginação por `OFFSET`) não foi eliminada, só reduzida
-  pela metade.** Pra zerar de vez, o caminho é paginação por keyset (seek:
-  `id_parcela > última_id` em vez de `OFFSET`) na carga de qualquer escopo —
-  não voltar a cogitar `GROUP BY` por tela, que exigiria duplicar a lógica
-  do `FilterBar` em SQL.
+  pela metade — e o teste de 2026-10-30 (ver acima) mostrou ela estourando o
+  timeout de 2min em páginas profundas (`offset=60000`+) do `BANCO_DADOS`,
+  mais grave do que os 40,6s medidos em 2026-10-29.** Pra zerar de vez, o
+  caminho é paginação por keyset (seek: `id_parcela > última_id` em vez de
+  `OFFSET`) na carga de qualquer escopo — não voltar a cogitar `GROUP BY`
+  por tela, que exigiria duplicar a lógica do `FilterBar` em SQL. Com a
+  regressão acima corrigida, o escopo ativo volta a ser rápido (~1,8s) e o
+  fallback para a tabela inteira deixa de ser o caminho normal — mas se
+  algum dia ele for acionado de novo (ex.: outra regressão, ou um gestor
+  com conexão lenta/timeout mais curto), o `OFFSET` profundo continua
+  podendo estourar.
 - Modais de detalhe (cobrador/loja/cliente): hoje ainda leem tudo via
   `collections` em memória; poderiam virar fetch sob demanda filtrado
   (`WHERE user_id=X` etc.), só quando o gestor clica — ganho pequeno agora
