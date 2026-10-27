@@ -967,6 +967,14 @@ export type Database = {
           valor_total: number;
         }[];
       };
+      cobrador_na_data_em_lote: {
+        Args: { p_pares: Json };
+        Returns: {
+          cobrador_id: string | null;
+          data: string;
+          documento: string;
+        }[];
+      };
       converter_valor_brasileiro: { Args: { valor: string }; Returns: number };
       distribuir_clientes_cobradores: {
         Args: never;

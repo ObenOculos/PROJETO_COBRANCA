@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useTransition } from "react";
+import React, { useState, useMemo, useEffect, useTransition } from "react";
 import {
   Users,
   Download,
@@ -12,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
+import { supabase } from "../../lib/supabase";
 import { formatCurrency } from "../../utils/formatters";
 import { getClientPaymentStatus } from "../../filters/clientStatus";
 import { resolveSaleKey } from "../../filters/sales";
@@ -80,6 +81,33 @@ interface EnhancedCollectorPerformance {
   clientsPaid: number;
   clientsUnpaidOrPartial: number;
 }
+
+// Usado tanto no card (abaixo) quanto no calculo do ranking e no efeito que
+// busca o dono historico da carteira (cobrador_na_data_em_lote) -- um unico
+// parser de data para os dois, em vez de duas copias divergindo com o tempo.
+const parseDateSafely = (dateStr: string | null | undefined): Date | null => {
+  if (!dateStr) return null;
+  try {
+    const cleanDateStr = dateStr.toString().trim().split("T")[0].split(" ")[0];
+    if (cleanDateStr.includes("-")) {
+      const parts = cleanDateStr.split("-");
+      if (parts.length === 3) {
+        const [y, m, d] = parts.map(Number);
+        return new Date(y, m - 1, d);
+      }
+    } else if (cleanDateStr.includes("/")) {
+      const parts = cleanDateStr.split("/");
+      if (parts.length === 3) {
+        const [d, m, y] = parts.map(Number);
+        return new Date(y, m - 1, d);
+      }
+    }
+    const fallback = new Date(dateStr);
+    return isNaN(fallback.getTime()) ? null : fallback;
+  } catch (e) {
+    return null;
+  }
+};
 
 interface CollectorCardProps {
   collector: EnhancedCollectorPerformance;
@@ -705,49 +733,88 @@ const EnhancedPerformanceChart: React.FC = () => {
     [sourceCollections],
   );
 
+  const isDateInSelectedMonths = (date: Date | null) => {
+    if (!date) return false;
+    const dateMonth = date.getMonth();
+    const dateYear = date.getFullYear();
+    const monthMatches =
+      selectedMonths.length === 0 || selectedMonths.includes(dateMonth);
+    const yearMatches =
+      selectedYears.length === 0 || selectedYears.includes(dateYear);
+    return monthMatches && yearMatches;
+  };
+
+  // Dono histórico da carteira (atribuicoes_historico) na data de referência de
+  // cada título do período filtrado — não o dono ATUAL (c.user_id). Sem isso,
+  // reatribuir um cliente move junto os títulos que já venceram/lançaram sob o
+  // cobrador anterior (item 1b/Fase 2, docs/PROGRESSO.md). Vencimento tem
+  // prioridade sobre lançamento quando os dois batem no período (mesmo critério
+  // usado para decidir se o título entra no período, abaixo).
+  // Chave do Map: "<documento>|<data ISO>". Enquanto a busca não termina (ou se
+  // faltar algum par), cai no dono atual — nunca pior que o comportamento
+  // anterior, só corrige assim que a resposta chega.
+  const [historicalOwners, setHistoricalOwners] = useState<
+    Map<string, string | null>
+  >(new Map());
+
+  useEffect(() => {
+    const pares: { documento: string; data: string }[] = [];
+    const seen = new Set<string>();
+    sourceCollections.forEach((c) => {
+      if (!c.documento) return;
+      const dateVenc = parseDateSafely(c.data_vencimento);
+      const dateLanc = parseDateSafely(c.data_lancamento);
+      const vencMatches = isDateInSelectedMonths(dateVenc);
+      const refDate = vencMatches
+        ? dateVenc
+        : isDateInSelectedMonths(dateLanc)
+          ? dateLanc
+          : null;
+      if (!refDate) return;
+      const iso = todayLocalStr(refDate);
+      const key = `${c.documento}|${iso}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      pares.push({ documento: c.documento, data: iso });
+    });
+
+    if (pares.length === 0) {
+      setHistoricalOwners(new Map());
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const BATCH_SIZE = 2000;
+      const result = new Map<string, string | null>();
+      for (let i = 0; i < pares.length; i += BATCH_SIZE) {
+        if (cancelled) return;
+        const slice = pares.slice(i, i + BATCH_SIZE);
+        const { data, error } = await supabase.rpc(
+          "cobrador_na_data_em_lote",
+          { p_pares: slice },
+        );
+        if (error) {
+          console.error("Erro ao buscar dono histórico da carteira:", error);
+          continue;
+        }
+        (data || []).forEach(
+          (row: { documento: string; data: string; cobrador_id: string | null }) => {
+            result.set(`${row.documento}|${row.data}`, row.cobrador_id);
+          },
+        );
+      }
+      if (!cancelled) setHistoricalOwners(result);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceCollections, selectedMonths, selectedYears]);
+
   const enhancedPerformance = useMemo((): EnhancedCollectorPerformance[] => {
     const collectors = users.filter((u) => isCollectorType(u.type));
-
-    const parseDateSafely = (
-      dateStr: string | null | undefined,
-    ): Date | null => {
-      if (!dateStr) return null;
-      try {
-        const cleanDateStr = dateStr
-          .toString()
-          .trim()
-          .split("T")[0]
-          .split(" ")[0];
-        if (cleanDateStr.includes("-")) {
-          const parts = cleanDateStr.split("-");
-          if (parts.length === 3) {
-            const [y, m, d] = parts.map(Number);
-            return new Date(y, m - 1, d);
-          }
-        } else if (cleanDateStr.includes("/")) {
-          const parts = cleanDateStr.split("/");
-          if (parts.length === 3) {
-            const [d, m, y] = parts.map(Number);
-            return new Date(y, m - 1, d);
-          }
-        }
-        const fallback = new Date(dateStr);
-        return isNaN(fallback.getTime()) ? null : fallback;
-      } catch (e) {
-        return null;
-      }
-    };
-
-    const isDateInSelectedMonths = (date: Date | null) => {
-      if (!date) return false;
-      const dateMonth = date.getMonth();
-      const dateYear = date.getFullYear();
-      const monthMatches =
-        selectedMonths.length === 0 || selectedMonths.includes(dateMonth);
-      const yearMatches =
-        selectedYears.length === 0 || selectedYears.includes(dateYear);
-      return monthMatches && yearMatches;
-    };
 
     // Group all active collections by client once (respecting filter bar criteria)
     const globalClientsMap = new Map<string, Collection[]>();
@@ -771,12 +838,21 @@ const EnhancedPerformanceChart: React.FC = () => {
 
     return collectors.map((collector) => {
       const filteredCollections = sourceCollections.filter((c) => {
-        if (c.user_id !== collector.id) return false;
         const dateVenc = parseDateSafely(c.data_vencimento);
         const dateLanc = parseDateSafely(c.data_lancamento);
-        return (
-          isDateInSelectedMonths(dateVenc) || isDateInSelectedMonths(dateLanc)
-        );
+        const vencMatches = isDateInSelectedMonths(dateVenc);
+        const refDate = vencMatches
+          ? dateVenc
+          : isDateInSelectedMonths(dateLanc)
+            ? dateLanc
+            : null;
+        if (!refDate) return false;
+
+        const key = `${c.documento}|${todayLocalStr(refDate)}`;
+        const historicalOwner = historicalOwners.has(key)
+          ? historicalOwners.get(key)
+          : c.user_id; // ainda nao chegou do RPC: nao regride, so nao corrige ainda
+        return historicalOwner === collector.id;
       });
 
       const receivedAmount = salePayments
@@ -1046,10 +1122,14 @@ const EnhancedPerformanceChart: React.FC = () => {
         clientsUnpaidOrPartial,
       };
     });
+    // isDateInSelectedMonths nao precisa entrar: deriva so de selectedMonths/
+    // selectedYears, que ja estao na lista abaixo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     sourceCollections,
     allowedDocs,
     hasSourceFilter,
+    historicalOwners,
     users,
     monthlyGoals,
     salePayments,

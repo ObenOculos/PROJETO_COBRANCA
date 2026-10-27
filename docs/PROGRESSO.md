@@ -45,16 +45,50 @@ histórico de recebimento junto. Medido em 2026-10-05: **368 de 1.062 pagamentos
 - `process_payment`: marca origem `app`, data de Brasília, e só atualiza
   `total_pending_value` de visitas em aberto (era o antigo item 1d).
 
-**Fase 2 — telas (a fazer):**
-- Função única no banco de desempenho por período: recebido = `sale_payments`
-  do cobrador; carteira no período = `atribuicoes_historico`; quitações com o
-  dono da carteira no momento = `recebimentos_historico`. Desconto quita (1c).
-- Trocar `getCollectorPerformance`, `CollectorPerformanceModal`,
-  `EnhancedPerformanceChart` e o progresso da meta no `CollectorDashboard`
-  (hoje é o recebido de toda a vida da carteira, não do mês).
+**Fase 2 — telas (levantamento em 2026-10-27, antes de mexer):**
+`getCollectorPerformance` (`CollectionContext.tsx`) é **código morto** — não
+é chamado por nenhuma tela (só existe no contexto/tipos). `receivedAmount`
+em `CollectorPerformanceModal` e `EnhancedPerformanceChart` **já** vem de
+`sale_payments` por `collector_id`/data (fato, não carteira atual) — não
+tinha o bug. O progresso de meta do `CollectorDashboard`
+(`getMetricsByPeriod`) também já recebe `salePayments` prontos. O bug real
+estava só em `EnhancedPerformanceChart.tsx`: `clientsPaid`/
+`clientsUnpaidOrPartial`/`salesPaid`/`salesUnpaidOrPartial`/
+`salesTotalPeriod`/`totalAmount`/`pendingAmount` eram calculados filtrando
+`collections` por `c.user_id === collector.id` (dono **atual**) dentro do
+período — um título vencido em março sob o cobrador A, hoje reatribuído pro
+B, contava pro B mesmo que B nunca tivesse tido esse título em março.
+(`clientsPaid`/`clientsUnpaidOrPartial`/`totalAssignedClients` do card
+"Carteira Atual" são deliberadamente um retrato de HOJE, não do período —
+ficaram como estavam, de propósito.)
+
+**Corrigido em 2026-10-27** (migration `20261027000002`, versão simples
+decidida com o usuário: dono na data de vencimento do título, ou lançamento
+se só essa bateu no período — não o momento exato da quitação, que exigiria
+`recebimentos_historico`; essa versão mais precisa fica anotada pra depois
+se a simples não for suficiente):
+- Função `cobrador_na_data_em_lote(p_pares jsonb)`: dado um lote de pares
+  `{documento, data}`, devolve quem era o dono da carteira
+  (`atribuicoes_historico`) naquela data — testada no banco (leitura): ~280ms
+  para 3.000 pares (um mês inteiro de títulos tem tipicamente ~1.800-2.000
+  pares únicos).
+- `EnhancedPerformanceChart.tsx`: um `useEffect` novo junta os pares únicos
+  (documento + data de referência) de todos os títulos do período filtrado,
+  chama a função em lote, e o `filteredCollections` por cobrador passa a
+  comparar contra esse dono histórico em vez de `c.user_id`. Enquanto a
+  resposta não chega (ou falta algum par), cai pro dono atual — nunca pior
+  que o comportamento anterior, só corrige assim que a resposta chega.
+- `tsc -b` limpo; lint sem aumentar a contagem (`EnhancedPerformanceChart.tsx`:
+  1 erro pré-existente, igual antes).
+- **Ainda não testado no `npm run dev` nem commitado.**
+
+**Ainda em aberto (não faz parte desta correção):**
 - Tela "Baixas do ERP" a partir de `recebimentos_historico`.
 - A origem `erp_ou_manual` não distingue a planilha da edição manual na
   parcela. Para separar, a importação precisa passar por uma RPC.
+- Versão com o momento exato da quitação (via `recebimentos_historico`), se
+  a atribuição por data de vencimento/lançamento não for precisa o
+  suficiente na prática.
 
 ### 1c. Regras de "pendente/pago" divergentes
 
@@ -387,6 +421,15 @@ contextos de poucas linhas — cancelamento de visita, gatilho de importação
   `collections` em memória; poderiam virar fetch sob demanda filtrado
   (`WHERE user_id=X` etc.), só quando o gestor clica — ganho pequeno agora
   que o Passo 2 já evita a tabela inteira, fica pra se o keyset não bastar.
+- **Ideia anotada pelo usuário em 2026-10-27, não avaliada ainda:** filtrar
+  por padrão o mês atual em tudo (não só carregar menos linhas, mudar o
+  que cada painel pede), e os totais agregados (dívida total, contagem de
+  clientes, etc.) passarem a ser calculados no banco (função/`GROUP BY`)
+  em vez de somados em JS sobre `collections` carregado por inteiro. Evita
+  a consulta longa na raiz, mas é o tipo de `GROUP BY` por tela que a
+  skill `arquiteto-cobranca` pede pra evitar (duplica a lógica do
+  `FilterBar` em SQL) — por isso não foi feito junto com o Passo 2.
+  Avaliar junto com a decisão de keyset acima antes de implementar.
 
 A mensagem de loading (`ManagerDashboard.tsx`) já diz o motivo da carga
 ("...para mostrar os clientes que já quitaram tudo", etc.) em vez do
