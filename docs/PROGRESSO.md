@@ -174,6 +174,56 @@ reorganização:**
   parâmetro enviado pelo cliente. `apelidos_temporario` (RLS ligado, zero
   policies, já sem uso) continua fora do radar.
 
+**Concluído (2026-10-27/28/29) — Etapa 2b (RLS por carteira), passo 3 da
+reorganização:**
+- Migration `20261029000001_rls_carteira_etapa2b.sql`: cada cobrador passa a
+  ver/editar só a própria carteira (`BANCO_DADOS`, `scheduled_visits`,
+  `sale_payments`, `clientes`, `collection_attempts`, `allowed_visit_dates`,
+  `monthly_goals`, `authorization_history`); gestor continua vendo tudo.
+  Cadastro/config (criar cliente, datas permitidas, metas) passa a ser
+  gestor-only. Trigger `trg_protege_atribuicao` impede um cobrador de
+  reatribuir o próprio cliente por fora das RPCs. As 6 RPCs sensíveis
+  (`atribuir_clientes_em_lote`, `cancelar_vendas`, `cancelar_clientes`,
+  `liberar_cliente_da_carteira`, `remover_cobrador_em_lote`,
+  `registrar_ajuste_recebimento`) passaram a exigir gestor checado no
+  servidor (`app_current_user_type()`), não mais o parâmetro enviado pelo
+  cliente. 5 funções legadas sem uso (`atribuir_cobrador` e variantes) sem
+  `EXECUTE` para `authenticated`. De brinde: `inserir_cliente_automaticamente`
+  (gatilho) virou `SECURITY DEFINER` (não era, ia quebrar a importação pra
+  quem não é gestor).
+- **Bug de desempenho real encontrado e corrigido em produção**
+  (`20261029000002_fix_performance_rls_etapa2b.sql`): as policies chamavam
+  `app_current_user_id()`/`app_current_user_type()` "soltas"; o Postgres
+  reavaliava essas funções `SECURITY DEFINER` LINHA A LINHA (confirmado com
+  `EXPLAIN ANALYZE`: 6,6s numa página de `BANCO_DADOS`, 127 mil linhas
+  filtradas uma a uma). Causou "statement timeout" (57014) real pro cobrador
+  de teste. Correção padrão do Postgres/Supabase: envolver em `(select ...)`
+  — mesma consulta cai para ~0,1-1,6s. Lição para qualquer policy futura:
+  **nunca chamar uma função direto numa condição de RLS, sempre `(select fn())`.**
+- `src/lib/supabase.ts`: removido o "teste de conectividade" que lia `users`
+  como `anon` ao carregar a página — desde a Etapa 2a isso sempre falha (401),
+  é esperado, e não travava nada, só sujava o console.
+- **Bug de cache encontrado durante o teste** (`CollectionContext.tsx`):
+  `getClientGroups`/`getDashboardStats`/`getCollectorPerformance` gravavam no
+  cache (`localStorage`/`sessionStorage`) o resultado mesmo quando chamadas
+  ANTES dos dados carregarem — uma chamada antecipada (corrida comum logo
+  após o login) grava um resultado vazio que fica preso até o cache ser
+  limpo na mão. Sintoma: "Minha Carteira" aparecia vazia ("Nenhum cliente com
+  vendas encontrado") mesmo com os dados certos já carregados em memória; só
+  um logout (que limpa os caches) resolvia, e um F5 sozinho reintroduzia o
+  problema. Corrigido nas três funções: nunca ler/gravar cache quando
+  `collections` ainda está vazio.
+- **Testado em produção pelo usuário** (perfil cobrador, Francisco): login,
+  "Minha Carteira" mostrando só a própria carteira (confirmado também direto
+  no banco: 800 clientes, 7.836 parcelas ativas, todas dele), sobrevive a F5
+  repetido. Um resíduo de HMR do Vite (servidor de dev antigo ainda com o
+  bundle pré-correção) mascarou o resultado por uma rodada de teste; resolvido
+  reiniciando o servidor.
+- Fora do escopo (continua pendente, ver Etapa 2a): `users`,
+  `enderecos_historico`, as 3 tabelas de histórico; `process_payment` ainda
+  não valida `p_collector_id` contra quem chamou (risco de mérito mal
+  atribuído, não de acesso a dado de terceiro).
+
 ### 2. Reagendamento atômico
 
 `rescheduleVisit` (`CollectionContext.tsx` ~3900–4130) faz 3 escritas separadas

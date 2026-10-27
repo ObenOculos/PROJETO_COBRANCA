@@ -1741,6 +1741,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const getClientGroups = useMemo(
     () =>
       (collectorId?: string): ClientGroup[] => {
+        // Sem collections carregadas ainda não dá pra saber se é "sem
+        // cliente mesmo" ou "dados a caminho" — nunca ler nem gravar cache
+        // aqui, senão uma chamada antecipada (antes do fetch terminar)
+        // grava um resultado vazio que fica preso no localStorage até o
+        // cache ser limpo na mão (ex.: só reaparece depois de um logout).
+        if (collections.length === 0) return [];
+
         const cacheKey = `client-groups-${collectorId || "all"}`;
 
         const cachedData = dataCache.get<ClientGroup[]>(cacheKey);
@@ -1908,6 +1915,23 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   const getDashboardStats = useMemo(
     () => (): DashboardStats => {
+      // Idem getClientGroups: nunca ler/gravar cache com collections ainda
+      // vazio (chamada antecipada antes do fetch terminar gravaria zero em
+      // sessionStorage e isso sobrevive a um F5).
+      if (collections.length === 0) {
+        return {
+          totalPending: 0,
+          totalOverdue: 0,
+          totalReceived: 0,
+          totalAmount: 0,
+          receivedAmount: 0,
+          pendingAmount: 0,
+          conversionRate: 0,
+          collectorsCount: users.filter((u) => isCollectorType(u.type))
+            .length,
+        };
+      }
+
       const cacheKey = "dashboard-stats";
 
       // Try to get from cache first
@@ -1963,6 +1987,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   const getCollectorPerformance = useMemo(
     () => (): CollectorPerformance[] => {
+      // Idem getClientGroups/getDashboardStats.
+      if (collections.length === 0) return [];
+
       const cacheKey = "collector-performance";
 
       // Try to get from cache first

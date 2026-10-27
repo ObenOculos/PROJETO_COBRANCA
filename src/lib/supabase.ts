@@ -21,14 +21,3 @@ export const supabase = createClient<Database>(config.url, config.anonKey, {
     detectSessionInUrl: false,
   },
 });
-
-// Testar a conexão silenciosamente
-supabase
-  .from("users")
-  .select("count", { count: "exact", head: true })
-  .then(({ error }) => {
-    if (error) {
-      console.error("Erro de conectividade com o banco de dados");
-    }
-    // Conexão OK - sem logs em produção
-  });
