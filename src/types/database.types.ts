@@ -825,6 +825,49 @@ export type Database = {
         };
         Relationships: [];
       };
+      banco_dados_clientes_quitados: {
+        Row: {
+          acrescimo: string | null;
+          bairro: string | null;
+          cep: string | null;
+          cidade: string | null;
+          cliente: string | null;
+          codigo_externo: string | null;
+          complemento: string | null;
+          convenio: string | null;
+          data_de_recebimento: string | null;
+          data_lancamento: string | null;
+          data_vencimento: string | null;
+          desconto: string | null;
+          descricao: string | null;
+          dias_carencia: string | null;
+          dias_em_atraso: number | null;
+          documento: string | null;
+          endereco: string | null;
+          estado: string | null;
+          id_parcela: number;
+          juros_aplicado: string | null;
+          juros_pago: string | null;
+          juros_por_dia: string | null;
+          multa: string | null;
+          multa_aplicada: string | null;
+          multa_paga: string | null;
+          nome_da_loja: string | null;
+          numero: string | null;
+          numero_titulo: number | null;
+          obs: string | null;
+          parcela: number | null;
+          situacao: string | null;
+          status: string | null;
+          tipo_de_cobranca: string | null;
+          user_id: string | null;
+          valor_original: string | null;
+          valor_reajustado: string | null;
+          valor_recebido: string | null;
+          venda_n: number | null;
+        };
+        Relationships: [];
+      };
       daily_payment_report: {
         Row: {
           average_payment: number | null;

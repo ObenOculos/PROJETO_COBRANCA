@@ -45,7 +45,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     getFilteredCollections,
     collections,
     ensureAllCollections,
+    ensureSettledCollections,
     loadingFullScope,
+    loadingSettledCollections,
     collectionsRequested,
     requestCollections,
     loading,
@@ -213,6 +215,15 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     (activeTab === "collections" &&
       (collectionsView === "cash-report" || filterWantsSettledClients));
 
+  // O unico caso que NAO precisa da tabela inteira: filtro "Pago" sozinho (sem
+  // Relatorio de Caixa, sem aba que soma agregados). Ai basta o complemento
+  // (clientes quitados) somado ao que ja esta carregado — ver
+  // ensureSettledCollections no CollectionContext.
+  const settledFilterOnly =
+    activeTab === "collections" &&
+    collectionsView !== "cash-report" &&
+    filterWantsSettledClients;
+
   // Motivo da promoção, pra quem clicou num filtro ou abriu uma aba entender
   // por que a tela parou pra carregar tudo em vez de só trocar de conteúdo.
   const fullScopeReason = TABS_NEEDING_FULL_SCOPE.has(activeTab)
@@ -224,10 +235,16 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         : "";
 
   useEffect(() => {
-    if (needsFullScope) void ensureAllCollections();
-    // ensureAllCollections e no-op quando o escopo ja e "all".
+    if (!needsFullScope) return;
+    if (settledFilterOnly) {
+      void ensureSettledCollections();
+    } else {
+      void ensureAllCollections();
+    }
+    // ensureAllCollections/ensureSettledCollections sao no-op quando ja
+    // carregaram o que precisavam.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsFullScope]);
+  }, [needsFullScope, settledFilterOnly]);
 
   useEffect(() => {
     if (TABS_AUTOLOADING_COLLECTIONS.has(activeTab)) void requestCollections();
@@ -238,7 +255,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const renderTabContent = () => {
     // Segurar e melhor do que exibir total subestimado: sem os clientes
     // quitados, os numeros dessas telas ficam menores do que a realidade.
-    if (needsFullScope && loadingFullScope) {
+    if (
+      needsFullScope &&
+      (settledFilterOnly ? loadingSettledCollections : loadingFullScope)
+    ) {
       return (
         <div className="flex items-center justify-center py-16">
           <div className="text-center">

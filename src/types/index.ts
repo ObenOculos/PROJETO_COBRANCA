@@ -315,6 +315,18 @@ export interface CollectionContextType {
    */
   ensureAllCollections: () => Promise<void>;
   /**
+   * Soma a `collections` os clientes 100% quitados (view
+   * `banco_dados_clientes_quitados`), sem promover o escopo para `"all"`.
+   * No-op se já estiver em `"all"` ou se já tiver sido chamada nesta sessão.
+   * Usada pelo filtro "Pago" da Cobrança: é o único consumidor que precisa
+   * das linhas de quem quitou, não de agregados.
+   */
+  ensureSettledCollections: () => Promise<void>;
+  /** Verdadeiro enquanto `ensureSettledCollections` está em curso. Flag
+   * própria, separada de `loadingFullScope`: as duas cargas podem estar em
+   * voo ao mesmo tempo. */
+  loadingSettledCollections: boolean;
+  /**
    * Falso enquanto o gestor ainda não pediu os dados de cobrança. Nesse estado
    * `collections` está vazio POR ESCOLHA — a tela deve oferecer a consulta, e
    * não dizer que não há resultados. Já nasce verdadeiro para cobradores, que

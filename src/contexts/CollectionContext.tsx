@@ -172,6 +172,12 @@ const COLLECTIONS_SOURCE = {
   all: "BANCO_DADOS",
 } as const satisfies Record<CollectionsScope, string>;
 
+// Complemento de banco_dados_clientes_ativos: so os clientes 100% quitados
+// (ver migration 20261029000003). Usada so pelo filtro "Pago" da Cobranca
+// (ensureSettledCollections) -- nao e um CollectionsScope porque nao
+// substitui o conjunto carregado, so soma a ele.
+const SETTLED_COLLECTIONS_SOURCE = "banco_dados_clientes_quitados";
+
 // Tamanho da pagina do PostgREST e quantas paginas buscar em paralelo.
 const COLLECTIONS_PAGE_SIZE = 1000;
 const COLLECTIONS_CONCURRENCY = 8;
@@ -214,11 +220,28 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   // Conjunto bruto vindo do banco (inclui titulos cancelados). Toda a operacao
   // de cobranca consome `collections` (derivado abaixo), que exclui cancelados.
   const [allCollections, setAllCollections] = useState<Collection[]>([]);
+  // Complemento carregado por ensureSettledCollections (clientes 100%
+  // quitados, filtro "Pago"). Fica FORA de allCollections de proposito: uma
+  // recarga do escopo "active" (realtime, refreshCollections) substitui
+  // allCollections inteiro, e se os quitados estivessem misturados la dentro
+  // essa recarga os apagaria sem querer. Zerado ao promover para "all"
+  // (ensureAllCollections), que ja os inclui.
+  const [settledCollections, setSettledCollections] = useState<Collection[]>(
+    [],
+  );
+  // Uniao bruta (inclui cancelados) dos dois carregamentos. Alguns
+  // consumidores precisam do bruto de UM cliente especifico (historico de
+  // venda, deteccao de "100% cancelado") mesmo quando esse cliente so esta
+  // em settledCollections — usam isto em vez de allCollections sozinho.
+  const rawCollections = useMemo(
+    () => [...allCollections, ...settledCollections],
+    [allCollections, settledCollections],
+  );
   // Titulos cancelados na origem (status === "Cancelado") saem de toda a
   // cobranca ativa: totais, carteira, atribuicao, rota/visitas e desempenho.
   const collections = useMemo(
-    () => allCollections.filter((c) => !isCancelado(c.status)),
-    [allCollections],
+    () => rawCollections.filter((c) => !isCancelado(c.status)),
+    [rawCollections],
   );
   const [users, setUsers] = useState<User[]>([]);
   const [salePayments, setSalePayments] = useState<SalePayment[]>([]);
@@ -286,6 +309,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   // valor de estado velho na hora de recarregar.
   const collectionsScopeRef = React.useRef<CollectionsScope>("active");
   const loadingFullScopeRef = React.useRef(false);
+  // Flag PROPRIA de ensureSettledCollections, separada de loadingFullScope:
+  // as duas cargas podem ficar em voo ao mesmo tempo (gestor troca de aba no
+  // meio da carga de quitados), e compartilhar a mesma trava faria uma
+  // confundir a outra com "ja estou carregando" e desistir sem tentar de novo.
+  const [loadingSettledCollections, setLoadingSettledCollections] =
+    useState(false);
+  const loadingSettledCollectionsRef = React.useRef(false);
+  // Trava de ensureSettledCollections nesta sessao. Ao contrario do escopo
+  // "all" (que fica marcado em collectionsScopeRef), settledCollections e um
+  // estado à parte: nao ha um valor de escopo para conferir "ja e esse
+  // escopo", so "ja pedi" ou nao.
+  const settledCollectionsLoadedRef = React.useRef(false);
 
   const applyCollectionsScope = (scope: CollectionsScope) => {
     collectionsScopeRef.current = scope;
@@ -749,6 +784,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     } else {
       console.log("Usuário não logado, limpando dados...");
       setAllCollections([]);
+      setSettledCollections([]);
+      settledCollectionsLoadedRef.current = false;
       setUsers([]);
       setSalePayments([]);
       setScheduledVisits([]);
@@ -1059,9 +1096,82 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
     try {
       await fetchCollections(true, "all");
+      // "all" ja inclui os quitados; o complemento em separado ficaria
+      // duplicado dentro de `collections` (useMemo soma os dois arrays).
+      setSettledCollections([]);
     } finally {
       loadingFullScopeRef.current = false;
       setLoadingFullScope(false);
+    }
+  };
+
+  // Carrega os clientes 100% quitados (view banco_dados_clientes_quitados,
+  // migration 20261029000003) em `settledCollections`, sem tocar em
+  // allCollections nem promover o escopo para "all". So o filtro "Pago" da
+  // Cobranca precisa disso: o escopo "active" ja exclui justamente quem
+  // quitou tudo.
+  const ensureSettledCollections = async () => {
+    if (user?.type === "collector") return;
+    markCollectionsRequested();
+    // "all" ja inclui os quitados; nao ha o que buscar a mais.
+    if (collectionsScopeRef.current === "all") return;
+    if (settledCollectionsLoadedRef.current) return;
+    if (loadingSettledCollectionsRef.current) return;
+
+    loadingSettledCollectionsRef.current = true;
+    setLoadingSettledCollections(true);
+    // Trava antes de buscar, mesma razao do ensureAllCollections: duas
+    // chamadas concorrentes nao podem disparar duas varreduras da view.
+    settledCollectionsLoadedRef.current = true;
+
+    try {
+      const source = SETTLED_COLLECTIONS_SOURCE as "BANCO_DADOS";
+      const registry = await loadClientesRegistry();
+
+      const buildPage = (from: number, to: number) =>
+        supabase
+          .from(source)
+          .select("*")
+          .order("id_parcela", { ascending: true })
+          .range(from, to);
+
+      const { count, error: countError } = await supabase
+        .from(source)
+        .select("id_parcela", { count: "exact", head: true });
+
+      const total = countError ? null : (count ?? null);
+
+      const buffer: Collection[] = [];
+      const onBatch = (batchRows: BancoDadosRow[]) => {
+        for (const row of batchRows)
+          buffer.push(mapRowToCollection(row, registry));
+      };
+
+      if (total === null) {
+        await fetchAllPages<BancoDadosRow>(buildPage, {
+          pageSize: COLLECTIONS_PAGE_SIZE,
+          accumulate: false,
+          onBatch,
+        });
+      } else {
+        await fetchPagesInParallel<BancoDadosRow>(buildPage, total, {
+          pageSize: COLLECTIONS_PAGE_SIZE,
+          concurrency: COLLECTIONS_CONCURRENCY,
+          accumulate: false,
+          onBatch,
+        });
+      }
+
+      // A paginacao por OFFSET nao e estavel (ver dedupeBy em fetchCollections).
+      setSettledCollections(dedupeBy(buffer, (c) => c.id_parcela));
+      invalidateCollections();
+    } catch (err) {
+      console.error("Erro ao carregar clientes quitados:", err);
+      // Permite tentar de novo na proxima vez que o filtro "Pago" for aberto.
+      settledCollectionsLoadedRef.current = false;
+    } finally {
+      loadingSettledCollectionsRef.current = false;
+      setLoadingSettledCollections(false);
     }
   };
 
@@ -1438,7 +1548,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       collections.map(clientKey).filter(Boolean),
     );
     const canceladoCollections = wantCancelados
-      ? allCollections.filter(
+      ? rawCollections.filter(
           (c) =>
             isCancelado(c.status) && !baseActiveClientKeys.has(clientKey(c)),
         )
@@ -2750,13 +2860,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   const getSalesByClient = React.useCallback(
     (clientDocument: string): SaleGroup[] => {
-      // Agrupar collections por venda. Usa allCollections (inclui canceladas)
-      // para que as parcelas canceladas aparecam no DETALHE do titulo; os
-      // totais abaixo, porem, ignoram as canceladas.
+      // Agrupar collections por venda. Usa rawCollections (inclui canceladas
+      // e os quitados de settledCollections) para que as parcelas canceladas
+      // apareçam no DETALHE do título; os totais abaixo, porém, ignoram as
+      // canceladas.
       const salesMap = new Map<number, Collection[]>();
       const individualInstallments: Collection[] = [];
 
-      allCollections
+      rawCollections
         .filter((collection) => collection.documento === clientDocument)
         .forEach((collection) => {
           // Identidade da venda = numero_titulo (com fallback venda_n). Ver
@@ -2857,7 +2968,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // Retornar vendas agrupadas + venda renegociada
       return [...saleGroups, ...renegotiatedSaleGroups];
     },
-    [allCollections, calculateSaleBalance, getSalePayments],
+    [rawCollections, calculateSaleBalance, getSalePayments],
   );
   // NOVO: Função para pré-carregar dados dos clientes em batch
   const prefetchClientsData = React.useCallback(
@@ -4008,6 +4119,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     collectionsScope,
     loadingFullScope,
     ensureAllCollections,
+    ensureSettledCollections,
+    loadingSettledCollections,
     collectionsRequested,
     requestCollections,
     error,

@@ -61,9 +61,14 @@ histórico de recebimento junto. Medido em 2026-10-05: **368 de 1.062 pagamentos
   calculam saldo como `original - recebido`, **sem desconto**. Uma venda quitada
   com desconto continua "parcial/pendente" e derruba a conversão de quem negociou.
   A regra certa (desconto quita) está em `getClientPending`/`calculateSaleBalance`.
-- A view `banco_dados_clientes_ativos` decide "em aberto" pela coluna `status`.
-  O front e `cliente_tem_saldo_aberto` decidem pelos valores. Em 2026-10-05:
-  13 parcelas `Pago` com saldo e 27 `Pago Parcial` sem saldo.
+  **Ainda em aberto** — fica para quando o item 8 mexer no Desempenho.
+- ~~A view `banco_dados_clientes_ativos` decide "em aberto" pela coluna
+  `status`. O front e `cliente_tem_saldo_aberto` decidem pelos valores.~~
+  **Corrigido em 2026-10-27** (migration `20261029000003`, junto do item 8): a
+  view passou a usar `cliente_tem_saldo_aberto` (mesma função já usada para
+  cancelar visita de quitado), em vez de uma segunda conta por `status`. Em
+  2026-10-05 isso divergia em 13 parcelas `Pago` com saldo e 27 `Pago Parcial`
+  sem saldo.
 
 ### 1. Segurança — CRÍTICO
 
@@ -303,7 +308,34 @@ a causa — pra gestor a condição `app_current_user_type() = 'manager'` já
 resolve a política (a checagem de dono nem chega a rodar, "InitPlan 2: never
 executed"); o custo real é da paginação por `OFFSET` sobre 128 mil linhas
 (cada página tardia precisa reordenar/re-escanear a tabela), que já existia
-antes da Etapa 2b.
+antes da Etapa 2b. **Essa causa raiz (paginação por OFFSET) continua sem
+solução** — o passo 1 abaixo só evita que o filtro "Pago" precise do escopo
+completo; não deixa o escopo completo em si mais rápido.
+
+**Passo 1 — feito em 2026-10-27:** o filtro "Pago" da Cobrança promovia pro
+escopo completo só porque a view `banco_dados_clientes_ativos` exclui
+justamente os clientes quitados. Migration `20261029000003` criou o
+complemento (`banco_dados_clientes_quitados`) e `ensureSettledCollections`
+(`CollectionContext.tsx`) busca só esse recorte e soma ao que já estava
+carregado, em vez de promover pra tabela inteira — de caminho corrigiu o
+item 1c (a view agora usa `cliente_tem_saldo_aberto`, por valor, não a coluna
+`status`). Relatório de Caixa e as abas Desempenho/Lojas/Clientes **continuam
+promovendo pro escopo completo** — ainda não têm agregação no banco (ver
+análise de consumidores abaixo).
+
+**Passos seguintes (não começados), por esforço:**
+- Cards de `EnhancedStoreManagement` (`GROUP BY nome_da_loja`) e lista
+  principal de `ClientAssignment` (`GROUP BY documento` — exceto o badge de
+  "situação", que precisa de lógica extra em SQL).
+- `getCollectorPerformance`/`EnhancedPerformanceChart` (`GROUP BY` cobrador +
+  sub-agrupamento por venda) — o mais complexo, é onde mora o item 1c
+  restante (desconto não entra no saldo de `isPending`/`salesMap`).
+- `DailyCashReport`: hoje usa `collections` só como lookup (`.find()`) pra
+  resolver loja/nome/dívida de cada pagamento — é JOIN, não agregação;
+  melhor resolvido com RPC que já faça o join no banco.
+- Modais de detalhe (cobrador/loja/cliente): trocar "já tenho tudo em
+  memória" por fetch sob demanda filtrado (`WHERE user_id=X` etc.), só
+  quando o gestor clica.
 
 Ajuste feito agora (`ManagerDashboard.tsx`): a mensagem de loading passou a
 dizer o motivo da carga completa ("...para mostrar os clientes que já
