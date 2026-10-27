@@ -16,6 +16,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 5 | Quebrar componentes gigantes | Baixa | Contínuo |
 | 6 | `RouteMap` não detecta reagendadas | Baixa | Pequeno |
 | 7 | Vulnerabilidades restantes (só dev) | Baixa | — |
+| 8 | Escopo completo do gestor baixa `BANCO_DADOS` inteiro pro navegador | Média | Médio |
 
 ### 1b. Desempenho por atribuição atual — ALTA
 
@@ -219,6 +220,11 @@ reorganização:**
   repetido. Um resíduo de HMR do Vite (servidor de dev antigo ainda com o
   bundle pré-correção) mascarou o resultado por uma rodada de teste; resolvido
   reiniciando o servidor.
+- **Testado em produção pelo usuário** (perfil gestor, Fábio): login, escopo
+  completo carregando (os 40,6s do item 8, não um bloqueio), e a ação de
+  gestor real — `remover_cobrador_em_lote` via `ClientAssignment` — funcionou
+  ("✅ Remoção concluída: 1 clientes (9 parcelas) removidos do cobrador"),
+  confirmando que a RPC gestor-only não travou o próprio gestor.
 - Fora do escopo (continua pendente, ver Etapa 2a): `users`,
   `enderecos_historico`, as 3 tabelas de histórico; `process_payment` ainda
   não valida `p_collector_id` contra quem chamou (risco de mérito mal
@@ -277,6 +283,43 @@ casa. Usar `rescheduledFromId` / `rescheduleCount`. (O "atrasada" do RouteMap
 Produção: **0**. Restam ~28 só de ferramentas de dev: internas do `vercel`
 CLI 62 (dependem do pacote) e `vite`/`esbuild` (exige migrar para Vite 8).
 O override de `tar` em `package.json` ainda é necessário.
+
+### 8. Escopo completo do gestor baixa a tabela inteira
+
+Levantado em 2026-10-29, durante o teste da Etapa 2b. `CollectionContext`
+tem dois escopos: "ativo" (view `banco_dados_clientes_ativos`, ~9-10 mil
+linhas, exclui quem já quitou tudo) e "completo" (`BANCO_DADOS` inteiro,
+127.977 linhas). A Cobranças exige um clique manual ("Consultar cobranças")
+pra carregar o escopo ativo — de propósito, pra não pesar no login. Mas o
+filtro "Pago" e as abas Desempenho/Lojas/Clientes/Relatório de Caixa
+promovem automaticamente pro escopo COMPLETO (maior que o que o botão
+manual carrega), baixando as 128 mil linhas inteiras (38 colunas cada) pro
+navegador só para agregar (somar/contar) ou filtrar em JavaScript.
+
+**Medido em 2026-10-29** (teste de gestor da Etapa 2b): carregar o escopo
+completo levou **40,6s** (`Collections carregadas: 127977 (all) em 40643ms`).
+Confirmado com `EXPLAIN ANALYZE` simulando a sessão do gestor que a RLS NÃO é
+a causa — pra gestor a condição `app_current_user_type() = 'manager'` já
+resolve a política (a checagem de dono nem chega a rodar, "InitPlan 2: never
+executed"); o custo real é da paginação por `OFFSET` sobre 128 mil linhas
+(cada página tardia precisa reordenar/re-escanear a tabela), que já existia
+antes da Etapa 2b.
+
+Ajuste feito agora (`ManagerDashboard.tsx`): a mensagem de loading passou a
+dizer o motivo da carga completa ("...para mostrar os clientes que já
+quitaram tudo", etc.) em vez do genérico "Carregando histórico completo...".
+Resolve a sensação de "travou sem avisar", não o custo real.
+
+**Ideia melhor, maior, fica pra depois (decisão: anotar e seguir por
+agora):** trocar "baixar tudo e calcular no cliente" por cálculo no banco:
+- Desempenho/Lojas/Clientes: função/view com `GROUP BY` por cobrador/loja/
+  cliente — devolve algumas centenas de linhas agregadas, não 128 mil.
+- Relatório de Caixa: consulta já filtrada por data (deve ser pequena).
+- Filtro "Pago": view dedicada aos clientes quitados (espelho da
+  `banco_dados_clientes_ativos`), sem precisar escalar pro escopo completo.
+
+Mexe no modelo de dados do `CollectionContext` e nas telas que consomem
+`collections` — maior que um ajuste de texto, vale etapa própria.
 
 ---
 

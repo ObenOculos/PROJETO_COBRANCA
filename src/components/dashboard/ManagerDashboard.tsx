@@ -213,6 +213,16 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     (activeTab === "collections" &&
       (collectionsView === "cash-report" || filterWantsSettledClients));
 
+  // Motivo da promoção, pra quem clicou num filtro ou abriu uma aba entender
+  // por que a tela parou pra carregar tudo em vez de só trocar de conteúdo.
+  const fullScopeReason = TABS_NEEDING_FULL_SCOPE.has(activeTab)
+    ? "para calcular os números completos desta tela"
+    : collectionsView === "cash-report"
+      ? "para montar o Relatório de Caixa"
+      : filterWantsSettledClients
+        ? "para mostrar os clientes que já quitaram tudo"
+        : "";
+
   useEffect(() => {
     if (needsFullScope) void ensureAllCollections();
     // ensureAllCollections e no-op quando o escopo ja e "all".
@@ -247,7 +257,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               />
             </div>
             <p className="text-gray-600 dark:text-dark-text-secondary text-sm font-medium">
-              Carregando histórico completo...
+              Carregando todos os registros
+              {fullScopeReason ? ` ${fullScopeReason}` : ""}...
+            </p>
+            <p className="text-gray-400 dark:text-dark-text-secondary text-xs mt-1">
+              Pode levar alguns segundos — é uma base grande.
             </p>
           </div>
         </div>
