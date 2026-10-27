@@ -208,12 +208,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
 
         // Resolve o login (não é e-mail) para o e-mail sintético usado no
-        // Supabase Auth. Não revela nada sobre a senha nesta consulta.
-        const { data: row, error: lookupError } = await supabase
-          .from("users")
-          .select("id, name, login, type, active, created_at, auth_email")
-          .eq("login", login)
-          .maybeSingle();
+        // Supabase Auth. Roda como anon (ainda sem sessão) — por isso é uma
+        // RPC dedicada, não uma leitura direta de "users" (Etapa 2a: anon
+        // não tem mais acesso à tabela).
+        const { data: authEmail, error: lookupError } = await supabase.rpc(
+          "resolve_auth_email",
+          { p_login: login },
+        );
 
         if (lookupError) {
           setError(
@@ -222,17 +223,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           throw lookupError;
         }
 
-        if (!row || !row.auth_email) {
+        if (!authEmail) {
           setError("Login ou senha incorretos. Verifique suas credenciais.");
           return false;
         }
 
         const { error: signInError } = await supabase.auth.signInWithPassword(
-          { email: row.auth_email, password },
+          { email: authEmail, password },
         );
 
         if (signInError) {
           setError("Login ou senha incorretos. Verifique suas credenciais.");
+          return false;
+        }
+
+        // A partir daqui a sessão já é "authenticated" — a leitura do
+        // perfil completo só é permitida depois do sign-in (Etapa 2a).
+        const { data: row, error: profileError } = await supabase
+          .from("users")
+          .select("id, name, login, type, active, created_at, auth_email")
+          .eq("login", login)
+          .single();
+
+        if (profileError || !row) {
+          await supabase.auth.signOut();
+          setError("Erro ao carregar o perfil do usuário.");
           return false;
         }
 

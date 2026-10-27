@@ -135,6 +135,45 @@ com o sistema no ar, não reconstruir do zero):**
   `p_usuario_id`/`p_collector_id` vindo do cliente sem checagem no servidor —
   só fica seguro de verdade na Etapa 2, com `auth.uid()`.
 
+**Concluído (2026-10-27/28) — Etapa 2a (RLS/privilégios), passo 2 da
+reorganização:**
+- Achado novo nesta etapa: além das tabelas, **todas as ~30 funções RPC do
+  banco tinham EXECUTE liberado para `anon`** (incluindo `cancelar_vendas`,
+  `process_payment`, `atribuir_clientes_em_lote`) — dava pra cancelar venda ou
+  atribuir cliente chamando a API REST direto, sem nunca logar.
+- Migration `20261028000001_rls_privilegios_etapa2a.sql` aplicada:
+  `app_current_user_id()`/`app_current_user_type()` (ponte `auth.uid()` →
+  `users.id`, para a Etapa 2b), `resolve_auth_email(p_login)` (única coisa que
+  `anon` ainda pode chamar — usada pelo login antes do `signInWithPassword`),
+  `REVOKE` de todo o resto de `anon` (tabelas e funções), RLS ligado nas 13
+  tabelas que faltavam, política única `authenticated_full_access` (logado
+  continua vendo/fazendo tudo que já via/fazia — zero mudança de
+  comportamento) e `authenticated_read_only` nas 3 tabelas de histórico
+  (escrita só por trigger/RPC, como já era).
+- **Verificado direto (curl, só com a chave `anon` pública)**: antes da
+  migration, `GET /rest/v1/BANCO_DADOS` devolvia dados reais (CPF, nome) sem
+  nenhuma credencial; depois, 401 "permission denied" em `BANCO_DADOS` e
+  `users`, e `resolve_auth_email` continua funcionando (inclusive devolvendo
+  `null` sem erro pra login inexistente, sem vazar informação).
+- `AuthContext.tsx`: a resolução de login→e-mail passou a usar a RPC em vez
+  de ler `users` direto (que pararia de funcionar pra `anon`); o perfil
+  completo só é lido depois do `signInWithPassword` (já como `authenticated`).
+- **Testado em produção pelo usuário**: login ativo/inativo de novo (ok) e
+  reagendamento de uma visita atrasada real (cliente Ana Keyvila Barbosa,
+  068.996.153-71) — confirma que a escrita autenticada não quebrou com RLS
+  ligado. Teste limpo depois (visita nova apagada, visita original restaurada
+  a "agendada" em 23/05/2026 19:07, como estava).
+- **Segunda confirmação do mesmo bug de exibição** (primeira vez: cliente
+  Antônia, Etapa 1): `scheduled_visits.reschedule_reason` grava a chave crua
+  (`rota`); o texto de `notes` as vezes mostra o rótulo completo e as vezes a
+  chave crua, dependendo de qual trecho do código gerou aquela linha —
+  inconsistência real, ainda não investigada a fundo.
+- Fora do escopo (fica para a **Etapa 2b**, planejamento próprio): RLS por
+  perfil (cobrador só vê a própria carteira; hoje todo autenticado vê tudo,
+  igual a antes) e as RPCs validando `auth.uid()` em vez de confiar no
+  parâmetro enviado pelo cliente. `apelidos_temporario` (RLS ligado, zero
+  policies, já sem uso) continua fora do radar.
+
 ### 2. Reagendamento atômico
 
 `rescheduleVisit` (`CollectionContext.tsx` ~3900–4130) faz 3 escritas separadas

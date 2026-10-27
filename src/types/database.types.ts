@@ -865,6 +865,18 @@ export type Database = {
       };
     };
     Functions: {
+      app_current_user_id: {
+        Args: never;
+        Returns: string;
+      };
+      app_current_user_type: {
+        Args: never;
+        Returns: string;
+      };
+      resolve_auth_email: {
+        Args: { p_login: string };
+        Returns: string;
+      };
       atribuir_clientes_em_lote: {
         Args: {
           p_clientes?: string[];
