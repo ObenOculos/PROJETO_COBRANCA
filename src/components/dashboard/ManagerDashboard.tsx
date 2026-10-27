@@ -19,8 +19,11 @@ import { Notification } from "../../contexts/NotificationContext";
 
 // O gestor carrega por padrao so os clientes com algo em aberto (metade das
 // linhas). Estas telas somam recebimentos de clientes JA QUITADOS — inclusive
-// quem quitou no mes corrente — entao precisam da tabela inteira, carregada sob
-// demanda. Ver `collectionsScope` no CollectionContext.
+// quem quitou no mes corrente — entao precisam do complemento tambem, pedido
+// sob demanda por ensureSettledCollections (migration 20261029000003:
+// banco_dados_clientes_ativos + banco_dados_clientes_quitados particionam
+// BANCO_DADOS exatamente, entao o resultado e identico ao escopo "all", so
+// que em duas buscas menores em vez de uma varredura da tabela inteira).
 const TABS_NEEDING_FULL_SCOPE = new Set(["performance", "stores", "clients"]);
 
 // Telas que dependem das cobrancas mas nao tem uma consulta propria: como o
@@ -44,9 +47,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const {
     getFilteredCollections,
     collections,
-    ensureAllCollections,
     ensureSettledCollections,
-    loadingFullScope,
     loadingSettledCollections,
     collectionsRequested,
     requestCollections,
@@ -215,15 +216,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     (activeTab === "collections" &&
       (collectionsView === "cash-report" || filterWantsSettledClients));
 
-  // O unico caso que NAO precisa da tabela inteira: filtro "Pago" sozinho (sem
-  // Relatorio de Caixa, sem aba que soma agregados). Ai basta o complemento
-  // (clientes quitados) somado ao que ja esta carregado — ver
-  // ensureSettledCollections no CollectionContext.
-  const settledFilterOnly =
-    activeTab === "collections" &&
-    collectionsView !== "cash-report" &&
-    filterWantsSettledClients;
-
   // Motivo da promoção, pra quem clicou num filtro ou abriu uma aba entender
   // por que a tela parou pra carregar tudo em vez de só trocar de conteúdo.
   const fullScopeReason = TABS_NEEDING_FULL_SCOPE.has(activeTab)
@@ -235,16 +227,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         : "";
 
   useEffect(() => {
-    if (!needsFullScope) return;
-    if (settledFilterOnly) {
-      void ensureSettledCollections();
-    } else {
-      void ensureAllCollections();
-    }
-    // ensureAllCollections/ensureSettledCollections sao no-op quando ja
-    // carregaram o que precisavam.
+    // ensureSettledCollections cobre todo caso de needsFullScope: o
+    // complemento (quitados) somado ao escopo "active" ja carregado e
+    // identico ao escopo "all" (ver comentario de TABS_NEEDING_FULL_SCOPE).
+    // E no-op se ja foi pedido ou se o escopo ja esta em "all".
+    if (needsFullScope) void ensureSettledCollections();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsFullScope, settledFilterOnly]);
+  }, [needsFullScope]);
 
   useEffect(() => {
     if (TABS_AUTOLOADING_COLLECTIONS.has(activeTab)) void requestCollections();
@@ -255,10 +244,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const renderTabContent = () => {
     // Segurar e melhor do que exibir total subestimado: sem os clientes
     // quitados, os numeros dessas telas ficam menores do que a realidade.
-    if (
-      needsFullScope &&
-      (settledFilterOnly ? loadingSettledCollections : loadingFullScope)
-    ) {
+    if (needsFullScope && loadingSettledCollections) {
       return (
         <div className="flex items-center justify-center py-16">
           <div className="text-center">

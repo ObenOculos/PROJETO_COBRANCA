@@ -312,46 +312,49 @@ antes da Etapa 2b. **Essa causa raiz (paginação por OFFSET) continua sem
 solução** — o passo 1 abaixo só evita que o filtro "Pago" precise do escopo
 completo; não deixa o escopo completo em si mais rápido.
 
-**Passo 1 — feito em 2026-10-27:** o filtro "Pago" da Cobrança promovia pro
-escopo completo só porque a view `banco_dados_clientes_ativos` exclui
-justamente os clientes quitados. Migration `20261029000003` criou o
-complemento (`banco_dados_clientes_quitados`) e `ensureSettledCollections`
-(`CollectionContext.tsx`) busca só esse recorte e soma ao que já estava
-carregado, em vez de promover pra tabela inteira — de caminho corrigiu o
-item 1c (a view agora usa `cliente_tem_saldo_aberto`, por valor, não a coluna
-`status`). Relatório de Caixa e as abas Desempenho/Lojas/Clientes **continuam
-promovendo pro escopo completo** — ainda não têm agregação no banco (ver
-análise de consumidores abaixo).
+**Passo 1 — feito em 2026-10-27 (commit `365ae05`):** o filtro "Pago" da
+Cobrança promovia pro escopo completo só porque a view
+`banco_dados_clientes_ativos` exclui justamente os clientes quitados.
+Migration `20261029000003` criou o complemento (`banco_dados_clientes_quitados`)
+e `ensureSettledCollections` (`CollectionContext.tsx`) busca só esse recorte
+e soma ao que já estava carregado, em vez de promover pra tabela inteira —
+de caminho corrigiu o item 1c (a view agora usa `cliente_tem_saldo_aberto`,
+por valor, não a coluna `status`).
 
-**Passos seguintes (não começados), por esforço:**
-- Cards de `EnhancedStoreManagement` (`GROUP BY nome_da_loja`) e lista
-  principal de `ClientAssignment` (`GROUP BY documento` — exceto o badge de
-  "situação", que precisa de lógica extra em SQL).
-- `getCollectorPerformance`/`EnhancedPerformanceChart` (`GROUP BY` cobrador +
-  sub-agrupamento por venda) — o mais complexo, é onde mora o item 1c
-  restante (desconto não entra no saldo de `isPending`/`salesMap`).
-- `DailyCashReport`: hoje usa `collections` só como lookup (`.find()`) pra
-  resolver loja/nome/dívida de cada pagamento — é JOIN, não agregação;
-  melhor resolvido com RPC que já faça o join no banco.
-- Modais de detalhe (cobrador/loja/cliente): trocar "já tenho tudo em
-  memória" por fetch sob demanda filtrado (`WHERE user_id=X` etc.), só
-  quando o gestor clica.
+**Passo 2 — feito em 2026-10-27, mesma sessão:** as duas views particionam
+`BANCO_DADOS` **exatamente** (conferido no banco: 58.075 + 69.902 = 127.977
+linhas; 5.571 + 9.296 = 14.867 clientes) — então "active" + "quitados" é
+*idêntico* ao escopo "all", não uma aproximação. Com isso, Desempenho,
+Lojas, Clientes e Relatório de Caixa (as 4 telas que ainda promoviam pra
+tabela inteira) passaram a usar `ensureSettledCollections` também —
+`ManagerDashboard.tsx` não chama mais `ensureAllCollections` em lugar
+nenhum (a função fica no `CollectionContext` sem uso, como contingência).
+Isso NÃO é uma aproximação de agregação por tela: `collections` continua
+com as linhas de verdade, então nenhuma lógica de filtro (`FilterBar`,
+`getFilteredCollections`) precisou ser reimplementada em SQL — o que seria
+necessário para um `GROUP BY` por tela e é exatamente o tipo de duplicação
+de regra que a skill `arquiteto-cobranca` pede pra evitar. Como o custo do
+`OFFSET` cresce ~quadraticamente com o tamanho da tabela, dividir 128 mil
+linhas em duas buscas de 58 e 70 mil cada corta esse custo quase pela
+metade (58.075² + 69.902² ≈ 8,3 bi contra 127.977² ≈ 16,4 bi) de graça, sem
+nenhum código novo de agregação.
 
-Ajuste feito agora (`ManagerDashboard.tsx`): a mensagem de loading passou a
-dizer o motivo da carga completa ("...para mostrar os clientes que já
-quitaram tudo", etc.) em vez do genérico "Carregando histórico completo...".
-Resolve a sensação de "travou sem avisar", não o custo real.
+**Ainda em aberto:**
+- **A causa raiz (paginação por `OFFSET`) não foi eliminada, só reduzida
+  pela metade.** Pra zerar de vez, o caminho é paginação por keyset (seek:
+  `id_parcela > última_id` em vez de `OFFSET`) na carga de qualquer escopo —
+  não voltar a cogitar `GROUP BY` por tela, que exigiria duplicar a lógica
+  do `FilterBar` em SQL.
+- `getCollectorPerformance`/`CollectorDashboard`: resto do item 1c
+  (`isPending`/`salesMap` somam saldo sem desconto).
+- Modais de detalhe (cobrador/loja/cliente): hoje ainda leem tudo via
+  `collections` em memória; poderiam virar fetch sob demanda filtrado
+  (`WHERE user_id=X` etc.), só quando o gestor clica — ganho pequeno agora
+  que o Passo 2 já evita a tabela inteira, fica pra se o keyset não bastar.
 
-**Ideia melhor, maior, fica pra depois (decisão: anotar e seguir por
-agora):** trocar "baixar tudo e calcular no cliente" por cálculo no banco:
-- Desempenho/Lojas/Clientes: função/view com `GROUP BY` por cobrador/loja/
-  cliente — devolve algumas centenas de linhas agregadas, não 128 mil.
-- Relatório de Caixa: consulta já filtrada por data (deve ser pequena).
-- Filtro "Pago": view dedicada aos clientes quitados (espelho da
-  `banco_dados_clientes_ativos`), sem precisar escalar pro escopo completo.
-
-Mexe no modelo de dados do `CollectionContext` e nas telas que consomem
-`collections` — maior que um ajuste de texto, vale etapa própria.
+A mensagem de loading (`ManagerDashboard.tsx`) já diz o motivo da carga
+("...para mostrar os clientes que já quitaram tudo", etc.) em vez do
+genérico "Carregando histórico completo...".
 
 ---
 

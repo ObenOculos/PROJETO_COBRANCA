@@ -1112,11 +1112,26 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   // quitou tudo.
   const ensureSettledCollections = async () => {
     if (user?.type === "collector") return;
-    markCollectionsRequested();
+
+    // Garante o escopo "active" carregado, em paralelo com o complemento
+    // abaixo (idempotente: se o gestor ja clicou "Consultar cobrancas", ou
+    // outra chamada ja estiver em voo, isto so devolve essa promessa).
+    // SEM ISTO: marcar "dados pedidos" aqui e so buscar o complemento faria
+    // `collectionsRequested` virar true com os dados incompletos (so
+    // quitados, sem quem ainda deve) sempre que o gestor abrisse uma aba
+    // promovida (Desempenho/Lojas/Clientes) antes de clicar no botao da
+    // Cobranca — o botao sumia e a tabela vinha truncada.
+    const activeLoad = requestCollections();
+
     // "all" ja inclui os quitados; nao ha o que buscar a mais.
-    if (collectionsScopeRef.current === "all") return;
-    if (settledCollectionsLoadedRef.current) return;
-    if (loadingSettledCollectionsRef.current) return;
+    if (
+      collectionsScopeRef.current === "all" ||
+      settledCollectionsLoadedRef.current ||
+      loadingSettledCollectionsRef.current
+    ) {
+      await activeLoad;
+      return;
+    }
 
     loadingSettledCollectionsRef.current = true;
     setLoadingSettledCollections(true);
@@ -1161,6 +1176,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           onBatch,
         });
       }
+
+      // So libera o loading depois que o escopo "active" tambem terminar:
+      // senao Desempenho/Lojas/Clientes renderizariam com os quitados prontos
+      // mas o resto da carteira ainda faltando (numero subestimado por um
+      // instante).
+      await activeLoad;
 
       // A paginacao por OFFSET nao e estavel (ver dedupeBy em fetchCollections).
       setSettledCollections(dedupeBy(buffer, (c) => c.id_parcela));
