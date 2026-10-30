@@ -8,6 +8,7 @@ import EnhancedStoreManagement from "./EnhancedStoreManagement";
 import DatabaseUpload from "../admin/DatabaseUpload";
 import { ClientAssignment } from "../ClientAssignment";
 import VisitTracking from "./VisitTracking";
+import CollectorsSummary from "./CollectorsSummary";
 import DailyCashReport from "./DailyCashReport";
 import AuthorizationManager from "./AuthorizationManager";
 import TabTransition from "../common/TabTransition";
@@ -24,7 +25,12 @@ import { Notification } from "../../contexts/NotificationContext";
 // banco_dados_clientes_ativos + banco_dados_clientes_quitados particionam
 // BANCO_DADOS exatamente, entao o resultado e identico ao escopo "all", so
 // que em duas buscas menores em vez de uma varredura da tabela inteira).
-const TABS_NEEDING_FULL_SCOPE = new Set(["performance", "stores", "clients"]);
+const TABS_NEEDING_FULL_SCOPE = new Set([
+  "performance",
+  "stores",
+  "clients",
+  "collectors-summary",
+]);
 
 // Telas que dependem das cobrancas mas nao tem uma consulta propria: como o
 // gestor nao carrega mais nada no login, elas precisam pedir os dados ao abrir.
@@ -57,6 +63,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const [internalActiveTab, setInternalActiveTab] = useState<
     | "collections"
     | "performance"
+    | "collectors-summary"
     | "users"
     | "stores"
     | "clients"
@@ -374,6 +381,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
       case "performance":
         return <EnhancedPerformanceChart />;
+
+      case "collectors-summary":
+        return <CollectorsSummary />;
 
       case "stores":
         return <EnhancedStoreManagement />;

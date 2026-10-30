@@ -500,6 +500,67 @@ categoria ou um recorte dos valores atuais.
 
 ---
 
+## Nova tela: Resumo por Cobrador
+
+Aba nova do gestor ("Resumo", `src/components/dashboard/CollectorsSummary.tsx`)
+— dashboard agregado por cobrador (cards ou tabela), com filtro de período e
+de cobrador. Puramente aditiva: não substitui nenhuma tela existente, só lê
+`collections`/`scheduledVisits`/`salePayments`/`users` do `CollectionContext`
+(nenhuma migration, nenhuma mudança de banco). Fiada em `ManagerDashboard.tsx`
+e `config/navigation.ts` (id `collectors-summary`, precisa de escopo
+completo — já incluída em `TABS_NEEDING_FULL_SCOPE`).
+
+**Estado em 2026-10-30, fim da sessão:** `tsc -b` limpo; lint do arquivo
+limpo (arquivo novo, sem baseline pra comparar). **Nada commitado ainda**
+(`git status`: `CollectorsSummary.tsx` novo/untracked,
+`ManagerDashboard.tsx`/`navigation.ts` modificados). Testada visualmente
+pelo usuário ao longo da sessão (várias rodadas de ajuste fino), mas sem uma
+passada final de "pronto pra commitar".
+
+**Bug real corrigido no caminho:** a tela comparava `data_vencimento` como
+string crua contra `today`/`dateFrom`/`dateTo` pra classificar "vencida"/
+"prevista" — mas essa coluna de `BANCO_DADOS` tem ~29% das linhas em
+`DD/MM/YYYY` misturado com `YYYY-MM-DD` (ver `filters/dates.ts`). Corrigido
+reusando `toYYYYMMDD` (normalização, mesma de `ClientAssignment`) pra
+comparar com o período e `calculateOverdueDays` (mesma fonte de
+`CollectorDashboard`/`CollectionContext`/`EnhancedStoreManagement`) pra
+"vencida".
+
+**Decisões de design fechadas nesta sessão (a pedido do usuário, várias
+rodadas de revisão visual):**
+- Filtro de cobrador guarda os **excluídos**, não os selecionados — um
+  conjunto vazio sempre significa "todos" e um cheio significa "nenhum",
+  sem a ambiguidade que "selecionados vazio = todos" teria. Botão
+  "Selecionar todos"/"Desmarcar todos" alterna entre os dois extremos.
+- **Financeiro** (parcelas de `BANCO_DADOS`) e **Agenda** (`scheduledVisits`)
+  são domínios independentes (uma parcela pode vencer sem visita marcada, e
+  vice-versa) — a tela marca essa separação com um tom cinza claro/escuro,
+  mas **só nas células de título** (cabeçalho da tabela, rótulo da "Visão
+  geral"), nunca no conteúdo/corpo — tirado de lá a pedido explícito do
+  usuário depois de testar.
+- Tabela: colunas ordenáveis (clique no título ordena asc/desc, seta indica
+  a coluna ativa); coluna `#` de rank; Cards e Tabela compartilham o mesmo
+  estado de ordenação.
+- Vista padrão (sem preferência salva) é **Tabela**, não Cards — melhor pra
+  comparar/rankear muitos cobradores (a lista já vem ordenada).
+- "Visão geral" (soma agregada) é colapsável por um botão no próprio
+  cabeçalho (sempre presente, funciona igual com 1 ou vários cobradores) —
+  só o padrão muda: começa fechada na transição pra exatamente 1 cobrador no
+  filtro (os totais ficariam idênticos ao card/linha única), mas o usuário
+  pode abrir/fechar manualmente em qualquer contagem depois.
+- Com 1 cobrador só no filtro, o card ocupa a largura total no modo Cards
+  (antes ficava espremido num terço da tela, sobrando grid vazio ao lado).
+- Texto explicativo (situação atual vs. período; Financeiro vs. Agenda) saiu
+  de um banner azul fixo e virou um ícone "ⓘ" com popover ao lado do título.
+- Renomeado "Prevista" → "Vence no período" (menos ambíguo em relação às
+  métricas de agenda).
+
+**Testado em 2026-10-30** (via browser, dado real): filtro de cobrador por
+exclusão, popover, colapso automático da Visão Geral ao cair pra 1
+cobrador (reabre manual), card de largura total com 1 cobrador, tabela com
+rank/ordenação batendo com os totais — tudo certo, sem erro novo no
+console. Commitado.
+
 ## Concluído
 
 ### 2026-10-06

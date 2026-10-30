@@ -7,6 +7,7 @@ import {
   CircleCheckBig,
   CalendarClock,
   ChartSpline,
+  ClipboardList,
   User,
   CloudUpload,
   LucideIcon,
@@ -62,6 +63,12 @@ export const navigationItems: NavItemConfig[] = [
     id: "performance",
     managerName: "Desempenho",
     managerIcon: ChartSpline,
+    roles: ["manager"],
+  },
+  {
+    id: "collectors-summary",
+    managerName: "Resumo",
+    managerIcon: ClipboardList,
     roles: ["manager"],
   },
   {
