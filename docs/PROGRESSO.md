@@ -342,6 +342,31 @@ como `reagendar_visita` faz — mostra o texto crú do Postgres
 colisão acontecer por aí (hoje improvável: o modal já esconde quem tem visita
 ativa).
 
+**Piloto do `refreshData()` catch-all (2026-10-30):** usuário reportou que
+reagendar pelo modal de "Visitas Atrasadas" mostra a tela cheia
+"Atualizando dados..." — o mesmo achado já registrado antes (ver memória,
+achado em 2026-10-27, estacionado a pedido do usuário). `handleConfirmReschedule`
+(`VisitScheduler.tsx`, handler único usado tanto pelo modal normal quanto
+pelo de atrasadas — os dois abrem o mesmo modal de reagendamento) chamava
+`await refreshData()` depois do `rescheduleVisit`, que já atualiza
+`scheduledVisits` no estado local a partir da linha real devolvida pela RPC
+`reagendar_visita` (item 2) e só toca na tabela `scheduled_visits` — nada em
+collections/users/payments/metas pode ter mudado. **Corrigido:** removida a
+chamada de `refreshData()` nesse ponto (sem substituir por nada — não havia
+nada a buscar de novo). De caminho, o `catch` passou a mostrar
+`error.message` em vez do texto genérico fixo, pra aproveitar as mensagens
+amigáveis que `reagendar_visita` já devolve (conflito, visita já reagendada
+por outra operação etc.). `tsc -b` limpo; lint do arquivo sem aumentar
+(21→21). Só este ponto foi tocado — os outros ~10 lugares que chamam
+`refreshData()` depois de outras mutações (registrar/cancelar visita,
+atribuição de cobrador) continuam como estavam; ver memória de estado pra
+decidir se valem o mesmo tratamento depois.
+
+**Testado em produção em 2026-10-30** (cobrador Francisco, cliente Zildete
+Fernandes Oliveira de Brito, pelo modal "Visitas Atrasadas"): "Visita
+reagendada com sucesso!", lista atualizou na hora (8→7 atrasadas) sem a
+tela cheia "Atualizando dados...". Commitado.
+
 ### 3. Exclusão de visitas
 
 `deleteScheduledVisits` (`CollectionContext.tsx` ~488, usado pelo

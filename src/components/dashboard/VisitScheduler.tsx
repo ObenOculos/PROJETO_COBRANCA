@@ -1923,11 +1923,19 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       triggerNotification("Visita reagendada com sucesso!", "success");
       handleCloseRescheduleModal();
 
-      // Refresh dos dados para atualizar outras abas
-      await refreshData();
+      // Sem refreshData aqui: rescheduleVisit (CollectionContext) ja
+      // atualiza scheduledVisits no estado local a partir da linha real
+      // devolvida pela RPC reagendar_visita, e reagendar so toca na tabela
+      // scheduled_visits - nao ha nada em collections/users/payments/metas
+      // que possa ter mudado. O catch-all (fetch de tudo de novo, tela
+      // "Atualizando dados...") so deixava a UI parecendo um F5 sem motivo.
     } catch (error) {
       console.error("Erro ao reagendar visita:", error);
-      alert("Erro ao reagendar visita. Tente novamente.");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Erro ao reagendar visita. Tente novamente.",
+      );
     } finally {
       setIsRescheduling(false);
     }
