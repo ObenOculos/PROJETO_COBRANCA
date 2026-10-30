@@ -331,8 +331,12 @@ auditoria); checagem de conflito de `reagendar_visita` ampliada para a mesma
 granularidade. Testado em transação com `ROLLBACK`: limpeza resolveu
 exatamente os 5 clientes esperados, índice novo criou sem erro, tentativa de
 duplicata entre cobradores diferentes rejeitada pelo banco, reagendamento
-normal continua funcionando. **Ainda não aplicado em produção (`db push`
-pendente).**
+normal continua funcionando. **Aplicado em produção** (`db push` do
+usuário, confirmado via Management API: índice `uniq_active_visit_per_client`
+existe como definido e as 5 duplicatas esperadas foram marcadas
+`cancelada` com a nota de auditoria da migration nova — as outras 22
+`cancelada` com nota parecida vêm da migration antiga `20260601000002`,
+texto diferente).
 
 Achado mas **fora de escopo por ora** (fica pra quando alguém tocar em
 `scheduleVisit`): o caminho de "agendar visita nova" (`CollectionContext.tsx`,
