@@ -312,6 +312,36 @@ e corridas diretas na API, só alcançável em transação manual (já validado
 antes do push). **Migration aplicada em produção (`db push` do usuário,
 2026-10-30, confirmada no banco via Management API).**
 
+**Lacuna encontrada no teste e corrigida na sequência (migration
+`20261030000004`):** o índice único que sustentava a checagem de conflito
+(`uniq_active_visit_per_client_date`) só cobria mesmo cobrador + mesma data —
+mais fraco que a regra real do app ("no máximo 1 visita ativa por cliente,
+qualquer data, qualquer cobrador", já aplicada no modal de agendamento por
+`VisitScheduler.tsx`/`baseFilteredClients`). A lacuna permitia duplicata
+entre cobradores diferentes quando a carteira é reatribuída com
+`transferVisits=false` (`BulkAssignmentModal`): o agendamento antigo fica
+com o cobrador anterior, e o cliente aparece "livre" no modal do novo
+cobrador. **5 clientes já tinham duplicata ativa em produção** (mesmo
+cobrador, datas diferentes — padrão compatível com a fila offline).
+Corrigido: índice trocado para `UNIQUE (client_document) WHERE status =
+'agendada'` (sem data, sem cobrador); duplicatas existentes resolvidas com a
+mesma estratégia não destrutiva da migration `20260601000002` (mantém a mais
+recente por `created_at`, marca as demais como `cancelada` com nota de
+auditoria); checagem de conflito de `reagendar_visita` ampliada para a mesma
+granularidade. Testado em transação com `ROLLBACK`: limpeza resolveu
+exatamente os 5 clientes esperados, índice novo criou sem erro, tentativa de
+duplicata entre cobradores diferentes rejeitada pelo banco, reagendamento
+normal continua funcionando. **Ainda não aplicado em produção (`db push`
+pendente).**
+
+Achado mas **fora de escopo por ora** (fica pra quando alguém tocar em
+`scheduleVisit`): o caminho de "agendar visita nova" (`CollectionContext.tsx`,
+`scheduleVisit`) não traduz o erro do índice único pra uma mensagem amigável
+como `reagendar_visita` faz — mostra o texto crú do Postgres
+(`duplicate key value violates unique constraint...`) se algum dia essa
+colisão acontecer por aí (hoje improvável: o modal já esconde quem tem visita
+ativa).
+
 ### 3. Exclusão de visitas
 
 `deleteScheduledVisits` (`CollectionContext.tsx` ~488, usado pelo
