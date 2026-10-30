@@ -539,6 +539,13 @@ de cobrador. Puramente aditiva: não substitui nenhuma tela existente, só lê
 e `config/navigation.ts` (id `collectors-summary`, precisa de escopo
 completo — já incluída em `TABS_NEEDING_FULL_SCOPE`).
 
+Atende aos itens 56 ("indicadores de carteira vencida, a receber e prevista,
+com filtro de data flexível por cobrador") e 58 ("consolidar o
+acompanhamento por cobrador") do cronograma da reunião de 28/10/2026
+(`cronograma_acoes.csv`, Agente_CEO_Grupo_FV). O pedido original era alterar
+a tela Acompanhamento existente; decisão do Erick foi entregar como aba nova
+em vez disso. Marcado `concluido` na planilha em 2026-10-30.
+
 **Estado em 2026-10-30, fim da sessão:** `tsc -b` limpo; lint do arquivo
 limpo (arquivo novo, sem baseline pra comparar). **Nada commitado ainda**
 (`git status`: `CollectorsSummary.tsx` novo/untracked,
