@@ -3940,140 +3940,32 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         updatedNotes = `${formattedExistingNotes}\n${rescheduleNote}`;
       }
 
-      // Pré-checagem: o cliente já tem uma visita ATIVA na data de destino?
-      // Se sim, abortamos ANTES de mexer na visita original, evitando deixá-la
-      // "órfã" (marcada como reagendada sem uma nova visita criada) — já que o
-      // índice único do banco rejeitaria o INSERT de qualquer forma.
-      const { data: conflictRows, error: conflictError } = await supabase
-        .from("scheduled_visits")
-        .select("id")
-        .eq("collector_id", currentVisit.collectorId)
-        .eq("client_document", currentVisit.clientDocument)
-        .eq("scheduled_date", newDate)
-        .eq("status", "agendada")
-        .neq("id", visitId);
+      const newVisitNotes = `Visita reagendada de ${fromDateTime}${reason ? `. Motivo: ${reason}` : ""}`;
 
-      if (conflictError) {
-        console.error(
-          "Erro ao verificar conflito de data no reagendamento:",
-          conflictError,
-        );
-        throw conflictError;
-      }
-
-      if (conflictRows && conflictRows.length > 0) {
-        throw new Error(
-          "Este cliente já possui uma visita agendada nessa data. Escolha outra data.",
-        );
-      }
-
-      // Em vez de atualizar a visita existente, vamos:
-      // 1. Marcar a visita original como "reagendada"
-      // 2. Criar uma nova visita com a nova data
-
-      // Primeiro, atualizar a visita original para status "reagendada"
-      const originalUpdateData = {
-        status: "reagendada",
-        rescheduled_to: newDate, // Campo adicionado na migração
-        notes: updatedNotes,
-        updated_at: new Date().toISOString(),
-        reschedule_count: newRescheduleCount,
-        // O motivo pertence ao elo que foi EMPURRADO, nao a visita nova: e esta
-        // visita que deixou de acontecer, e por este motivo.
-        reschedule_reason: reason ?? null,
-      };
-
-      // UPDATE condicional ao status "agendada": funciona como uma trava
-      // atômica. Em caso de corrida (duas tentativas simultâneas, retry após
-      // falha de rede, evento disparado duas vezes), apenas UMA operação
-      // consegue alterar a linha; as demais recebem 0 linhas afetadas e abortam
-      // ANTES do INSERT, impedindo a criação de visitas duplicadas.
-      const { data: claimedRows, error: originalError } = await supabase
-        .from("scheduled_visits")
-        .update(originalUpdateData)
-        .eq("id", visitId)
-        .eq("status", "agendada")
-        .select("id");
-
-      if (originalError) {
-        console.error(
-          "Erro ao marcar visita original como reagendada:",
-          originalError,
-        );
-        throw originalError;
-      }
-
-      if (!claimedRows || claimedRows.length === 0) {
-        // Outra operação já reagendou esta visita nesse intervalo: não criar
-        // duplicata. O estado local será corrigido no próximo fetch.
-        throw new Error(
-          "Esta visita já foi reagendada por outra operação. Atualize a lista.",
-        );
-      }
-
-      // Agora, criar uma nova visita com a nova data
-      const newVisitData = {
-        collector_id: currentVisit.collectorId,
-        client_document: currentVisit.clientDocument,
-        client_name: currentVisit.clientName,
-        scheduled_date: newDate,
-        scheduled_time: newTime || null,
-        status: "agendada",
-        notes: `Visita reagendada de ${fromDateTime}${reason ? `. Motivo: ${reason}` : ""}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        reschedule_count: 0, // Nova visita começa com 0
-        rescheduled_from_id: visitId, // Vínculo rastreável com a visita de origem
-        scheduled_by_manager_id: currentVisit.scheduled_by_manager_id,
-        // Copiar dados do cliente
-        client_address: currentVisit.clientAddress,
-        client_number: currentVisit.clientNumber,
-        client_neighborhood: currentVisit.clientNeighborhood,
-        client_city: currentVisit.clientCity,
-        total_pending_value: currentVisit.totalPendingValue,
-        overdue_count: currentVisit.overdueCount,
-      };
-
-      const { data: newVisit, error: newVisitError } = await supabase
-        .from("scheduled_visits")
-        .insert(newVisitData)
-        .select()
+      // Checagem de conflito, UPDATE da original, INSERT da nova e o vínculo
+      // entre elas — tudo numa unica transacao no banco (RPC reagendar_visita,
+      // migration 20261030000003). Antes eram ate 4 chamadas separadas do
+      // navegador com reversao "best-effort" se uma falhasse no meio; 2.106
+      // visitas "reagendada" sem rescheduled_to_id em 2026-10-02 vieram dessa
+      // janela. SELECT ... FOR UPDATE dentro da funcao trava a linha, que
+      // cobre a mesma corrida que o UPDATE condicional cobria aqui.
+      const { data: newVisit, error: rpcError } = await supabase
+        .rpc("reagendar_visita", {
+          p_visit_id: visitId,
+          p_nova_data: newDate,
+          p_novo_horario: newTime || null,
+          p_motivo_chave: reason ?? null,
+          p_notas_original: updatedNotes,
+          p_notas_nova: newVisitNotes,
+        })
         .single();
 
-      if (newVisitError) {
-        console.error("Erro ao criar nova visita reagendada:", newVisitError);
-        // A original já foi marcada como "reagendada" no passo anterior. Como a
-        // nova visita não pôde ser criada, revertemos a original para
-        // "agendada" (best-effort) para não deixá-la órfã.
-        const { error: revertError } = await supabase
-          .from("scheduled_visits")
-          .update({
-            status: "agendada",
-            rescheduled_to: currentVisit.rescheduledTo ?? null,
-            reschedule_count: currentRescheduleCount,
-            notes: currentVisit.notes ?? null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", visitId);
-        if (revertError) {
-          console.error(
-            "Falha ao reverter visita original após erro no reagendamento:",
-            revertError,
-          );
-        }
-        throw newVisitError;
+      if (rpcError) {
+        console.error("Erro ao reagendar visita (RPC):", rpcError);
+        throw rpcError;
       }
-
-      // Fechar o vínculo rastreável: a visita original aponta para a nova por ID.
-      // (rescheduled_to continua preenchido com a data por compatibilidade.)
-      const { error: linkError } = await supabase
-        .from("scheduled_visits")
-        .update({ rescheduled_to_id: newVisit.id })
-        .eq("id", visitId);
-
-      if (linkError) {
-        // Não é crítico para o reagendamento em si; apenas registrar.
-        console.error("Erro ao vincular visita original à nova:", linkError);
+      if (!newVisit) {
+        throw new Error("Reagendamento não retornou a nova visita.");
       }
 
       // Atualizar estado local: marcar original como reagendada e adicionar nova

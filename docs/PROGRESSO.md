@@ -8,9 +8,9 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | # | Item | Gravidade | Esforço |
 |---|------|-----------|---------|
 | 1 | Segurança: RLS desligado + login em texto puro | **Crítica** | Grande, em etapas |
-| 1b | Desempenho credita pela atribuição atual — Fase 2 (telas) | **Alta** | Médio |
+| 1b | ~~Desempenho credita pela atribuição atual — Fase 2 (telas)~~ | Alta | Médio |
 | 1c | ~~Regras de "pendente/pago" divergentes (desconto, coluna `status`)~~ | Média | Pequeno/médio |
-| 2 | Reagendamento atômico (RPC) | Média | Pequeno/médio |
+| 2 | ~~Reagendamento atômico (RPC)~~ | Média | Pequeno/médio |
 | 3 | Trocar exclusão de visitas por cancelamento | Média | Pequeno |
 | 4 | Modelagem de `scheduled_visits` | Baixa/média | Médio, incremental |
 | 5 | Quebrar componentes gigantes | Baixa | Contínuo |
@@ -279,14 +279,38 @@ reorganização:**
 
 ### 2. Reagendamento atômico
 
-`rescheduleVisit` (`CollectionContext.tsx` ~3900–4130) faz 3 escritas separadas
-do navegador (marca a original como `reagendada` → insere a nova → grava
-`rescheduled_to_id`), com reversão "best-effort". Se cair no meio, a cadeia
-fica quebrada. Em 2026-10-02 havia **2.106 visitas `reagendada` sem
-`rescheduled_to_id`** — a maioria provavelmente anterior à migration
-`20260601000001_add_reschedule_link_ids` (não verificado).
-**Fazer:** uma função SQL (RPC) transacional, no padrão de
-`atribuir_clientes_em_lote`.
+~~`rescheduleVisit` (`CollectionContext.tsx` ~3900–4130) fazia 3+ escritas
+separadas do navegador (checa conflito → marca a original como `reagendada`
+com UPDATE condicional → insere a nova → grava `rescheduled_to_id`), com
+reversão "best-effort" se o INSERT falhasse depois do UPDATE. Se caísse no
+meio, a cadeia ficava quebrada. Em 2026-10-02 havia **2.106 visitas
+`reagendada` sem `rescheduled_to_id`** — a maioria provavelmente anterior à
+migration `20260601000001_add_reschedule_link_ids` (não verificado).~~
+
+**Corrigido em 2026-10-30** (migration `20261030000003`): função
+`reagendar_visita(p_visit_id, p_nova_data, p_novo_horario, p_motivo_chave,
+p_notas_original, p_notas_nova)` — `SELECT ... FOR UPDATE` trava a linha
+(substitui o UPDATE condicional que fazia esse papel no front), checa
+conflito de data, autorização (dono da visita ou gestor — repete a regra da
+policy `dono_ou_gestor`, já que `SECURITY DEFINER` contorna a RLS) e faz as
+3 escritas (UPDATE original + INSERT nova + vínculo) numa transação só.
+`rescheduleVisit` no front monta os textos das notas (igual a antes,
+`config/rescheduleReasons.ts` continua sendo a única fonte do rótulo do
+motivo) e só repassa pra função. Testado no banco em transação com
+`ROLLBACK` (nada gravado): reagendamento normal, tentativa de reagendar a
+mesma visita duas vezes (já "reagendada") e conflito de data — as 3
+situações se comportaram como esperado. `tsc -b` limpo; lint sem aumentar
+(`CollectionContext.tsx`: 18→18). Testado no `npm run dev` em 2026-10-30
+(usuário): reagendamento normal confirmado no banco (UPDATE da original +
+INSERT da nova + vínculo, tudo na mesma transação). O teste de "conflito"
+pela tela não é alcançável — `VisitScheduler.tsx` (`baseFilteredClients`)
+já esconde do modal de agendamento qualquer cliente com visita
+`status = "agendada"`, então nunca existem duas visitas ativas do mesmo
+cliente ao mesmo tempo para colidir; o checável na função é rede de
+segurança contra o índice único do banco (`uniq_active_visit_per_client_date`)
+e corridas diretas na API, só alcançável em transação manual (já validado
+antes do push). **Migration aplicada em produção (`db push` do usuário,
+2026-10-30, confirmada no banco via Management API).**
 
 ### 3. Exclusão de visitas
 

@@ -1035,6 +1035,17 @@ export type Database = {
         };
         Returns: undefined;
       };
+      reagendar_visita: {
+        Args: {
+          p_visit_id: string;
+          p_nova_data: string;
+          p_novo_horario?: string | null;
+          p_motivo_chave?: string | null;
+          p_notas_original?: string | null;
+          p_notas_nova?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["scheduled_visits"]["Row"][];
+      };
       remover_cobrador: { Args: { p_documento: string }; Returns: undefined };
       remover_cobrador_em_lote: {
         Args: {
