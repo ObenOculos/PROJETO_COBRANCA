@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { X, Save, AlertCircle, Plus, Trash2 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { hasInstallmentBalance } from "../../filters/clientStatus";
@@ -65,7 +65,6 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     new Set(titulosEmAberto.map((t) => t.collectionId)),
   );
   const [numeroParcelas, setNumeroParcelas] = useState(2);
-  const [parcelas, setParcelas] = useState<ParcelaDraft[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -77,25 +76,15 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     [titulosEmAberto, selecionados],
   );
 
-  const toggleTitulo = (collectionId: number) => {
-    setSelecionados((prev) => {
-      const next = new Set(prev);
-      if (next.has(collectionId)) next.delete(collectionId);
-      else next.add(collectionId);
-      return next;
-    });
-    setParcelas(null); // seleção mudou: recomeça o parcelamento
-  };
-
-  const gerarParcelas = () => {
-    if (numeroParcelas < 1) return;
-    const valorBase = Math.floor((saldoSelecionado / numeroParcelas) * 100) / 100;
+  const gerarParcelas = (saldo: number, n: number): ParcelaDraft[] => {
+    if (n < 1 || saldo <= 0) return [];
+    const valorBase = Math.floor((saldo / n) * 100) / 100;
     const draft: ParcelaDraft[] = [];
     let acumulado = 0;
-    for (let i = 1; i <= numeroParcelas; i++) {
-      const isLast = i === numeroParcelas;
+    for (let i = 1; i <= n; i++) {
+      const isLast = i === n;
       const valor = isLast
-        ? Math.round((saldoSelecionado - acumulado) * 100) / 100
+        ? Math.round((saldo - acumulado) * 100) / 100
         : valorBase;
       acumulado += valor;
       draft.push({
@@ -104,46 +93,78 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
         data: addDaysLocal(todayLocalStr(), 30 * i),
       });
     }
-    setParcelas(draft);
+    return draft;
+  };
+
+  // Parcelas sao geradas automaticamente a partir do saldo selecionado —
+  // sem botao manual. parcelasDirty marca que o usuario editou algo a mao;
+  // se a selecao de titulos ou o numero de parcelas mudar depois disso, as
+  // parcelas sao recalculadas (nunca ficam desatualizadas) mas avisamos em
+  // vez de descartar silenciosamente a edicao.
+  const [parcelas, setParcelas] = useState<ParcelaDraft[]>(() =>
+    gerarParcelas(saldoSelecionado, numeroParcelas),
+  );
+  const [parcelasDirty, setParcelasDirty] = useState(false);
+  const [recalcNotice, setRecalcNotice] = useState(false);
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setParcelas(gerarParcelas(saldoSelecionado, numeroParcelas));
+    setRecalcNotice(parcelasDirty);
+    setParcelasDirty(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saldoSelecionado, numeroParcelas]);
+
+  const toggleTitulo = (collectionId: number) => {
+    setSelecionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(collectionId)) next.delete(collectionId);
+      else next.add(collectionId);
+      return next;
+    });
   };
 
   const updateParcela = (index: number, field: "valor" | "data", value: string) => {
     setParcelas((prev) =>
-      prev
-        ? prev.map((p, i) => (i === index ? { ...p, [field]: value } : p))
-        : prev,
+      prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)),
     );
+    setParcelasDirty(true);
+    setRecalcNotice(false);
   };
 
   const removerParcela = (index: number) => {
     setParcelas((prev) =>
-      prev
-        ? prev
-            .filter((_, i) => i !== index)
-            .map((p, i) => ({ ...p, numero: i + 1 }))
-        : prev,
+      prev.filter((_, i) => i !== index).map((p, i) => ({ ...p, numero: i + 1 })),
     );
+    setParcelasDirty(true);
+    setRecalcNotice(false);
   };
 
   const adicionarParcela = () => {
     setParcelas((prev) => {
-      const base = prev ?? [];
-      const last = base[base.length - 1];
+      const last = prev[prev.length - 1];
       return [
-        ...base,
+        ...prev,
         {
-          numero: base.length + 1,
+          numero: prev.length + 1,
           valor: "0.00",
           data: last ? addDaysLocal(last.data, 30) : addDaysLocal(todayLocalStr(), 30),
         },
       ];
     });
+    setParcelasDirty(true);
+    setRecalcNotice(false);
   };
 
   const totalParcelas = useMemo(
-    () => (parcelas ?? []).reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0),
+    () => parcelas.reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0),
     [parcelas],
   );
+  const totalBate = Math.abs(totalParcelas - saldoSelecionado) <= 0.01;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,8 +174,8 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
       setError("Selecione ao menos um título.");
       return;
     }
-    if (!parcelas || parcelas.length === 0) {
-      setError("Gere ou monte ao menos uma parcela.");
+    if (parcelas.length === 0) {
+      setError("Monte ao menos uma parcela.");
       return;
     }
     for (const p of parcelas) {
@@ -162,6 +183,12 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
         setError("Toda parcela precisa de valor positivo e data.");
         return;
       }
+    }
+    if (!totalBate) {
+      setError(
+        `A soma das parcelas (${formatCurrency(totalParcelas)}) não bate com o saldo selecionado (${formatCurrency(saldoSelecionado)}). Ajuste os valores antes de continuar.`,
+      );
+      return;
     }
 
     setLoading(true);
@@ -256,30 +283,20 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
             </p>
           </div>
 
-          <div className="flex items-end gap-3">
-            <div className="flex-1 space-y-1.5">
-              <label className="text-xs font-bold text-gray-400">
-                Número de parcelas
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={numeroParcelas}
-                onChange={(e) => setNumeroParcelas(Number(e.target.value))}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none transition-all dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={gerarParcelas}
-              disabled={saldoSelecionado <= 0}
-              className="px-4 py-2.5 bg-indigo-50 text-indigo-600 font-bold rounded-xl hover:bg-indigo-100 transition-all disabled:opacity-50"
-            >
-              Gerar parcelas
-            </button>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-gray-400">
+              Número de parcelas
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={numeroParcelas}
+              onChange={(e) => setNumeroParcelas(Number(e.target.value))}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none transition-all dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+            />
           </div>
 
-          {parcelas && (
+          {parcelas.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-gray-400">
@@ -293,6 +310,11 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                   <Plus className="w-3 h-3" /> adicionar
                 </button>
               </div>
+              {recalcNotice && (
+                <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                  Seleção mudou — parcelas recalculadas, revise os valores.
+                </p>
+              )}
               <div className="space-y-2 max-h-56 overflow-y-auto minimal-scrollbar">
                 {parcelas.map((p, i) => (
                   <div key={i} className="flex items-center gap-2">
@@ -324,8 +346,11 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                   </div>
                 ))}
               </div>
-              <p className="text-sm text-right font-bold text-gray-900 dark:text-dark-text">
+              <p
+                className={`text-sm text-right font-bold ${totalBate ? "text-gray-900 dark:text-dark-text" : "text-red-600"}`}
+              >
                 Total combinado: {formatCurrency(totalParcelas)}
+                {!totalBate && " — não bate com o saldo selecionado"}
               </p>
             </div>
           )}
@@ -340,7 +365,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={loading || !parcelas || parcelas.length === 0}
+              disabled={loading || parcelas.length === 0}
               className="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
