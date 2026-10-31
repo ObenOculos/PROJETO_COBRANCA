@@ -94,7 +94,14 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   const [filterCity, setFilterCity] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [copiedDoc, setCopiedDoc] = useState<string | null>(null);
   const itemsPerPage = 10;
+
+  const copyDocument = (document: string) => {
+    navigator.clipboard.writeText(document);
+    setCopiedDoc(document);
+    setTimeout(() => setCopiedDoc((prev) => (prev === document ? null : prev)), 1500);
+  };
 
   const lastContacts = useMemo(() => {
     const map: Record<
@@ -516,7 +523,13 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                               e.stopPropagation();
                               handleWhatsApp(group, user, formatCurrency);
                             }}
-                            className="p-2 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white rounded-xl transition-all border border-green-100"
+                            disabled={!(group.mobile || group.phone)}
+                            title={
+                              group.mobile || group.phone
+                                ? "Chamar no WhatsApp"
+                                : "Cliente sem telefone"
+                            }
+                            className="p-2 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white rounded-xl transition-all border border-green-100 disabled:opacity-40 disabled:hover:bg-green-50 disabled:hover:text-green-600 disabled:cursor-not-allowed"
                           >
                             <Zap className="w-4 h-4 fill-current" />
                           </button>
@@ -532,10 +545,18 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigator.clipboard.writeText(group.document);
-                              alert("Copiado!");
+                              copyDocument(group.document);
                             }}
-                            className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all border border-indigo-100"
+                            title={
+                              copiedDoc === group.document
+                                ? "Copiado!"
+                                : "Copiar documento"
+                            }
+                            className={`p-2 rounded-xl transition-all border ${
+                              copiedDoc === group.document
+                                ? "bg-green-600 text-white border-green-600"
+                                : "bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border-indigo-100"
+                            }`}
                           >
                             <CheckCircle className="w-4 h-4" />
                           </button>
@@ -610,10 +631,10 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
 const handleWhatsApp = (client: any, user: any, formatCurrency: any) => {
   const phone = (client.mobile || client.phone || "").replace(/\D/g, "");
-  if (!phone) {
-    alert("Cliente sem telefone.");
-    return;
-  }
+  // Botao fica desabilitado quando o cliente nao tem telefone (ver render
+  // acima); chegar aqui sem numero so aconteceria por um onClick direto,
+  // entao so ignora em vez de interromper com um dialog nativo.
+  if (!phone) return;
   const message = encodeURIComponent(
     `Olá ${client.client}, sou o ${user?.name} do setor de cobrança. Gostaria de falar sobre sua pendência de ${formatCurrency(client.pendingValue)}. Podemos conversar?`,
   );
