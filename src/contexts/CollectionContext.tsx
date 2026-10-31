@@ -1437,6 +1437,22 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       (a) => a.clientDocument === clientDocument && a.status === "ativo",
     );
 
+  /** Acordo QUEBRADO mais recente do cliente, se houver — pode haver mais
+   * de um historicamente (renegociar apos quebra cria um acordo novo), por
+   * isso pega o mais recente por resolvedAt (quando a quebra foi marcada)
+   * ou createdAt como fallback. Leitura paralela a getAcordoAtivoDoCliente,
+   * nao reaproveita — statuses diferentes, nao e so trocar um filtro. */
+  const getAcordoQuebradoDoCliente = (
+    clientDocument: string,
+  ): Acordo | undefined =>
+    acordos
+      .filter((a) => a.clientDocument === clientDocument && a.status === "quebrado")
+      .sort(
+        (a, b) =>
+          new Date(b.resolvedAt ?? b.createdAt).getTime() -
+          new Date(a.resolvedAt ?? a.createdAt).getTime(),
+      )[0];
+
   const criarAcordo = async (params: {
     clientDocument: string;
     titulos: { collectionId: number; saldoNoMomento: number }[];
@@ -4347,6 +4363,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     acordos,
     fetchAcordos,
     getAcordoAtivoDoCliente,
+    getAcordoQuebradoDoCliente,
     criarAcordo,
     fetchAcordoDetalhe,
     registrarPagamentoAcordo,

@@ -380,6 +380,7 @@ export interface CollectionContextType {
   acordos: Acordo[];
   fetchAcordos: () => Promise<void>;
   getAcordoAtivoDoCliente: (clientDocument: string) => Acordo | undefined;
+  getAcordoQuebradoDoCliente: (clientDocument: string) => Acordo | undefined;
   criarAcordo: (params: {
     clientDocument: string;
     titulos: { collectionId: number; saldoNoMomento: number }[];

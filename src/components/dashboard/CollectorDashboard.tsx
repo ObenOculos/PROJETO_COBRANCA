@@ -46,6 +46,7 @@ import {
   clientMaxOverdueDays,
 } from "../../filters/clientStatus";
 import { priorityBucket, PRIORITY_COLOR_CLASSES } from "../../filters/priority";
+import { SEM_CONTATO_DIAS } from "../../config/collectionAttempts";
 
 import LogContactModal from "./LogContactModal";
 import ClientDetailModal from "./ClientDetailModal";
@@ -81,15 +82,6 @@ const INITIAL_CARD_IDS = [
   "clientsByCity",
 ];
 
-// Filtro "Status" da Fila de Atendimento -> CollectionAttempt["result"]
-// (ver STATUS_TO_ATTEMPT em LogContactModal.tsx, mesmo vocabulario).
-const FILTER_STATUS_TO_RESULT: Record<string, string> = {
-  promessa: "promise",
-  mensagem_enviada: "message_sent",
-  nao_atende: "no_answer",
-  recusou: "refusal",
-};
-
 // Busca em lotes porque .in() tem limite pratico de tamanho de URL/query.
 const chunk = <T,>(arr: T[], size: number): T[][] => {
   const out: T[][] = [];
@@ -116,11 +108,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   onOpenDetail,
   onOpenAcordo,
 }) => {
-  const { getAcordoAtivoDoCliente } = useCollection();
+  const { getAcordoAtivoDoCliente, getAcordoQuebradoDoCliente } = useCollection();
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterAging, setFilterAging] = useState("all");
   const [filterCity, setFilterCity] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [copiedDoc, setCopiedDoc] = useState<string | null>(null);
   const itemsPerPage = 10;
@@ -238,6 +228,10 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return Array.from(set).sort();
   }, [openClientGroups]);
 
+  // Busca + cidade, aplicadas antes de seccionar por urgencia (abaixo).
+  // Atraso/Status saíram daqui: Crítico agora é seção própria da agenda, e
+  // "Resto da carteira" (o que não caiu em nenhuma seção) fica só com
+  // busca + cidade, sem filtro extra.
   const filteredClientGroups = useMemo(() => {
     return openClientGroups.filter((group) => {
       const lowerSearch = searchTerm.toLowerCase();
@@ -247,42 +241,73 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           .filter(Boolean)
           .some((value) => value?.toLowerCase().includes(lowerSearch));
       if (!matchesSearch) return false;
-
-      if (filterAging !== "all") {
-        const maxAtraso = clientMaxOverdueDays(group);
-        if (priorityBucket(maxAtraso) !== filterAging) return false;
-      }
       if (filterCity !== "all" && group.city !== filterCity) return false;
-      if (filterStatus !== "all") {
-        const last = lastContacts[group.document];
-        if (filterStatus === "no_contact" && last) return false;
-        if (filterStatus !== "no_contact") {
-          if (!last || last.result !== FILTER_STATUS_TO_RESULT[filterStatus])
-            return false;
-        }
-      }
       return true;
     });
-  }, [
-    openClientGroups,
-    searchTerm,
-    filterAging,
-    filterCity,
-    filterStatus,
-    lastContacts,
-  ]);
+  }, [openClientGroups, searchTerm, filterCity]);
+
+  // Agenda priorizada: cada cliente cai em UMA só seção (a de maior
+  // precedencia), quem sobra vai pro "Resto da carteira". Ordem pensada
+  // pelo que é mais acionável agora: uma promessa vencendo ou um acordo
+  // quebrado é alguém esperando contato; atraso e silencio vêm depois.
+  const today = todayLocalStr();
+  const todayDate = new Date(today + "T00:00:00");
+  const { promessas, acordosQuebrados, criticos, semContato, resto } =
+    useMemo(() => {
+      const claimed = new Set<string>();
+      const promessas: ClientGroup[] = [];
+      const acordosQuebrados: ClientGroup[] = [];
+      const criticos: ClientGroup[] = [];
+      const semContato: ClientGroup[] = [];
+
+      const claim = (list: ClientGroup[], group: ClientGroup) => {
+        list.push(group);
+        claimed.add(group.document);
+      };
+
+      filteredClientGroups.forEach((group) => {
+        const nextActionDate = lastContacts[group.document]?.nextActionDate;
+        if (nextActionDate && nextActionDate <= today) claim(promessas, group);
+      });
+      filteredClientGroups.forEach((group) => {
+        if (claimed.has(group.document)) return;
+        if (getAcordoQuebradoDoCliente(group.document))
+          claim(acordosQuebrados, group);
+      });
+      filteredClientGroups.forEach((group) => {
+        if (claimed.has(group.document)) return;
+        if (priorityBucket(clientMaxOverdueDays(group)) === "critical")
+          claim(criticos, group);
+      });
+      filteredClientGroups.forEach((group) => {
+        if (claimed.has(group.document)) return;
+        const last = lastContacts[group.document];
+        const diasSemContato = last
+          ? Math.floor(
+              (todayDate.getTime() - last.date.getTime()) / 86400000,
+            )
+          : Infinity;
+        if (diasSemContato > SEM_CONTATO_DIAS) claim(semContato, group);
+      });
+
+      const resto = filteredClientGroups.filter(
+        (g) => !claimed.has(g.document),
+      );
+      return { promessas, acordosQuebrados, criticos, semContato, resto };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filteredClientGroups, lastContacts, getAcordoQuebradoDoCliente, today]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterAging, filterCity, filterStatus]);
+  }, [searchTerm, filterCity]);
 
-  const totalPages = Math.ceil(filteredClientGroups.length / itemsPerPage);
+  const totalPages = Math.ceil(resto.length / itemsPerPage);
   const paginatedClients = useMemo(() => {
-    return filteredClientGroups.slice(
+    return resto.slice(
       (currentPage - 1) * itemsPerPage,
       currentPage * itemsPerPage,
     );
-  }, [filteredClientGroups, currentPage]);
+  }, [resto, currentPage]);
 
   const stats = useMemo(() => {
     // Recebido de TODA a carteira atribuida, inclusive quem ja quitou: e o
@@ -437,37 +462,24 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         </div>
       </div>
 
-      <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-100 dark:border-dark-border space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h2 className="font-bold text-gray-900 dark:text-dark-text flex items-center gap-2">
-              <Rocket className="w-5 h-5 text-indigo-600" />
-              Fila de Atendimento
-            </h2>
+      <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <h2 className="font-bold text-gray-900 dark:text-dark-text flex items-center gap-2">
+            <Rocket className="w-5 h-5 text-indigo-600" />
+            Agenda
+          </h2>
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar cliente, CPF ou cidade..."
-              className="w-full sm:w-80 pl-4 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none text-sm dark:bg-dark-bg-secondary dark:border-dark-border"
+              className="w-full sm:w-72 pl-4 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none text-sm dark:bg-dark-bg-secondary dark:border-dark-border"
             />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <select
-              value={filterAging}
-              onChange={(e) => setFilterAging(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 text-xs font-medium focus:ring-2 focus:ring-indigo-100 outline-none dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-            >
-              <option value="all">Todos os Atrasos</option>
-              <option value="critical">Crítico (+90 dias)</option>
-              <option value="high">Alerta (60-90 dias)</option>
-              <option value="medium">Médio (30-60 dias)</option>
-              <option value="low">Em dia / Recente (0-30 dias)</option>
-            </select>
             <select
               value={filterCity}
               onChange={(e) => setFilterCity(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 text-xs font-medium focus:ring-2 focus:ring-indigo-100 outline-none dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+              className="px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 text-xs font-medium focus:ring-2 focus:ring-indigo-100 outline-none dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
             >
               <option value="all">Todas as Cidades</option>
               {cities.map((city) => (
@@ -476,19 +488,72 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                 </option>
               ))}
             </select>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 text-xs font-medium focus:ring-2 focus:ring-indigo-100 outline-none dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-            >
-              <option value="all">Todos os Status</option>
-              <option value="no_contact">Sem Contato Registrado</option>
-              <option value="promessa">Promessa de Pagamento</option>
-              <option value="mensagem_enviada">Mensagem Enviada</option>
-              <option value="nao_atende">Não Atende</option>
-              <option value="recusou">Recusou Pagar</option>
-            </select>
           </div>
+        </div>
+      </div>
+
+      <AgendaSection
+        title="Promessas vencendo hoje/atrasadas"
+        icon={<Clock className="w-4 h-4" />}
+        iconBgClass="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600"
+        groups={promessas}
+        lastContacts={lastContacts}
+        getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
+        copiedDoc={copiedDoc}
+        copyDocument={copyDocument}
+        user={user}
+        onOpenDetail={onOpenDetail}
+        onOpenLog={onOpenLog}
+        onOpenAcordo={onOpenAcordo}
+      />
+      <AgendaSection
+        title="Acordo quebrado"
+        icon={<AlertCircle className="w-4 h-4" />}
+        iconBgClass="bg-red-100 dark:bg-red-900/30 text-red-600"
+        groups={acordosQuebrados}
+        lastContacts={lastContacts}
+        getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
+        copiedDoc={copiedDoc}
+        copyDocument={copyDocument}
+        user={user}
+        onOpenDetail={onOpenDetail}
+        onOpenLog={onOpenLog}
+        onOpenAcordo={onOpenAcordo}
+      />
+      <AgendaSection
+        title="Crítico (90+ dias sem pagar)"
+        icon={<Flame className="w-4 h-4" />}
+        iconBgClass="bg-orange-100 dark:bg-orange-900/30 text-orange-600"
+        groups={criticos}
+        lastContacts={lastContacts}
+        getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
+        copiedDoc={copiedDoc}
+        copyDocument={copyDocument}
+        user={user}
+        onOpenDetail={onOpenDetail}
+        onOpenLog={onOpenLog}
+        onOpenAcordo={onOpenAcordo}
+      />
+      <AgendaSection
+        title={`Sem contato há mais de ${SEM_CONTATO_DIAS} dias`}
+        icon={<CalendarDays className="w-4 h-4" />}
+        iconBgClass="bg-gray-100 dark:bg-dark-bg-secondary text-gray-500"
+        groups={semContato}
+        lastContacts={lastContacts}
+        getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
+        copiedDoc={copiedDoc}
+        copyDocument={copyDocument}
+        user={user}
+        onOpenDetail={onOpenDetail}
+        onOpenLog={onOpenLog}
+        onOpenAcordo={onOpenAcordo}
+      />
+
+      <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-100 dark:border-dark-border">
+          <h3 className="font-bold text-gray-900 dark:text-dark-text">
+            Resto da carteira
+          </h3>
         </div>
 
         <div className="overflow-x-auto">
@@ -535,8 +600,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         {totalPages > 1 && (
           <div className="p-4 border-t border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50/30 dark:bg-dark-bg-secondary/30">
             <p className="text-xs text-gray-500">
-              Mostrando {paginatedClients.length} de{" "}
-              {filteredClientGroups.length}
+              Mostrando {paginatedClients.length} de {resto.length}
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -715,6 +779,90 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
         </div>
       </td>
     </tr>
+  );
+};
+
+const AGENDA_PREVIEW_COUNT = 5;
+
+interface AgendaSectionProps {
+  title: string;
+  icon: React.ReactNode;
+  iconBgClass: string;
+  groups: ClientGroup[];
+  lastContacts: Record<
+    string,
+    { note: string; date: Date; result: string; nextActionDate: string | null }
+  >;
+  getAcordoAtivoDoCliente: (clientDocument: string) => unknown;
+  copiedDoc: string | null;
+  copyDocument: (document: string) => void;
+  user: User | null;
+  onOpenDetail: (client: ClientGroup) => void;
+  onOpenLog: (client: ClientGroup) => void;
+  onOpenAcordo: (client: ClientGroup) => void;
+}
+
+// Bloco de uma seção da agenda priorizada: cabeçalho com ícone/contagem,
+// até AGENDA_PREVIEW_COUNT linhas visíveis + "ver mais". Não renderiza nada
+// se a seção estiver vazia (evita card vazio poluindo a tela).
+const AgendaSection: React.FC<AgendaSectionProps> = ({
+  title,
+  icon,
+  iconBgClass,
+  groups,
+  lastContacts,
+  getAcordoAtivoDoCliente,
+  copiedDoc,
+  copyDocument,
+  user,
+  onOpenDetail,
+  onOpenLog,
+  onOpenAcordo,
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  if (groups.length === 0) return null;
+  const visible = expanded ? groups : groups.slice(0, AGENDA_PREVIEW_COUNT);
+
+  return (
+    <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden">
+      <div className="p-4 border-b border-gray-100 dark:border-dark-border flex items-center gap-3">
+        <div className={`p-2 rounded-lg ${iconBgClass}`}>{icon}</div>
+        <h3 className="font-bold text-gray-900 dark:text-dark-text">{title}</h3>
+        <span className="ml-auto px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text-secondary">
+          {groups.length}
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
+            {visible.map((group) => (
+              <ClientQueueRow
+                key={group.clientId}
+                group={group}
+                lastContact={lastContacts[group.document]}
+                acordoAtivo={!!getAcordoAtivoDoCliente(group.document)}
+                copiedDoc={copiedDoc}
+                copyDocument={copyDocument}
+                user={user}
+                onOpenDetail={onOpenDetail}
+                onOpenLog={onOpenLog}
+                onOpenAcordo={onOpenAcordo}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {groups.length > AGENDA_PREVIEW_COUNT && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="w-full py-2.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-dark-bg-secondary transition-colors"
+        >
+          {expanded
+            ? "Ver menos"
+            : `Ver mais (${groups.length - AGENDA_PREVIEW_COUNT})`}
+        </button>
+      )}
+    </div>
   );
 };
 
