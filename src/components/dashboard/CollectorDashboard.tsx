@@ -137,7 +137,15 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // nao carrega collection_attempts globalmente, so sob demanda por titulo
   // (CollectionModal).
   const [attemptsByCollection, setAttemptsByCollection] = useState<
-    Record<string, { date: string; result: string; notes: string | null }>
+    Record<
+      string,
+      {
+        date: string;
+        result: string;
+        notes: string | null;
+        nextActionDate: string | null;
+      }
+    >
   >({});
 
   useEffect(() => {
@@ -157,12 +165,17 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     (async () => {
       const map: Record<
         string,
-        { date: string; result: string; notes: string | null }
+        {
+          date: string;
+          result: string;
+          notes: string | null;
+          nextActionDate: string | null;
+        }
       > = {};
       for (const batch of chunk(ids, 300)) {
         const { data, error } = await supabase
           .from("collection_attempts")
-          .select("collection_id, date, result, notes, created_at")
+          .select("collection_id, date, result, notes, next_action_date, created_at")
           .in("collection_id", batch)
           .order("created_at", { ascending: false });
         if (error) {
@@ -175,6 +188,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               date: row.date,
               result: row.result,
               notes: row.notes,
+              nextActionDate: row.next_action_date,
             };
           }
         });
@@ -187,8 +201,10 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   }, [myCollections]);
 
   const lastContacts = useMemo(() => {
-    const map: Record<string, { note: string; date: Date; result: string }> =
-      {};
+    const map: Record<
+      string,
+      { note: string; date: Date; result: string; nextActionDate: string | null }
+    > = {};
     (myCollections || []).forEach((c) => {
       if (!c.documento || !c.id_parcela) return;
       const attempt = attemptsByCollection[c.id_parcela.toString()];
@@ -200,6 +216,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           note: attempt.notes || "",
           date,
           result: attempt.result,
+          nextActionDate: attempt.nextActionDate,
         };
       }
     });
