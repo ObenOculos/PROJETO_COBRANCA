@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { supabase } from "../../lib/supabase";
 import AddressHistoryViewer from "./AddressHistoryViewer";
 import ClientHistoryViewer from "./ClientHistoryViewer";
 import {
@@ -27,6 +28,10 @@ import {
   rescheduleReasonLabel,
 } from "../../config/rescheduleReasons";
 import { isCancelado } from "../../types/status";
+import {
+  ATTEMPT_TYPE_LABELS,
+  ATTEMPT_RESULT_LABELS,
+} from "../../config/collectionAttempts";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useClientBirthDate } from "../../hooks/useClientBirthDate";
 import { useAuth } from "../../contexts/AuthContext";
@@ -232,6 +237,74 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     );
     return clientesReincidentes(doCliente, 2, reincidenciaResets)[0] ?? null;
   }, [clientGroup.document, scheduledVisits, reincidenciaResets]);
+
+  // Histórico completo de collection_attempts do cliente (ligação/WhatsApp/
+  // mensagem registrados por LogContactModal ou CollectionModal), em TODOS
+  // os títulos dele -- não só os em aberto (diferente do attemptsByCollection
+  // da agenda do cobrador, que só olha título pendente). Nunca existiu uma
+  // visão agregada disso antes; a aba "Tentativas" do CollectionModal só
+  // mostra um título por vez.
+  interface ContactAttemptRow {
+    id: string;
+    saleDescription: string;
+    date: string;
+    type: string;
+    result: string;
+    notes: string | null;
+    nextAction: string | null;
+    nextActionDate: string | null;
+  }
+  const [contactAttempts, setContactAttempts] = useState<ContactAttemptRow[]>(
+    [],
+  );
+
+  useEffect(() => {
+    const idToSale = new Map<string, string>();
+    clientGroup.sales?.forEach((sale) => {
+      sale.installments?.forEach((inst) => {
+        idToSale.set(
+          inst.id_parcela.toString(),
+          sale.description || `Venda ${sale.titleNumber}`,
+        );
+      });
+    });
+    const ids = Array.from(idToSale.keys());
+    if (ids.length === 0) {
+      setContactAttempts([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("collection_attempts")
+        .select(
+          "id, collection_id, date, type, result, notes, next_action, next_action_date, created_at",
+        )
+        .in("collection_id", ids)
+        .order("created_at", { ascending: false });
+      if (cancelled) return;
+      if (error) {
+        console.error("Erro ao buscar histórico de contatos do cliente:", error);
+        return;
+      }
+      setContactAttempts(
+        (data || []).map((row) => ({
+          id: row.id,
+          saleDescription: idToSale.get(row.collection_id) ?? "Título",
+          date: row.date,
+          type: row.type,
+          result: row.result,
+          notes: row.notes,
+          nextAction: row.next_action,
+          nextActionDate: row.next_action_date,
+        })),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientGroup.document]);
 
   const [isGeneralPaymentModalOpen, setIsGeneralPaymentModalOpen] =
     useState(false);
@@ -868,6 +941,60 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       ))}
                     </ol>
                   </div>
+                </div>
+              )}
+
+              {/* Histórico de Contatos (collection_attempts) -- ligação,
+                  WhatsApp, mensagem registrados pelo cobrador de carteira.
+                  Visualmente distinto do bloco de visitas abaixo, que é do
+                  cobrador externo (scheduled_visits). */}
+              {contactAttempts.length > 0 && (
+                <div className="mt-8 space-y-4 lg:col-span-2">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <MessageCircle className="h-5 w-5 mr-2 text-indigo-600" />
+                    Histórico de Contatos
+                  </h3>
+                  <ul className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                    {contactAttempts.map((attempt) => (
+                      <li
+                        key={attempt.id}
+                        className="bg-gray-50 p-4 rounded-2xl border border-gray-200"
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-800">
+                            <History className="w-4 h-4 text-indigo-500" />
+                            {ATTEMPT_TYPE_LABELS[
+                              attempt.type as keyof typeof ATTEMPT_TYPE_LABELS
+                            ] ?? attempt.type}
+                          </span>
+                          <span className="text-[10px] text-gray-400">
+                            {formatDate(attempt.date)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 mb-1">
+                          {attempt.saleDescription}
+                        </p>
+                        <p className="text-xs font-semibold text-gray-600 mb-1">
+                          {ATTEMPT_RESULT_LABELS[
+                            attempt.result as keyof typeof ATTEMPT_RESULT_LABELS
+                          ] ?? attempt.result}
+                        </p>
+                        {attempt.notes && (
+                          <p className="text-xs text-gray-500 whitespace-pre-wrap">
+                            {attempt.notes}
+                          </p>
+                        )}
+                        {attempt.nextAction && (
+                          <p className="text-[11px] text-gray-400 mt-2">
+                            Próxima ação: {attempt.nextAction}
+                            {attempt.nextActionDate
+                              ? ` (${formatDate(attempt.nextActionDate)})`
+                              : ""}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
 
