@@ -46,6 +46,8 @@ const ATTEMPT_RESULT_LABELS: Record<CollectionAttempt["result"], string> = {
   refusal: "Recusa",
   partial_payment: "Pagamento parcial",
   full_payment: "Pagamento integral",
+  contact_made: "Contato realizado",
+  message_sent: "Mensagem enviada",
 };
 
 const CollectionModal: React.FC<CollectionModalProps> = ({

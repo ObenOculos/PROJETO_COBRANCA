@@ -192,7 +192,9 @@ export interface CollectionAttempt {
     | "promise"
     | "refusal"
     | "partial_payment"
-    | "full_payment";
+    | "full_payment"
+    | "contact_made"
+    | "message_sent";
   notes?: string;
   nextAction?: string;
   nextActionDate?: string;

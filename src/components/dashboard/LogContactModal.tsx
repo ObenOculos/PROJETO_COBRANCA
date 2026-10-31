@@ -1,15 +1,34 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { X, Save, Calendar, MessageSquare, AlertCircle } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCollection } from "../../contexts/CollectionContext";
 import { todayLocalStr } from "../../config/visitStatus";
+import { hasInstallmentBalance } from "../../filters/clientStatus";
+import { ClientGroup, CollectionAttempt } from "../../types";
 
 interface LogContactModalProps {
-  client: any;
+  client: ClientGroup;
   onClose: () => void;
   onSuccess: () => void;
 }
+
+// Motivo do contato -> tipo/resultado de collection_attempts. "Contato
+// realizado" e "mensagem enviada" nao existiam no vocabulario original
+// (criado pro CollectionModal, que so cobre ligacao/visita de titulo
+// unico); estendidos em types/index.ts (CollectionAttempt) e no
+// ATTEMPT_RESULT_LABELS do CollectionModal.
+const STATUS_TO_ATTEMPT: Record<
+  string,
+  { type: CollectionAttempt["type"]; result: CollectionAttempt["result"] }
+> = {
+  promessa_pagamento: { type: "call", result: "promise" },
+  contato_realizado: { type: "call", result: "contact_made" },
+  nao_atende: { type: "call", result: "no_answer" },
+  telefone_errado: { type: "call", result: "not_found" },
+  recusou_pagar: { type: "call", result: "refusal" },
+  mensagem_enviada: { type: "whatsapp", result: "message_sent" },
+};
 
 const LogContactModal: React.FC<LogContactModalProps> = ({
   client,
@@ -23,6 +42,20 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   const [notes, setNotes] = useState("");
   const [promiseDate, setPromiseDate] = useState("");
   const [error, setError] = useState("");
+
+  // Um contato de carteira fala da divida do cliente como um todo, mas
+  // collection_attempts e por titulo (collection_id) -- e assim que a aba
+  // "Tentativas" de cada titulo no CollectionModal ja funciona. Grava uma
+  // linha identica em cada titulo em aberto pra aparecer em todos eles.
+  const titulosEmAberto = useMemo(() => {
+    const ids: number[] = [];
+    client?.sales?.forEach((sale) => {
+      sale.installments?.forEach((inst) => {
+        if (hasInstallmentBalance(inst)) ids.push(inst.id_parcela);
+      });
+    });
+    return ids;
+  }, [client]);
 
   if (!client) return null;
 
@@ -38,39 +71,41 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
       return;
     }
 
+    if (titulosEmAberto.length === 0) {
+      setError("Este cliente não tem título em aberto para registrar o contato.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
-      const finalNotes =
-        status === "promessa_pagamento" && promiseDate
-          ? `[PROMESSA PARA ${new Date(promiseDate).toLocaleDateString("pt-BR")}] - ${notes}`
-          : `[${status.replace("_", " ").toUpperCase()}] - ${notes}`;
+      const { type, result } = STATUS_TO_ATTEMPT[status];
+      const date = todayLocalStr();
+      const rows = titulosEmAberto.map((collectionId) => ({
+        collection_id: collectionId.toString(),
+        date,
+        type,
+        result,
+        notes,
+        next_action:
+          status === "promessa_pagamento" ? "Promessa de pagamento" : null,
+        next_action_date:
+          status === "promessa_pagamento" && promiseDate ? promiseDate : null,
+      }));
 
       const { error: insertError } = await supabase
-        .from("scheduled_visits")
-        .insert([
-          {
-            collector_id: user.id,
-            client_document: client.document,
-            client_name: client.client,
-            scheduled_date: todayLocalStr(),
-            status: "realizada", // Marcamos como realizada para entrar no histórico
-            notes: finalNotes,
-            client_address: client.address || "",
-            client_city: client.city || "",
-            total_pending_value: client.pendingValue,
-            data_visita_realizada: todayLocalStr(),
-          },
-        ]);
+        .from("collection_attempts")
+        .insert(rows);
 
       if (insertError) throw insertError;
 
       await refreshCollections();
       onSuccess();
-    } catch (err: any) {
+    } catch (err) {
       console.error("Erro ao registrar contato:", err);
-      setError("Falha ao salvar contato: " + err.message);
+      const message = err instanceof Error ? err.message : String(err);
+      setError("Falha ao salvar contato: " + message);
     } finally {
       setLoading(false);
     }
