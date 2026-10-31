@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { supabase } from "../../lib/supabase";
 import { USER_TYPE_LABELS } from "../../config/profiles";
 import {
   Target,
@@ -78,9 +79,24 @@ const INITIAL_CARD_IDS = [
   "clientsByCity",
 ];
 
+// Filtro "Status" da Fila de Atendimento -> CollectionAttempt["result"]
+// (ver STATUS_TO_ATTEMPT em LogContactModal.tsx, mesmo vocabulario).
+const FILTER_STATUS_TO_RESULT: Record<string, string> = {
+  promessa: "promise",
+  mensagem_enviada: "message_sent",
+  nao_atende: "no_answer",
+  recusou: "refusal",
+};
+
+// Busca em lotes porque .in() tem limite pratico de tamanho de URL/query.
+const chunk = <T,>(arr: T[], size: number): T[][] => {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+};
+
 interface InternalCollectorWalletProps {
   clientGroups: any[];
-  myVisits: any[];
   user: any;
   monthlyGoals: any[];
   myCollections: any[];
@@ -91,7 +107,6 @@ interface InternalCollectorWalletProps {
 
 const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   clientGroups,
-  myVisits,
   user,
   monthlyGoals,
   myCollections,
@@ -114,30 +129,80 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     setTimeout(() => setCopiedDoc((prev) => (prev === document ? null : prev)), 1500);
   };
 
-  const lastContacts = useMemo(() => {
-    const map: Record<
-      string,
-      { note: string; date: Date; status: string; rawStatus: string }
-    > = {};
-    myVisits.forEach((v) => {
-      if (v.status === "realizada" && v.notes && v.clientDocument) {
-        const date = new Date(
-          v.dataVisitaRealizada || v.updatedAt || v.createdAt,
-        );
-        const current = map[v.clientDocument];
-        if (!current || date > current.date) {
-          const statusMatch = v.notes.match(/^\[(.*?)\]/);
-          map[v.clientDocument] = {
-            note: v.notes,
-            date: date,
-            status: v.status,
-            rawStatus: statusMatch ? statusMatch[1].toLowerCase() : "outros",
-          };
+  // Ultimo contato registrado por cliente (collection_attempts, ver
+  // LogContactModal.tsx). Antes lia de scheduled_visits (visita falsa com
+  // status "realizada") -- buscado a parte aqui porque o CollectionContext
+  // nao carrega collection_attempts globalmente, so sob demanda por titulo
+  // (CollectionModal).
+  const [attemptsByCollection, setAttemptsByCollection] = useState<
+    Record<string, { date: string; result: string; notes: string | null }>
+  >({});
+
+  useEffect(() => {
+    const ids = Array.from(
+      new Set(
+        (myCollections || [])
+          .filter((c) => hasInstallmentBalance(c))
+          .map((c) => c.id_parcela?.toString())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    if (ids.length === 0) {
+      setAttemptsByCollection({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const map: Record<
+        string,
+        { date: string; result: string; notes: string | null }
+      > = {};
+      for (const batch of chunk(ids, 300)) {
+        const { data, error } = await supabase
+          .from("collection_attempts")
+          .select("collection_id, date, result, notes, created_at")
+          .in("collection_id", batch)
+          .order("created_at", { ascending: false });
+        if (error) {
+          console.error("Erro ao buscar últimos contatos da carteira:", error);
+          continue;
         }
+        (data || []).forEach((row) => {
+          if (!map[row.collection_id]) {
+            map[row.collection_id] = {
+              date: row.date,
+              result: row.result,
+              notes: row.notes,
+            };
+          }
+        });
+      }
+      if (!cancelled) setAttemptsByCollection(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [myCollections]);
+
+  const lastContacts = useMemo(() => {
+    const map: Record<string, { note: string; date: Date; result: string }> =
+      {};
+    (myCollections || []).forEach((c) => {
+      if (!c.documento || !c.id_parcela) return;
+      const attempt = attemptsByCollection[c.id_parcela.toString()];
+      if (!attempt) return;
+      const date = new Date(attempt.date + "T00:00:00");
+      const current = map[c.documento];
+      if (!current || date > current.date) {
+        map[c.documento] = {
+          note: attempt.notes || "",
+          date,
+          result: attempt.result,
+        };
       }
     });
     return map;
-  }, [myVisits]);
+  }, [myCollections, attemptsByCollection]);
 
   // Lista de trabalho: so quem ainda deve. Quem quitou segue atribuido e conta
   // no recebido (meta), mas sai da carteira.
@@ -188,7 +253,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         const last = lastContacts[group.document];
         if (filterStatus === "no_contact" && last) return false;
         if (filterStatus !== "no_contact") {
-          if (!last || !last.rawStatus.includes(filterStatus.replace("_", " ")))
+          if (!last || last.result !== FILTER_STATUS_TO_RESULT[filterStatus])
             return false;
         }
       }
@@ -1462,7 +1527,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     const renderInternalWallet = () => (
       <InternalCollectorWallet
         clientGroups={clientGroups}
-        myVisits={myVisits}
         user={user}
         monthlyGoals={monthlyGoals}
         myCollections={myCollections}
