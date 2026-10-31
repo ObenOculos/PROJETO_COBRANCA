@@ -24,6 +24,8 @@ import {
   ChevronUp,
   Settings,
   Handshake,
+  Copy,
+  Check,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
@@ -462,8 +464,30 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                           <span className="font-bold text-gray-900 dark:text-dark-text group-hover:text-indigo-600 transition-colors">
                             {group.client}
                           </span>
-                          <span className="text-xs text-gray-400">
+                          <span className="flex items-center gap-1 text-xs text-gray-400">
                             {group.document}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyDocument(group.document);
+                              }}
+                              title={
+                                copiedDoc === group.document
+                                  ? "Copiado!"
+                                  : "Copiar documento"
+                              }
+                              className={`p-0.5 rounded transition-colors ${
+                                copiedDoc === group.document
+                                  ? "text-green-600"
+                                  : "text-gray-300 hover:text-indigo-600"
+                              }`}
+                            >
+                              {copiedDoc === group.document ? (
+                                <Check className="w-3 h-3" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
                           </span>
                           {getAcordoAtivoDoCliente(group.document) && (
                             <span className="w-fit px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
@@ -541,24 +565,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                             className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100"
                           >
                             <MessageSquare className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              copyDocument(group.document);
-                            }}
-                            title={
-                              copiedDoc === group.document
-                                ? "Copiado!"
-                                : "Copiar documento"
-                            }
-                            className={`p-2 rounded-xl transition-all border ${
-                              copiedDoc === group.document
-                                ? "bg-green-600 text-white border-green-600"
-                                : "bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border-indigo-100"
-                            }`}
-                          >
-                            <CheckCircle className="w-4 h-4" />
                           </button>
                           <button
                             onClick={(e) => {
