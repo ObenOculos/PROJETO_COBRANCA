@@ -728,13 +728,52 @@ do cobrador selecionado (`SITUACAO_BY_PROFILE`), em vez de todas —
 minimiza erro de atribuir um status fora do domínio do cobrador de
 destino.
 
-**Achado, não corrigido:** `AcordoModal.tsx` mostra "venc. Invalid Date"
-pra títulos de alguns clientes (reproduzido com um cliente real) — bug de
-exibição, não bloqueou a criação do acordo, mas precisa de correção.
+**Achado e corrigido em 2026-10-31 (ver seção "Pendências do acordo
+fechadas" abaixo):** `AcordoModal.tsx` mostrava "venc. Invalid Date" pra
+títulos de alguns clientes.
 
-**Ainda pendente:** decidir se/quando corrigir `LogContactModal` (achado
-acima, registra contato como visita falsa em vez de usar
-`collection_attempts`) — segue intacto, fora do escopo desta sessão.
+**`LogContactModal` corrigido** (ver seção abaixo) — não grava mais
+visita falsa.
+
+**Pendências do acordo fechadas em 2026-10-31 (commits `6dc5b83`/
+`d4a94be`/`589da98`, `tsc -b` limpo em cada etapa, lint sem aumentar a
+contagem):**
+
+1. **`database.types.ts` regenerado** contra o schema real (nunca tinha
+   sido desde que foi escrito à mão). Revelou 2 problemas no arquivo
+   manual: `recebimentos_historico.origem` estava com union literal
+   inventado (`"app" | "erp_ou_manual" | "foto_inicial"`) quando a coluna
+   real é `text` livre — `ClientHistoryViewer.tsx` ganhou fallback pra
+   valor fora dos 3 conhecidos; e vários parâmetros opcionais de RPC
+   (`reagendar_visita`, `registrar_pagamento_acordo`) são `string |
+   undefined`, não `string | null` — `CollectionContext.tsx` ajustado.
+   De quebra, `cancelarVendas`/`cancelarClientes` ganharam guarda de
+   usuário autenticado antes do RPC (`p_usuario_id` é obrigatório, sem
+   default — antes passava `user?.id` possivelmente `undefined`).
+2. **"venc. Invalid Date" no `AcordoModal.tsx` corrigido.**
+   `data_vencimento` é `text` livre em `BANCO_DADOS` (~29% das linhas em
+   `DD/MM/YYYY`, resto `YYYY-MM-DD` — comentário em
+   `CollectorsSummary.tsx`); o modal fazia `new Date(vencimento +
+   "T00:00:00")`, que só funciona pro formato ISO. Trocado pelo
+   `formatDate()` de `utils/formatters`, já usado em todo o resto do app
+   pra essa mesma coluna.
+3. **`LogContactModal.tsx` ("Registrar Interação") não grava mais visita
+   falsa em `scheduled_visits`.** Passa a inserir em
+   `collection_attempts` — uma linha por título em aberto do cliente
+   (mesma lista que `AcordoModal` usa via `hasInstallmentBalance`),
+   bloqueando com aviso se não houver título aberto; é assim que a aba
+   "Tentativas" de cada título no `CollectionModal` já funciona (decisão
+   confirmada com o usuário: o contato precisa aparecer em todos os
+   títulos pendentes, não só no mais antigo). `CollectionAttempt["result"]`
+   (`types/index.ts`) ganhou `contact_made`/`message_sent` pros 2 motivos
+   do modal que não existiam no vocabulário original (criado pro
+   `CollectionModal`, que só cobre ligação/visita de título único) —
+   `ATTEMPT_RESULT_LABELS` do `CollectionModal` atualizado junto.
+
+**Ainda pendente:** `database.types.ts` precisa virar passo de rotina
+depois de migration nova (não há script/CI que force isso — ficou 1 mês
+desalinhado sem ninguém notar porque só gera erro de tipo quando a coluna
+realmente diverge do que foi escrito à mão).
 
 **Polimento de UI na carteira do cobrador, feedback do usuário depois do
 teste (commits `0150444`/`d7cf137`/`34a53a1`, `tsc -b`/lint sem aumentar
