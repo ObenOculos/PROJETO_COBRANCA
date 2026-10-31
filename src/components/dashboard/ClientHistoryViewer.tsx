@@ -250,7 +250,10 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
         icon: <Camera className="h-4 w-4 text-gray-500" />,
         titulo: "Recebido até o início do histórico",
       },
-    }[ev.origem];
+    }[ev.origem] ?? {
+      icon: <History className="h-4 w-4 text-gray-400" />,
+      titulo: `Origem desconhecida (${ev.origem})`,
+    };
 
     const valores = [
       recebido !== 0 &&

@@ -1555,7 +1555,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         p_acordo_parcela_id: params.acordoParcelaId,
         p_valor_pago: params.valorPago,
         p_data_pagamento: params.dataPagamento,
-        p_notes: params.notes ?? null,
+        p_notes: params.notes,
       })
       .single();
 
@@ -1685,13 +1685,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     if (!isOnline) {
       throw new Error("Não é possível cancelar vendas offline.");
     }
+    if (!user?.id) {
+      throw new Error("Usuário não autenticado.");
+    }
     if (saleNumbers.length === 0) return;
     setGlobalLoading(true, `Cancelando ${saleNumbers.length} venda(s)...`);
     try {
       const { error } = await supabase.rpc("cancelar_vendas", {
         p_documento: clientDocument,
         p_motivo: motivo,
-        p_usuario_id: user?.id,
+        p_usuario_id: user.id,
         p_chaves: saleNumbers,
       });
       if (error) throw new Error(`Erro ao cancelar vendas: ${error.message}`);
@@ -1713,6 +1716,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     if (!isOnline) {
       throw new Error("Não é possível cancelar clientes offline.");
     }
+    if (!user?.id) {
+      throw new Error("Usuário não autenticado.");
+    }
     if (clientDocuments.length === 0) return;
     setGlobalLoading(
       true,
@@ -1722,7 +1728,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const { error } = await supabase.rpc("cancelar_clientes", {
         p_documentos: clientDocuments,
         p_motivo: motivo,
-        p_usuario_id: user?.id,
+        p_usuario_id: user.id,
       });
       if (error) throw new Error(`Erro ao cancelar clientes: ${error.message}`);
       await refreshData();
@@ -4236,8 +4242,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         .rpc("reagendar_visita", {
           p_visit_id: visitId,
           p_nova_data: newDate,
-          p_novo_horario: newTime || null,
-          p_motivo_chave: reason ?? null,
+          p_novo_horario: newTime || undefined,
+          p_motivo_chave: reason ?? undefined,
           p_notas_original: updatedNotes,
           p_notas_nova: newVisitNotes,
         })

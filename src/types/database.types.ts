@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)";
+    PostgrestVersion: "12.2.3";
   };
   graphql_public: {
     Tables: {
@@ -39,140 +39,235 @@ export type Database = {
   };
   public: {
     Tables: {
-      acordos: {
+      acordo_pagamentos: {
         Row: {
-          id: string;
-          client_document: string;
-          client_name: string | null;
-          collector_id: string;
-          valor_negociado: number;
-          numero_parcelas: number;
-          status: string;
-          motivo_cancelamento: string | null;
-          acordo_origem_id: string | null;
-          created_by_id: string | null;
+          acordo_parcela_id: string;
+          collector_id: string | null;
           created_at: string;
-          resolved_at: string | null;
+          data_pagamento: string;
+          estorno_de: string | null;
+          id: string;
+          motivo: string | null;
+          notes: string | null;
+          registrado_por_id: string | null;
+          valor_pago: number;
         };
         Insert: {
-          id?: string;
-          client_document: string;
-          client_name?: string | null;
-          collector_id: string;
-          valor_negociado: number;
-          numero_parcelas: number;
-          status?: string;
-          motivo_cancelamento?: string | null;
-          acordo_origem_id?: string | null;
-          created_by_id?: string | null;
+          acordo_parcela_id: string;
+          collector_id?: string | null;
           created_at?: string;
-          resolved_at?: string | null;
+          data_pagamento: string;
+          estorno_de?: string | null;
+          id?: string;
+          motivo?: string | null;
+          notes?: string | null;
+          registrado_por_id?: string | null;
+          valor_pago: number;
         };
         Update: {
-          id?: string;
-          client_document?: string;
-          client_name?: string | null;
-          collector_id?: string;
-          valor_negociado?: number;
-          numero_parcelas?: number;
-          status?: string;
-          motivo_cancelamento?: string | null;
-          acordo_origem_id?: string | null;
-          created_by_id?: string | null;
+          acordo_parcela_id?: string;
+          collector_id?: string | null;
           created_at?: string;
-          resolved_at?: string | null;
-        };
-        Relationships: [];
-      };
-      acordo_titulos: {
-        Row: {
-          id: string;
-          acordo_id: string;
-          collection_id: number;
-          saldo_no_momento: number;
-          created_at: string;
-        };
-        Insert: {
+          data_pagamento?: string;
+          estorno_de?: string | null;
           id?: string;
-          acordo_id: string;
-          collection_id: number;
-          saldo_no_momento: number;
-          created_at?: string;
+          motivo?: string | null;
+          notes?: string | null;
+          registrado_por_id?: string | null;
+          valor_pago?: number;
         };
-        Update: {
-          id?: string;
-          acordo_id?: string;
-          collection_id?: number;
-          saldo_no_momento?: number;
-          created_at?: string;
-        };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "acordo_pagamentos_acordo_parcela_id_fkey";
+            columns: ["acordo_parcela_id"];
+            isOneToOne: false;
+            referencedRelation: "acordo_parcelas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "acordo_pagamentos_collector_id_fkey";
+            columns: ["collector_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "acordo_pagamentos_estorno_de_fkey";
+            columns: ["estorno_de"];
+            isOneToOne: false;
+            referencedRelation: "acordo_pagamentos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "acordo_pagamentos_registrado_por_id_fkey";
+            columns: ["registrado_por_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       acordo_parcelas: {
         Row: {
-          id: string;
           acordo_id: string;
+          created_at: string;
+          data_vencimento: string;
+          id: string;
           numero: number;
           valor_parcela: number;
-          data_vencimento: string;
-          created_at: string;
         };
         Insert: {
-          id?: string;
           acordo_id: string;
+          created_at?: string;
+          data_vencimento: string;
+          id?: string;
           numero: number;
           valor_parcela: number;
-          data_vencimento: string;
-          created_at?: string;
         };
         Update: {
-          id?: string;
           acordo_id?: string;
+          created_at?: string;
+          data_vencimento?: string;
+          id?: string;
           numero?: number;
           valor_parcela?: number;
-          data_vencimento?: string;
-          created_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "acordo_parcelas_acordo_id_fkey";
+            columns: ["acordo_id"];
+            isOneToOne: false;
+            referencedRelation: "acordos";
+            referencedColumns: ["id"];
+          },
+        ];
       };
-      acordo_pagamentos: {
+      acordo_titulos: {
         Row: {
-          id: string;
-          acordo_parcela_id: string;
-          valor_pago: number;
-          data_pagamento: string;
-          collector_id: string | null;
-          notes: string | null;
-          estorno_de: string | null;
-          motivo: string | null;
-          registrado_por_id: string | null;
+          acordo_id: string;
+          collection_id: number;
           created_at: string;
+          id: string;
+          saldo_no_momento: number;
         };
         Insert: {
-          id?: string;
-          acordo_parcela_id: string;
-          valor_pago: number;
-          data_pagamento: string;
-          collector_id?: string | null;
-          notes?: string | null;
-          estorno_de?: string | null;
-          motivo?: string | null;
-          registrado_por_id?: string | null;
+          acordo_id: string;
+          collection_id: number;
           created_at?: string;
+          id?: string;
+          saldo_no_momento: number;
         };
         Update: {
-          id?: string;
-          acordo_parcela_id?: string;
-          valor_pago?: number;
-          data_pagamento?: string;
-          collector_id?: string | null;
-          notes?: string | null;
-          estorno_de?: string | null;
-          motivo?: string | null;
-          registrado_por_id?: string | null;
+          acordo_id?: string;
+          collection_id?: number;
           created_at?: string;
+          id?: string;
+          saldo_no_momento?: number;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "acordo_titulos_acordo_id_fkey";
+            columns: ["acordo_id"];
+            isOneToOne: false;
+            referencedRelation: "acordos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "acordo_titulos_collection_id_fkey";
+            columns: ["collection_id"];
+            isOneToOne: false;
+            referencedRelation: "BANCO_DADOS";
+            referencedColumns: ["id_parcela"];
+          },
+          {
+            foreignKeyName: "acordo_titulos_collection_id_fkey";
+            columns: ["collection_id"];
+            isOneToOne: false;
+            referencedRelation: "banco_dados_clientes_ativos";
+            referencedColumns: ["id_parcela"];
+          },
+          {
+            foreignKeyName: "acordo_titulos_collection_id_fkey";
+            columns: ["collection_id"];
+            isOneToOne: false;
+            referencedRelation: "banco_dados_clientes_quitados";
+            referencedColumns: ["id_parcela"];
+          },
+          {
+            foreignKeyName: "acordo_titulos_collection_id_fkey";
+            columns: ["collection_id"];
+            isOneToOne: false;
+            referencedRelation: "vw_clientes_cobradores";
+            referencedColumns: ["id_parcela"];
+          },
+        ];
+      };
+      acordos: {
+        Row: {
+          acordo_origem_id: string | null;
+          client_document: string;
+          client_name: string | null;
+          collector_id: string;
+          created_at: string;
+          created_by_id: string | null;
+          id: string;
+          motivo_cancelamento: string | null;
+          numero_parcelas: number;
+          resolved_at: string | null;
+          status: string;
+          valor_negociado: number;
+        };
+        Insert: {
+          acordo_origem_id?: string | null;
+          client_document: string;
+          client_name?: string | null;
+          collector_id: string;
+          created_at?: string;
+          created_by_id?: string | null;
+          id?: string;
+          motivo_cancelamento?: string | null;
+          numero_parcelas: number;
+          resolved_at?: string | null;
+          status?: string;
+          valor_negociado: number;
+        };
+        Update: {
+          acordo_origem_id?: string | null;
+          client_document?: string;
+          client_name?: string | null;
+          collector_id?: string;
+          created_at?: string;
+          created_by_id?: string | null;
+          id?: string;
+          motivo_cancelamento?: string | null;
+          numero_parcelas?: number;
+          resolved_at?: string | null;
+          status?: string;
+          valor_negociado?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "acordos_acordo_origem_id_fkey";
+            columns: ["acordo_origem_id"];
+            isOneToOne: false;
+            referencedRelation: "acordos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "acordos_collector_id_fkey";
+            columns: ["collector_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "acordos_created_by_id_fkey";
+            columns: ["created_by_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       allowed_visit_dates: {
         Row: {
@@ -679,15 +774,42 @@ export type Database = {
           documento: string | null;
           id: number;
           id_parcela: number;
-          origem: "app" | "erp_ou_manual" | "foto_inicial";
+          origem: string;
           recebido_antes: number | null;
           recebido_depois: number | null;
           registrado_em: string;
           sale_payment_id: string | null;
         };
-        // Append-only: gravado so por gatilho no banco.
-        Insert: never;
-        Update: never;
+        Insert: {
+          chave_venda: number;
+          cobrador_carteira_id?: string | null;
+          data_de_recebimento?: string | null;
+          desconto_antes?: number | null;
+          desconto_depois?: number | null;
+          documento?: string | null;
+          id?: never;
+          id_parcela: number;
+          origem: string;
+          recebido_antes?: number | null;
+          recebido_depois?: number | null;
+          registrado_em?: string;
+          sale_payment_id?: string | null;
+        };
+        Update: {
+          chave_venda?: number;
+          cobrador_carteira_id?: string | null;
+          data_de_recebimento?: string | null;
+          desconto_antes?: number | null;
+          desconto_depois?: number | null;
+          documento?: string | null;
+          id?: never;
+          id_parcela?: number;
+          origem?: string;
+          recebido_antes?: number | null;
+          recebido_depois?: number | null;
+          registrado_em?: string;
+          sale_payment_id?: string | null;
+        };
         Relationships: [];
       };
       sale_payments: {
@@ -720,12 +842,15 @@ export type Database = {
           created_at?: string | null;
           discount_amount?: number | null;
           distribution_details?: Json | null;
+          estorno_de?: string | null;
           id?: string;
           is_agreement?: boolean | null;
+          motivo?: string | null;
           notes?: string | null;
           payment_amount: number;
           payment_date?: string;
           payment_method?: string | null;
+          registrado_por_id?: string | null;
           sale_number?: number | null;
           store_name?: string | null;
           updated_at?: string | null;
@@ -738,12 +863,15 @@ export type Database = {
           created_at?: string | null;
           discount_amount?: number | null;
           distribution_details?: Json | null;
+          estorno_de?: string | null;
           id?: string;
           is_agreement?: boolean | null;
+          motivo?: string | null;
           notes?: string | null;
           payment_amount?: number;
           payment_date?: string;
           payment_method?: string | null;
+          registrado_por_id?: string | null;
           sale_number?: number | null;
           store_name?: string | null;
           updated_at?: string | null;
@@ -754,6 +882,13 @@ export type Database = {
             columns: ["collector_id"];
             isOneToOne: false;
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sale_payments_estorno_de_fkey";
+            columns: ["estorno_de"];
+            isOneToOne: false;
+            referencedRelation: "sale_payments";
             referencedColumns: ["id"];
           },
         ];
@@ -881,7 +1016,7 @@ export type Database = {
       };
       users: {
         Row: {
-          active: boolean | null;
+          active: boolean;
           auth_email: string | null;
           auth_user_id: string | null;
           created_at: string | null;
@@ -892,7 +1027,7 @@ export type Database = {
           type: string;
         };
         Insert: {
-          active?: boolean | null;
+          active?: boolean;
           auth_email?: string | null;
           auth_user_id?: string | null;
           created_at?: string | null;
@@ -903,7 +1038,7 @@ export type Database = {
           type: string;
         };
         Update: {
-          active?: boolean | null;
+          active?: boolean;
           auth_email?: string | null;
           auth_user_id?: string | null;
           created_at?: string | null;
@@ -912,6 +1047,42 @@ export type Database = {
           name?: string;
           password?: string | null;
           type?: string;
+        };
+        Relationships: [];
+      };
+      vendas_canceladas: {
+        Row: {
+          cancelado_em: string;
+          chave_venda: number;
+          documento: string;
+          id: number;
+          motivo: string;
+          parcelas: number;
+          usuario_id: string | null;
+          valor_em_aberto: number;
+          valor_original: number;
+        };
+        Insert: {
+          cancelado_em?: string;
+          chave_venda: number;
+          documento: string;
+          id?: never;
+          motivo: string;
+          parcelas: number;
+          usuario_id?: string | null;
+          valor_em_aberto: number;
+          valor_original: number;
+        };
+        Update: {
+          cancelado_em?: string;
+          chave_venda?: number;
+          documento?: string;
+          id?: never;
+          motivo?: string;
+          parcelas?: number;
+          usuario_id?: string | null;
+          valor_em_aberto?: number;
+          valor_original?: number;
         };
         Relationships: [];
       };
@@ -937,7 +1108,7 @@ export type Database = {
           documento: string | null;
           endereco: string | null;
           estado: string | null;
-          id_parcela: number;
+          id_parcela: number | null;
           juros_aplicado: string | null;
           juros_pago: string | null;
           juros_por_dia: string | null;
@@ -958,7 +1129,15 @@ export type Database = {
           valor_recebido: string | null;
           venda_n: number | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "fk_banco_dados_user";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       banco_dados_clientes_quitados: {
         Row: {
@@ -980,7 +1159,7 @@ export type Database = {
           documento: string | null;
           endereco: string | null;
           estado: string | null;
-          id_parcela: number;
+          id_parcela: number | null;
           juros_aplicado: string | null;
           juros_pago: string | null;
           juros_por_dia: string | null;
@@ -1001,7 +1180,15 @@ export type Database = {
           valor_recebido: string | null;
           venda_n: number | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "fk_banco_dados_user";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       daily_payment_report: {
         Row: {
@@ -1026,6 +1213,13 @@ export type Database = {
           },
         ];
       };
+      saldo_por_documento: {
+        Row: {
+          documento: string | null;
+          saldo: number | null;
+        };
+        Relationships: [];
+      };
       vw_clientes_cobradores: {
         Row: {
           cliente: string | null;
@@ -1043,18 +1237,8 @@ export type Database = {
       };
     };
     Functions: {
-      app_current_user_id: {
-        Args: never;
-        Returns: string;
-      };
-      app_current_user_type: {
-        Args: never;
-        Returns: string;
-      };
-      resolve_auth_email: {
-        Args: { p_login: string };
-        Returns: string;
-      };
+      app_current_user_id: { Args: never; Returns: string };
+      app_current_user_type: { Args: never; Returns: string };
       atribuir_clientes_em_lote: {
         Args: {
           p_clientes?: string[];
@@ -1079,6 +1263,58 @@ export type Database = {
         Returns: {
           documentos_atualizados: number;
         }[];
+      };
+      cancelar_acordo: {
+        Args: { p_acordo_id: string; p_motivo: string };
+        Returns: {
+          acordo_origem_id: string | null;
+          client_document: string;
+          client_name: string | null;
+          collector_id: string;
+          created_at: string;
+          created_by_id: string | null;
+          id: string;
+          motivo_cancelamento: string | null;
+          numero_parcelas: number;
+          resolved_at: string | null;
+          status: string;
+          valor_negociado: number;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "acordos";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      cancelar_clientes: {
+        Args: {
+          p_documentos: string[];
+          p_motivo: string;
+          p_usuario_id: string;
+        };
+        Returns: number;
+      };
+      cancelar_vendas: {
+        Args: {
+          p_chaves?: number[];
+          p_documento: string;
+          p_motivo: string;
+          p_usuario_id: string;
+        };
+        Returns: number;
+      };
+      cancelar_visitas_de_clientes_quitados: {
+        Args: { p_documentos: string[] };
+        Returns: number;
+      };
+      cliente_tem_acordo_ativo: {
+        Args: { p_documento: string };
+        Returns: boolean;
+      };
+      cliente_tem_saldo_aberto: {
+        Args: { p_documento: string };
+        Returns: boolean;
       };
       clientes_do_cobrador: {
         Args: { p_cobrador_id: string };
@@ -1105,12 +1341,35 @@ export type Database = {
       cobrador_na_data_em_lote: {
         Args: { p_pares: Json };
         Returns: {
-          cobrador_id: string | null;
+          cobrador_id: string;
           data: string;
           documento: string;
         }[];
       };
       converter_valor_brasileiro: { Args: { valor: string }; Returns: number };
+      criar_acordo: {
+        Args: { p_client_document: string; p_parcelas: Json; p_titulos: Json };
+        Returns: {
+          acordo_origem_id: string | null;
+          client_document: string;
+          client_name: string | null;
+          collector_id: string;
+          created_at: string;
+          created_by_id: string | null;
+          id: string;
+          motivo_cancelamento: string | null;
+          numero_parcelas: number;
+          resolved_at: string | null;
+          status: string;
+          valor_negociado: number;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "acordos";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       distribuir_clientes_cobradores: {
         Args: never;
         Returns: {
@@ -1118,6 +1377,14 @@ export type Database = {
           cobrador_id: string;
           cobrador_nome: string;
         }[];
+      };
+      liberar_cliente_da_carteira: {
+        Args: {
+          p_documento: string;
+          p_situacao: string;
+          p_usuario_id?: string;
+        };
+        Returns: number;
       };
       listar_cobradores: {
         Args: never;
@@ -1129,35 +1396,7 @@ export type Database = {
           valor_total: number;
         }[];
       };
-      cancelar_vendas: {
-        Args: {
-          p_documento: string;
-          p_motivo: string;
-          p_usuario_id?: string;
-          p_chaves?: number[];
-        };
-        Returns: number;
-      };
-      cancelar_clientes: {
-        Args: {
-          p_documentos: string[];
-          p_motivo: string;
-          p_usuario_id?: string;
-        };
-        Returns: number;
-      };
-      registrar_ajuste_recebimento: {
-        Args: {
-          p_client_document: string;
-          p_client_name: string;
-          p_sale_number: number;
-          p_diferenca: number;
-          p_motivo: string;
-          p_usuario_id: string;
-          p_pagamento_estornado?: string;
-        };
-        Returns: undefined;
-      };
+      marcar_acordos_quebrados: { Args: never; Returns: number };
       process_payment: {
         Args: {
           p_client_document: string;
@@ -1172,57 +1411,103 @@ export type Database = {
       };
       reagendar_visita: {
         Args: {
-          p_visit_id: string;
+          p_motivo_chave?: string;
+          p_notas_nova?: string;
+          p_notas_original?: string;
           p_nova_data: string;
-          p_novo_horario?: string | null;
-          p_motivo_chave?: string | null;
-          p_notas_original?: string | null;
-          p_notas_nova?: string | null;
+          p_novo_horario?: string;
+          p_visit_id: string;
         };
-        Returns: Database["public"]["Tables"]["scheduled_visits"]["Row"][];
-      };
-      remover_cobrador: { Args: { p_documento: string }; Returns: undefined };
-      remover_cobrador_em_lote: {
-        Args: {
-          p_documentos?: string[];
-          p_clientes?: string[];
-          p_usuario_id?: string;
+        Returns: {
+          cancellation_approved_at: string | null;
+          cancellation_approved_by: string | null;
+          cancellation_rejected_at: string | null;
+          cancellation_rejected_by: string | null;
+          cancellation_rejection_reason: string | null;
+          cancellation_request_date: string | null;
+          cancellation_request_reason: string | null;
+          client_address: string | null;
+          client_city: string | null;
+          client_document: string;
+          client_name: string;
+          client_neighborhood: string | null;
+          client_number: string | null;
+          collector_id: string;
+          created_at: string | null;
+          data_visita_realizada: string | null;
+          id: string;
+          notes: string | null;
+          overdue_count: number | null;
+          reschedule_count: number | null;
+          reschedule_reason: string | null;
+          rescheduled_from_id: string | null;
+          rescheduled_to: string | null;
+          rescheduled_to_id: string | null;
+          scheduled_by_manager_id: string | null;
+          scheduled_date: string;
+          scheduled_time: string | null;
+          status: string;
+          total_pending_value: number | null;
+          updated_at: string | null;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "scheduled_visits";
+          isOneToOne: false;
+          isSetofReturn: true;
         };
-        Returns: number;
       };
-      liberar_cliente_da_carteira: {
-        Args: {
-          p_documento: string;
-          p_situacao: string;
-          p_usuario_id?: string;
-        };
-        Returns: number;
-      };
-      criar_acordo: {
+      registrar_ajuste_recebimento: {
         Args: {
           p_client_document: string;
-          p_titulos: Json;
-          p_parcelas: Json;
+          p_client_name: string;
+          p_diferenca: number;
+          p_motivo: string;
+          p_pagamento_estornado?: string;
+          p_sale_number: number;
+          p_usuario_id: string;
         };
-        Returns: Database["public"]["Tables"]["acordos"]["Row"];
+        Returns: undefined;
       };
       registrar_pagamento_acordo: {
         Args: {
           p_acordo_parcela_id: string;
-          p_valor_pago: number;
           p_data_pagamento: string;
-          p_notes?: string | null;
+          p_notes?: string;
+          p_valor_pago: number;
         };
-        Returns: Database["public"]["Tables"]["acordo_pagamentos"]["Row"];
+        Returns: {
+          acordo_parcela_id: string;
+          collector_id: string | null;
+          created_at: string;
+          data_pagamento: string;
+          estorno_de: string | null;
+          id: string;
+          motivo: string | null;
+          notes: string | null;
+          registrado_por_id: string | null;
+          valor_pago: number;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "acordo_pagamentos";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
       };
-      cancelar_acordo: {
-        Args: { p_acordo_id: string; p_motivo: string };
-        Returns: Database["public"]["Tables"]["acordos"]["Row"];
-      };
-      marcar_acordos_quebrados: {
-        Args: Record<PropertyKey, never>;
+      remover_cobrador: { Args: { p_documento: string }; Returns: undefined };
+      remover_cobrador_em_lote: {
+        Args: {
+          p_clientes?: string[];
+          p_documentos?: string[];
+          p_usuario_id?: string;
+        };
         Returns: number;
       };
+      resolve_auth_email: { Args: { p_login: string }; Returns: string };
+      saldo_acordo_parcela: { Args: { p_parcela_id: string }; Returns: number };
+      situacao_primaria_do_tipo: { Args: { p_type: string }; Returns: string };
+      texto_para_valor: { Args: { p: string }; Returns: number };
       transferir_clientes: {
         Args: { p_cobrador_destino: string; p_cobrador_origem: string };
         Returns: {
