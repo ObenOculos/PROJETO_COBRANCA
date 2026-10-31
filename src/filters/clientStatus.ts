@@ -2,7 +2,8 @@
 // Antes essa regra vivia inline no getFilteredCollections (CollectionContext) e
 // corria o risco de divergir do ClientAssignment e do CollectorDashboard. Estes
 // helpers devem ser reutilizados por todas as telas que classificam clientes.
-import { Collection } from "../types";
+import { Collection, ClientGroup } from "../types";
+import { calculateOverdueDays } from "../utils/formatters";
 
 export type ClientPaymentStatus = "pago" | "parcial" | "pendente";
 
@@ -118,3 +119,21 @@ export const normalizePaymentStatus = (raw: string): ClientPaymentStatus => {
 /** Indica se o filtro de status selecionado se refere a titulos cancelados. */
 export const isCanceladoFilter = (status: string | undefined | null): boolean =>
   (status || "").trim().toLowerCase() === "cancelado";
+
+/**
+ * Maior atraso (em dias) entre as parcelas do cliente que ainda tem saldo.
+ * Ignora parcela quitada/cancelada (hasInstallmentBalance) e vencimento
+ * futuro (calculateOverdueDays <= 0). 0 se o cliente nao tem parcela
+ * pendente vencida.
+ */
+export const clientMaxOverdueDays = (group: Pick<ClientGroup, "sales">): number => {
+  let maxAtraso = 0;
+  group.sales?.forEach((sale) => {
+    sale.installments?.forEach((inst) => {
+      if (!hasInstallmentBalance(inst)) return;
+      const atraso = calculateOverdueDays(inst.data_vencimento);
+      if (atraso > maxAtraso) maxAtraso = atraso;
+    });
+  });
+  return maxAtraso;
+};

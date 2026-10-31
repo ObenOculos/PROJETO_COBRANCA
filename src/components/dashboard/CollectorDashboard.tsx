@@ -43,7 +43,9 @@ import { resolveSaleKey } from "../../filters/sales";
 import {
   hasOpenBalance,
   hasInstallmentBalance,
+  clientMaxOverdueDays,
 } from "../../filters/clientStatus";
+import { priorityBucket, PRIORITY_COLOR_CLASSES } from "../../filters/priority";
 
 import LogContactModal from "./LogContactModal";
 import ClientDetailModal from "./ClientDetailModal";
@@ -229,24 +231,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           .some((value) => value?.toLowerCase().includes(lowerSearch));
       if (!matchesSearch) return false;
 
-      let maxAtraso = 0;
-      group.sales.forEach((sale: any) => {
-        sale.installments.forEach((inst: any) => {
-          const isPending = hasInstallmentBalance(inst);
-          if (isPending) {
-            const calculatedAtraso = calculateOverdueDays(inst.data_vencimento);
-            if (calculatedAtraso > maxAtraso) maxAtraso = calculatedAtraso;
-          }
-        });
-      });
-
       if (filterAging !== "all") {
-        if (filterAging === "critical" && maxAtraso <= 90) return false;
-        if (filterAging === "high" && (maxAtraso <= 60 || maxAtraso > 90))
-          return false;
-        if (filterAging === "medium" && (maxAtraso <= 30 || maxAtraso > 60))
-          return false;
-        if (filterAging === "low" && maxAtraso > 30) return false;
+        const maxAtraso = clientMaxOverdueDays(group);
+        if (priorityBucket(maxAtraso) !== filterAging) return false;
       }
       if (filterCity !== "all" && group.city !== filterCity) return false;
       if (filterStatus !== "all") {
@@ -304,9 +291,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     myCollections.forEach((c) => {
       const isPending = hasInstallmentBalance(c);
       if (isPending) {
-        const actualAtraso = calculateOverdueDays(c.data_vencimento);
-        if (actualAtraso > 90) critical++;
-        else if (actualAtraso > 60) high++;
+        const bucket = priorityBucket(calculateOverdueDays(c.data_vencimento));
+        if (bucket === "critical") critical++;
+        else if (bucket === "high") high++;
       }
     });
 
@@ -326,16 +313,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     monthlyGoals,
     user?.id,
   ]);
-
-  const getPriorityColor = (days: number) => {
-    if (days > 90)
-      return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
-    if (days > 60)
-      return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
-    if (days > 30)
-      return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
-    return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
-  };
 
   return (
     <div className="space-y-6">
@@ -511,19 +488,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
               {paginatedClients.length > 0 ? (
                 paginatedClients.map((group) => {
-                  let maxAtraso = 0;
-                  group.sales?.forEach((sale: any) => {
-                    sale?.installments?.forEach((inst: any) => {
-                      const isPending = hasInstallmentBalance(inst);
-                      if (isPending) {
-                        const calculatedAtraso = calculateOverdueDays(
-                          inst.data_vencimento,
-                        );
-                        if (calculatedAtraso > maxAtraso)
-                          maxAtraso = calculatedAtraso;
-                      }
-                    });
-                  });
+                  const maxAtraso = clientMaxOverdueDays(group);
                   const lastContact = lastContacts[group.document];
                   return (
                     <tr
@@ -596,7 +561,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                         onClick={() => onOpenDetail(group)}
                       >
                         <span
-                          className={`px-3 py-1 rounded-full text-[10px] font-bold ${getPriorityColor(maxAtraso)}`}
+                          className={`px-3 py-1 rounded-full text-[10px] font-bold ${PRIORITY_COLOR_CLASSES[priorityBucket(maxAtraso)]}`}
                         >
                           {maxAtraso} dias
                         </span>
