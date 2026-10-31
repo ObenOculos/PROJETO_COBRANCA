@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { X, Save, AlertCircle, Plus, Trash2 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { hasInstallmentBalance } from "../../filters/clientStatus";
-import { formatCurrency } from "../../utils/formatters";
+import { formatCurrency, formatDate } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
 import { ClientGroup } from "../../types";
 
@@ -242,12 +242,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                       onChange={() => toggleTitulo(t.collectionId)}
                     />
                     <span className="truncate text-gray-700 dark:text-dark-text-secondary">
-                      {t.descricao} — venc.{" "}
-                      {t.vencimento
-                        ? new Date(t.vencimento + "T00:00:00").toLocaleDateString(
-                            "pt-BR",
-                          )
-                        : "—"}
+                      {t.descricao} — venc. {formatDate(t.vencimento)}
                     </span>
                   </div>
                   <span className="font-bold text-gray-900 dark:text-dark-text shrink-0">
