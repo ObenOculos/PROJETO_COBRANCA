@@ -24,31 +24,16 @@ import {
 import { Modal } from "../Modal";
 import TabTransition from "../common/TabTransition";
 import { todayLocalStr } from "../../config/visitStatus";
+import {
+  ATTEMPT_TYPE_LABELS,
+  ATTEMPT_RESULT_LABELS,
+} from "../../config/collectionAttempts";
 
 interface CollectionModalProps {
   collection: Collection;
   userType: UserType;
   onClose: () => void;
 }
-
-const ATTEMPT_TYPE_LABELS: Record<CollectionAttempt["type"], string> = {
-  call: "Ligação",
-  visit: "Visita",
-  email: "E-mail",
-  whatsapp: "WhatsApp",
-};
-
-const ATTEMPT_RESULT_LABELS: Record<CollectionAttempt["result"], string> = {
-  no_answer: "Não atendeu",
-  busy: "Ocupado",
-  not_found: "Não encontrado",
-  promise: "Promessa de pagamento",
-  refusal: "Recusa",
-  partial_payment: "Pagamento parcial",
-  full_payment: "Pagamento integral",
-  contact_made: "Contato realizado",
-  message_sent: "Mensagem enviada",
-};
 
 const CollectionModal: React.FC<CollectionModalProps> = ({
   collection,
