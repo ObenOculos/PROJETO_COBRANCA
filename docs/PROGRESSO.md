@@ -736,6 +736,22 @@ exibição, não bloqueou a criação do acordo, mas precisa de correção.
 acima, registra contato como visita falsa em vez de usar
 `collection_attempts`) — segue intacto, fora do escopo desta sessão.
 
+**Polimento de UI na carteira do cobrador, feedback do usuário depois do
+teste (commits `0150444`/`d7cf137`/`34a53a1`, `tsc -b`/lint sem aumentar
+a contagem em cada um):**
+- Removidos os dois últimos `alert()` nativos de `CollectorDashboard.tsx`
+  (copiar documento e WhatsApp sem telefone) — mesmo motivo do
+  `window.prompt` do cancelamento de acordo, ver
+  [[feedback-sem-dialogs-nativos]]: copiar ganhou feedback visual (ícone
+  fica verde ~1,5s) e o botão de WhatsApp fica desabilitado com `title`
+  em vez de alertar.
+- Botão de copiar documento saiu da coluna "Ações" (redundante — usuário:
+  "acho inútil esse botão") e virou um ícone pequeno ao lado do próprio
+  CPF/CNPJ.
+- Ícone do botão de WhatsApp trocado do raio (`Zap`, genérico, lucide não
+  tem logos de marca) por um SVG inline do glifo do WhatsApp — sem nova
+  dependência só por causa de um ícone.
+
 ## Concluído
 
 ### 2026-10-06
