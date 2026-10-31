@@ -597,7 +597,7 @@ cobrador (reabre manual), card de largura total com 1 cobrador, tabela com
 rank/ordenação batendo com os totais — tudo certo, sem erro novo no
 console. Commitado.
 
-## Acordo de renegociação (Interno/Terceirizado/Jurídico) — concluído 2026-10-31
+## Acordo de renegociação (Interno/Terceirizado/Jurídico) — concluído 2026-10-31 (commit `8966889`)
 
 Pedido do usuário em 2026-10-30, fora do cronograma da reunião de 28/10:
 melhorar a interface dos perfis "carteira" (Interno/Terceirizado/Jurídico =
