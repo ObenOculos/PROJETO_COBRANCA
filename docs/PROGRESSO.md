@@ -791,6 +791,79 @@ a contagem em cada um):**
   tem logos de marca) por um SVG inline do glifo do WhatsApp — sem nova
   dependência só por causa de um ícone.
 
+## Redesenho da carteira do cobrador (Interno/Terceirizado/Jurídico) — Fase 1 concluída 2026-10-31 (commits `cfb7778`…`62fef28`)
+
+Pedido do usuário: revisão completa da tela de carteira pensando na
+rotina real do cobrador (saber rápido quem ligar, promessas vencendo,
+reduzir cliques) + um sistema de metas novo. Decidido com o usuário:
+**Fase 1 = só a tela** (este bloco); metas fica pra Fase 2, fora desta
+sessão — exige schema novo (`collection_attempts` não tem coluna de quem
+fez o contato) e telas de gestor, mais seguro planejar depois de ver a
+tela nova em uso. Metas coletivas/comissão de gestor por cobrador com
+meta batida: fora de escopo também, mencionado pelo usuário mas adiado
+("é simples, mas é bom deixar pra depois").
+
+Levantamento antes de desenhar (dois agentes de exploração) achou: a
+barra de progresso de "Recuperação do Mês" já usa `monthly_goals` com
+fallback fixo de R$100mil quando não há meta cadastrada (não mexido,
+fica pra Fase 2); já existe um modal de criar/editar meta
+(`MonthlyGoalEditModal.tsx`, 566 linhas) mas enterrado dentro de
+"Desempenho"; `EnhancedPerformanceChart.tsx` já segmenta cobrador
+acima/abaixo da meta — embrião do "visão gerencial" da Fase 2.
+
+**Plano formal:** `docs/plans/logical-soaring-sunset.md` (no histórico de
+planos do Claude Code, não versionado no repo).
+
+**As 6 etapas, cada uma commitada e testada ao vivo separadamente:**
+1. `src/filters/priority.ts` (novo) + `clientMaxOverdueDays` em
+   `clientStatus.ts`: os limiares de atraso 90/60/30 dias estavam escritos
+   a mão em 3 lugares de `CollectorDashboard.tsx`, e o loop de "maior
+   atraso do cliente" duplicado 2x. Refactor puro, badges idênticos antes
+   e depois.
+2. `attemptsByCollection`/`lastContacts` passaram a carregar
+   `next_action_date` (gravado pelo `LogContactModal` numa promessa de
+   pagamento, nunca lido em lugar nenhum antes) — mesmo fetch em lote já
+   existente, sem query nova.
+3. **"Fila de Atendimento" virou agenda priorizada por seções**, cada
+   cliente numa só (maior precedência primeiro): Promessas vencendo
+   hoje/atrasadas > Acordo quebrado (`getAcordoQuebradoDoCliente`, novo,
+   paralelo a `getAcordoAtivoDoCliente`) > Crítico 90+ dias > Sem contato
+   há 7+ dias (`SEM_CONTATO_DIAS`, `config/collectionAttempts.ts`) > Resto
+   da carteira. Dropdowns "Todos os Atrasos"/"Todos os Status" saíram
+   (decidido com o usuário) — Crítico virou seção própria, resto só com
+   busca + cidade. Linha extraída em `ClientQueueRow` reusável.
+4. Histórico de contatos: `ATTEMPT_TYPE_LABELS`/`ATTEMPT_RESULT_LABELS`
+   saíram de dentro do `CollectionModal.tsx` pra
+   `config/collectionAttempts.ts`; novo bloco na aba "Dados" do
+   `ClientDetailModal` mostra **todos** os `collection_attempts` do
+   cliente (todos os títulos, não só em aberto) — nunca existiu essa
+   visão agregada antes, só o último contato truncado na linha da agenda.
+5. Botão "Ligar" (`tel:`) — não existia em lugar nenhum da tela. Linha da
+   agenda (ao lado do WhatsApp) e aba Dados (um botão por número).
+6. `AcordoModal.tsx`: parcelas geradas automaticamente a partir do saldo
+   selecionado (sem botão manual "Gerar parcelas"); se o usuário editou à
+   mão e muda a seleção/número de parcelas depois, mostra aviso inline em
+   vez de descartar silenciosamente; "Total combinado" fica vermelho ao
+   vivo quando não bate com o saldo, `handleSubmit` bloqueia o envio no
+   mesmo caso.
+
+`tsc -b` limpo a cada etapa; lint de cada arquivo tocado sem aumentar a
+contagem (`CollectorDashboard.tsx` 22→17 — melhorou, removeu `any`s
+junto). Testado ao vivo logado como cobrador Terceirizado (cliente de
+teste João Siriano Soares): cliente sem contato caiu em "Crítico";
+registrar promessa de pagamento moveu pra "Promessas vencendo" (seção de
+maior precedência) e "Crítico" sumiu (seção vazia não renderiza);
+histórico de contatos mostrou a venda correta; desmarcar um título no
+`AcordoModal` recalculou as parcelas e mostrou o aviso. Dados de teste
+removidos do banco depois de cada verificação.
+
+**Ainda pendente (Fase 2, fora desta sessão):** sistema de metas —
+schema por perfil/critério, migration adicionando `collector_id` em
+`collection_attempts` (hoje não dá pra atribuir "contato feito" a um
+cobrador), telas de criar/editar meta acessíveis, painel individual do
+cobrador, painel comparativo do gestor. Meta coletiva/comissão por
+cobrador com meta batida: mencionado pelo usuário, adiado.
+
 ## Concluído
 
 ### 2026-10-06
