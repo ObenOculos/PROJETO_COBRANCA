@@ -27,6 +27,7 @@ import {
   Handshake,
   Copy,
   Check,
+  Phone,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
@@ -648,6 +649,12 @@ const handleWhatsApp = (client: any, user: any, formatCurrency: any) => {
   window.open(`https://wa.me/55${phone}?text=${message}`, "_blank");
 };
 
+const handleCall = (client: Pick<ClientGroup, "mobile" | "phone">) => {
+  const phone = (client.mobile || client.phone || "").replace(/\D/g, "");
+  if (!phone) return;
+  window.open(`tel:${phone}`, "_self");
+};
+
 interface ClientQueueRowProps {
   group: ClientGroup;
   lastContact:
@@ -746,6 +753,17 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCall(group);
+            }}
+            disabled={!(group.mobile || group.phone)}
+            title={group.mobile || group.phone ? "Ligar" : "Cliente sem telefone"}
+            className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all border border-indigo-100 disabled:opacity-40 disabled:hover:bg-indigo-50 disabled:hover:text-indigo-600 disabled:cursor-not-allowed"
+          >
+            <Phone className="w-4 h-4" />
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();

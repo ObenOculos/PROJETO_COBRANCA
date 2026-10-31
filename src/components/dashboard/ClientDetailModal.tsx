@@ -867,15 +867,35 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       </h4>
                       <div className="space-y-2">
                         {clientGroup.phone && (
-                          <div className="flex items-center text-sm">
-                            <Phone className="h-4 w-4 text-gray-400 mr-2" />
-                            <span>{clientGroup.phone}</span>
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center">
+                              <Phone className="h-4 w-4 text-gray-400 mr-2" />
+                              <span>{clientGroup.phone}</span>
+                            </div>
+                            <button
+                              onClick={() =>
+                                window.open(`tel:${clientGroup.phone}`, "_self")
+                              }
+                              className="text-[10px] font-bold text-blue-600"
+                            >
+                              Ligar
+                            </button>
                           </div>
                         )}
                         {clientGroup.mobile && (
-                          <div className="flex items-center text-sm">
-                            <MessageCircle className="h-4 w-4 text-gray-400 mr-2" />
-                            <span>{clientGroup.mobile}</span>
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center">
+                              <MessageCircle className="h-4 w-4 text-gray-400 mr-2" />
+                              <span>{clientGroup.mobile}</span>
+                            </div>
+                            <button
+                              onClick={() =>
+                                window.open(`tel:${clientGroup.mobile}`, "_self")
+                              }
+                              className="text-[10px] font-bold text-blue-600"
+                            >
+                              Ligar
+                            </button>
                           </div>
                         )}
                         {!clientGroup.phone && !clientGroup.mobile && (
