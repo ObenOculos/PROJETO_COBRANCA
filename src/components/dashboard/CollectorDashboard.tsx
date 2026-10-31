@@ -37,7 +37,7 @@ import TabTransition from "../common/TabTransition";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
-import { FilterOptions, ClientGroup } from "../../types";
+import { FilterOptions, ClientGroup, User } from "../../types";
 import { Notification } from "../../contexts/NotificationContext";
 import { resolveSaleKey } from "../../filters/sales";
 import {
@@ -504,139 +504,20 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
               {paginatedClients.length > 0 ? (
-                paginatedClients.map((group) => {
-                  const maxAtraso = clientMaxOverdueDays(group);
-                  const lastContact = lastContacts[group.document];
-                  return (
-                    <tr
-                      key={group.clientId}
-                      className="group hover:bg-gray-50/80 dark:hover:bg-dark-bg-secondary transition-colors cursor-pointer"
-                    >
-                      <td
-                        className="px-6 py-4"
-                        onClick={() => onOpenDetail(group)}
-                      >
-                        <div className="flex flex-col gap-1">
-                          <span className="font-bold text-gray-900 dark:text-dark-text group-hover:text-indigo-600 transition-colors">
-                            {group.client}
-                          </span>
-                          <span className="flex items-center gap-1 text-xs text-gray-400">
-                            {group.document}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyDocument(group.document);
-                              }}
-                              title={
-                                copiedDoc === group.document
-                                  ? "Copiado!"
-                                  : "Copiar documento"
-                              }
-                              className={`p-0.5 rounded transition-colors ${
-                                copiedDoc === group.document
-                                  ? "text-green-600"
-                                  : "text-gray-300 hover:text-indigo-600"
-                              }`}
-                            >
-                              {copiedDoc === group.document ? (
-                                <Check className="w-3 h-3" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
-                            </button>
-                          </span>
-                          {getAcordoAtivoDoCliente(group.document) && (
-                            <span className="w-fit px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
-                              Em acordo
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td
-                        className="px-6 py-4 max-w-xs"
-                        onClick={() => onOpenDetail(group)}
-                      >
-                        {lastContact ? (
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
-                              {new Date(lastContact.date).toLocaleDateString(
-                                "pt-BR",
-                              )}
-                            </span>
-                            <p className="text-xs text-gray-600 dark:text-dark-text-secondary line-clamp-2 italic">
-                              "{lastContact.note}"
-                            </p>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-300 italic">
-                            Sem registros
-                          </span>
-                        )}
-                      </td>
-                      <td
-                        className="px-6 py-4 text-center"
-                        onClick={() => onOpenDetail(group)}
-                      >
-                        <span
-                          className={`px-3 py-1 rounded-full text-[10px] font-bold ${PRIORITY_COLOR_CLASSES[priorityBucket(maxAtraso)]}`}
-                        >
-                          {maxAtraso} dias
-                        </span>
-                      </td>
-                      <td
-                        className="px-6 py-4 text-right"
-                        onClick={() => onOpenDetail(group)}
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-bold text-red-600 dark:text-red-400">
-                            {formatCurrency(group.pendingValue)}
-                          </span>
-                          <span className="text-[10px] text-gray-400">
-                            Total: {formatCurrency(group.totalValue)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleWhatsApp(group, user, formatCurrency);
-                            }}
-                            disabled={!(group.mobile || group.phone)}
-                            title={
-                              group.mobile || group.phone
-                                ? "Chamar no WhatsApp"
-                                : "Cliente sem telefone"
-                            }
-                            className="p-2 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white rounded-xl transition-all border border-green-100 disabled:opacity-40 disabled:hover:bg-green-50 disabled:hover:text-green-600 disabled:cursor-not-allowed"
-                          >
-                            <WhatsAppIcon className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenLog(group);
-                            }}
-                            className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100"
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenAcordo(group);
-                            }}
-                            className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white rounded-xl transition-all border border-amber-100"
-                            title="Negociar / Acordo"
-                          >
-                            <Handshake className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
+                paginatedClients.map((group) => (
+                  <ClientQueueRow
+                    key={group.clientId}
+                    group={group}
+                    lastContact={lastContacts[group.document]}
+                    acordoAtivo={!!getAcordoAtivoDoCliente(group.document)}
+                    copiedDoc={copiedDoc}
+                    copyDocument={copyDocument}
+                    user={user}
+                    onOpenDetail={onOpenDetail}
+                    onOpenLog={onOpenLog}
+                    onOpenAcordo={onOpenAcordo}
+                  />
+                ))
               ) : (
                 <tr>
                   <td
@@ -701,6 +582,140 @@ const handleWhatsApp = (client: any, user: any, formatCurrency: any) => {
     `Olá ${client.client}, sou o ${user?.name} do setor de cobrança. Gostaria de falar sobre sua pendência de ${formatCurrency(client.pendingValue)}. Podemos conversar?`,
   );
   window.open(`https://wa.me/55${phone}?text=${message}`, "_blank");
+};
+
+interface ClientQueueRowProps {
+  group: ClientGroup;
+  lastContact:
+    | { note: string; date: Date; result: string; nextActionDate: string | null }
+    | undefined;
+  acordoAtivo: boolean;
+  copiedDoc: string | null;
+  copyDocument: (document: string) => void;
+  user: User | null;
+  onOpenDetail: (client: ClientGroup) => void;
+  onOpenLog: (client: ClientGroup) => void;
+  onOpenAcordo: (client: ClientGroup) => void;
+}
+
+// Linha da agenda/fila de atendimento, reusada em cada secao priorizada
+// (ver docs/plans — redesenho da carteira, etapa 3) e em "Resto da
+// carteira". Extraida da tabela unica original pra nao repetir o JSX em
+// cada secao.
+const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
+  group,
+  lastContact,
+  acordoAtivo,
+  copiedDoc,
+  copyDocument,
+  user,
+  onOpenDetail,
+  onOpenLog,
+  onOpenAcordo,
+}) => {
+  const maxAtraso = clientMaxOverdueDays(group);
+  return (
+    <tr className="group hover:bg-gray-50/80 dark:hover:bg-dark-bg-secondary transition-colors cursor-pointer">
+      <td className="px-6 py-4" onClick={() => onOpenDetail(group)}>
+        <div className="flex flex-col gap-1">
+          <span className="font-bold text-gray-900 dark:text-dark-text group-hover:text-indigo-600 transition-colors">
+            {group.client}
+          </span>
+          <span className="flex items-center gap-1 text-xs text-gray-400">
+            {group.document}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                copyDocument(group.document);
+              }}
+              title={copiedDoc === group.document ? "Copiado!" : "Copiar documento"}
+              className={`p-0.5 rounded transition-colors ${
+                copiedDoc === group.document
+                  ? "text-green-600"
+                  : "text-gray-300 hover:text-indigo-600"
+              }`}
+            >
+              {copiedDoc === group.document ? (
+                <Check className="w-3 h-3" />
+              ) : (
+                <Copy className="w-3 h-3" />
+              )}
+            </button>
+          </span>
+          {acordoAtivo && (
+            <span className="w-fit px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
+              Em acordo
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="px-6 py-4 max-w-xs" onClick={() => onOpenDetail(group)}>
+        {lastContact ? (
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
+              {new Date(lastContact.date).toLocaleDateString("pt-BR")}
+            </span>
+            <p className="text-xs text-gray-600 dark:text-dark-text-secondary line-clamp-2 italic">
+              "{lastContact.note}"
+            </p>
+          </div>
+        ) : (
+          <span className="text-xs text-gray-300 italic">Sem registros</span>
+        )}
+      </td>
+      <td className="px-6 py-4 text-center" onClick={() => onOpenDetail(group)}>
+        <span
+          className={`px-3 py-1 rounded-full text-[10px] font-bold ${PRIORITY_COLOR_CLASSES[priorityBucket(maxAtraso)]}`}
+        >
+          {maxAtraso} dias
+        </span>
+      </td>
+      <td className="px-6 py-4 text-right" onClick={() => onOpenDetail(group)}>
+        <div className="flex flex-col">
+          <span className="font-bold text-red-600 dark:text-red-400">
+            {formatCurrency(group.pendingValue)}
+          </span>
+          <span className="text-[10px] text-gray-400">
+            Total: {formatCurrency(group.totalValue)}
+          </span>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleWhatsApp(group, user, formatCurrency);
+            }}
+            disabled={!(group.mobile || group.phone)}
+            title={group.mobile || group.phone ? "Chamar no WhatsApp" : "Cliente sem telefone"}
+            className="p-2 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white rounded-xl transition-all border border-green-100 disabled:opacity-40 disabled:hover:bg-green-50 disabled:hover:text-green-600 disabled:cursor-not-allowed"
+          >
+            <WhatsAppIcon className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenLog(group);
+            }}
+            className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100"
+          >
+            <MessageSquare className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenAcordo(group);
+            }}
+            className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white rounded-xl transition-all border border-amber-100"
+            title="Negociar / Acordo"
+          >
+            <Handshake className="w-4 h-4" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
 };
 
 interface CollectorDashboardProps {
