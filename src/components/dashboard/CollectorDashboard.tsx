@@ -110,6 +110,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   onOpenAcordo,
 }) => {
   const { getAcordoAtivoDoCliente, getAcordoQuebradoDoCliente } = useCollection();
+  const [walletTab, setWalletTab] = useState<"agenda" | "carteira">("agenda");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCity, setFilterCity] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -253,62 +254,58 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // quebrado é alguém esperando contato; atraso e silencio vêm depois.
   const today = todayLocalStr();
   const todayDate = new Date(today + "T00:00:00");
-  const { promessas, acordosQuebrados, criticos, semContato, resto } =
-    useMemo(() => {
-      const claimed = new Set<string>();
-      const promessas: ClientGroup[] = [];
-      const acordosQuebrados: ClientGroup[] = [];
-      const criticos: ClientGroup[] = [];
-      const semContato: ClientGroup[] = [];
+  const { promessas, acordosQuebrados, criticos, semContato } = useMemo(() => {
+    const claimed = new Set<string>();
+    const promessas: ClientGroup[] = [];
+    const acordosQuebrados: ClientGroup[] = [];
+    const criticos: ClientGroup[] = [];
+    const semContato: ClientGroup[] = [];
 
-      const claim = (list: ClientGroup[], group: ClientGroup) => {
-        list.push(group);
-        claimed.add(group.document);
-      };
+    const claim = (list: ClientGroup[], group: ClientGroup) => {
+      list.push(group);
+      claimed.add(group.document);
+    };
 
-      filteredClientGroups.forEach((group) => {
-        const nextActionDate = lastContacts[group.document]?.nextActionDate;
-        if (nextActionDate && nextActionDate <= today) claim(promessas, group);
-      });
-      filteredClientGroups.forEach((group) => {
-        if (claimed.has(group.document)) return;
-        if (getAcordoQuebradoDoCliente(group.document))
-          claim(acordosQuebrados, group);
-      });
-      filteredClientGroups.forEach((group) => {
-        if (claimed.has(group.document)) return;
-        if (priorityBucket(clientMaxOverdueDays(group)) === "critical")
-          claim(criticos, group);
-      });
-      filteredClientGroups.forEach((group) => {
-        if (claimed.has(group.document)) return;
-        const last = lastContacts[group.document];
-        const diasSemContato = last
-          ? Math.floor(
-              (todayDate.getTime() - last.date.getTime()) / 86400000,
-            )
-          : Infinity;
-        if (diasSemContato > SEM_CONTATO_DIAS) claim(semContato, group);
-      });
+    filteredClientGroups.forEach((group) => {
+      const nextActionDate = lastContacts[group.document]?.nextActionDate;
+      if (nextActionDate && nextActionDate <= today) claim(promessas, group);
+    });
+    filteredClientGroups.forEach((group) => {
+      if (claimed.has(group.document)) return;
+      if (getAcordoQuebradoDoCliente(group.document))
+        claim(acordosQuebrados, group);
+    });
+    filteredClientGroups.forEach((group) => {
+      if (claimed.has(group.document)) return;
+      if (priorityBucket(clientMaxOverdueDays(group)) === "critical")
+        claim(criticos, group);
+    });
+    filteredClientGroups.forEach((group) => {
+      if (claimed.has(group.document)) return;
+      const last = lastContacts[group.document];
+      const diasSemContato = last
+        ? Math.floor((todayDate.getTime() - last.date.getTime()) / 86400000)
+        : Infinity;
+      if (diasSemContato > SEM_CONTATO_DIAS) claim(semContato, group);
+    });
 
-      const resto = filteredClientGroups.filter(
-        (g) => !claimed.has(g.document),
-      );
-      return { promessas, acordosQuebrados, criticos, semContato, resto };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filteredClientGroups, lastContacts, getAcordoQuebradoDoCliente, today]);
+    return { promessas, acordosQuebrados, criticos, semContato };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredClientGroups, lastContacts, getAcordoQuebradoDoCliente, today]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterCity]);
+  }, [searchTerm, filterCity, walletTab]);
 
-  const totalPages = Math.ceil(resto.length / itemsPerPage);
+  // Carteira completa: diretório com todo mundo em aberto, não só quem
+  // sobrou da agenda — é a visão de "navegar tudo" que a Agenda não dá.
+  const totalPages = Math.ceil(filteredClientGroups.length / itemsPerPage);
   const paginatedClients = useMemo(() => {
-    return resto.slice(
+    return filteredClientGroups.slice(
       (currentPage - 1) * itemsPerPage,
       currentPage * itemsPerPage,
     );
-  }, [resto, currentPage]);
+  }, [filteredClientGroups, currentPage]);
 
   const stats = useMemo(() => {
     // Recebido de TODA a carteira atribuida, inclusive quem ja quitou: e o
@@ -465,10 +462,32 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
       <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm p-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h2 className="font-bold text-gray-900 dark:text-dark-text flex items-center gap-2">
-            <Rocket className="w-5 h-5 text-indigo-600" />
-            Agenda
-          </h2>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setWalletTab("agenda")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                walletTab === "agenda"
+                  ? "bg-indigo-600 text-white"
+                  : "text-gray-500 hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
+              }`}
+            >
+              <Rocket className="w-4 h-4" />
+              Agenda
+            </button>
+            <button
+              type="button"
+              onClick={() => setWalletTab("carteira")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                walletTab === "carteira"
+                  ? "bg-indigo-600 text-white"
+                  : "text-gray-500 hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Carteira completa
+            </button>
+          </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <input
               type="text"
@@ -493,146 +512,153 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         </div>
       </div>
 
-      <AgendaSection
-        title="Promessas vencendo hoje/atrasadas"
-        icon={<Clock className="w-4 h-4" />}
-        iconBgClass="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600"
-        groups={promessas}
-        lastContacts={lastContacts}
-        getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
-        copiedDoc={copiedDoc}
-        copyDocument={copyDocument}
-        user={user}
-        onOpenDetail={onOpenDetail}
-        onOpenLog={onOpenLog}
-        onOpenAcordo={onOpenAcordo}
-      />
-      <AgendaSection
-        title="Acordo quebrado"
-        icon={<AlertCircle className="w-4 h-4" />}
-        iconBgClass="bg-red-100 dark:bg-red-900/30 text-red-600"
-        groups={acordosQuebrados}
-        lastContacts={lastContacts}
-        getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
-        copiedDoc={copiedDoc}
-        copyDocument={copyDocument}
-        user={user}
-        onOpenDetail={onOpenDetail}
-        onOpenLog={onOpenLog}
-        onOpenAcordo={onOpenAcordo}
-      />
-      <AgendaSection
-        title="Crítico (90+ dias sem pagar)"
-        icon={<Flame className="w-4 h-4" />}
-        iconBgClass="bg-orange-100 dark:bg-orange-900/30 text-orange-600"
-        groups={criticos}
-        lastContacts={lastContacts}
-        getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
-        copiedDoc={copiedDoc}
-        copyDocument={copyDocument}
-        user={user}
-        onOpenDetail={onOpenDetail}
-        onOpenLog={onOpenLog}
-        onOpenAcordo={onOpenAcordo}
-      />
-      <AgendaSection
-        title={`Sem contato há mais de ${SEM_CONTATO_DIAS} dias`}
-        icon={<CalendarDays className="w-4 h-4" />}
-        iconBgClass="bg-gray-100 dark:bg-dark-bg-secondary text-gray-500"
-        groups={semContato}
-        lastContacts={lastContacts}
-        getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
-        copiedDoc={copiedDoc}
-        copyDocument={copyDocument}
-        user={user}
-        onOpenDetail={onOpenDetail}
-        onOpenLog={onOpenLog}
-        onOpenAcordo={onOpenAcordo}
-      />
-
-      <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-100 dark:border-dark-border">
-          <h3 className="font-bold text-gray-900 dark:text-dark-text">
-            Resto da carteira
-          </h3>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50/50 dark:bg-dark-bg-secondary text-[11px] font-bold text-gray-400 tracking-wide">
-                <th className="px-6 py-4">Cliente</th>
-                <th className="px-6 py-4">Última Interação</th>
-                <th className="px-6 py-4 text-center">Atraso</th>
-                <th className="px-6 py-4 text-right">Valor Pendente</th>
-                <th className="px-6 py-4 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
-              {paginatedClients.length > 0 ? (
-                paginatedClients.map((group) => (
-                  <ClientQueueRow
-                    key={group.clientId}
-                    group={group}
-                    lastContact={lastContacts[group.document]}
-                    acordoAtivo={!!getAcordoAtivoDoCliente(group.document)}
-                    copiedDoc={copiedDoc}
-                    copyDocument={copyDocument}
-                    user={user}
-                    onOpenDetail={onOpenDetail}
-                    onOpenLog={onOpenLog}
-                    onOpenAcordo={onOpenAcordo}
-                  />
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-6 py-12 text-center text-sm text-gray-500"
-                  >
-                    Nenhum cliente encontrado.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50/30 dark:bg-dark-bg-secondary/30">
-            <p className="text-xs text-gray-500">
-              Mostrando {paginatedClients.length} de {resto.length}
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40"
-              >
-                Anterior
-              </button>
-              <div className="flex items-center gap-1">
-                <span className="w-8 h-8 flex items-center justify-center bg-indigo-600 text-white rounded-lg text-xs font-bold">
-                  {currentPage}
-                </span>
-                <span className="text-xs text-gray-400 px-1">de</span>
-                <span className="text-xs text-gray-600 dark:text-dark-text font-bold">
-                  {totalPages}
-                </span>
-              </div>
-              <button
-                onClick={() =>
-                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-                }
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40"
-              >
-                Próxima
-              </button>
-            </div>
+      {walletTab === "agenda" ? (
+        <>
+          <AgendaSection
+            title="Promessas vencendo hoje/atrasadas"
+            icon={<Clock className="w-4 h-4" />}
+            iconBgClass="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600"
+            groups={promessas}
+            lastContacts={lastContacts}
+            getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
+            copiedDoc={copiedDoc}
+            copyDocument={copyDocument}
+            user={user}
+            onOpenDetail={onOpenDetail}
+            onOpenLog={onOpenLog}
+            onOpenAcordo={onOpenAcordo}
+          />
+          <AgendaSection
+            title="Acordo quebrado"
+            icon={<AlertCircle className="w-4 h-4" />}
+            iconBgClass="bg-red-100 dark:bg-red-900/30 text-red-600"
+            groups={acordosQuebrados}
+            lastContacts={lastContacts}
+            getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
+            copiedDoc={copiedDoc}
+            copyDocument={copyDocument}
+            user={user}
+            onOpenDetail={onOpenDetail}
+            onOpenLog={onOpenLog}
+            onOpenAcordo={onOpenAcordo}
+          />
+          <AgendaSection
+            title="Crítico (90+ dias sem pagar)"
+            icon={<Flame className="w-4 h-4" />}
+            iconBgClass="bg-orange-100 dark:bg-orange-900/30 text-orange-600"
+            groups={criticos}
+            lastContacts={lastContacts}
+            getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
+            copiedDoc={copiedDoc}
+            copyDocument={copyDocument}
+            user={user}
+            onOpenDetail={onOpenDetail}
+            onOpenLog={onOpenLog}
+            onOpenAcordo={onOpenAcordo}
+          />
+          <AgendaSection
+            title={`Sem contato há mais de ${SEM_CONTATO_DIAS} dias`}
+            icon={<CalendarDays className="w-4 h-4" />}
+            iconBgClass="bg-gray-100 dark:bg-dark-bg-secondary text-gray-500"
+            groups={semContato}
+            lastContacts={lastContacts}
+            getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
+            copiedDoc={copiedDoc}
+            copyDocument={copyDocument}
+            user={user}
+            onOpenDetail={onOpenDetail}
+            onOpenLog={onOpenLog}
+            onOpenAcordo={onOpenAcordo}
+          />
+        </>
+      ) : (
+        <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-100 dark:border-dark-border">
+            <h3 className="font-bold text-gray-900 dark:text-dark-text">
+              Carteira completa
+            </h3>
           </div>
-        )}
-      </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/50 dark:bg-dark-bg-secondary text-[11px] font-bold text-gray-400 tracking-wide">
+                  <th className="px-6 py-4">Cliente</th>
+                  <th className="px-6 py-4">Última Interação</th>
+                  <th className="px-6 py-4 text-center">Atraso</th>
+                  <th className="px-6 py-4 text-right">Valor Pendente</th>
+                  <th className="px-6 py-4 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
+                {paginatedClients.length > 0 ? (
+                  paginatedClients.map((group) => (
+                    <ClientQueueRow
+                      key={group.clientId}
+                      group={group}
+                      lastContact={lastContacts[group.document]}
+                      acordoAtivo={!!getAcordoAtivoDoCliente(group.document)}
+                      copiedDoc={copiedDoc}
+                      copyDocument={copyDocument}
+                      user={user}
+                      onOpenDetail={onOpenDetail}
+                      onOpenLog={onOpenLog}
+                      onOpenAcordo={onOpenAcordo}
+                    />
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-6 py-12 text-center text-sm text-gray-500"
+                    >
+                      Nenhum cliente encontrado.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50/30 dark:bg-dark-bg-secondary/30">
+              <p className="text-xs text-gray-500">
+                Mostrando {paginatedClients.length} de{" "}
+                {filteredClientGroups.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40"
+                >
+                  Anterior
+                </button>
+                <div className="flex items-center gap-1">
+                  <span className="w-8 h-8 flex items-center justify-center bg-indigo-600 text-white rounded-lg text-xs font-bold">
+                    {currentPage}
+                  </span>
+                  <span className="text-xs text-gray-400 px-1">de</span>
+                  <span className="text-xs text-gray-600 dark:text-dark-text font-bold">
+                    {totalPages}
+                  </span>
+                </div>
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40"
+                >
+                  Próxima
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
