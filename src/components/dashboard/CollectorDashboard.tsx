@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
 import { USER_TYPE_LABELS } from "../../config/profiles";
 import {
@@ -28,6 +29,7 @@ import {
   Copy,
   Check,
   Phone,
+  X,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
@@ -518,6 +520,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             title="Promessas vencendo hoje/atrasadas"
             icon={<Clock className="w-4 h-4" />}
             iconBgClass="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600"
+            accentBorderClass="border-l-indigo-400 dark:border-l-indigo-600"
             groups={promessas}
             lastContacts={lastContacts}
             getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
@@ -532,6 +535,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             title="Acordo quebrado"
             icon={<AlertCircle className="w-4 h-4" />}
             iconBgClass="bg-red-100 dark:bg-red-900/30 text-red-600"
+            accentBorderClass="border-l-red-400 dark:border-l-red-600"
             groups={acordosQuebrados}
             lastContacts={lastContacts}
             getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
@@ -546,6 +550,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             title="Crítico (90+ dias sem pagar)"
             icon={<Flame className="w-4 h-4" />}
             iconBgClass="bg-orange-100 dark:bg-orange-900/30 text-orange-600"
+            accentBorderClass="border-l-orange-400 dark:border-l-orange-600"
             groups={criticos}
             lastContacts={lastContacts}
             getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
@@ -560,6 +565,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             title={`Sem contato há mais de ${SEM_CONTATO_DIAS} dias`}
             icon={<CalendarDays className="w-4 h-4" />}
             iconBgClass="bg-gray-100 dark:bg-dark-bg-secondary text-gray-500"
+            accentBorderClass="border-l-gray-300 dark:border-l-gray-600"
             groups={semContato}
             lastContacts={lastContacts}
             getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
@@ -711,7 +717,10 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   onOpenAcordo,
 }) => {
   const maxAtraso = clientMaxOverdueDays(group);
+  const phoneValue = group.mobile || group.phone;
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
   return (
+    <>
     <tr className="group hover:bg-gray-50/80 dark:hover:bg-dark-bg-secondary transition-colors cursor-pointer">
       <td className="px-6 py-4" onClick={() => onOpenDetail(group)}>
         <div className="flex flex-col gap-1">
@@ -782,10 +791,10 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleCall(group);
+              setShowPhoneModal(true);
             }}
-            disabled={!(group.mobile || group.phone)}
-            title={group.mobile || group.phone ? "Ligar" : "Cliente sem telefone"}
+            disabled={!phoneValue}
+            title={phoneValue ? "Telefone" : "Cliente sem telefone"}
             className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all border border-indigo-100 disabled:opacity-40 disabled:hover:bg-indigo-50 disabled:hover:text-indigo-600 disabled:cursor-not-allowed"
           >
             <Phone className="w-4 h-4" />
@@ -823,6 +832,58 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
         </div>
       </td>
     </tr>
+    {showPhoneModal &&
+      phoneValue &&
+      createPortal(
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[100] backdrop-blur-sm"
+          onClick={() => setShowPhoneModal(false)}
+        >
+          <div
+            className="bg-white dark:bg-dark-bg rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden border border-gray-200 dark:border-dark-border"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50 dark:bg-dark-bg-secondary">
+              <h3 className="font-bold text-gray-900 dark:text-dark-text">
+                {group.client}
+              </h3>
+              <button
+                onClick={() => setShowPhoneModal(false)}
+                className="p-1.5 hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary rounded-full transition-colors"
+              >
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text text-center">
+                {phoneValue}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => copyDocument(phoneValue)}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-dark-bg-secondary text-gray-700 dark:text-dark-text font-bold text-sm rounded-xl hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary transition-colors"
+                >
+                  {copiedDoc === phoneValue ? (
+                    <Check className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                  {copiedDoc === phoneValue ? "Copiado!" : "Copiar"}
+                </button>
+                <button
+                  onClick={() => handleCall(group)}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-colors"
+                >
+                  <Phone className="w-4 h-4" />
+                  Ligar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 };
 
@@ -832,6 +893,7 @@ interface AgendaSectionProps {
   title: string;
   icon: React.ReactNode;
   iconBgClass: string;
+  accentBorderClass: string;
   groups: ClientGroup[];
   lastContacts: Record<
     string,
@@ -847,12 +909,14 @@ interface AgendaSectionProps {
 }
 
 // Bloco de uma seção da agenda priorizada: cabeçalho com ícone/contagem,
-// até AGENDA_PREVIEW_COUNT linhas visíveis + "ver mais". Não renderiza nada
-// se a seção estiver vazia (evita card vazio poluindo a tela).
+// borda colorida conforme a urgência, e paginação própria (AGENDA_PREVIEW_COUNT
+// por página). Não renderiza nada se a seção estiver vazia (evita card vazio
+// poluindo a tela).
 const AgendaSection: React.FC<AgendaSectionProps> = ({
   title,
   icon,
   iconBgClass,
+  accentBorderClass,
   groups,
   lastContacts,
   getAcordoAtivoDoCliente,
@@ -863,12 +927,21 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   onOpenLog,
   onOpenAcordo,
 }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [groups]);
   if (groups.length === 0) return null;
-  const visible = expanded ? groups : groups.slice(0, AGENDA_PREVIEW_COUNT);
+  const totalPages = Math.ceil(groups.length / AGENDA_PREVIEW_COUNT);
+  const visible = groups.slice(
+    (page - 1) * AGENDA_PREVIEW_COUNT,
+    page * AGENDA_PREVIEW_COUNT,
+  );
 
   return (
-    <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden">
+    <div
+      className={`bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border border-l-4 ${accentBorderClass} shadow-sm overflow-hidden`}
+    >
       <div className="p-4 border-b border-gray-100 dark:border-dark-border flex items-center gap-3">
         <div className={`p-2 rounded-lg ${iconBgClass}`}>{icon}</div>
         <h3 className="font-bold text-gray-900 dark:text-dark-text">{title}</h3>
@@ -896,15 +969,37 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
           </tbody>
         </table>
       </div>
-      {groups.length > AGENDA_PREVIEW_COUNT && (
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="w-full py-2.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-dark-bg-secondary transition-colors"
-        >
-          {expanded
-            ? "Ver menos"
-            : `Ver mais (${groups.length - AGENDA_PREVIEW_COUNT})`}
-        </button>
+      {totalPages > 1 && (
+        <div className="p-3 border-t border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50/30 dark:bg-dark-bg-secondary/30">
+          <p className="text-xs text-gray-500">
+            Mostrando {visible.length} de {groups.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={page === 1}
+              className="px-3 py-1.5 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <div className="flex items-center gap-1">
+              <span className="w-7 h-7 flex items-center justify-center bg-indigo-600 text-white rounded-lg text-xs font-bold">
+                {page}
+              </span>
+              <span className="text-xs text-gray-400 px-1">de</span>
+              <span className="text-xs text-gray-600 dark:text-dark-text font-bold">
+                {totalPages}
+              </span>
+            </div>
+            <button
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={page === totalPages}
+              className="px-3 py-1.5 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40"
+            >
+              Próxima
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
