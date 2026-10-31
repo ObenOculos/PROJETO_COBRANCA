@@ -597,6 +597,145 @@ cobrador (reabre manual), card de largura total com 1 cobrador, tabela com
 rank/ordenação batendo com os totais — tudo certo, sem erro novo no
 console. Commitado.
 
+## Acordo de renegociação (Interno/Terceirizado/Jurídico) — concluído 2026-10-31
+
+Pedido do usuário em 2026-10-30, fora do cronograma da reunião de 28/10:
+melhorar a interface dos perfis "carteira" (Interno/Terceirizado/Jurídico =
+SPC — **não** o Cobrador Externo, que trabalha por rota/visita e tem lógica
+diferente) pra cobrir o que o Cedrus (sistema antigo) faz hoje: ligar pro
+cliente e negociar/parcelar a dívida. Prints do Cedrus (`01.jpeg`/`02.jpeg`
+na raiz do projeto, só referência de fluxo — não commitados) mostraram uma
+tela "Negociações" (lista/filtro de acordos por devedor/status) e um fluxo
+de "Contato Receptivo" com "Realizar Contato / Negociação".
+
+**Achado no caminho:** o registro de ligação atual (`LogContactModal.tsx`,
+botão "Registrar Interação") grava o resultado como uma visita falsa em
+`scheduled_visits` (`status: "realizada"`) em vez de usar a tabela certa
+que já existe pra isso (`collection_attempts`, usada por outro componente,
+`CollectionModal.tsx`/`addAttempt`) — dois mecanismos de registrar contato
+coexistindo. Recomendei corrigir isso primeiro (escopo pequeno, bug real) e
+deixar "acordo" pra quando desse pra modelar com calma; o usuário decidiu
+seguir direto para o acordo completo. **`LogContactModal` não foi tocado
+nesta sessão — continua gravando a visita falsa.**
+
+**Modelagem (skill `arquiteto-cobranca`), decidida com o usuário:**
+- Quebra automática do acordo: **15 dias** de atraso numa parcela sem
+  quitar. Sem `pg_cron` configurado neste projeto — checado pelo front uma
+  vez por sessão (`marcar_acordos_quebrados()`, chamada não-bloqueante
+  depois da carga inicial em `CollectionContext.tsx`). Se a sessão for
+  aberta raramente, a quebra demora a refletir; migrar pra `pg_cron` se
+  isso incomodar na prática.
+- Criar acordo trava `BANCO_DADOS.situacao` do cliente em **"Em acordo"**
+  (nova situação, só nos 3 perfis carteira) até o acordo resolver
+  (cumprido/cancelado/quebrado). A trava é um trigger `BEFORE UPDATE` em
+  `BANCO_DADOS` (`trg_protege_situacao_acordo`) — não só checagem no
+  front, porque a importação da planilha do ERP (`DatabaseUpload.tsx`) faz
+  `UPDATE` direto do navegador, fora de qualquer RPC.
+- Reatribuição de carteira **bloqueada** enquanto o acordo está ativo:
+  `atribuir_clientes_em_lote`/`remover_cobrador_em_lote`/
+  `liberar_cliente_da_carteira` passam a pular (`WHERE NOT
+  cliente_tem_acordo_ativo(...)`) quem tem acordo ativo.
+- Datas de parcela livres (sem restrição tipo `allowed_visit_dates`) — bom
+  o bastante pro primeiro corte.
+
+**Schema novo** (migration `20261030000005_criar_acordos_renegociacao.sql`,
+aplicada em produção):
+- `acordos`: termos originais imutáveis (`valor_negociado`,
+  `numero_parcelas`); `status` (`ativo`/`cumprido`/`cancelado`/`quebrado`)
+  é o único campo de ciclo de vida que muda, nunca reaberto — renegociar é
+  sempre um acordo novo (`acordo_origem_id` encadeia, coluna existe mas
+  fluxo de renegociação em si não foi implementado nesta fatia). Índice
+  único `uniq_acordo_ativo_por_cliente`: no máximo 1 acordo ativo por
+  cliente (mesmo princípio de "1 visita ativa por cliente", migration
+  20261030000004).
+- `acordo_titulos`: N:N com `BANCO_DADOS` (títulos consolidados no
+  acordo), com `saldo_no_momento` capturado na criação (fato histórico de
+  auditoria).
+- `acordo_parcelas`: parcelas futuras combinadas, imutáveis. **Sem coluna
+  de status "paga/atrasada"** — é projeção do ledger de pagamentos, mesma
+  lição já aplicada em `BANCO_DADOS` (item 1c: não duplicar "situação da
+  dívida" numa coluna que alguma tela atualiza por conta própria).
+- `acordo_pagamentos`: ledger append-only, espelha exatamente a convenção
+  de `sale_payments` (pagamento positivo, estorno é registro novo com
+  valor negativo + `estorno_de` apontando pro original — nunca
+  `UPDATE`/`DELETE`).
+- RPCs: `criar_acordo` (acordo + títulos + parcelas numa transação),
+  `registrar_pagamento_acordo` (marca `cumprido` automático quando todas
+  as parcelas quitam), `cancelar_acordo` (motivo obrigatório),
+  `marcar_acordos_quebrados` (varredura dos 15 dias). Funções auxiliares
+  `cliente_tem_acordo_ativo`/`situacao_primaria_do_tipo`/
+  `saldo_acordo_parcela`.
+
+**Front:** tipos novos (`Acordo`/`AcordoTitulo`/`AcordoParcela`/
+`AcordoPagamento` em `types/index.ts`), funções no `CollectionContext`
+(`criarAcordo`/`fetchAcordoDetalhe`/`registrarPagamentoAcordo`/
+`cancelarAcordo`/`getAcordoAtivoDoCliente`), dois componentes novos em
+`components/dashboard/`: `AcordoModal.tsx` (criação — escolhe títulos em
+aberto, gera/edita parcelas) e `AcordoDetailModal.tsx` (acompanhar
+parcelas, registrar pagamento, cancelar). Botão "Negociar" novo na tabela
+de `InternalCollectorWallet` (dentro de `CollectorDashboard.tsx`), com
+badge "Em acordo" quando o cliente já tem um ativo. `config/profiles.ts`
+ganhou `SITUACAO_EM_ACORDO`/`WALLET_COLLECTOR_TYPES` e `ALL_SITUACOES`
+passou a deduplicar (sem isso "Em acordo", presente nos 3 perfis carteira,
+apareceria 3x nos dropdowns de `AddTituloModal`/`BulkAssignmentModal`).
+
+`tsc -b` limpo; lint de cada arquivo tocado sem aumentar a contagem
+(`CollectorDashboard.tsx` 19→19, `CollectionContext.tsx` 10→10,
+`types/index.ts` 3→3, `profiles.ts` e os 2 arquivos novos limpos).
+
+**Testado em produção em 2026-10-31** com clientes reais (criar acordo →
+pagamento parcial → pagamento total → `cumprido` automático; e criar
+acordo → pagamento parcial → cancelar com motivo): fluxo completo
+funcionando. No caminho, quatro bugs reais foram achados e corrigidos (todos
+testados ao vivo depois do fix):
+
+- **Pagamento do acordo não refletia no saldo do título original.**
+  `registrar_pagamento_acordo` só gravava no ledger próprio do acordo
+  (`acordo_pagamentos`); `BANCO_DADOS.valor_recebido` nunca mudava, então
+  tudo que lê saldo direto da tabela (`saldo_por_documento`,
+  `cliente_tem_saldo_aberto`, `hasOpenBalance`/`getClientPending` no front)
+  continuava mostrando o cliente como devendo o valor cheio depois de ele
+  quitar o acordo inteiro. Corrigido distribuindo o pagamento nos títulos
+  originais consolidados (mais antigo primeiro), mesma mecânica que
+  `process_payment` já usa pro pagamento normal — migration
+  `20261031000001_acordo_distribui_pagamento_nos_titulos.sql`. Efeito
+  colateral correto: o pagamento via acordo passa a contar pro Desempenho
+  do cobrador também, mesmo campo que já credita lá. Gap conhecido: acordos
+  pagos **antes** desta migration não são corrigidos retroativamente.
+- **Carteira do cobrador não atualizava sozinha** (precisava de F5 depois
+  de uma atribuição, pagamento ou criação de acordo). `useMemo`s em
+  `CollectorDashboard.tsx` (`myCollections`/`filteredCollections`/
+  `clientGroups`/`myVisits`/`periodMetrics`) tinham `[user?.id]` como
+  dependência, sem as funções (`getClientGroups` etc.) que o eslint já
+  apontava como faltando — ficavam presos no resultado calculado na
+  primeira vez até o `user?.id` mudar (ex.: relogin). Corrigido incluindo
+  as funções nas dependências.
+- **`requestCollections()` com race condition.** Reentrância travada só
+  por um `ref` booleano: uma segunda chamada enquanto a primeira ainda
+  carregava (comum no login do gestor, via `ensureSettledCollections`)
+  recebia uma Promise já resolvida sem esperar a carga real terminar —
+  quem fazia `await requestCollections()` seguia adiante com
+  `allCollections` parcial. Corrigido guardando e devolvendo a mesma
+  Promise em voo pra qualquer chamador concorrente.
+- **`AcordoDetailModal` usava `window.prompt()`** pro motivo do
+  cancelamento — trava a aba inteira enquanto o dialog nativo está aberto
+  (achado na prática: travou a automação do teste). Trocado por campo de
+  texto dentro do próprio modal.
+
+Também um ajuste de UX a pedido do usuário: o dropdown "Status das
+Parcelas" do `BulkAssignmentModal` agora mostra só as situações do perfil
+do cobrador selecionado (`SITUACAO_BY_PROFILE`), em vez de todas —
+minimiza erro de atribuir um status fora do domínio do cobrador de
+destino.
+
+**Achado, não corrigido:** `AcordoModal.tsx` mostra "venc. Invalid Date"
+pra títulos de alguns clientes (reproduzido com um cliente real) — bug de
+exibição, não bloqueou a criação do acordo, mas precisa de correção.
+
+**Ainda pendente:** decidir se/quando corrigir `LogContactModal` (achado
+acima, registra contato como visita falsa em vez de usar
+`collection_attempts`) — segue intacto, fora do escopo desta sessão.
+
 ## Concluído
 
 ### 2026-10-06

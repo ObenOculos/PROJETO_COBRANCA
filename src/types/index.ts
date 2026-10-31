@@ -373,6 +373,33 @@ export interface CollectionContextType {
     collectionId: number,
     attempt: Omit<CollectionAttempt, "id">,
   ) => Promise<void>;
+  // Acordos de renegociacao (perfis carteira: Interno/Terceirizado/
+  // Juridico). Ver supabase/migrations/20261030000005_criar_acordos_renegociacao.sql.
+  acordos: Acordo[];
+  fetchAcordos: () => Promise<void>;
+  getAcordoAtivoDoCliente: (clientDocument: string) => Acordo | undefined;
+  criarAcordo: (params: {
+    clientDocument: string;
+    titulos: { collectionId: number; saldoNoMomento: number }[];
+    parcelas: {
+      numero: number;
+      valorParcela: number;
+      dataVencimento: string;
+    }[];
+  }) => Promise<Acordo>;
+  fetchAcordoDetalhe: (acordoId: string) => Promise<{
+    acordo: Acordo;
+    titulos: AcordoTitulo[];
+    parcelas: AcordoParcela[];
+    pagamentos: AcordoPagamento[];
+  }>;
+  registrarPagamentoAcordo: (params: {
+    acordoParcelaId: string;
+    valorPago: number;
+    dataPagamento: string;
+    notes?: string;
+  }) => Promise<AcordoPagamento>;
+  cancelarAcordo: (acordoId: string, motivo: string) => Promise<void>;
   addUser: (user: Omit<User, "id" | "createdAt">) => Promise<void>;
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
@@ -531,6 +558,55 @@ export interface SalePaymentInput {
   paymentMethod?: string;
   notes?: string;
   discountAmount?: number;
+}
+
+// Acordo de renegociacao (parcelamento futuro combinado com o cliente).
+// Ver supabase/migrations/20261030000005_criar_acordos_renegociacao.sql.
+export type AcordoStatus = "ativo" | "cumprido" | "cancelado" | "quebrado";
+
+export interface Acordo {
+  id: string;
+  clientDocument: string;
+  clientName?: string | null;
+  collectorId: string;
+  valorNegociado: number;
+  numeroParcelas: number;
+  status: AcordoStatus;
+  motivoCancelamento?: string | null;
+  acordoOrigemId?: string | null;
+  createdById?: string | null;
+  createdAt: string;
+  resolvedAt?: string | null;
+}
+
+export interface AcordoTitulo {
+  id: string;
+  acordoId: string;
+  collectionId: number;
+  saldoNoMomento: number;
+  createdAt: string;
+}
+
+export interface AcordoParcela {
+  id: string;
+  acordoId: string;
+  numero: number;
+  valorParcela: number;
+  dataVencimento: string;
+  createdAt: string;
+}
+
+export interface AcordoPagamento {
+  id: string;
+  acordoParcelaId: string;
+  valorPago: number;
+  dataPagamento: string;
+  collectorId?: string | null;
+  notes?: string | null;
+  estornoDe?: string | null;
+  motivo?: string | null;
+  registradoPorId?: string | null;
+  createdAt: string;
 }
 
 export interface SaleBalance {

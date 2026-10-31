@@ -39,6 +39,141 @@ export type Database = {
   };
   public: {
     Tables: {
+      acordos: {
+        Row: {
+          id: string;
+          client_document: string;
+          client_name: string | null;
+          collector_id: string;
+          valor_negociado: number;
+          numero_parcelas: number;
+          status: string;
+          motivo_cancelamento: string | null;
+          acordo_origem_id: string | null;
+          created_by_id: string | null;
+          created_at: string;
+          resolved_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          client_document: string;
+          client_name?: string | null;
+          collector_id: string;
+          valor_negociado: number;
+          numero_parcelas: number;
+          status?: string;
+          motivo_cancelamento?: string | null;
+          acordo_origem_id?: string | null;
+          created_by_id?: string | null;
+          created_at?: string;
+          resolved_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          client_document?: string;
+          client_name?: string | null;
+          collector_id?: string;
+          valor_negociado?: number;
+          numero_parcelas?: number;
+          status?: string;
+          motivo_cancelamento?: string | null;
+          acordo_origem_id?: string | null;
+          created_by_id?: string | null;
+          created_at?: string;
+          resolved_at?: string | null;
+        };
+        Relationships: [];
+      };
+      acordo_titulos: {
+        Row: {
+          id: string;
+          acordo_id: string;
+          collection_id: number;
+          saldo_no_momento: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          acordo_id: string;
+          collection_id: number;
+          saldo_no_momento: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          acordo_id?: string;
+          collection_id?: number;
+          saldo_no_momento?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      acordo_parcelas: {
+        Row: {
+          id: string;
+          acordo_id: string;
+          numero: number;
+          valor_parcela: number;
+          data_vencimento: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          acordo_id: string;
+          numero: number;
+          valor_parcela: number;
+          data_vencimento: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          acordo_id?: string;
+          numero?: number;
+          valor_parcela?: number;
+          data_vencimento?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      acordo_pagamentos: {
+        Row: {
+          id: string;
+          acordo_parcela_id: string;
+          valor_pago: number;
+          data_pagamento: string;
+          collector_id: string | null;
+          notes: string | null;
+          estorno_de: string | null;
+          motivo: string | null;
+          registrado_por_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          acordo_parcela_id: string;
+          valor_pago: number;
+          data_pagamento: string;
+          collector_id?: string | null;
+          notes?: string | null;
+          estorno_de?: string | null;
+          motivo?: string | null;
+          registrado_por_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          acordo_parcela_id?: string;
+          valor_pago?: number;
+          data_pagamento?: string;
+          collector_id?: string | null;
+          notes?: string | null;
+          estorno_de?: string | null;
+          motivo?: string | null;
+          registrado_por_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       allowed_visit_dates: {
         Row: {
           allowed_date: number | null;
@@ -1061,6 +1196,31 @@ export type Database = {
           p_situacao: string;
           p_usuario_id?: string;
         };
+        Returns: number;
+      };
+      criar_acordo: {
+        Args: {
+          p_client_document: string;
+          p_titulos: Json;
+          p_parcelas: Json;
+        };
+        Returns: Database["public"]["Tables"]["acordos"]["Row"];
+      };
+      registrar_pagamento_acordo: {
+        Args: {
+          p_acordo_parcela_id: string;
+          p_valor_pago: number;
+          p_data_pagamento: string;
+          p_notes?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["acordo_pagamentos"]["Row"];
+      };
+      cancelar_acordo: {
+        Args: { p_acordo_id: string; p_motivo: string };
+        Returns: Database["public"]["Tables"]["acordos"]["Row"];
+      };
+      marcar_acordos_quebrados: {
+        Args: Record<PropertyKey, never>;
         Returns: number;
       };
       transferir_clientes: {

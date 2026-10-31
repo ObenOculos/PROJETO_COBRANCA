@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ChevronUp,
   Settings,
+  Handshake,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
@@ -33,7 +34,7 @@ import TabTransition from "../common/TabTransition";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
-import { FilterOptions } from "../../types";
+import { FilterOptions, ClientGroup } from "../../types";
 import { Notification } from "../../contexts/NotificationContext";
 import { resolveSaleKey } from "../../filters/sales";
 import {
@@ -43,6 +44,8 @@ import {
 
 import LogContactModal from "./LogContactModal";
 import ClientDetailModal from "./ClientDetailModal";
+import AcordoModal from "./AcordoModal";
+import AcordoDetailModal from "./AcordoDetailModal";
 import { todayLocalStr } from "../../config/visitStatus";
 
 const toDate = (dateInput: string | Date | null | undefined): Date | null => {
@@ -72,6 +75,7 @@ interface InternalCollectorWalletProps {
   myCollections: any[];
   onOpenLog: (client: any) => void;
   onOpenDetail: (client: any) => void;
+  onOpenAcordo: (client: ClientGroup) => void;
 }
 
 const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
@@ -82,7 +86,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   myCollections,
   onOpenLog,
   onOpenDetail,
+  onOpenAcordo,
 }) => {
+  const { getAcordoAtivoDoCliente } = useCollection();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAging, setFilterAging] = useState("all");
   const [filterCity, setFilterCity] = useState("all");
@@ -445,13 +451,18 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                         className="px-6 py-4"
                         onClick={() => onOpenDetail(group)}
                       >
-                        <div className="flex flex-col">
+                        <div className="flex flex-col gap-1">
                           <span className="font-bold text-gray-900 dark:text-dark-text group-hover:text-indigo-600 transition-colors">
                             {group.client}
                           </span>
                           <span className="text-xs text-gray-400">
                             {group.document}
                           </span>
+                          {getAcordoAtivoDoCliente(group.document) && (
+                            <span className="w-fit px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
+                              Em acordo
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td
@@ -527,6 +538,16 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                             className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all border border-indigo-100"
                           >
                             <CheckCircle className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenAcordo(group);
+                            }}
+                            className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white rounded-xl transition-all border border-amber-100"
+                            title="Negociar / Acordo"
+                          >
+                            <Handshake className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -662,6 +683,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     getVisitsByCollector,
     salePayments,
     monthlyGoals,
+    getAcordoAtivoDoCliente,
   } = useCollection();
   const collectionTableRef = useRef<CollectionTableRef>(null);
 
@@ -671,6 +693,12 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedClientForDetail, setSelectedClientForDetail] =
     useState<any>(null);
+  const [isAcordoModalOpen, setIsAcordoModalOpen] = useState(false);
+  const [selectedClientForAcordo, setSelectedClientForAcordo] =
+    useState<ClientGroup | null>(null);
+  const [selectedAcordoId, setSelectedAcordoId] = useState<string | null>(
+    null,
+  );
 
   // Usa a aba externa se fornecida, senão gerencia internamente
   const internalActiveTab: "overview" | "collections" | "route" | "visits" =
@@ -1175,15 +1203,25 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     );
   };
 
+  // getCollectorCollections/getFilteredCollections/getClientGroups/
+  // getVisitsByCollector sao fabricas memoizadas no contexto (useMemo com
+  // deps em `collections`/`scheduledVisits`): a referencia delas muda quando
+  // os dados mudam. Sem elas nas deps aqui, este useMemo so recalcula quando
+  // `user?.id` muda (ex.: relogin) — uma atribuicao, um pagamento de acordo
+  // etc. atualizam `collections` no contexto, mas a carteira exibida ficava
+  // presa no resultado antigo ate um F5 forcar tudo a remontar do zero.
   const myCollections = useMemo(
     () => getCollectorCollections(user?.id || ""),
-    [user?.id],
+    [user?.id, getCollectorCollections],
   );
   const filteredCollections = useMemo(
     () => getFilteredCollections(filters, "collector", user?.id),
-    [filters, user?.id],
+    [filters, user?.id, getFilteredCollections],
   );
-  const clientGroups = useMemo(() => getClientGroups(user?.id), [user?.id]);
+  const clientGroups = useMemo(
+    () => getClientGroups(user?.id),
+    [user?.id, getClientGroups],
+  );
   // Carteira ativa (quem ainda deve). clientGroups completo continua indo para
   // as metricas de recebido.
   const openClientGroups = useMemo(
@@ -1192,7 +1230,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   );
   const myVisits = useMemo(
     () => getVisitsByCollector(user?.id || ""),
-    [user?.id],
+    [user?.id, getVisitsByCollector],
   );
   // Perfis de carteira (sem rota/visitas em campo): Interno, Terceirizado e Jurídico.
   const isWalletCollector =
@@ -1203,7 +1241,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   // Calcular métricas gamificadas
   const { metrics: periodMetrics, goals } = useMemo(
     () => getMetricsByPeriod(salePayments, myVisits),
-    [salePayments, myVisits, monthlyGoals, user],
+    [salePayments, myVisits, monthlyGoals, user, getMetricsByPeriod],
   );
 
   // Simplified logic - group by sale to count correctly
@@ -1399,6 +1437,15 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         onOpenDetail={(client) => {
           setSelectedClientForDetail(client);
           setIsDetailModalOpen(true);
+        }}
+        onOpenAcordo={(client) => {
+          const ativo = getAcordoAtivoDoCliente(client.document);
+          if (ativo) {
+            setSelectedAcordoId(ativo.id);
+          } else {
+            setSelectedClientForAcordo(client);
+            setIsAcordoModalOpen(true);
+          }
         }}
       />
     );
@@ -1877,6 +1924,27 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             setIsDetailModalOpen(false);
             setSelectedClientForDetail(null);
           }}
+        />
+      )}
+
+      {isAcordoModalOpen && selectedClientForAcordo && (
+        <AcordoModal
+          client={selectedClientForAcordo}
+          onClose={() => {
+            setIsAcordoModalOpen(false);
+            setSelectedClientForAcordo(null);
+          }}
+          onSuccess={() => {
+            setIsAcordoModalOpen(false);
+            setSelectedClientForAcordo(null);
+          }}
+        />
+      )}
+
+      {selectedAcordoId && (
+        <AcordoDetailModal
+          acordoId={selectedAcordoId}
+          onClose={() => setSelectedAcordoId(null)}
         />
       )}
     </div>

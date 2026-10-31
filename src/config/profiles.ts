@@ -12,10 +12,32 @@ export const SITUACAO_BY_PROFILE: Record<
   readonly string[]
 > = {
   collector: ["Em mãos", "Em tratamento"],
-  internal_collector: ["Cobrança Interna", "Aguardando Interno"],
-  third_party_collector: ["Cobrança Terceirizada", "Aguardando Terceirizado"],
-  legal_collector: ["Cobrança Jurídica", "Aguardando Jurídico"],
+  internal_collector: ["Cobrança Interna", "Aguardando Interno", "Em acordo"],
+  third_party_collector: [
+    "Cobrança Terceirizada",
+    "Aguardando Terceirizado",
+    "Em acordo",
+  ],
+  legal_collector: ["Cobrança Jurídica", "Aguardando Jurídico", "Em acordo"],
 };
+
+/**
+ * Situacao de cliente com acordo de renegociacao ativo (tabela `acordos`).
+ * So existe nos 3 perfis "carteira" (Interno/Terceirizado/Juridico) -- ver
+ * [[WALLET_COLLECTOR_TYPES]]. Cobrador Externo (campo/visita) fica de fora:
+ * nao cria acordo. Espelha a CHECK constraint do banco (migration
+ * 20261030000005).
+ */
+export const SITUACAO_EM_ACORDO = "Em acordo";
+
+/** Perfis que podem criar/gerenciar acordo de renegociacao (telefone +
+ * negociacao, sem rota de visita em campo). Mesmo conjunto de
+ * `isWalletCollector` em CollectorDashboard.tsx. */
+export const WALLET_COLLECTOR_TYPES: Exclude<UserType, "manager">[] = [
+  "internal_collector",
+  "third_party_collector",
+  "legal_collector",
+];
 
 /**
  * The confirmed situacao set when a client is assigned to a specific user of
@@ -96,10 +118,17 @@ export const ENCERRAMENTO_SITUACOES: readonly string[] = ["Falecido"];
  * tres ficaram defasadas quando o perfil Terceirizado foi criado — no upload
  * isso apagava silenciosamente a situacao dos clientes dessas fases, porque
  * valor desconhecido vira NULL.
+ *
+ * Deduplicada: "Em acordo" aparece nos 3 perfis carteira em
+ * SITUACAO_BY_PROFILE (ver [[SITUACAO_EM_ACORDO]]), mas telas como
+ * AddTituloModal/BulkAssignmentModal renderizam esta lista direto como
+ * opcoes de dropdown — sem dedupe ela apareceria repetida.
  */
 export const ALL_SITUACOES: readonly string[] = [
-  ...Object.values(SITUACAO_BY_PROFILE).flat(),
-  ...ENCERRAMENTO_SITUACOES,
+  ...new Set([
+    ...Object.values(SITUACAO_BY_PROFILE).flat(),
+    ...ENCERRAMENTO_SITUACOES,
+  ]),
 ];
 
 /** All situacoes that exist outside the given profile's domain. */

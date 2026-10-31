@@ -24,6 +24,11 @@ import {
   AllowedVisitDate,
   isCollectorType,
   CollectionsScope,
+  Acordo,
+  AcordoStatus,
+  AcordoTitulo,
+  AcordoParcela,
+  AcordoPagamento,
 } from "../types";
 import { supabase } from "../lib/supabase";
 import {
@@ -36,6 +41,7 @@ import {
   lastVisitOutcomeByClient,
 } from "../config/visitOutcomes";
 import { rescheduleReasonLabel } from "../config/rescheduleReasons";
+import { Database } from "../types/database.types";
 import { useAuth } from "./AuthContext";
 import { useLoading } from "./LoadingContext";
 import { useOffline } from "../hooks/useOffline";
@@ -253,6 +259,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     Map<string, string>
   >(new Map());
   const [monthlyGoals, setMonthlyGoals] = useState<MonthlyGoal[]>([]);
+  // Acordos de renegociacao (telefone + negociacao, perfis carteira). Lista
+  // leve (so a linha de `acordos`, sem parcelas/pagamentos aninhados) --
+  // ver fetchAcordoDetalhe para o detalhe sob demanda de um acordo.
+  const [acordos, setAcordos] = useState<Acordo[]>([]);
   const [allowedVisitDates, setAllowedVisitDates] = useState<
     AllowedVisitDate[]
   >([]);
@@ -337,6 +347,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   // do dia — exigir uma consulta manual seria atrito diario sem ganho.
   const [collectionsRequested, setCollectionsRequested] = useState(false);
   const collectionsRequestedRef = React.useRef(false);
+  // Promessa em voo de requestCollections. Sem isto, um segundo chamador
+  // enquanto a primeira carga ainda roda cai no `if (collectionsRequestedRef.current) return`
+  // e recebe uma promise ja resolvida — quem faz `await requestCollections()`
+  // (ensureSettledCollections) segue adiante com `allCollections` parcial
+  // (o flush progressivo ainda nao terminou), e a tela renderiza numeros
+  // subestimados ate um refresh manual.
+  const requestCollectionsPromiseRef = React.useRef<Promise<void> | null>(
+    null,
+  );
 
   const markCollectionsRequested = () => {
     collectionsRequestedRef.current = true;
@@ -675,6 +694,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             fetchAllowedVisitDates(),
             fetchActiveAddressHistory(),
             fetchReincidenciaResets(),
+            fetchAcordos(),
           ]);
 
           // Gestor: nada de BANCO_DADOS agora. Ver `collectionsRequested`.
@@ -684,6 +704,24 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             markCollectionsRequested();
             await fetchCollections();
           }
+
+          // Sem pg_cron neste projeto (ver migration 20261030000005): a
+          // quebra automatica de acordo por atraso (15 dias) e checada aqui,
+          // uma vez por sessao, em vez de um job agendado no banco. Nao
+          // bloqueia a tela — roda depois que os dados principais ja
+          // carregaram.
+          supabase
+            .rpc("marcar_acordos_quebrados")
+            .then(({ data, error: quebraError }) => {
+              if (quebraError) {
+                console.error("Erro ao checar acordos quebrados:", quebraError);
+                return;
+              }
+              if ((data ?? 0) > 0) {
+                console.log(`${data} acordo(s) marcado(s) como quebrado.`);
+                fetchAcordos();
+              }
+            });
         } catch (error) {
           console.error("Erro ao carregar dados iniciais:", error);
           setError("Erro ao carregar dados iniciais. Tente novamente.");
@@ -928,7 +966,23 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Contagem antecipada: sem saber quantas paginas existem nao da para
       // dispara-las em paralelo. Se falhar, cai para a varredura sequencial.
-      let { count, error: countError } = await countFrom();
+      //
+      // O supabase-js nem sempre preenche `error` num HEAD com status >= 500
+      // (resposta sem corpo pra parsear como PostgrestError) — ele volta
+      // como sucesso com `count: 0`. Sem checar o status manualmente, um 503
+      // passageiro no servidor vira "cliente sem titulo nenhum" pro usuario,
+      // em vez de cair pra paginacao sequencial.
+      let { count, error: countError, status: countStatus } =
+        await countFrom();
+      if (countStatus >= 300 && !countError) {
+        countError = {
+          message: `HTTP ${countStatus} ao contar ${source}`,
+          details: "",
+          hint: "",
+          code: String(countStatus),
+          name: "PostgrestError",
+        };
+      }
 
       // A view pode nao existir ainda (codigo publicado antes da migration).
       // Subir o app com a tabela inteira e ruim, mas subir sem dado nenhum e
@@ -940,7 +994,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         );
         effectiveScope = "all";
         source = COLLECTIONS_SOURCE.all;
-        ({ count, error: countError } = await countFrom());
+        ({ count, error: countError, status: countStatus } =
+          await countFrom());
+        if (countStatus >= 300 && !countError) {
+          countError = {
+            message: `HTTP ${countStatus} ao contar ${source}`,
+            details: "",
+            hint: "",
+            code: String(countStatus),
+            name: "PostgrestError",
+          };
+        }
       }
 
       if (countError) {
@@ -1058,8 +1122,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   // "active" exclui. Sem isso os numeros dessas telas ficam subestimados.
   // Carga sob demanda da Cobranca do gestor. Idempotente: se os dados ja foram
   // pedidos (por aqui ou por uma aba que promoveu o escopo), nao refaz nada.
-  const requestCollections = async () => {
-    if (collectionsRequestedRef.current) return;
+  const requestCollections = (): Promise<void> => {
+    // Carga em voo: devolve a MESMA promise em vez de uma ja resolvida, senao
+    // quem faz `await requestCollections()` (ensureSettledCollections) acha
+    // que terminou antes da hora.
+    if (requestCollectionsPromiseRef.current) {
+      return requestCollectionsPromiseRef.current;
+    }
+    if (collectionsRequestedRef.current) return Promise.resolve();
 
     // Trava a reentrada no ref (efeito imediato, ao contrario do estado), mas
     // NAO publica `collectionsRequested` ainda: trocar a tela agora exibiria
@@ -1069,11 +1139,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     // fetchCollections so baixa o loading no finally e nunca o sobe — sem isto
     // o botao nao teria como indicar que a consulta esta em andamento.
     setLoading(true);
-    try {
-      await fetchCollections();
-    } finally {
-      setCollectionsRequested(true);
-    }
+    const promise = (async () => {
+      try {
+        await fetchCollections();
+      } finally {
+        setCollectionsRequested(true);
+        requestCollectionsPromiseRef.current = null;
+      }
+    })();
+    requestCollectionsPromiseRef.current = promise;
+    return promise;
   };
 
   const ensureAllCollections = async () => {
@@ -1312,6 +1387,214 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         err instanceof Error ? err.message : "Erro ao adicionar tentativa",
       );
     }
+  };
+
+  // --- Acordos de renegociacao (perfis carteira: Interno/Terceirizado/
+  // Juridico) --- ver supabase/migrations/20261030000005_criar_acordos_renegociacao.sql.
+
+  type AcordoRow = Database["public"]["Tables"]["acordos"]["Row"];
+  type AcordoTituloRow = Database["public"]["Tables"]["acordo_titulos"]["Row"];
+  type AcordoParcelaRow =
+    Database["public"]["Tables"]["acordo_parcelas"]["Row"];
+  type AcordoPagamentoRow =
+    Database["public"]["Tables"]["acordo_pagamentos"]["Row"];
+
+  const mapAcordoRow = (row: AcordoRow): Acordo => ({
+    id: row.id,
+    clientDocument: row.client_document,
+    clientName: row.client_name,
+    collectorId: row.collector_id,
+    valorNegociado: Number(row.valor_negociado),
+    numeroParcelas: row.numero_parcelas,
+    status: row.status as AcordoStatus,
+    motivoCancelamento: row.motivo_cancelamento,
+    acordoOrigemId: row.acordo_origem_id,
+    createdById: row.created_by_id,
+    createdAt: row.created_at,
+    resolvedAt: row.resolved_at,
+  });
+
+  const fetchAcordos = async () => {
+    try {
+      const { data, error: fetchError } = await supabase
+        .from("acordos")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (fetchError) throw fetchError;
+      setAcordos((data ?? []).map(mapAcordoRow));
+    } catch (err) {
+      console.error("Erro ao buscar acordos:", err);
+    }
+  };
+
+  /** Acordo ATIVO do cliente, se houver — no máximo 1 por vez (ver índice
+   * único `uniq_acordo_ativo_por_cliente`). */
+  const getAcordoAtivoDoCliente = (
+    clientDocument: string,
+  ): Acordo | undefined =>
+    acordos.find(
+      (a) => a.clientDocument === clientDocument && a.status === "ativo",
+    );
+
+  const criarAcordo = async (params: {
+    clientDocument: string;
+    titulos: { collectionId: number; saldoNoMomento: number }[];
+    parcelas: {
+      numero: number;
+      valorParcela: number;
+      dataVencimento: string;
+    }[];
+  }): Promise<Acordo> => {
+    const { data, error: rpcError } = await supabase
+      .rpc("criar_acordo", {
+        p_client_document: params.clientDocument,
+        p_titulos: params.titulos.map((t) => ({
+          collection_id: t.collectionId,
+          saldo_no_momento: t.saldoNoMomento,
+        })),
+        p_parcelas: params.parcelas.map((p) => ({
+          numero: p.numero,
+          valor_parcela: p.valorParcela,
+          data_vencimento: p.dataVencimento,
+        })),
+      })
+      .single();
+
+    if (rpcError) {
+      console.error("Erro ao criar acordo:", rpcError);
+      throw rpcError;
+    }
+
+    const acordo = mapAcordoRow(data);
+    setAcordos((prev) => [acordo, ...prev]);
+    // situacao do cliente mudou para "Em acordo" no banco (trigger) —
+    // refletir no estado local sem esperar um refetch de collections.
+    applyLocalStatus(
+      params.titulos.map((t) => t.collectionId),
+      "Em acordo",
+    );
+    return acordo;
+  };
+
+  const fetchAcordoDetalhe = async (
+    acordoId: string,
+  ): Promise<{
+    acordo: Acordo;
+    titulos: AcordoTitulo[];
+    parcelas: AcordoParcela[];
+    pagamentos: AcordoPagamento[];
+  }> => {
+    const [acordoRes, titulosRes, parcelasRes, pagamentosRes] =
+      await Promise.all([
+        supabase.from("acordos").select("*").eq("id", acordoId).single(),
+        supabase
+          .from("acordo_titulos")
+          .select("*")
+          .eq("acordo_id", acordoId),
+        supabase
+          .from("acordo_parcelas")
+          .select("*")
+          .eq("acordo_id", acordoId)
+          .order("numero"),
+        supabase
+          .from("acordo_pagamentos")
+          .select("*, acordo_parcelas!inner(acordo_id)")
+          .eq("acordo_parcelas.acordo_id", acordoId),
+      ]);
+
+    if (acordoRes.error) throw acordoRes.error;
+    if (titulosRes.error) throw titulosRes.error;
+    if (parcelasRes.error) throw parcelasRes.error;
+    if (pagamentosRes.error) throw pagamentosRes.error;
+
+    return {
+      acordo: mapAcordoRow(acordoRes.data),
+      titulos: ((titulosRes.data ?? []) as AcordoTituloRow[]).map((row) => ({
+        id: row.id,
+        acordoId: row.acordo_id,
+        collectionId: row.collection_id,
+        saldoNoMomento: Number(row.saldo_no_momento),
+        createdAt: row.created_at,
+      })),
+      parcelas: ((parcelasRes.data ?? []) as AcordoParcelaRow[]).map(
+        (row) => ({
+          id: row.id,
+          acordoId: row.acordo_id,
+          numero: row.numero,
+          valorParcela: Number(row.valor_parcela),
+          dataVencimento: row.data_vencimento,
+          createdAt: row.created_at,
+        }),
+      ),
+      pagamentos: ((pagamentosRes.data ?? []) as AcordoPagamentoRow[]).map(
+        (row) => ({
+          id: row.id,
+          acordoParcelaId: row.acordo_parcela_id,
+          valorPago: Number(row.valor_pago),
+          dataPagamento: row.data_pagamento,
+          collectorId: row.collector_id,
+          notes: row.notes,
+          estornoDe: row.estorno_de,
+          motivo: row.motivo,
+          registradoPorId: row.registrado_por_id,
+          createdAt: row.created_at,
+        }),
+      ),
+    };
+  };
+
+  const registrarPagamentoAcordo = async (params: {
+    acordoParcelaId: string;
+    valorPago: number;
+    dataPagamento: string;
+    notes?: string;
+  }): Promise<AcordoPagamento> => {
+    const { data, error: rpcError } = await supabase
+      .rpc("registrar_pagamento_acordo", {
+        p_acordo_parcela_id: params.acordoParcelaId,
+        p_valor_pago: params.valorPago,
+        p_data_pagamento: params.dataPagamento,
+        p_notes: params.notes ?? null,
+      })
+      .single();
+
+    if (rpcError) {
+      console.error("Erro ao registrar pagamento de acordo:", rpcError);
+      throw rpcError;
+    }
+
+    // O acordo pode ter virado "cumprido" dentro da RPC — refetch da lista
+    // leve pra refletir o status novo (sem refazer o fetch pesado geral).
+    await fetchAcordos();
+
+    const row = data as AcordoPagamentoRow;
+    return {
+      id: row.id,
+      acordoParcelaId: row.acordo_parcela_id,
+      valorPago: Number(row.valor_pago),
+      dataPagamento: row.data_pagamento,
+      collectorId: row.collector_id,
+      notes: row.notes,
+      estornoDe: row.estorno_de,
+      motivo: row.motivo,
+      registradoPorId: row.registrado_por_id,
+      createdAt: row.created_at,
+    };
+  };
+
+  const cancelarAcordo = async (acordoId: string, motivo: string) => {
+    const { error: rpcError } = await supabase.rpc("cancelar_acordo", {
+      p_acordo_id: acordoId,
+      p_motivo: motivo,
+    });
+
+    if (rpcError) {
+      console.error("Erro ao cancelar acordo:", rpcError);
+      throw rpcError;
+    }
+
+    await fetchAcordos();
   };
 
   const addUser = async (user: Omit<User, "id" | "createdAt">) => {
@@ -4055,6 +4338,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     applyLocalRemoval,
     applyLocalStatus,
     addAttempt,
+    acordos,
+    fetchAcordos,
+    getAcordoAtivoDoCliente,
+    criarAcordo,
+    fetchAcordoDetalhe,
+    registrarPagamentoAcordo,
+    cancelarAcordo,
     addUser,
     updateUser,
     deleteUser,

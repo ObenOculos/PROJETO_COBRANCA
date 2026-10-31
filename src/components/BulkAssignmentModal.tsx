@@ -13,7 +13,8 @@ import {
 import { Modal } from "./Modal";
 import { useCollection } from "../contexts/CollectionContext";
 import { supabase } from "../lib/supabase";
-import { ALL_SITUACOES } from "../config/profiles";
+import { ALL_SITUACOES, SITUACAO_BY_PROFILE } from "../config/profiles";
+import { UserType } from "../types";
 
 interface ClientWithCollections {
   uniqueKey: string;
@@ -35,9 +36,13 @@ interface Props {
 type CollectorAction = "assign" | "remove" | "skip";
 
 // Situações da fonte única (config/profiles), entre os dois valores de controle.
-const STATUS_OPTIONS = [
+// `situacoes` recebe o dominio do perfil de destino quando ha um cobrador
+// escolhido (SITUACAO_BY_PROFILE), ou ALL_SITUACOES caso contrario — evita
+// deixar escolher, por exemplo, "Cobrança Interna" numa atribuicao pro
+// Terceirizado.
+const buildStatusOptions = (situacoes: readonly string[]) => [
   { value: "skip", label: "Não alterar status" },
-  ...ALL_SITUACOES.map((s) => ({ value: s, label: s })),
+  ...situacoes.map((s) => ({ value: s, label: s })),
   { value: "empty", label: "Vazio (limpar)" },
 ];
 
@@ -56,6 +61,7 @@ const BulkAssignmentModal: React.FC<Props> = ({
     applyLocalRemoval,
     applyLocalStatus,
     scheduledVisits,
+    users,
   } = useCollection();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -88,6 +94,34 @@ const BulkAssignmentModal: React.FC<Props> = ({
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [progressLog]);
+
+  // Dominio de situacao do cobrador escolhido — so restringe quando a acao e
+  // "atribuir" e ha um cobrador selecionado; "remover"/"nao alterar" cobrador
+  // nao tem um unico perfil de destino, entao mantem a lista completa.
+  const targetSituacoes = (() => {
+    if (collectorAction !== "assign" || !selectedCollector) {
+      return ALL_SITUACOES;
+    }
+    const targetType = users.find((u) => u.id === selectedCollector)
+      ?.type as UserType | undefined;
+    if (!targetType || targetType === "manager") return ALL_SITUACOES;
+    return SITUACAO_BY_PROFILE[targetType];
+  })();
+  const statusOptions = buildStatusOptions(targetSituacoes);
+
+  // Se o status escolhido deixou de pertencer ao dominio (ex.: trocou o
+  // cobrador de destino depois de escolher o status), volta pra "nao alterar"
+  // em vez de deixar selecionado um valor que nao aparece mais na lista.
+  useEffect(() => {
+    if (
+      statusAction !== "skip" &&
+      statusAction !== "empty" &&
+      !targetSituacoes.includes(statusAction)
+    ) {
+      setStatusAction("skip");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetSituacoes]);
 
   const clientsList = Array.from(selectedClients)
     .map((key) => clientsData.find((c) => c.uniqueKey === key))
@@ -408,7 +442,7 @@ const BulkAssignmentModal: React.FC<Props> = ({
                 onChange={(e) => setStatusAction(e.target.value)}
                 className="w-full px-4 py-3 text-xs font-black border border-gray-200 dark:border-dark-border rounded-2xl bg-gray-50 dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-wide"
               >
-                {STATUS_OPTIONS.map((o) => (
+                {statusOptions.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label.toUpperCase()}
                   </option>
