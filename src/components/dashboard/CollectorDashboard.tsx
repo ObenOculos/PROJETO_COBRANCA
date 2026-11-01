@@ -30,6 +30,8 @@ import {
   Check,
   Phone,
   X,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
@@ -114,6 +116,114 @@ interface AgendaCategoriaConfig {
   emptyMessage: string;
 }
 
+// Colunas ordenaveis, compartilhadas pela tabela da Carteira completa e
+// pelas listas da Agenda (mesmo cabecalho nos dois, ver WalletTableHead).
+type WalletSortKey =
+  | "cliente"
+  | "ultimaInteracao"
+  | "retorno"
+  | "atraso"
+  | "valorPendente";
+
+interface SortableThProps {
+  label: string;
+  sortKeyName: WalletSortKey;
+  align?: "left" | "center" | "right";
+  widthClass?: string;
+  activeKey: WalletSortKey | null;
+  dir: "asc" | "desc";
+  onSort: (key: WalletSortKey) => void;
+}
+
+const SortableTh: React.FC<SortableThProps> = ({
+  label,
+  sortKeyName,
+  align = "left",
+  widthClass,
+  activeKey,
+  dir,
+  onSort,
+}) => (
+  <th
+    className={`px-6 py-4 cursor-pointer select-none hover:text-indigo-600 transition-colors ${
+      align === "center" ? "text-center" : align === "right" ? "text-right" : ""
+    } ${widthClass ?? ""}`}
+    onClick={() => onSort(sortKeyName)}
+  >
+    <span
+      className={`inline-flex items-center gap-1 ${
+        align === "right" ? "flex-row-reverse" : ""
+      }`}
+    >
+      {label}
+      {activeKey === sortKeyName &&
+        (dir === "asc" ? (
+          <ChevronUp className="w-3 h-3" />
+        ) : (
+          <ChevronDown className="w-3 h-3" />
+        ))}
+    </span>
+  </th>
+);
+
+interface WalletTableHeadProps {
+  sortKey: WalletSortKey | null;
+  sortDir: "asc" | "desc";
+  onSort: (key: WalletSortKey) => void;
+}
+
+// Cabecalho clicavel reusado pela tabela de "Carteira completa" e pela lista
+// de cada categoria da Agenda -- mesmas colunas nos dois lugares, um so JSX.
+const WalletTableHead: React.FC<WalletTableHeadProps> = ({
+  sortKey,
+  sortDir,
+  onSort,
+}) => (
+  <thead>
+    <tr className="bg-gray-50/50 dark:bg-dark-bg-secondary text-[11px] font-bold text-gray-400 tracking-wide">
+      <SortableTh
+        label="Cliente"
+        sortKeyName="cliente"
+        widthClass="w-96"
+        activeKey={sortKey}
+        dir={sortDir}
+        onSort={onSort}
+      />
+      <SortableTh
+        label="Última Interação"
+        sortKeyName="ultimaInteracao"
+        activeKey={sortKey}
+        dir={sortDir}
+        onSort={onSort}
+      />
+      <SortableTh
+        label="Retorno"
+        sortKeyName="retorno"
+        activeKey={sortKey}
+        dir={sortDir}
+        onSort={onSort}
+      />
+      <SortableTh
+        label="Atraso"
+        sortKeyName="atraso"
+        align="center"
+        activeKey={sortKey}
+        dir={sortDir}
+        onSort={onSort}
+      />
+      <SortableTh
+        label="Valor Pendente"
+        sortKeyName="valorPendente"
+        align="right"
+        activeKey={sortKey}
+        dir={sortDir}
+        onSort={onSort}
+      />
+      <th className="px-6 py-4 text-right">Ações</th>
+    </tr>
+  </thead>
+);
+
 interface InternalCollectorWalletProps {
   clientGroups: any[];
   user: any;
@@ -141,6 +251,27 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   } = useCollection();
   const [walletTab, setWalletTab] = useState<"agenda" | "carteira">("agenda");
   const [agendaSubTab, setAgendaSubTab] = useState<AgendaSubTab>("promessas");
+  // Modo foco: oculta os cards de desempenho (Recuperação do Mês, Total de
+  // Clientes etc.) pra sobrar só a lista de trabalho. Preferencia pessoal de
+  // tela, guardada no navegador -- nao sincroniza entre dispositivos.
+  const [focusMode, setFocusMode] = useState(() => {
+    try {
+      return localStorage.getItem("wallet_focus_mode") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleFocusMode = () => {
+    setFocusMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("wallet_focus_mode", next ? "1" : "0");
+      } catch {
+        // armazenamento indisponivel (aba anonima, etc.) -- so nao persiste
+      }
+      return next;
+    });
+  };
   // Filtro único (Agenda e Carteira completa usam o mesmo), reaproveitando o
   // motor do FilterBar/getFilteredCollections da tela de Cobrança -- ele
   // filtra por título; aqui a tabela é por cliente, então o resultado vira
@@ -311,6 +442,50 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return openClientGroups.filter((g) => matchedDocs.has(g.document));
   }, [openClientGroups, walletFilters, getFilteredCollections, user]);
 
+  // Ordenacao clicavel no cabecalho, compartilhada pela Carteira completa e
+  // pelas categorias da Agenda (mesmas colunas, mesmo header -- ver
+  // WalletTableHead). Nula = ordem padrao (precedencia da Agenda / vinda do
+  // filtro na Carteira completa).
+  const [sortKey, setSortKey] = useState<WalletSortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const toggleSort = (key: WalletSortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  };
+
+  const sortedWalletFilteredGroups = useMemo(() => {
+    if (!sortKey) return walletFilteredGroups;
+    const valueFor = (g: ClientGroup): number | string => {
+      switch (sortKey) {
+        case "cliente":
+          return (g.client || "").toLowerCase();
+        case "ultimaInteracao":
+          return lastContacts[g.document]?.date?.getTime() ?? -Infinity;
+        case "retorno":
+          return lastContacts[g.document]?.nextActionDate ?? "";
+        case "atraso":
+          return clientMaxOverdueDays(g);
+        case "valorPendente":
+          return g.pendingValue;
+        default:
+          return "";
+      }
+    };
+    return [...walletFilteredGroups].sort((a, b) => {
+      const va = valueFor(a);
+      const vb = valueFor(b);
+      const cmp =
+        typeof va === "string" || typeof vb === "string"
+          ? String(va).localeCompare(String(vb))
+          : (va as number) - (vb as number);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [walletFilteredGroups, sortKey, sortDir, lastContacts]);
+
   // Agenda priorizada: cada cliente cai em UMA só categoria (a de maior
   // precedencia), quem sobra vai pra "Em tratamento" (nao fica invisivel
   // mais). Ordem pensada pelo que é mais acionável agora: uma promessa
@@ -343,23 +518,23 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       claimed.add(group.document);
     };
 
-    walletFilteredGroups.forEach((group) => {
+    sortedWalletFilteredGroups.forEach((group) => {
       const nextActionDate = lastContacts[group.document]?.nextActionDate;
       if (nextActionDate && nextActionDate <= today) claim(promessas, group);
     });
-    walletFilteredGroups.forEach((group) => {
+    sortedWalletFilteredGroups.forEach((group) => {
       if (claimed.has(group.document)) return;
       if (getAcordoQuebradoDoCliente(group.document))
         claim(acordosQuebrados, group);
     });
-    walletFilteredGroups.forEach((group) => {
+    sortedWalletFilteredGroups.forEach((group) => {
       if (claimed.has(group.document)) return;
       const bucket = priorityBucket(clientMaxOverdueDays(group));
       if (bucket === "critical") claim(criticos, group);
       else if (bucket === "high") claim(alertas, group);
       else if (bucket === "medium") claim(medios, group);
     });
-    walletFilteredGroups.forEach((group) => {
+    sortedWalletFilteredGroups.forEach((group) => {
       if (claimed.has(group.document)) return;
       const last = lastContacts[group.document];
       const diasSemContato = last
@@ -369,7 +544,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     });
     // Resto: ja tem contato recente, nao esta em nenhuma faixa de atraso que
     // exija atencao agora e nao tem acordo quebrado — "ja sendo cuidado".
-    walletFilteredGroups.forEach((group) => {
+    sortedWalletFilteredGroups.forEach((group) => {
       if (claimed.has(group.document)) return;
       claim(emTratamento, group);
     });
@@ -384,7 +559,12 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       emTratamento,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walletFilteredGroups, lastContacts, getAcordoQuebradoDoCliente, today]);
+  }, [
+    sortedWalletFilteredGroups,
+    lastContacts,
+    getAcordoQuebradoDoCliente,
+    today,
+  ]);
 
   const agendaCategorias: AgendaCategoriaConfig[] = useMemo(
     () => [
@@ -460,17 +640,17 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [walletFilters, walletTab]);
+  }, [walletFilters, walletTab, sortKey, sortDir]);
 
   // Carteira completa: diretório com todo mundo em aberto, não só quem
   // sobrou da agenda — é a visão de "navegar tudo" que a Agenda não dá.
   const totalPages = Math.ceil(walletFilteredGroups.length / itemsPerPage);
   const paginatedClients = useMemo(() => {
-    return walletFilteredGroups.slice(
+    return sortedWalletFilteredGroups.slice(
       (currentPage - 1) * itemsPerPage,
       currentPage * itemsPerPage,
     );
-  }, [walletFilteredGroups, currentPage]);
+  }, [sortedWalletFilteredGroups, currentPage]);
 
   const stats = useMemo(() => {
     const mesAtual = todayLocalStr().slice(0, 7);
@@ -539,7 +719,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               Gestão de carteira ativa e recuperação de crédito.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-900/30">
               <span className="block text-xs text-red-600 dark:text-red-400 font-medium">
                 Críticos (+90d)
@@ -556,10 +736,31 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                 {stats.high}
               </span>
             </div>
+            <button
+              type="button"
+              onClick={toggleFocusMode}
+              title={
+                focusMode
+                  ? "Sair do modo foco (mostrar cards)"
+                  : "Modo foco (ocultar cards de desempenho)"
+              }
+              className={`p-2.5 rounded-xl border transition-colors ${
+                focusMode
+                  ? "text-indigo-600 bg-indigo-50 border-indigo-100 dark:bg-indigo-900/30 dark:border-indigo-900/30"
+                  : "text-gray-400 border-gray-200 dark:border-dark-border hover:text-indigo-600 hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
+              }`}
+            >
+              {focusMode ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
+            </button>
           </div>
         </div>
       </div>
 
+      {!focusMode && (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 shadow-sm">
           <div className="flex items-center gap-3 mb-2">
@@ -633,6 +834,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           </p>
         </div>
       </div>
+      )}
 
       <FilterBar
         filters={walletFilters}
@@ -712,6 +914,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             onOpenDetail={onOpenDetail}
             onOpenLog={onOpenLog}
             onOpenAcordo={onOpenAcordo}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={toggleSort}
           />
         </>
       ) : (
@@ -724,16 +929,11 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50/50 dark:bg-dark-bg-secondary text-[11px] font-bold text-gray-400 tracking-wide">
-                  <th className="px-6 py-4">Cliente</th>
-                  <th className="px-6 py-4">Última Interação</th>
-                  <th className="px-6 py-4">Retorno</th>
-                  <th className="px-6 py-4 text-center">Atraso</th>
-                  <th className="px-6 py-4 text-right">Valor Pendente</th>
-                  <th className="px-6 py-4 text-right">Ações</th>
-                </tr>
-              </thead>
+              <WalletTableHead
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
               <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
                 {paginatedClients.length > 0 ? (
                   paginatedClients.map((group) => (
@@ -866,30 +1066,50 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   return (
     <>
     <tr className="group hover:bg-gray-50/80 dark:hover:bg-dark-bg-secondary transition-colors cursor-pointer">
-      <td className="px-6 py-4" onClick={() => onOpenDetail(group)}>
-        <div className="flex flex-col gap-1">
-          <span className="font-bold text-gray-900 dark:text-dark-text group-hover:text-indigo-600 transition-colors">
+      <td className="px-6 py-4 w-96 max-w-96" onClick={() => onOpenDetail(group)}>
+        <div className="flex flex-col gap-1 min-w-0">
+          <span
+            className="block truncate font-bold text-gray-900 dark:text-dark-text group-hover:text-indigo-600 transition-colors"
+            title={group.client}
+          >
             {group.client}
-            {group.apelido && (
-              <span className="font-normal text-sm text-blue-600 dark:text-blue-400 ml-1">
-                ({group.apelido})
-              </span>
-            )}
           </span>
+          {group.apelido && (
+            <span
+              className="block truncate text-xs text-blue-600 dark:text-blue-400"
+              title={group.apelido}
+            >
+              <span className="text-gray-500 dark:text-dark-text-secondary">
+                Apelido:{" "}
+              </span>
+              {group.apelido}
+            </span>
+          )}
           {saleLabels.length > 0 && (
-            <span className="text-[11px] text-gray-400">
+            <span
+              className="block truncate text-[11px] text-gray-400"
+              title={saleLabels.join(", ")}
+            >
+              <span className="text-gray-500 dark:text-dark-text-secondary">
+                Venda(s):{" "}
+              </span>
               {saleLabels.join(", ")}
             </span>
           )}
-          <span className="flex items-center gap-1 text-xs text-gray-400">
-            {group.document}
+          <span className="flex items-center gap-1 text-xs text-gray-400 min-w-0">
+            <span className="truncate">
+              <span className="text-gray-500 dark:text-dark-text-secondary">
+                CPF/CNPJ:{" "}
+              </span>
+              {group.document}
+            </span>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 copyDocument(group.document);
               }}
               title={copiedDoc === group.document ? "Copiado!" : "Copiar documento"}
-              className={`p-0.5 rounded transition-colors ${
+              className={`p-0.5 rounded transition-colors shrink-0 ${
                 copiedDoc === group.document
                   ? "text-green-600"
                   : "text-gray-300 hover:text-indigo-600"
@@ -1071,12 +1291,16 @@ interface AgendaSectionProps {
   onOpenDetail: (client: ClientGroup) => void;
   onOpenLog: (client: ClientGroup) => void;
   onOpenAcordo: (client: ClientGroup) => void;
+  sortKey: WalletSortKey | null;
+  sortDir: "asc" | "desc";
+  onSort: (key: WalletSortKey) => void;
 }
 
 // Conteudo da categoria ativa da agenda priorizada: borda colorida conforme
 // a urgencia, paginacao propria (AGENDA_PREVIEW_COUNT por pagina). O
 // titulo/icone/contagem ja aparecem no pill da aba (ver agendaCategorias em
-// InternalCollectorWallet) -- aqui so a lista, ou o aviso de categoria vazia.
+// InternalCollectorWallet) -- aqui o cabecalho ordenavel (mesmo da Carteira
+// completa, ver WalletTableHead) + a lista, ou o aviso de categoria vazia.
 const AgendaSection: React.FC<AgendaSectionProps> = ({
   accentBorderClass,
   groups,
@@ -1089,6 +1313,9 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   onOpenDetail,
   onOpenLog,
   onOpenAcordo,
+  sortKey,
+  sortDir,
+  onSort,
 }) => {
   const [page, setPage] = useState(1);
   useEffect(() => {
@@ -1117,6 +1344,7 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
     >
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
+          <WalletTableHead sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
           <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
             {visible.map((group) => (
               <ClientQueueRow
