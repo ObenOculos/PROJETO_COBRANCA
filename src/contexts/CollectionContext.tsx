@@ -51,7 +51,7 @@ import {
   userCache,
   collectionsCache,
 } from "../utils/cache";
-import { calculateOverdueDays } from "../utils/formatters";
+import { calculateOverdueDays, formatCurrency } from "../utils/formatters";
 import { isCancelado } from "../types/status";
 import {
   clientKey,
@@ -1490,6 +1490,42 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       params.titulos.map((t) => t.collectionId),
       "Em acordo",
     );
+
+    // Fechar o acordo E um contato real com o cliente (visita, ligacao etc.),
+    // mas sem isto nao sobra rastro em collection_attempts: o cliente
+    // reaparecia em "Sem contato ha 7+ dias" como se tivesse sido ignorado.
+    // Mesma convencao do LogContactModal (uma linha por titulo), recortada
+    // aos titulos DESTE acordo em vez de todo titulo aberto do cliente.
+    const proximaParcela = [...params.parcelas].sort((a, b) =>
+      a.dataVencimento.localeCompare(b.dataVencimento),
+    )[0];
+    const notesAcordo =
+      `Acordo criado: ${params.parcelas.length}x — 1ª parcela em ` +
+      `${proximaParcela ? proximaParcela.dataVencimento.split("-").reverse().join("/") : "-"}` +
+      ` — valor negociado ${formatCurrency(
+        params.parcelas.reduce((sum, p) => sum + p.valorParcela, 0),
+      )}`;
+    const { error: attemptError } = await supabase
+      .from("collection_attempts")
+      .insert(
+        params.titulos.map((t) => ({
+          collection_id: t.collectionId.toString(),
+          date: todayLocalStr(),
+          type: "visit" as const,
+          result: "agreement" as const,
+          notes: notesAcordo,
+          next_action: "Acompanhar parcela do acordo",
+          next_action_date: proximaParcela?.dataVencimento ?? null,
+        })),
+      );
+    if (attemptError) {
+      // Nao interrompe o fluxo: o acordo em si ja foi criado com sucesso.
+      console.error(
+        "Erro ao registrar contato automatico do acordo:",
+        attemptError,
+      );
+    }
+
     return acordo;
   };
 
@@ -1524,15 +1560,51 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     if (parcelasRes.error) throw parcelasRes.error;
     if (pagamentosRes.error) throw pagamentosRes.error;
 
+    const titulosRows = (titulosRes.data ?? []) as AcordoTituloRow[];
+
+    // acordo_titulos so guarda saldo_no_momento (fato historico); venda/titulo
+    // de origem vem de BANCO_DADOS por leitura, pra tela de detalhe poder
+    // mostrar QUAIS titulos/vendas foram consolidados, nao so a contagem.
+    interface TituloOrigemInfo {
+      id_parcela: number;
+      venda_n: number | null;
+      numero_titulo: number | null;
+      descricao: string | null;
+      data_vencimento: string | null;
+    }
+    const collectionIds = titulosRows.map((row) => row.collection_id);
+    const titulosInfoRes = collectionIds.length
+      ? await supabase
+          .from("BANCO_DADOS")
+          .select("id_parcela, venda_n, numero_titulo, descricao, data_vencimento")
+          .in("id_parcela", collectionIds)
+      : { data: [] as TituloOrigemInfo[], error: null };
+    if (titulosInfoRes.error) throw titulosInfoRes.error;
+    const infoByCollectionId = new Map(
+      ((titulosInfoRes.data ?? []) as TituloOrigemInfo[]).map((row) => [
+        row.id_parcela,
+        row,
+      ]),
+    );
+
     return {
       acordo: mapAcordoRow(acordoRes.data),
-      titulos: ((titulosRes.data ?? []) as AcordoTituloRow[]).map((row) => ({
-        id: row.id,
-        acordoId: row.acordo_id,
-        collectionId: row.collection_id,
-        saldoNoMomento: Number(row.saldo_no_momento),
-        createdAt: row.created_at,
-      })),
+      titulos: titulosRows.map((row) => {
+        const info = infoByCollectionId.get(row.collection_id);
+        return {
+          id: row.id,
+          acordoId: row.acordo_id,
+          collectionId: row.collection_id,
+          saldoNoMomento: Number(row.saldo_no_momento),
+          createdAt: row.created_at,
+          saleNumber: info ? resolveSaleKey(info) : undefined,
+          saleLabel: info
+            ? info.descricao ||
+              `Venda ${info.numero_titulo ?? info.venda_n ?? 0}`
+            : undefined,
+          vencimentoOriginal: info?.data_vencimento ?? null,
+        };
+      }),
       parcelas: ((parcelasRes.data ?? []) as AcordoParcelaRow[]).map(
         (row) => ({
           id: row.id,

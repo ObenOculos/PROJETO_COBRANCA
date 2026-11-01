@@ -30,8 +30,9 @@ export const isAjusteOuEstorno = (p: {
   !!p.estornoDe ||
   /^(ajuste|estorno)/i.test(p.paymentMethod ?? "");
 
-export const resolveSaleKey = (c: Collection): number =>
-  c.numero_titulo ?? c.venda_n ?? 0;
+export const resolveSaleKey = (
+  c: Pick<Collection, "numero_titulo" | "venda_n">,
+): number => c.numero_titulo ?? c.venda_n ?? 0;
 
 /**
  * Conta vendas distintas agrupando por CLIENTE (documento || cliente):

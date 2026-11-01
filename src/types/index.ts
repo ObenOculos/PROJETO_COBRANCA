@@ -194,7 +194,8 @@ export interface CollectionAttempt {
     | "partial_payment"
     | "full_payment"
     | "contact_made"
-    | "message_sent";
+    | "message_sent"
+    | "agreement";
   notes?: string;
   nextAction?: string;
   nextActionDate?: string;
@@ -588,6 +589,13 @@ export interface AcordoTitulo {
   collectionId: number;
   saldoNoMomento: number;
   createdAt: string;
+  /**
+   * Enriquecido a partir de BANCO_DADOS em fetchAcordoDetalhe (leitura, não
+   * vem de acordo_titulos) — ausente se o título não for mais encontrado.
+   */
+  saleNumber?: number;
+  saleLabel?: string;
+  vencimentoOriginal?: string | null;
 }
 
 export interface AcordoParcela {

@@ -23,4 +23,5 @@ export const ATTEMPT_RESULT_LABELS: Record<CollectionAttempt["result"], string> 
   full_payment: "Pagamento integral",
   contact_made: "Contato realizado",
   message_sent: "Mensagem enviada",
+  agreement: "Acordo realizado",
 };
