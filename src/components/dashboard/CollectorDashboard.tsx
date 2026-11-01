@@ -111,10 +111,14 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   onOpenDetail,
   onOpenAcordo,
 }) => {
-  const { getAcordoAtivoDoCliente, getAcordoQuebradoDoCliente } = useCollection();
+  const { getAcordoAtivoDoCliente, getAcordoQuebradoDoCliente, getFilteredCollections } =
+    useCollection();
   const [walletTab, setWalletTab] = useState<"agenda" | "carteira">("agenda");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterCity, setFilterCity] = useState("all");
+  // Filtro único (Agenda e Carteira completa usam o mesmo), reaproveitando o
+  // motor do FilterBar/getFilteredCollections da tela de Cobrança -- ele
+  // filtra por título; aqui a tabela é por cliente, então o resultado vira
+  // um conjunto de documentos usado pra recortar openClientGroups.
+  const [walletFilters, setWalletFilters] = useState<FilterOptions>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [copiedDoc, setCopiedDoc] = useState<string | null>(null);
   const itemsPerPage = 10;
@@ -224,31 +228,22 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     [clientGroups],
   );
 
-  const cities = useMemo(() => {
-    const set = new Set<string>();
-    openClientGroups.forEach((g) => {
-      if (g.city) set.add(g.city);
-    });
-    return Array.from(set).sort();
-  }, [openClientGroups]);
-
-  // Busca + cidade, aplicadas antes de seccionar por urgencia (abaixo).
-  // Atraso/Status saíram daqui: Crítico agora é seção própria da agenda, e
-  // "Resto da carteira" (o que não caiu em nenhuma seção) fica só com
-  // busca + cidade, sem filtro extra.
-  const filteredClientGroups = useMemo(() => {
-    return openClientGroups.filter((group) => {
-      const lowerSearch = searchTerm.toLowerCase();
-      const matchesSearch =
-        !searchTerm ||
-        [group.client, group.document, group.city, group.neighborhood]
-          .filter(Boolean)
-          .some((value) => value?.toLowerCase().includes(lowerSearch));
-      if (!matchesSearch) return false;
-      if (filterCity !== "all" && group.city !== filterCity) return false;
-      return true;
-    });
-  }, [openClientGroups, searchTerm, filterCity]);
+  // Mesmo motor de filtro do FilterBar (titulo a titulo) pra Agenda e
+  // Carteira completa -- recortado de volta pra cliente via o conjunto de
+  // documentos que sobrou.
+  const walletFilteredGroups = useMemo(() => {
+    const matchedCollections = getFilteredCollections(
+      walletFilters,
+      user?.type || "collector",
+      user?.id,
+    );
+    const matchedDocs = new Set(
+      matchedCollections
+        .map((c) => c.documento?.trim())
+        .filter((d): d is string => Boolean(d)),
+    );
+    return openClientGroups.filter((g) => matchedDocs.has(g.document));
+  }, [openClientGroups, walletFilters, getFilteredCollections, user]);
 
   // Agenda priorizada: cada cliente cai em UMA só seção (a de maior
   // precedencia), quem sobra vai pro "Resto da carteira". Ordem pensada
@@ -268,21 +263,21 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       claimed.add(group.document);
     };
 
-    filteredClientGroups.forEach((group) => {
+    walletFilteredGroups.forEach((group) => {
       const nextActionDate = lastContacts[group.document]?.nextActionDate;
       if (nextActionDate && nextActionDate <= today) claim(promessas, group);
     });
-    filteredClientGroups.forEach((group) => {
+    walletFilteredGroups.forEach((group) => {
       if (claimed.has(group.document)) return;
       if (getAcordoQuebradoDoCliente(group.document))
         claim(acordosQuebrados, group);
     });
-    filteredClientGroups.forEach((group) => {
+    walletFilteredGroups.forEach((group) => {
       if (claimed.has(group.document)) return;
       if (priorityBucket(clientMaxOverdueDays(group)) === "critical")
         claim(criticos, group);
     });
-    filteredClientGroups.forEach((group) => {
+    walletFilteredGroups.forEach((group) => {
       if (claimed.has(group.document)) return;
       const last = lastContacts[group.document];
       const diasSemContato = last
@@ -293,21 +288,21 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
     return { promessas, acordosQuebrados, criticos, semContato };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredClientGroups, lastContacts, getAcordoQuebradoDoCliente, today]);
+  }, [walletFilteredGroups, lastContacts, getAcordoQuebradoDoCliente, today]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterCity, walletTab]);
+  }, [walletFilters, walletTab]);
 
   // Carteira completa: diretório com todo mundo em aberto, não só quem
   // sobrou da agenda — é a visão de "navegar tudo" que a Agenda não dá.
-  const totalPages = Math.ceil(filteredClientGroups.length / itemsPerPage);
+  const totalPages = Math.ceil(walletFilteredGroups.length / itemsPerPage);
   const paginatedClients = useMemo(() => {
-    return filteredClientGroups.slice(
+    return walletFilteredGroups.slice(
       (currentPage - 1) * itemsPerPage,
       currentPage * itemsPerPage,
     );
-  }, [filteredClientGroups, currentPage]);
+  }, [walletFilteredGroups, currentPage]);
 
   const stats = useMemo(() => {
     // Recebido de TODA a carteira atribuida, inclusive quem ja quitou: e o
@@ -316,7 +311,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       (sum, g) => sum + g.totalReceived,
       0,
     );
-    const totalPending = filteredClientGroups.reduce(
+    const totalPending = walletFilteredGroups.reduce(
       (sum, g) => sum + g.pendingValue,
       0,
     );
@@ -340,7 +335,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     });
 
     return {
-      totalClients: filteredClientGroups.length,
+      totalClients: walletFilteredGroups.length,
       totalPending,
       totalReceived,
       progress: Math.min((totalReceived / targetValue) * 100, 100),
@@ -350,7 +345,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     };
   }, [
     clientGroups,
-    filteredClientGroups,
+    walletFilteredGroups,
     myCollections,
     monthlyGoals,
     user?.id,
@@ -462,9 +457,16 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         </div>
       </div>
 
-      <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex gap-2">
+      <FilterBar
+        filters={walletFilters}
+        onFilterChange={setWalletFilters}
+        userType={user?.type || "collector"}
+        context="collectionsCollector"
+        searchPlaceholder="Buscar cliente, CPF ou cidade..."
+        showStatusPills={false}
+        collapsible
+        leading={
+          <div className="flex gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setWalletTab("agenda")}
@@ -490,29 +492,8 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               Carteira completa
             </button>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar cliente, CPF ou cidade..."
-              className="w-full sm:w-72 pl-4 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none text-sm dark:bg-dark-bg-secondary dark:border-dark-border"
-            />
-            <select
-              value={filterCity}
-              onChange={(e) => setFilterCity(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 text-xs font-medium focus:ring-2 focus:ring-indigo-100 outline-none dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-            >
-              <option value="all">Todas as Cidades</option>
-              {cities.map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {walletTab === "agenda" ? (
         <>
@@ -630,7 +611,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             <div className="p-4 border-t border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50/30 dark:bg-dark-bg-secondary/30">
               <p className="text-xs text-gray-500">
                 Mostrando {paginatedClients.length} de{" "}
-                {filteredClientGroups.length}
+                {walletFilteredGroups.length}
               </p>
               <div className="flex items-center gap-2">
                 <button

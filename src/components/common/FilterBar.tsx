@@ -35,6 +35,14 @@ interface FilterBarProps {
   showAgingPills?: boolean;
   /** Conteúdo extra (ex.: pills próprias da tela) renderizado DENTRO do card. */
   children?: React.ReactNode;
+  /** Conteúdo renderizado na mesma linha da busca, antes dela (ex.: abas da tela). */
+  leading?: React.ReactNode;
+  /**
+   * Pills/painel avançado só aparecem depois de clicar em "Filtros" (mesmo
+   * no desktop, onde por padrão ficam sempre visíveis). Default false
+   * preserva o comportamento atual das telas existentes.
+   */
+  collapsible?: boolean;
 }
 
 const FilterBar: React.FC<FilterBarProps> = ({
@@ -47,6 +55,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
   showStatusPills = true,
   showAgingPills = true,
   children,
+  leading,
+  collapsible = false,
 }) => {
   const { users, getFilteredCollections } = useCollection();
   const { user } = useAuth();
@@ -310,6 +320,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
       {/* Barra de Filtros Unificada */}
       <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-150/80 dark:border-dark-border shadow-sm space-y-3">
         <div className="flex flex-row items-center gap-3">
+          {leading}
           {/* Busca */}
           {showSearch && (
             <div className="relative flex-1">
@@ -367,10 +378,14 @@ const FilterBar: React.FC<FilterBarProps> = ({
           </button>
         </div>
 
-        {/* Demais filtros: no mobile ficam ocultos até expandir; no desktop sempre visíveis */}
+        {/* Demais filtros: no mobile ficam ocultos até expandir; no desktop
+            sempre visíveis, exceto quando `collapsible` -- aí só aparecem
+            junto com o painel avançado (botão "Filtros" do topo). */}
         <div
           id="filterbar-secondary"
-          className={`${mobileOpen ? "block" : "hidden"} md:block space-y-3`}
+          className={`${
+            mobileOpen || (collapsible && isExpanded) ? "block" : "hidden"
+          } ${collapsible ? "" : "md:block"} space-y-3`}
         >
           {/* Mobile: acesso ao painel avançado (no desktop usa-se o botão do topo) */}
           <button
