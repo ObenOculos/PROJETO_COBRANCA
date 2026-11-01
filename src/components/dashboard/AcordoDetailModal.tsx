@@ -1,8 +1,13 @@
-import React, { useEffect, useState } from "react";
-import { X, CheckCircle2, AlertCircle, Ban } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { X, CheckCircle2, AlertCircle, Ban, ChevronRight } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
+import {
+  ACORDO_CANCEL_REASONS,
+  ACORDO_CANCEL_REASON_OTHER,
+  acordoCancelReasonLabel,
+} from "../../config/acordoCancelReasons";
 import {
   Acordo,
   AcordoParcela,
@@ -47,7 +52,10 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
   const [payDate, setPayDate] = useState(todayLocalStr());
   const [saving, setSaving] = useState(false);
   const [showCancelForm, setShowCancelForm] = useState(false);
-  const [cancelMotivo, setCancelMotivo] = useState("");
+  const [cancelMotivoKey, setCancelMotivoKey] = useState("");
+  const [cancelObservacao, setCancelObservacao] = useState("");
+  const [showQuitadas, setShowQuitadas] = useState(false);
+  const [showTitulosOrigem, setShowTitulosOrigem] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -78,6 +86,27 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
     pagamentos
       .filter((p) => p.acordoParcelaId === parcelaId)
       .reduce((sum, p) => sum + p.valorPago, 0);
+
+  const gruposTitulosPorVenda = useMemo(() => {
+    const map = new Map<
+      number,
+      { saleLabel: string; titulos: AcordoTitulo[] }
+    >();
+    titulos.forEach((t) => {
+      const key = t.saleNumber ?? -1;
+      const grupo = map.get(key);
+      if (grupo) grupo.titulos.push(t);
+      else
+        map.set(key, {
+          saleLabel: t.saleLabel || `Título ${t.collectionId}`,
+          titulos: [t],
+        });
+    });
+    return Array.from(map.entries()).map(([saleKey, g]) => ({
+      saleKey,
+      ...g,
+    }));
+  }, [titulos]);
 
   const openPayForm = (parcela: AcordoParcela) => {
     setPayingParcelaId(parcela.id);
@@ -114,11 +143,23 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
   };
 
   const confirmCancelar = async () => {
-    const motivo = cancelMotivo.trim();
-    if (!motivo) {
-      setError("Motivo do cancelamento é obrigatório.");
+    if (!cancelMotivoKey) {
+      setError("Selecione um motivo de cancelamento.");
       return;
     }
+    const observacao = cancelObservacao.trim();
+    if (cancelMotivoKey === ACORDO_CANCEL_REASON_OTHER && !observacao) {
+      setError("Descreva o motivo do cancelamento.");
+      return;
+    }
+    const label = acordoCancelReasonLabel(cancelMotivoKey);
+    const motivo =
+      cancelMotivoKey === ACORDO_CANCEL_REASON_OTHER
+        ? observacao
+        : observacao
+          ? `${label} — ${observacao}`
+          : label;
+
     setSaving(true);
     setError("");
     try {
@@ -190,104 +231,238 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
                 </div>
               </div>
 
+              {titulos.length > 0 && (
+                <div className="border border-gray-200 dark:border-dark-border rounded-xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowTitulosOrigem((v) => !v)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold text-gray-500 dark:text-dark-text-secondary bg-gray-50 dark:bg-dark-bg-secondary hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <ChevronRight
+                        className={`w-3.5 h-3.5 transition-transform ${showTitulosOrigem ? "rotate-90" : ""}`}
+                      />
+                      Títulos consolidados ({titulos.length})
+                    </span>
+                  </button>
+                  {showTitulosOrigem && (
+                    <div className="divide-y divide-gray-100 dark:divide-dark-border">
+                      {gruposTitulosPorVenda.map((grupo) => (
+                        <div key={grupo.saleKey}>
+                          <p className="px-3 py-1.5 text-[11px] font-bold text-gray-400 bg-gray-50 dark:bg-dark-bg-secondary uppercase tracking-wide">
+                            {grupo.saleLabel}
+                          </p>
+                          <div className="divide-y divide-gray-50 dark:divide-dark-border">
+                            {grupo.titulos.map((t) => (
+                              <div
+                                key={t.id}
+                                className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-600 dark:text-dark-text-secondary"
+                              >
+                                <span className="flex-1">
+                                  Título {t.collectionId}
+                                  {t.vencimentoOriginal &&
+                                    ` — venc. original ${new Date(
+                                      t.vencimentoOriginal + "T00:00:00",
+                                    ).toLocaleDateString("pt-BR")}`}
+                                </span>
+                                <span className="font-bold text-gray-700 dark:text-dark-text shrink-0">
+                                  {formatCurrency(t.saldoNoMomento)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {acordo.motivoCancelamento && (
                 <p className="text-xs text-gray-500 italic">
                   Motivo: {acordo.motivoCancelamento}
                 </p>
               )}
 
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400">
-                  Parcelas
-                </label>
-                <div className="space-y-2">
-                  {parcelas.map((p) => {
-                    const saldo = saldoDaParcela(p.id, p.valorParcela);
-                    const quitada = saldo <= 0.01;
-                    return (
-                      <div
-                        key={p.id}
-                        className="border border-gray-200 dark:border-dark-border rounded-xl p-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-bold text-sm text-gray-900 dark:text-dark-text">
-                              Parcela {p.numero} — {formatCurrency(p.valorParcela)}
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              Vencimento:{" "}
-                              {new Date(
-                                p.dataVencimento + "T00:00:00",
-                              ).toLocaleDateString("pt-BR")}
-                            </p>
-                          </div>
-                          {quitada ? (
-                            <span className="flex items-center gap-1 text-green-600 text-xs font-bold">
-                              <CheckCircle2 className="w-4 h-4" /> Quitada
-                            </span>
-                          ) : (
-                            acordo.status === "ativo" && (
-                              <button
-                                onClick={() => openPayForm(p)}
-                                className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700"
-                              >
-                                Registrar pagamento
-                              </button>
-                            )
-                          )}
-                        </div>
-                        {!quitada && (
-                          <p className="text-xs text-right text-red-500 mt-1">
-                            Saldo: {formatCurrency(saldo)}
-                          </p>
-                        )}
+              {(() => {
+                const quitadas = parcelas.filter(
+                  (p) => saldoDaParcela(p.id, p.valorParcela) <= 0.01,
+                );
+                const pendentes = parcelas.filter(
+                  (p) => saldoDaParcela(p.id, p.valorParcela) > 0.01,
+                );
+                const totalPagoQuitadas = pagamentos
+                  .filter((pg) =>
+                    quitadas.some((q) => q.id === pg.acordoParcelaId),
+                  )
+                  .reduce((sum, pg) => sum + pg.valorPago, 0);
+                const totalAberto = pendentes.reduce(
+                  (sum, p) => sum + saldoDaParcela(p.id, p.valorParcela),
+                  0,
+                );
+                const progressPct = parcelas.length
+                  ? (quitadas.length / parcelas.length) * 100
+                  : 0;
 
-                        {payingParcelaId === p.id && (
-                          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-dark-border flex items-end gap-2">
-                            <div className="flex-1">
-                              <label className="text-[10px] font-bold text-gray-400">
-                                Valor pago
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min={0}
-                                value={payValue}
-                                onChange={(e) => setPayValue(e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <label className="text-[10px] font-bold text-gray-400">
-                                Data
-                              </label>
-                              <input
-                                type="date"
-                                value={payDate}
-                                onChange={(e) => setPayDate(e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-                              />
-                            </div>
-                            <button
-                              onClick={confirmPayment}
-                              disabled={saving}
-                              className="px-3 py-2 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 disabled:opacity-50"
-                            >
-                              Confirmar
-                            </button>
-                            <button
-                              onClick={() => setPayingParcelaId(null)}
-                              className="px-3 py-2 text-gray-500 text-xs font-bold"
-                            >
-                              Cancelar
-                            </button>
+                return (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-gray-500 dark:text-dark-text-secondary">
+                          {quitadas.length}/{parcelas.length} parcelas pagas
+                        </span>
+                        <span className="font-bold text-red-500">
+                          Saldo em aberto: {formatCurrency(totalAberto)}
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-100 dark:bg-dark-bg-tertiary overflow-hidden">
+                        <div
+                          className="h-full bg-green-500 rounded-full transition-all"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {quitadas.length > 0 && (
+                      <div className="border border-gray-200 dark:border-dark-border rounded-xl overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setShowQuitadas((v) => !v)}
+                          className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold text-gray-500 dark:text-dark-text-secondary bg-gray-50 dark:bg-dark-bg-secondary hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <ChevronRight
+                              className={`w-3.5 h-3.5 transition-transform ${showQuitadas ? "rotate-90" : ""}`}
+                            />
+                            {quitadas.length} parcela
+                            {quitadas.length > 1 ? "s" : ""} quitada
+                            {quitadas.length > 1 ? "s" : ""}
+                          </span>
+                          <span className="text-green-600">
+                            {formatCurrency(totalPagoQuitadas)}
+                          </span>
+                        </button>
+                        {showQuitadas && (
+                          <div className="divide-y divide-gray-100 dark:divide-dark-border">
+                            {quitadas.map((p) => (
+                              <div
+                                key={p.id}
+                                className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-500 dark:text-dark-text-secondary"
+                              >
+                                <span className="w-7 shrink-0 text-gray-400">
+                                  #{p.numero}
+                                </span>
+                                <span className="flex-1">
+                                  {new Date(
+                                    p.dataVencimento + "T00:00:00",
+                                  ).toLocaleDateString("pt-BR")}
+                                </span>
+                                <span className="font-bold text-gray-700 dark:text-dark-text">
+                                  {formatCurrency(p.valorParcela)}
+                                </span>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400">
+                        Parcelas pendentes
+                      </label>
+                      {pendentes.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-4">
+                          Todas as parcelas estão quitadas.
+                        </p>
+                      ) : (
+                        <div className="border border-gray-200 dark:border-dark-border rounded-xl divide-y divide-gray-100 dark:divide-dark-border max-h-72 overflow-y-auto minimal-scrollbar">
+                          {pendentes.map((p) => {
+                            const saldo = saldoDaParcela(p.id, p.valorParcela);
+                            return (
+                              <div key={p.id}>
+                                <div className="flex items-center gap-2 px-3 py-2 text-sm">
+                                  <span className="w-7 shrink-0 text-xs text-gray-400">
+                                    #{p.numero}
+                                  </span>
+                                  <span className="w-20 shrink-0 text-xs text-gray-500 dark:text-dark-text-secondary">
+                                    {new Date(
+                                      p.dataVencimento + "T00:00:00",
+                                    ).toLocaleDateString("pt-BR")}
+                                  </span>
+                                  <span className="flex-1 font-bold text-gray-900 dark:text-dark-text">
+                                    {formatCurrency(p.valorParcela)}
+                                  </span>
+                                  {saldo < p.valorParcela - 0.01 && (
+                                    <span className="text-[11px] text-amber-600 shrink-0">
+                                      saldo {formatCurrency(saldo)}
+                                    </span>
+                                  )}
+                                  {acordo.status === "ativo" && (
+                                    <button
+                                      onClick={() => openPayForm(p)}
+                                      className="shrink-0 px-2.5 py-1 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700"
+                                    >
+                                      Pagar
+                                    </button>
+                                  )}
+                                </div>
+
+                                {payingParcelaId === p.id && (
+                                  <div className="px-3 pb-3 flex items-end gap-2">
+                                    <div className="flex-1">
+                                      <label className="text-[10px] font-bold text-gray-400">
+                                        Valor pago
+                                      </label>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min={0}
+                                        value={payValue}
+                                        onChange={(e) =>
+                                          setPayValue(e.target.value)
+                                        }
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                                      />
+                                    </div>
+                                    <div className="flex-1">
+                                      <label className="text-[10px] font-bold text-gray-400">
+                                        Data
+                                      </label>
+                                      <input
+                                        type="date"
+                                        value={payDate}
+                                        onChange={(e) =>
+                                          setPayDate(e.target.value)
+                                        }
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                                      />
+                                    </div>
+                                    <button
+                                      onClick={confirmPayment}
+                                      disabled={saving}
+                                      className="px-3 py-2 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 disabled:opacity-50"
+                                    >
+                                      Confirmar
+                                    </button>
+                                    <button
+                                      onClick={() => setPayingParcelaId(null)}
+                                      className="px-3 py-2 text-gray-500 text-xs font-bold"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {acordo.status === "ativo" &&
                 (showCancelForm ? (
@@ -295,13 +470,35 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
                     <label className="text-xs font-bold text-gray-400">
                       Motivo do cancelamento (obrigatório)
                     </label>
+                    <select
+                      value={cancelMotivoKey}
+                      onChange={(e) => setCancelMotivoKey(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                      autoFocus
+                    >
+                      <option value="">Selecione um motivo...</option>
+                      {ACORDO_CANCEL_REASONS.map((r) => (
+                        <option key={r.key} value={r.key}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                    <label className="text-xs font-bold text-gray-400">
+                      Observação{" "}
+                      {cancelMotivoKey === ACORDO_CANCEL_REASON_OTHER
+                        ? "(obrigatória)"
+                        : "(opcional)"}
+                    </label>
                     <textarea
-                      value={cancelMotivo}
-                      onChange={(e) => setCancelMotivo(e.target.value)}
+                      value={cancelObservacao}
+                      onChange={(e) => setCancelObservacao(e.target.value)}
                       rows={2}
                       className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-                      placeholder="Ex.: cliente renegociou em condições melhores"
-                      autoFocus
+                      placeholder={
+                        cancelMotivoKey === ACORDO_CANCEL_REASON_OTHER
+                          ? "Descreva o motivo do cancelamento"
+                          : "Detalhe adicional, se precisar"
+                      }
                     />
                     <div className="flex items-center gap-2">
                       <button
@@ -314,7 +511,8 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
                       <button
                         onClick={() => {
                           setShowCancelForm(false);
-                          setCancelMotivo("");
+                          setCancelMotivoKey("");
+                          setCancelObservacao("");
                           setError("");
                         }}
                         disabled={saving}
