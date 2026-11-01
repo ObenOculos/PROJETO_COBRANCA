@@ -92,6 +92,28 @@ const chunk = <T,>(arr: T[], size: number): T[][] => {
   return out;
 };
 
+// As 7 categorias da agenda priorizada, nesta ordem de precedência (ver
+// useMemo em InternalCollectorWallet) — cada cliente cai numa só.
+type AgendaSubTab =
+  | "promessas"
+  | "quebrado"
+  | "critico"
+  | "alerta"
+  | "medio"
+  | "semContato"
+  | "tratamento";
+
+interface AgendaCategoriaConfig {
+  key: AgendaSubTab;
+  label: string;
+  icon: React.ReactNode;
+  /** Classe do pill quando esta e a aba ativa. */
+  activeClass: string;
+  accentBorderClass: string;
+  groups: ClientGroup[];
+  emptyMessage: string;
+}
+
 interface InternalCollectorWalletProps {
   clientGroups: any[];
   user: any;
@@ -111,9 +133,14 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   onOpenDetail,
   onOpenAcordo,
 }) => {
-  const { getAcordoAtivoDoCliente, getAcordoQuebradoDoCliente, getFilteredCollections } =
-    useCollection();
+  const {
+    getAcordoAtivoDoCliente,
+    getAcordoQuebradoDoCliente,
+    getFilteredCollections,
+    salePayments,
+  } = useCollection();
   const [walletTab, setWalletTab] = useState<"agenda" | "carteira">("agenda");
+  const [agendaSubTab, setAgendaSubTab] = useState<AgendaSubTab>("promessas");
   // Filtro único (Agenda e Carteira completa usam o mesmo), reaproveitando o
   // motor do FilterBar/getFilteredCollections da tela de Cobrança -- ele
   // filtra por título; aqui a tabela é por cliente, então o resultado vira
@@ -198,6 +225,45 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     };
   }, [myCollections]);
 
+  // Pagamento de parcela de acordo registrado por ESTE cobrador neste mes.
+  // Nao vem de `salePayments` (sale_payments) -- registrar_pagamento_acordo
+  // so grava em acordo_pagamentos e espelha o saldo em BANCO_DADOS, nunca
+  // cria linha em sale_payments (migration 20261031000001). Sem somar isto
+  // aparte, "Recuperacao do Mes" ficaria sem o que vem de acordo.
+  const [acordoPagamentosMes, setAcordoPagamentosMes] = useState(0);
+  useEffect(() => {
+    if (!user?.id) {
+      setAcordoPagamentosMes(0);
+      return;
+    }
+    let cancelled = false;
+    const mesAtual = todayLocalStr().slice(0, 7);
+    (async () => {
+      // data_pagamento aqui e sempre YYYY-MM-DD (gravada via todayLocalStr
+      // no AcordoDetailModal, nunca o texto livre de BANCO_DADOS), entao
+      // comparar por prefixo do mes e seguro.
+      const { data, error } = await supabase
+        .from("acordo_pagamentos")
+        .select("valor_pago, data_pagamento")
+        .eq("collector_id", user.id)
+        .gte("data_pagamento", `${mesAtual}-01`);
+      if (error) {
+        console.error("Erro ao buscar pagamentos de acordo do mês:", error);
+        return;
+      }
+      if (!cancelled) {
+        setAcordoPagamentosMes(
+          (data || [])
+            .filter((p) => p.data_pagamento.startsWith(mesAtual))
+            .reduce((sum, p) => sum + Number(p.valor_pago), 0),
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
   const lastContacts = useMemo(() => {
     const map: Record<
       string,
@@ -245,18 +311,32 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return openClientGroups.filter((g) => matchedDocs.has(g.document));
   }, [openClientGroups, walletFilters, getFilteredCollections, user]);
 
-  // Agenda priorizada: cada cliente cai em UMA só seção (a de maior
-  // precedencia), quem sobra vai pro "Resto da carteira". Ordem pensada
-  // pelo que é mais acionável agora: uma promessa vencendo ou um acordo
-  // quebrado é alguém esperando contato; atraso e silencio vêm depois.
+  // Agenda priorizada: cada cliente cai em UMA só categoria (a de maior
+  // precedencia), quem sobra vai pra "Em tratamento" (nao fica invisivel
+  // mais). Ordem pensada pelo que é mais acionável agora: uma promessa
+  // vencendo ou um acordo quebrado é alguém esperando contato; atraso por
+  // faixa (90/60/30 — mesmos limiares de priorityBucket, que já usa o maior
+  // atraso entre as parcelas em aberto = o do boleto vencido mais antigo)
+  // vem depois; silêncio e "tudo em dia" por último.
   const today = todayLocalStr();
   const todayDate = new Date(today + "T00:00:00");
-  const { promessas, acordosQuebrados, criticos, semContato } = useMemo(() => {
+  const {
+    promessas,
+    acordosQuebrados,
+    criticos,
+    alertas,
+    medios,
+    semContato,
+    emTratamento,
+  } = useMemo(() => {
     const claimed = new Set<string>();
     const promessas: ClientGroup[] = [];
     const acordosQuebrados: ClientGroup[] = [];
     const criticos: ClientGroup[] = [];
+    const alertas: ClientGroup[] = [];
+    const medios: ClientGroup[] = [];
     const semContato: ClientGroup[] = [];
+    const emTratamento: ClientGroup[] = [];
 
     const claim = (list: ClientGroup[], group: ClientGroup) => {
       list.push(group);
@@ -274,8 +354,10 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     });
     walletFilteredGroups.forEach((group) => {
       if (claimed.has(group.document)) return;
-      if (priorityBucket(clientMaxOverdueDays(group)) === "critical")
-        claim(criticos, group);
+      const bucket = priorityBucket(clientMaxOverdueDays(group));
+      if (bucket === "critical") claim(criticos, group);
+      else if (bucket === "high") claim(alertas, group);
+      else if (bucket === "medium") claim(medios, group);
     });
     walletFilteredGroups.forEach((group) => {
       if (claimed.has(group.document)) return;
@@ -285,10 +367,96 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         : Infinity;
       if (diasSemContato > SEM_CONTATO_DIAS) claim(semContato, group);
     });
+    // Resto: ja tem contato recente, nao esta em nenhuma faixa de atraso que
+    // exija atencao agora e nao tem acordo quebrado — "ja sendo cuidado".
+    walletFilteredGroups.forEach((group) => {
+      if (claimed.has(group.document)) return;
+      claim(emTratamento, group);
+    });
 
-    return { promessas, acordosQuebrados, criticos, semContato };
+    return {
+      promessas,
+      acordosQuebrados,
+      criticos,
+      alertas,
+      medios,
+      semContato,
+      emTratamento,
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletFilteredGroups, lastContacts, getAcordoQuebradoDoCliente, today]);
+
+  const agendaCategorias: AgendaCategoriaConfig[] = useMemo(
+    () => [
+      {
+        key: "promessas",
+        label: "Promessas vencendo",
+        icon: <Clock className="w-4 h-4" />,
+        activeClass: "bg-indigo-600 text-white",
+        accentBorderClass: "border-l-indigo-400 dark:border-l-indigo-600",
+        groups: promessas,
+        emptyMessage: "Nenhuma promessa vencendo hoje ou atrasada.",
+      },
+      {
+        key: "quebrado",
+        label: "Acordo quebrado",
+        icon: <AlertCircle className="w-4 h-4" />,
+        activeClass: "bg-red-600 text-white",
+        accentBorderClass: "border-l-red-400 dark:border-l-red-600",
+        groups: acordosQuebrados,
+        emptyMessage: "Nenhum acordo quebrado.",
+      },
+      {
+        key: "critico",
+        label: "Crítico (+90 dias)",
+        icon: <Flame className="w-4 h-4" />,
+        activeClass: "bg-orange-600 text-white",
+        accentBorderClass: "border-l-orange-400 dark:border-l-orange-600",
+        groups: criticos,
+        emptyMessage: "Nenhum cliente crítico (+90 dias).",
+      },
+      {
+        key: "alerta",
+        label: "Alerta (60-90 dias)",
+        icon: <Flame className="w-4 h-4" />,
+        activeClass: "bg-amber-500 text-white",
+        accentBorderClass: "border-l-amber-400 dark:border-l-amber-600",
+        groups: alertas,
+        emptyMessage: "Nenhum cliente em alerta (60-90 dias).",
+      },
+      {
+        key: "medio",
+        label: "Médio (30-60 dias)",
+        icon: <CalendarRange className="w-4 h-4" />,
+        activeClass: "bg-yellow-500 text-white",
+        accentBorderClass: "border-l-yellow-400 dark:border-l-yellow-600",
+        groups: medios,
+        emptyMessage: "Nenhum cliente no atraso médio (30-60 dias).",
+      },
+      {
+        key: "semContato",
+        label: `Sem contato (${SEM_CONTATO_DIAS}+ dias)`,
+        icon: <CalendarDays className="w-4 h-4" />,
+        activeClass: "bg-gray-600 text-white",
+        accentBorderClass: "border-l-gray-300 dark:border-l-gray-600",
+        groups: semContato,
+        emptyMessage: "Nenhum cliente sem contato.",
+      },
+      {
+        key: "tratamento",
+        label: "Em tratamento",
+        icon: <CheckCircle className="w-4 h-4" />,
+        activeClass: "bg-green-600 text-white",
+        accentBorderClass: "border-l-green-400 dark:border-l-green-600",
+        groups: emTratamento,
+        emptyMessage: "Nenhum cliente em tratamento.",
+      },
+    ],
+    [promessas, acordosQuebrados, criticos, alertas, medios, semContato, emTratamento],
+  );
+
+  const categoriaAtiva =
+    agendaCategorias.find((c) => c.key === agendaSubTab) ?? agendaCategorias[0];
 
   useEffect(() => {
     setCurrentPage(1);
@@ -305,21 +473,26 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   }, [walletFilteredGroups, currentPage]);
 
   const stats = useMemo(() => {
-    // Recebido de TODA a carteira atribuida, inclusive quem ja quitou: e o
-    // progresso da meta, nao pode cair quando o cliente paga tudo.
-    const totalReceived = clientGroups.reduce(
-      (sum, g) => sum + g.totalReceived,
-      0,
-    );
+    const mesAtual = todayLocalStr().slice(0, 7);
+    // Recuperado POR ESTE COBRADOR neste mes -- nao o valor_recebido da
+    // carteira inteira (isso soma a vida toda do titulo, pagamento organico
+    // do cliente incluso, sem ligacao com o trabalho do cobrador). Soma
+    // sale_payments que ele mesmo registrou (pagamento normal) +
+    // acordo_pagamentos que ele mesmo registrou (nao passa por sale_payments,
+    // ver efeito de acordoPagamentosMes acima), os dois dentro do mes atual.
+    const totalReceived =
+      salePayments
+        .filter(
+          (p) =>
+            p.collectorId === user?.id && p.paymentDate.startsWith(mesAtual),
+        )
+        .reduce((sum, p) => sum + p.paymentAmount, 0) + acordoPagamentosMes;
     const totalPending = walletFilteredGroups.reduce(
       (sum, g) => sum + g.pendingValue,
       0,
     );
-    const now = new Date();
     const goal = monthlyGoals.find(
-      (g) =>
-        g.user_id === user?.id &&
-        g.month.startsWith(todayLocalStr(now).slice(0, 7)),
+      (g) => g.user_id === user?.id && g.month.startsWith(mesAtual),
     );
     const targetValue = goal?.payments_goal || 100000;
 
@@ -344,11 +517,12 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       high,
     };
   }, [
-    clientGroups,
     walletFilteredGroups,
     myCollections,
     monthlyGoals,
     user?.id,
+    salePayments,
+    acordoPagamentosMes,
   ]);
 
   return (
@@ -454,6 +628,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                 : 0,
             )}
           </p>
+          <p className="text-[10px] text-gray-400 mt-1">
+            Volume em aberto ÷ clientes na carteira
+          </p>
         </div>
       </div>
 
@@ -497,57 +674,36 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
       {walletTab === "agenda" ? (
         <>
+          <div className="flex flex-wrap gap-2">
+            {agendaCategorias.map((categoria) => (
+              <button
+                key={categoria.key}
+                type="button"
+                onClick={() => setAgendaSubTab(categoria.key)}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-colors ${
+                  agendaSubTab === categoria.key
+                    ? categoria.activeClass
+                    : "bg-white dark:bg-dark-bg text-gray-500 border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
+                }`}
+              >
+                {categoria.icon}
+                {categoria.label}
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                    agendaSubTab === categoria.key
+                      ? "bg-white/20"
+                      : "bg-gray-100 dark:bg-dark-bg-tertiary text-gray-500 dark:text-dark-text-secondary"
+                  }`}
+                >
+                  {categoria.groups.length}
+                </span>
+              </button>
+            ))}
+          </div>
           <AgendaSection
-            title="Promessas vencendo hoje/atrasadas"
-            icon={<Clock className="w-4 h-4" />}
-            iconBgClass="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600"
-            accentBorderClass="border-l-indigo-400 dark:border-l-indigo-600"
-            groups={promessas}
-            lastContacts={lastContacts}
-            getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
-            copiedDoc={copiedDoc}
-            copyDocument={copyDocument}
-            user={user}
-            onOpenDetail={onOpenDetail}
-            onOpenLog={onOpenLog}
-            onOpenAcordo={onOpenAcordo}
-          />
-          <AgendaSection
-            title="Acordo quebrado"
-            icon={<AlertCircle className="w-4 h-4" />}
-            iconBgClass="bg-red-100 dark:bg-red-900/30 text-red-600"
-            accentBorderClass="border-l-red-400 dark:border-l-red-600"
-            groups={acordosQuebrados}
-            lastContacts={lastContacts}
-            getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
-            copiedDoc={copiedDoc}
-            copyDocument={copyDocument}
-            user={user}
-            onOpenDetail={onOpenDetail}
-            onOpenLog={onOpenLog}
-            onOpenAcordo={onOpenAcordo}
-          />
-          <AgendaSection
-            title="Crítico (90+ dias sem pagar)"
-            icon={<Flame className="w-4 h-4" />}
-            iconBgClass="bg-orange-100 dark:bg-orange-900/30 text-orange-600"
-            accentBorderClass="border-l-orange-400 dark:border-l-orange-600"
-            groups={criticos}
-            lastContacts={lastContacts}
-            getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
-            copiedDoc={copiedDoc}
-            copyDocument={copyDocument}
-            user={user}
-            onOpenDetail={onOpenDetail}
-            onOpenLog={onOpenLog}
-            onOpenAcordo={onOpenAcordo}
-          />
-          <AgendaSection
-            title={`Sem contato há mais de ${SEM_CONTATO_DIAS} dias`}
-            icon={<CalendarDays className="w-4 h-4" />}
-            iconBgClass="bg-gray-100 dark:bg-dark-bg-secondary text-gray-500"
-            accentBorderClass="border-l-gray-300 dark:border-l-gray-600"
-            groups={semContato}
+            accentBorderClass={categoriaAtiva.accentBorderClass}
+            groups={categoriaAtiva.groups}
+            emptyMessage={categoriaAtiva.emptyMessage}
             lastContacts={lastContacts}
             getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
             copiedDoc={copiedDoc}
@@ -572,6 +728,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                 <tr className="bg-gray-50/50 dark:bg-dark-bg-secondary text-[11px] font-bold text-gray-400 tracking-wide">
                   <th className="px-6 py-4">Cliente</th>
                   <th className="px-6 py-4">Última Interação</th>
+                  <th className="px-6 py-4">Retorno</th>
                   <th className="px-6 py-4 text-center">Atraso</th>
                   <th className="px-6 py-4 text-right">Valor Pendente</th>
                   <th className="px-6 py-4 text-right">Ações</th>
@@ -596,7 +753,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                 ) : (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-6 py-12 text-center text-sm text-gray-500"
                     >
                       Nenhum cliente encontrado.
@@ -700,6 +857,12 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   const maxAtraso = clientMaxOverdueDays(group);
   const phoneValue = group.mobile || group.phone;
   const [showPhoneModal, setShowPhoneModal] = useState(false);
+  // saleNumber 0 = parcela avulsa (sem numero_titulo nem venda_n, ver
+  // resolveSaleKey em filters/sales.ts) -- na pratica, titulo que nasceu de
+  // uma renegociacao em vez de vir com numero de venda do ERP.
+  const saleLabels = Array.from(
+    new Set((group.sales ?? []).map((s) => s.saleNumber)),
+  ).map((n) => (n ? `#${n}` : "#Renegociada"));
   return (
     <>
     <tr className="group hover:bg-gray-50/80 dark:hover:bg-dark-bg-secondary transition-colors cursor-pointer">
@@ -707,7 +870,17 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
         <div className="flex flex-col gap-1">
           <span className="font-bold text-gray-900 dark:text-dark-text group-hover:text-indigo-600 transition-colors">
             {group.client}
+            {group.apelido && (
+              <span className="font-normal text-sm text-blue-600 dark:text-blue-400 ml-1">
+                ({group.apelido})
+              </span>
+            )}
           </span>
+          {saleLabels.length > 0 && (
+            <span className="text-[11px] text-gray-400">
+              {saleLabels.join(", ")}
+            </span>
+          )}
           <span className="flex items-center gap-1 text-xs text-gray-400">
             {group.document}
             <button
@@ -748,6 +921,19 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           </div>
         ) : (
           <span className="text-xs text-gray-300 italic">Sem registros</span>
+        )}
+      </td>
+      <td className="px-6 py-4" onClick={() => onOpenDetail(group)}>
+        {lastContact?.nextActionDate ? (
+          <span className="inline-flex items-center gap-1 w-fit px-2 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
+            <Clock className="w-3 h-3" />
+            Retorno:{" "}
+            {new Date(
+              lastContact.nextActionDate + "T00:00:00",
+            ).toLocaleDateString("pt-BR")}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-300 italic">—</span>
         )}
       </td>
       <td className="px-6 py-4 text-center" onClick={() => onOpenDetail(group)}>
@@ -871,11 +1057,9 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
 const AGENDA_PREVIEW_COUNT = 5;
 
 interface AgendaSectionProps {
-  title: string;
-  icon: React.ReactNode;
-  iconBgClass: string;
   accentBorderClass: string;
   groups: ClientGroup[];
+  emptyMessage: string;
   lastContacts: Record<
     string,
     { note: string; date: Date; result: string; nextActionDate: string | null }
@@ -889,16 +1073,14 @@ interface AgendaSectionProps {
   onOpenAcordo: (client: ClientGroup) => void;
 }
 
-// Bloco de uma seção da agenda priorizada: cabeçalho com ícone/contagem,
-// borda colorida conforme a urgência, e paginação própria (AGENDA_PREVIEW_COUNT
-// por página). Não renderiza nada se a seção estiver vazia (evita card vazio
-// poluindo a tela).
+// Conteudo da categoria ativa da agenda priorizada: borda colorida conforme
+// a urgencia, paginacao propria (AGENDA_PREVIEW_COUNT por pagina). O
+// titulo/icone/contagem ja aparecem no pill da aba (ver agendaCategorias em
+// InternalCollectorWallet) -- aqui so a lista, ou o aviso de categoria vazia.
 const AgendaSection: React.FC<AgendaSectionProps> = ({
-  title,
-  icon,
-  iconBgClass,
   accentBorderClass,
   groups,
+  emptyMessage,
   lastContacts,
   getAcordoAtivoDoCliente,
   copiedDoc,
@@ -912,7 +1094,17 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   useEffect(() => {
     setPage(1);
   }, [groups]);
-  if (groups.length === 0) return null;
+
+  if (groups.length === 0) {
+    return (
+      <div
+        className={`bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border border-l-4 ${accentBorderClass} shadow-sm p-8 text-center text-sm text-gray-400`}
+      >
+        {emptyMessage}
+      </div>
+    );
+  }
+
   const totalPages = Math.ceil(groups.length / AGENDA_PREVIEW_COUNT);
   const visible = groups.slice(
     (page - 1) * AGENDA_PREVIEW_COUNT,
@@ -923,13 +1115,6 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
     <div
       className={`bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border border-l-4 ${accentBorderClass} shadow-sm overflow-hidden`}
     >
-      <div className="p-4 border-b border-gray-100 dark:border-dark-border flex items-center gap-3">
-        <div className={`p-2 rounded-lg ${iconBgClass}`}>{icon}</div>
-        <h3 className="font-bold text-gray-900 dark:text-dark-text">{title}</h3>
-        <span className="ml-auto px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 dark:bg-dark-bg-secondary text-gray-600 dark:text-dark-text-secondary">
-          {groups.length}
-        </span>
-      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
