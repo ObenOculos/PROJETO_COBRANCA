@@ -58,7 +58,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // Configurações de inatividade
-  const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutos
+  const INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 1 hora
   let inactivityTimer: ReturnType<typeof setTimeout>;
 
   const clearLocalSession = () => {
