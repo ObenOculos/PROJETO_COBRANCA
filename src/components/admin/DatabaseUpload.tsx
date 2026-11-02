@@ -3,6 +3,7 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { supabase } from "../../lib/supabase";
 import { fetchAllPagesByIdRange } from "../../utils/supabasePagination";
+import { parseMoney } from "../../utils/money";
 import { Modal } from "../Modal"; // Importar o componente Modal
 import { useCollection } from "../../contexts/CollectionContext";
 import {
@@ -423,37 +424,6 @@ const parseNullableNumber = (
   const parsedNumber = Number(normalizedValue);
 
   return Number.isNaN(parsedNumber) ? null : parsedNumber;
-};
-
-/**
- * Converte um valor monetario para numero, tolerante a formatos comuns:
- * - remove "R$", espacos e outros simbolos;
- * - "1.234,56" (BR: ponto de milhar + virgula decimal) -> 1234.56;
- * - "1234,56" (so virgula decimal) -> 1234.56;
- * - "1234.56" (ponto decimal) -> 1234.56.
- * Retorna null para vazio/invalido. Substitui o antigo Number(x.replace(",","."))
- * que so trocava a PRIMEIRA virgula e quebrava com separador de milhar.
- */
-const parseMoney = (value: string | undefined | null): number | null => {
-  if (value === undefined || value === null) return null;
-  let s = value.toString().trim();
-  if (s === "") return null;
-
-  // Mantem apenas digitos, virgula, ponto e sinal.
-  s = s.replace(/[^\d,.-]/g, "");
-  if (s === "" || s === "-") return null;
-
-  if (s.includes(",") && s.includes(".")) {
-    // Tem os dois: ponto e milhar, virgula e decimal (padrao BR).
-    s = s.replace(/\./g, "").replace(",", ".");
-  } else if (s.includes(",")) {
-    // So virgula: decimal BR.
-    s = s.replace(",", ".");
-  }
-  // So ponto (ou nenhum): ja esta no formato decimal.
-
-  const n = Number(s);
-  return Number.isNaN(n) ? null : n;
 };
 
 /**

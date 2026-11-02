@@ -5,6 +5,7 @@ import { Database } from "../../types/database.types";
 import { ChevronDown } from "lucide-react";
 import { CollectionStatus } from "../../types/status";
 import { ALL_SITUACOES } from "../../config/profiles";
+import { parseMoney } from "../../utils/money";
 import {
   CADASTRO_CONTATO_COLUMNS,
   CadastroContatoColumn,
@@ -32,6 +33,23 @@ const splitFormData = (data: TituloFormData) => {
   }
   return { titulo, cadastro };
 };
+
+// Campos de dinheiro do formulario: inputs de texto com placeholder BR (ex.
+// "10,00"). Precisam passar por parseMoney antes do insert -- mesma regra de
+// `DatabaseUpload.tsx`, que ja faz isso no upload em massa.
+const MONEY_FIELDS = [
+  "valor_original",
+  "valor_reajustado",
+  "valor_recebido",
+  "desconto",
+  "acrescimo",
+  "multa",
+  "multa_aplicada",
+  "multa_paga",
+  "juros_por_dia",
+  "juros_aplicado",
+  "juros_pago",
+] as const;
 
 interface AddTituloModalProps {
   isOpen: boolean;
@@ -136,6 +154,14 @@ const AddTituloModal: React.FC<AddTituloModalProps> = ({
     }
 
     const { titulo, cadastro } = splitFormData(formData);
+
+    // Campos de dinheiro chegam como string (input de texto, placeholder BR)
+    // -- normaliza pro mesmo formato que o upload em massa ja grava.
+    for (const field of MONEY_FIELDS) {
+      if (field in titulo) {
+        titulo[field] = parseMoney(titulo[field] as string | null);
+      }
+    }
 
     const dataToInsert: BancoDadosInsert = {
       ...sampleBancoDados,
