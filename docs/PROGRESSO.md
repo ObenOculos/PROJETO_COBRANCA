@@ -18,6 +18,27 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 7 | Vulnerabilidades restantes (só dev) | Baixa | — |
 | 8 | ~~Escopo completo do gestor baixa `BANCO_DADOS` inteiro pro navegador~~ | Média | Médio |
 | 9 | Status "A Vencer" não existe hoje — avaliar relação com os demais | Baixa | A analisar |
+| 10 | Etapa 3 — tipar `BANCO_DADOS` (FK `documento`/dinheiro `numeric`/datas `date`) | Média | Grande, em 3 fases |
+
+### Etapa 3 — tipar `BANCO_DADOS`, fase 1/3 (FK `documento`) — concluída 2026-11-02
+
+Decisão antiga da reorganização do banco (ver item 10 acima e
+`estado-reorganizacao-banco`/memória). Levantamento prévio (consultas no
+banco + 3 agentes de exploração no front) confirmou que os dados já estão
+limpos (dinheiro 100% numérico, datas só ISO/BR conhecidos, zero órfãos em
+`documento`↔`clientes`) — o risco real estava em pontos pontuais do código,
+não nos dados. Plano completo em 3 fases (FK → dinheiro → datas), front
+sempre antes da migration (invertido do fluxo normal, porque aqui é o
+código que precisa já estar pronto pra constraint, não o contrário).
+
+- **Fase 1 (FK `documento → clientes(documento)`), commits `e26f30b`
+  (reordena `AddTituloModal.tsx`/`DatabaseUpload.tsx` pra criar o cadastro
+  do cliente ANTES do título) e `2925075` (migration
+  `20261102000002_fk_banco_dados_documento.sql`, `NOT VALID` +
+  `VALIDATE CONSTRAINT` — primeira vez que esse padrão aparece no projeto).
+  Aplicada e validada em produção (`convalidated = true`).
+- **Fase 2 (dinheiro `text` → `numeric`)** e **Fase 3 (datas `text` →
+  `date`)**: ver plano salvo, a fazer na sequência.
 
 ### Importação do financeiro Ciclone — concluída em 2026-11-02
 
