@@ -19,6 +19,45 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 8 | ~~Escopo completo do gestor baixa `BANCO_DADOS` inteiro pro navegador~~ | Média | Médio |
 | 9 | Status "A Vencer" não existe hoje — avaliar relação com os demais | Baixa | A analisar |
 | 10 | Etapa 3 — tipar `BANCO_DADOS` (FK `documento`/dinheiro `numeric`/datas `date`) | Média | Grande, em 3 fases |
+| 11 | ~~Título de acordo ativo pagável por fora (Distribuir Pagamento/CollectionModal/upload)~~ | Alta | Pequeno/médio |
+
+### Item 11 — título em acordo ativo pagável por fora — concluída 2026-11-02
+
+Achado ao testar a Fase 2 da Etapa 3 (perguntando "e se o cobrador pagar um
+título que já está num acordo?"): nenhum caminho de pagamento sabia da
+existência de acordos. `process_payment` (Distribuir Pagamento),
+`updateCollection` (pagamento de uma parcela via `CollectionModal`) e o
+upload em massa de status atualizavam `BANCO_DADOS` direto, sem checar
+`acordo_titulos`. O saldo do acordo é calculado só a partir de
+`acordo_parcelas`/`acordo_pagamentos` — nunca olha pra `BANCO_DADOS` — então
+os dois "livros" podiam divergir: título virava "Pago" mas o acordo
+continuava "ativo" pra sempre, sem saber do pagamento.
+
+- Migration `20261102000005_bloqueia_pagamento_titulo_em_acordo.sql`: gatilho
+  `BEFORE UPDATE` em `BANCO_DADOS` (`trg_bancodados_protege_titulo_em_acordo`)
+  bloqueia qualquer alteração de `status`/`valor_recebido`/`desconto` num
+  título vinculado a um acordo `ativo`, **exceto** quando a própria RPC do
+  acordo (`registrar_pagamento_acordo`) avisa via `set_config` que é ela
+  escrevendo. Resolve na raiz (cobre `process_payment`, `CollectionModal` e
+  upload de uma vez, sem precisar de guarda em cada front) — o upload já
+  tinha fallback linha-a-linha pra lote que falha, então nenhuma mudança foi
+  necessária em `DatabaseUpload.tsx`. `process_payment` também passou a
+  excluir títulos de acordo ativo da sua seleção e recusa explicitamente
+  (antes de gravar em `sale_payments`) quando não sobra nada pagável — sem
+  isso o cobrador ganharia "mérito" por um pagamento que não abateu nada.
+- Front (commit `d6cbc42`): modal de confirmação ("Voltar"/"Continuar") ao
+  clicar em "Distribuir Pagamento" quando o cliente tem acordo ativo
+  (`ClientDetailModal.tsx`), banner de aviso dentro do `GeneralPaymentModal.tsx`
+  e no card de pagamento/status do `CollectionModal.tsx`. Reusa
+  `getAcordoAtivoDoCliente`, já existente no `CollectionContext`.
+- Confirmado por design (não corrigido aqui, só registrado): um cliente
+  nunca tem mais de um acordo `ativo` simultâneo — índice único parcial
+  `uniq_acordo_ativo_por_cliente` já garante isso no banco desde a migration
+  original. `acordo_origem_id` (encadeamento de renegociação após quebra) já
+  existe na tabela mas não está implementado em nenhuma tela ainda.
+- Testado em transação com `ROLLBACK` contra produção (update direto
+  bloqueado, `process_payment` bloqueado pra cliente 100% coberto por
+  acordo, `registrar_pagamento_acordo` funcionando normalmente) e aplicado.
 
 ### Etapa 3 — tipar `BANCO_DADOS`, fase 1/3 (FK `documento`) — concluída 2026-11-02
 
