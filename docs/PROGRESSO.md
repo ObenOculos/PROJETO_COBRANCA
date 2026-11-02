@@ -37,8 +37,41 @@ código que precisa já estar pronto pra constraint, não o contrário).
   `20261102000002_fk_banco_dados_documento.sql`, `NOT VALID` +
   `VALIDATE CONSTRAINT` — primeira vez que esse padrão aparece no projeto).
   Aplicada e validada em produção (`convalidated = true`).
-- **Fase 2 (dinheiro `text` → `numeric`)** e **Fase 3 (datas `text` →
-  `date`)**: ver plano salvo, a fazer na sequência.
+- **Fase 2 (dinheiro `text` → `numeric`) — concluída 2026-11-02**, commits
+  `c7dd211` (front: `src/utils/money.ts` com `parseMoney`, corrige
+  `AddTituloModal.tsx`) e `a4f92e5` (migration
+  `20261102000004_banco_dados_dinheiro_numeric.sql`). Investigação da
+  migration achou raio de impacto no **banco** que o levantamento inicial
+  (só front) não cobriu — duas tentativas em `ROLLBACK` contra produção
+  antes de acertar:
+  - 2 views (`banco_dados_clientes_ativos`/`_quitados`, item 8) e 1 trigger
+    (`trg_banco_dados_atualiza_saldo`, por ter `UPDATE OF valor_original,...`
+    na própria definição) bloqueiam `ALTER COLUMN TYPE` por dependerem
+    estruturalmente das colunas — dropados e recriados idênticos na mesma
+    transação da migration.
+  - 6 funções em uso real reescritas para usar as colunas numeric
+    diretamente, sem `REPLACE(...)`/`texto_para_valor(...)`/`TO_CHAR(...)`:
+    `trg_atualiza_saldo_por_documento`, `process_payment`,
+    `registrar_pagamento_acordo`, `cancelar_vendas`,
+    `trg_recebimentos_historico_ins`/`_upd`.
+  - Achados à parte, decididos com o usuário: apagados `vw_clientes_cobradores`
+    (view) e as RPCs `clientes_do_cobrador`/`clientes_sem_cobrador`/
+    `listar_cobradores` — nenhuma rastreada em migration, nenhuma chamada
+    pelo front (confirmado por busca em `src/`), teriam quebrado de qualquer
+    forma (`converter_valor_brasileiro(text)` em coluna agora `numeric`).
+    Grant órfão do role `anon` em `banco_dados_clientes_quitados` removido ao
+    recriar a view — causa raiz (`pg_default_acl` do schema `public` concede
+    tudo, incluindo `anon`, a toda tabela/view nova) registrada mas **não
+    corrigida** (afeta qualquer objeto novo futuro; vale sessão de segurança
+    dedicada).
+  - Testado em `ROLLBACK` (contagem de linhas das 2 views idêntica
+    antes/depois) e depois com pagamento real em produção (cliente Ana
+    Claudia Almeida Araujo, "Distribuir Pagamento" entre 2 vendas): status,
+    valores e `recebimentos_historico` (audit trail) todos corretos.
+- **Fase 3 (datas `text` → `date`)**: ver plano salvo — mesma investigação
+  de views/triggers/funções vai ser necessária antes do `ALTER COLUMN TYPE`
+  (já há pistas: `process_payment` declara `v_hoje text`, checar tipo de
+  `recebimentos_historico.data_de_recebimento`/`sale_payments.payment_date`).
 
 ### Importação do financeiro Ciclone — concluída em 2026-11-02
 
