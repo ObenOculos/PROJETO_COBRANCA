@@ -53,8 +53,16 @@ do Sistema de Cobrança como mais uma loja, com sincronização recorrente.
   (~70 requisições).
 - **Efeito colateral encontrado e corrigido**: a carga expôs a causa raiz do
   item 8 (ver abaixo) antes do esperado — registrado lá.
-- Agendamento recorrente (Task Scheduler) **ainda não configurado** — ficou
-  pendente depois que o item 8 precisou ser resolvido primeiro.
+- **Agendamento recorrente configurado em 2026-11-02**: tarefa do Windows
+  Task Scheduler `Cobranca_Sync_Financeiro_Ciclone`, diária às 5h, roda
+  `python sync_financeiro.py` (sincronização completa, sem `--limit`) como o
+  usuário local, logon `Interactive` (funciona com a tela bloqueada, não com
+  logoff), `StartWhenAvailable` (se o PC estiver hibernando no horário, roda
+  ao acordar) e retry automático (2x, 10 min) em caso de falha. Testada
+  manualmente no mesmo dia: 35.632 títulos, 0 novos clientes/atualizações
+  (nada mudou desde a carga inicial) — confirma upsert idempotente de ponta
+  a ponta. Os 32 títulos sem CPF/CNPJ válido (ignorados) são estáveis desde
+  a carga original, não é regressão.
 
 ### 1b. Desempenho por atribuição atual — ALTA
 
