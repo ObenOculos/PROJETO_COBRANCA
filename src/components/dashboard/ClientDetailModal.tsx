@@ -10,6 +10,7 @@ import {
   Edit,
   CreditCard,
   Info,
+  AlertTriangle,
   Receipt,
   Phone,
   MessageCircle,
@@ -165,6 +166,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     scheduledVisits,
     users,
     reincidenciaResets,
+    getAcordoAtivoDoCliente,
   } = useCollection();
   const { user } = useAuth();
 
@@ -308,6 +310,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
   const [isGeneralPaymentModalOpen, setIsGeneralPaymentModalOpen] =
     useState(false);
+  const [showAcordoAtivoConfirm, setShowAcordoAtivoConfirm] = useState(false);
   const [isGeneralEditModalOpen, setIsGeneralEditModalOpen] = useState(false);
   const [view, setView] = useState<"vendas" | "dados" | "historico">("vendas");
   const [expandedSales, setExpandedSales] = useState<Set<number>>(new Set());
@@ -771,7 +774,13 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 <button
                   id="distribute-payment"
                   name="distributePayment"
-                  onClick={() => setIsGeneralPaymentModalOpen(true)}
+                  onClick={() => {
+                    if (getAcordoAtivoDoCliente(clientGroup.document)) {
+                      setShowAcordoAtivoConfirm(true);
+                    } else {
+                      setIsGeneralPaymentModalOpen(true);
+                    }
+                  }}
                   className="flex items-center px-3 py-2 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-700 transition-colors text-sm font-medium shadow-sm"
                   title="Distribuir pagamento entre parcelas"
                 >
@@ -1478,6 +1487,52 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Aviso de acordo ativo antes de abrir o Distribuir Pagamento --
+          titulos vinculados ao acordo nao podem ser pagos por aqui (ver
+          migration 20261102000005); o cobrador precisa confirmar que sabe
+          disso antes de continuar. */}
+      {showAcordoAtivoConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[130]">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4">
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-amber-100 rounded-full">
+                  <AlertTriangle className="h-6 w-6 text-amber-600" />
+                </div>
+                <h3 className="text-base font-bold text-gray-900">
+                  Este cliente tem um acordo ativo
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                Títulos vinculados ao acordo não podem ser pagos por aqui — o
+                sistema vai recusar e manter o valor neles. Só títulos fora do
+                acordo (se houver) serão aplicados. Para pagar o acordo, use a
+                tela dele.
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowAcordoAtivoConfirm(false)}
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors font-medium text-sm"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAcordoAtivoConfirm(false);
+                  setIsGeneralPaymentModalOpen(true);
+                }}
+                className="w-full sm:w-auto px-4 py-2 bg-amber-600 text-white rounded-2xl hover:bg-amber-700 transition-colors font-medium text-sm"
+              >
+                Continuar
+              </button>
+            </div>
           </div>
         </div>
       )}

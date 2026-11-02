@@ -40,7 +40,11 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
   userType,
   onClose,
 }) => {
-  const { updateCollection, addAttempt } = useCollection();
+  const { updateCollection, addAttempt, getAcordoAtivoDoCliente } =
+    useCollection();
+  const acordoAtivo = collection.documento
+    ? getAcordoAtivoDoCliente(collection.documento)
+    : undefined;
   const [currentAddress, setCurrentAddress] = useState<any>(null);
   const [addressLoading, setAddressLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"details" | "attempts" | "action">(
@@ -538,6 +542,17 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
 
             {activeTab === "action" && userType !== "manager" && (
               <div className="space-y-6 pb-4">
+                {acordoAtivo && (
+                  <div className="p-4 border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900 rounded-2xl flex items-start gap-3">
+                    <Info className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      Este cliente tem um <strong>acordo ativo</strong>. Este
+                      título pode estar vinculado a ele — se estiver, o
+                      sistema vai recusar status/pagamento registrados por
+                      aqui. Use a tela do acordo para registrar o pagamento.
+                    </p>
+                  </div>
+                )}
                 {/* Card: Status */}
                 <div className="p-5 border border-gray-100 dark:border-dark-border rounded-2xl bg-white dark:bg-dark-bg shadow-sm">
                   <h3 className="text-xs font-bold text-gray-400 tracking-wide mb-4 flex items-center gap-2">

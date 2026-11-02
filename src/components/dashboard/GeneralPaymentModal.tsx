@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Calendar,
   Clock,
+  Info,
 } from "lucide-react";
 import { ClientGroup, SaleGroup, ScheduledVisit } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
@@ -35,7 +36,11 @@ interface SaleDistributionItem {
 
 const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
   ({ clientGroup, clientSales, onClose, onSuccess }) => {
-    const { scheduleVisit, processSalePayment } = useCollection();
+    const { scheduleVisit, processSalePayment, getAcordoAtivoDoCliente } =
+      useCollection();
+    const acordoAtivo = clientGroup.document
+      ? getAcordoAtivoDoCliente(clientGroup.document)
+      : undefined;
     const { user } = useAuth();
     const { isOnline } = useOffline();
     const { addNotification } = useNotifications();
@@ -425,6 +430,18 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
           <div className="overflow-y-auto max-h-[calc(95vh-180px)] sm:max-h-[calc(90vh-180px)]">
             <form onSubmit={handleSubmit} className="p-4 sm:p-6">
+              {acordoAtivo && (
+                <div className="mb-6 p-4 border border-amber-200 bg-amber-50 rounded-2xl flex items-start gap-3">
+                  <Info className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                  <p className="text-sm text-amber-700">
+                    Este cliente tem um <strong>acordo ativo</strong>. Os
+                    títulos vinculados a ele não podem ser pagos por aqui — o
+                    sistema vai recusar e manter o valor neles; só títulos
+                    fora do acordo (se houver) serão aplicados. Para pagar o
+                    acordo, use a tela dele.
+                  </p>
+                </div>
+              )}
               {/* Resumo do Cliente */}
               <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-4 sm:p-6 mb-6 border border-purple-200">
                 <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center">
@@ -717,8 +734,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 </div>
               )}
 
-              {/* Botões de Ação */}
-              <div className="mt-6 pt-4 sm:pt-6 border-t border-gray-200">
+              {/* Botões de Ação -- sticky pra nunca ficar escondido rolando o
+                  conteúdo (ex.: muitas vendas na distribuição, ou o aviso de
+                  acordo ativo empurrando o resto pra baixo). */}
+              <div className="sticky bottom-0 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 mt-6 px-4 sm:px-6 py-4 sm:py-6 bg-white border-t border-gray-200 z-10">
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:justify-end">
                   <button
                     id="confirm-button"
