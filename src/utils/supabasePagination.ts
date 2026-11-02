@@ -109,6 +109,92 @@ export async function fetchPagesInParallel<T>(
   return rows;
 }
 
+type RangeQuery<T> = (
+  gte: number,
+  lt: number | null,
+) => PromiseLike<PageResult<T>>;
+
+interface RangePaginationOptions<T> extends PaginationOptions<T> {
+  concurrency?: number;
+}
+
+/**
+ * Busca todas as linhas de uma consulta ordenada por uma coluna numerica
+ * unica (id_parcela) usando faixas [lo, hi) em vez de OFFSET.
+ *
+ * Por que: OFFSET faz o banco computar e descartar todas as linhas
+ * anteriores a cada pagina -- custo que cresce com a profundidade (e, se a
+ * fonte for uma view com agregacao, o calculo caro se repete do zero em
+ * TODA pagina). Uma faixa por id e um index range scan: custo independente
+ * de quantas paginas vieram antes. Bonus: como cada linha pertence a
+ * exatamente uma faixa pelo seu proprio id, a instabilidade do OFFSET sob
+ * escrita concorrente (ver `dedupeBy`) deixa de existir aqui.
+ *
+ * `buildRangeQuery(gte, lt)` deve aplicar `.gte(coluna, gte)` e, quando `lt`
+ * nao for null, `.lt(coluna, lt)`, sempre com `.order(coluna, {ascending:
+ * true})` e `.limit(pageSize)`. Dentro de uma faixa que vier cheia (mais que
+ * `pageSize` linhas), a funcao pagina sequencialmente SO aquela faixa por
+ * keyset (`id > ultimo_visto`), nunca por OFFSET.
+ *
+ * O retorno (quando `accumulate`) vem na ordem das faixas (crescente por
+ * id), nao na ordem em que cada faixa termina de buscar -- mesma garantia
+ * que `fetchPagesInParallel` ja dava, só que por faixa em vez de por pagina.
+ */
+export async function fetchAllPagesByIdRange<T>(
+  buildRangeQuery: RangeQuery<T>,
+  bounds: { min: number; max: number },
+  getId: (row: T) => number,
+  {
+    pageSize = DEFAULT_PAGE_SIZE,
+    concurrency = DEFAULT_CONCURRENCY,
+    onBatch,
+    accumulate = true,
+  }: RangePaginationOptions<T> = {},
+): Promise<T[]> {
+  const { min, max } = bounds;
+  if (min > max) return [];
+
+  const span = max - min + 1;
+  const bucketCount = Math.max(1, Math.min(concurrency, span));
+  const bucketWidth = Math.ceil(span / bucketCount);
+
+  const buckets = Array.from({ length: bucketCount }, (_, i) => {
+    const lo = min + i * bucketWidth;
+    const hi = i === bucketCount - 1 ? null : min + (i + 1) * bucketWidth;
+    return { lo, hi };
+  });
+
+  let loaded = 0;
+
+  // Cada faixa acumula no seu PROPRIO array -- faixas rodam em paralelo e
+  // terminam fora de ordem, entao so concatenar por indice de faixa (abaixo)
+  // garante que o retorno saia crescente por id, igual a antes.
+  const fetchBucket = async ({
+    lo,
+    hi,
+  }: (typeof buckets)[number]): Promise<T[]> => {
+    const bucketRows: T[] = [];
+    let cursor = lo;
+    for (;;) {
+      const { data, error } = await buildRangeQuery(cursor, hi);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      loaded += data.length;
+      if (accumulate) bucketRows.push(...data);
+      onBatch?.(data, loaded);
+
+      if (data.length < pageSize) break;
+      cursor = getId(data[data.length - 1]) + 1;
+    }
+    return bucketRows;
+  };
+
+  const perBucket = await Promise.all(buckets.map(fetchBucket));
+
+  return perBucket.flat();
+}
+
 /**
  * Remove duplicatas mantendo a primeira ocorrencia.
  *

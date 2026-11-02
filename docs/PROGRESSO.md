@@ -16,8 +16,45 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 5 | Quebrar componentes gigantes | Baixa | Contínuo |
 | 6 | `RouteMap` não detecta reagendadas | Baixa | Pequeno |
 | 7 | Vulnerabilidades restantes (só dev) | Baixa | — |
-| 8 | Escopo completo do gestor baixa `BANCO_DADOS` inteiro pro navegador | Média | Médio |
+| 8 | ~~Escopo completo do gestor baixa `BANCO_DADOS` inteiro pro navegador~~ | Média | Médio |
 | 9 | Status "A Vencer" não existe hoje — avaliar relação com os demais | Baixa | A analisar |
+
+### Importação do financeiro Ciclone — concluída em 2026-11-02
+
+Pedido do usuário: trazer o financeiro do ERP Ciclone (contas a receber das
+óticas revendedoras, empresas 1+2, filial única "Focco Brasil") para dentro
+do Sistema de Cobrança como mais uma loja, com sincronização recorrente.
+
+- Migration `20261101000001_ciclone_titulo_map.sql` (tabela técnica
+  `ciclone_titulo_map`: `id_parcela` estável por `fncrt_uuid`, já que o
+  Ciclone não tem esse id e ele precisa ser o mesmo entre rodadas).
+- Script `Ciclone/Esquema_SQL/sync_cobranca/sync_financeiro.py`: lê
+  `fn_crtitulo` (+ `fn_crtitulobaixado`/`fn_crbaixa` para data de
+  recebimento), filtra `pgcln_codigo >= 100000` (abaixo disso são contas
+  internas — a própria Focco Brasil, um sócio, funcionários, processadoras
+  de pagamento como BLU/Cielo/Mercado Pago — **não** clientes revendedores
+  reais) e `documento` com CPF/CNPJ válido. `fncrt_situacao` do Ciclone não é
+  um status de pagamento confiável (títulos com saldo 0 majoritariamente
+  continuam `'A'`; títulos `'F'` não têm nenhuma baixa linkada) — o status
+  real vem do saldo (`valor - saldo`), só `'C'` (cancelado) é usado como está
+  (zera o saldo via `desconto`, mantendo `valor_original` como fato
+  histórico).
+- **Carga completa aplicada em produção**: 35.632 títulos (28.606 recebidos,
+  3.664 cancelados, 1.992 em atraso, 1.370 pendentes), 1.886 clientes.
+  `BANCO_DADOS` foi de 127.977 → 163.609 linhas. Conferido: soma de
+  `valor_original`/`valor_recebido` por status bate exatamente; `clientes`
+  só preenchido nos campos vazios (nunca sobrescreve cadastro editado à mão).
+- Dois bugs reais achados e corrigidos no caminho: (1) PostgREST exige
+  chaves uniformes em todo POST em lote (`PGRST102`) — os patches parciais
+  de `clientes` e a coluna `descricao` condicional de `BANCO_DADOS`
+  quebravam isso; (2) otimização de rede: resolver `id_parcela` fazia um
+  POST + GET separado (~800 requisições para 35,6 mil títulos) — trocado
+  para `Prefer: return=representation`, o próprio POST já devolve o id
+  (~70 requisições).
+- **Efeito colateral encontrado e corrigido**: a carga expôs a causa raiz do
+  item 8 (ver abaixo) antes do esperado — registrado lá.
+- Agendamento recorrente (Task Scheduler) **ainda não configurado** — ficou
+  pendente depois que o item 8 precisou ser resolvido primeiro.
 
 ### 1b. Desempenho por atribuição atual — ALTA
 
@@ -488,18 +525,55 @@ contextos de poucas linhas — cancelamento de visita, gatilho de importação
 — onde o custo por chamada nunca foi o problema).
 
 **Ainda em aberto:**
-- **A causa raiz (paginação por `OFFSET`) não foi eliminada, só reduzida
-  pela metade — e o teste de 2026-10-30 (ver acima) mostrou ela estourando o
-  timeout de 2min em páginas profundas (`offset=60000`+) do `BANCO_DADOS`,
-  mais grave do que os 40,6s medidos em 2026-10-29.** Pra zerar de vez, o
-  caminho é paginação por keyset (seek: `id_parcela > última_id` em vez de
-  `OFFSET`) na carga de qualquer escopo — não voltar a cogitar `GROUP BY`
-  por tela, que exigiria duplicar a lógica do `FilterBar` em SQL. Com a
-  regressão acima corrigida, o escopo ativo volta a ser rápido (~1,8s) e o
-  fallback para a tabela inteira deixa de ser o caminho normal — mas se
-  algum dia ele for acionado de novo (ex.: outra regressão, ou um gestor
-  com conexão lenta/timeout mais curto), o `OFFSET` profundo continua
-  podendo estourar.
+~~**A causa raiz (paginação por `OFFSET`) não foi eliminada, só reduzida
+  pela metade.**~~ **Corrigido em 2026-11-02**, forçado pela carga do
+  financeiro Ciclone (+35.632 linhas, `BANCO_DADOS` 127.977 → 163.609):
+  reproduziu em produção, sem nenhuma escrita concorrente, exatamente o que
+  este item previa — `banco_dados_clientes_ativos` levou **54,3s** para
+  74.345 linhas, e `banco_dados_clientes_quitados` deu `57014` (statement
+  timeout) em `offset=10000`/`offset=12000`, bem mais superficial que os
+  `offset=60000+` de antes.
+
+  **Diagnóstico mais preciso do que "é o `OFFSET`"**: `EXPLAIN ANALYZE` ao
+  vivo mostrou que **79% do custo por página era o `HashAggregate`** de
+  `saldo_por_documento` (migration `20261030000001`) — essa view recalculava
+  `SUM(...) GROUP BY documento` sobre as 163 mil linhas **do zero, em toda
+  página pedida**, não só na profundidade. O `OFFSET` era só os ~21%
+  restantes.
+
+  **Correção (migration `20261102000001_materializa_saldo_por_documento.sql`)**:
+  1. `saldo_por_documento` deixou de ser view e passou a ser tabela
+     (`saldo_por_documento_tbl`) mantida por gatilho `AFTER INSERT OR UPDATE
+     ON "BANCO_DADOS"`, que recalcula **só o documento afetado** (indexado
+     por `idx_banco_dados_documento`) — não é o anti-padrão "saldo
+     decrementado" da skill `arquiteto-cobranca`: o gatilho sempre recalcula
+     a soma do zero, nunca faz `saldo = saldo - pago`, só move esse
+     recálculo de "toda leitura, tabela inteira" para "toda escrita, 1
+     documento". `banco_dados_clientes_ativos`/`_quitados` e
+     `cliente_tem_saldo_aberto` continuam lendo pelo mesmo nome
+     (`CREATE OR REPLACE VIEW` preserva as views dependentes), sem mudar
+     uma linha de SQL nelas.
+  2. **Agora sim**, paginação por keyset: `fetchAllPagesByIdRange`
+     (`src/utils/supabasePagination.ts`) troca `OFFSET` por faixas de
+     `id_parcela` (index range scan via `BANCO_DADOS_pkey`, custo
+     independente da profundidade) nos 3 pontos de `CollectionContext.tsx`
+     que usavam `fetchAllPages`/`fetchPagesInParallel` (escopos
+     `active`/`all`/`quitados`). Bônus: elimina a instabilidade do `OFFSET`
+     sob escrita concorrente (uma linha pertence a exatamente uma faixa pelo
+     próprio id) — os 3 pontos não precisam mais de `dedupeBy`.
+  - Testado em transação com `ROLLBACK` contra produção antes do `db push`:
+    zero divergência entre a fórmula antiga e a tabela nova nos 16.728
+    documentos; gatilho testado em `UPDATE` (pagamento parcial/total),
+    `INSERT` (cliente novo) e no caso-limite (todos os títulos do documento
+    cancelados → saldo zera, não fica obsoleto).
+  - **Medido em produção depois do `db push`**: a página que antes dava
+    `57014` responde em **108–172ms** (REST, service role, fora do
+    navegador). `tsc -b` limpo; lint de `CollectionContext.tsx` idêntico ao
+    `HEAD` (18 problemas antes e depois, nenhum novo); `supabasePagination.ts`
+    sem problema, antes e depois.
+  - Projeto no plano gratuito do Supabase (compute compartilhado, sem
+    `pg_cron`) — por isso a correção foi algorítmica (parar de recalcular),
+    não "banco mais forte" nem refresh periódico por job agendado.
 - Modais de detalhe (cobrador/loja/cliente): hoje ainda leem tudo via
   `collections` em memória; poderiam virar fetch sob demanda filtrado
   (`WHERE user_id=X` etc.), só quando o gestor clica — ganho pequeno agora

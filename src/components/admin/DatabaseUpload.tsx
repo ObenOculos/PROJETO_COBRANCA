@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { supabase } from "../../lib/supabase";
+import { fetchAllPagesByIdRange } from "../../utils/supabasePagination";
 import { Modal } from "../Modal"; // Importar o componente Modal
 import { useCollection } from "../../contexts/CollectionContext";
 import {
@@ -823,29 +824,43 @@ const DatabaseUpload: React.FC = () => {
     setUploadStatus("🔄 Gerando arquivo Excel...");
     try {
       const BATCH_SIZE = 1000;
-      let allData: any[] = [];
-      let from = 0;
-      let hasMore = true;
 
-      // Fetch all data in batches
-      while (hasMore) {
-        const { data, error } = await supabase
+      // Faixa por id_parcela em vez de OFFSET: um index range scan
+      // (BANCO_DADOS_pkey) tem custo independente da profundidade, ao
+      // contrario de OFFSET sobre a tabela inteira (mesmo utilitario usado
+      // em CollectionContext.tsx para o mesmo motivo).
+      const [minRes, maxRes] = await Promise.all([
+        supabase
           .from("BANCO_DADOS")
-          .select("*")
+          .select("id_parcela")
           .order("id_parcela", { ascending: true })
-          .range(from, from + BATCH_SIZE - 1);
+          .limit(1),
+        supabase
+          .from("BANCO_DADOS")
+          .select("id_parcela")
+          .order("id_parcela", { ascending: false })
+          .limit(1),
+      ]);
+      const min = (minRes.data?.[0]?.id_parcela as number | undefined) ?? null;
+      const max = (maxRes.data?.[0]?.id_parcela as number | undefined) ?? null;
 
-        if (error) {
-          throw error;
-        }
-
-        if (data && data.length > 0) {
-          allData = allData.concat(data);
-          from += data.length;
-        } else {
-          hasMore = false;
-        }
-      }
+      const allData: any[] =
+        min === null || max === null
+          ? []
+          : await fetchAllPagesByIdRange<Record<string, unknown>>(
+              (gte, lt) => {
+                const base = supabase
+                  .from("BANCO_DADOS")
+                  .select("*")
+                  .order("id_parcela", { ascending: true })
+                  .gte("id_parcela", gte)
+                  .limit(BATCH_SIZE);
+                return lt === null ? base : base.lt("id_parcela", lt);
+              },
+              { min, max },
+              (row) => Number(row.id_parcela),
+              { pageSize: BATCH_SIZE },
+            );
 
       if (allData.length === 0) {
         setUploadStatus("ℹ️ Nenhum dado para exportar.");

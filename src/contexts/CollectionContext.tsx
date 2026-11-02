@@ -73,8 +73,7 @@ import {
 } from "../hooks/useCacheInvalidation";
 import {
   fetchAllPages,
-  fetchPagesInParallel,
-  dedupeBy,
+  fetchAllPagesByIdRange,
 } from "../utils/supabasePagination";
 import { todayLocalStr } from "../config/visitStatus";
 
@@ -947,74 +946,91 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         );
       };
 
-      // Um builder NOVO por pagina. Reaproveitar o mesmo objeto entre paginas
-      // fazia o supabase-js concatenar o order a cada chamada, e a ultima
-      // pagina saia com "order=id_parcela.asc" repetido uma vez por pagina ja
+      // Um builder NOVO por chamada. Reaproveitar o mesmo objeto entre
+      // chamadas fazia o supabase-js concatenar o order a cada uma, e a
+      // ultima saia com "order=id_parcela.asc" repetido uma vez por pagina ja
       // carregada.
-      const buildPage = (from: number, to: number) =>
-        applyCollectorFilter(supabase.from(source).select("*"))
+      //
+      // Faixa por id_parcela em vez de OFFSET: um index range scan tem custo
+      // independente da profundidade (ver fetchAllPagesByIdRange). `lt` nulo
+      // significa "sem limite superior" (ultima faixa).
+      const buildRangeQuery = (gte: number, lt: number | null) => {
+        const base = applyCollectorFilter(supabase.from(source).select("*"))
           .order("id_parcela", { ascending: true })
-          .range(from, to);
+          .gte("id_parcela", gte)
+          .limit(COLLECTIONS_PAGE_SIZE);
+        return lt === null ? base : base.lt("id_parcela", lt);
+      };
 
-      const countFrom = () =>
-        applyCollectorFilter(
-          supabase.from(source).select("id_parcela", {
-            count: "exact",
-            head: true,
-          }),
-        );
+      const normalizeStatusError = (status: number, error: unknown) =>
+        status >= 300 && !error
+          ? {
+              message: `HTTP ${status} ao consultar ${source}`,
+              details: "",
+              hint: "",
+              code: String(status),
+              name: "PostgrestError",
+            }
+          : error;
 
-      // Contagem antecipada: sem saber quantas paginas existem nao da para
-      // dispara-las em paralelo. Se falhar, cai para a varredura sequencial.
+      // Contagem (so para a mensagem de progresso) + limites de id_parcela
+      // (para montar as faixas) -- as 3 precisam do MESMO filtro de cobrador.
       //
       // O supabase-js nem sempre preenche `error` num HEAD com status >= 500
       // (resposta sem corpo pra parsear como PostgrestError) — ele volta
       // como sucesso com `count: 0`. Sem checar o status manualmente, um 503
-      // passageiro no servidor vira "cliente sem titulo nenhum" pro usuario,
-      // em vez de cair pra paginacao sequencial.
-      let { count, error: countError, status: countStatus } =
-        await countFrom();
-      if (countStatus >= 300 && !countError) {
-        countError = {
-          message: `HTTP ${countStatus} ao contar ${source}`,
-          details: "",
-          hint: "",
-          code: String(countStatus),
-          name: "PostgrestError",
+      // passageiro no servidor vira "cliente sem titulo nenhum" pro usuario.
+      const fetchScopeStats = async () => {
+        const [countRes, minRes, maxRes] = await Promise.all([
+          applyCollectorFilter(
+            supabase
+              .from(source)
+              .select("id_parcela", { count: "exact", head: true }),
+          ),
+          applyCollectorFilter(supabase.from(source).select("id_parcela"))
+            .order("id_parcela", { ascending: true })
+            .limit(1),
+          applyCollectorFilter(supabase.from(source).select("id_parcela"))
+            .order("id_parcela", { ascending: false })
+            .limit(1),
+        ]);
+
+        const error =
+          normalizeStatusError(countRes.status, countRes.error) ||
+          normalizeStatusError(minRes.status, minRes.error) ||
+          normalizeStatusError(maxRes.status, maxRes.error);
+
+        return {
+          count: error ? null : (countRes.count ?? null),
+          min: (minRes.data?.[0]?.id_parcela as number | undefined) ?? null,
+          max: (maxRes.data?.[0]?.id_parcela as number | undefined) ?? null,
+          error,
         };
-      }
+      };
+
+      let { count, min, max, error: statsError } = await fetchScopeStats();
 
       // A view pode nao existir ainda (codigo publicado antes da migration).
       // Subir o app com a tabela inteira e ruim, mas subir sem dado nenhum e
       // pior — entao cai para "all" em vez de falhar.
-      if (countError && effectiveScope === "active") {
+      if (statsError && effectiveScope === "active") {
         console.warn(
           `Falha ao consultar ${source}; caindo para ${COLLECTIONS_SOURCE.all}. A migration 20260827000001 foi aplicada?`,
-          countError,
+          statsError,
         );
         effectiveScope = "all";
         source = COLLECTIONS_SOURCE.all;
-        ({ count, error: countError, status: countStatus } =
-          await countFrom());
-        if (countStatus >= 300 && !countError) {
-          countError = {
-            message: `HTTP ${countStatus} ao contar ${source}`,
-            details: "",
-            hint: "",
-            code: String(countStatus),
-            name: "PostgrestError",
-          };
-        }
+        ({ count, min, max, error: statsError } = await fetchScopeStats());
       }
 
-      if (countError) {
+      if (statsError) {
         console.warn(
-          `Nao foi possivel contar ${source}; usando paginacao sequencial.`,
-          countError,
+          `Nao foi possivel obter estatisticas de ${source}.`,
+          statsError,
         );
       }
 
-      const total = countError ? null : (count ?? null);
+      const total = statsError ? null : count;
 
       // O cadastro (tabela `clientes`) precisa estar em maos ANTES de mapear as
       // linhas: e ele que preenche nome, apelido, telefones e e-mail de cada
@@ -1057,25 +1073,27 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // `accumulate: false`: as linhas cruas viram Collection em `onBatch` e
       // sao descartadas na hora — segurar as duas versoes de 111k linhas ao
       // mesmo tempo pesa demais em celular.
-      if (total === null) {
-        await fetchAllPages<BancoDadosRow>(buildPage, {
-          pageSize: COLLECTIONS_PAGE_SIZE,
-          accumulate: false,
-          onBatch,
-        });
-      } else {
-        await fetchPagesInParallel<BancoDadosRow>(buildPage, total, {
-          pageSize: COLLECTIONS_PAGE_SIZE,
-          concurrency: COLLECTIONS_CONCURRENCY,
-          accumulate: false,
-          onBatch,
-        });
+      //
+      // min/max nulos: escopo vazio (ou nao foi possivel obter os limites) —
+      // nada a buscar.
+      if (min !== null && max !== null) {
+        await fetchAllPagesByIdRange<BancoDadosRow>(
+          buildRangeQuery,
+          { min, max },
+          (row) => Number(row.id_parcela),
+          {
+            pageSize: COLLECTIONS_PAGE_SIZE,
+            concurrency: COLLECTIONS_CONCURRENCY,
+            accumulate: false,
+            onBatch,
+          },
+        );
       }
 
-      // A paginacao por OFFSET nao e estavel: se uma importacao insere linhas
-      // durante a carga, as paginas seguintes escorregam e a mesma parcela
-      // pode vir duas vezes.
-      const transformedData = dedupeBy(buffer, (c) => c.id_parcela);
+      // Faixa por id_parcela: cada linha pertence a exatamente uma faixa
+      // pelo seu proprio id, entao nao ha o que deduplicar aqui (ao contrario
+      // do OFFSET antigo, que podia repetir linha sob escrita concorrente).
+      const transformedData = buffer;
 
       if (transformedData.length === 0) {
         console.warn("Nenhum dado retornado do Supabase");
@@ -1218,18 +1236,33 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const source = SETTLED_COLLECTIONS_SOURCE as "BANCO_DADOS";
       const registry = await loadClientesRegistry();
 
-      const buildPage = (from: number, to: number) =>
-        supabase
+      // Faixa por id_parcela em vez de OFFSET -- mesma razao de
+      // fetchCollections: index range scan, custo independente da
+      // profundidade (ver fetchAllPagesByIdRange).
+      const buildRangeQuery = (gte: number, lt: number | null) => {
+        const base = supabase
           .from(source)
           .select("*")
           .order("id_parcela", { ascending: true })
-          .range(from, to);
+          .gte("id_parcela", gte)
+          .limit(COLLECTIONS_PAGE_SIZE);
+        return lt === null ? base : base.lt("id_parcela", lt);
+      };
 
-      const { count, error: countError } = await supabase
-        .from(source)
-        .select("id_parcela", { count: "exact", head: true });
-
-      const total = countError ? null : (count ?? null);
+      const [minRes, maxRes] = await Promise.all([
+        supabase
+          .from(source)
+          .select("id_parcela")
+          .order("id_parcela", { ascending: true })
+          .limit(1),
+        supabase
+          .from(source)
+          .select("id_parcela")
+          .order("id_parcela", { ascending: false })
+          .limit(1),
+      ]);
+      const min = (minRes.data?.[0]?.id_parcela as number | undefined) ?? null;
+      const max = (maxRes.data?.[0]?.id_parcela as number | undefined) ?? null;
 
       const buffer: Collection[] = [];
       const onBatch = (batchRows: BancoDadosRow[]) => {
@@ -1237,19 +1270,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           buffer.push(mapRowToCollection(row, registry));
       };
 
-      if (total === null) {
-        await fetchAllPages<BancoDadosRow>(buildPage, {
-          pageSize: COLLECTIONS_PAGE_SIZE,
-          accumulate: false,
-          onBatch,
-        });
-      } else {
-        await fetchPagesInParallel<BancoDadosRow>(buildPage, total, {
-          pageSize: COLLECTIONS_PAGE_SIZE,
-          concurrency: COLLECTIONS_CONCURRENCY,
-          accumulate: false,
-          onBatch,
-        });
+      if (min !== null && max !== null) {
+        await fetchAllPagesByIdRange<BancoDadosRow>(
+          buildRangeQuery,
+          { min, max },
+          (row) => Number(row.id_parcela),
+          {
+            pageSize: COLLECTIONS_PAGE_SIZE,
+            concurrency: COLLECTIONS_CONCURRENCY,
+            accumulate: false,
+            onBatch,
+          },
+        );
       }
 
       // So libera o loading depois que o escopo "active" tambem terminar:
@@ -1258,8 +1290,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // instante).
       await activeLoad;
 
-      // A paginacao por OFFSET nao e estavel (ver dedupeBy em fetchCollections).
-      setSettledCollections(dedupeBy(buffer, (c) => c.id_parcela));
+      // Faixa por id_parcela: cada linha pertence a exatamente uma faixa, nao
+      // ha o que deduplicar (ao contrario do OFFSET antigo).
+      setSettledCollections(buffer);
       invalidateCollections();
     } catch (err) {
       console.error("Erro ao carregar clientes quitados:", err);
