@@ -1454,6 +1454,13 @@ const DatabaseUpload: React.FC = () => {
         return newRow;
       });
 
+      // Garante o cadastro dos clientes novos ANTES de inserir as parcelas: a
+      // FK fk_banco_dados_documento exige que o documento ja exista em
+      // `clientes` para poder ser referenciado por um titulo novo.
+      if (rowsToInsert.length > 0) {
+        await insertCadastroForNewClients(rowsToInsert);
+      }
+
       // Insert em LOTES de 500 (em vez de um unico request gigante que poderia
       // estourar limite de payload/timeout em arquivos grandes). ignoreDuplicates:
       // rede de seguranca -- se algum id_parcela duplicado escapar da verificacao
@@ -1490,7 +1497,6 @@ const DatabaseUpload: React.FC = () => {
       // ✅ Registrar endereços no histórico após sucesso
       if (rowsToInsert.length > 0) {
         await insertAddressHistoryForNewClients(rowsToInsert);
-        await insertCadastroForNewClients(rowsToInsert);
       }
 
       return {

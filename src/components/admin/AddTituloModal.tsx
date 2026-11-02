@@ -74,59 +74,14 @@ const AddTituloModal: React.FC<AddTituloModalProps> = ({
     setFormData((prev) => ({ ...prev, [name]: value === "" ? null : value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    if (!formData.id_parcela) {
-      setError("O campo 'ID Parcela' é obrigatório.");
-      setLoading(false);
-      return;
-    }
-
-    const { titulo, cadastro } = splitFormData(formData);
-
-    const dataToInsert: BancoDadosInsert = {
-      ...sampleBancoDados,
-      ...titulo,
-      id_parcela: Number(formData.id_parcela),
-      dias_em_atraso: formData.dias_em_atraso
-        ? Number(formData.dias_em_atraso)
-        : null,
-      numero_titulo: formData.numero_titulo
-        ? Number(formData.numero_titulo)
-        : null,
-      parcela: formData.parcela ? Number(formData.parcela) : null,
-      venda_n: formData.venda_n ? Number(formData.venda_n) : null,
-    };
-
-    const { error: insertError } = await supabase
-      .from("BANCO_DADOS")
-      .insert(dataToInsert);
-
-    if (insertError) {
-      setLoading(false);
-      setError(`Erro ao adicionar título: ${insertError.message}`);
-      console.error(insertError);
-      return;
-    }
-
-    await upsertCadastroCliente(dataToInsert.documento, dataToInsert.cliente, cadastro);
-
-    setLoading(false);
-    onSuccess();
-    onClose();
-    setFormData({});
-  };
-
   // O cadastro do cliente mora em `clientes` (migration 20260904000001); as
   // colunas homonimas de BANCO_DADOS sao legado. Sem isto, um titulo criado por
   // aqui nasceria com o cadastro so no lugar antigo e a tela nao mostraria os
   // dados digitados.
   //
-  // Falha aqui nao desfaz o titulo: ele ja foi gravado e o cadastro pode ser
-  // corrigido pela importacao. So registramos o aviso.
+  // Roda ANTES do insert em BANCO_DADOS (nao depois): a FK
+  // fk_banco_dados_documento exige que o cliente ja exista para um documento
+  // inedito poder ser referenciado pelo titulo.
   const upsertCadastroCliente = async (
     documentoRaw: string | null | undefined,
     nomeRaw: string | null | undefined,
@@ -167,6 +122,52 @@ const AddTituloModal: React.FC<AddTituloModalProps> = ({
         insertCadastroError,
       );
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    if (!formData.id_parcela) {
+      setError("O campo 'ID Parcela' é obrigatório.");
+      setLoading(false);
+      return;
+    }
+
+    const { titulo, cadastro } = splitFormData(formData);
+
+    const dataToInsert: BancoDadosInsert = {
+      ...sampleBancoDados,
+      ...titulo,
+      id_parcela: Number(formData.id_parcela),
+      dias_em_atraso: formData.dias_em_atraso
+        ? Number(formData.dias_em_atraso)
+        : null,
+      numero_titulo: formData.numero_titulo
+        ? Number(formData.numero_titulo)
+        : null,
+      parcela: formData.parcela ? Number(formData.parcela) : null,
+      venda_n: formData.venda_n ? Number(formData.venda_n) : null,
+    };
+
+    await upsertCadastroCliente(dataToInsert.documento, dataToInsert.cliente, cadastro);
+
+    const { error: insertError } = await supabase
+      .from("BANCO_DADOS")
+      .insert(dataToInsert);
+
+    if (insertError) {
+      setLoading(false);
+      setError(`Erro ao adicionar título: ${insertError.message}`);
+      console.error(insertError);
+      return;
+    }
+
+    setLoading(false);
+    onSuccess();
+    onClose();
+    setFormData({});
   };
 
   const sections: SectionType[] = [
