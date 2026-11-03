@@ -193,13 +193,6 @@ export type Database = {
             referencedRelation: "banco_dados_clientes_quitados";
             referencedColumns: ["id_parcela"];
           },
-          {
-            foreignKeyName: "acordo_titulos_collection_id_fkey";
-            columns: ["collection_id"];
-            isOneToOne: false;
-            referencedRelation: "vw_clientes_cobradores";
-            referencedColumns: ["id_parcela"];
-          },
         ];
       };
       acordos: {
@@ -474,7 +467,7 @@ export type Database = {
       };
       BANCO_DADOS: {
         Row: {
-          acrescimo: string | null;
+          acrescimo: number | null;
           bairro: string | null;
           cep: string | null;
           cidade: string | null;
@@ -485,7 +478,7 @@ export type Database = {
           data_de_recebimento: string | null;
           data_lancamento: string | null;
           data_vencimento: string | null;
-          desconto: string | null;
+          desconto: number | null;
           descricao: string | null;
           dias_carencia: string | null;
           dias_em_atraso: number | null;
@@ -493,12 +486,12 @@ export type Database = {
           endereco: string | null;
           estado: string | null;
           id_parcela: number;
-          juros_aplicado: string | null;
-          juros_pago: string | null;
-          juros_por_dia: string | null;
-          multa: string | null;
-          multa_aplicada: string | null;
-          multa_paga: string | null;
+          juros_aplicado: number | null;
+          juros_pago: number | null;
+          juros_por_dia: number | null;
+          multa: number | null;
+          multa_aplicada: number | null;
+          multa_paga: number | null;
           nome_da_loja: string | null;
           numero: string | null;
           numero_titulo: number | null;
@@ -508,13 +501,13 @@ export type Database = {
           status: string | null;
           tipo_de_cobranca: string | null;
           user_id: string | null;
-          valor_original: string | null;
-          valor_reajustado: string | null;
-          valor_recebido: string | null;
+          valor_original: number | null;
+          valor_reajustado: number | null;
+          valor_recebido: number | null;
           venda_n: number | null;
         };
         Insert: {
-          acrescimo?: string | null;
+          acrescimo?: number | null;
           bairro?: string | null;
           cep?: string | null;
           cidade?: string | null;
@@ -525,7 +518,7 @@ export type Database = {
           data_de_recebimento?: string | null;
           data_lancamento?: string | null;
           data_vencimento?: string | null;
-          desconto?: string | null;
+          desconto?: number | null;
           descricao?: string | null;
           dias_carencia?: string | null;
           dias_em_atraso?: number | null;
@@ -533,12 +526,12 @@ export type Database = {
           endereco?: string | null;
           estado?: string | null;
           id_parcela: number;
-          juros_aplicado?: string | null;
-          juros_pago?: string | null;
-          juros_por_dia?: string | null;
-          multa?: string | null;
-          multa_aplicada?: string | null;
-          multa_paga?: string | null;
+          juros_aplicado?: number | null;
+          juros_pago?: number | null;
+          juros_por_dia?: number | null;
+          multa?: number | null;
+          multa_aplicada?: number | null;
+          multa_paga?: number | null;
           nome_da_loja?: string | null;
           numero?: string | null;
           numero_titulo?: number | null;
@@ -548,13 +541,13 @@ export type Database = {
           status?: string | null;
           tipo_de_cobranca?: string | null;
           user_id?: string | null;
-          valor_original?: string | null;
-          valor_reajustado?: string | null;
-          valor_recebido?: string | null;
+          valor_original?: number | null;
+          valor_reajustado?: number | null;
+          valor_recebido?: number | null;
           venda_n?: number | null;
         };
         Update: {
-          acrescimo?: string | null;
+          acrescimo?: number | null;
           bairro?: string | null;
           cep?: string | null;
           cidade?: string | null;
@@ -565,7 +558,7 @@ export type Database = {
           data_de_recebimento?: string | null;
           data_lancamento?: string | null;
           data_vencimento?: string | null;
-          desconto?: string | null;
+          desconto?: number | null;
           descricao?: string | null;
           dias_carencia?: string | null;
           dias_em_atraso?: number | null;
@@ -573,12 +566,12 @@ export type Database = {
           endereco?: string | null;
           estado?: string | null;
           id_parcela?: number;
-          juros_aplicado?: string | null;
-          juros_pago?: string | null;
-          juros_por_dia?: string | null;
-          multa?: string | null;
-          multa_aplicada?: string | null;
-          multa_paga?: string | null;
+          juros_aplicado?: number | null;
+          juros_pago?: number | null;
+          juros_por_dia?: number | null;
+          multa?: number | null;
+          multa_aplicada?: number | null;
+          multa_paga?: number | null;
           nome_da_loja?: string | null;
           numero?: string | null;
           numero_titulo?: number | null;
@@ -588,12 +581,19 @@ export type Database = {
           status?: string | null;
           tipo_de_cobranca?: string | null;
           user_id?: string | null;
-          valor_original?: string | null;
-          valor_reajustado?: string | null;
-          valor_recebido?: string | null;
+          valor_original?: number | null;
+          valor_reajustado?: number | null;
+          valor_recebido?: number | null;
           venda_n?: number | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "fk_banco_dados_documento";
+            columns: ["documento"];
+            isOneToOne: false;
+            referencedRelation: "clientes";
+            referencedColumns: ["documento"];
+          },
           {
             foreignKeyName: "fk_banco_dados_user";
             columns: ["user_id"];
@@ -602,6 +602,24 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      ciclone_titulo_map: {
+        Row: {
+          created_at: string;
+          fncrt_uuid: string;
+          id_parcela: number;
+        };
+        Insert: {
+          created_at?: string;
+          fncrt_uuid: string;
+          id_parcela?: number;
+        };
+        Update: {
+          created_at?: string;
+          fncrt_uuid?: string;
+          id_parcela?: number;
+        };
+        Relationships: [];
       };
       clientes: {
         Row: {
@@ -809,6 +827,24 @@ export type Database = {
           recebido_depois?: number | null;
           registrado_em?: string;
           sale_payment_id?: string | null;
+        };
+        Relationships: [];
+      };
+      saldo_por_documento_tbl: {
+        Row: {
+          documento: string;
+          saldo: number;
+          updated_at: string;
+        };
+        Insert: {
+          documento: string;
+          saldo: number;
+          updated_at?: string;
+        };
+        Update: {
+          documento?: string;
+          saldo?: number;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -1090,7 +1126,7 @@ export type Database = {
     Views: {
       banco_dados_clientes_ativos: {
         Row: {
-          acrescimo: string | null;
+          acrescimo: number | null;
           bairro: string | null;
           cep: string | null;
           cidade: string | null;
@@ -1101,7 +1137,7 @@ export type Database = {
           data_de_recebimento: string | null;
           data_lancamento: string | null;
           data_vencimento: string | null;
-          desconto: string | null;
+          desconto: number | null;
           descricao: string | null;
           dias_carencia: string | null;
           dias_em_atraso: number | null;
@@ -1109,12 +1145,12 @@ export type Database = {
           endereco: string | null;
           estado: string | null;
           id_parcela: number | null;
-          juros_aplicado: string | null;
-          juros_pago: string | null;
-          juros_por_dia: string | null;
-          multa: string | null;
-          multa_aplicada: string | null;
-          multa_paga: string | null;
+          juros_aplicado: number | null;
+          juros_pago: number | null;
+          juros_por_dia: number | null;
+          multa: number | null;
+          multa_aplicada: number | null;
+          multa_paga: number | null;
           nome_da_loja: string | null;
           numero: string | null;
           numero_titulo: number | null;
@@ -1124,12 +1160,19 @@ export type Database = {
           status: string | null;
           tipo_de_cobranca: string | null;
           user_id: string | null;
-          valor_original: string | null;
-          valor_reajustado: string | null;
-          valor_recebido: string | null;
+          valor_original: number | null;
+          valor_reajustado: number | null;
+          valor_recebido: number | null;
           venda_n: number | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "fk_banco_dados_documento";
+            columns: ["documento"];
+            isOneToOne: false;
+            referencedRelation: "clientes";
+            referencedColumns: ["documento"];
+          },
           {
             foreignKeyName: "fk_banco_dados_user";
             columns: ["user_id"];
@@ -1141,7 +1184,7 @@ export type Database = {
       };
       banco_dados_clientes_quitados: {
         Row: {
-          acrescimo: string | null;
+          acrescimo: number | null;
           bairro: string | null;
           cep: string | null;
           cidade: string | null;
@@ -1152,7 +1195,7 @@ export type Database = {
           data_de_recebimento: string | null;
           data_lancamento: string | null;
           data_vencimento: string | null;
-          desconto: string | null;
+          desconto: number | null;
           descricao: string | null;
           dias_carencia: string | null;
           dias_em_atraso: number | null;
@@ -1160,12 +1203,12 @@ export type Database = {
           endereco: string | null;
           estado: string | null;
           id_parcela: number | null;
-          juros_aplicado: string | null;
-          juros_pago: string | null;
-          juros_por_dia: string | null;
-          multa: string | null;
-          multa_aplicada: string | null;
-          multa_paga: string | null;
+          juros_aplicado: number | null;
+          juros_pago: number | null;
+          juros_por_dia: number | null;
+          multa: number | null;
+          multa_aplicada: number | null;
+          multa_paga: number | null;
           nome_da_loja: string | null;
           numero: string | null;
           numero_titulo: number | null;
@@ -1175,12 +1218,19 @@ export type Database = {
           status: string | null;
           tipo_de_cobranca: string | null;
           user_id: string | null;
-          valor_original: string | null;
-          valor_reajustado: string | null;
-          valor_recebido: string | null;
+          valor_original: number | null;
+          valor_reajustado: number | null;
+          valor_recebido: number | null;
           venda_n: number | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "fk_banco_dados_documento";
+            columns: ["documento"];
+            isOneToOne: false;
+            referencedRelation: "clientes";
+            referencedColumns: ["documento"];
+          },
           {
             foreignKeyName: "fk_banco_dados_user";
             columns: ["user_id"];
@@ -1218,20 +1268,13 @@ export type Database = {
           documento: string | null;
           saldo: number | null;
         };
-        Relationships: [];
-      };
-      vw_clientes_cobradores: {
-        Row: {
-          cliente: string | null;
-          cobrador_login: string | null;
-          cobrador_nome: string | null;
-          cobrador_tipo: string | null;
-          data_vencimento: string | null;
-          dias_em_atraso: number | null;
-          documento: string | null;
-          id_parcela: number | null;
-          status: string | null;
-          valor_original: string | null;
+        Insert: {
+          documento?: string | null;
+          saldo?: number | null;
+        };
+        Update: {
+          documento?: string | null;
+          saldo?: number | null;
         };
         Relationships: [];
       };
@@ -1316,28 +1359,6 @@ export type Database = {
         Args: { p_documento: string };
         Returns: boolean;
       };
-      clientes_do_cobrador: {
-        Args: { p_cobrador_id: string };
-        Returns: {
-          cliente: string;
-          cpf: string;
-          parcelas_pagas: number;
-          parcelas_vencidas: number;
-          total_parcelas: number;
-          valor_total: number;
-        }[];
-      };
-      clientes_sem_cobrador: {
-        Args: never;
-        Returns: {
-          cliente: string;
-          cpf: string;
-          primeira_parcela: string;
-          total_parcelas: number;
-          ultima_parcela: string;
-          valor_total: number;
-        }[];
-      };
       cobrador_na_data_em_lote: {
         Args: { p_pares: Json };
         Returns: {
@@ -1385,16 +1406,6 @@ export type Database = {
           p_usuario_id?: string;
         };
         Returns: number;
-      };
-      listar_cobradores: {
-        Args: never;
-        Returns: {
-          cobrador_id: string;
-          cobrador_nome: string;
-          total_clientes: number;
-          total_parcelas: number;
-          valor_total: number;
-        }[];
       };
       marcar_acordos_quebrados: { Args: never; Returns: number };
       process_payment: {
@@ -1508,6 +1519,10 @@ export type Database = {
       saldo_acordo_parcela: { Args: { p_parcela_id: string }; Returns: number };
       situacao_primaria_do_tipo: { Args: { p_type: string }; Returns: string };
       texto_para_valor: { Args: { p: string }; Returns: number };
+      titulo_em_acordo_ativo: {
+        Args: { p_id_parcela: number };
+        Returns: boolean;
+      };
       transferir_clientes: {
         Args: { p_cobrador_destino: string; p_cobrador_origem: string };
         Returns: {
