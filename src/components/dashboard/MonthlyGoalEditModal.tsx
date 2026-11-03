@@ -18,14 +18,6 @@ interface MonthlyGoalEditModalProps {
   collector: User | null;
 }
 
-interface MonthlyGoal {
-  id?: string;
-  user_id: string;
-  month: string;
-  visits_goal: number;
-  payments_goal: number;
-}
-
 const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
   isOpen,
   onClose,
@@ -36,8 +28,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
   const [visitsGoal, setVisitsGoal] = useState(0);
   const [paymentsGoal, setPaymentsGoal] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
-  const [currentGoal, setCurrentGoal] = useState<MonthlyGoal | null>(null);
-  const { scheduledVisits, salePayments } = useCollection();
+  const { scheduledVisits, salePayments, setMonthlyGoal } = useCollection();
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(["period", "goals"]),
@@ -75,7 +66,6 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
 
       if (error) {
         console.error("Error fetching monthly goal:", error);
-        setCurrentGoal(null);
         setVisitsGoal(0);
         setPaymentsGoal(0);
         return;
@@ -83,11 +73,9 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
 
       if (data && data.length > 0) {
         const goal = data[0];
-        setCurrentGoal(goal);
         setVisitsGoal(goal.visits_goal);
         setPaymentsGoal(goal.payments_goal);
       } else {
-        setCurrentGoal(null);
         setVisitsGoal(0);
         setPaymentsGoal(0);
       }
@@ -195,32 +183,21 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
     const monthPadded = (selectedMonth + 1).toString().padStart(2, "0");
     const dateString = `${selectedYear}-${monthPadded}-01`;
 
-    const goalData = {
-      user_id: collector.id,
-      month: dateString,
-      visits_goal: visitsGoal,
-      payments_goal: paymentsGoal,
-    };
-
-    let error = null;
-
-    if (currentGoal?.id) {
-      const { error: updateError } = await supabase
-        .from("monthly_goals")
-        .update(goalData)
-        .eq("id", currentGoal.id);
-      error = updateError;
-    } else {
-      const { error: insertError } = await supabase
-        .from("monthly_goals")
-        .insert(goalData);
-      error = insertError;
-    }
-
-    if (error) {
-      console.error("Error saving monthly goal:", error);
-    } else {
+    try {
+      // setMonthlyGoal faz upsert por (user_id, month) e atualiza o estado
+      // global (monthlyGoals) -- usar o insert/update direto daqui, como
+      // antes, deixava o resto do app (card de meta do cobrador, meta da
+      // equipe, comparativo do gestor) com o valor velho ate recarregar a
+      // pagina, porque nenhum deles soube que uma meta nova foi salva.
+      await setMonthlyGoal({
+        user_id: collector.id,
+        month: dateString,
+        visits_goal: visitsGoal,
+        payments_goal: paymentsGoal,
+      });
       onClose();
+    } catch (err) {
+      console.error("Error saving monthly goal:", err);
     }
 
     setIsSaving(false);
