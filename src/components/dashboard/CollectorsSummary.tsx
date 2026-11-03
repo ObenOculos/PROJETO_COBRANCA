@@ -19,6 +19,7 @@ import {
   Gauge,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { isCollectorType, UserType } from "../../types";
 import { USER_TYPE_LABELS } from "../../config/profiles";
 import {
@@ -262,8 +263,15 @@ const SortTh: React.FC<{
 );
 
 const CollectorsSummary: React.FC = () => {
-  const { users, collections, scheduledVisits, salePayments } =
-    useCollection();
+  const {
+    users,
+    collections,
+    scheduledVisits,
+    salePayments,
+    monthlyGoals,
+    managerCollectorLinks,
+  } = useCollection();
+  const { user: currentUser } = useAuth();
 
   const today = todayLocalStr();
   const [dateFrom, setDateFrom] = useState(monthStart(today));
@@ -625,6 +633,46 @@ const CollectorsSummary: React.FC = () => {
     [rows],
   );
 
+  // Meta da equipe do gestor logado: soma das metas mensais (monthly_goals)
+  // dos cobradores atualmente vinculados a ele (manager_collector_links),
+  // contra o recuperado por eles no MES ATUAL -- sempre mes atual, nao o
+  // periodo escolhido no filtro acima (meta e mensal por natureza; um
+  // periodo arbitrario nao bate com "meta do mes"). Nao e bonificacao/
+  // comissao (isso fica pra depois, decisao do usuario) -- so visibilidade.
+  const teamGoal = useMemo(() => {
+    if (!currentUser || currentUser.type !== "manager") return null;
+    const mesAtual = today.slice(0, 7);
+    const teamCollectorIds = new Set(
+      managerCollectorLinks
+        .filter((l) => l.managerId === currentUser.id)
+        .map((l) => l.collectorId),
+    );
+    if (teamCollectorIds.size === 0) return null;
+
+    const targetValue = monthlyGoals
+      .filter(
+        (g) => teamCollectorIds.has(g.user_id) && g.month.startsWith(mesAtual),
+      )
+      .reduce((sum, g) => sum + (g.payments_goal || 0), 0);
+    const actualValue = salePayments
+      .filter(
+        (p) =>
+          teamCollectorIds.has(p.collectorId) &&
+          p.paymentDate.startsWith(mesAtual),
+      )
+      .reduce((sum, p) => sum + p.paymentAmount, 0);
+
+    if (targetValue <= 0) return null;
+
+    return {
+      collectorCount: teamCollectorIds.size,
+      targetValue,
+      actualValue,
+      progress: Math.min((actualValue / targetValue) * 100, 100),
+      remaining: Math.max(0, targetValue - actualValue),
+    };
+  }, [currentUser, managerCollectorLinks, monthlyGoals, salePayments, today]);
+
   const collectorFilterLabel =
     excludedCollectorIds.size === 0
       ? "Todos os cobradores"
@@ -796,6 +844,40 @@ const CollectorsSummary: React.FC = () => {
           </span>
         </div>
       </div>
+
+      {teamGoal && (
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border-2 border-indigo-100 dark:border-indigo-900/40 p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold text-gray-900 dark:text-dark-text">
+              Meta da equipe (mês atual)
+            </span>
+            <span className="text-xs font-normal text-gray-400 dark:text-dark-text-secondary">
+              {teamGoal.collectorCount}{" "}
+              {teamGoal.collectorCount === 1 ? "cobrador" : "cobradores"}
+            </span>
+          </div>
+          <div className="flex justify-between text-xs font-medium">
+            <span className="text-gray-500">
+              {formatCurrency(teamGoal.actualValue, false)} de{" "}
+              {formatCurrency(teamGoal.targetValue, false)}
+            </span>
+            <span className="text-indigo-600">
+              {teamGoal.progress.toFixed(1)}%
+            </span>
+          </div>
+          <div className="h-2 bg-gray-100 dark:bg-dark-bg-secondary rounded-full overflow-hidden">
+            <div
+              className="h-full bg-indigo-600"
+              style={{ width: `${teamGoal.progress}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-500">
+            {teamGoal.remaining > 0
+              ? `Faltam ${formatCurrency(teamGoal.remaining, false)} para a meta da equipe`
+              : "Meta da equipe atingida"}
+          </p>
+        </div>
+      )}
 
       {/* Visao geral: soma de todos os cobradores visiveis no momento. Fica
           visivel nos dois modos (Cards e Tabela), conforme pedido. O
