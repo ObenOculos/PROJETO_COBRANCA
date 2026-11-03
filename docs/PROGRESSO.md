@@ -1153,23 +1153,44 @@ gerente↔cobrador é greenfield total.
 - **Visita agendada ativa trava a saída automática**, igual acordo ativo
   — precisa estender o guard (hoje só checa acordo).
 
-**Ordem de implementação (etapas pequenas):**
-1. migration `collection_attempts.collector_id` — **concluída** (commit
-   `092768d`, 2026-11-03): coluna nullable, populada nos 3 pontos de
-   inserção (`addAttempt`, `criarAcordo`, `LogContactModal`). Falta
-   `db push` em produção.
-2. função/view SQL espelhando `clientMaxOverdueDays` (hoje só existe no
-   front).
-3. CRUD `collector_overdue_ranges` (faixas por cobrador, com vigência).
-4. CRUD `manager_collector_links` (vínculo gerente↔cobrador, com
-   vigência).
-5. reposicionar metas (UI já existe em `MonthlyGoalEditModal.tsx`, hoje
-   enterrada em "Desempenho") + meta de equipe do gerente.
-6. "Clientes urgentes" read-only (view derivada, sem tabela nova).
-7. automação de saída/redistribuição — rodar em modo dry-run antes de
-   ligar de verdade.
-8. consolidação no painel do gerente (`CollectorsSummary.tsx` é o lugar
-   natural).
+**Ordem de implementação (etapas pequenas) — todas no mesmo dia, 2026-11-03:**
+1. migration `collection_attempts.collector_id` — **concluída** (commits
+   `092768d`/`765f0f5`): coluna nullable, populada nos 3 pontos de
+   inserção (`addAttempt`, `criarAcordo`, `LogContactModal`). Em produção
+   (`db push` confirmado pelo usuário).
+2. função SQL `cliente_max_atraso_dias` espelhando `clientMaxOverdueDays`
+   — **concluída** (commit `7e089de`), validada contra produção antes de
+   commitar. Em produção.
+3. `collector_overdue_ranges` (faixa por cobrador, com vigência) + RPC
+   `definir_faixa_atraso_cobrador` — **concluída** (commit `7e089de`). Em
+   produção.
+4. `manager_collector_links` (vínculo gerente↔cobrador, com vigência) +
+   RPCs `vincular_cobrador_a_gerente`/`desvincular_cobrador` — **concluída**
+   (commit `7e089de`). Em produção.
+   UI das etapas 3/4: modal "Faixa & Equipe" em `UserManagement.tsx`
+   (commit `a7f3e20`), testado ao vivo logado como gestor.
+5. Metas: `MonthlyGoalEditModal` reposicionado (acessível direto do menu
+   de cada cobrador em Usuários, commit `3a069f8`) + card "Meta da
+   equipe (mês atual)" em `CollectorsSummary.tsx`. **Achado testando ao
+   vivo:** `MonthlyGoalEditModal` gravava a meta direto via supabase, sem
+   nunca chamar `fetchMonthlyGoals` — nada no app via a meta nova até
+   recarregar a página inteira. Corrigido trocando para `setMonthlyGoal`
+   do contexto, que já faz upsert + refresh (commit `42f223c`). Card
+   "Recuperação do Mês" (painel do cobrador) também ajustado: mostrava
+   R$100mil fixo quando não havia meta cadastrada, agora mostra "sem
+   meta" (commit `b159290`).
+6. "Clientes urgentes" — **concluída** (commit `494fb96`): nova aba na
+   Agenda priorizada do cobrador, clientes dentro da própria faixa mas a
+   ≤15 dias do teto (`URGENTE_SAIDA_CARTEIRA_DIAS` em `filters/priority.ts`),
+   com destaque para quem não teve nenhuma ação. Única exceção de
+   propósito à regra "um cliente, uma categoria" da agenda. Testada ao
+   vivo (faixa temporária 1600-1635 para cliente com 1625 dias de atraso
+   → badge "Faltam 10 dias na carteira" correto).
+7. automação de saída/redistribuição — **não iniciada**. Rodar em modo
+   dry-run antes de ligar de verdade; usuário já avisado que a ativação
+   real pede confirmação explícita separada.
+8. consolidação no painel do gerente (`CollectorsSummary.tsx`) — **não
+   iniciada** além do card de meta de equipe da etapa 5.
 
 Detalhe completo da análise na memória `estado-metas-vinculo-carteira`.
 
