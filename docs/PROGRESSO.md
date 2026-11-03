@@ -155,7 +155,6 @@ código que precisa já estar pronto pra constraint, não o contrário).
     Achados clientes reais da Oticas Luana com datas de lançamento
     espalhadas de 2022 a 2026 onde a ordenação por string e por data
     discordam — o endereço "mais recente" pode mudar para esses casos.
-    **Ainda falta validar na tela** (`npm run dev`) com o usuário.
   - `database.types.ts` **estava desatualizado desde a fase 1/2 desta etapa
     e a carga do Ciclone** (ainda mostrava os 11 campos de dinheiro como
     `string`, tinha `vw_clientes_cobradores`/RPCs órfãs já removidas, não
@@ -163,12 +162,23 @@ código que precisa já estar pronto pra constraint, não o contrário).
     — regenerado contra o schema real de uma vez, pegando o atraso
     acumulado das 3 fases. As 3 colunas de data continuam `string | null`
     no tipo gerado (esperado: `date` sai como string ISO pelo PostgREST).
-  - **Ainda falta**: validar no `npm run dev` o cadastro de pagamento com
-    data pela tela, o filtro de período por vencimento/lançamento
-    (`ClientAssignment`), o Acompanhamento de Visitas (atraso calculado a
-    partir de `data_vencimento`) e o `UpdateAddressModal` com um cliente
-    real da Oticas Luana — mesmo checklist do plano, pendente de uma rodada
-    do usuário.
+  - **Validado no `npm run dev` em 2026-11-03** (gestor, dados reais de
+    produção, via navegador): filtro de período por lançamento em
+    Atribuição de Cobradores (loja Oticas Luana Itapipoca, legada em BR,
+    01/01/2024–31/12/2024 → 368 registros corretos); Acompanhamento de
+    Visitas (datas/status renderizando certo); Cobranças "Em atraso" (394
+    clientes/417 vendas) com uma venda aberta em detalhe — parcelas com
+    `data_vencimento` de meses passados corretamente marcadas "Em atraso";
+    `GeneralPaymentModal` (Distribuir Pagamento) abrindo e calculando saldo
+    certo pra uma cliente da Oticas Luana; "Endereço Atual e Histórico"
+    exibindo certo. **Dois pontos do checklist ficaram de fora de propósito**
+    por serem escrita real em produção sem necessidade (a correção já
+    estava confirmada no banco via `ROLLBACK`): não cheguei a confirmar um
+    pagamento de verdade pela tela (só abri o modal), nem a clicar
+    "Atualizar Endereço" num cliente sem histórico ainda (só esse caso
+    aciona o ramo de arquivamento por `data_lancamento` do
+    `update_client_address` — o efeito já está provado a nível de SQL, já
+    que a coluna virou `date`; só não foi clicado na tela).
 
 **Etapa 3 — as 3 fases (FK, dinheiro, datas) estão concluídas e em
 produção.** Dívida técnica registrada e deixada de propósito fora do
