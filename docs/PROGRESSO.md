@@ -1117,6 +1117,62 @@ cobrador), telas de criar/editar meta acessíveis, painel individual do
 cobrador, painel comparativo do gestor. Meta coletiva/comissão por
 cobrador com meta batida: mencionado pelo usuário, adiado.
 
+## Metas mensais + vínculo gerente↔cobrador + carteira automática por faixa de atraso — análise 2026-11-03
+
+Pedido do usuário: três features sobre a base do redesenho de carteira
+acima — (1) metas mensais cobrador/gerente, (2) vínculo gerente↔cobrador
+com histórico (bonificação do gerente pelos resultados da equipe), (3)
+saída/redistribuição automática de cliente da carteira quando ultrapassa
+a faixa de atraso do cobrador + seção "Clientes urgentes" + consolidação
+no painel do gerente. Pedido explícito: analisar antes de implementar.
+
+**Levantamento confirmou que boa parte já existe:**
+atribuição cliente↔cobrador (`BANCO_DADOS.user_id`, aplicada por
+cliente/`documento` via `atribuir_clientes_em_lote`) já tem auditoria
+append-only (`atribuicoes_historico`, trigger, com `motivo`+`gerente_id`);
+guard `cliente_tem_acordo_ativo` já trava reatribuição/remoção de cliente
+com acordo ativo; atraso financeiro por cliente já tem fonte única
+(`clientMaxOverdueDays` em `src/filters/clientStatus.ts`, usado por
+`priority.ts` desde a Fase 1); `sale_payments`/`acordo_pagamentos` já
+guardam `collector_id` próprio do pagamento (não o dono atual da
+carteira) — resolve sozinho "cliente mudou de cobrador no meio do mês"
+para fins de meta. `users` não tem `manager_id` nem hierarquia — vínculo
+gerente↔cobrador é greenfield total.
+
+**Decisões de negócio fechadas com o usuário:**
+- Critério de atraso = maior atraso entre parcelas pendentes do cliente
+  (reaproveita `clientMaxOverdueDays`).
+- Granularidade da carteira continua por **cliente** (não por venda) — se
+  uma venda do cliente sai da faixa, o cliente inteiro migra junto.
+- Redistribuição automática cai em **fila do gestor com confirmação
+  manual** (não reatribui direto a outro cobrador) — reaproveita
+  `user_id = NULL` + motivo novo `fora_da_faixa` em
+  `atribuicoes_historico`, sem coluna de status derivado nova.
+- Faixas de atraso configuradas **por cobrador individual** (não por
+  perfil).
+- **Visita agendada ativa trava a saída automática**, igual acordo ativo
+  — precisa estender o guard (hoje só checa acordo).
+
+**Ordem de implementação (etapas pequenas):**
+1. migration `collection_attempts.collector_id` — **concluída** (commit
+   `092768d`, 2026-11-03): coluna nullable, populada nos 3 pontos de
+   inserção (`addAttempt`, `criarAcordo`, `LogContactModal`). Falta
+   `db push` em produção.
+2. função/view SQL espelhando `clientMaxOverdueDays` (hoje só existe no
+   front).
+3. CRUD `collector_overdue_ranges` (faixas por cobrador, com vigência).
+4. CRUD `manager_collector_links` (vínculo gerente↔cobrador, com
+   vigência).
+5. reposicionar metas (UI já existe em `MonthlyGoalEditModal.tsx`, hoje
+   enterrada em "Desempenho") + meta de equipe do gerente.
+6. "Clientes urgentes" read-only (view derivada, sem tabela nova).
+7. automação de saída/redistribuição — rodar em modo dry-run antes de
+   ligar de verdade.
+8. consolidação no painel do gerente (`CollectorsSummary.tsx` é o lugar
+   natural).
+
+Detalhe completo da análise na memória `estado-metas-vinculo-carteira`.
+
 ## Concluído
 
 ### 2026-10-06
