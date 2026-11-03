@@ -674,7 +674,12 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     const goal = monthlyGoals.find(
       (g) => g.user_id === user?.id && g.month.startsWith(mesAtual),
     );
-    const targetValue = goal?.payments_goal || 100000;
+    // Sem fallback fixo: meta nao cadastrada mostra "sem meta" em vez de
+    // comparar o recuperado contra um numero arbitrario (R$100mil) que o
+    // gestor nunca definiu -- isso inflava a barra de progresso sem sentido.
+    const hasGoal = !!goal && goal.payments_goal > 0;
+    const targetValue = goal?.payments_goal ?? 0;
+    const remaining = Math.max(0, targetValue - totalReceived);
 
     let critical = 0,
       high = 0;
@@ -691,8 +696,12 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       totalClients: walletFilteredGroups.length,
       totalPending,
       totalReceived,
-      progress: Math.min((totalReceived / targetValue) * 100, 100),
+      progress: hasGoal
+        ? Math.min((totalReceived / targetValue) * 100, 100)
+        : 0,
+      hasGoal,
       targetValue,
+      remaining,
       critical,
       high,
     };
@@ -774,20 +783,33 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           <p className="text-2xl font-bold text-gray-900 dark:text-dark-text">
             {formatCurrency(stats.totalReceived)}
           </p>
-          <div className="mt-4 space-y-2">
-            <div className="flex justify-between text-xs font-medium">
-              <span className="text-gray-500">Progresso</span>
-              <span className="text-indigo-600">
-                {stats.progress.toFixed(1)}%
-              </span>
+          {stats.hasGoal ? (
+            <div className="mt-4 space-y-2">
+              <div className="flex justify-between text-xs font-medium">
+                <span className="text-gray-500">
+                  Meta: {formatCurrency(stats.targetValue)}
+                </span>
+                <span className="text-indigo-600">
+                  {stats.progress.toFixed(1)}%
+                </span>
+              </div>
+              <div className="h-2 bg-gray-100 dark:bg-dark-bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-indigo-600"
+                  style={{ width: `${stats.progress}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                {stats.remaining > 0
+                  ? `Faltam ${formatCurrency(stats.remaining)} para a meta`
+                  : "Meta atingida"}
+              </p>
             </div>
-            <div className="h-2 bg-gray-100 dark:bg-dark-bg-secondary rounded-full overflow-hidden">
-              <div
-                className="h-full bg-indigo-600"
-                style={{ width: `${stats.progress}%` }}
-              />
-            </div>
-          </div>
+          ) : (
+            <p className="mt-4 text-xs text-gray-400">
+              Meta do mês ainda não definida pelo gestor.
+            </p>
+          )}
         </div>
         <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 shadow-sm">
           <div className="flex items-center gap-3 mb-2">
