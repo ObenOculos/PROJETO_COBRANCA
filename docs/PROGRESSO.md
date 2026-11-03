@@ -1193,8 +1193,15 @@ gerente↔cobrador é greenfield total.
    cron nem botão** — ativação real pede confirmação explícita separada,
    combinado com o usuário). UI do dry-run ainda não construída (parte da
    etapa 8).
-8. consolidação no painel do gerente (`CollectorsSummary.tsx`) — **não
-   iniciada** além do card de meta de equipe da etapa 5.
+8. consolidação no painel do gerente (`CollectorsSummary.tsx`, commit
+   `a7fe147`) — **concluída**: seção "Carteira automática por faixa de
+   atraso" (consulta sob demanda, não carrega sozinha) com "Perto de sair
+   da carteira agora" (lê `clientes_fora_da_faixa()`) e "Saíram da
+   carteira por faixa no período" (lê `atribuicoes_historico` filtrado por
+   `motivo = fora_da_faixa`, respeita o filtro de data já existente na
+   tela). Testada ao vivo: faixa 1500–1600 para o cliente de 1625 dias
+   (João Siriano Soares) → linha correta com "+25 dias" e badge "Travado:
+   acordo ativo". Dado de teste removido depois.
 
 **Achado preparando a etapa 7, sem relação com a feature — vulnerabilidade
 de segurança corrigida no mesmo dia (commits `c9c2a29`, `c45de08`):**
