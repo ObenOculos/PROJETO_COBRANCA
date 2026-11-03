@@ -42,6 +42,27 @@ export interface MonthlyGoal {
   updated_at: string;
 }
 
+// Faixa de dias de atraso que um cobrador atende (carteira automática).
+// Vigência: só a linha com vigenteAte null é a faixa atual do cobrador.
+export interface CollectorOverdueRange {
+  id: string;
+  collectorId: string;
+  minDias: number;
+  maxDias: number | null;
+  vigenteDesde: string;
+  vigenteAte: string | null;
+}
+
+// Vínculo gerente<->cobrador (bonificação/consolidação de equipe).
+// Vigência: só a linha com vigenteAte null é o vínculo atual do cobrador.
+export interface ManagerCollectorLink {
+  id: string;
+  managerId: string;
+  collectorId: string;
+  vigenteDesde: string;
+  vigenteAte: string | null;
+}
+
 // Authorization history types
 export interface AuthorizationHistory {
   id: string;
@@ -296,6 +317,10 @@ export interface CollectionContextType {
   scheduledVisits: ScheduledVisit[];
   monthlyGoals: MonthlyGoal[]; // Added
   allowedVisitDates: AllowedVisitDate[];
+  /** Faixa de atraso vigente de cada cobrador (uma por collectorId). */
+  collectorOverdueRanges: CollectorOverdueRange[];
+  /** Vínculo gerente<->cobrador vigente de cada cobrador (uma por collectorId). */
+  managerCollectorLinks: ManagerCollectorLink[];
   loading: boolean;
   /**
    * Quanto de BANCO_DADOS está carregado em `collections`.
@@ -347,6 +372,21 @@ export interface CollectionContextType {
   fetchUsers: () => Promise<void>;
   fetchSalePayments: () => Promise<void>;
   fetchAllowedVisitDates: () => Promise<void>;
+  fetchCollectorOverdueRanges: () => Promise<void>;
+  fetchManagerCollectorLinks: () => Promise<void>;
+  /** Fecha a faixa vigente do cobrador (se houver) e abre uma nova. Só gestor. */
+  definirFaixaAtrasoCobrador: (
+    collectorId: string,
+    minDias: number,
+    maxDias: number | null,
+  ) => Promise<void>;
+  /** Fecha o vínculo vigente do cobrador (se houver) e abre um novo com o gestor informado. Só gestor. */
+  vincularCobradorAGerente: (
+    managerId: string,
+    collectorId: string,
+  ) => Promise<void>;
+  /** Fecha o vínculo vigente do cobrador, sem abrir um novo. Só gestor. */
+  desvincularCobrador: (collectorId: string) => Promise<void>;
   refreshData: () => Promise<void>;
   refreshCollections: () => Promise<void>;
   updateCollection: (id: number, updates: Partial<Collection>) => Promise<void>;

@@ -22,6 +22,8 @@ import {
   SaleBalance,
   ScheduledVisit,
   AllowedVisitDate,
+  CollectorOverdueRange,
+  ManagerCollectorLink,
   isCollectorType,
   CollectionsScope,
   Acordo,
@@ -264,6 +266,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [acordos, setAcordos] = useState<Acordo[]>([]);
   const [allowedVisitDates, setAllowedVisitDates] = useState<
     AllowedVisitDate[]
+  >([]);
+  // Faixa de atraso / vinculo gerente<->cobrador vigentes (uma linha por
+  // collectorId -- so quem tem vigente_ate null, ver migrations
+  // 20261103000004/5). Historico fica no banco, nao carregado aqui.
+  const [collectorOverdueRanges, setCollectorOverdueRanges] = useState<
+    CollectorOverdueRange[]
+  >([]);
+  const [managerCollectorLinks, setManagerCollectorLinks] = useState<
+    ManagerCollectorLink[]
   >([]);
   const [activeAddressHistory, setActiveAddressHistory] = useState<
     {
@@ -622,6 +633,117 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   }, [isOnline]);
 
+  // Faixa de atraso vigente de cada cobrador (vigente_ate IS NULL).
+  const fetchCollectorOverdueRanges = React.useCallback(async () => {
+    if (!isOnline) return;
+    try {
+      const { data, error: supabaseError } = await supabase
+        .from("collector_overdue_ranges")
+        .select("*")
+        .is("vigente_ate", null);
+
+      if (supabaseError) {
+        console.error("Erro ao buscar faixas de atraso:", supabaseError);
+        return;
+      }
+
+      setCollectorOverdueRanges(
+        (data ?? []).map((row) => ({
+          id: row.id,
+          collectorId: row.collector_id,
+          minDias: row.min_dias,
+          maxDias: row.max_dias,
+          vigenteDesde: row.vigente_desde,
+          vigenteAte: row.vigente_ate,
+        })),
+      );
+    } catch (err) {
+      console.error("Erro ao carregar faixas de atraso:", err);
+    }
+  }, [isOnline]);
+
+  // Vinculo gerente<->cobrador vigente de cada cobrador (vigente_ate IS NULL).
+  const fetchManagerCollectorLinks = React.useCallback(async () => {
+    if (!isOnline) return;
+    try {
+      const { data, error: supabaseError } = await supabase
+        .from("manager_collector_links")
+        .select("*")
+        .is("vigente_ate", null);
+
+      if (supabaseError) {
+        console.error("Erro ao buscar vínculos de equipe:", supabaseError);
+        return;
+      }
+
+      setManagerCollectorLinks(
+        (data ?? []).map((row) => ({
+          id: row.id,
+          managerId: row.manager_id,
+          collectorId: row.collector_id,
+          vigenteDesde: row.vigente_desde,
+          vigenteAte: row.vigente_ate,
+        })),
+      );
+    } catch (err) {
+      console.error("Erro ao carregar vínculos de equipe:", err);
+    }
+  }, [isOnline]);
+
+  // Fecha a faixa vigente do cobrador (se houver) e abre uma nova -- mesma
+  // RPC atomica do banco (migration 20261103000004), nunca dois passos
+  // separados (UPDATE+INSERT) pelo client.
+  const definirFaixaAtrasoCobrador = async (
+    collectorId: string,
+    minDias: number,
+    maxDias: number | null,
+  ) => {
+    const { error: rpcError } = await supabase.rpc(
+      "definir_faixa_atraso_cobrador",
+      {
+        p_collector_id: collectorId,
+        p_min_dias: minDias,
+        p_max_dias: maxDias,
+      },
+    );
+    if (rpcError) {
+      console.error("Erro ao definir faixa de atraso:", rpcError);
+      throw rpcError;
+    }
+    await fetchCollectorOverdueRanges();
+  };
+
+  // Fecha o vinculo vigente do cobrador (se houver, com outro gestor) e
+  // abre um novo com o gestor informado -- RPC atomica (migration
+  // 20261103000005).
+  const vincularCobradorAGerente = async (
+    managerId: string,
+    collectorId: string,
+  ) => {
+    const { error: rpcError } = await supabase.rpc(
+      "vincular_cobrador_a_gerente",
+      { p_manager_id: managerId, p_collector_id: collectorId },
+    );
+    if (rpcError) {
+      console.error("Erro ao vincular cobrador a gerente:", rpcError);
+      throw rpcError;
+    }
+    await fetchManagerCollectorLinks();
+  };
+
+  // Fecha o vinculo vigente do cobrador, sem abrir um novo (fica sem
+  // gestor responsavel).
+  const desvincularCobrador = async (collectorId: string) => {
+    const { error: rpcError } = await supabase.rpc("desvincular_cobrador", {
+      p_collector_id: collectorId,
+    });
+    if (rpcError) {
+      console.error("Erro ao desvincular cobrador:", rpcError);
+      throw rpcError;
+    }
+    await fetchManagerCollectorLinks();
+  };
+
   // Fetch active address history for "New" badge
   const fetchActiveAddressHistory = React.useCallback(async () => {
     // If offline, skip
@@ -694,6 +816,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             fetchActiveAddressHistory(),
             fetchReincidenciaResets(),
             fetchAcordos(),
+            fetchCollectorOverdueRanges(),
+            fetchManagerCollectorLinks(),
           ]);
 
           // Gestor: nada de BANCO_DADOS agora. Ver `collectionsRequested`.
@@ -4446,6 +4570,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     scheduledVisits,
     monthlyGoals,
     allowedVisitDates,
+    collectorOverdueRanges,
+    managerCollectorLinks,
     loading,
     collectionsScope,
     loadingFullScope,
@@ -4460,6 +4586,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     fetchUsers,
     fetchSalePayments,
     fetchAllowedVisitDates,
+    fetchCollectorOverdueRanges,
+    fetchManagerCollectorLinks,
+    definirFaixaAtrasoCobrador,
+    vincularCobradorAGerente,
+    desvincularCobrador,
     refreshData,
     refreshCollections,
     updateCollection,

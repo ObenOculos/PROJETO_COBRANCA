@@ -713,6 +713,54 @@ export type Database = {
           },
         ];
       };
+      collector_overdue_ranges: {
+        Row: {
+          collector_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          max_dias: number | null;
+          min_dias: number;
+          vigente_ate: string | null;
+          vigente_desde: string;
+        };
+        Insert: {
+          collector_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          max_dias?: number | null;
+          min_dias: number;
+          vigente_ate?: string | null;
+          vigente_desde?: string;
+        };
+        Update: {
+          collector_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          max_dias?: number | null;
+          min_dias?: number;
+          vigente_ate?: string | null;
+          vigente_desde?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "collector_overdue_ranges_collector_id_fkey";
+            columns: ["collector_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "collector_overdue_ranges_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       enderecos_historico: {
         Row: {
           bairro: string | null;
@@ -754,6 +802,58 @@ export type Database = {
           numero?: string | null;
         };
         Relationships: [];
+      };
+      manager_collector_links: {
+        Row: {
+          collector_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          manager_id: string;
+          vigente_ate: string | null;
+          vigente_desde: string;
+        };
+        Insert: {
+          collector_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          manager_id: string;
+          vigente_ate?: string | null;
+          vigente_desde?: string;
+        };
+        Update: {
+          collector_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          manager_id?: string;
+          vigente_ate?: string | null;
+          vigente_desde?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "manager_collector_links_collector_id_fkey";
+            columns: ["collector_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "manager_collector_links_manager_id_fkey";
+            columns: ["manager_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "manager_collector_links_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       monthly_goals: {
         Row: {
@@ -1362,6 +1462,10 @@ export type Database = {
         Args: { p_documentos: string[] };
         Returns: number;
       };
+      cliente_max_atraso_dias: {
+        Args: { p_documento: string };
+        Returns: number;
+      };
       cliente_tem_acordo_ativo: {
         Args: { p_documento: string };
         Returns: boolean;
@@ -1401,6 +1505,27 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      definir_faixa_atraso_cobrador: {
+        Args: {
+          p_collector_id: string;
+          p_max_dias: number | null;
+          p_min_dias: number;
+        };
+        Returns: {
+          collector_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          max_dias: number | null;
+          min_dias: number;
+          vigente_ate: string | null;
+          vigente_desde: string;
+        };
+      };
+      desvincular_cobrador: {
+        Args: { p_collector_id: string };
+        Returns: undefined;
       };
       distribuir_clientes_cobradores: {
         Args: never;
@@ -1566,6 +1691,18 @@ export type Database = {
             };
             Returns: undefined;
           };
+      vincular_cobrador_a_gerente: {
+        Args: { p_collector_id: string; p_manager_id: string };
+        Returns: {
+          collector_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          manager_id: string;
+          vigente_ate: string | null;
+          vigente_desde: string;
+        };
+      };
     };
     Enums: {
       [_ in never]: never;
