@@ -37,6 +37,16 @@ contagem do arquivo que você mexeu (compare com `git show HEAD:<arquivo>`).
   `npx supabase migration repair --status applied <versao>` (senão um
   `db push` futuro tenta rodar de novo).
 - Escritas em produção: confirmar com o usuário antes.
+- Guard de papel em função `SECURITY DEFINER` (`IF app_current_user_type() ...`):
+  use **`IS DISTINCT FROM 'manager'`**, nunca `<> 'manager'`. Sessão sem login
+  (`anon`) tem `app_current_user_type()` `NULL`, e `NULL <> 'manager'` avalia
+  `NULL` — um `IF` com condição `NULL` não executa o `THEN`, a exceção nunca
+  dispara e a função roda como se fosse gestor (achado e corrigido em
+  2026-11-03, migrations `20261103000007`/`8`, ver `docs/PROGRESSO.md`).
+- Função nova **não** precisa mais de `REVOKE EXECUTE ... FROM anon` manual —
+  `ALTER DEFAULT PRIVILEGES` (migration `20261103000008`) já fecha isso por
+  padrão. Tabela nova continua precisando de RLS explícita `TO authenticated`
+  (padrão desde a Etapa 2a/2b) — isso o default privileges não cobre.
 
 ## Mapa do código
 
