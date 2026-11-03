@@ -669,6 +669,7 @@ export type Database = {
       collection_attempts: {
         Row: {
           collection_id: string;
+          collector_id: string | null;
           created_at: string;
           date: string;
           id: string;
@@ -680,6 +681,7 @@ export type Database = {
         };
         Insert: {
           collection_id: string;
+          collector_id?: string | null;
           created_at?: string;
           date: string;
           id?: string;
@@ -691,6 +693,7 @@ export type Database = {
         };
         Update: {
           collection_id?: string;
+          collector_id?: string | null;
           created_at?: string;
           date?: string;
           id?: string;
@@ -700,7 +703,15 @@ export type Database = {
           result?: string;
           type?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "collection_attempts_collector_id_fkey";
+            columns: ["collector_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       enderecos_historico: {
         Row: {

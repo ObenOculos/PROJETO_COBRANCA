@@ -1409,6 +1409,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           notes: attempt.notes,
           next_action: attempt.nextAction,
           next_action_date: attempt.nextActionDate,
+          collector_id: user?.id ?? null,
         });
 
       if (supabaseError) {
@@ -1551,6 +1552,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           notes: notesAcordo,
           next_action: "Acompanhar parcela do acordo",
           next_action_date: proximaParcela?.dataVencimento ?? null,
+          collector_id: user?.id ?? null,
         })),
       );
     if (attemptError) {

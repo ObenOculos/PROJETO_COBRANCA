@@ -92,6 +92,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
           status === "promessa_pagamento" ? "Promessa de pagamento" : null,
         next_action_date:
           status === "promessa_pagamento" && promiseDate ? promiseDate : null,
+        collector_id: user.id,
       }));
 
       const { error: insertError } = await supabase
