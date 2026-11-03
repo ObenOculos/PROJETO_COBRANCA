@@ -1186,11 +1186,38 @@ gerente↔cobrador é greenfield total.
    propósito à regra "um cliente, uma categoria" da agenda. Testada ao
    vivo (faixa temporária 1600-1635 para cliente com 1625 dias de atraso
    → badge "Faltam 10 dias na carteira" correto).
-7. automação de saída/redistribuição — **não iniciada**. Rodar em modo
-   dry-run antes de ligar de verdade; usuário já avisado que a ativação
-   real pede confirmação explícita separada.
+7. automação de saída/redistribuição — **dry-run concluído** (commit
+   `c9c2a29`): `clientes_fora_da_faixa()` (só leitura, usa
+   `cliente_max_atraso_dias` + guard novo `cliente_tem_visita_agendada_ativa`)
+   e `executar_saida_carteira_fora_da_faixa()` (construída, **não ligada a
+   cron nem botão** — ativação real pede confirmação explícita separada,
+   combinado com o usuário). UI do dry-run ainda não construída (parte da
+   etapa 8).
 8. consolidação no painel do gerente (`CollectorsSummary.tsx`) — **não
    iniciada** além do card de meta de equipe da etapa 5.
+
+**Achado preparando a etapa 7, sem relação com a feature — vulnerabilidade
+de segurança corrigida no mesmo dia (commits `c9c2a29`, `c45de08`):**
+várias RPCs `SECURITY DEFINER` (`criar_acordo`, `atribuir_clientes_em_lote`,
+`remover_cobrador_em_lote`, `reagendar_visita`, as 3 RPCs novas da
+etapa 3/4 desta sessão, entre outras) usavam
+`IF app_current_user_type() <> 'manager' THEN RAISE EXCEPTION` como trava.
+Para uma sessão **sem login** (`anon`), essa função retorna `NULL`, e
+`NULL <> 'manager'` avalia `NULL` — um `IF` com condição `NULL` não executa
+o `THEN`, a exceção nunca dispara, a função roda como se fosse gestor.
+Confirmado por leitura (sem mutação) que essas funções tinham `EXECUTE`
+liberado pra `anon` — este projeto Supabase tem `ALTER DEFAULT PRIVILEGES`
+concedendo `EXECUTE` em função nova direto pros papéis `anon`/
+`authenticated`/`service_role` (não via `PUBLIC` — só descoberto depois de
+um primeiro `REVOKE ... FROM PUBLIC` não ter resolvido nada) — e rodam
+`SECURITY DEFINER` com dono `postgres` (`BYPASSRLS`), então a RLS das
+tabelas não protegia. Corrigido: guard trocado pra `IS DISTINCT FROM`
+(NULL-safe) nas funções realmente vulneráveis, `EXECUTE` revogado de
+`anon` explicitamente (não só de `PUBLIC`) em ~15 funções, e
+`ALTER DEFAULT PRIVILEGES` fechando isso por padrão pra funções futuras.
+Verificado com uma chamada real como `anon` (UUID inofensivo, sem
+corresponder a nenhum registro real) — `HTTP 401` depois da correção,
+antes teria rodado. Detalhe em `CLAUDE.md` (seção Banco/migrations).
 
 Detalhe completo da análise na memória `estado-metas-vinculo-carteira`.
 
