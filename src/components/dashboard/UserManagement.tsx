@@ -8,6 +8,7 @@ import {
   MoreVertical,
   Ban,
   CheckCircle,
+  Gauge,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -18,6 +19,7 @@ import {
 } from "../../types";
 import ClearVisitsModal, { pendingVisitsCount } from "./ClearVisitsModal";
 import { USER_TYPE_LABELS } from "../../config/profiles";
+import FaixaEquipeModal from "./FaixaEquipeModal";
 
 const UserManagement: React.FC = () => {
   const { users, addUser, updateUser, deleteUser, scheduledVisits } =
@@ -50,6 +52,7 @@ const UserManagement: React.FC = () => {
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserType | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [faixaEquipeFor, setFaixaEquipeFor] = useState<UserType | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -271,6 +274,19 @@ const UserManagement: React.FC = () => {
                         >
                           <Edit className="h-4 w-4 mr-2" /> Editar
                         </a>
+                        {isCollectorType(user.type) && (
+                          <a
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setFaixaEquipeFor(user);
+                              setActiveDropdown(null);
+                            }}
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            <Gauge className="h-4 w-4 mr-2" /> Faixa &amp; Equipe
+                          </a>
+                        )}
                         {currentUser?.id !== user.id && (
                           <a
                             href="#"
@@ -477,6 +493,13 @@ const UserManagement: React.FC = () => {
           collectorId={clearVisitsFor.id}
           collectorName={clearVisitsFor.name}
           onClose={() => setClearVisitsFor(null)}
+        />
+      )}
+
+      {faixaEquipeFor && (
+        <FaixaEquipeModal
+          collector={faixaEquipeFor}
+          onClose={() => setFaixaEquipeFor(null)}
         />
       )}
     </div>
