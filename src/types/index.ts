@@ -63,6 +63,21 @@ export interface ManagerCollectorLink {
   vigenteAte: string | null;
 }
 
+// Linha do dry-run de clientes_fora_da_faixa() (carteira automática por
+// faixa de atraso). bloqueadoPor null = sairia de fato se a automação
+// estivesse ligada; "acordo_ativo"/"visita_agendada" explica por que não.
+export interface ClienteForaDaFaixa {
+  documento: string;
+  cliente: string | null;
+  collectorId: string;
+  collectorName: string | null;
+  atrasoAtual: number;
+  faixaMin: number;
+  faixaMax: number;
+  diasExcedidos: number;
+  bloqueadoPor: string | null;
+}
+
 // Authorization history types
 export interface AuthorizationHistory {
   id: string;

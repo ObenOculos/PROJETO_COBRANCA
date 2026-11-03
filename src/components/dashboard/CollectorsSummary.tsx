@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { isCollectorType, UserType } from "../../types";
+import { supabase } from "../../lib/supabase";
+import { isCollectorType, UserType, ClienteForaDaFaixa } from "../../types";
 import { USER_TYPE_LABELS } from "../../config/profiles";
 import {
   isVisitOverdue,
@@ -297,6 +298,70 @@ const CollectorsSummary: React.FC = () => {
   // apos `rows`), porque af os totais seriam identicos ao card/linha unica.
   const [overviewOpen, setOverviewOpen] = useState(true);
   const prevSingleRef = useRef(false);
+  // Carteira automatica por faixa de atraso (etapas 7/8 da iniciativa de
+  // metas/vinculo/carteira automatica): consulta sob demanda (nao carrega
+  // sozinho) porque clientes_fora_da_faixa() varre todo cliente atribuido
+  // a um cobrador com faixa cadastrada -- mesma cautela de outras cargas
+  // pesadas do gestor neste projeto (ver collectionsRequested).
+  const [faixaOpen, setFaixaOpen] = useState(false);
+  const [foraDaFaixa, setForaDaFaixa] = useState<ClienteForaDaFaixa[] | null>(
+    null,
+  );
+  const [loadingForaDaFaixa, setLoadingForaDaFaixa] = useState(false);
+  const [saidasNoPeriodo, setSaidasNoPeriodo] = useState<
+    | {
+        documento: string;
+        clienteNome: string | null;
+        cobradorAnteriorId: string | null;
+        assignedAt: string;
+      }[]
+    | null
+  >(null);
+
+  const consultarCarteiraAutomatica = async () => {
+    setLoadingForaDaFaixa(true);
+    try {
+      const [foraRes, saidasRes] = await Promise.all([
+        supabase.rpc("clientes_fora_da_faixa"),
+        supabase
+          .from("atribuicoes_historico")
+          .select("documento, cliente_nome, cobrador_anterior_id, assigned_at")
+          .eq("motivo", "fora_da_faixa")
+          .gte("assigned_at", `${dateFrom}T00:00:00`)
+          .lte("assigned_at", `${dateTo}T23:59:59`)
+          .order("assigned_at", { ascending: false }),
+      ]);
+
+      if (foraRes.error) throw foraRes.error;
+      if (saidasRes.error) throw saidasRes.error;
+
+      setForaDaFaixa(
+        (foraRes.data ?? []).map((r) => ({
+          documento: r.documento,
+          cliente: r.cliente,
+          collectorId: r.collector_id,
+          collectorName: r.collector_name,
+          atrasoAtual: r.atraso_atual,
+          faixaMin: r.faixa_min,
+          faixaMax: r.faixa_max,
+          diasExcedidos: r.dias_excedidos,
+          bloqueadoPor: r.bloqueado_por,
+        })),
+      );
+      setSaidasNoPeriodo(
+        (saidasRes.data ?? []).map((r) => ({
+          documento: r.documento,
+          clienteNome: r.cliente_nome,
+          cobradorAnteriorId: r.cobrador_anterior_id,
+          assignedAt: r.assigned_at,
+        })),
+      );
+    } catch (err) {
+      console.error("Erro ao consultar carteira automática por faixa:", err);
+    } finally {
+      setLoadingForaDaFaixa(false);
+    }
+  };
   // Conjunto dos EXCLUIDOS (nao dos selecionados). Vazio = nada excluido =
   // todos aparecem; cheio (todo allCollectors) = todos excluidos = nenhum
   // aparece. Essa inversao deixa representar os 3 estados (todos/parcial/
@@ -876,6 +941,151 @@ const CollectorsSummary: React.FC = () => {
               ? `Faltam ${formatCurrency(teamGoal.remaining, false)} para a meta da equipe`
               : "Meta da equipe atingida"}
           </p>
+        </div>
+      )}
+
+      {/* Carteira automatica por faixa de atraso (etapas 7/8): dry-run de
+          quem sairia da carteira do proprio cobrador por ultrapassar a
+          faixa dele, e quem ja saiu (motivo fora_da_faixa em
+          atribuicoes_historico) no periodo filtrado acima. So leitura --
+          a execucao real (executar_saida_carteira_fora_da_faixa) existe no
+          banco mas nao esta ligada a nenhum botao aqui de proposito. */}
+      {currentUser?.type === "manager" && (
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border-2 border-pink-100 dark:border-pink-900/40 p-4 space-y-3">
+          <button
+            onClick={() => setFaixaOpen((o) => !o)}
+            className="w-full flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-dark-text"
+          >
+            <AlertTriangle className="h-4 w-4 text-pink-600 dark:text-pink-400" />
+            Carteira automática por faixa de atraso
+            {faixaOpen ? (
+              <ChevronUp className="h-3.5 w-3.5 ml-auto text-gray-400" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 ml-auto text-gray-400" />
+            )}
+          </button>
+
+          {faixaOpen && (
+            <>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                  Consulta sob demanda -- varre todo cliente atribuído a um
+                  cobrador com faixa cadastrada.
+                </p>
+                <button
+                  onClick={consultarCarteiraAutomatica}
+                  disabled={loadingForaDaFaixa}
+                  className="px-3 py-1.5 bg-pink-600 text-white rounded-lg text-xs font-bold hover:bg-pink-700 disabled:opacity-50"
+                >
+                  {loadingForaDaFaixa ? "Consultando..." : "Consultar"}
+                </button>
+              </div>
+
+              {foraDaFaixa && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-gray-600 dark:text-dark-text-secondary">
+                    Perto de sair da carteira agora ({foraDaFaixa.length})
+                  </p>
+                  {foraDaFaixa.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">
+                      Nenhum cliente ultrapassou a faixa do próprio cobrador.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto border border-gray-100 dark:border-dark-border rounded-lg">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-gray-50 dark:bg-dark-bg text-gray-500">
+                          <tr>
+                            <th className="px-3 py-2 font-bold">Cliente</th>
+                            <th className="px-3 py-2 font-bold">Cobrador</th>
+                            <th className="px-3 py-2 font-bold text-center">
+                              Atraso
+                            </th>
+                            <th className="px-3 py-2 font-bold text-center">
+                              Faixa
+                            </th>
+                            <th className="px-3 py-2 font-bold text-center">
+                              Excedeu por
+                            </th>
+                            <th className="px-3 py-2 font-bold">Situação</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
+                          {[...foraDaFaixa]
+                            .sort((a, b) => {
+                              if (!!a.bloqueadoPor !== !!b.bloqueadoPor) {
+                                return a.bloqueadoPor ? 1 : -1;
+                              }
+                              return b.diasExcedidos - a.diasExcedidos;
+                            })
+                            .map((c) => (
+                              <tr key={c.documento}>
+                                <td className="px-3 py-2 font-medium text-gray-800 dark:text-dark-text">
+                                  {c.cliente ?? c.documento}
+                                </td>
+                                <td className="px-3 py-2 text-gray-500">
+                                  {c.collectorName ?? "—"}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  {c.atrasoAtual} dias
+                                </td>
+                                <td className="px-3 py-2 text-center text-gray-400">
+                                  {c.faixaMin}–{c.faixaMax}
+                                </td>
+                                <td className="px-3 py-2 text-center font-bold text-pink-600">
+                                  +{c.diasExcedidos} dias
+                                </td>
+                                <td className="px-3 py-2">
+                                  {c.bloqueadoPor ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
+                                      {c.bloqueadoPor === "acordo_ativo"
+                                        ? "Travado: acordo ativo"
+                                        : "Travado: visita agendada"}
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-50 text-pink-600 border border-pink-100">
+                                      Sairia agora
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {saidasNoPeriodo && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-gray-600 dark:text-dark-text-secondary">
+                    Saíram da carteira por faixa no período ({saidasNoPeriodo.length})
+                  </p>
+                  {saidasNoPeriodo.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">
+                      Nenhuma saída automática registrada no período.
+                    </p>
+                  ) : (
+                    <ul className="text-xs divide-y divide-gray-100 dark:divide-dark-border border border-gray-100 dark:border-dark-border rounded-lg">
+                      {saidasNoPeriodo.map((s) => (
+                        <li
+                          key={`${s.documento}-${s.assignedAt}`}
+                          className="px-3 py-2 flex items-center justify-between"
+                        >
+                          <span className="font-medium text-gray-800 dark:text-dark-text">
+                            {s.clienteNome ?? s.documento}
+                          </span>
+                          <span className="text-gray-400">
+                            {new Date(s.assignedAt).toLocaleDateString("pt-BR")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

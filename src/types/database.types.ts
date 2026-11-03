@@ -1474,6 +1474,24 @@ export type Database = {
         Args: { p_documento: string };
         Returns: boolean;
       };
+      cliente_tem_visita_agendada_ativa: {
+        Args: { p_documento: string };
+        Returns: boolean;
+      };
+      clientes_fora_da_faixa: {
+        Args: never;
+        Returns: {
+          documento: string;
+          cliente: string | null;
+          collector_id: string;
+          collector_name: string | null;
+          atraso_atual: number;
+          faixa_min: number;
+          faixa_max: number;
+          dias_excedidos: number;
+          bloqueado_por: string | null;
+        }[];
+      };
       cobrador_na_data_em_lote: {
         Args: { p_pares: Json };
         Returns: {
@@ -1534,6 +1552,10 @@ export type Database = {
           cobrador_id: string;
           cobrador_nome: string;
         }[];
+      };
+      executar_saida_carteira_fora_da_faixa: {
+        Args: never;
+        Returns: number;
       };
       liberar_cliente_da_carteira: {
         Args: {
