@@ -17,6 +17,13 @@ export const PRIORITY_LABELS: Record<PriorityBucket, string> = {
   low: "Em dia / Recente (0-30 dias)",
 };
 
+// A partir de quantos dias de folga (faixa.maxDias - atraso atual) um
+// cliente entra em "Clientes urgentes" (prestes a sair da carteira do
+// cobrador por ultrapassar a faixa de atraso dele -- ver
+// collector_overdue_ranges). Usado tanto no painel do cobrador quanto no
+// do gestor, por isso fica aqui e nao inline num componente.
+export const URGENTE_SAIDA_CARTEIRA_DIAS = 15;
+
 export const PRIORITY_COLOR_CLASSES: Record<PriorityBucket, string> = {
   critical: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   high: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",

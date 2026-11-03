@@ -32,6 +32,7 @@ import {
   X,
   Eye,
   EyeOff,
+  AlertTriangle,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
@@ -50,7 +51,11 @@ import {
   hasInstallmentBalance,
   clientMaxOverdueDays,
 } from "../../filters/clientStatus";
-import { priorityBucket, PRIORITY_COLOR_CLASSES } from "../../filters/priority";
+import {
+  priorityBucket,
+  PRIORITY_COLOR_CLASSES,
+  URGENTE_SAIDA_CARTEIRA_DIAS,
+} from "../../filters/priority";
 import { SEM_CONTATO_DIAS } from "../../config/collectionAttempts";
 
 import LogContactModal from "./LogContactModal";
@@ -96,9 +101,15 @@ const chunk = <T,>(arr: T[], size: number): T[][] => {
 
 // As 7 categorias da agenda priorizada, nesta ordem de precedência (ver
 // useMemo em InternalCollectorWallet) — cada cliente cai numa só.
+// "urgente" (Clientes urgentes — perto de sair da faixa de atraso do
+// cobrador, ver collector_overdue_ranges) é a única exceção: fica de fora
+// dessa exclusividade de proposito, porque responde uma pergunta diferente
+// ("vou perder este cliente da carteira?") das outras 7, que respondem "o
+// que eu faco agora?" — um cliente pode aparecer ali E em outra categoria.
 type AgendaSubTab =
   | "promessas"
   | "quebrado"
+  | "urgente"
   | "critico"
   | "alerta"
   | "medio"
@@ -248,6 +259,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     getAcordoQuebradoDoCliente,
     getFilteredCollections,
     salePayments,
+    collectorOverdueRanges,
   } = useCollection();
   const [walletTab, setWalletTab] = useState<"agenda" | "carteira">("agenda");
   const [agendaSubTab, setAgendaSubTab] = useState<AgendaSubTab>("promessas");
@@ -442,6 +454,44 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return openClientGroups.filter((g) => matchedDocs.has(g.document));
   }, [openClientGroups, walletFilters, getFilteredCollections, user]);
 
+  // Faixa de atraso vigente DESTE cobrador (ver collector_overdue_ranges,
+  // cadastrada em Usuarios > Faixa & Equipe). Sem faixa cadastrada, ou faixa
+  // sem limite superior (maxDias null), a secao "Clientes urgentes" nao
+  // aparece -- nao ha "perto de sair" sem um teto definido.
+  const minhaFaixaAtraso = collectorOverdueRanges.find(
+    (r) => r.collectorId === user?.id,
+  );
+
+  // Clientes urgentes: dentro da MINHA faixa mas a poucos dias do teto dela
+  // (URGENTE_SAIDA_CARTEIRA_DIAS). "Sem nenhuma acao" reusa lastContacts
+  // (mesma fonte do balde "Sem contato") -- ausencia de entrada ali so
+  // acontece quando nenhum titulo em aberto do cliente tem uma unica
+  // tentativa registrada, exatamente o que o pedido original definiu.
+  const { urgentes, urgenteInfoByDocument } = useMemo(() => {
+    const info = new Map<string, { diasRestantes: number; semAcao: boolean }>();
+    if (!minhaFaixaAtraso || minhaFaixaAtraso.maxDias == null) {
+      return { urgentes: [] as ClientGroup[], urgenteInfoByDocument: info };
+    }
+    const maxDias = minhaFaixaAtraso.maxDias;
+    const ranked: { group: ClientGroup; diasRestantes: number }[] = [];
+    walletFilteredGroups.forEach((group) => {
+      const atraso = clientMaxOverdueDays(group);
+      if (atraso < minhaFaixaAtraso.minDias || atraso >= maxDias) return;
+      const diasRestantes = maxDias - atraso;
+      if (diasRestantes > URGENTE_SAIDA_CARTEIRA_DIAS) return;
+      info.set(group.document, {
+        diasRestantes,
+        semAcao: !lastContacts[group.document],
+      });
+      ranked.push({ group, diasRestantes });
+    });
+    ranked.sort((a, b) => a.diasRestantes - b.diasRestantes);
+    return {
+      urgentes: ranked.map((r) => r.group),
+      urgenteInfoByDocument: info,
+    };
+  }, [walletFilteredGroups, minhaFaixaAtraso, lastContacts]);
+
   // Ordenacao clicavel no cabecalho, compartilhada pela Carteira completa e
   // pelas categorias da Agenda (mesmas colunas, mesmo header -- ver
   // WalletTableHead). Nula = ordem padrao (precedencia da Agenda / vinda do
@@ -587,6 +637,18 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         emptyMessage: "Nenhum acordo quebrado.",
       },
       {
+        key: "urgente",
+        label: "Clientes urgentes",
+        icon: <AlertTriangle className="w-4 h-4" />,
+        activeClass: "bg-pink-600 text-white",
+        accentBorderClass: "border-l-pink-400 dark:border-l-pink-600",
+        groups: urgentes,
+        emptyMessage:
+          minhaFaixaAtraso && minhaFaixaAtraso.maxDias != null
+            ? "Nenhum cliente perto de sair da sua faixa de atraso."
+            : "Sua faixa de atraso ainda não foi configurada pelo gestor.",
+      },
+      {
         key: "critico",
         label: "Crítico (+90 dias)",
         icon: <Flame className="w-4 h-4" />,
@@ -632,7 +694,17 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         emptyMessage: "Nenhum cliente em tratamento.",
       },
     ],
-    [promessas, acordosQuebrados, criticos, alertas, medios, semContato, emTratamento],
+    [
+      promessas,
+      acordosQuebrados,
+      urgentes,
+      minhaFaixaAtraso,
+      criticos,
+      alertas,
+      medios,
+      semContato,
+      emTratamento,
+    ],
   );
 
   const categoriaAtiva =
@@ -939,6 +1011,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             sortKey={sortKey}
             sortDir={sortDir}
             onSort={toggleSort}
+            urgenteInfoByDocument={urgenteInfoByDocument}
           />
         </>
       ) : (
@@ -970,6 +1043,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                       onOpenDetail={onOpenDetail}
                       onOpenLog={onOpenLog}
                       onOpenAcordo={onOpenAcordo}
+                      urgenteInfo={urgenteInfoByDocument.get(group.document)}
                     />
                   ))
                 ) : (
@@ -1059,6 +1133,11 @@ interface ClientQueueRowProps {
   onOpenDetail: (client: ClientGroup) => void;
   onOpenLog: (client: ClientGroup) => void;
   onOpenAcordo: (client: ClientGroup) => void;
+  /** Presente quando o cliente esta perto de sair da faixa de atraso do
+   * cobrador (ver urgentes/urgenteInfoByDocument em InternalCollectorWallet).
+   * Mostrado em qualquer aba, nao so "Clientes urgentes" -- e informacao
+   * util onde quer que o cobrador veja esse cliente. */
+  urgenteInfo?: { diasRestantes: number; semAcao: boolean };
 }
 
 // Linha da agenda/fila de atendimento, reusada em cada secao priorizada
@@ -1075,6 +1154,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   onOpenDetail,
   onOpenLog,
   onOpenAcordo,
+  urgenteInfo,
 }) => {
   const maxAtraso = clientMaxOverdueDays(group);
   const phoneValue = group.mobile || group.phone;
@@ -1147,6 +1227,19 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           {acordoAtivo && (
             <span className="w-fit px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
               Em acordo
+            </span>
+          )}
+          {urgenteInfo && (
+            <span
+              className={`w-fit px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                urgenteInfo.semAcao
+                  ? "bg-red-50 text-red-600 border-red-200"
+                  : "bg-pink-50 text-pink-600 border-pink-100"
+              }`}
+            >
+              {urgenteInfo.semAcao ? "Sem nenhuma ação — " : ""}
+              Faltam {urgenteInfo.diasRestantes}{" "}
+              {urgenteInfo.diasRestantes === 1 ? "dia" : "dias"} na carteira
             </span>
           )}
         </div>
@@ -1316,6 +1409,7 @@ interface AgendaSectionProps {
   sortKey: WalletSortKey | null;
   sortDir: "asc" | "desc";
   onSort: (key: WalletSortKey) => void;
+  urgenteInfoByDocument: Map<string, { diasRestantes: number; semAcao: boolean }>;
 }
 
 // Conteudo da categoria ativa da agenda priorizada: borda colorida conforme
@@ -1338,6 +1432,7 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   sortKey,
   sortDir,
   onSort,
+  urgenteInfoByDocument,
 }) => {
   const [page, setPage] = useState(1);
   useEffect(() => {
@@ -1380,6 +1475,7 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
                 onOpenDetail={onOpenDetail}
                 onOpenLog={onOpenLog}
                 onOpenAcordo={onOpenAcordo}
+                urgenteInfo={urgenteInfoByDocument.get(group.document)}
               />
             ))}
           </tbody>
