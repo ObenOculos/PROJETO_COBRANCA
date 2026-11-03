@@ -18,7 +18,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 7 | Vulnerabilidades restantes (só dev) | Baixa | — |
 | 8 | ~~Escopo completo do gestor baixa `BANCO_DADOS` inteiro pro navegador~~ | Média | Médio |
 | 9 | Status "A Vencer" não existe hoje — avaliar relação com os demais | Baixa | A analisar |
-| 10 | Etapa 3 — tipar `BANCO_DADOS` (FK `documento`/dinheiro `numeric`/datas `date`) | Média | Grande, em 3 fases |
+| 10 | ~~Etapa 3 — tipar `BANCO_DADOS` (FK `documento`/dinheiro `numeric`/datas `date`)~~ | Média | Grande, em 3 fases |
 | 11 | ~~Título de acordo ativo pagável por fora (Distribuir Pagamento/CollectionModal/upload)~~ | Alta | Pequeno/médio |
 
 ### Item 11 — título em acordo ativo pagável por fora — concluída 2026-11-02
@@ -107,10 +107,78 @@ código que precisa já estar pronto pra constraint, não o contrário).
     antes/depois) e depois com pagamento real em produção (cliente Ana
     Claudia Almeida Araujo, "Distribuir Pagamento" entre 2 vendas): status,
     valores e `recebimentos_historico` (audit trail) todos corretos.
-- **Fase 3 (datas `text` → `date`)**: ver plano salvo — mesma investigação
-  de views/triggers/funções vai ser necessária antes do `ALTER COLUMN TYPE`
-  (já há pistas: `process_payment` declara `v_hoje text`, checar tipo de
-  `recebimentos_historico.data_de_recebimento`/`sale_payments.payment_date`).
+- **Fase 3 (datas `text` → `date`) — concluída 2026-11-03**, commits
+  `6ff4e9e` (front: `DatabaseUpload.tsx` passou a normalizar
+  `data_de_recebimento` com `parseDateToISO` no fluxo de upload de status,
+  mesmo padrão já usado para `data_vencimento`; `CollectionContext.tsx.updateCollection`
+  passou a normalizar com `toYYYYMMDD` antes de montar o update — único
+  choke point de escrita desse campo, cobre todas as telas que chamam
+  `updateCollection`) e `63eee7e` (migration
+  `20261103000001_banco_dados_datas_date.sql` + regeneração de
+  `database.types.ts`). Levantamento (mesmo processo da fase 2:
+  `information_schema.view_column_usage` + busca em `pg_proc.prosrc` +
+  `pg_trigger`/`pg_policy`/`pg_constraint`/`pg_indexes` pelos 3 nomes de
+  coluna) achou raio de impacto menor que a fase 2:
+  - 2 views (`banco_dados_clientes_ativos`/`_quitados`, mesmo par do item 8)
+    dependem das colunas — recriadas idênticas em torno do `ALTER`. Nenhuma
+    view órfã esta vez (`vw_clientes_cobradores` já foi apagada na fase 2).
+  - Nenhum trigger lista estas colunas em `UPDATE OF` — diferente da fase 2
+    (`trg_banco_dados_atualiza_saldo` precisou ser dropado/recriado lá),
+    aqui nenhum trigger bloqueou o `ALTER` por esse caminho.
+  - Nenhuma policy de RLS, constraint ou índice referencia as 3 colunas.
+  - Só **1 função** precisou mudar: `process_payment` declarava `v_hoje
+    text := to_char(...)` e gravava em `data_de_recebimento` — confirmado em
+    teste direto que Postgres **não** tem cast implícito nem de atribuição de
+    `text` para `date` (o inverso, `date` → `text`, tem e funciona sem
+    mudança nenhuma — é o caso dos triggers `trg_recebimentos_historico_ins`/`_upd`,
+    que gravam `n.data_de_recebimento` em `recebimentos_historico.data_de_recebimento`,
+    coluna `text`). Corrigido: `v_hoje date := (now() AT TIME ZONE
+    'America/Sao_Paulo')::date`, sem o `to_char`. `registrar_pagamento_acordo`
+    já recebia `p_data_pagamento` como `date` (sem mudança). `criar_acordo`/
+    `marcar_acordos_quebrados` bateram na busca por texto por usarem
+    `data_vencimento` de `acordo_parcelas` — tabela diferente, falso
+    positivo. `update_client_address` só usa `data_lancamento` em `ORDER BY`,
+    sem comparação de tipo.
+  - Testado em transação com `ROLLBACK` contra produção antes do `db push`:
+    contagem das 2 views batendo exato (74.209 + 89.400 = 163.609, igual
+    antes), as 3 colunas confirmadas `date`, amostra de conversão (incluindo
+    lojas "Oticas Luana \*", formato BR) correta. Depois de aplicada,
+    `process_payment` testado de ponta a ponta em `ROLLBACK` contra um
+    cliente real com saldo aberto: gravou `data_de_recebimento` como `date`
+    de verdade, sem erro.
+  - `tsc -b` e lint limpos (contagem de `DatabaseUpload.tsx`/
+    `CollectionContext.tsx` idêntica ao `HEAD`: 29 problemas nos dois juntos,
+    antes e depois).
+  - **Efeito colateral confirmado, não é bug**: `UpdateAddressModal.tsx`
+    ordena por `data_lancamento DESC` no Postgres — antes ordenava como
+    texto (BR/ISO misturados), agora ordena cronologicamente de verdade.
+    Achados clientes reais da Oticas Luana com datas de lançamento
+    espalhadas de 2022 a 2026 onde a ordenação por string e por data
+    discordam — o endereço "mais recente" pode mudar para esses casos.
+    **Ainda falta validar na tela** (`npm run dev`) com o usuário.
+  - `database.types.ts` **estava desatualizado desde a fase 1/2 desta etapa
+    e a carga do Ciclone** (ainda mostrava os 11 campos de dinheiro como
+    `string`, tinha `vw_clientes_cobradores`/RPCs órfãs já removidas, não
+    tinha `ciclone_titulo_map`/`saldo_por_documento_tbl`/`titulo_em_acordo_ativo`)
+    — regenerado contra o schema real de uma vez, pegando o atraso
+    acumulado das 3 fases. As 3 colunas de data continuam `string | null`
+    no tipo gerado (esperado: `date` sai como string ISO pelo PostgREST).
+  - **Ainda falta**: validar no `npm run dev` o cadastro de pagamento com
+    data pela tela, o filtro de período por vencimento/lançamento
+    (`ClientAssignment`), o Acompanhamento de Visitas (atraso calculado a
+    partir de `data_vencimento`) e o `UpdateAddressModal` com um cliente
+    real da Oticas Luana — mesmo checklist do plano, pendente de uma rodada
+    do usuário.
+
+**Etapa 3 — as 3 fases (FK, dinheiro, datas) estão concluídas e em
+produção.** Dívida técnica registrada e deixada de propósito fora do
+escopo: as 6+ implementações duplicadas de parse de data BR/ISO no front
+(`src/filters/dates.ts`, `utils/formatters.ts`, parsers inline em
+`CollectionContext.tsx`/`DatabaseUpload.tsx`/`EnhancedPerformanceChart.tsx`/
+`VisitScheduler.tsx`) continuam como estavam — todas já toleravam ISO puro
+antes desta migration, então nenhuma precisou mudar, mas consolidar em uma
+função única fica para uma sessão dedicada de organização, não uma correção
+exigida por esta etapa.
 
 ### Importação do financeiro Ciclone — concluída em 2026-11-02
 
