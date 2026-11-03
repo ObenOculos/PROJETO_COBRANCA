@@ -1359,7 +1359,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       if (updates.valor_recebido !== undefined)
         dbUpdates.valor_recebido = updates.valor_recebido;
       if (updates.data_de_recebimento !== undefined)
-        dbUpdates.data_de_recebimento = updates.data_de_recebimento;
+        dbUpdates.data_de_recebimento = toYYYYMMDD(
+          updates.data_de_recebimento,
+        );
       if (updates.obs !== undefined) dbUpdates.obs = updates.obs;
       if (updates.user_id !== undefined) dbUpdates.user_id = updates.user_id;
       if (updates.desconto !== undefined) dbUpdates.desconto = updates.desconto; // Added this line

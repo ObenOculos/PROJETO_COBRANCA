@@ -1055,16 +1055,23 @@ const DatabaseUpload: React.FC = () => {
       const situacao = row.situacao || row["situacao"];
       const updateObj: any = {};
 
-      // status e data_de_recebimento sao texto: comparacao direta (trim).
+      // status e texto: comparacao direta (trim).
       if (row.status && row.status.trim() !== (current?.status ?? "").trim()) {
         updateObj.status = row.status;
       }
-      if (
-        row.data_de_recebimento &&
-        row.data_de_recebimento.trim() !==
-          (current?.data_de_recebimento ?? "").trim()
-      ) {
-        updateObj.data_de_recebimento = row.data_de_recebimento;
+
+      // data_de_recebimento: normaliza para ISO e compara so a parte da data,
+      // mesmo padrao de data_vencimento abaixo. So altera se o arquivo trouxer
+      // uma data reconhecida diferente da atual.
+      {
+        const raw = row.data_de_recebimento ?? row["data_de_recebimento"];
+        if (raw !== undefined && raw !== null && raw.toString().trim() !== "") {
+          const newIso = parseDateToISO(raw);
+          if (newIso) {
+            const curIso = parseDateToISO(current?.data_de_recebimento);
+            if (newIso !== curIso) updateObj.data_de_recebimento = newIso;
+          }
+        }
       }
 
       // Campos numericos (armazenados como texto no banco): comparacao
