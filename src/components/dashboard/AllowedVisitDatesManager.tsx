@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { supabase } from "../../lib/supabase";
-import { AllowedVisitDate, isCollectorType } from "../../types";
+import { AllowedVisitDate } from "../../types";
 import {
   Calendar as CalendarIcon,
   CalendarClock,
@@ -223,11 +223,17 @@ const AllowedVisitDatesManager: React.FC = () => {
     }
   }, [collections, allowedDates]);
 
-  // Lista de cobradores
+  // Lista de cobradores -- so Externo (`collector`): e o unico perfil cuja
+  // tela de agendamento (VisitScheduler/getNextAllowedVisitDate) de fato le
+  // allowed_visit_dates. Carteira (interno/terceirizado/juridico) agenda
+  // contato por ScheduleContactModal/ContactScheduler, que nunca consulta
+  // essa tabela -- configurar data permitida pra eles e config morta, sem
+  // nenhum aviso (item 18, docs/PROGRESSO.md). Confirmado em produção
+  // (2026-11-04) que as 93 linhas existentes sao todas de `collector`.
   const collectors = useMemo(() => {
     if (!users) return [];
     return users
-      .filter((u) => isCollectorType(u.type))
+      .filter((u) => u.type === "collector")
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [users]);
 

@@ -26,7 +26,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 15 | ~~Transferência de carteira em massa não filtra agendamento por canal~~ | Alta | Pequeno/médio |
 | 16 | ~~Cobrador de carteira não tem como cancelar um contato agendado (só concluir/reagendar)~~ | Média/Alta | Médio |
 | 17 | ~~Duas implementações de "desfecho libera cliente da carteira" (visitOutcomes vs. `if` no LogContactModal)~~ | Média | Pequeno/médio |
-| 18 | `AllowedVisitDatesManager` aceita os 4 perfis mas só `VisitScheduler` (externo) lê o resultado | Média | Pequeno |
+| 18 | ~~`AllowedVisitDatesManager` aceita os 4 perfis mas só `VisitScheduler` (externo) lê o resultado~~ | Média | Pequeno |
 | 19 | `monthly_goals.visits_goal` muda de significado por perfil sem isso aparecer no schema/UI do % | Média | Pequeno |
 | 20 | ~~Helper `WALLET_COLLECTOR_TYPES.includes(...)` repetido em 6+ lugares em vez de `isWalletCollectorType()` único~~ | Baixa | Pequeno |
 | 21 | Jurídico (`legal_collector`) é 100% idêntico a Interno/Terceirizado — zero modelagem de processo/protesto/prazo legal | A avaliar com o negócio | A analisar |
@@ -51,14 +51,28 @@ etapas pequenas, testar antes de seguir — ver [[trabalho-em-etapas]]):
 4. ~~Item 17 (unificar liberação de carteira)~~ — concluído, ver detalhe
    abaixo.
 5. ~~Item 16 (cancelamento de contato)~~ — concluído, ver detalhe abaixo.
-6. Item 18 (`AllowedVisitDatesManager` restringir a externo) — próximo. Pequeno,
-   mas confirmar que ninguém já configurou isso pra carteira em produção
-   antes de restringir.
-7. Item 19 (documentar dualidade de `visits_goal`) — comentário de coluna
+6. ~~Item 18 (`AllowedVisitDatesManager` restringir a externo)~~ — concluído,
+   ver detalhe abaixo.
+7. Item 19 (documentar dualidade de `visits_goal`) — próximo. Comentário de coluna
    + rótulo na UI de indicador, não só na de edição.
 8. Item 21 (Jurídico) — depende de decisão de negócio, não é só código;
    perguntar como a cobrança jurídica funciona de verdade hoje fora do
    sistema antes de desenhar qualquer coisa.
+
+### Item 18 — restringe `AllowedVisitDatesManager` a Externo — concluído 2026-11-04
+
+`AllowedVisitDatesManager` deixava o gestor escolher qualquer um dos 4
+perfis de cobrador no dropdown, mas só `VisitScheduler`
+(`getNextAllowedVisitDate`, `utils/visitScheduling.ts`) de fato lê
+`allowed_visit_dates` — carteira (interno/terceirizado/jurídico) agenda
+contato por `ScheduleContactModal`/`ContactScheduler`, que nunca consulta
+essa tabela. Configurar data permitida pra um cobrador de carteira seria
+config morta, sem nenhum aviso. **Confirmado em produção antes de
+restringir** (Management API, read-only): as 93 linhas existentes em
+`allowed_visit_dates` são todas de cobradores `collector` — nenhuma de
+carteira seria afetada. Dropdown de `AllowedVisitDatesManager` agora filtra
+só `type === "collector"` em vez de `isCollectorType` (os 4 perfis).
+`tsc -b`/lint limpos.
 
 ### Item 16 — cancelamento direto de contato agendado — concluído 2026-11-04
 
