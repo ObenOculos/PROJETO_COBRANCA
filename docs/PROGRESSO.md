@@ -21,6 +21,106 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 10 | ~~Etapa 3 — tipar `BANCO_DADOS` (FK `documento`/dinheiro `numeric`/datas `date`)~~ | Média | Grande, em 3 fases |
 | 11 | ~~Título de acordo ativo pagável por fora (Distribuir Pagamento/CollectionModal/upload)~~ | Alta | Pequeno/médio |
 | 12 | Atraso ciente de acordo ativo + Termo de Acordo automático (ver detalhe abaixo) | Alta | Grande, em etapas |
+| 13 | ~~Agendamento de contato pro cobrador de carteira (interno/terceirizado/jurídico)~~ | Alta | Grande, em etapas |
+| 14 | Guard de agendamento ativo ausente em `atribuir_clientes_em_lote`/`remover_cobrador_em_lote` | **Alta** | Pequeno |
+| 15 | Transferência de carteira em massa não filtra agendamento por canal | **Alta** | Pequeno/médio |
+| 16 | Cobrador de carteira não tem como cancelar um contato agendado (só concluir/reagendar) | Média/Alta | Médio |
+| 17 | Duas implementações de "desfecho libera cliente da carteira" (visitOutcomes vs. `if` no LogContactModal) | Média | Pequeno/médio |
+| 18 | `AllowedVisitDatesManager` aceita os 4 perfis mas só `VisitScheduler` (externo) lê o resultado | Média | Pequeno |
+| 19 | `monthly_goals.visits_goal` muda de significado por perfil sem isso aparecer no schema/UI do % | Média | Pequeno |
+| 20 | Helper `WALLET_COLLECTOR_TYPES.includes(...)` repetido em 6+ lugares em vez de `isWalletCollectorType()` único | Baixa | Pequeno |
+| 21 | Jurídico (`legal_collector`) é 100% idêntico a Interno/Terceirizado — zero modelagem de processo/protesto/prazo legal | A avaliar com o negócio | A analisar |
+
+### Item 21 — diagnóstico das modalidades de cobrança (externo/interno/terceirizado/jurídico) — 2026-11-04
+
+Pedido do usuário: avaliação crítica e honesta da lógica operacional das 4
+modalidades (redundância, inconsistência, diferenças que deveriam/não
+deveriam existir, complexidade desnecessária, lacunas, indicadores,
+arquitetura) — feita por leitura de código real (`ClientAssignment.tsx`,
+`BulkAssignmentModal.tsx`, `AllowedVisitDatesManager.tsx`, migrations de
+acordo/faixa de atraso), não por memória. Diagnóstico completo (com "como
+funciona hoje / problema / solução recomendada / prioridade" por item) fica
+no histórico da conversa — os achados acionáveis viraram os itens 14-21
+acima. Ordem sugerida de execução (confirmar com o usuário a cada um,
+etapas pequenas, testar antes de seguir — ver [[trabalho-em-etapas]]):
+1. Item 14 (guard de agendamento ativo) — correção de integridade, menor
+   risco, maior urgência.
+2. Item 15 (transferência não filtra canal) — bug ativo introduzido pela
+   Etapa 1 do item 13, mesma área de código.
+3. Item 20 (helper `isWalletCollectorType`) — limpeza pequena, zero risco,
+   bom aquecimento antes dos itens maiores.
+4. Item 17 (unificar liberação de carteira) — média complexidade.
+5. Item 16 (cancelamento de contato) — lacuna funcional real, precisa de
+   decisão de UX (fluxo com ou sem aprovação do gestor).
+6. Item 18 (`AllowedVisitDatesManager` restringir a externo) — pequeno,
+   mas confirmar que ninguém já configurou isso pra carteira em produção
+   antes de restringir.
+7. Item 19 (documentar dualidade de `visits_goal`) — comentário de coluna
+   + rótulo na UI de indicador, não só na de edição.
+8. Item 21 (Jurídico) — depende de decisão de negócio, não é só código;
+   perguntar como a cobrança jurídica funciona de verdade hoje fora do
+   sistema antes de desenhar qualquer coisa.
+
+### Item 13 — agendamento de contato pro cobrador de carteira — concluído 2026-11-04
+
+Pedido do usuário: cobrador interno/terceirizado/jurídico (ligação/WhatsApp)
+ganhar agendamento equivalente ao do cobrador externo (visita presencial),
+com os mesmos indicadores no painel do gestor, reagendamento, reincidência,
+SPC e meta — "não quero copiar, quero adaptar", depois confirmado "pode
+reaproveitar o que já existe". Decisão de arquitetura: generalizar
+`scheduled_visits` (campo `channel`) em vez de criar tabela paralela —
+reaproveita RPC de reagendamento, índice único e indicadores quase sem
+mudança de código. Decisões de negócio fechadas com o usuário: agendamento
+com data/hora futura; reagendar = remarcar tentativa; meta conta **contato
+efetivo**, não qualquer tentativa; cidade/bairro só agrupam a seleção (não
+estende `allowed_visit_dates`, que é sobre logística de rota física,
+inaplicável a telefone); agendamento em massa como página própria no menu,
+não um modo de seleção dentro da Carteira completa.
+
+9 etapas, todas commitadas, `tsc -b`/lint limpos em cada uma (plano salvo
+em `C:\Users\User\.claude\plans\rosy-brewing-pond.md`, não está no repo):
+1. **Migration**: coluna `channel` em `scheduled_visits` (default
+   `'presencial'`, sem impacto em fluxo existente) + RPC `reagendar_visita`
+   propagando o canal (commit `63242d9`). Aplicada em produção.
+2. **Config**: `rescheduleReasons.ts` ganha motivos por canal;
+   `collectionAttempts.ts` ganha `isEffectiveAttemptResult`/`isEffectiveLabel`
+   (commit `5e24c8b`). `visitOutcomes.ts` ficou intocado de propósito —
+   desfecho de ligação/WhatsApp reaproveita o vocabulário que já existia em
+   `ATTEMPT_RESULT_LABELS`/`LogContactModal`, sem duplicar catálogo.
+3-5. **Agendar/concluir/reagendar + fila priorizada** (commit `7046507`):
+   `ScheduleContactModal`/`RescheduleContactModal` novos; `LogContactModal`
+   fecha o agendamento vinculado via `updateVisitStatus` (já existente, sem
+   função nova); nova categoria "Agendados para hoje" (maior precedência) na
+   agenda priorizada do cobrador; opção "Contestou a Dívida (SPC)" libera o
+   cliente pra "Aguardando Jurídico" (mesma regra da visita, caminho
+   próprio — ver item 17 acima); widget de acompanhamento diário.
+6. **Meta por contato efetivo** (commit `20b816b`): `getMetricsByPeriod`
+   (`CollectorDashboard`) e `visitsPerformance`
+   (`EnhancedPerformanceChart`) passam a contar só contato efetivo pro
+   cobrador de carteira — a contagem "Realizada" exibida continua igual
+   (volume de trabalho) pros dois.
+7. **Painéis do gestor** (commit `ecf2523`): `VisitTracking` mostra
+   canal em vez de endereço quando não é presencial; `CollectorsSummary`
+   generaliza rótulos "visitas"→"agendamentos"/"contatos".
+8. **Agendamento em massa** (commit `644bd6f`): `ContactScheduler.tsx`
+   novo — filtro por nome/CPF/cidade, seleção múltipla, mesma
+   data/hora/canal pra todos, reaproveitando `scheduleVisit` em loop. Nova
+   entrada "Agendamentos" no menu (só pros 3 perfis de carteira). Gestor
+   acessa via botão "Agendar em massa" no Resumo por Cobrador
+   (`CollectorsSummary`), sem precisar logar como o cobrador. **Corrigido
+   de caminho**: botão "Nova Visita" do gestor em `VisitTracking` só
+   aparece pra cobrador externo agora (antes abriria o `VisitScheduler`
+   presencial por engano pra um cobrador de carteira).
+
+**Testado parcialmente ao vivo** (navegador, sessão já logada): login real
+de cobrador terceirizado de teste mostrou o widget diário, a categoria
+"Agendados para hoje", o badge do canal e os botões agendar/reagendar
+funcionando com dado real (cliente João Siriano Soares, 1 ligação ativa).
+Manager (`eobx@hotmail.com`) confirmado logando e abrindo o Resumo — não
+cheguei a testar o clique no botão "Agendar em massa" nem a submeter nada
+novo (interrompido pelo usuário pra pedir o diagnóstico abaixo). **Falta**:
+teste de submissão real (agendar/concluir/reagendar de verdade) e do botão
+do gestor — usuário vai terminar o teste manualmente.
 
 ### Item 12 — atraso ciente de acordo + Termo de Acordo automático — em andamento
 
