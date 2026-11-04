@@ -24,6 +24,7 @@ export const ATTEMPT_RESULT_LABELS: Record<CollectionAttempt["result"], string> 
   contact_made: "Contato realizado",
   message_sent: "Mensagem enviada",
   agreement: "Acordo realizado",
+  disputed: "Contestou a dívida (SPC)",
 };
 
 /**
@@ -35,7 +36,15 @@ export const ATTEMPT_RESULT_LABELS: Record<CollectionAttempt["result"], string> 
  * respondeu.
  */
 const EFFECTIVE_ATTEMPT_RESULTS: ReadonlySet<CollectionAttempt["result"]> =
-  new Set(["promise", "refusal", "partial_payment", "full_payment", "contact_made", "agreement"]);
+  new Set([
+    "promise",
+    "refusal",
+    "partial_payment",
+    "full_payment",
+    "contact_made",
+    "agreement",
+    "disputed",
+  ]);
 
 export const isEffectiveAttemptResult = (
   result: CollectionAttempt["result"],

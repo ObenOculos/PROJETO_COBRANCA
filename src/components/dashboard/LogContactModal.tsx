@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCollection } from "../../contexts/CollectionContext";
 import { todayLocalStr } from "../../config/visitStatus";
+import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
 import { hasInstallmentBalance } from "../../filters/clientStatus";
 import { ClientGroup, CollectionAttempt } from "../../types";
 
@@ -11,6 +12,12 @@ interface LogContactModalProps {
   client: ClientGroup;
   onClose: () => void;
   onSuccess: () => void;
+  /**
+   * Presente quando este contato veio de um agendamento ativo (ver
+   * ScheduleContactModal/InternalCollectorWallet) -- ao registrar, fecha
+   * esse agendamento como "realizada" em vez de deixa-lo em aberto.
+   */
+  linkedScheduledVisitId?: string;
 }
 
 // Motivo do contato -> tipo/resultado de collection_attempts. "Contato
@@ -28,15 +35,23 @@ const STATUS_TO_ATTEMPT: Record<
   telefone_errado: { type: "call", result: "not_found" },
   recusou_pagar: { type: "call", result: "refusal" },
   mensagem_enviada: { type: "whatsapp", result: "message_sent" },
+  contestou_divida: { type: "call", result: "disputed" },
 };
+
+// Situacao gravada ao liberar o cliente da carteira por contestacao (SPC) --
+// mesmo destino do desfecho "spc" da visita presencial (ver
+// config/visitOutcomes.VISIT_OUTCOMES), so que aqui o gatilho e o resultado
+// do contato (ligacao/whatsapp) em vez da observacao da visita.
+const SITUACAO_SPC = "Aguardando Jurídico";
 
 const LogContactModal: React.FC<LogContactModalProps> = ({
   client,
   onClose,
   onSuccess,
+  linkedScheduledVisitId,
 }) => {
   const { user } = useAuth();
-  const { refreshCollections } = useCollection();
+  const { refreshCollections, updateVisitStatus } = useCollection();
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("promessa_pagamento");
   const [notes, setNotes] = useState("");
@@ -101,6 +116,32 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
 
       if (insertError) throw insertError;
 
+      if (linkedScheduledVisitId) {
+        await updateVisitStatus(
+          linkedScheduledVisitId,
+          "realizada",
+          ATTEMPT_RESULT_LABELS[result],
+        );
+      }
+
+      // Contestacao da divida (SPC): mesma regra da visita presencial --
+      // cobranca por telefone/WhatsApp nao resolve mais o caso, sai da
+      // carteira e volta pra fila de Atribuicao marcado "Aguardando
+      // Jurídico" pro gestor redistribuir.
+      if (status === "contestou_divida") {
+        const { error: releaseError } = await supabase.rpc(
+          "liberar_cliente_da_carteira",
+          {
+            p_documento: client.document,
+            p_situacao: SITUACAO_SPC,
+            p_usuario_id: user.id,
+          },
+        );
+        if (releaseError) {
+          console.error("Erro ao liberar cliente da carteira (SPC):", releaseError);
+        }
+      }
+
       await refreshCollections();
       onSuccess();
     } catch (err) {
@@ -161,6 +202,9 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
               <option value="recusou_pagar">Recusou Pagar / Contestação</option>
               <option value="mensagem_enviada">
                 Mensagem Enviada (WhatsApp/SMS)
+              </option>
+              <option value="contestou_divida">
+                Contestou a Dívida (SPC)
               </option>
             </select>
           </div>

@@ -33,6 +33,8 @@ import {
   Eye,
   EyeOff,
   AlertTriangle,
+  CalendarClock,
+  CalendarPlus,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
@@ -43,7 +45,7 @@ import TabTransition from "../common/TabTransition";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
-import { FilterOptions, ClientGroup, User } from "../../types";
+import { FilterOptions, ClientGroup, User, ScheduledVisit } from "../../types";
 import { Notification } from "../../contexts/NotificationContext";
 import { resolveSaleKey } from "../../filters/sales";
 import {
@@ -59,6 +61,8 @@ import {
 import { SEM_CONTATO_DIAS } from "../../config/collectionAttempts";
 
 import LogContactModal from "./LogContactModal";
+import ScheduleContactModal from "./ScheduleContactModal";
+import RescheduleContactModal from "./RescheduleContactModal";
 import ClientDetailModal from "./ClientDetailModal";
 import AcordoModal from "./AcordoModal";
 import AcordoDetailModal from "./AcordoDetailModal";
@@ -71,7 +75,7 @@ const WhatsAppIcon: React.FC<{ className?: string }> = ({ className }) => (
     <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.48 1.32 5L2 22l5.25-1.38a9.88 9.88 0 0 0 4.79 1.22h.01c5.46 0 9.9-4.45 9.9-9.91C21.96 6.47 17.5 2 12.04 2zm5.84 14.19c-.25.7-1.45 1.33-2 1.42-.52.08-1.17.11-1.89-.12-.44-.14-1-.32-1.72-.63-3.03-1.31-5-4.37-5.15-4.57-.15-.2-1.23-1.63-1.23-3.11 0-1.48.78-2.21 1.06-2.51.27-.3.6-.37.8-.37.2 0 .4 0 .57.01.18.01.43-.07.67.51.25.6.86 2.08.93 2.23.08.15.13.33.03.53-.1.2-.15.33-.3.5-.15.18-.31.4-.45.54-.15.15-.3.31-.13.6.17.3.76 1.25 1.63 2.02 1.12 1 2.06 1.31 2.36 1.46.3.15.47.13.65-.08.18-.2.76-.88.96-1.18.2-.3.4-.25.68-.15.28.1 1.77.84 2.07.99.3.15.5.22.57.35.08.13.08.73-.17 1.43z" />
   </svg>
 );
-import { todayLocalStr } from "../../config/visitStatus";
+import { todayLocalStr, isVisitOverdue } from "../../config/visitStatus";
 
 const toDate = (dateInput: string | Date | null | undefined): Date | null => {
   if (!dateInput) return null;
@@ -107,6 +111,7 @@ const chunk = <T,>(arr: T[], size: number): T[][] => {
 // ("vou perder este cliente da carteira?") das outras 7, que respondem "o
 // que eu faco agora?" — um cliente pode aparecer ali E em outra categoria.
 type AgendaSubTab =
+  | "agendados"
   | "promessas"
   | "quebrado"
   | "urgente"
@@ -243,6 +248,8 @@ interface InternalCollectorWalletProps {
   onOpenLog: (client: any) => void;
   onOpenDetail: (client: any) => void;
   onOpenAcordo: (client: ClientGroup) => void;
+  onScheduleContact: (client: ClientGroup) => void;
+  onRescheduleContact: (visit: ScheduledVisit) => void;
 }
 
 const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
@@ -253,6 +260,8 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   onOpenLog,
   onOpenDetail,
   onOpenAcordo,
+  onScheduleContact,
+  onRescheduleContact,
 }) => {
   const {
     getAcordoAtivoDoCliente,
@@ -262,7 +271,27 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     collectorOverdueRanges,
     acordoAtivoOverdueMap,
     acordos,
+    scheduledVisits,
   } = useCollection();
+
+  // Contato (ligacao/whatsapp) agendado em aberto, por cliente -- equivalente
+  // ao agendamento do cobrador externo, mas so os canais de carteira (visita
+  // presencial e do VisitScheduler, nao aparece aqui). No maximo 1 por
+  // cliente (uniq_active_visit_per_client ja garante isso no banco).
+  const scheduledContactByDocument = useMemo(() => {
+    const map = new Map<string, ScheduledVisit>();
+    scheduledVisits.forEach((v) => {
+      if (
+        v.collectorId === user?.id &&
+        v.channel &&
+        v.channel !== "presencial" &&
+        v.status === "agendada"
+      ) {
+        map.set(v.clientDocument, v);
+      }
+    });
+    return map;
+  }, [scheduledVisits, user?.id]);
   const [walletTab, setWalletTab] = useState<"agenda" | "carteira">("agenda");
   const [agendaSubTab, setAgendaSubTab] = useState<AgendaSubTab>("promessas");
   // Modo foco: oculta os cards de desempenho (Recuperação do Mês, Total de
@@ -562,7 +591,35 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // vem depois; silêncio e "tudo em dia" por último.
   const today = todayLocalStr();
   const todayDate = new Date(today + "T00:00:00");
+
+  // Acompanhamento diario dos contatos agendados (ligacao/whatsapp) deste
+  // cobrador -- mesma proposta do Acompanhamento de Visitas do externo, só
+  // que aqui é a visão do próprio cobrador sobre o dia, não a do gestor
+  // (essa fica em VisitTracking.tsx).
+  const dailyContactStats = useMemo(() => {
+    const mine = scheduledVisits.filter(
+      (v) =>
+        v.collectorId === user?.id && v.channel && v.channel !== "presencial",
+    );
+    return {
+      agendadosHoje: mine.filter(
+        (v) => v.status === "agendada" && v.scheduledDate === today,
+      ).length,
+      atrasados: mine.filter((v) => isVisitOverdue(v, today)).length,
+      concluidosHoje: mine.filter(
+        (v) => v.status === "realizada" && v.dataVisitaRealizada === today,
+      ).length,
+      reagendadosHoje: mine.filter(
+        (v) =>
+          v.status === "reagendada" &&
+          v.updatedAt &&
+          todayLocalStr(new Date(v.updatedAt)) === today,
+      ).length,
+    };
+  }, [scheduledVisits, user?.id, today]);
+
   const {
+    agendados,
     promessas,
     acordosQuebrados,
     criticos,
@@ -572,6 +629,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     emTratamento,
   } = useMemo(() => {
     const claimed = new Set<string>();
+    const agendados: ClientGroup[] = [];
     const promessas: ClientGroup[] = [];
     const acordosQuebrados: ClientGroup[] = [];
     const criticos: ClientGroup[] = [];
@@ -585,7 +643,15 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       claimed.add(group.document);
     };
 
+    // Maior precedencia: o cobrador se comprometeu com uma data/hora pra
+    // este contato (ScheduleContactModal), diferente de promessa (compromisso
+    // do CLIENTE) -- so entra aqui quando chegou o dia ou passou.
     sortedWalletFilteredGroups.forEach((group) => {
+      const contato = scheduledContactByDocument.get(group.document);
+      if (contato && contato.scheduledDate <= today) claim(agendados, group);
+    });
+    sortedWalletFilteredGroups.forEach((group) => {
+      if (claimed.has(group.document)) return;
       const nextActionDate = lastContacts[group.document]?.nextActionDate;
       if (nextActionDate && nextActionDate <= today) claim(promessas, group);
     });
@@ -617,6 +683,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     });
 
     return {
+      agendados,
       promessas,
       acordosQuebrados,
       criticos,
@@ -628,6 +695,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     sortedWalletFilteredGroups,
+    scheduledContactByDocument,
     lastContacts,
     getAcordoQuebradoDoCliente,
     acordoAtivoOverdueMap,
@@ -650,6 +718,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     // so remaneja de aba/subaba quando o cobrador esta na Agenda.
     if (walletTab !== "agenda") return;
     const categoriasExclusivas: { key: AgendaSubTab; groups: ClientGroup[] }[] = [
+      { key: "agendados", groups: agendados },
       { key: "promessas", groups: promessas },
       { key: "quebrado", groups: acordosQuebrados },
       { key: "critico", groups: criticos },
@@ -669,6 +738,15 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
   const agendaCategorias: AgendaCategoriaConfig[] = useMemo(
     () => [
+      {
+        key: "agendados",
+        label: "Agendados para hoje",
+        icon: <CalendarClock className="w-4 h-4" />,
+        activeClass: "bg-purple-600 text-white",
+        accentBorderClass: "border-l-purple-400 dark:border-l-purple-600",
+        groups: agendados,
+        emptyMessage: "Nenhum contato agendado para hoje ou atrasado.",
+      },
       {
         key: "promessas",
         label: "Promessas vencendo",
@@ -746,6 +824,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       },
     ],
     [
+      agendados,
       promessas,
       acordosQuebrados,
       urgentes,
@@ -981,6 +1060,53 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       </div>
       )}
 
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-3 flex items-center gap-2">
+          <CalendarClock className="w-4 h-4 text-purple-600 shrink-0" />
+          <div>
+            <p className="text-[11px] text-gray-500 leading-tight">
+              Agendados hoje
+            </p>
+            <p className="text-lg font-bold text-gray-900 dark:text-dark-text leading-tight">
+              {dailyContactStats.agendadosHoje}
+            </p>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-3 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+          <div>
+            <p className="text-[11px] text-gray-500 leading-tight">
+              Atrasados
+            </p>
+            <p className="text-lg font-bold text-red-600 leading-tight">
+              {dailyContactStats.atrasados}
+            </p>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-3 flex items-center gap-2">
+          <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+          <div>
+            <p className="text-[11px] text-gray-500 leading-tight">
+              Concluídos hoje
+            </p>
+            <p className="text-lg font-bold text-gray-900 dark:text-dark-text leading-tight">
+              {dailyContactStats.concluidosHoje}
+            </p>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-3 flex items-center gap-2">
+          <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+          <div>
+            <p className="text-[11px] text-gray-500 leading-tight">
+              Reagendados hoje
+            </p>
+            <p className="text-lg font-bold text-gray-900 dark:text-dark-text leading-tight">
+              {dailyContactStats.reagendadosHoje}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <FilterBar
         filters={walletFilters}
         onFilterChange={setWalletFilters}
@@ -1063,6 +1189,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             sortDir={sortDir}
             onSort={toggleSort}
             urgenteInfoByDocument={urgenteInfoByDocument}
+            scheduledContactByDocument={scheduledContactByDocument}
+            onScheduleContact={onScheduleContact}
+            onRescheduleContact={onRescheduleContact}
           />
         </>
       ) : (
@@ -1095,6 +1224,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                       onOpenLog={onOpenLog}
                       onOpenAcordo={onOpenAcordo}
                       urgenteInfo={urgenteInfoByDocument.get(group.document)}
+                      scheduledContact={scheduledContactByDocument.get(group.document)}
+                      onScheduleContact={onScheduleContact}
+                      onRescheduleContact={onRescheduleContact}
                     />
                   ))
                 ) : (
@@ -1189,6 +1321,10 @@ interface ClientQueueRowProps {
    * Mostrado em qualquer aba, nao so "Clientes urgentes" -- e informacao
    * util onde quer que o cobrador veja esse cliente. */
   urgenteInfo?: { diasRestantes: number; semAcao: boolean };
+  /** Contato (ligacao/whatsapp) agendado em aberto deste cliente, se houver. */
+  scheduledContact?: ScheduledVisit;
+  onScheduleContact: (client: ClientGroup) => void;
+  onRescheduleContact: (visit: ScheduledVisit) => void;
 }
 
 // Linha da agenda/fila de atendimento, reusada em cada secao priorizada
@@ -1206,6 +1342,9 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   onOpenLog,
   onOpenAcordo,
   urgenteInfo,
+  scheduledContact,
+  onScheduleContact,
+  onRescheduleContact,
 }) => {
   const { acordoAtivoOverdueMap } = useCollection();
   const maxAtraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
@@ -1292,6 +1431,25 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               {urgenteInfo.semAcao ? "Sem nenhuma ação — " : ""}
               Faltam {urgenteInfo.diasRestantes}{" "}
               {urgenteInfo.diasRestantes === 1 ? "dia" : "dias"} na carteira
+            </span>
+          )}
+          {scheduledContact && (
+            <span
+              className={`w-fit inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                isVisitOverdue(scheduledContact)
+                  ? "bg-red-50 text-red-600 border-red-200"
+                  : "bg-purple-50 text-purple-600 border-purple-100"
+              }`}
+            >
+              <CalendarClock className="w-3 h-3" />
+              {scheduledContact.channel === "whatsapp" ? "WhatsApp" : "Ligação"}
+              {": "}
+              {new Date(
+                scheduledContact.scheduledDate + "T00:00:00",
+              ).toLocaleDateString("pt-BR")}
+              {scheduledContact.scheduledTime
+                ? ` ${scheduledContact.scheduledTime}`
+                : ""}
             </span>
           )}
         </div>
@@ -1383,6 +1541,21 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           >
             <Handshake className="w-4 h-4" />
           </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (scheduledContact) onRescheduleContact(scheduledContact);
+              else onScheduleContact(group);
+            }}
+            className="p-2 bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white rounded-xl transition-all border border-purple-100"
+            title={scheduledContact ? "Reagendar contato" : "Agendar contato"}
+          >
+            {scheduledContact ? (
+              <CalendarClock className="w-4 h-4" />
+            ) : (
+              <CalendarPlus className="w-4 h-4" />
+            )}
+          </button>
         </div>
       </td>
     </tr>
@@ -1462,6 +1635,9 @@ interface AgendaSectionProps {
   sortDir: "asc" | "desc";
   onSort: (key: WalletSortKey) => void;
   urgenteInfoByDocument: Map<string, { diasRestantes: number; semAcao: boolean }>;
+  scheduledContactByDocument: Map<string, ScheduledVisit>;
+  onScheduleContact: (client: ClientGroup) => void;
+  onRescheduleContact: (visit: ScheduledVisit) => void;
 }
 
 // Conteudo da categoria ativa da agenda priorizada: borda colorida conforme
@@ -1485,6 +1661,9 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   sortDir,
   onSort,
   urgenteInfoByDocument,
+  scheduledContactByDocument,
+  onScheduleContact,
+  onRescheduleContact,
 }) => {
   const [page, setPage] = useState(1);
   useEffect(() => {
@@ -1528,6 +1707,9 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
                 onOpenLog={onOpenLog}
                 onOpenAcordo={onOpenAcordo}
                 urgenteInfo={urgenteInfoByDocument.get(group.document)}
+                scheduledContact={scheduledContactByDocument.get(group.document)}
+                onScheduleContact={onScheduleContact}
+                onRescheduleContact={onRescheduleContact}
               />
             ))}
           </tbody>
@@ -1633,6 +1815,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     salePayments,
     monthlyGoals,
     getAcordoAtivoDoCliente,
+    scheduledVisits,
   } = useCollection();
   const collectionTableRef = useRef<CollectionTableRef>(null);
 
@@ -1648,6 +1831,25 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   const [selectedAcordoId, setSelectedAcordoId] = useState<string | null>(
     null,
   );
+  // Agendamento de contato (ligacao/whatsapp) do cobrador de carteira --
+  // equivalente ao agendamento de visita do externo, ver ScheduleContactModal.
+  const [scheduleContactClient, setScheduleContactClient] =
+    useState<ClientGroup | null>(null);
+  const [rescheduleContactVisit, setRescheduleContactVisit] =
+    useState<ScheduledVisit | null>(null);
+  // Contato agendado ATIVO do cliente aberto no LogContactModal, se houver --
+  // ao registrar o resultado, fecha esse agendamento como "realizada" em vez
+  // de deixa-lo em aberto (ver LogContactModal.linkedScheduledVisitId).
+  const linkedScheduledVisitId = selectedClientForLog
+    ? scheduledVisits.find(
+        (v) =>
+          v.clientDocument === selectedClientForLog.document &&
+          v.collectorId === user?.id &&
+          v.channel &&
+          v.channel !== "presencial" &&
+          v.status === "agendada",
+      )?.id
+    : undefined;
 
   // Usa a aba externa se fornecida, senão gerencia internamente
   const internalActiveTab: "overview" | "collections" | "route" | "visits" =
@@ -2395,6 +2597,8 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             setIsAcordoModalOpen(true);
           }
         }}
+        onScheduleContact={setScheduleContactClient}
+        onRescheduleContact={setRescheduleContactVisit}
       />
     );
 
@@ -2852,6 +3056,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       {isLogModalOpen && selectedClientForLog && (
         <LogContactModal
           client={selectedClientForLog}
+          linkedScheduledVisitId={linkedScheduledVisitId}
           onClose={() => {
             setIsLogModalOpen(false);
             setSelectedClientForLog(null);
@@ -2861,6 +3066,22 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             setSelectedClientForLog(null);
             // Opcional: recarregar dados ou mostrar notificação
           }}
+        />
+      )}
+
+      {scheduleContactClient && (
+        <ScheduleContactModal
+          client={scheduleContactClient}
+          onClose={() => setScheduleContactClient(null)}
+          onSuccess={() => setScheduleContactClient(null)}
+        />
+      )}
+
+      {rescheduleContactVisit && (
+        <RescheduleContactModal
+          visit={rescheduleContactVisit}
+          onClose={() => setRescheduleContactVisit(null)}
+          onSuccess={() => setRescheduleContactVisit(null)}
         />
       )}
 

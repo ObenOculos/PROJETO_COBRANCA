@@ -239,7 +239,8 @@ export interface CollectionAttempt {
     | "full_payment"
     | "contact_made"
     | "message_sent"
-    | "agreement";
+    | "agreement"
+    | "disputed";
   notes?: string;
   nextAction?: string;
   nextActionDate?: string;
