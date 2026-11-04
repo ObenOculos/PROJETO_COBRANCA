@@ -23,7 +23,7 @@ import {
   ReincidenteCliente,
   todayLocalStr,
 } from "../../config/visitStatus";
-import { isEffectiveLabel } from "../../config/collectionAttempts";
+import { countsTowardVisitsGoal } from "../../config/collectionAttempts";
 import { isWalletCollectorType } from "../../config/profiles";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
@@ -979,7 +979,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       // (conseguiu falar com o cliente) -- usado SO na meta (visitsPerformance)
       // do cobrador de carteira (interno/terceirizado/jurídico), que é mais
       // rigorosa que "realizada" sozinho (ligação/WhatsApp feita, qualquer
-      // desfecho). Ver isEffectiveLabel e o adendo do plano desta feature.
+      // desfecho). Ver countsTowardVisitsGoal (config/collectionAttempts).
       let visitsRealizadasEfetivas = 0;
       let visitsNaoEncontrado = 0;
       let visitsAgendadas = 0;
@@ -1009,7 +1009,7 @@ const EnhancedPerformanceChart: React.FC = () => {
 
         if (v.status === "realizada") {
           visitsRealizadas++;
-          if (isEffectiveLabel(v.notes)) visitsRealizadasEfetivas++;
+          if (countsTowardVisitsGoal(v, true)) visitsRealizadasEfetivas++;
         }
         if (v.status === "nao_encontrado") visitsNaoEncontrado++;
         if (v.status === "cancelada") visitsCanceladas++;
@@ -1347,7 +1347,10 @@ const EnhancedPerformanceChart: React.FC = () => {
               <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl shrink-0">
                 <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               </div>
-              <span className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary block truncate">
+              <span
+                className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary block truncate"
+                title="Soma de todos os cobradores selecionados. Para carteira (interno/terceirizado/jurídico) conta contato efetivo (ligação/WhatsApp), não visita presencial."
+              >
                 Visitas
               </span>
             </div>

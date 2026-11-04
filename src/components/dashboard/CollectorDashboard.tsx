@@ -59,7 +59,10 @@ import {
   PRIORITY_COLOR_CLASSES,
   URGENTE_SAIDA_CARTEIRA_DIAS,
 } from "../../filters/priority";
-import { SEM_CONTATO_DIAS, isEffectiveLabel } from "../../config/collectionAttempts";
+import {
+  SEM_CONTATO_DIAS,
+  countsTowardVisitsGoal,
+} from "../../config/collectionAttempts";
 
 import LogContactModal from "./LogContactModal";
 import ScheduleContactModal from "./ScheduleContactModal";
@@ -2037,12 +2040,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     // Meta do cobrador de carteira (interno/terceirizado/jurídico) conta
     // CONTATO EFETIVO (conseguiu falar com o cliente), não toda tentativa --
     // diferente do externo, onde "realizada" já é a visita feita, qualquer
-    // desfecho. Ver isEffectiveLabel (config/collectionAttempts) e o adendo
-    // do plano salvo desta feature.
+    // desfecho. Ver countsTowardVisitsGoal (config/collectionAttempts).
     const isWalletCollectorGoal = isWalletCollectorType(user?.type);
     const countsAsRealizada = (v: ScheduledVisit) =>
-      v.status === "realizada" &&
-      (!isWalletCollectorGoal || isEffectiveLabel(v.notes));
+      countsTowardVisitsGoal(v, isWalletCollectorGoal);
 
     const todayVisits = visits.filter((v) => {
       if (!countsAsRealizada(v)) return false;

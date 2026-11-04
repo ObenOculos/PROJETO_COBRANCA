@@ -27,7 +27,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 16 | ~~Cobrador de carteira não tem como cancelar um contato agendado (só concluir/reagendar)~~ | Média/Alta | Médio |
 | 17 | ~~Duas implementações de "desfecho libera cliente da carteira" (visitOutcomes vs. `if` no LogContactModal)~~ | Média | Pequeno/médio |
 | 18 | ~~`AllowedVisitDatesManager` aceita os 4 perfis mas só `VisitScheduler` (externo) lê o resultado~~ | Média | Pequeno |
-| 19 | `monthly_goals.visits_goal` muda de significado por perfil sem isso aparecer no schema/UI do % | Média | Pequeno |
+| 19 | ~~`monthly_goals.visits_goal` muda de significado por perfil sem isso aparecer no schema/UI do %~~ | Média | Pequeno |
 | 20 | ~~Helper `WALLET_COLLECTOR_TYPES.includes(...)` repetido em 6+ lugares em vez de `isWalletCollectorType()` único~~ | Baixa | Pequeno |
 | 21 | Jurídico (`legal_collector`) é 100% idêntico a Interno/Terceirizado — zero modelagem de processo/protesto/prazo legal | A avaliar com o negócio | A analisar |
 
@@ -53,11 +53,42 @@ etapas pequenas, testar antes de seguir — ver [[trabalho-em-etapas]]):
 5. ~~Item 16 (cancelamento de contato)~~ — concluído, ver detalhe abaixo.
 6. ~~Item 18 (`AllowedVisitDatesManager` restringir a externo)~~ — concluído,
    ver detalhe abaixo.
-7. Item 19 (documentar dualidade de `visits_goal`) — próximo. Comentário de coluna
-   + rótulo na UI de indicador, não só na de edição.
-8. Item 21 (Jurídico) — depende de decisão de negócio, não é só código;
+7. ~~Item 19 (documentar dualidade de `visits_goal`)~~ — concluído, ver
+   detalhe abaixo.
+8. Item 21 (Jurídico) — próximo e último. Depende de decisão de negócio, não é só código;
    perguntar como a cobrança jurídica funciona de verdade hoje fora do
    sistema antes de desenhar qualquer coisa.
+
+### Item 19 — documenta dualidade de `visits_goal` + corrige divergência no cálculo — concluído 2026-11-04
+
+Pedido original: `monthly_goals.visits_goal` muda de significado por
+perfil (visita presencial pro Externo, contato EFETIVO pra carteira) sem
+isso aparecer no schema nem na UI de indicador — só no modal de edição da
+meta. **Escopo expandido com confirmação do usuário**: ao investigar,
+achei que `CollectorPerformanceModal.tsx` (histórico mensal por cobrador)
+calculava `visitsInMonth` contando qualquer `status === "realizada"`,
+SEM aplicar o filtro de contato efetivo que `CollectorDashboard.tsx` e
+`EnhancedPerformanceChart.tsx` já aplicavam — inflava o % de carteira
+nesse modal especificamente (3º lugar calculando a mesma regra, divergente
+dos outros 2).
+
+Corrigido na raiz: `countsTowardVisitsGoal(visit, isWalletCollector)` nova
+em `config/collectionAttempts.ts`, fonte única da decisão "essa
+visita/contato bate meta?". `CollectorDashboard`/`EnhancedPerformanceChart`
+passaram a chamá-la em vez de reimplementar a mesma condição inline;
+`CollectorPerformanceModal` ganhou a chamada que faltava — hoje os 3
+lugares usam a mesma função.
+
+Documentação: `COMMENT ON COLUMN monthly_goals.visits_goal` (migration
+`20261104000006`, **não aplicada em produção ainda**) explicando a
+dualidade e apontando pra `countsTowardVisitsGoal` como fonte única.
+Rótulo na UI: `CollectorPerformanceModal` mostra "Contatos" em vez de
+"Visitas" pra cobrador de carteira (mesmo padrão já usado em
+`CollectorsSummary.tsx`); o card agregado de equipe em
+`EnhancedPerformanceChart` ganhou tooltip explicando que soma visita
+presencial + contato efetivo quando a seleção mistura perfis. `tsc -b`/lint
+sem regressão nos 4 arquivos tocados (ajustei a dependência de um
+`useMemo` que o eslint sinalizou).
 
 ### Item 18 — restringe `AllowedVisitDatesManager` a Externo — concluído 2026-11-04
 

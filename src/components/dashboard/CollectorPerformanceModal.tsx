@@ -23,6 +23,8 @@ import {
   REMARCACOES_REINCIDENTE,
   ReincidenteCliente,
 } from "../../config/visitStatus";
+import { countsTowardVisitsGoal } from "../../config/collectionAttempts";
+import { isWalletCollectorType } from "../../config/profiles";
 import Pagination from "../common/Pagination";
 
 interface CollectorPerformanceModalProps {
@@ -62,6 +64,13 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
 }) => {
   const { monthlyGoals, salePayments, scheduledVisits, collections } =
     useCollection();
+
+  // Carteira (interno/terceirizado/jurídico) cumpre CONTATO, não visita --
+  // rótulo "Visitas" seria enganoso nessa tela, que mostra o % direto pro
+  // gestor (item 19, docs/PROGRESSO.md: antes só o modal de edição da meta
+  // deixava essa dualidade clara).
+  const isWalletGoal = isWalletCollectorType(collector?.collectorType);
+  const visitsLabel = isWalletGoal ? "Contatos" : "Visitas";
 
   const [activeTab, setActiveTab] = useState<
     "summary" | "history" | "pending" | "carteira"
@@ -256,7 +265,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
         );
         return (
           v.collectorId === collector.collectorId &&
-          v.status === "realizada" &&
+          countsTowardVisitsGoal(v, isWalletGoal) &&
           visitDate.getUTCMonth() === goalMonth &&
           visitDate.getUTCFullYear() === goalYear
         );
@@ -303,7 +312,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
         overallPerformance: (visitsPerformance + paymentsPerformance) / 2,
       };
     });
-  }, [collector, monthlyGoals, salePayments, scheduledVisits, sortOrder]);
+  }, [collector, isWalletGoal, monthlyGoals, salePayments, scheduledVisits, sortOrder]);
 
   const availableYears = useMemo(() => {
     const years = new Set(performanceHistory.map((h) => h.year));
@@ -592,7 +601,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
                         <p className="text-[10px] font-bold text-gray-400 mb-1">
-                          Visitas
+                          {visitsLabel}
                         </p>
                         <p className="text-lg font-bold text-blue-600">
                           {summaryStats.avgVisitsPerformance.toFixed(1)}%
@@ -806,7 +815,9 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                           <div className="space-y-4">
                             <div>
                               <div className="flex justify-between text-[10px] font-bold tracking-wide mb-1.5">
-                                <span className="text-gray-400">Visitas</span>
+                                <span className="text-gray-400">
+                                  {visitsLabel}
+                                </span>
                                 <span className="text-gray-800 dark:text-dark-text">
                                   {history.visitsActual} / {history.visitsGoal}
                                 </span>
@@ -852,7 +863,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                     <div className="grid grid-cols-2 gap-8">
                       <div className="space-y-3">
                         <label className="block text-[10px] font-bold text-gray-400 mb-4 text-center">
-                          Visitas (%)
+                          {visitsLabel} (%)
                         </label>
                         {filteredHistory
                           .slice(

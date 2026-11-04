@@ -1,6 +1,6 @@
 // Fonte unica de verdade pra regras sobre collection_attempts (tentativas
 // de contato/cobranca registradas por CollectionModal e LogContactModal).
-import { CollectionAttempt } from "../types";
+import { CollectionAttempt, ScheduledVisit } from "../types";
 
 /** Dias sem nenhum contato registrado pra um cliente entrar na secao "Sem
  * contato" da agenda priorizada da carteira (CollectorDashboard.tsx). */
@@ -65,3 +65,22 @@ export const isEffectiveLabel = (notes?: string | null): boolean => {
   ).find(([, label]) => label === text)?.[0];
   return result ? isEffectiveAttemptResult(result) : false;
 };
+
+/**
+ * Decide se uma visita/contato CONTA pra meta de atendimento
+ * (`monthly_goals.visits_goal`) -- "realizada" sempre vale pro cobrador
+ * Externo (foi ao local, qualquer desfecho), mas pra carteira
+ * (WALLET_COLLECTOR_TYPES) so conta quando foi CONTATO EFETIVO
+ * (`isEffectiveLabel`). Fonte unica: antes de 2026-11-04,
+ * CollectorPerformanceModal reimplementava so a metade "realizada" dessa
+ * regra, sem o filtro de efetivo -- inflava o % de carteira no historico
+ * mensal por cobrador (item 19, docs/PROGRESSO.md). Qualquer tela que
+ * precise decidir "essa visita bate meta?" deve chamar esta funcao, nunca
+ * comparar `status === "realizada"` sozinho.
+ */
+export const countsTowardVisitsGoal = (
+  visit: Pick<ScheduledVisit, "status" | "notes">,
+  isWalletCollector: boolean,
+): boolean =>
+  visit.status === "realizada" &&
+  (!isWalletCollector || isEffectiveLabel(visit.notes));
