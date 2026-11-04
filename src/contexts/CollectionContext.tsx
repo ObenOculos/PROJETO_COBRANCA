@@ -537,6 +537,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             rescheduledFromId: visit.rescheduled_from_id,
             rescheduledToId: visit.rescheduled_to_id,
             rescheduleReason: visit.reschedule_reason ?? undefined,
+            channel: visit.channel as ScheduledVisit["channel"],
           }),
         );
 
@@ -3919,6 +3920,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             overdue_count: visitData.overdueCount,
             scheduled_by_manager_id: visitData.scheduled_by_manager_id,
             reschedule_count: 0, // Initialize rescheduleCount to 0
+            ...(visitData.channel ? { channel: visitData.channel } : {}),
           },
         ])
         .select()
@@ -3955,6 +3957,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         cancellationRejectionReason: data.cancellation_rejection_reason,
         rescheduleCount: data.reschedule_count, // Include rescheduleCount
         rescheduledTo: data.rescheduled_to,
+        channel: data.channel as ScheduledVisit["channel"],
         // Fronteira DB->dominio: colunas nullable mapeadas para campos opcionais
       } as ScheduledVisit;
 
@@ -4741,6 +4744,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           clientCity: newVisit.client_city,
           totalPendingValue: newVisit.total_pending_value,
           overdueCount: newVisit.overdue_count,
+          channel: newVisit.channel as ScheduledVisit["channel"],
         } as ScheduledVisit);
         console.log("Estado local atualizado. Visitas:", updated.length);
         return updated;

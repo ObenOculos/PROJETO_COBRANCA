@@ -154,7 +154,15 @@ export interface ScheduledVisit {
   rescheduledToId?: string; // ID da nova visita gerada ao reagendar esta
   /** Motivo pelo qual ESTA visita foi empurrada (src/config/rescheduleReasons). */
   rescheduleReason?: string;
+  /**
+   * Canal do agendamento. Ausente na criação = "presencial" (default no
+   * banco) — só o cobrador externo cria sem informar. Cobrador de carteira
+   * (interno/terceirizado/jurídico) informa "ligacao"/"whatsapp".
+   */
+  channel?: "presencial" | "ligacao" | "whatsapp";
 }
+
+export type ScheduledVisitChannel = NonNullable<ScheduledVisit["channel"]>;
 
 export interface AllowedVisitDate {
   allowed_date: number; // Day of month (1-31)

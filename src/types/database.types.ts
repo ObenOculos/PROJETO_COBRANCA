@@ -1144,6 +1144,7 @@ export type Database = {
           cancellation_rejection_reason: string | null;
           cancellation_request_date: string | null;
           cancellation_request_reason: string | null;
+          channel: string;
           client_address: string | null;
           client_city: string | null;
           client_document: string;
@@ -1169,6 +1170,7 @@ export type Database = {
           updated_at: string | null;
         };
         Insert: {
+          channel?: string;
           cancellation_approved_at?: string | null;
           cancellation_approved_by?: string | null;
           cancellation_rejected_at?: string | null;
@@ -1201,6 +1203,7 @@ export type Database = {
           updated_at?: string | null;
         };
         Update: {
+          channel?: string;
           cancellation_approved_at?: string | null;
           cancellation_approved_by?: string | null;
           cancellation_rejected_at?: string | null;
@@ -1739,6 +1742,7 @@ export type Database = {
           cancellation_rejection_reason: string | null;
           cancellation_request_date: string | null;
           cancellation_request_reason: string | null;
+          channel: string;
           client_address: string | null;
           client_city: string | null;
           client_document: string;
