@@ -1499,7 +1499,14 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 sm:gap-4">
-                        {user?.type === "manager" && (
+                        {/* So pra cobrador externo (visita presencial) -- o
+                        de carteira (interno/terceirizado/jurídico) agenda
+                        contato pelo "Agendar em massa" do Resumo por
+                        Cobrador (ContactScheduler), não por aqui: abrir o
+                        VisitScheduler pra eles criaria um agendamento
+                        channel="presencial" por engano. */}
+                        {user?.type === "manager" &&
+                          collectorTypeById[collectorId] === "collector" && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();

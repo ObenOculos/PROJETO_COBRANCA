@@ -11,6 +11,7 @@ import {
   User,
   CloudUpload,
   FileSignature,
+  PhoneCall,
   LucideIcon,
 } from "lucide-react";
 
@@ -59,6 +60,14 @@ export const navigationItems: NavItemConfig[] = [
     managerIcon: Calendar,
     collectorIcon: Calendar,
     roles: ["collector"],
+  },
+  {
+    id: "contact-schedule",
+    managerName: "Agendamentos",
+    collectorName: "Agendamentos",
+    managerIcon: PhoneCall,
+    collectorIcon: PhoneCall,
+    roles: ["internal_collector", "third_party_collector", "legal_collector"],
   },
   {
     id: "performance",

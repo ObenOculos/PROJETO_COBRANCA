@@ -34,6 +34,7 @@ import {
 import { hasInstallmentBalance } from "../../filters/clientStatus";
 import { toYYYYMMDD } from "../../filters/dates";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
+import ContactScheduler from "./ContactScheduler";
 
 interface CollectorRow {
   id: string;
@@ -283,6 +284,10 @@ const CollectorsSummary: React.FC = () => {
   const [expandedReincidente, setExpandedReincidente] = useState<
     string | null
   >(null);
+  // Agendamento em massa de contato (ligação/WhatsApp) pro gestor, sem
+  // precisar logar como o cobrador -- ver ContactScheduler.
+  const [scheduleContactCollectorId, setScheduleContactCollectorId] =
+    useState<string | null>(null);
   // Tabela e melhor pra comparar/rankear muitos cobradores (a lista ja vem
   // ordenada por vencidaValor); Cards fica melhor pra olhar 1-2 em detalhe —
   // por isso o padrao (sem preferencia salva) e Tabela.
@@ -1243,6 +1248,18 @@ const CollectorsSummary: React.FC = () => {
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
                       {USER_TYPE_LABELS[row.type]}
                     </div>
+                    {WALLET_COLLECTOR_TYPES.includes(
+                      row.type as (typeof WALLET_COLLECTOR_TYPES)[number],
+                    ) && (
+                      <button
+                        type="button"
+                        onClick={() => setScheduleContactCollectorId(row.id)}
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700"
+                      >
+                        <CalendarClock className="h-3 w-3" />
+                        Agendar em massa
+                      </button>
+                    )}
                   </div>
                 </div>
                 {row.vencidaValor > 0 && (
@@ -1529,6 +1546,18 @@ const CollectorsSummary: React.FC = () => {
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
                       {USER_TYPE_LABELS[row.type]}
                     </div>
+                    {WALLET_COLLECTOR_TYPES.includes(
+                      row.type as (typeof WALLET_COLLECTOR_TYPES)[number],
+                    ) && (
+                      <button
+                        type="button"
+                        onClick={() => setScheduleContactCollectorId(row.id)}
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700"
+                      >
+                        <CalendarClock className="h-3 w-3" />
+                        Agendar em massa
+                      </button>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
                     <div className="font-semibold">
@@ -1633,6 +1662,20 @@ const CollectorsSummary: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {scheduleContactCollectorId && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={() => setScheduleContactCollectorId(null)}
+        >
+          <div onClick={(e) => e.stopPropagation()}>
+            <ContactScheduler
+              collectorId={scheduleContactCollectorId}
+              onClose={() => setScheduleContactCollectorId(null)}
+            />
+          </div>
         </div>
       )}
     </div>

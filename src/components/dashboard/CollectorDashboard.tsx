@@ -63,6 +63,7 @@ import { SEM_CONTATO_DIAS, isEffectiveLabel } from "../../config/collectionAttem
 import LogContactModal from "./LogContactModal";
 import ScheduleContactModal from "./ScheduleContactModal";
 import RescheduleContactModal from "./RescheduleContactModal";
+import ContactScheduler from "./ContactScheduler";
 import ClientDetailModal from "./ClientDetailModal";
 import AcordoModal from "./AcordoModal";
 import AcordoDetailModal from "./AcordoDetailModal";
@@ -3053,6 +3054,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           return renderInternalWallet();
         }
         return <VisitScheduler />;
+
+      case "contact-schedule":
+        if (!isWalletCollector || !user?.id) return null;
+        return <ContactScheduler collectorId={user.id} />;
 
       default:
         return null;
