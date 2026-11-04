@@ -5,6 +5,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useCollection } from "../../contexts/CollectionContext";
 import { todayLocalStr } from "../../config/visitStatus";
 import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
+import { releaseSituacaoForAttemptResult } from "../../config/visitOutcomes";
 import { hasInstallmentBalance } from "../../filters/clientStatus";
 import { ClientGroup, CollectionAttempt } from "../../types";
 
@@ -37,12 +38,6 @@ const STATUS_TO_ATTEMPT: Record<
   mensagem_enviada: { type: "whatsapp", result: "message_sent" },
   contestou_divida: { type: "call", result: "disputed" },
 };
-
-// Situacao gravada ao liberar o cliente da carteira por contestacao (SPC) --
-// mesmo destino do desfecho "spc" da visita presencial (ver
-// config/visitOutcomes.VISIT_OUTCOMES), so que aqui o gatilho e o resultado
-// do contato (ligacao/whatsapp) em vez da observacao da visita.
-const SITUACAO_SPC = "Aguardando Jurídico";
 
 const LogContactModal: React.FC<LogContactModalProps> = ({
   client,
@@ -124,21 +119,25 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
         );
       }
 
-      // Contestacao da divida (SPC): mesma regra da visita presencial --
-      // cobranca por telefone/WhatsApp nao resolve mais o caso, sai da
-      // carteira e volta pra fila de Atribuicao marcado "Aguardando
-      // Jurídico" pro gestor redistribuir.
-      if (status === "contestou_divida") {
+      // Mesma regra da visita presencial (config/visitOutcomes), ponto unico
+      // de decisao: cobranca por telefone/WhatsApp tambem pode encerrar o
+      // caso (hoje, so contestacao da divida/SPC) e devolver o cliente pra
+      // fila de Atribuicao.
+      const releaseSituacao = releaseSituacaoForAttemptResult(result);
+      if (releaseSituacao) {
         const { error: releaseError } = await supabase.rpc(
           "liberar_cliente_da_carteira",
           {
             p_documento: client.document,
-            p_situacao: SITUACAO_SPC,
+            p_situacao: releaseSituacao,
             p_usuario_id: user.id,
           },
         );
         if (releaseError) {
-          console.error("Erro ao liberar cliente da carteira (SPC):", releaseError);
+          console.error(
+            `Erro ao liberar cliente da carteira (${releaseSituacao}):`,
+            releaseError,
+          );
         }
       }
 

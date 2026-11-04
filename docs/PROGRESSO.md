@@ -25,7 +25,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 14 | ~~Guard de agendamento ativo ausente em `atribuir_clientes_em_lote`/`remover_cobrador_em_lote`~~ | Alta | Pequeno |
 | 15 | ~~Transferência de carteira em massa não filtra agendamento por canal~~ | Alta | Pequeno/médio |
 | 16 | Cobrador de carteira não tem como cancelar um contato agendado (só concluir/reagendar) | Média/Alta | Médio |
-| 17 | Duas implementações de "desfecho libera cliente da carteira" (visitOutcomes vs. `if` no LogContactModal) | Média | Pequeno/médio |
+| 17 | ~~Duas implementações de "desfecho libera cliente da carteira" (visitOutcomes vs. `if` no LogContactModal)~~ | Média | Pequeno/médio |
 | 18 | `AllowedVisitDatesManager` aceita os 4 perfis mas só `VisitScheduler` (externo) lê o resultado | Média | Pequeno |
 | 19 | `monthly_goals.visits_goal` muda de significado por perfil sem isso aparecer no schema/UI do % | Média | Pequeno |
 | 20 | ~~Helper `WALLET_COLLECTOR_TYPES.includes(...)` repetido em 6+ lugares em vez de `isWalletCollectorType()` único~~ | Baixa | Pequeno |
@@ -48,8 +48,9 @@ etapas pequenas, testar antes de seguir — ver [[trabalho-em-etapas]]):
    abaixo (inclui a correção derivada do bug de órfão por guard do item 14).
 3. ~~Item 20 (helper `isWalletCollectorType`)~~ — concluído, ver detalhe
    abaixo.
-4. Item 17 (unificar liberação de carteira) — próximo. Média complexidade.
-5. Item 16 (cancelamento de contato) — lacuna funcional real, precisa de
+4. ~~Item 17 (unificar liberação de carteira)~~ — concluído, ver detalhe
+   abaixo.
+5. Item 16 (cancelamento de contato) — próximo. Lacuna funcional real, precisa de
    decisão de UX (fluxo com ou sem aprovação do gestor).
 6. Item 18 (`AllowedVisitDatesManager` restringir a externo) — pequeno,
    mas confirmar que ninguém já configurou isso pra carteira em produção
@@ -59,6 +60,23 @@ etapas pequenas, testar antes de seguir — ver [[trabalho-em-etapas]]):
 8. Item 21 (Jurídico) — depende de decisão de negócio, não é só código;
    perguntar como a cobrança jurídica funciona de verdade hoje fora do
    sistema antes de desenhar qualquer coisa.
+
+### Item 17 — unificar "desfecho libera cliente da carteira" — concluído 2026-11-04
+
+`config/visitOutcomes.ts` já era o ponto único pra visita presencial
+(`visitReleaseSituacao`, casando o TEXTO exato da nota contra
+`VISIT_OUTCOMES`), mas ligação/WhatsApp tinha sua própria regra isolada —
+um `if (status === "contestou_divida")` direto em `LogContactModal.tsx`,
+com a situação `"Aguardando Jurídico"` duplicada como constante local
+(`SITUACAO_SPC`). Unificado: `visitOutcomes.ts` ganha `SITUACAO_SPC`
+exportado (usado também pela entrada `spc` do catálogo de visita) e
+`releaseSituacaoForAttemptResult(result)` — mesma decisão, mas com o
+gatilho sendo o `result` ESTRUTURADO de `collection_attempts` (`disputed`)
+em vez de texto de nota de visita (que não existe pra ligação/WhatsApp).
+`LogContactModal` chama essa função em vez de comparar a string do
+dropdown (`status`), então um resultado "disputed" futuro vindo de outro
+fluxo (não só esse dropdown) herdaria a liberação automaticamente. `tsc
+-b`/lint limpos.
 
 ### Item 20 — helper `isWalletCollectorType` — concluído 2026-11-04
 

@@ -1,4 +1,4 @@
-import { ScheduledVisit } from "../types";
+import { CollectionAttempt, ScheduledVisit } from "../types";
 
 /**
  * Catalogo canonico das observacoes pre-programadas que o cobrador escolhe ao
@@ -26,6 +26,11 @@ export interface VisitOutcome {
   /** Situacao gravada ao liberar o cliente da carteira. Ausente = nao libera. */
   releasesTo?: string;
 }
+
+/** Situacao de liberacao por contestacao da divida (SPC) -- mesmo destino
+ * pros dois canais (visita presencial OU ligacao/whatsapp), ver `spc`
+ * abaixo e `RELEASE_SITUACAO_BY_ATTEMPT_RESULT`. */
+export const SITUACAO_SPC = "Aguardando Jurídico";
 
 export const VISIT_OUTCOMES: readonly VisitOutcome[] = [
   {
@@ -72,7 +77,7 @@ export const VISIT_OUTCOMES: readonly VisitOutcome[] = [
     // Juridica, exatamente como "nao encontrado" entra em "Aguardando Interno".
     // O MOTIVO (SPC) fica na observacao da visita, que e filtravel — nao se
     // duplica numa situacao propria que poderia divergir dela.
-    releasesTo: "Aguardando Jurídico",
+    releasesTo: SITUACAO_SPC,
   },
 ] as const;
 
@@ -119,6 +124,25 @@ export const visitReleaseSituacao = (
   if (status === "realizada") return releaseSituacaoFor(notes);
   return null;
 };
+
+/**
+ * Mesma decisao que `visitReleaseSituacao`, mas pro canal ligacao/whatsapp
+ * (LogContactModal) -- la nao existe nota de visita pra casar com o texto
+ * do catalogo acima; o gatilho e o `result` ESTRUTURADO de
+ * collection_attempts. Ponto unico tambem: antes de 2026-11-04 o
+ * LogContactModal reimplementava isso com um `if (status ===
+ * "contestou_divida")` direto no componente, divergente deste arquivo
+ * (item 17, docs/PROGRESSO.md).
+ */
+const RELEASE_SITUACAO_BY_ATTEMPT_RESULT: Partial<
+  Record<CollectionAttempt["result"], string>
+> = {
+  disputed: SITUACAO_SPC,
+};
+
+export const releaseSituacaoForAttemptResult = (
+  result: CollectionAttempt["result"],
+): string | null => RELEASE_SITUACAO_BY_ATTEMPT_RESULT[result] ?? null;
 
 /**
  * Classifica uma observacao gravada para fins de FILTRO. Mais tolerante que
