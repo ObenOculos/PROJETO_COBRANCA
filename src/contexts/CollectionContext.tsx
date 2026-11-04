@@ -1582,6 +1582,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     createdById: row.created_by_id,
     createdAt: row.created_at,
     resolvedAt: row.resolved_at,
+    formaPagamentoParcelas: row.forma_pagamento_parcelas,
+    testemunha1Nome: row.testemunha1_nome,
+    testemunha1Cpf: row.testemunha1_cpf,
+    testemunha2Nome: row.testemunha2_nome,
+    testemunha2Cpf: row.testemunha2_cpf,
+    multaPercentualAplicado: Number(row.multa_percentual_aplicado),
+    jurosPercentualAmAplicado: Number(row.juros_percentual_am_aplicado),
+    descontoPercentualAplicado: Number(row.desconto_percentual_aplicado),
   });
 
   /**
@@ -1697,12 +1705,27 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   const criarAcordo = async (params: {
     clientDocument: string;
-    titulos: { collectionId: number; saldoNoMomento: number }[];
+    titulos: {
+      collectionId: number;
+      saldoNoMomento: number;
+      diasAtrasoNoMomento: number;
+      multaValor: number;
+      jurosValor: number;
+      descontoValor: number;
+    }[];
     parcelas: {
       numero: number;
       valorParcela: number;
       dataVencimento: string;
     }[];
+    multaPercentualAplicado: number;
+    jurosPercentualAmAplicado: number;
+    descontoPercentualAplicado: number;
+    formaPagamentoParcelas: string;
+    testemunha1Nome: string;
+    testemunha1Cpf: string;
+    testemunha2Nome: string;
+    testemunha2Cpf: string;
   }): Promise<Acordo> => {
     const { data, error: rpcError } = await supabase
       .rpc("criar_acordo", {
@@ -1710,12 +1733,24 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         p_titulos: params.titulos.map((t) => ({
           collection_id: t.collectionId,
           saldo_no_momento: t.saldoNoMomento,
+          dias_atraso_no_momento: t.diasAtrasoNoMomento,
+          multa_valor: t.multaValor,
+          juros_valor: t.jurosValor,
+          desconto_valor: t.descontoValor,
         })),
         p_parcelas: params.parcelas.map((p) => ({
           numero: p.numero,
           valor_parcela: p.valorParcela,
           data_vencimento: p.dataVencimento,
         })),
+        p_multa_percentual_aplicado: params.multaPercentualAplicado,
+        p_juros_percentual_am_aplicado: params.jurosPercentualAmAplicado,
+        p_desconto_percentual_aplicado: params.descontoPercentualAplicado,
+        p_forma_pagamento_parcelas: params.formaPagamentoParcelas,
+        p_testemunha1_nome: params.testemunha1Nome,
+        p_testemunha1_cpf: params.testemunha1Cpf,
+        p_testemunha2_nome: params.testemunha2Nome,
+        p_testemunha2_cpf: params.testemunha2Cpf,
       })
       .single();
 
@@ -1839,6 +1874,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           acordoId: row.acordo_id,
           collectionId: row.collection_id,
           saldoNoMomento: Number(row.saldo_no_momento),
+          diasAtrasoNoMomento: row.dias_atraso_no_momento,
+          multaValor: Number(row.multa_valor),
+          jurosValor: Number(row.juros_valor),
+          descontoValor: Number(row.desconto_valor),
           createdAt: row.created_at,
           saleNumber: info ? resolveSaleKey(info) : undefined,
           saleLabel: info

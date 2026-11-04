@@ -463,12 +463,27 @@ export interface CollectionContextType {
   }) => Promise<AcordoConfiguracaoPadrao>;
   criarAcordo: (params: {
     clientDocument: string;
-    titulos: { collectionId: number; saldoNoMomento: number }[];
+    titulos: {
+      collectionId: number;
+      saldoNoMomento: number;
+      diasAtrasoNoMomento: number;
+      multaValor: number;
+      jurosValor: number;
+      descontoValor: number;
+    }[];
     parcelas: {
       numero: number;
       valorParcela: number;
       dataVencimento: string;
     }[];
+    multaPercentualAplicado: number;
+    jurosPercentualAmAplicado: number;
+    descontoPercentualAplicado: number;
+    formaPagamentoParcelas: string;
+    testemunha1Nome: string;
+    testemunha1Cpf: string;
+    testemunha2Nome: string;
+    testemunha2Cpf: string;
   }) => Promise<Acordo>;
   fetchAcordoDetalhe: (acordoId: string) => Promise<{
     acordo: Acordo;
@@ -660,6 +675,15 @@ export interface Acordo {
   createdById?: string | null;
   createdAt: string;
   resolvedAt?: string | null;
+  // Congelados no momento da negociacao (Etapa 3b) -- nunca recalculados.
+  formaPagamentoParcelas?: string | null;
+  testemunha1Nome?: string | null;
+  testemunha1Cpf?: string | null;
+  testemunha2Nome?: string | null;
+  testemunha2Cpf?: string | null;
+  multaPercentualAplicado: number;
+  jurosPercentualAmAplicado: number;
+  descontoPercentualAplicado: number;
 }
 
 export interface AcordoTitulo {
@@ -667,6 +691,11 @@ export interface AcordoTitulo {
   acordoId: string;
   collectionId: number;
   saldoNoMomento: number;
+  // Congelados no momento da negociacao (Etapa 3b) -- nunca recalculados.
+  diasAtrasoNoMomento: number;
+  multaValor: number;
+  jurosValor: number;
+  descontoValor: number;
   createdAt: string;
   /**
    * Enriquecido a partir de BANCO_DADOS em fetchAcordoDetalhe (leitura, não

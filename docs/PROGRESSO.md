@@ -64,17 +64,34 @@ etapas:
   HEAD). `database.types.ts` tem a tabela/RPC adicionadas à mão (migration
   ainda não aplicada — regenerar com `supabase gen types` depois do
   `db push` pra conferir contra o schema real).
-- **3b — `AcordoModal` aplica o padrão (cobrador) — não iniciada.** Calcular
-  multa/juros por título (proporcional aos dias de atraso), campo de
-  desconto (padrão 0%, até o máximo configurado), captura de 2 testemunhas
-  (nome completo + CPF), forma de pagamento das parcelas, e o fluxo de
-  entrada via Pix: QR Code/copia-e-cola estático (padrão BR Code do Bacen,
-  **sem gateway de pagamento** — decisão do usuário 2026-11-04, zero
-  fornecedor novo) gerado com a chave Pix da empresa (config 3a) + valor da
-  entrada; cobrador confirma manualmente o recebimento e só então
-  `criarAcordo` roda de fato. Hoje a trava `totalBate` exige que a soma das
-  parcelas bata exatamente com o saldo selecionado — precisa passar a
-  comparar com saldo + encargos − desconto.
+- **3b — `AcordoModal` aplica o padrão (cobrador) — concluída 2026-11-04,
+  aguardando `db push`.** Migration `20261104000003`: `acordo_titulos` ganha
+  `dias_atraso_no_momento`/`multa_valor`/`juros_valor`/`desconto_valor`
+  (congelados, nunca recalculados — o Termo gerado depois tem que mostrar o
+  que foi negociado naquele dia); `acordos` ganha `forma_pagamento_parcelas`,
+  `testemunha{1,2}_{nome,cpf}` e os 3 percentuais efetivamente aplicados
+  (podem divergir do padrão do gestor se o cobrador editou).
+  `criar_acordo` (RPC) estendida com `CREATE OR REPLACE` (parâmetros novos
+  com default no final — chamada antiga de 3 args continua resolvendo pra
+  mesma função, sem quebrar nada em voo). `AcordoModal` virou wizard de 3
+  passos: 1) títulos (igual); 2) multa/juros/desconto (editável, com o
+  padrão do gestor como valor inicial), parcelas (agora somam o **total
+  negociado** = saldo + multa + juros − desconto, não mais o saldo cru),
+  forma de pagamento das parcelas 2+ e testemunhas (opcionais); 3)
+  confirmação da entrada — a 1ª parcela é sempre a entrada via Pix: QR
+  Code/copia-e-cola gerado 100% local (`src/utils/pix.ts`, payload BR Code
+  do Bacen com CRC16-CCITT, **sem gateway/serviço externo** — decisão do
+  usuário 2026-11-04), cobrador marca manualmente "confirmo que recebi" e
+  só então o botão "Criar Acordo" libera. Ao criar, a 1ª parcela já nasce
+  paga (`registrarPagamentoAcordo` chamado logo em seguida, com a data de
+  hoje) — se esse passo falhar o acordo não é desfeito, só fica sem a
+  entrada registrada (cobrador resolve pelo detalhe do acordo). Multa/juros
+  por título: `saldo × multa% ` + `saldo × juros%am × dias/30` (simples),
+  zerados se o título ainda não venceu (`diasAtraso <= 0`). `AcordoDetailModal`
+  também mostra a composição (saldo + multa + juros − desconto) por título
+  quando há encargo. Nova dependência `qrcode`/`@types/qrcode` (renderiza o
+  QR a partir do payload, sem chamada de rede). `tsc`/`eslint` ok (contagem
+  igual a HEAD em todos os arquivos tocados).
 - **3c — Geração do Termo de Acordo (PDF) — não iniciada.** Cabeçalho com a
   logo (`Logo Focco Brasil.png`, não commitada ainda) e dados completos da
   empresa/cliente, tabela "Títulos Negociados" (Dias/Vl.Orig/Multa/Juros/

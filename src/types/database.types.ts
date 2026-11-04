@@ -206,21 +206,33 @@ export type Database = {
           acordo_id: string;
           collection_id: number;
           created_at: string;
+          desconto_valor: number;
+          dias_atraso_no_momento: number;
           id: string;
+          juros_valor: number;
+          multa_valor: number;
           saldo_no_momento: number;
         };
         Insert: {
           acordo_id: string;
           collection_id: number;
           created_at?: string;
+          desconto_valor?: number;
+          dias_atraso_no_momento?: number;
           id?: string;
+          juros_valor?: number;
+          multa_valor?: number;
           saldo_no_momento: number;
         };
         Update: {
           acordo_id?: string;
           collection_id?: number;
           created_at?: string;
+          desconto_valor?: number;
+          dias_atraso_no_momento?: number;
           id?: string;
+          juros_valor?: number;
+          multa_valor?: number;
           saldo_no_momento?: number;
         };
         Relationships: [
@@ -262,11 +274,19 @@ export type Database = {
           collector_id: string;
           created_at: string;
           created_by_id: string | null;
+          desconto_percentual_aplicado: number;
+          forma_pagamento_parcelas: string | null;
           id: string;
+          juros_percentual_am_aplicado: number;
           motivo_cancelamento: string | null;
+          multa_percentual_aplicado: number;
           numero_parcelas: number;
           resolved_at: string | null;
           status: string;
+          testemunha1_cpf: string | null;
+          testemunha1_nome: string | null;
+          testemunha2_cpf: string | null;
+          testemunha2_nome: string | null;
           valor_negociado: number;
         };
         Insert: {
@@ -276,11 +296,19 @@ export type Database = {
           collector_id: string;
           created_at?: string;
           created_by_id?: string | null;
+          desconto_percentual_aplicado?: number;
+          forma_pagamento_parcelas?: string | null;
           id?: string;
+          juros_percentual_am_aplicado?: number;
           motivo_cancelamento?: string | null;
+          multa_percentual_aplicado?: number;
           numero_parcelas: number;
           resolved_at?: string | null;
           status?: string;
+          testemunha1_cpf?: string | null;
+          testemunha1_nome?: string | null;
+          testemunha2_cpf?: string | null;
+          testemunha2_nome?: string | null;
           valor_negociado: number;
         };
         Update: {
@@ -290,11 +318,19 @@ export type Database = {
           collector_id?: string;
           created_at?: string;
           created_by_id?: string | null;
+          desconto_percentual_aplicado?: number;
+          forma_pagamento_parcelas?: string | null;
           id?: string;
+          juros_percentual_am_aplicado?: number;
           motivo_cancelamento?: string | null;
+          multa_percentual_aplicado?: number;
           numero_parcelas?: number;
           resolved_at?: string | null;
           status?: string;
+          testemunha1_cpf?: string | null;
+          testemunha1_nome?: string | null;
+          testemunha2_cpf?: string | null;
+          testemunha2_nome?: string | null;
           valor_negociado?: number;
         };
         Relationships: [
@@ -1561,7 +1597,19 @@ export type Database = {
       };
       converter_valor_brasileiro: { Args: { valor: string }; Returns: number };
       criar_acordo: {
-        Args: { p_client_document: string; p_parcelas: Json; p_titulos: Json };
+        Args: {
+          p_client_document: string;
+          p_desconto_percentual_aplicado?: number;
+          p_forma_pagamento_parcelas?: string;
+          p_juros_percentual_am_aplicado?: number;
+          p_multa_percentual_aplicado?: number;
+          p_parcelas: Json;
+          p_testemunha1_cpf?: string;
+          p_testemunha1_nome?: string;
+          p_testemunha2_cpf?: string;
+          p_testemunha2_nome?: string;
+          p_titulos: Json;
+        };
         Returns: {
           acordo_origem_id: string | null;
           client_document: string;
@@ -1569,11 +1617,19 @@ export type Database = {
           collector_id: string;
           created_at: string;
           created_by_id: string | null;
+          desconto_percentual_aplicado: number;
+          forma_pagamento_parcelas: string | null;
           id: string;
+          juros_percentual_am_aplicado: number;
           motivo_cancelamento: string | null;
+          multa_percentual_aplicado: number;
           numero_parcelas: number;
           resolved_at: string | null;
           status: string;
+          testemunha1_cpf: string | null;
+          testemunha1_nome: string | null;
+          testemunha2_cpf: string | null;
+          testemunha2_nome: string | null;
           valor_negociado: number;
         };
         SetofOptions: {

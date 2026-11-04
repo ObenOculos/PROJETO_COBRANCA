@@ -253,23 +253,47 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
                             {grupo.saleLabel}
                           </p>
                           <div className="divide-y divide-gray-50 dark:divide-dark-border">
-                            {grupo.titulos.map((t) => (
-                              <div
-                                key={t.id}
-                                className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-600 dark:text-dark-text-secondary"
-                              >
-                                <span className="flex-1">
-                                  Título {t.collectionId}
-                                  {t.vencimentoOriginal &&
-                                    ` — venc. original ${new Date(
-                                      t.vencimentoOriginal + "T00:00:00",
-                                    ).toLocaleDateString("pt-BR")}`}
-                                </span>
-                                <span className="font-bold text-gray-700 dark:text-dark-text shrink-0">
-                                  {formatCurrency(t.saldoNoMomento)}
-                                </span>
-                              </div>
-                            ))}
+                            {grupo.titulos.map((t) => {
+                              const temEncargo =
+                                t.multaValor > 0 ||
+                                t.jurosValor > 0 ||
+                                t.descontoValor > 0;
+                              const totalFinal =
+                                t.saldoNoMomento +
+                                t.multaValor +
+                                t.jurosValor -
+                                t.descontoValor;
+                              return (
+                                <div
+                                  key={t.id}
+                                  className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs text-gray-600 dark:text-dark-text-secondary"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <span>
+                                      Título {t.collectionId}
+                                      {t.vencimentoOriginal &&
+                                        ` — venc. original ${new Date(
+                                          t.vencimentoOriginal + "T00:00:00",
+                                        ).toLocaleDateString("pt-BR")}`}
+                                    </span>
+                                    {temEncargo && (
+                                      <p className="text-[10px] text-gray-400">
+                                        Saldo {formatCurrency(t.saldoNoMomento)}
+                                        {t.multaValor > 0 &&
+                                          ` + multa ${formatCurrency(t.multaValor)}`}
+                                        {t.jurosValor > 0 &&
+                                          ` + juros ${formatCurrency(t.jurosValor)}`}
+                                        {t.descontoValor > 0 &&
+                                          ` − desconto ${formatCurrency(t.descontoValor)}`}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <span className="font-bold text-gray-700 dark:text-dark-text shrink-0">
+                                    {formatCurrency(totalFinal)}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       ))}

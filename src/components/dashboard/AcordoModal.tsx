@@ -1,5 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { X, Save, AlertCircle, Plus, Trash2 } from "lucide-react";
+import QRCode from "qrcode";
+import {
+  X,
+  Save,
+  AlertCircle,
+  Plus,
+  Trash2,
+  Copy,
+  CheckCircle2,
+  QrCode,
+} from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { hasInstallmentBalance } from "../../filters/clientStatus";
 import {
@@ -9,6 +19,7 @@ import {
 } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
 import { ClientGroup } from "../../types";
+import { gerarPixCopiaECola } from "../../utils/pix";
 
 interface AcordoModalProps {
   client: ClientGroup;
@@ -29,7 +40,17 @@ interface TituloAberto {
   saleNumber: number;
   saleLabel: string;
   vencido: boolean;
+  diasAtraso: number;
 }
+
+const FORMAS_PAGAMENTO_PARCELAS = [
+  "Boleto",
+  "Pix",
+  "Dinheiro",
+  "Cartão de crédito",
+  "Cartão de débito",
+  "Transferência",
+];
 
 /** Soma dois dias YYYY-MM-DD evitando problema de fuso (ver todayLocalStr). */
 const addDaysLocal = (dateStr: string, days: number): string => {
@@ -47,13 +68,19 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const { criarAcordo } = useCollection();
+  const {
+    criarAcordo,
+    acordoConfiguracaoPadrao,
+    fetchAcordoDetalhe,
+    registrarPagamentoAcordo,
+  } = useCollection();
 
   const titulosEmAberto = useMemo<TituloAberto[]>(() => {
     const list: TituloAberto[] = [];
     client.sales?.forEach((sale) => {
       sale.installments?.forEach((inst) => {
         if (hasInstallmentBalance(inst)) {
+          const diasAtraso = calculateOverdueDays(inst.data_vencimento);
           list.push({
             collectionId: inst.id_parcela,
             saldo:
@@ -63,7 +90,8 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
             vencimento: inst.data_vencimento,
             saleNumber: sale.saleNumber,
             saleLabel: sale.description || `Venda ${sale.titleNumber}`,
-            vencido: calculateOverdueDays(inst.data_vencimento) > 0,
+            vencido: diasAtraso > 0,
+            diasAtraso,
           });
         }
       });
@@ -91,7 +119,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [aVencerPendentes, setAVencerPendentes] = useState<TituloAberto[]>([]);
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   // O botao "Criar Acordo" nasce na mesma posicao em que "Continuar" estava:
   // num toque rapido (ghost click/replay de touch em mobile) o clique que
   // avanca a etapa pode "vazar" pro botao novo que aparece no mesmo lugar,
@@ -99,12 +127,80 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   // por um instante logo depois de entrar na etapa 2 pra absorver isso.
   const [step2Armado, setStep2Armado] = useState(false);
 
+  // Padrao do gestor (Etapa 3a, config/AcordoConfiguracaoPadrao.tsx) como
+  // ponto de partida -- editavel pelo cobrador na negociacao (decisao do
+  // usuario em 2026-11-04: "deixar um padrao, mas editavel pelo cobrador
+  // quando necessario"). Lido uma vez na abertura do modal: o modal e
+  // remontado a cada abertura, entao nao precisa reagir a troca do padrao
+  // enquanto o cobrador ja esta editando.
+  const [multaPercentual, setMultaPercentual] = useState(() =>
+    String(acordoConfiguracaoPadrao?.multaPercentual ?? 0),
+  );
+  const [jurosPercentualAm, setJurosPercentualAm] = useState(() =>
+    String(acordoConfiguracaoPadrao?.jurosPercentualAm ?? 0),
+  );
+  const [descontoPercentual, setDescontoPercentual] = useState(() =>
+    String(acordoConfiguracaoPadrao?.descontoPadraoPercentual ?? 0),
+  );
+  const descontoMaximoPercentual =
+    acordoConfiguracaoPadrao?.descontoMaximoPercentual ?? 0;
+  const diasEntreParcelasPadrao = acordoConfiguracaoPadrao?.diasEntreParcelas ?? 30;
+  const [formaPagamentoParcelas, setFormaPagamentoParcelas] = useState(
+    FORMAS_PAGAMENTO_PARCELAS[0],
+  );
+  const [testemunha1Nome, setTestemunha1Nome] = useState("");
+  const [testemunha1Cpf, setTestemunha1Cpf] = useState("");
+  const [testemunha2Nome, setTestemunha2Nome] = useState("");
+  const [testemunha2Cpf, setTestemunha2Cpf] = useState("");
+
+  // Entrada via Pix (1a parcela) -- QR Code/copia-e-cola estatico gerado
+  // localmente (decisao do usuario em 2026-11-04: sem gateway de
+  // pagamento), confirmacao manual do cobrador antes do acordo ser criado
+  // de fato.
+  const [pixCopiaECola, setPixCopiaECola] = useState("");
+  const [pixQrDataUrl, setPixQrDataUrl] = useState("");
+  const [pixCopiado, setPixCopiado] = useState(false);
+  const [entradaConfirmada, setEntradaConfirmada] = useState(false);
+
   const saldoSelecionado = useMemo(
     () =>
       titulosEmAberto
         .filter((t) => selecionados.has(t.collectionId))
         .reduce((sum, t) => sum + t.saldo, 0),
     [titulosEmAberto, selecionados],
+  );
+
+  /**
+   * Multa/juros/desconto POR TITULO, proporcional aos dias de atraso de
+   * cada um -- confirmado batendo com o modelo de Termo de Acordo do
+   * usuario (multa % flat + juros simples % a.m. * dias/30). Titulo ainda
+   * nao vencido (diasAtraso <= 0) nao acumula multa nem juros -- so entra
+   * pelo saldo cheio. Estes valores sao o que vai congelado em
+   * acordo_titulos (migration 20261104000003), nunca recalculados depois.
+   */
+  const titulosComEncargo = useMemo(() => {
+    const multa = Number(multaPercentual) || 0;
+    const juros = Number(jurosPercentualAm) || 0;
+    const desconto = Number(descontoPercentual) || 0;
+    return titulosEmAberto
+      .filter((t) => selecionados.has(t.collectionId))
+      .map((t) => {
+        const multaValor =
+          t.diasAtraso > 0 ? Math.round(t.saldo * (multa / 100) * 100) / 100 : 0;
+        const jurosValor =
+          t.diasAtraso > 0
+            ? Math.round(t.saldo * (juros / 100) * (t.diasAtraso / 30) * 100) / 100
+            : 0;
+        const totalBruto = t.saldo + multaValor + jurosValor;
+        const descontoValor = Math.round(totalBruto * (desconto / 100) * 100) / 100;
+        const totalFinal = Math.round((totalBruto - descontoValor) * 100) / 100;
+        return { ...t, multaValor, jurosValor, descontoValor, totalFinal };
+      });
+  }, [titulosEmAberto, selecionados, multaPercentual, jurosPercentualAm, descontoPercentual]);
+
+  const totalNegociado = useMemo(
+    () => titulosComEncargo.reduce((sum, t) => sum + t.totalFinal, 0),
+    [titulosComEncargo],
   );
 
   const gerarParcelas = (saldo: number, n: number): ParcelaDraft[] => {
@@ -121,25 +217,26 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
       draft.push({
         numero: i,
         valor: valor.toFixed(2),
-        data: addDaysLocal(todayLocalStr(), 30 * i),
+        data: addDaysLocal(todayLocalStr(), diasEntreParcelasPadrao * i),
       });
     }
     return draft;
   };
 
-  // Parcelas sao geradas automaticamente a partir do saldo selecionado —
-  // sem botao manual. parcelasDirty marca que o usuario editou algo a mao;
-  // se a selecao de titulos ou o numero de parcelas mudar depois disso, as
-  // parcelas sao recalculadas (nunca ficam desatualizadas) mas avisamos em
-  // vez de descartar silenciosamente a edicao.
+  // Parcelas sao geradas automaticamente a partir do total negociado (saldo
+  // + multa + juros - desconto) — sem botao manual. parcelasDirty marca que
+  // o usuario editou algo a mao; se a selecao de titulos, os encargos ou o
+  // numero de parcelas mudarem depois disso, as parcelas sao recalculadas
+  // (nunca ficam desatualizadas) mas avisamos em vez de descartar
+  // silenciosamente a edicao.
   const [parcelas, setParcelas] = useState<ParcelaDraft[]>(() =>
-    gerarParcelas(saldoSelecionado, numeroParcelas),
+    gerarParcelas(totalNegociado, numeroParcelas),
   );
   const [parcelasDirty, setParcelasDirty] = useState(false);
   const [recalcNotice, setRecalcNotice] = useState(false);
   const [mostrarTodasParcelas, setMostrarTodasParcelas] = useState(false);
   const [dataPrimeiraParcela, setDataPrimeiraParcela] = useState(
-    () => parcelas[0]?.data ?? addDaysLocal(todayLocalStr(), 30),
+    () => parcelas[0]?.data ?? addDaysLocal(todayLocalStr(), diasEntreParcelasPadrao),
   );
   const isFirstRender = useRef(true);
   const PARCELAS_VISIVEIS = 3;
@@ -149,25 +246,25 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
       isFirstRender.current = false;
       return;
     }
-    const novasParcelas = gerarParcelas(saldoSelecionado, numeroParcelas);
+    const novasParcelas = gerarParcelas(totalNegociado, numeroParcelas);
     setParcelas(novasParcelas);
     setDataPrimeiraParcela(
-      novasParcelas[0]?.data ?? addDaysLocal(todayLocalStr(), 30),
+      novasParcelas[0]?.data ?? addDaysLocal(todayLocalStr(), diasEntreParcelasPadrao),
     );
     setRecalcNotice(parcelasDirty);
     setParcelasDirty(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saldoSelecionado, numeroParcelas]);
+  }, [totalNegociado, numeroParcelas]);
 
   /** Recalcula as datas de todas as parcelas a partir da data escolhida pro
-   * cobrador, mantendo o espacamento de 30 dias entre elas — evita digitar
+   * cobrador, mantendo o espacamento padrao entre elas — evita digitar
    * data por data quando só a data-base muda. */
   const aplicarDataBase = () => {
     if (!dataPrimeiraParcela) return;
     setParcelas((prev) =>
       prev.map((p, i) => ({
         ...p,
-        data: addDaysLocal(dataPrimeiraParcela, 30 * i),
+        data: addDaysLocal(dataPrimeiraParcela, diasEntreParcelasPadrao * i),
       })),
     );
     setParcelasDirty(true);
@@ -207,7 +304,9 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
         {
           numero: prev.length + 1,
           valor: "0.00",
-          data: last ? addDaysLocal(last.data, 30) : addDaysLocal(todayLocalStr(), 30),
+          data: last
+            ? addDaysLocal(last.data, diasEntreParcelasPadrao)
+            : addDaysLocal(todayLocalStr(), diasEntreParcelasPadrao),
         },
       ];
     });
@@ -219,22 +318,65 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     () => parcelas.reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0),
     [parcelas],
   );
-  const totalBate = Math.abs(totalParcelas - saldoSelecionado) <= 0.01;
+  const totalBate = Math.abs(totalParcelas - totalNegociado) <= 0.01;
+
+  // Valor da entrada = 1a parcela (numero 1) -- nao e um campo a parte, so
+  // a primeira linha das parcelas negociadas (igual ao modelo de Termo de
+  // Acordo do usuario, onde a 1a parcela e so a de maior valor).
+  const valorEntrada = parseFloat(parcelas[0]?.valor || "0") || 0;
 
   const doCreateAcordo = async () => {
     setLoading(true);
     try {
-      await criarAcordo({
+      const acordo = await criarAcordo({
         clientDocument: client.document,
-        titulos: titulosEmAberto
-          .filter((t) => selecionados.has(t.collectionId))
-          .map((t) => ({ collectionId: t.collectionId, saldoNoMomento: t.saldo })),
+        titulos: titulosComEncargo.map((t) => ({
+          collectionId: t.collectionId,
+          saldoNoMomento: t.saldo,
+          diasAtrasoNoMomento: t.diasAtraso,
+          multaValor: t.multaValor,
+          jurosValor: t.jurosValor,
+          descontoValor: t.descontoValor,
+        })),
         parcelas: parcelas.map((p) => ({
           numero: p.numero,
           valorParcela: parseFloat(p.valor),
           dataVencimento: p.data,
         })),
+        multaPercentualAplicado: Number(multaPercentual) || 0,
+        jurosPercentualAmAplicado: Number(jurosPercentualAm) || 0,
+        descontoPercentualAplicado: Number(descontoPercentual) || 0,
+        formaPagamentoParcelas,
+        testemunha1Nome: testemunha1Nome.trim(),
+        testemunha1Cpf: testemunha1Cpf.trim(),
+        testemunha2Nome: testemunha2Nome.trim(),
+        testemunha2Cpf: testemunha2Cpf.trim(),
       });
+
+      // Entrada (1a parcela) ja foi confirmada via Pix pelo cobrador antes
+      // deste submit (gate da etapa 3) -- registra o pagamento pra ela
+      // nascer paga, sem exigir um segundo passo manual no detalhe do
+      // acordo. Nao interrompe o fluxo se falhar: o acordo em si ja foi
+      // criado, o cobrador pode registrar o pagamento da 1a parcela pelo
+      // detalhe do acordo depois.
+      try {
+        const detalhe = await fetchAcordoDetalhe(acordo.id);
+        const parcelaEntrada = detalhe.parcelas.find((p) => p.numero === 1);
+        if (parcelaEntrada) {
+          await registrarPagamentoAcordo({
+            acordoParcelaId: parcelaEntrada.id,
+            valorPago: valorEntrada,
+            dataPagamento: todayLocalStr(),
+            notes: "Entrada via Pix confirmada manualmente pelo cobrador na criação do acordo.",
+          });
+        }
+      } catch (entradaErr) {
+        console.error(
+          "Acordo criado, mas falhou ao registrar o pagamento da entrada:",
+          entradaErr,
+        );
+      }
+
       onSuccess();
     } catch (err) {
       console.error("Erro ao criar acordo:", err);
@@ -258,11 +400,15 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
 
   const handleVoltar = () => {
     setError("");
-    setStep(1);
+    setStep((s) => (s === 3 ? 2 : 1));
   };
 
+  // Protecao contra "ghost click"/replay de touch no mobile: o botao final
+  // ("Criar Acordo") nasce na mesma posicao em que o botao da etapa
+  // anterior estava -- trava o submit por um instante ao entrar na ultima
+  // etapa (3, confirmacao da entrada) pra absorver isso.
   useEffect(() => {
-    if (step !== 2) {
+    if (step !== 3) {
       setStep2Armado(false);
       return;
     }
@@ -271,16 +417,12 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     return () => clearTimeout(timer);
   }, [step]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  /** Valida a etapa 2 (parcelas/encargos/testemunhas) e avanca pra
+   * confirmacao da entrada -- ou pede confirmacao de titulos a vencer
+   * antes, igual o fluxo anterior fazia no submit final. */
+  const handleAvancarParaEntrada = () => {
     setError("");
 
-    if (step !== 2 || !step2Armado) return;
-
-    if (selecionados.size === 0) {
-      setError("Selecione ao menos um título.");
-      return;
-    }
     if (parcelas.length === 0) {
       setError("Monte ao menos uma parcela.");
       return;
@@ -293,8 +435,19 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     }
     if (!totalBate) {
       setError(
-        `A soma das parcelas (${formatCurrency(totalParcelas)}) não bate com o saldo selecionado (${formatCurrency(saldoSelecionado)}). Ajuste os valores antes de continuar.`,
+        `A soma das parcelas (${formatCurrency(totalParcelas)}) não bate com o total negociado (${formatCurrency(totalNegociado)} = saldo + multa + juros − desconto). Ajuste os valores antes de continuar.`,
       );
+      return;
+    }
+    const desconto = Number(descontoPercentual) || 0;
+    if (desconto > descontoMaximoPercentual + 0.001) {
+      setError(
+        `O desconto (${desconto}%) passa do máximo permitido (${descontoMaximoPercentual}%). Ajuste ou peça para o gestor liberar um desconto maior.`,
+      );
+      return;
+    }
+    if (!formaPagamentoParcelas) {
+      setError("Escolha a forma de pagamento das parcelas.");
       return;
     }
 
@@ -306,12 +459,63 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
       return;
     }
 
+    setStep(3);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (step !== 3 || !step2Armado) return;
+    if (!entradaConfirmada) {
+      setError("Confirme o recebimento do Pix da entrada antes de criar o acordo.");
+      return;
+    }
+
     doCreateAcordo();
   };
 
   const confirmarComAVencer = () => {
     setAVencerPendentes([]);
-    doCreateAcordo();
+    setStep(3);
+  };
+
+  // Gera o QR Code/copia-e-cola da entrada ao entrar na etapa 3 (ou se o
+  // valor da 1a parcela mudar depois de voltar e ajustar algo). Payload
+  // 100% local (ver src/utils/pix.ts) -- sem chamada de rede.
+  useEffect(() => {
+    if (step !== 3) return;
+    setEntradaConfirmada(false);
+    if (!acordoConfiguracaoPadrao?.empresaChavePix || valorEntrada <= 0) {
+      setPixCopiaECola("");
+      setPixQrDataUrl("");
+      return;
+    }
+    const payload = gerarPixCopiaECola({
+      chave: acordoConfiguracaoPadrao.empresaChavePix,
+      nomeRecebedor: acordoConfiguracaoPadrao.empresaNome || "",
+      cidadeRecebedor: acordoConfiguracaoPadrao.empresaEndereco || "",
+      valor: valorEntrada,
+      txid: client.document,
+    });
+    setPixCopiaECola(payload);
+    QRCode.toDataURL(payload, { margin: 1, width: 220 })
+      .then(setPixQrDataUrl)
+      .catch((err) => {
+        console.error("Erro ao gerar QR Code Pix:", err);
+        setPixQrDataUrl("");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, valorEntrada]);
+
+  const copiarPix = async () => {
+    try {
+      await navigator.clipboard.writeText(pixCopiaECola);
+      setPixCopiado(true);
+      setTimeout(() => setPixCopiado(false), 2000);
+    } catch (err) {
+      console.error("Erro ao copiar código Pix:", err);
+    }
   };
 
   return (
@@ -367,6 +571,17 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                 2
               </span>
               Parcelas
+            </span>
+            <span className="flex-1 h-px bg-gray-200 dark:bg-dark-border" />
+            <span
+              className={`flex items-center gap-1.5 text-xs font-bold ${step === 3 ? "text-indigo-600" : "text-gray-400"}`}
+            >
+              <span
+                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step === 3 ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-dark-bg-tertiary text-gray-400"}`}
+              >
+                3
+              </span>
+              Entrada
             </span>
           </div>
 
@@ -439,6 +654,58 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
 
           {step === 2 && (
             <>
+              <div className="space-y-2 p-3 bg-gray-50 dark:bg-dark-bg-tertiary rounded-xl border border-gray-100 dark:border-dark-border">
+                <label className="text-xs font-bold text-gray-400">
+                  Multa, juros e desconto
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] text-gray-400">Multa (%)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      value={multaPercentual}
+                      onChange={(e) => setMultaPercentual(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400">Juros (% a.m.)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      value={jurosPercentualAm}
+                      onChange={(e) => setJurosPercentualAm(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400">
+                      Desconto (%) — máx. {descontoMaximoPercentual}%
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      max={descontoMaximoPercentual}
+                      value={descontoPercentual}
+                      onChange={(e) => setDescontoPercentual(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <span className="text-gray-400">
+                    Saldo selecionado: {formatCurrency(saldoSelecionado)}
+                  </span>
+                  <span className="font-bold text-indigo-600">
+                    Total negociado: {formatCurrency(totalNegociado)}
+                  </span>
+                </div>
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-400">
                   Número de parcelas
@@ -544,11 +811,134 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                     className={`text-sm text-right font-bold ${totalBate ? "text-gray-900 dark:text-dark-text" : "text-red-600"}`}
                   >
                     Total combinado: {formatCurrency(totalParcelas)}
-                    {!totalBate && " — não bate com o saldo selecionado"}
+                    {!totalBate && " — não bate com o total negociado"}
+                  </p>
+                  <p className="text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                    A 1ª parcela ({formatCurrency(parseFloat(parcelas[0]?.valor || "0") || 0)}) é a
+                    entrada — sempre via Pix, confirmada na próxima etapa.
                   </p>
                 </div>
               )}
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-400">
+                  Forma de pagamento das demais parcelas
+                </label>
+                <select
+                  value={formaPagamentoParcelas}
+                  onChange={(e) => setFormaPagamentoParcelas(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                >
+                  {FORMAS_PAGAMENTO_PARCELAS.map((forma) => (
+                    <option key={forma} value={forma}>
+                      {forma}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-400">
+                  Testemunhas (opcional)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Testemunha 1 — nome completo"
+                    value={testemunha1Nome}
+                    onChange={(e) => setTestemunha1Nome(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                  />
+                  <input
+                    type="text"
+                    placeholder="CPF"
+                    value={testemunha1Cpf}
+                    onChange={(e) => setTestemunha1Cpf(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Testemunha 2 — nome completo"
+                    value={testemunha2Nome}
+                    onChange={(e) => setTestemunha2Nome(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                  />
+                  <input
+                    type="text"
+                    placeholder="CPF"
+                    value={testemunha2Cpf}
+                    onChange={(e) => setTestemunha2Cpf(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                  />
+                </div>
+              </div>
             </>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
+                A entrada de <strong>{formatCurrency(valorEntrada)}</strong> precisa
+                ser paga via Pix antes do acordo ser criado. Mostre o QR Code ou
+                envie o código copia-e-cola para o cliente e confirme o
+                recebimento abaixo.
+              </p>
+
+              {!acordoConfiguracaoPadrao?.empresaChavePix ? (
+                <div className="p-3 bg-amber-50 border border-amber-100 text-amber-700 text-sm rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  Nenhuma chave Pix cadastrada. Peça para o gestor configurar em
+                  "Config. de Acordos".
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3 p-4 bg-gray-50 dark:bg-dark-bg-tertiary rounded-xl border border-gray-100 dark:border-dark-border">
+                  {pixQrDataUrl ? (
+                    <img
+                      src={pixQrDataUrl}
+                      alt="QR Code Pix da entrada"
+                      className="w-48 h-48 rounded-lg bg-white p-2"
+                    />
+                  ) : (
+                    <div className="w-48 h-48 flex items-center justify-center text-gray-300">
+                      <QrCode className="w-10 h-10" />
+                    </div>
+                  )}
+                  <div className="w-full flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={pixCopiaECola}
+                      className="flex-1 px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-500 dark:bg-dark-bg-secondary dark:border-dark-border"
+                    />
+                    <button
+                      type="button"
+                      onClick={copiarPix}
+                      className="shrink-0 px-3 py-2 bg-gray-100 dark:bg-dark-bg-secondary text-gray-700 dark:text-dark-text text-xs font-bold rounded-lg hover:bg-gray-200 flex items-center gap-1"
+                    >
+                      {pixCopiado ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                      {pixCopiado ? "Copiado" : "Copiar"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <label className="flex items-start gap-3 p-3 bg-green-50 dark:bg-dark-bg-tertiary border border-green-100 dark:border-dark-border rounded-xl cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={entradaConfirmada}
+                  onChange={(e) => setEntradaConfirmada(e.target.checked)}
+                />
+                <span className="text-sm text-gray-700 dark:text-dark-text-secondary">
+                  Confirmo que recebi o pagamento da entrada (
+                  {formatCurrency(valorEntrada)}) via Pix.
+                </span>
+              </label>
+            </div>
           )}
         </div>
 
@@ -571,6 +961,24 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                 Continuar
               </button>
             </>
+          ) : step === 2 ? (
+            <>
+              <button
+                type="button"
+                onClick={handleVoltar}
+                className="flex-1 px-4 py-3 border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-all dark:border-dark-border dark:text-dark-text-secondary"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                onClick={handleAvancarParaEntrada}
+                disabled={parcelas.length === 0}
+                className="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-all disabled:opacity-50"
+              >
+                Continuar
+              </button>
+            </>
           ) : (
             <>
               <button
@@ -582,7 +990,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
               </button>
               <button
                 type="submit"
-                disabled={loading || parcelas.length === 0 || !step2Armado}
+                disabled={loading || !step2Armado || !entradaConfirmada}
                 className="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading ? (
@@ -644,7 +1052,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                 onClick={confirmarComAVencer}
                 className="flex-1 px-4 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all"
               >
-                Confirmar e criar acordo
+                Confirmar e continuar
               </button>
             </div>
           </div>
