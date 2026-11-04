@@ -292,6 +292,16 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // um conjunto de documentos usado pra recortar openClientGroups.
   const [walletFilters, setWalletFilters] = useState<FilterOptions>({});
 
+  // A Agenda so mostra um recorte priorizado (promessas, urgentes etc.) --
+  // uma busca pode nao aparecer nela mesmo existindo na carteira (ex.:
+  // cliente sem visita prevista hoje). Ao digitar uma busca na Agenda, pula
+  // sozinho pra Carteira completa (onde a lista filtrada e exibida por
+  // inteiro) pra nao parecer que a busca "nao encontrou nada".
+  useEffect(() => {
+    if (!(walletFilters.search || "").trim()) return;
+    setWalletTab((prev) => (prev === "agenda" ? "carteira" : prev));
+  }, [walletFilters.search]);
+
   // Numero do acordo (prefixo do id, mesmo formato do Termo em PDF -- ver
   // src/utils/termoAcordo.ts) buscavel pelo MESMO campo de busca da carteira,
   // igual a pesquisar o CPF do cliente: um termo de 6+ caracteres que bate
