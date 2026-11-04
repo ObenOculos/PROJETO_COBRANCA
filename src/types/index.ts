@@ -446,6 +446,21 @@ export interface CollectionContextType {
    * -- ver migration 20261104000001_atraso_considera_acordo_ativo.
    */
   acordoAtivoOverdueMap: Map<string, { dataVencimento: string; saldo: number }[]>;
+  // Configuracao padrao de acordo (Etapa 3a). null = ainda nao carregada ou
+  // nunca cadastrada (gestor ve formulario vazio, cobrador ve 0% em tudo).
+  acordoConfiguracaoPadrao: AcordoConfiguracaoPadrao | null;
+  fetchAcordoConfiguracaoPadrao: () => Promise<void>;
+  definirConfiguracaoPadraoAcordo: (params: {
+    multaPercentual: number;
+    jurosPercentualAm: number;
+    descontoPadraoPercentual: number;
+    descontoMaximoPercentual: number;
+    diasEntreParcelas: number;
+    empresaNome: string;
+    empresaCnpj: string;
+    empresaEndereco: string;
+    empresaChavePix: string;
+  }) => Promise<AcordoConfiguracaoPadrao>;
   criarAcordo: (params: {
     clientDocument: string;
     titulos: { collectionId: number; saldoNoMomento: number }[];
@@ -681,6 +696,26 @@ export interface AcordoPagamento {
   estornoDe?: string | null;
   motivo?: string | null;
   registradoPorId?: string | null;
+  createdAt: string;
+}
+
+// Configuracao padrao de acordo (multa/juros/desconto/dados da empresa),
+// ponto de partida editavel pelo cobrador ao negociar. Ver
+// supabase/migrations/20261104000002_acordo_configuracao_padrao.sql.
+export interface AcordoConfiguracaoPadrao {
+  id: string;
+  multaPercentual: number;
+  jurosPercentualAm: number;
+  descontoPadraoPercentual: number;
+  descontoMaximoPercentual: number;
+  diasEntreParcelas: number;
+  empresaNome: string | null;
+  empresaCnpj: string | null;
+  empresaEndereco: string | null;
+  empresaChavePix: string | null;
+  vigenteDesde: string;
+  vigenteAte: string | null;
+  createdBy: string | null;
   createdAt: string;
 }
 

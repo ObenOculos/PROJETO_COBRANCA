@@ -39,6 +39,65 @@ export type Database = {
   };
   public: {
     Tables: {
+      acordo_configuracao_padrao: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          desconto_maximo_percentual: number;
+          desconto_padrao_percentual: number;
+          dias_entre_parcelas: number;
+          empresa_cnpj: string | null;
+          empresa_chave_pix: string | null;
+          empresa_endereco: string | null;
+          empresa_nome: string | null;
+          id: string;
+          juros_percentual_am: number;
+          multa_percentual: number;
+          vigente_ate: string | null;
+          vigente_desde: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          desconto_maximo_percentual?: number;
+          desconto_padrao_percentual?: number;
+          dias_entre_parcelas?: number;
+          empresa_cnpj?: string | null;
+          empresa_chave_pix?: string | null;
+          empresa_endereco?: string | null;
+          empresa_nome?: string | null;
+          id?: string;
+          juros_percentual_am?: number;
+          multa_percentual?: number;
+          vigente_ate?: string | null;
+          vigente_desde?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          desconto_maximo_percentual?: number;
+          desconto_padrao_percentual?: number;
+          dias_entre_parcelas?: number;
+          empresa_cnpj?: string | null;
+          empresa_chave_pix?: string | null;
+          empresa_endereco?: string | null;
+          empresa_nome?: string | null;
+          id?: string;
+          juros_percentual_am?: number;
+          multa_percentual?: number;
+          vigente_ate?: string | null;
+          vigente_desde?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "acordo_configuracao_padrao_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       acordo_pagamentos: {
         Row: {
           acordo_parcela_id: string;
@@ -1522,6 +1581,35 @@ export type Database = {
           to: "acordos";
           isOneToOne: true;
           isSetofReturn: false;
+        };
+      };
+      definir_configuracao_padrao_acordo: {
+        Args: {
+          p_desconto_maximo_percentual: number;
+          p_desconto_padrao_percentual: number;
+          p_dias_entre_parcelas: number;
+          p_empresa_cnpj: string;
+          p_empresa_chave_pix: string;
+          p_empresa_endereco: string;
+          p_empresa_nome: string;
+          p_juros_percentual_am: number;
+          p_multa_percentual: number;
+        };
+        Returns: {
+          created_at: string;
+          created_by: string | null;
+          desconto_maximo_percentual: number;
+          desconto_padrao_percentual: number;
+          dias_entre_parcelas: number;
+          empresa_cnpj: string | null;
+          empresa_chave_pix: string | null;
+          empresa_endereco: string | null;
+          empresa_nome: string | null;
+          id: string;
+          juros_percentual_am: number;
+          multa_percentual: number;
+          vigente_ate: string | null;
+          vigente_desde: string;
         };
       };
       definir_faixa_atraso_cobrador: {

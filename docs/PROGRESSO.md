@@ -20,6 +20,73 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 9 | Status "A Vencer" não existe hoje — avaliar relação com os demais | Baixa | A analisar |
 | 10 | ~~Etapa 3 — tipar `BANCO_DADOS` (FK `documento`/dinheiro `numeric`/datas `date`)~~ | Média | Grande, em 3 fases |
 | 11 | ~~Título de acordo ativo pagável por fora (Distribuir Pagamento/CollectionModal/upload)~~ | Alta | Pequeno/médio |
+| 12 | Atraso ciente de acordo ativo + Termo de Acordo automático (ver detalhe abaixo) | Alta | Grande, em etapas |
+
+### Item 12 — atraso ciente de acordo + Termo de Acordo automático — em andamento
+
+Pedido do usuário em 2026-11-04 (conversa original + WhatsApp com o Fábio,
+dono do negócio, sobre encargos de acordo). Três frentes:
+
+**A) Atraso ciente de acordo ativo — concluída 2026-11-04 (`9f6cb4c`)**
+`clientMaxOverdueDays`/`cliente_max_atraso_dias` (migration
+`20261104000001`) passam a usar o cronograma do acordo ATIVO (parcelas
+novas) em vez do vencimento do título original quando há acordo em
+andamento — o título é fato histórico imutável e ficava com data pré-acordo
+pra sempre. `CollectionContext` carrega em lote (`acordoAtivoOverdueMap`,
+junto de `fetchAcordos`) as parcelas em aberto dos acordos ativos. Acordo
+cancelado/quebrado/cumprido volta sozinho a usar o título (basta não estar
+mais `ativo`, sem caminho de reversão à parte). Pílula "Atraso" (Minha
+Carteira) também corrigida (quebra de linha em números grandes).
+Migration `20261104000001` ainda **não aplicada** em produção (passar pro
+usuário: `supabase db push`).
+
+**B) Termo de Acordo automático — em andamento.** Hoje `AcordoModal` não
+aplica NENHUM encargo (só divide o saldo selecionado em N parcelas iguais).
+Fábio confirmou que pode haver multa/juros, "de forma flexível"; decisão do
+usuário: padrão definido pelo gestor, editável pelo cobrador por
+negociação. Fórmula confirmada batendo com o modelo de Termo que o usuário
+mandou (`Termo_Acordo_Exemplo.pdf`, não commitado): multa 2% flat sobre o
+saldo do título + juros simples (não compostos) % a.m. pro-rata pelos dias
+de atraso do título (`saldo × taxa_mensal × dias/30`) — "C. Monetária" e
+"Honorário" ficam fora do escopo (zerados no exemplo real). Plano em 3
+etapas:
+
+- **3a — Configuração padrão (gestor) — concluída 2026-11-04, aguardando
+  `db push`.** Nova tabela `acordo_configuracao_padrao` (migration
+  `20261104000002`, com vigência histórica, mesmo padrão de
+  `collector_overdue_ranges`): multa %, juros % a.m., desconto padrão % (0
+  por padrão) e máximo %, dias entre parcelas (hoje fixo em 30 no
+  `AcordoModal`, sem limite de número de parcelas), dados da empresa (nome,
+  CNPJ, endereço, chave Pix). RPC `definir_configuracao_padrao_acordo`
+  (fecha vigente, abre nova, só gestor). Tela nova
+  `AcordoConfiguracaoPadrao.tsx`, aba "Config. de Acordos" no painel do
+  gestor (`src/config/navigation.ts`). `tsc`/`eslint` ok (contagem igual a
+  HEAD). `database.types.ts` tem a tabela/RPC adicionadas à mão (migration
+  ainda não aplicada — regenerar com `supabase gen types` depois do
+  `db push` pra conferir contra o schema real).
+- **3b — `AcordoModal` aplica o padrão (cobrador) — não iniciada.** Calcular
+  multa/juros por título (proporcional aos dias de atraso), campo de
+  desconto (padrão 0%, até o máximo configurado), captura de 2 testemunhas
+  (nome completo + CPF), forma de pagamento das parcelas, e o fluxo de
+  entrada via Pix: QR Code/copia-e-cola estático (padrão BR Code do Bacen,
+  **sem gateway de pagamento** — decisão do usuário 2026-11-04, zero
+  fornecedor novo) gerado com a chave Pix da empresa (config 3a) + valor da
+  entrada; cobrador confirma manualmente o recebimento e só então
+  `criarAcordo` roda de fato. Hoje a trava `totalBate` exige que a soma das
+  parcelas bata exatamente com o saldo selecionado — precisa passar a
+  comparar com saldo + encargos − desconto.
+- **3c — Geração do Termo de Acordo (PDF) — não iniciada.** Cabeçalho com a
+  logo (`Logo Focco Brasil.png`, não commitada ainda) e dados completos da
+  empresa/cliente, tabela "Títulos Negociados" (Dias/Vl.Orig/Multa/Juros/
+  Desconto/Total por título — já praticamente pronta a partir do cálculo da
+  3b), tabela "Parcelas Acordadas", QR Code Pix da entrada + forma de
+  pagamento das parcelas, testemunhas, cláusulas 2ª–4ª como **placeholder**
+  (texto jurídico final: usuário vai mandar depois — só trocar o texto,
+  sem mexer no resto). Gerado automaticamente ao criar o acordo + botão
+  "baixar" no `AcordoDetailModal`.
+
+Arquivos de referência na raiz do projeto (não commitados):
+`Termo_Acordo_Exemplo.pdf`, `Logo Focco Brasil.png`.
 
 ### Item 11 — título em acordo ativo pagável por fora — concluída 2026-11-02
 

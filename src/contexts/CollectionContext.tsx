@@ -31,6 +31,7 @@ import {
   AcordoTitulo,
   AcordoParcela,
   AcordoPagamento,
+  AcordoConfiguracaoPadrao,
 } from "../types";
 import { supabase } from "../lib/supabase";
 import {
@@ -269,6 +270,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const [acordoAtivoOverdueMap, setAcordoAtivoOverdueMap] = useState<
     Map<string, { dataVencimento: string; saldo: number }[]>
   >(new Map());
+  // Configuracao padrao de acordo vigente (Etapa 3a, ver fetchAcordoConfiguracaoPadrao).
+  const [acordoConfiguracaoPadrao, setAcordoConfiguracaoPadrao] =
+    useState<AcordoConfiguracaoPadrao | null>(null);
   const [allowedVisitDates, setAllowedVisitDates] = useState<
     AllowedVisitDate[]
   >([]);
@@ -821,6 +825,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             fetchActiveAddressHistory(),
             fetchReincidenciaResets(),
             fetchAcordos(),
+            fetchAcordoConfiguracaoPadrao(),
             fetchCollectorOverdueRanges(),
             fetchManagerCollectorLinks(),
           ]);
@@ -1921,6 +1926,80 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
 
     await fetchAcordos();
+  };
+
+  type AcordoConfiguracaoPadraoRow =
+    Database["public"]["Tables"]["acordo_configuracao_padrao"]["Row"];
+
+  const mapAcordoConfiguracaoPadraoRow = (
+    row: AcordoConfiguracaoPadraoRow,
+  ): AcordoConfiguracaoPadrao => ({
+    id: row.id,
+    multaPercentual: Number(row.multa_percentual),
+    jurosPercentualAm: Number(row.juros_percentual_am),
+    descontoPadraoPercentual: Number(row.desconto_padrao_percentual),
+    descontoMaximoPercentual: Number(row.desconto_maximo_percentual),
+    diasEntreParcelas: row.dias_entre_parcelas,
+    empresaNome: row.empresa_nome,
+    empresaCnpj: row.empresa_cnpj,
+    empresaEndereco: row.empresa_endereco,
+    empresaChavePix: row.empresa_chave_pix,
+    vigenteDesde: row.vigente_desde,
+    vigenteAte: row.vigente_ate,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  });
+
+  const fetchAcordoConfiguracaoPadrao = async () => {
+    try {
+      const { data, error: fetchError } = await supabase
+        .from("acordo_configuracao_padrao")
+        .select("*")
+        .is("vigente_ate", null)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+      setAcordoConfiguracaoPadrao(
+        data ? mapAcordoConfiguracaoPadraoRow(data) : null,
+      );
+    } catch (err) {
+      console.error("Erro ao buscar configuração padrão de acordo:", err);
+    }
+  };
+
+  const definirConfiguracaoPadraoAcordo = async (params: {
+    multaPercentual: number;
+    jurosPercentualAm: number;
+    descontoPadraoPercentual: number;
+    descontoMaximoPercentual: number;
+    diasEntreParcelas: number;
+    empresaNome: string;
+    empresaCnpj: string;
+    empresaEndereco: string;
+    empresaChavePix: string;
+  }): Promise<AcordoConfiguracaoPadrao> => {
+    const { data, error: rpcError } = await supabase
+      .rpc("definir_configuracao_padrao_acordo", {
+        p_multa_percentual: params.multaPercentual,
+        p_juros_percentual_am: params.jurosPercentualAm,
+        p_desconto_padrao_percentual: params.descontoPadraoPercentual,
+        p_desconto_maximo_percentual: params.descontoMaximoPercentual,
+        p_dias_entre_parcelas: params.diasEntreParcelas,
+        p_empresa_nome: params.empresaNome,
+        p_empresa_cnpj: params.empresaCnpj,
+        p_empresa_endereco: params.empresaEndereco,
+        p_empresa_chave_pix: params.empresaChavePix,
+      })
+      .single();
+
+    if (rpcError) {
+      console.error("Erro ao definir configuração padrão de acordo:", rpcError);
+      throw rpcError;
+    }
+
+    const nova = mapAcordoConfiguracaoPadraoRow(data);
+    setAcordoConfiguracaoPadrao(nova);
+    return nova;
   };
 
   const addUser = async (user: Omit<User, "id" | "createdAt">) => {
@@ -4682,6 +4761,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     getAcordoAtivoDoCliente,
     getAcordoQuebradoDoCliente,
     acordoAtivoOverdueMap,
+    acordoConfiguracaoPadrao,
+    fetchAcordoConfiguracaoPadrao,
+    definirConfiguracaoPadraoAcordo,
     criarAcordo,
     fetchAcordoDetalhe,
     registrarPagamentoAcordo,

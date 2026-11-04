@@ -11,6 +11,7 @@ import VisitTracking from "./VisitTracking";
 import CollectorsSummary from "./CollectorsSummary";
 import DailyCashReport from "./DailyCashReport";
 import AuthorizationManager from "./AuthorizationManager";
+import AcordoConfiguracaoPadrao from "./AcordoConfiguracaoPadrao";
 import TabTransition from "../common/TabTransition";
 import { useCollection } from "../../contexts/CollectionContext";
 import { FilterOptions } from "../../types";
@@ -70,6 +71,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     | "visit-tracking"
     | "authorization"
     | "database-upload"
+    | "acordo-config"
   >(() => {
     const savedTab = localStorage.getItem("managerActiveTab");
     return (savedTab as any) || "collections";
@@ -284,6 +286,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     switch (activeTab) {
       case "database-upload":
         return <DatabaseUpload />;
+      case "acordo-config":
+        return <AcordoConfiguracaoPadrao />;
       case "collections":
         return (
           <div className="space-y-3 sm:space-y-4">

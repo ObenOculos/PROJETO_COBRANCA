@@ -10,6 +10,7 @@ import {
   ClipboardList,
   User,
   CloudUpload,
+  FileSignature,
   LucideIcon,
 } from "lucide-react";
 
@@ -105,6 +106,12 @@ export const navigationItems: NavItemConfig[] = [
     id: "database-upload",
     managerName: "Upload de Dados",
     managerIcon: CloudUpload,
+    roles: ["manager"],
+  },
+  {
+    id: "acordo-config",
+    managerName: "Config. de Acordos",
+    managerIcon: FileSignature,
     roles: ["manager"],
   },
 ];
