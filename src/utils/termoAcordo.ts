@@ -168,17 +168,19 @@ export const gerarTermoAcordoPdf = async ({
     { align: "right" },
   );
 
-  y = Math.max(logoBottom, y + 10) + 7;
+  y = Math.max(logoBottom, y + 10) + 16;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(19);
   setColor(PRIMARY_DARK);
-  doc.text("Termo de Acordo", marginX, y);
+  doc.text("Termo de Acordo", pageWidth / 2, y, { align: "center" });
   doc.setFont("helvetica", "italic");
   doc.setFontSize(9.5);
   setColor(MUTED);
-  doc.text("Confissão de dívida e parcelamento", marginX, y + 5.5);
+  doc.text("Confissão de dívida e parcelamento", pageWidth / 2, y + 5.5, {
+    align: "center",
+  });
   doc.setFont("helvetica", "normal");
-  y += 11;
+  y += 12;
 
   setDraw(LINE);
   doc.setLineWidth(0.3);
