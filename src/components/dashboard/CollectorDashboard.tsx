@@ -35,6 +35,7 @@ import {
   AlertTriangle,
   CalendarClock,
   CalendarPlus,
+  CalendarX,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
@@ -63,6 +64,7 @@ import { SEM_CONTATO_DIAS, isEffectiveLabel } from "../../config/collectionAttem
 import LogContactModal from "./LogContactModal";
 import ScheduleContactModal from "./ScheduleContactModal";
 import RescheduleContactModal from "./RescheduleContactModal";
+import CancelContactModal from "./CancelContactModal";
 import ContactScheduler from "./ContactScheduler";
 import ClientDetailModal from "./ClientDetailModal";
 import AcordoModal from "./AcordoModal";
@@ -251,6 +253,7 @@ interface InternalCollectorWalletProps {
   onOpenAcordo: (client: ClientGroup) => void;
   onScheduleContact: (client: ClientGroup) => void;
   onRescheduleContact: (visit: ScheduledVisit) => void;
+  onCancelContact: (visit: ScheduledVisit) => void;
 }
 
 const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
@@ -263,6 +266,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   onOpenAcordo,
   onScheduleContact,
   onRescheduleContact,
+  onCancelContact,
 }) => {
   const {
     getAcordoAtivoDoCliente,
@@ -1193,6 +1197,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             scheduledContactByDocument={scheduledContactByDocument}
             onScheduleContact={onScheduleContact}
             onRescheduleContact={onRescheduleContact}
+            onCancelContact={onCancelContact}
           />
         </>
       ) : (
@@ -1228,6 +1233,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                       scheduledContact={scheduledContactByDocument.get(group.document)}
                       onScheduleContact={onScheduleContact}
                       onRescheduleContact={onRescheduleContact}
+                      onCancelContact={onCancelContact}
                     />
                   ))
                 ) : (
@@ -1326,6 +1332,7 @@ interface ClientQueueRowProps {
   scheduledContact?: ScheduledVisit;
   onScheduleContact: (client: ClientGroup) => void;
   onRescheduleContact: (visit: ScheduledVisit) => void;
+  onCancelContact: (visit: ScheduledVisit) => void;
 }
 
 // Linha da agenda/fila de atendimento, reusada em cada secao priorizada
@@ -1346,6 +1353,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   scheduledContact,
   onScheduleContact,
   onRescheduleContact,
+  onCancelContact,
 }) => {
   const { acordoAtivoOverdueMap } = useCollection();
   const maxAtraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
@@ -1557,6 +1565,18 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               <CalendarPlus className="w-4 h-4" />
             )}
           </button>
+          {scheduledContact && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancelContact(scheduledContact);
+              }}
+              className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl transition-all border border-red-100"
+              title="Cancelar contato agendado"
+            >
+              <CalendarX className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </td>
     </tr>
@@ -1639,6 +1659,7 @@ interface AgendaSectionProps {
   scheduledContactByDocument: Map<string, ScheduledVisit>;
   onScheduleContact: (client: ClientGroup) => void;
   onRescheduleContact: (visit: ScheduledVisit) => void;
+  onCancelContact: (visit: ScheduledVisit) => void;
 }
 
 // Conteudo da categoria ativa da agenda priorizada: borda colorida conforme
@@ -1665,6 +1686,7 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   scheduledContactByDocument,
   onScheduleContact,
   onRescheduleContact,
+  onCancelContact,
 }) => {
   const [page, setPage] = useState(1);
   useEffect(() => {
@@ -1711,6 +1733,7 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
                 scheduledContact={scheduledContactByDocument.get(group.document)}
                 onScheduleContact={onScheduleContact}
                 onRescheduleContact={onRescheduleContact}
+                onCancelContact={onCancelContact}
               />
             ))}
           </tbody>
@@ -1837,6 +1860,11 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   const [scheduleContactClient, setScheduleContactClient] =
     useState<ClientGroup | null>(null);
   const [rescheduleContactVisit, setRescheduleContactVisit] =
+    useState<ScheduledVisit | null>(null);
+  // Cancelamento direto (sem aprovacao) de um contato agendado -- item 16,
+  // docs/PROGRESSO.md. Visita presencial usa outro fluxo (com aprovacao do
+  // gestor, ver requestVisitCancellation/VisitScheduler).
+  const [cancelContactVisit, setCancelContactVisit] =
     useState<ScheduledVisit | null>(null);
   // Contato agendado ATIVO do cliente aberto no LogContactModal, se houver --
   // ao registrar o resultado, fecha esse agendamento como "realizada" em vez
@@ -2610,6 +2638,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         }}
         onScheduleContact={setScheduleContactClient}
         onRescheduleContact={setRescheduleContactVisit}
+        onCancelContact={setCancelContactVisit}
       />
     );
 
@@ -3097,6 +3126,14 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           visit={rescheduleContactVisit}
           onClose={() => setRescheduleContactVisit(null)}
           onSuccess={() => setRescheduleContactVisit(null)}
+        />
+      )}
+
+      {cancelContactVisit && (
+        <CancelContactModal
+          visit={cancelContactVisit}
+          onClose={() => setCancelContactVisit(null)}
+          onSuccess={() => setCancelContactVisit(null)}
         />
       )}
 

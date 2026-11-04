@@ -573,6 +573,9 @@ export interface CollectionContextType {
     notes?: string,
   ) => Promise<void>;
   requestVisitCancellation: (visitId: string, reason: string) => Promise<void>;
+  /** Cancelamento DIRETO (sem aprovacao), so pra contato ligacao/whatsapp
+   * da carteira -- ver cancelScheduledContact em CollectionContext. */
+  cancelScheduledContact: (visitId: string, reason: string) => Promise<void>;
   approveVisitCancellation: (
     visitId: string,
     managerId: string,

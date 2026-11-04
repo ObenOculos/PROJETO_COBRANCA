@@ -24,7 +24,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 13 | ~~Agendamento de contato pro cobrador de carteira (interno/terceirizado/jurídico)~~ | Alta | Grande, em etapas |
 | 14 | ~~Guard de agendamento ativo ausente em `atribuir_clientes_em_lote`/`remover_cobrador_em_lote`~~ | Alta | Pequeno |
 | 15 | ~~Transferência de carteira em massa não filtra agendamento por canal~~ | Alta | Pequeno/médio |
-| 16 | Cobrador de carteira não tem como cancelar um contato agendado (só concluir/reagendar) | Média/Alta | Médio |
+| 16 | ~~Cobrador de carteira não tem como cancelar um contato agendado (só concluir/reagendar)~~ | Média/Alta | Médio |
 | 17 | ~~Duas implementações de "desfecho libera cliente da carteira" (visitOutcomes vs. `if` no LogContactModal)~~ | Média | Pequeno/médio |
 | 18 | `AllowedVisitDatesManager` aceita os 4 perfis mas só `VisitScheduler` (externo) lê o resultado | Média | Pequeno |
 | 19 | `monthly_goals.visits_goal` muda de significado por perfil sem isso aparecer no schema/UI do % | Média | Pequeno |
@@ -50,9 +50,8 @@ etapas pequenas, testar antes de seguir — ver [[trabalho-em-etapas]]):
    abaixo.
 4. ~~Item 17 (unificar liberação de carteira)~~ — concluído, ver detalhe
    abaixo.
-5. Item 16 (cancelamento de contato) — próximo. Lacuna funcional real, precisa de
-   decisão de UX (fluxo com ou sem aprovação do gestor).
-6. Item 18 (`AllowedVisitDatesManager` restringir a externo) — pequeno,
+5. ~~Item 16 (cancelamento de contato)~~ — concluído, ver detalhe abaixo.
+6. Item 18 (`AllowedVisitDatesManager` restringir a externo) — próximo. Pequeno,
    mas confirmar que ninguém já configurou isso pra carteira em produção
    antes de restringir.
 7. Item 19 (documentar dualidade de `visits_goal`) — comentário de coluna
@@ -60,6 +59,33 @@ etapas pequenas, testar antes de seguir — ver [[trabalho-em-etapas]]):
 8. Item 21 (Jurídico) — depende de decisão de negócio, não é só código;
    perguntar como a cobrança jurídica funciona de verdade hoje fora do
    sistema antes de desenhar qualquer coisa.
+
+### Item 16 — cancelamento direto de contato agendado — concluído 2026-11-04
+
+Cobrador de carteira só tinha concluir/reagendar um contato ativo, nunca
+cancelar — diferente da visita presencial, que tem fluxo de cancelamento
+com aprovação do gestor (`requestVisitCancellation`/`approveVisitCancellation`,
+status `cancelamento_solicitado`). **Decisão confirmada com o usuário**:
+cancelamento DIRETO (sem aprovação) pra ligação/WhatsApp, só com motivo —
+diferente da visita, não há custo de deslocamento perdido que justifique
+exigir aprovação.
+
+Implementado: `cancelScheduledContact(visitId, reason)` em
+`CollectionContext` — confere o status real no banco antes (mesma cautela
+do `rescheduleVisit`), recusa se o canal for `presencial` (defensivo; essa
+função só é chamada pela tela da carteira) e grava `status: "cancelada"`
+direto, reaproveitando as colunas `cancellation_request_date`/`_reason`
+(sem preencher `cancellation_approved_*`, que são exclusivas do fluxo com
+aprovação). `CancelContactModal.tsx` novo (mesmo padrão visual de
+`RescheduleContactModal`, textarea de motivo, sem `window.confirm`/`alert`
+nativo). Botão "Cancelar contato agendado" no `ClientQueueRow`
+(`CollectorDashboard.tsx`), visível só quando há `scheduledContact`, ao
+lado do botão agendar/reagendar — thread de prop `onCancelContact` por
+`InternalCollectorWallet`→`AgendaSection`→`ClientQueueRow` (reusado nas
+duas seções, agenda priorizada e Carteira completa). `tsc -b`/lint sem
+regressão. **Testado só até onde o navegador permite sem login** (sem
+credencial de cobrador de carteira à mão nesta sessão) — usuário precisa
+confirmar o clique end-to-end manualmente.
 
 ### Item 17 — unificar "desfecho libera cliente da carteira" — concluído 2026-11-04
 

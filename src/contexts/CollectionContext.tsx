@@ -4337,6 +4337,89 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
+  // Cancelamento DIRETO (sem aprovacao do gestor) de um contato agendado
+  // (ligacao/whatsapp) do cobrador de carteira -- diferente da visita
+  // presencial (requestVisitCancellation acima), que tem custo de
+  // deslocamento perdido e por isso passa por "cancelamento_solicitado" +
+  // aprovacao. Item 16, docs/PROGRESSO.md: decisao confirmada com o
+  // usuario foi cancelamento direto, so com motivo, pra ligacao/WhatsApp.
+  const cancelScheduledContact = async (visitId: string, reason: string) => {
+    try {
+      console.log("Cancelando contato agendado:", visitId, reason);
+
+      const currentVisit = scheduledVisits.find((v) => v.id === visitId);
+      if (!currentVisit) {
+        throw new Error("Contato não encontrado no estado local.");
+      }
+      if ((currentVisit.channel ?? "presencial") === "presencial") {
+        throw new Error(
+          "Visita presencial precisa de aprovação do gestor para cancelar.",
+        );
+      }
+
+      // Confere o status REAL no banco antes de cancelar -- mesma cautela
+      // do rescheduleVisit, evita cancelar duas vezes (ou um contato ja
+      // concluido/reagendado por outra aba/dispositivo).
+      const { data: latestVisitData, error: fetchError } = await supabase
+        .from("scheduled_visits")
+        .select("status")
+        .eq("id", visitId)
+        .single();
+
+      if (fetchError) {
+        console.error(
+          "Erro ao buscar dados do contato para cancelamento:",
+          fetchError,
+        );
+        throw fetchError;
+      }
+
+      if (latestVisitData?.status !== "agendada") {
+        throw new Error(
+          `Este contato não pode ser cancelado (status atual: ${latestVisitData?.status}). Atualize a lista e tente novamente.`,
+        );
+      }
+
+      const updateData = {
+        status: "cancelada" as const,
+        cancellation_request_date: new Date().toISOString(),
+        cancellation_request_reason: reason,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from("scheduled_visits")
+        .update(updateData)
+        .eq("id", visitId);
+
+      if (error) {
+        console.error("Erro ao cancelar contato no Supabase:", error);
+        throw error;
+      }
+
+      setScheduledVisits((prev) =>
+        prev.map((visit) =>
+          visit.id === visitId
+            ? {
+                ...visit,
+                status: "cancelada",
+                cancellationRequestDate: updateData.cancellation_request_date,
+                cancellationRequestReason: reason,
+                updatedAt: updateData.updated_at,
+              }
+            : visit,
+        ),
+      );
+
+      invalidateVisits();
+
+      console.log("Contato agendado cancelado com sucesso");
+    } catch (error) {
+      console.error("Erro ao cancelar contato agendado:", error);
+      throw error;
+    }
+  };
+
   const getPendingCancellationRequests = React.useCallback(() => {
     return scheduledVisits.filter(
       (visit) => visit.status === "cancelamento_solicitado",
@@ -4903,6 +4986,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     scheduleVisit,
     updateVisitStatus,
     requestVisitCancellation,
+    cancelScheduledContact,
     approveVisitCancellation,
     rejectVisitCancellation,
     getPendingCancellationRequests,
