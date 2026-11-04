@@ -33,7 +33,6 @@ import {
   Eye,
   EyeOff,
   AlertTriangle,
-  Search,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
@@ -244,6 +243,7 @@ interface InternalCollectorWalletProps {
   onOpenLog: (client: any) => void;
   onOpenDetail: (client: any) => void;
   onOpenAcordo: (client: ClientGroup) => void;
+  onOpenAcordoById: (acordoId: string) => void;
 }
 
 const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
@@ -254,6 +254,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   onOpenLog,
   onOpenDetail,
   onOpenAcordo,
+  onOpenAcordoById,
 }) => {
   const {
     getAcordoAtivoDoCliente,
@@ -262,6 +263,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     salePayments,
     collectorOverdueRanges,
     acordoAtivoOverdueMap,
+    acordos,
   } = useCollection();
   const [walletTab, setWalletTab] = useState<"agenda" | "carteira">("agenda");
   const [agendaSubTab, setAgendaSubTab] = useState<AgendaSubTab>("promessas");
@@ -291,6 +293,19 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // filtra por título; aqui a tabela é por cliente, então o resultado vira
   // um conjunto de documentos usado pra recortar openClientGroups.
   const [walletFilters, setWalletFilters] = useState<FilterOptions>({});
+
+  // Numero do acordo (prefixo do id, mesmo formato do Termo em PDF -- ver
+  // src/utils/termoAcordo.ts) buscavel pelo MESMO campo de busca da carteira,
+  // em vez de um campo separado: um termo de 6+ caracteres que bate com o
+  // prefixo de algum acordo vira um atalho pra abrir o detalhe direto.
+  const acordoBuscaMatch = useMemo(() => {
+    const termo = (walletFilters.search || "").trim().toUpperCase();
+    if (termo.length < 6) return null;
+    return (
+      acordos.find((a) => a.id.toUpperCase().startsWith(termo)) ?? null
+    );
+  }, [walletFilters.search, acordos]);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [copiedDoc, setCopiedDoc] = useState<string | null>(null);
   const itemsPerPage = 10;
@@ -938,7 +953,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         onFilterChange={setWalletFilters}
         userType={user?.type || "collector"}
         context="collectionsCollector"
-        searchPlaceholder="Buscar cliente, CPF ou cidade..."
+        searchPlaceholder="Buscar cliente, CPF, cidade ou nº do acordo..."
         showStatusPills={false}
         collapsible
         leading={
@@ -970,6 +985,25 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           </div>
         }
       />
+
+      {acordoBuscaMatch && (
+        <button
+          type="button"
+          onClick={() => onOpenAcordoById(acordoBuscaMatch.id)}
+          className="w-full flex items-center justify-between gap-2 px-4 py-2.5 mb-4 bg-indigo-50 dark:bg-dark-bg-tertiary border border-indigo-100 dark:border-dark-border rounded-xl text-sm hover:bg-indigo-100 dark:hover:bg-dark-border transition-colors text-left"
+        >
+          <span className="text-indigo-700 dark:text-indigo-300">
+            <span className="font-bold">
+              Acordo Nº {acordoBuscaMatch.id.slice(0, 8).toUpperCase()}
+            </span>
+            {" — "}
+            {acordoBuscaMatch.clientName || acordoBuscaMatch.clientDocument}
+          </span>
+          <span className="font-bold text-indigo-600 dark:text-indigo-400 shrink-0">
+            Abrir →
+          </span>
+        </button>
+      )}
 
       {walletTab === "agenda" ? (
         <>
@@ -1585,7 +1619,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     salePayments,
     monthlyGoals,
     getAcordoAtivoDoCliente,
-    acordos,
   } = useCollection();
   const collectionTableRef = useRef<CollectionTableRef>(null);
 
@@ -1601,24 +1634,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   const [selectedAcordoId, setSelectedAcordoId] = useState<string | null>(
     null,
   );
-  const [buscaAcordoTermo, setBuscaAcordoTermo] = useState("");
-  const [buscaAcordoErro, setBuscaAcordoErro] = useState("");
-
-  /** Acha o acordo pelo "numero" exibido no Termo (prefixo do id, ver
-   * src/utils/termoAcordo.ts) -- atalho pra abrir o detalhe direto sem
-   * precisar achar o cliente na carteira primeiro. */
-  const buscarAcordoPorNumero = () => {
-    const termo = buscaAcordoTermo.trim().toUpperCase();
-    if (!termo) return;
-    const encontrado = acordos.find((a) => a.id.toUpperCase().startsWith(termo));
-    if (encontrado) {
-      setSelectedAcordoId(encontrado.id);
-      setBuscaAcordoTermo("");
-      setBuscaAcordoErro("");
-    } else {
-      setBuscaAcordoErro("Nenhum acordo encontrado com esse número.");
-    }
-  };
 
   // Usa a aba externa se fornecida, senão gerencia internamente
   const internalActiveTab: "overview" | "collections" | "route" | "visits" =
@@ -2366,6 +2381,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             setIsAcordoModalOpen(true);
           }
         }}
+        onOpenAcordoById={(acordoId) => setSelectedAcordoId(acordoId)}
       />
     );
 
@@ -2816,36 +2832,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
   return (
     <div className="p-4 sm:p-6 lg:p-16 pt-16 lg:pt-16">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="relative w-full max-w-xs">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            value={buscaAcordoTermo}
-            onChange={(e) => {
-              setBuscaAcordoTermo(e.target.value);
-              setBuscaAcordoErro("");
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") buscarAcordoPorNumero();
-            }}
-            placeholder="Buscar acordo pelo nº (ex: A1B2C3D4)"
-            className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-indigo-200 outline-none transition-all dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={buscarAcordoPorNumero}
-          disabled={!buscaAcordoTermo.trim()}
-          className="shrink-0 px-3 py-2 bg-gray-100 dark:bg-dark-bg-tertiary text-gray-700 dark:text-dark-text text-sm font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-dark-border disabled:opacity-50"
-        >
-          Buscar
-        </button>
-      </div>
-      {buscaAcordoErro && (
-        <p className="text-xs text-red-500 -mt-2 mb-3">{buscaAcordoErro}</p>
-      )}
-
       {/* Tab Content */}
       <TabTransition activeKey={activeTab}>{renderTabContent()}</TabTransition>
 
