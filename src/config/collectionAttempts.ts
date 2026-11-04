@@ -25,3 +25,34 @@ export const ATTEMPT_RESULT_LABELS: Record<CollectionAttempt["result"], string> 
   message_sent: "Mensagem enviada",
   agreement: "Acordo realizado",
 };
+
+/**
+ * Resultados que significam "conseguiu falar com o cliente" (contato
+ * efetivo), usados pela meta de atendimentos do cobrador de carteira
+ * (WALLET_COLLECTOR_TYPES) -- diferente da visita presencial, onde
+ * "realizada" ja conta sozinho (o cobrador foi ao local, qualquer desfecho).
+ * "Mensagem enviada" fica de fora: enviar nao confirma que o cliente leu ou
+ * respondeu.
+ */
+const EFFECTIVE_ATTEMPT_RESULTS: ReadonlySet<CollectionAttempt["result"]> =
+  new Set(["promise", "refusal", "partial_payment", "full_payment", "contact_made", "agreement"]);
+
+export const isEffectiveAttemptResult = (
+  result: CollectionAttempt["result"],
+): boolean => EFFECTIVE_ATTEMPT_RESULTS.has(result);
+
+/**
+ * Mesma classificacao, mas a partir do ROTULO gravado em
+ * scheduled_visits.notes na conclusao de um contato agendado (Etapa 4) --
+ * la nao sobra o `result` estruturado, so o texto exibido. Espelha o padrao
+ * de `exactVisitOutcome` (src/config/visitOutcomes): texto EXATO contra o
+ * catalogo, nunca semelhanca.
+ */
+export const isEffectiveLabel = (notes?: string | null): boolean => {
+  const text = (notes ?? "").trim();
+  if (!text) return false;
+  const result = (
+    Object.entries(ATTEMPT_RESULT_LABELS) as [CollectionAttempt["result"], string][]
+  ).find(([, label]) => label === text)?.[0];
+  return result ? isEffectiveAttemptResult(result) : false;
+};

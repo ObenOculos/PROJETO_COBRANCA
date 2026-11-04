@@ -1,4 +1,4 @@
-import { ScheduledVisit } from "../types";
+import { ScheduledVisit, ScheduledVisitChannel } from "../types";
 
 /**
  * Motivos pre-programados de reagendamento.
@@ -16,10 +16,17 @@ export interface RescheduleReason {
   label: string;
   /** Texto curto para chips/agrupamentos. */
   short: string;
+  /** Canais em que este motivo é oferecido. Ausente = vale para todos. */
+  channels?: readonly ScheduledVisitChannel[];
 }
 
 export const RESCHEDULE_REASONS: readonly RescheduleReason[] = [
-  { key: "ausente", label: "Cliente ausente", short: "Ausente" },
+  {
+    key: "ausente",
+    label: "Cliente ausente",
+    short: "Ausente",
+    channels: ["presencial"],
+  },
   {
     key: "pediu_outra_data",
     label: "Cliente pediu outra data",
@@ -29,19 +36,40 @@ export const RESCHEDULE_REASONS: readonly RescheduleReason[] = [
     key: "endereco_nao_localizado",
     label: "Endereço não localizado",
     short: "Endereço",
+    channels: ["presencial"],
   },
   {
     key: "responsavel_ausente",
     label: "Responsável não estava presente",
     short: "Responsável ausente",
+    channels: ["presencial"],
   },
   {
     key: "rota",
     label: "Problema na rota / agenda do cobrador",
     short: "Rota",
+    channels: ["presencial"],
+  },
+  {
+    key: "nao_atendeu_reagendar",
+    label: "Cliente não atendeu",
+    short: "Não atendeu",
+    channels: ["ligacao", "whatsapp"],
+  },
+  {
+    key: "pediu_outro_horario",
+    label: "Cliente pediu outro horário",
+    short: "Outro horário",
+    channels: ["ligacao", "whatsapp"],
   },
   { key: "outro", label: "Outro motivo", short: "Outro" },
 ];
+
+/** Motivos oferecidos para um canal (ausência de `channels` = vale para todos). */
+export const rescheduleReasonsForChannel = (
+  channel: ScheduledVisitChannel,
+): readonly RescheduleReason[] =>
+  RESCHEDULE_REASONS.filter((r) => !r.channels || r.channels.includes(channel));
 
 /** Chave usada quando a remarcacao e anterior a captura de motivo. */
 export const REASON_NAO_INFORMADO = "nao_informado";
