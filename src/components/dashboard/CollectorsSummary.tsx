@@ -22,7 +22,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
 import { isCollectorType, UserType, ClienteForaDaFaixa } from "../../types";
-import { USER_TYPE_LABELS } from "../../config/profiles";
+import { USER_TYPE_LABELS, WALLET_COLLECTOR_TYPES } from "../../config/profiles";
 import {
   isVisitOverdue,
   lastVisitStatusByClient,
@@ -1160,14 +1160,14 @@ const CollectorsSummary: React.FC = () => {
           <div
             className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-dark-text-secondary ${TONE_AGENDA}`}
           >
-            Agenda (visitas)
+            Agenda (visitas/contatos)
           </div>
           <div className="flex flex-wrap gap-2">
             <Badge
               icon={CalendarClock}
               label="Em atraso"
               value={totals.emAtrasoVisitas}
-              unit="visitas"
+              unit="agendamentos"
               tone={totals.emAtrasoVisitas > 0 ? "red" : "neutral"}
             />
             <Badge
@@ -1180,27 +1180,27 @@ const CollectorsSummary: React.FC = () => {
               icon={CalendarCheck2}
               label="Agendamentos"
               value={totals.agendadasQtd}
-              unit="visitas"
+              unit="agendamentos"
               money={formatCurrency(totals.agendadasValor, false)}
             />
             <Badge
               icon={Users}
               label="Realizadas"
               value={totals.realizadasQtd}
-              unit="visitas"
+              unit="agendamentos"
             />
             <Badge
               icon={RotateCcw}
               label="Reagendamentos"
               value={totals.reagendadasQtd}
-              unit="visitas"
+              unit="agendamentos"
               money={formatCurrency(totals.reagendadasValor, false)}
             />
             <Badge
               icon={SearchX}
               label="Não encontrado"
               value={totals.naoEncontradoQtd}
-              unit="visitas"
+              unit="agendamentos"
               money={formatCurrency(totals.naoEncontradoValor, false)}
             />
             <Badge
@@ -1276,7 +1276,7 @@ const CollectorsSummary: React.FC = () => {
                     icon={CalendarClock}
                     label="Em atraso"
                     value={row.emAtrasoVisitas}
-                    unit="visitas"
+                    unit="agendamentos"
                     tone={row.emAtrasoVisitas > 0 ? "red" : "neutral"}
                   />
                   <Badge
@@ -1318,27 +1318,27 @@ const CollectorsSummary: React.FC = () => {
                     icon={CalendarCheck2}
                     label="Agendamentos"
                     value={row.agendadasQtd}
-                    unit="visitas"
+                    unit="agendamentos"
                     money={formatCurrency(row.agendadasValor, false)}
                   />
                   <Badge
                     icon={Users}
                     label="Realizadas"
                     value={row.realizadasQtd}
-                    unit="visitas"
+                    unit="agendamentos"
                   />
                   <Badge
                     icon={RotateCcw}
                     label="Reagendamentos"
                     value={row.reagendadasQtd}
-                    unit="visitas"
+                    unit="agendamentos"
                     money={formatCurrency(row.reagendadasValor, false)}
                   />
                   <Badge
                     icon={SearchX}
                     label="Não encontrado"
                     value={row.naoEncontradoQtd}
-                    unit="visitas"
+                    unit="agendamentos"
                     money={formatCurrency(row.naoEncontradoValor, false)}
                   />
                   <Badge
@@ -1400,7 +1400,7 @@ const CollectorsSummary: React.FC = () => {
                   colSpan={7}
                   className={`px-3 py-1.5 text-center border-l border-gray-200 dark:border-dark-border ${TONE_AGENDA}`}
                 >
-                  Agenda (visitas)
+                  Agenda (visitas/contatos)
                 </th>
               </tr>
               <tr className="border-b border-gray-100 dark:border-dark-border/40 text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">
@@ -1568,7 +1568,11 @@ const CollectorsSummary: React.FC = () => {
                   <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
                     <div className="font-semibold">{row.emAtrasoVisitas}</div>
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      visitas
+                      {WALLET_COLLECTOR_TYPES.includes(
+                        row.type as (typeof WALLET_COLLECTOR_TYPES)[number],
+                      )
+                        ? "contatos"
+                        : "visitas"}
                     </div>
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
@@ -1588,7 +1592,11 @@ const CollectorsSummary: React.FC = () => {
                   <td className="px-3 py-3 text-right whitespace-nowrap">
                     <div className="font-semibold">{row.realizadasQtd}</div>
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      visitas
+                      {WALLET_COLLECTOR_TYPES.includes(
+                        row.type as (typeof WALLET_COLLECTOR_TYPES)[number],
+                      )
+                        ? "contatos"
+                        : "visitas"}
                     </div>
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">

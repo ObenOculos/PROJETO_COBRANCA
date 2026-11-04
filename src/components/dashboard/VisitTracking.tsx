@@ -19,6 +19,8 @@ import {
   Zap,
   Trash2,
   RefreshCw,
+  Phone,
+  MessageCircle,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import * as XLSX from "xlsx";
@@ -58,6 +60,36 @@ const reincidenciaTone = (n: number) =>
   n >= 5
     ? "bg-red-100 text-red-700 border-red-200"
     : "bg-amber-100 text-amber-700 border-amber-200";
+
+/**
+ * Local (visita presencial) ou canal (contato do cobrador de carteira),
+ * reusado na tabela desktop e nos cards mobile -- so visita presencial tem
+ * bairro/cidade preenchidos (ScheduleContactModal não grava endereço).
+ */
+const LocationOrChannelCell: React.FC<{
+  visit: ScheduledVisit;
+  iconClassName: string;
+}> = ({ visit, iconClassName }) => {
+  if (visit.channel && visit.channel !== "presencial") {
+    const Icon = visit.channel === "whatsapp" ? MessageCircle : Phone;
+    return (
+      <>
+        <Icon className={iconClassName} />
+        <span className="truncate">
+          {visit.channel === "whatsapp" ? "WhatsApp" : "Ligação"}
+        </span>
+      </>
+    );
+  }
+  return (
+    <>
+      <MapPin className={iconClassName} />
+      <span className="truncate">
+        {visit.clientNeighborhood}, {visit.clientCity}
+      </span>
+    </>
+  );
+};
 
 // Helper function to parse YYYY-MM-DD date strings safely
 const parseDateString = (dateString: string): Date | null => {
@@ -810,7 +842,12 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       Cobrador: getCollectorName(visit.collectorId),
       Cliente: visit.clientName,
       Documento: visit.clientDocument,
-      Endereço: `${visit.clientAddress}${visit.clientNumber ? `, ${visit.clientNumber}` : ""}, ${visit.clientNeighborhood}, ${visit.clientCity}`,
+      "Local / Canal":
+        visit.channel && visit.channel !== "presencial"
+          ? visit.channel === "whatsapp"
+            ? "WhatsApp"
+            : "Ligação"
+          : `${visit.clientAddress}${visit.clientNumber ? `, ${visit.clientNumber}` : ""}, ${visit.clientNeighborhood}, ${visit.clientCity}`,
       "Data Agendada": formatSafeDate(visit.scheduledDate),
       "Hora Agendada": visit.scheduledTime || "N/A",
       Status: getStatusLabel(visit.status),
@@ -1556,7 +1593,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                         Agendamento
                                       </th>
                                       <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
-                                        Localização
+                                        Local / Canal
                                       </th>
                                       <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
                                         Status / Valor
@@ -1628,11 +1665,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                           </td>
                                           <td className="py-4 pr-4">
                                             <div className="flex items-center text-xs font-medium text-gray-600 dark:text-dark-text-secondary max-w-[200px]">
-                                              <MapPin className="h-4 w-4 mr-2 text-gray-400 shrink-0" />
-                                              <span className="truncate">
-                                                {visit.clientNeighborhood},{" "}
-                                                {visit.clientCity}
-                                              </span>
+                                              <LocationOrChannelCell
+                                                visit={visit}
+                                                iconClassName="h-4 w-4 mr-2 text-gray-400 shrink-0"
+                                              />
                                             </div>
                                           </td>
                                           <td className="py-4 pr-4">
@@ -1765,11 +1801,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                             `ÀS ${visit.scheduledTime}`}
                                         </div>
                                         <div className="flex items-center text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
-                                          <MapPin className="h-3.5 w-3.5 mr-2.5 text-gray-400 shrink-0" />
-                                          <span className="truncate">
-                                            {visit.clientNeighborhood},{" "}
-                                            {visit.clientCity}
-                                          </span>
+                                          <LocationOrChannelCell
+                                            visit={visit}
+                                            iconClassName="h-3.5 w-3.5 mr-2.5 text-gray-400 shrink-0"
+                                          />
                                         </div>
                                       </div>
 
