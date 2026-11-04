@@ -292,16 +292,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // um conjunto de documentos usado pra recortar openClientGroups.
   const [walletFilters, setWalletFilters] = useState<FilterOptions>({});
 
-  // A Agenda so mostra um recorte priorizado (promessas, urgentes etc.) --
-  // uma busca pode nao aparecer nela mesmo existindo na carteira (ex.:
-  // cliente sem visita prevista hoje). Ao digitar uma busca na Agenda, pula
-  // sozinho pra Carteira completa (onde a lista filtrada e exibida por
-  // inteiro) pra nao parecer que a busca "nao encontrou nada".
-  useEffect(() => {
-    if (!(walletFilters.search || "").trim()) return;
-    setWalletTab((prev) => (prev === "agenda" ? "carteira" : prev));
-  }, [walletFilters.search]);
-
   // Numero do acordo (prefixo do id, mesmo formato do Termo em PDF -- ver
   // src/utils/termoAcordo.ts) buscavel pelo MESMO campo de busca da carteira,
   // igual a pesquisar o CPF do cliente: um termo de 6+ caracteres que bate
@@ -643,6 +633,39 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     acordoAtivoOverdueMap,
     today,
   ]);
+
+  // Ao digitar uma busca, tenta manter o cobrador DENTRO da Agenda: as 7
+  // categorias acima (exceto "urgente", que nao e exclusiva -- ver comentario
+  // la em cima) particionam TODO o conjunto filtrado, entao um termo que
+  // isola um unico cliente (ex.: CPF ou numero de acordo) cai inteiro numa
+  // unica categoria -- pula pra ela (ex.: "Em tratamento") em vez de deixar
+  // a busca parecer vazia na aba atual. Se a busca espalhar clientes por
+  // mais de uma categoria (ou nao achar ninguem), cai pra Carteira completa,
+  // que mostra a lista inteira de uma vez. So reage a busca MUDAR -- nao a
+  // cada recalculo das categorias (ex.: ordenacao), senao o cobrador seria
+  // chutado de volta toda hora com uma busca ainda digitada.
+  useEffect(() => {
+    if (!(walletFilters.search || "").trim()) return;
+    // Na Carteira completa a busca ja aparece direto na lista (igual CPF) --
+    // so remaneja de aba/subaba quando o cobrador esta na Agenda.
+    if (walletTab !== "agenda") return;
+    const categoriasExclusivas: { key: AgendaSubTab; groups: ClientGroup[] }[] = [
+      { key: "promessas", groups: promessas },
+      { key: "quebrado", groups: acordosQuebrados },
+      { key: "critico", groups: criticos },
+      { key: "alerta", groups: alertas },
+      { key: "medio", groups: medios },
+      { key: "semContato", groups: semContato },
+      { key: "tratamento", groups: emTratamento },
+    ];
+    const comResultado = categoriasExclusivas.filter((c) => c.groups.length > 0);
+    if (comResultado.length === 1) {
+      setAgendaSubTab(comResultado[0].key);
+    } else {
+      setWalletTab("carteira");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walletFilters.search]);
 
   const agendaCategorias: AgendaCategoriaConfig[] = useMemo(
     () => [
