@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
-import { USER_TYPE_LABELS, WALLET_COLLECTOR_TYPES } from "../../config/profiles";
+import { USER_TYPE_LABELS, isWalletCollectorType } from "../../config/profiles";
 import {
   Target,
   Clock,
@@ -2011,9 +2011,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     // diferente do externo, onde "realizada" já é a visita feita, qualquer
     // desfecho. Ver isEffectiveLabel (config/collectionAttempts) e o adendo
     // do plano salvo desta feature.
-    const isWalletCollectorGoal = WALLET_COLLECTOR_TYPES.includes(
-      user?.type as (typeof WALLET_COLLECTOR_TYPES)[number],
-    );
+    const isWalletCollectorGoal = isWalletCollectorType(user?.type);
     const countsAsRealizada = (v: ScheduledVisit) =>
       v.status === "realizada" &&
       (!isWalletCollectorGoal || isEffectiveLabel(v.notes));

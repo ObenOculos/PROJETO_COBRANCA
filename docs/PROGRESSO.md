@@ -28,7 +28,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 17 | Duas implementações de "desfecho libera cliente da carteira" (visitOutcomes vs. `if` no LogContactModal) | Média | Pequeno/médio |
 | 18 | `AllowedVisitDatesManager` aceita os 4 perfis mas só `VisitScheduler` (externo) lê o resultado | Média | Pequeno |
 | 19 | `monthly_goals.visits_goal` muda de significado por perfil sem isso aparecer no schema/UI do % | Média | Pequeno |
-| 20 | Helper `WALLET_COLLECTOR_TYPES.includes(...)` repetido em 6+ lugares em vez de `isWalletCollectorType()` único | Baixa | Pequeno |
+| 20 | ~~Helper `WALLET_COLLECTOR_TYPES.includes(...)` repetido em 6+ lugares em vez de `isWalletCollectorType()` único~~ | Baixa | Pequeno |
 | 21 | Jurídico (`legal_collector`) é 100% idêntico a Interno/Terceirizado — zero modelagem de processo/protesto/prazo legal | A avaliar com o negócio | A analisar |
 
 ### Item 21 — diagnóstico das modalidades de cobrança (externo/interno/terceirizado/jurídico) — 2026-11-04
@@ -46,9 +46,9 @@ etapas pequenas, testar antes de seguir — ver [[trabalho-em-etapas]]):
 1. ~~Item 14 (guard de agendamento ativo)~~ — concluído, ver detalhe abaixo.
 2. ~~Item 15 (transferência não filtra canal)~~ — concluído, ver detalhe
    abaixo (inclui a correção derivada do bug de órfão por guard do item 14).
-3. Item 20 (helper `isWalletCollectorType`) — próximo. Limpeza pequena, zero risco,
-   bom aquecimento antes dos itens maiores.
-4. Item 17 (unificar liberação de carteira) — média complexidade.
+3. ~~Item 20 (helper `isWalletCollectorType`)~~ — concluído, ver detalhe
+   abaixo.
+4. Item 17 (unificar liberação de carteira) — próximo. Média complexidade.
 5. Item 16 (cancelamento de contato) — lacuna funcional real, precisa de
    decisão de UX (fluxo com ou sem aprovação do gestor).
 6. Item 18 (`AllowedVisitDatesManager` restringir a externo) — pequeno,
@@ -59,6 +59,16 @@ etapas pequenas, testar antes de seguir — ver [[trabalho-em-etapas]]):
 8. Item 21 (Jurídico) — depende de decisão de negócio, não é só código;
    perguntar como a cobrança jurídica funciona de verdade hoje fora do
    sistema antes de desenhar qualquer coisa.
+
+### Item 20 — helper `isWalletCollectorType` — concluído 2026-11-04
+
+Terceiro item da ordem combinada (aquecimento, zero risco). `WALLET_COLLECTOR_TYPES.includes(x as (typeof WALLET_COLLECTOR_TYPES)[number])`
+estava repetido ipsis litteris em 7 lugares (`CollectorDashboard.tsx`,
+`MonthlyGoalEditModal.tsx`, `EnhancedPerformanceChart.tsx`,
+`CollectorsSummary.tsx` ×4). Extraído `isWalletCollectorType(type)` em
+`src/config/profiles.ts`, ao lado de `WALLET_COLLECTOR_TYPES`; os 7 lugares
+agora chamam a função em vez de repetir o cast. `tsc -b` limpo, lint sem
+regressão em nenhum dos 5 arquivos tocados.
 
 ### Itens 14 e 15 — guard de agendamento ativo + filtro de canal na transferência — concluídos 2026-11-04
 

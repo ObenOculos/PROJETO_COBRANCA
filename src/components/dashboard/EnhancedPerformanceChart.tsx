@@ -24,7 +24,7 @@ import {
   todayLocalStr,
 } from "../../config/visitStatus";
 import { isEffectiveLabel } from "../../config/collectionAttempts";
-import { WALLET_COLLECTOR_TYPES } from "../../config/profiles";
+import { isWalletCollectorType } from "../../config/profiles";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
 import FilterBar from "../common/FilterBar";
@@ -1068,9 +1068,7 @@ const EnhancedPerformanceChart: React.FC = () => {
         .map(([document, v]) => ({ document, name: v.name, count: v.count }))
         .sort((a, b) => b.count - a.count);
 
-      const isWalletCollectorGoal = WALLET_COLLECTOR_TYPES.includes(
-        collector.type as (typeof WALLET_COLLECTOR_TYPES)[number],
-      );
+      const isWalletCollectorGoal = isWalletCollectorType(collector.type);
       const currentMonthVisitsActual = isWalletCollectorGoal
         ? visitsRealizadasEfetivas
         : visitsRealizadas;

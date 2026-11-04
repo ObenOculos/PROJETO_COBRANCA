@@ -11,7 +11,7 @@ import { User } from "../../types";
 import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
 import { Modal } from "../Modal";
-import { WALLET_COLLECTOR_TYPES } from "../../config/profiles";
+import { isWalletCollectorType } from "../../config/profiles";
 
 interface MonthlyGoalEditModalProps {
   isOpen: boolean;
@@ -44,9 +44,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
   // cobrador de carteira (interno/terceirizado/jurídico) "visita" não existe,
   // o que ele cumpre é contato (ligação/WhatsApp) efetivo. Ver
   // isEffectiveLabel/WALLET_COLLECTOR_TYPES e o adendo do plano desta feature.
-  const isWalletCollector = WALLET_COLLECTOR_TYPES.includes(
-    collector?.type as (typeof WALLET_COLLECTOR_TYPES)[number],
-  );
+  const isWalletCollector = isWalletCollectorType(collector?.type);
   const visitsGoalLabel = isWalletCollector
     ? "Meta de Atendimentos"
     : "Meta de Visitas";

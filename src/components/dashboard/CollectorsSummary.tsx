@@ -22,7 +22,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
 import { isCollectorType, UserType, ClienteForaDaFaixa } from "../../types";
-import { USER_TYPE_LABELS, WALLET_COLLECTOR_TYPES } from "../../config/profiles";
+import { USER_TYPE_LABELS, isWalletCollectorType } from "../../config/profiles";
 import {
   isVisitOverdue,
   lastVisitStatusByClient,
@@ -1248,9 +1248,7 @@ const CollectorsSummary: React.FC = () => {
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
                       {USER_TYPE_LABELS[row.type]}
                     </div>
-                    {WALLET_COLLECTOR_TYPES.includes(
-                      row.type as (typeof WALLET_COLLECTOR_TYPES)[number],
-                    ) && (
+                    {isWalletCollectorType(row.type) && (
                       <button
                         type="button"
                         onClick={() => setScheduleContactCollectorId(row.id)}
@@ -1546,9 +1544,7 @@ const CollectorsSummary: React.FC = () => {
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
                       {USER_TYPE_LABELS[row.type]}
                     </div>
-                    {WALLET_COLLECTOR_TYPES.includes(
-                      row.type as (typeof WALLET_COLLECTOR_TYPES)[number],
-                    ) && (
+                    {isWalletCollectorType(row.type) && (
                       <button
                         type="button"
                         onClick={() => setScheduleContactCollectorId(row.id)}
@@ -1597,9 +1593,7 @@ const CollectorsSummary: React.FC = () => {
                   <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
                     <div className="font-semibold">{row.emAtrasoVisitas}</div>
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {WALLET_COLLECTOR_TYPES.includes(
-                        row.type as (typeof WALLET_COLLECTOR_TYPES)[number],
-                      )
+                      {isWalletCollectorType(row.type)
                         ? "contatos"
                         : "visitas"}
                     </div>
@@ -1621,9 +1615,7 @@ const CollectorsSummary: React.FC = () => {
                   <td className="px-3 py-3 text-right whitespace-nowrap">
                     <div className="font-semibold">{row.realizadasQtd}</div>
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {WALLET_COLLECTOR_TYPES.includes(
-                        row.type as (typeof WALLET_COLLECTOR_TYPES)[number],
-                      )
+                      {isWalletCollectorType(row.type)
                         ? "contatos"
                         : "visitas"}
                     </div>

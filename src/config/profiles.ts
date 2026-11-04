@@ -31,13 +31,21 @@ export const SITUACAO_BY_PROFILE: Record<
 export const SITUACAO_EM_ACORDO = "Em acordo";
 
 /** Perfis que podem criar/gerenciar acordo de renegociacao (telefone +
- * negociacao, sem rota de visita em campo). Mesmo conjunto de
- * `isWalletCollector` em CollectorDashboard.tsx. */
+ * negociacao, sem rota de visita em campo). */
 export const WALLET_COLLECTOR_TYPES: Exclude<UserType, "manager">[] = [
   "internal_collector",
   "third_party_collector",
   "legal_collector",
 ];
+
+/** True quando o usuario e cobrador de carteira (Interno/Terceirizado/
+ * Juridico) -- fonte unica, use sempre no lugar de
+ * `WALLET_COLLECTOR_TYPES.includes(x as (typeof WALLET_COLLECTOR_TYPES)[number])`
+ * repetido (item 20, docs/PROGRESSO.md). */
+export const isWalletCollectorType = (
+  type: UserType | null | undefined,
+): boolean =>
+  !!type && WALLET_COLLECTOR_TYPES.includes(type as Exclude<UserType, "manager">);
 
 /**
  * The confirmed situacao set when a client is assigned to a specific user of
