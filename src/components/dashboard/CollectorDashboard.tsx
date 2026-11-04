@@ -243,7 +243,6 @@ interface InternalCollectorWalletProps {
   onOpenLog: (client: any) => void;
   onOpenDetail: (client: any) => void;
   onOpenAcordo: (client: ClientGroup) => void;
-  onOpenAcordoById: (acordoId: string) => void;
 }
 
 const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
@@ -254,7 +253,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   onOpenLog,
   onOpenDetail,
   onOpenAcordo,
-  onOpenAcordoById,
 }) => {
   const {
     getAcordoAtivoDoCliente,
@@ -296,15 +294,17 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
   // Numero do acordo (prefixo do id, mesmo formato do Termo em PDF -- ver
   // src/utils/termoAcordo.ts) buscavel pelo MESMO campo de busca da carteira,
-  // em vez de um campo separado: um termo de 6+ caracteres que bate com o
-  // prefixo de algum acordo vira um atalho pra abrir o detalhe direto.
-  const acordoBuscaMatch = useMemo(() => {
+  // igual a pesquisar o CPF do cliente: um termo de 6+ caracteres que bate
+  // com o prefixo de algum acordo vira a busca pelo documento do cliente
+  // daquele acordo -- o cliente aparece na lista normal (com o badge "Em
+  // acordo" de sempre), sem indicador/UI diferenciado.
+  const walletFiltersParaFiltragem = useMemo(() => {
     const termo = (walletFilters.search || "").trim().toUpperCase();
-    if (termo.length < 6) return null;
-    return (
-      acordos.find((a) => a.id.toUpperCase().startsWith(termo)) ?? null
-    );
-  }, [walletFilters.search, acordos]);
+    if (termo.length < 6) return walletFilters;
+    const acordoMatch = acordos.find((a) => a.id.toUpperCase().startsWith(termo));
+    if (!acordoMatch) return walletFilters;
+    return { ...walletFilters, search: acordoMatch.clientDocument };
+  }, [walletFilters, acordos]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [copiedDoc, setCopiedDoc] = useState<string | null>(null);
@@ -459,7 +459,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // documentos que sobrou.
   const walletFilteredGroups = useMemo(() => {
     const matchedCollections = getFilteredCollections(
-      walletFilters,
+      walletFiltersParaFiltragem,
       user?.type || "collector",
       user?.id,
     );
@@ -469,7 +469,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         .filter((d): d is string => Boolean(d)),
     );
     return openClientGroups.filter((g) => matchedDocs.has(g.document));
-  }, [openClientGroups, walletFilters, getFilteredCollections, user]);
+  }, [openClientGroups, walletFiltersParaFiltragem, getFilteredCollections, user]);
 
   // Faixa de atraso vigente DESTE cobrador (ver collector_overdue_ranges,
   // cadastrada em Usuarios > Faixa & Equipe). Sem faixa cadastrada, ou faixa
@@ -985,25 +985,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           </div>
         }
       />
-
-      {acordoBuscaMatch && (
-        <button
-          type="button"
-          onClick={() => onOpenAcordoById(acordoBuscaMatch.id)}
-          className="w-full flex items-center justify-between gap-2 px-4 py-2.5 mb-4 bg-indigo-50 dark:bg-dark-bg-tertiary border border-indigo-100 dark:border-dark-border rounded-xl text-sm hover:bg-indigo-100 dark:hover:bg-dark-border transition-colors text-left"
-        >
-          <span className="text-indigo-700 dark:text-indigo-300">
-            <span className="font-bold">
-              Acordo Nº {acordoBuscaMatch.id.slice(0, 8).toUpperCase()}
-            </span>
-            {" — "}
-            {acordoBuscaMatch.clientName || acordoBuscaMatch.clientDocument}
-          </span>
-          <span className="font-bold text-indigo-600 dark:text-indigo-400 shrink-0">
-            Abrir →
-          </span>
-        </button>
-      )}
 
       {walletTab === "agenda" ? (
         <>
@@ -2381,7 +2362,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             setIsAcordoModalOpen(true);
           }
         }}
-        onOpenAcordoById={(acordoId) => setSelectedAcordoId(acordoId)}
       />
     );
 
