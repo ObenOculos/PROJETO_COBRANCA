@@ -156,5 +156,5 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.criar_acordo(jsonb, jsonb, jsonb, numeric, numeric, numeric, text, text, text, text, text) IS
+COMMENT ON FUNCTION public.criar_acordo(text, jsonb, jsonb, numeric, numeric, numeric, text, text, text, text, text) IS
   'Cria acordo + titulos consolidados (com multa/juros/desconto por titulo, congelados) + parcelas. Percentuais aplicados e testemunhas/forma de pagamento sao fato do acordo, nunca recalculados depois.';
