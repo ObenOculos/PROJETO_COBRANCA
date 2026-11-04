@@ -264,6 +264,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   // leve (so a linha de `acordos`, sem parcelas/pagamentos aninhados) --
   // ver fetchAcordoDetalhe para o detalhe sob demanda de um acordo.
   const [acordos, setAcordos] = useState<Acordo[]>([]);
+  // documento -> parcelas em aberto do acordo ATIVO (ver fetchAcordos e
+  // clientMaxOverdueDays em src/filters/clientStatus.ts).
+  const [acordoAtivoOverdueMap, setAcordoAtivoOverdueMap] = useState<
+    Map<string, { dataVencimento: string; saldo: number }[]>
+  >(new Map());
   const [allowedVisitDates, setAllowedVisitDates] = useState<
     AllowedVisitDate[]
   >([]);
@@ -1574,6 +1579,74 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     resolvedAt: row.resolved_at,
   });
 
+  /**
+   * Parcelas em aberto dos acordos ATIVOS, em lote (não por cliente) -- usada
+   * por clientMaxOverdueDays para o atraso refletir o cronograma do acordo em
+   * vez do título original (ver migration 20261104000001). Só os acordos
+   * ativos entram aqui (lista naturalmente pequena); detalhe completo de um
+   * acordo específico continua em fetchAcordoDetalhe.
+   */
+  const fetchAcordoAtivoOverdueMap = async (acordosAtivos: Acordo[]) => {
+    if (acordosAtivos.length === 0) {
+      setAcordoAtivoOverdueMap(new Map());
+      return;
+    }
+
+    const acordoIdParaDocumento = new Map(
+      acordosAtivos.map((a) => [a.id, a.clientDocument]),
+    );
+
+    const { data: parcelasData, error: parcelasError } = await supabase
+      .from("acordo_parcelas")
+      .select("id, acordo_id, data_vencimento, valor_parcela")
+      .in(
+        "acordo_id",
+        acordosAtivos.map((a) => a.id),
+      );
+    if (parcelasError) {
+      console.error("Erro ao buscar parcelas de acordos ativos:", parcelasError);
+      return;
+    }
+
+    const parcelaIds = (parcelasData ?? []).map((p) => p.id);
+    const { data: pagamentosData, error: pagamentosError } = parcelaIds.length
+      ? await supabase
+          .from("acordo_pagamentos")
+          .select("acordo_parcela_id, valor_pago")
+          .in("acordo_parcela_id", parcelaIds)
+      : { data: [] as { acordo_parcela_id: string; valor_pago: number }[], error: null };
+    if (pagamentosError) {
+      console.error(
+        "Erro ao buscar pagamentos de acordos ativos:",
+        pagamentosError,
+      );
+      return;
+    }
+
+    const pagoPorParcela = new Map<string, number>();
+    (pagamentosData ?? []).forEach((pg) => {
+      pagoPorParcela.set(
+        pg.acordo_parcela_id,
+        (pagoPorParcela.get(pg.acordo_parcela_id) ?? 0) + Number(pg.valor_pago),
+      );
+    });
+
+    const map = new Map<string, { dataVencimento: string; saldo: number }[]>();
+    // Entrada (mesmo vazia) para TODO cliente com acordo ativo -- e o que
+    // diferencia "sem acordo ativo" (usa titulo) de "acordo ativo sem
+    // parcela em aberto" em clientMaxOverdueDays.
+    acordosAtivos.forEach((a) => {
+      if (!map.has(a.clientDocument)) map.set(a.clientDocument, []);
+    });
+    (parcelasData ?? []).forEach((p) => {
+      const documento = acordoIdParaDocumento.get(p.acordo_id);
+      if (!documento) return;
+      const saldo = Number(p.valor_parcela) - (pagoPorParcela.get(p.id) ?? 0);
+      map.get(documento)!.push({ dataVencimento: p.data_vencimento, saldo });
+    });
+    setAcordoAtivoOverdueMap(map);
+  };
+
   const fetchAcordos = async () => {
     try {
       const { data, error: fetchError } = await supabase
@@ -1582,7 +1655,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         .order("created_at", { ascending: false });
 
       if (fetchError) throw fetchError;
-      setAcordos((data ?? []).map(mapAcordoRow));
+      const acordosMapeados = (data ?? []).map(mapAcordoRow);
+      setAcordos(acordosMapeados);
+      await fetchAcordoAtivoOverdueMap(
+        acordosMapeados.filter((a) => a.status === "ativo"),
+      );
     } catch (err) {
       console.error("Erro ao buscar acordos:", err);
     }
@@ -4604,6 +4681,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     fetchAcordos,
     getAcordoAtivoDoCliente,
     getAcordoQuebradoDoCliente,
+    acordoAtivoOverdueMap,
     criarAcordo,
     fetchAcordoDetalhe,
     registrarPagamentoAcordo,

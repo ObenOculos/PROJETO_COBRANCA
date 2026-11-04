@@ -437,6 +437,15 @@ export interface CollectionContextType {
   fetchAcordos: () => Promise<void>;
   getAcordoAtivoDoCliente: (clientDocument: string) => Acordo | undefined;
   getAcordoQuebradoDoCliente: (clientDocument: string) => Acordo | undefined;
+  /**
+   * documento -> parcelas em aberto (dataVencimento + saldo) do acordo ATIVO
+   * do cliente. Uma entrada (mesmo array vazio) = cliente tem acordo ativo.
+   * Carregado em lote junto de fetchAcordos (so para acordos ativos, lista
+   * pequena). Usado por clientMaxOverdueDays (src/filters/clientStatus.ts)
+   * para o atraso refletir o cronograma do acordo em vez do titulo original
+   * -- ver migration 20261104000001_atraso_considera_acordo_ativo.
+   */
+  acordoAtivoOverdueMap: Map<string, { dataVencimento: string; saldo: number }[]>;
   criarAcordo: (params: {
     clientDocument: string;
     titulos: { collectionId: number; saldoNoMomento: number }[];

@@ -260,6 +260,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     getFilteredCollections,
     salePayments,
     collectorOverdueRanges,
+    acordoAtivoOverdueMap,
   } = useCollection();
   const [walletTab, setWalletTab] = useState<"agenda" | "carteira">("agenda");
   const [agendaSubTab, setAgendaSubTab] = useState<AgendaSubTab>("promessas");
@@ -475,7 +476,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     const maxDias = minhaFaixaAtraso.maxDias;
     const ranked: { group: ClientGroup; diasRestantes: number }[] = [];
     walletFilteredGroups.forEach((group) => {
-      const atraso = clientMaxOverdueDays(group);
+      const atraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
       if (atraso < minhaFaixaAtraso.minDias || atraso >= maxDias) return;
       const diasRestantes = maxDias - atraso;
       if (diasRestantes > URGENTE_SAIDA_CARTEIRA_DIAS) return;
@@ -490,7 +491,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       urgentes: ranked.map((r) => r.group),
       urgenteInfoByDocument: info,
     };
-  }, [walletFilteredGroups, minhaFaixaAtraso, lastContacts]);
+  }, [walletFilteredGroups, minhaFaixaAtraso, lastContacts, acordoAtivoOverdueMap]);
 
   // Ordenacao clicavel no cabecalho, compartilhada pela Carteira completa e
   // pelas categorias da Agenda (mesmas colunas, mesmo header -- ver
@@ -518,7 +519,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         case "retorno":
           return lastContacts[g.document]?.nextActionDate ?? "";
         case "atraso":
-          return clientMaxOverdueDays(g);
+          return clientMaxOverdueDays(g, acordoAtivoOverdueMap);
         case "valorPendente":
           return g.pendingValue;
         default:
@@ -534,7 +535,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           : (va as number) - (vb as number);
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [walletFilteredGroups, sortKey, sortDir, lastContacts]);
+  }, [walletFilteredGroups, sortKey, sortDir, lastContacts, acordoAtivoOverdueMap]);
 
   // Agenda priorizada: cada cliente cai em UMA só categoria (a de maior
   // precedencia), quem sobra vai pra "Em tratamento" (nao fica invisivel
@@ -579,7 +580,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     });
     sortedWalletFilteredGroups.forEach((group) => {
       if (claimed.has(group.document)) return;
-      const bucket = priorityBucket(clientMaxOverdueDays(group));
+      const bucket = priorityBucket(clientMaxOverdueDays(group, acordoAtivoOverdueMap));
       if (bucket === "critical") claim(criticos, group);
       else if (bucket === "high") claim(alertas, group);
       else if (bucket === "medium") claim(medios, group);
@@ -613,6 +614,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     sortedWalletFilteredGroups,
     lastContacts,
     getAcordoQuebradoDoCliente,
+    acordoAtivoOverdueMap,
     today,
   ]);
 
@@ -1156,7 +1158,8 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   onOpenAcordo,
   urgenteInfo,
 }) => {
-  const maxAtraso = clientMaxOverdueDays(group);
+  const { acordoAtivoOverdueMap } = useCollection();
+  const maxAtraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
   const phoneValue = group.mobile || group.phone;
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   // saleNumber 0 = parcela avulsa (sem numero_titulo nem venda_n, ver
@@ -1273,7 +1276,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
       </td>
       <td className="px-6 py-4 text-center" onClick={() => onOpenDetail(group)}>
         <span
-          className={`px-3 py-1 rounded-full text-[10px] font-bold ${PRIORITY_COLOR_CLASSES[priorityBucket(maxAtraso)]}`}
+          className={`inline-block whitespace-nowrap px-3 py-1 rounded-full text-[10px] font-bold ${PRIORITY_COLOR_CLASSES[priorityBucket(maxAtraso)]}`}
         >
           {maxAtraso} dias
         </span>

@@ -120,13 +120,51 @@ export const normalizePaymentStatus = (raw: string): ClientPaymentStatus => {
 export const isCanceladoFilter = (status: string | undefined | null): boolean =>
   (status || "").trim().toLowerCase() === "cancelado";
 
+/** Parcela de acordo em aberto, para fins de calculo de atraso. */
+export interface AcordoParcelaAberta {
+  dataVencimento: string;
+  saldo: number;
+}
+
+/**
+ * documento -> parcelas em aberto do acordo ATIVO do cliente. Uma entrada
+ * (mesmo vazia) significa "este cliente tem acordo ativo" -- e o que
+ * diferencia de "sem acordo ativo, usar titulo original" em
+ * clientMaxOverdueDays. Montado em lote em CollectionContext a partir dos
+ * acordos ativos (fetchAcordos), nao por cliente, pra nao autorizar N+1
+ * fetch por linha da tabela.
+ */
+export type AcordoAtivoOverdueMap = Map<string, AcordoParcelaAberta[]>;
+
 /**
  * Maior atraso (em dias) entre as parcelas do cliente que ainda tem saldo.
- * Ignora parcela quitada/cancelada (hasInstallmentBalance) e vencimento
- * futuro (calculateOverdueDays <= 0). 0 se o cliente nao tem parcela
- * pendente vencida.
+ *
+ * Se o cliente tem acordo ATIVO (presente em acordoAtivoParcelas), usa o
+ * cronograma NOVO (parcelas do acordo) em vez do titulo original -- o
+ * titulo e fato historico imutavel e fica com a data de vencimento
+ * pre-acordo para sempre, mesmo com o acordo em dia (achado 2026-11-04,
+ * ver migration 20261104000001_atraso_considera_acordo_ativo). Sem acordo
+ * ativo, mesma regra de sempre: maior atraso entre as parcelas do titulo
+ * que ainda tem saldo, ignorando quitada/cancelada (hasInstallmentBalance)
+ * e vencimento futuro (calculateOverdueDays <= 0).
+ *
+ * Espelho exato em SQL: cliente_max_atraso_dias.
  */
-export const clientMaxOverdueDays = (group: Pick<ClientGroup, "sales">): number => {
+export const clientMaxOverdueDays = (
+  group: Pick<ClientGroup, "sales" | "document">,
+  acordoAtivoParcelas?: AcordoAtivoOverdueMap,
+): number => {
+  const parcelasAcordo = acordoAtivoParcelas?.get(group.document);
+  if (parcelasAcordo) {
+    let maxAtraso = 0;
+    parcelasAcordo.forEach((parcela) => {
+      if (round2(parcela.saldo) <= 0.01) return;
+      const atraso = calculateOverdueDays(parcela.dataVencimento);
+      if (atraso > maxAtraso) maxAtraso = atraso;
+    });
+    return maxAtraso;
+  }
+
   let maxAtraso = 0;
   group.sales?.forEach((sale) => {
     sale.installments?.forEach((inst) => {
