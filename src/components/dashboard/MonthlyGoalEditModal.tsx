@@ -11,6 +11,7 @@ import { User } from "../../types";
 import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
 import { Modal } from "../Modal";
+import { WALLET_COLLECTOR_TYPES } from "../../config/profiles";
 
 interface MonthlyGoalEditModalProps {
   isOpen: boolean;
@@ -38,6 +39,17 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
 
   const [suggestVisits3, setSuggestVisits3] = useState<number | null>(null);
   const [suggestVisits6, setSuggestVisits6] = useState<number | null>(null);
+
+  // Mesma coluna (visits_goal) para os dois mundos -- so o rotulo muda: pro
+  // cobrador de carteira (interno/terceirizado/jurídico) "visita" não existe,
+  // o que ele cumpre é contato (ligação/WhatsApp) efetivo. Ver
+  // isEffectiveLabel/WALLET_COLLECTOR_TYPES e o adendo do plano desta feature.
+  const isWalletCollector = WALLET_COLLECTOR_TYPES.includes(
+    collector?.type as (typeof WALLET_COLLECTOR_TYPES)[number],
+  );
+  const visitsGoalLabel = isWalletCollector
+    ? "Meta de Atendimentos"
+    : "Meta de Visitas";
   const [suggestPayments3, setSuggestPayments3] = useState<number | null>(null);
   const [suggestPayments6, setSuggestPayments6] = useState<number | null>(null);
 
@@ -321,7 +333,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">
-                      Meta de Visitas
+                      {visitsGoalLabel}
                     </label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -394,7 +406,9 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-dark-border dark:text-dark-text">
                       <tr>
-                        <td className="px-3 py-2 font-medium">Média Visitas</td>
+                        <td className="px-3 py-2 font-medium">
+                          Média {isWalletCollector ? "Atendimentos" : "Visitas"}
+                        </td>
                         <td className="px-3 py-2 text-center">
                           <button
                             type="button"

@@ -23,6 +23,8 @@ import {
   ReincidenteCliente,
   todayLocalStr,
 } from "../../config/visitStatus";
+import { isEffectiveLabel } from "../../config/collectionAttempts";
+import { WALLET_COLLECTOR_TYPES } from "../../config/profiles";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
 import FilterBar from "../common/FilterBar";
@@ -973,6 +975,12 @@ const EnhancedPerformanceChart: React.FC = () => {
       );
 
       let visitsRealizadas = 0;
+      // Subconjunto de visitsRealizadas que conta como "contato efetivo"
+      // (conseguiu falar com o cliente) -- usado SO na meta (visitsPerformance)
+      // do cobrador de carteira (interno/terceirizado/jurídico), que é mais
+      // rigorosa que "realizada" sozinho (ligação/WhatsApp feita, qualquer
+      // desfecho). Ver isEffectiveLabel e o adendo do plano desta feature.
+      let visitsRealizadasEfetivas = 0;
       let visitsNaoEncontrado = 0;
       let visitsAgendadas = 0;
       let visitsCancelamentoSolicitado = 0;
@@ -999,7 +1007,10 @@ const EnhancedPerformanceChart: React.FC = () => {
         // Regra única em config/visitStatus.
         const isOverdue = isVisitOverdue(v);
 
-        if (v.status === "realizada") visitsRealizadas++;
+        if (v.status === "realizada") {
+          visitsRealizadas++;
+          if (isEffectiveLabel(v.notes)) visitsRealizadasEfetivas++;
+        }
         if (v.status === "nao_encontrado") visitsNaoEncontrado++;
         if (v.status === "cancelada") visitsCanceladas++;
         if (v.status === "agendada" && !isOverdue) {
@@ -1057,7 +1068,12 @@ const EnhancedPerformanceChart: React.FC = () => {
         .map(([document, v]) => ({ document, name: v.name, count: v.count }))
         .sort((a, b) => b.count - a.count);
 
-      const currentMonthVisitsActual = visitsRealizadas;
+      const isWalletCollectorGoal = WALLET_COLLECTOR_TYPES.includes(
+        collector.type as (typeof WALLET_COLLECTOR_TYPES)[number],
+      );
+      const currentMonthVisitsActual = isWalletCollectorGoal
+        ? visitsRealizadasEfetivas
+        : visitsRealizadas;
       const pendingVisits = visitsAgendadas + visitsCancelamentoSolicitado;
 
       const visitsPerformance =

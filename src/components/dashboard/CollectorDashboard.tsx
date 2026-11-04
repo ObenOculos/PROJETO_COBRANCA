@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
-import { USER_TYPE_LABELS } from "../../config/profiles";
+import { USER_TYPE_LABELS, WALLET_COLLECTOR_TYPES } from "../../config/profiles";
 import {
   Target,
   Clock,
@@ -58,7 +58,7 @@ import {
   PRIORITY_COLOR_CLASSES,
   URGENTE_SAIDA_CARTEIRA_DIAS,
 } from "../../filters/priority";
-import { SEM_CONTATO_DIAS } from "../../config/collectionAttempts";
+import { SEM_CONTATO_DIAS, isEffectiveLabel } from "../../config/collectionAttempts";
 
 import LogContactModal from "./LogContactModal";
 import ScheduleContactModal from "./ScheduleContactModal";
@@ -2005,8 +2005,20 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       isSameDay(p.paymentDate, today),
     );
 
+    // Meta do cobrador de carteira (interno/terceirizado/jurídico) conta
+    // CONTATO EFETIVO (conseguiu falar com o cliente), não toda tentativa --
+    // diferente do externo, onde "realizada" já é a visita feita, qualquer
+    // desfecho. Ver isEffectiveLabel (config/collectionAttempts) e o adendo
+    // do plano salvo desta feature.
+    const isWalletCollectorGoal = WALLET_COLLECTOR_TYPES.includes(
+      user?.type as (typeof WALLET_COLLECTOR_TYPES)[number],
+    );
+    const countsAsRealizada = (v: ScheduledVisit) =>
+      v.status === "realizada" &&
+      (!isWalletCollectorGoal || isEffectiveLabel(v.notes));
+
     const todayVisits = visits.filter((v) => {
-      if (v.status !== "realizada") return false;
+      if (!countsAsRealizada(v)) return false;
       const dateToCheck = v.dataVisitaRealizada || v.scheduledDate;
       return isSameDay(dateToCheck, today);
     });
@@ -2019,7 +2031,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       },
       weekly: {
         visits: visits.filter((v) => {
-          if (v.status !== "realizada") return false;
+          if (!countsAsRealizada(v)) return false;
           const dateToCheck = v.dataVisitaRealizada || v.scheduledDate;
           const visitDate = toDate(dateToCheck);
           return visitDate && visitDate >= startOfWeek;
@@ -2033,7 +2045,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       },
       monthly: {
         visits: visits.filter((v) => {
-          if (v.status !== "realizada") return false;
+          if (!countsAsRealizada(v)) return false;
           const dateToCheck = v.dataVisitaRealizada || v.scheduledDate;
           const visitDate = toDate(dateToCheck);
           return visitDate && visitDate >= startOfMonth;
