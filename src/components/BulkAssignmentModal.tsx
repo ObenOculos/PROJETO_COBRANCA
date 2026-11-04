@@ -13,7 +13,11 @@ import {
 import { Modal } from "./Modal";
 import { useCollection } from "../contexts/CollectionContext";
 import { supabase } from "../lib/supabase";
-import { ALL_SITUACOES, SITUACAO_BY_PROFILE } from "../config/profiles";
+import {
+  ALL_SITUACOES,
+  SITUACAO_BY_PROFILE,
+  channelsForCollectorType,
+} from "../config/profiles";
 import { UserType } from "../types";
 
 interface ClientWithCollections {
@@ -95,18 +99,20 @@ const BulkAssignmentModal: React.FC<Props> = ({
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [progressLog]);
 
+  const targetCollectorType =
+    collectorAction === "assign" && selectedCollector
+      ? (users.find((u) => u.id === selectedCollector)?.type as
+          | UserType
+          | undefined)
+      : undefined;
+
   // Dominio de situacao do cobrador escolhido — so restringe quando a acao e
   // "atribuir" e ha um cobrador selecionado; "remover"/"nao alterar" cobrador
   // nao tem um unico perfil de destino, entao mantem a lista completa.
-  const targetSituacoes = (() => {
-    if (collectorAction !== "assign" || !selectedCollector) {
-      return ALL_SITUACOES;
-    }
-    const targetType = users.find((u) => u.id === selectedCollector)
-      ?.type as UserType | undefined;
-    if (!targetType || targetType === "manager") return ALL_SITUACOES;
-    return SITUACAO_BY_PROFILE[targetType];
-  })();
+  const targetSituacoes =
+    !targetCollectorType || targetCollectorType === "manager"
+      ? ALL_SITUACOES
+      : SITUACAO_BY_PROFILE[targetCollectorType];
   const statusOptions = buildStatusOptions(targetSituacoes);
 
   // Se o status escolhido deixou de pertencer ao dominio (ex.: trocou o
@@ -127,15 +133,22 @@ const BulkAssignmentModal: React.FC<Props> = ({
     .map((key) => clientsData.find((c) => c.uniqueKey === key))
     .filter(Boolean) as ClientWithCollections[];
 
-  // Agendamentos em aberto (status agendada) dos clientes selecionados.
+  // Agendamentos em aberto (status agendada) dos clientes selecionados que
+  // de fato seguiriam para o cobrador escolhido -- so o canal que o perfil
+  // dele usa (ver assignCollectorToClients/channelsForCollectorType). Sem
+  // esse filtro o aviso contava agendamentos que na pratica nao transferem
+  // (ex.: ligacao/whatsapp indo pra um cobrador Externo), divergindo do
+  // resultado real (item 15, docs/PROGRESSO.md).
   const selectedDocs = new Set(
     clientsList.map((c) => c.documento).filter(Boolean),
   );
+  const transferableChannels = channelsForCollectorType(targetCollectorType);
   const pendingVisitsCount = scheduledVisits.filter(
     (v) =>
       v.clientDocument &&
       selectedDocs.has(v.clientDocument) &&
-      v.status === "agendada",
+      v.status === "agendada" &&
+      transferableChannels.includes(v.channel ?? "presencial"),
   ).length;
   const selectedCollectorName =
     collectors.find((c) => c.id === selectedCollector)?.name ??
@@ -189,7 +202,7 @@ const BulkAssignmentModal: React.FC<Props> = ({
           `Atribuindo ${clientsList.length} clientes a ${collectorName}...`,
           "info",
         );
-        await assignCollectorToClients(
+        const { transferredVisitDocs } = await assignCollectorToClients(
           selectedCollector,
           identifiers,
           true,
@@ -205,11 +218,24 @@ const BulkAssignmentModal: React.FC<Props> = ({
           transferVisits,
         );
         // Atualizacao otimista: reflete a atribuicao no estado local (sem refetch).
-        applyLocalAssignment(selectedCollector, identifiers, transferVisits);
+        // So marca como transferido o que o servidor confirmou (ver item 15/
+        // item 14 em docs/PROGRESSO.md — cliente bloqueado pelo guard de
+        // acordo/visita ativa fica com o agendamento junto, nao sozinho).
+        applyLocalAssignment(
+          selectedCollector,
+          identifiers,
+          transferVisits,
+          transferredVisitDocs,
+        );
         if (pendingVisitsCount > 0) {
+          const blockedCount =
+            pendingVisitsCount - transferredVisitDocs.length;
           addLog(
             transferVisits
-              ? `${pendingVisitsCount} agendamento(s) transferido(s) junto`
+              ? `${transferredVisitDocs.length} agendamento(s) transferido(s) junto` +
+                  (blockedCount > 0
+                    ? ` — ${blockedCount} mantido(s) com o cobrador atual (cliente bloqueado por acordo/visita ativa)`
+                    : "")
               : `${pendingVisitsCount} agendamento(s) mantido(s) com o cobrador atual`,
             "info",
           );

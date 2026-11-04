@@ -420,7 +420,7 @@ export interface CollectionContextType {
     skipRefresh?: boolean,
     onBatchProgress?: (completed: number, total: number) => void,
     transferVisits?: boolean,
-  ) => Promise<void>;
+  ) => Promise<{ transferredVisitDocs: string[] }>;
   removeCollectorFromClients: (
     clientIdentifiers: { document?: string; clientName?: string }[],
     skipRefresh?: boolean,
@@ -431,6 +431,7 @@ export interface CollectionContextType {
     collectorId: string,
     clientIdentifiers: { document?: string; clientName?: string }[],
     transferVisits?: boolean,
+    transferredVisitDocs?: string[],
   ) => void;
   applyLocalRemoval: (
     clientIdentifiers: { document?: string; clientName?: string }[],

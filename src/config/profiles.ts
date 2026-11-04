@@ -1,4 +1,4 @@
-import { UserType } from "../types";
+import { ScheduledVisitChannel, UserType } from "../types";
 
 /**
  * Maps each collector profile to the situacao values that belong to its domain.
@@ -49,6 +49,35 @@ export const PRIMARY_SITUACAO: Record<Exclude<UserType, "manager">, string> = {
   third_party_collector: "Cobrança Terceirizada",
   legal_collector: "Cobrança Jurídica",
 };
+
+/**
+ * Canais de agendamento (`scheduled_visits.channel`) que cada perfil de
+ * cobrador de fato usa/le na sua tela — Externo so trabalha com visita
+ * presencial (VisitScheduler); carteira (WALLET_COLLECTOR_TYPES) so
+ * trabalha com ligacao/whatsapp (CollectorDashboard). Fonte unica pra
+ * decidir se um agendamento pode seguir junto numa reatribuicao de cliente
+ * entre cobradores (ver transferVisits em CollectionContext) -- sem isso,
+ * transferir um cliente de carteira pra um cobrador externo (ou vice-versa)
+ * movia o agendamento pro novo cobrador mesmo que o canal nao exista na
+ * tela dele, deixando o contato invisivel/orfao.
+ */
+export const CHANNELS_BY_PROFILE: Record<
+  Exclude<UserType, "manager">,
+  readonly ScheduledVisitChannel[]
+> = {
+  collector: ["presencial"],
+  internal_collector: ["ligacao", "whatsapp"],
+  third_party_collector: ["ligacao", "whatsapp"],
+  legal_collector: ["ligacao", "whatsapp"],
+};
+
+/** Canais compativeis com o perfil (vazio para `manager`/indefinido). */
+export function channelsForCollectorType(
+  userType: UserType | undefined,
+): readonly ScheduledVisitChannel[] {
+  if (!userType || userType === "manager") return [];
+  return CHANNELS_BY_PROFILE[userType];
+}
 
 export const USER_TYPE_LABELS: Record<UserType, string> = {
   manager: "Gerente",

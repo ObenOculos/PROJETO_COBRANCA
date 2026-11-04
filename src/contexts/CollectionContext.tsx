@@ -38,6 +38,7 @@ import {
   situacoesOutsideProfile,
   assignmentSituacaoRule,
   resolveSituacaoOnAssign,
+  channelsForCollectorType,
 } from "../config/profiles";
 import {
   visitReleaseSituacao,
@@ -3031,7 +3032,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     skipRefresh = false,
     onBatchProgress?: (completed: number, total: number) => void,
     transferVisits = true,
-  ) => {
+  ): Promise<{ transferredVisitDocs: string[] }> => {
+    let transferredVisitDocs: string[] = [];
     try {
       console.log(
         `Iniciando atribuição de ${clientIdentifiers.length} clientes ao cobrador ${collectorId}`,
@@ -3091,23 +3093,83 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // AGENDADAS dos clientes reatribuidos passam para o novo cobrador. Visitas
       // ja realizadas/canceladas sao historico e nao mudam. Se transferVisits for
       // false, os agendamentos permanecem com o cobrador atual.
-      if (transferVisits) {
+      // So migra o CANAL que o perfil de destino de fato usa (presencial pro
+      // Externo, ligacao/whatsapp pra carteira) -- sem isso, mover um cliente
+      // de carteira pra um cobrador externo (ou vice-versa) empurrava o
+      // agendamento junto mesmo que o perfil novo nao tenha tela pra ele,
+      // deixando o contato orfao (item 15, docs/PROGRESSO.md).
+      const transferableChannels = channelsForCollectorType(targetType);
+      if (transferVisits && transferableChannels.length > 0) {
         const documentos = clientIdentifiers
           .map((id) => id.document)
           .filter((d): d is string => !!d);
         const visitBatch = 300;
+
+        // 1) So vale a pena checar quem de fato tem agendamento aberto e
+        // compativel com o canal do perfil de destino.
+        const candidateDocs = new Set<string>();
         for (let i = 0; i < documentos.length; i += visitBatch) {
           const docs = documentos.slice(i, i + visitBatch);
-          const { error: visitError } = await supabase
+          const { data, error: candidateError } = await supabase
             .from("scheduled_visits")
-            .update({ collector_id: collectorId })
+            .select("client_document")
             .in("client_document", docs)
-            .eq("status", "agendada");
-          if (visitError) {
+            .eq("status", "agendada")
+            .in("channel", transferableChannels as string[]);
+          if (candidateError) {
             console.error(
-              "Erro ao migrar agendamentos da carteira:",
-              visitError,
+              "Erro ao buscar agendamentos candidatos a transferencia:",
+              candidateError,
             );
+            continue;
+          }
+          data?.forEach(
+            (v) => v.client_document && candidateDocs.add(v.client_document),
+          );
+        }
+
+        // 2) Das/dos candidatas(os), so migra quem a RPC acima de fato
+        // reatribuiu ao novo cobrador. Um cliente com acordo ou visita/
+        // contato ativo pode ter sido bloqueado pelo guard da RPC (item 14)
+        // -- nesse caso o cliente continua com o cobrador atual, e o
+        // agendamento tem que continuar junto com ele, nunca seguir pro
+        // novo cobrador sozinho (fica orfao: aponta pra quem nao tem mais
+        // esse cliente na carteira).
+        if (candidateDocs.size > 0) {
+          const candidateArr = Array.from(candidateDocs);
+          const confirmedDocs: string[] = [];
+          for (let i = 0; i < candidateArr.length; i += visitBatch) {
+            const docs = candidateArr.slice(i, i + visitBatch);
+            const { data, error: confirmError } = await supabase
+              .from("BANCO_DADOS")
+              .select("documento")
+              .in("documento", docs)
+              .eq("user_id", collectorId);
+            if (confirmError) {
+              console.error(
+                "Erro ao confirmar reatribuicao antes de migrar agendamentos:",
+                confirmError,
+              );
+              continue;
+            }
+            data?.forEach((r) => r.documento && confirmedDocs.push(r.documento));
+          }
+          transferredVisitDocs = Array.from(new Set(confirmedDocs));
+
+          for (let i = 0; i < transferredVisitDocs.length; i += visitBatch) {
+            const docs = transferredVisitDocs.slice(i, i + visitBatch);
+            const { error: visitError } = await supabase
+              .from("scheduled_visits")
+              .update({ collector_id: collectorId })
+              .in("client_document", docs)
+              .eq("status", "agendada")
+              .in("channel", transferableChannels as string[]);
+            if (visitError) {
+              console.error(
+                "Erro ao migrar agendamentos da carteira:",
+                visitError,
+              );
+            }
           }
         }
       }
@@ -3116,6 +3178,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       console.log(
         `✅ Atribuição concluída: ${clientIdentifiers.length} clientes (${totalParcelasAtualizadas} parcelas) atribuídos ao cobrador ${collectorId}`,
       );
+      return { transferredVisitDocs };
     } catch (err) {
       console.error("Erro ao atribuir cobrador aos clientes:", err);
       setError(
@@ -3225,6 +3288,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     collectorId: string,
     identifiers: { document?: string; clientName?: string }[],
     transferVisits = true,
+    transferredVisitDocs?: string[],
   ) => {
     const { docSet, nameSet } = buildIdentifierSets(identifiers);
     const targetType = users.find((u) => u.id === collectorId)?.type;
@@ -3245,12 +3309,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       ),
     );
 
-    if (transferVisits && docSet.size > 0) {
+    // Usa a confirmacao vinda do servidor (assignCollectorToClients) de quais
+    // documentos de fato tiveram o cliente reatribuido -- um cliente com
+    // acordo ou visita/contato ativo pode ter sido bloqueado pelo guard da
+    // RPC (item 14), e nesse caso o agendamento continua com o cobrador
+    // atual. Sem essa lista, o patch otimista espelhava so o filtro de
+    // canal e marcava como transferido um agendamento que na verdade ficou
+    // parado (orfao, item 15, docs/PROGRESSO.md).
+    if (transferVisits && transferredVisitDocs && transferredVisitDocs.length > 0) {
+      const transferredSet = new Set(transferredVisitDocs);
       setScheduledVisits((prev) =>
         prev.map((v) =>
-          v.clientDocument &&
-          docSet.has(v.clientDocument) &&
-          v.status === "agendada"
+          v.clientDocument && transferredSet.has(v.clientDocument)
             ? { ...v, collectorId }
             : v,
         ),

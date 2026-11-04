@@ -22,8 +22,8 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 11 | ~~Título de acordo ativo pagável por fora (Distribuir Pagamento/CollectionModal/upload)~~ | Alta | Pequeno/médio |
 | 12 | Atraso ciente de acordo ativo + Termo de Acordo automático (ver detalhe abaixo) | Alta | Grande, em etapas |
 | 13 | ~~Agendamento de contato pro cobrador de carteira (interno/terceirizado/jurídico)~~ | Alta | Grande, em etapas |
-| 14 | Guard de agendamento ativo ausente em `atribuir_clientes_em_lote`/`remover_cobrador_em_lote` | **Alta** | Pequeno |
-| 15 | Transferência de carteira em massa não filtra agendamento por canal | **Alta** | Pequeno/médio |
+| 14 | ~~Guard de agendamento ativo ausente em `atribuir_clientes_em_lote`/`remover_cobrador_em_lote`~~ | Alta | Pequeno |
+| 15 | ~~Transferência de carteira em massa não filtra agendamento por canal~~ | Alta | Pequeno/médio |
 | 16 | Cobrador de carteira não tem como cancelar um contato agendado (só concluir/reagendar) | Média/Alta | Médio |
 | 17 | Duas implementações de "desfecho libera cliente da carteira" (visitOutcomes vs. `if` no LogContactModal) | Média | Pequeno/médio |
 | 18 | `AllowedVisitDatesManager` aceita os 4 perfis mas só `VisitScheduler` (externo) lê o resultado | Média | Pequeno |
@@ -43,11 +43,10 @@ funciona hoje / problema / solução recomendada / prioridade" por item) fica
 no histórico da conversa — os achados acionáveis viraram os itens 14-21
 acima. Ordem sugerida de execução (confirmar com o usuário a cada um,
 etapas pequenas, testar antes de seguir — ver [[trabalho-em-etapas]]):
-1. Item 14 (guard de agendamento ativo) — correção de integridade, menor
-   risco, maior urgência.
-2. Item 15 (transferência não filtra canal) — bug ativo introduzido pela
-   Etapa 1 do item 13, mesma área de código.
-3. Item 20 (helper `isWalletCollectorType`) — limpeza pequena, zero risco,
+1. ~~Item 14 (guard de agendamento ativo)~~ — concluído, ver detalhe abaixo.
+2. ~~Item 15 (transferência não filtra canal)~~ — concluído, ver detalhe
+   abaixo (inclui a correção derivada do bug de órfão por guard do item 14).
+3. Item 20 (helper `isWalletCollectorType`) — próximo. Limpeza pequena, zero risco,
    bom aquecimento antes dos itens maiores.
 4. Item 17 (unificar liberação de carteira) — média complexidade.
 5. Item 16 (cancelamento de contato) — lacuna funcional real, precisa de
@@ -60,6 +59,56 @@ etapas pequenas, testar antes de seguir — ver [[trabalho-em-etapas]]):
 8. Item 21 (Jurídico) — depende de decisão de negócio, não é só código;
    perguntar como a cobrança jurídica funciona de verdade hoje fora do
    sistema antes de desenhar qualquer coisa.
+
+### Itens 14 e 15 — guard de agendamento ativo + filtro de canal na transferência — concluídos 2026-11-04
+
+Primeiros dois itens da ordem combinada após o diagnóstico (item 21 abaixo).
+
+**Item 14.** `cliente_tem_visita_agendada_ativa` (criado na automação de
+saída por faixa, `20261103000006`) não estava em `atribuir_clientes_em_lote`/
+`remover_cobrador_em_lote` — só `cliente_tem_acordo_ativo` travava. Gestor
+podia reatribuir/remover cliente com visita/ligação/WhatsApp agendado pra
+hoje sem aviso, deixando o agendamento órfão (continuava apontando pro
+cobrador antigo). Migration `20261104000005`: mesmo padrão de bloqueio
+silencioso (exclui da `UPDATE` via `WHERE`, sem exceção nem contagem
+separada) que o guard de acordo já usa nas duas RPCs. **Não aplicada em
+produção ainda** — passar pro usuário: `supabase db push`.
+
+**Item 15.** `BulkAssignmentModal`/`assignCollectorToClients` perguntava
+"transferir agendamentos?" e movia TODO agendamento `agendada` pro cobrador
+novo, sem checar se o canal existe no perfil de destino (ex.: ligação indo
+pra um cobrador Externo, que só usa `VisitScheduler` presencial). Nova fonte
+única `channelsForCollectorType`/`CHANNELS_BY_PROFILE`
+(`src/config/profiles.ts`) mapeia Externo→`presencial`, carteira
+(Interno/Terceirizado/Jurídico)→`ligação`/`whatsapp`; a transferência real
+(`scheduled_visits.update`) e o patch otimista (`applyLocalAssignment`) e a
+contagem exibida no aviso (`pendingVisitsCount`) passam a filtrar por esse
+canal.
+
+**Correção derivada, mesma sessão**: implementando o item 15 ficou claro que
+a transferência de agendamento (rede e patch otimista) rodava pra **todos**
+os clientes do lote, sem checar se o item 14 bloqueou a reatribuição daquele
+cliente específico — ou seja, mesmo bloqueado pelo guard novo, o
+agendamento ainda migrava pro cobrador novo sozinho, ficando órfão do lado
+oposto (cliente com o cobrador antigo, agendamento apontando pro novo).
+Corrigido em `assignCollectorToClients`: depois do `UPDATE` em lote, confere
+no `BANCO_DADOS` quais documentos candidatos (que têm agendamento aberto e
+canal compatível) *de fato* ficaram com `user_id = collectorId` antes de
+mover o agendamento — só esses são migrados. A função passa a devolver
+`transferredVisitDocs`, que `BulkAssignmentModal` usa tanto pro log final
+quanto pro patch otimista (`applyLocalAssignment` ganhou um 4º parâmetro),
+pra UI não divergir do servidor.
+
+**Decisão em aberto, não resolvida nesta sessão**: com o guard do item 14
+ativo, um cliente com visita/contato ativo **nunca** é reatribuído por essas
+duas RPCs — nem quando o gestor escolhe explicitamente "Sim, transferir
+agendamentos" no prompt do `BulkAssignmentModal`. Antes do item 14 esse
+fluxo funcionava (o agendamento ia junto); agora ele fica parado com o
+cobrador atual, silenciosamente (sem orfão, mas também sem transferir nada,
+mesmo quando o gestor pediu). Perguntar ao usuário se isso é aceitável
+(manager cancela/conclui o agendamento antes de reatribuir) ou se o guard
+precisa de uma exceção quando o chamador confirma que vai mover o
+agendamento junto.
 
 ### Item 13 — agendamento de contato pro cobrador de carteira — concluído 2026-11-04
 
