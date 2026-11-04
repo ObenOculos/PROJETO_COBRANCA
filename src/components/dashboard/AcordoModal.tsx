@@ -20,6 +20,7 @@ import {
 import { todayLocalStr } from "../../config/visitStatus";
 import { ClientGroup } from "../../types";
 import { gerarPixCopiaECola } from "../../utils/pix";
+import { gerarTermoAcordoPdf, nomeArquivoTermoAcordo } from "../../utils/termoAcordo";
 
 interface AcordoModalProps {
   client: ClientGroup;
@@ -370,10 +371,35 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
             notes: "Entrada via Pix confirmada manualmente pelo cobrador na criação do acordo.",
           });
         }
-      } catch (entradaErr) {
+
+        // Termo de Acordo (PDF) -- gerado a partir dos mesmos dados
+        // congelados (Etapa 3c). Nao interrompe o fluxo se falhar: o
+        // cobrador ainda pode baixar depois pelo detalhe do acordo.
+        const endereco = [
+          [client.address, client.number].filter(Boolean).join(", "),
+          client.complemento,
+          client.neighborhood,
+          client.cep ? `CEP: ${client.cep}` : "",
+          [client.city, client.state].filter(Boolean).join("/"),
+        ]
+          .filter(Boolean)
+          .join(", ");
+        const pdf = await gerarTermoAcordoPdf({
+          acordo,
+          titulos: detalhe.titulos,
+          parcelas: detalhe.parcelas,
+          empresa: acordoConfiguracaoPadrao,
+          devedor: {
+            nome: client.client,
+            documento: client.document,
+            endereco: endereco || "endereço não informado",
+          },
+        });
+        pdf.save(nomeArquivoTermoAcordo(acordo));
+      } catch (posCriacaoErr) {
         console.error(
-          "Acordo criado, mas falhou ao registrar o pagamento da entrada:",
-          entradaErr,
+          "Acordo criado, mas falhou um passo posterior (pagamento da entrada ou Termo de Acordo):",
+          posCriacaoErr,
         );
       }
 

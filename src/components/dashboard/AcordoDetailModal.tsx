@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { X, CheckCircle2, AlertCircle, Ban, ChevronRight } from "lucide-react";
+import {
+  X,
+  CheckCircle2,
+  AlertCircle,
+  Ban,
+  ChevronRight,
+  Download,
+} from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
@@ -14,6 +21,7 @@ import {
   AcordoPagamento,
   AcordoTitulo,
 } from "../../types";
+import { gerarTermoAcordoPdf, nomeArquivoTermoAcordo } from "../../utils/termoAcordo";
 
 interface AcordoDetailModalProps {
   acordoId: string;
@@ -38,8 +46,13 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
   acordoId,
   onClose,
 }) => {
-  const { fetchAcordoDetalhe, registrarPagamentoAcordo, cancelarAcordo } =
-    useCollection();
+  const {
+    fetchAcordoDetalhe,
+    registrarPagamentoAcordo,
+    cancelarAcordo,
+    getClientGroups,
+    acordoConfiguracaoPadrao,
+  } = useCollection();
 
   const [acordo, setAcordo] = useState<Acordo | null>(null);
   const [titulos, setTitulos] = useState<AcordoTitulo[]>([]);
@@ -56,6 +69,7 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
   const [cancelObservacao, setCancelObservacao] = useState("");
   const [showQuitadas, setShowQuitadas] = useState(false);
   const [showTitulosOrigem, setShowTitulosOrigem] = useState(false);
+  const [baixandoTermo, setBaixandoTermo] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -142,6 +156,50 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
     }
   };
 
+  const baixarTermo = async () => {
+    if (!acordo) return;
+    setBaixandoTermo(true);
+    setError("");
+    try {
+      const clientGroup = getClientGroups().find(
+        (g) => g.document === acordo.clientDocument,
+      );
+      const endereco = clientGroup
+        ? [
+            [clientGroup.address, clientGroup.number]
+              .filter(Boolean)
+              .join(", "),
+            clientGroup.complemento,
+            clientGroup.neighborhood,
+            clientGroup.cep ? `CEP: ${clientGroup.cep}` : "",
+            [clientGroup.city, clientGroup.state].filter(Boolean).join("/"),
+          ]
+            .filter(Boolean)
+            .join(", ")
+        : "";
+      const pdf = await gerarTermoAcordoPdf({
+        acordo,
+        titulos,
+        parcelas,
+        empresa: acordoConfiguracaoPadrao,
+        devedor: {
+          nome:
+            acordo.clientName || clientGroup?.client || acordo.clientDocument,
+          documento: acordo.clientDocument,
+          endereco: endereco || "endereço não informado",
+        },
+      });
+      pdf.save(nomeArquivoTermoAcordo(acordo));
+    } catch (err) {
+      setError(
+        "Falha ao gerar o Termo de Acordo: " +
+          (err instanceof Error ? err.message : "erro"),
+      );
+    } finally {
+      setBaixandoTermo(false);
+    }
+  };
+
   const confirmCancelar = async () => {
     if (!cancelMotivoKey) {
       setError("Selecione um motivo de cancelamento.");
@@ -183,19 +241,40 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
               Acordo{acordo ? ` — ${acordo.clientName || acordo.clientDocument}` : ""}
             </h3>
             {acordo && (
-              <span
-                className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${STATUS_COLOR[acordo.status]}`}
-              >
-                {STATUS_LABEL[acordo.status]}
-              </span>
+              <div className="flex items-center gap-2 mt-1">
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${STATUS_COLOR[acordo.status]}`}
+                >
+                  {STATUS_LABEL[acordo.status]}
+                </span>
+                <span className="text-[10px] font-mono text-gray-400">
+                  Nº {acordo.id.slice(0, 8).toUpperCase()}
+                </span>
+              </div>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary rounded-full transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {acordo && (
+              <button
+                onClick={baixarTermo}
+                disabled={baixandoTermo}
+                title="Baixar Termo de Acordo"
+                className="p-2 hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary rounded-full transition-colors disabled:opacity-50"
+              >
+                {baixandoTermo ? (
+                  <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                ) : (
+                  <Download className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary rounded-full transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
         </div>
 
         <div className="p-6 space-y-5 overflow-y-auto minimal-scrollbar">
@@ -230,6 +309,48 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
                   </p>
                 </div>
               </div>
+
+              {(() => {
+                const entrada = parcelas.find((p) => p.numero === 1);
+                if (!entrada) return null;
+                const saldoEntrada = saldoDaParcela(
+                  entrada.id,
+                  entrada.valorParcela,
+                );
+                const entradaPaga = saldoEntrada <= 0.01;
+                const pagamentoEntrada = pagamentos
+                  .filter((p) => p.acordoParcelaId === entrada.id)
+                  .sort((a, b) => b.dataPagamento.localeCompare(a.dataPagamento))[0];
+                return (
+                  <div
+                    className={`flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border text-sm ${
+                      entradaPaga
+                        ? "bg-green-50 border-green-100 text-green-700"
+                        : "bg-amber-50 border-amber-100 text-amber-700"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 font-bold">
+                      {entradaPaga ? (
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                      )}
+                      Entrada ({formatCurrency(entrada.valorParcela)}){" "}
+                      {entradaPaga
+                        ? `paga${pagamentoEntrada ? ` em ${new Date(pagamentoEntrada.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR")}` : ""}`
+                        : "ainda não paga"}
+                    </span>
+                    {!entradaPaga && acordo.status === "ativo" && (
+                      <button
+                        onClick={() => openPayForm(entrada)}
+                        className="shrink-0 px-2.5 py-1 bg-amber-600 text-white text-xs font-bold rounded-lg hover:bg-amber-700"
+                      >
+                        Registrar
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
 
               {titulos.length > 0 && (
                 <div className="border border-gray-200 dark:border-dark-border rounded-xl overflow-hidden">

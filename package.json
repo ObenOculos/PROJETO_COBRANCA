@@ -17,6 +17,8 @@
     "@types/pako": "^2.0.3",
     "@types/qrcode": "^1.5.6",
     "@vercel/speed-insights": "^1.2.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.9",
     "lucide-react": "^0.554.0",
     "pako": "^2.1.0",
     "papaparse": "^5.5.4",

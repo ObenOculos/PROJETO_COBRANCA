@@ -92,18 +92,37 @@ etapas:
   quando há encargo. Nova dependência `qrcode`/`@types/qrcode` (renderiza o
   QR a partir do payload, sem chamada de rede). `tsc`/`eslint` ok (contagem
   igual a HEAD em todos os arquivos tocados).
-- **3c — Geração do Termo de Acordo (PDF) — não iniciada.** Cabeçalho com a
-  logo (`Logo Focco Brasil.png`, não commitada ainda) e dados completos da
-  empresa/cliente, tabela "Títulos Negociados" (Dias/Vl.Orig/Multa/Juros/
-  Desconto/Total por título — já praticamente pronta a partir do cálculo da
-  3b), tabela "Parcelas Acordadas", QR Code Pix da entrada + forma de
-  pagamento das parcelas, testemunhas, cláusulas 2ª–4ª como **placeholder**
-  (texto jurídico final: usuário vai mandar depois — só trocar o texto,
-  sem mexer no resto). Gerado automaticamente ao criar o acordo + botão
-  "baixar" no `AcordoDetailModal`.
+- **3c — Geração do Termo de Acordo (PDF) — concluída 2026-11-04.**
+  `src/utils/termoAcordo.ts` (`gerarTermoAcordoPdf`), 100% client-side
+  (`jspdf` + `jspdf-autotable`, novas dependências), sem backend/gateway —
+  mesmo espírito do Pix (Etapa 3b). Layout próprio (não copia o modelo de
+  referência do usuário), paleta indigo do app: cabeçalho com a logo
+  (`src/assets/focco-brasil-logo.png`, commitada), cartões DEVEDOR/CREDOR,
+  tabela "Títulos Negociados" (Dias/Vl.Orig/Multa/Juros/Desconto/Total),
+  chips de resumo (saldo original / encargos / total negociado), tabela
+  "Parcelas Acordadas", seção "Pagamento" com QR Code Pix da entrada +
+  copia-e-cola + forma de pagamento das demais parcelas, cláusulas 2ª–4ª
+  como **placeholder** (texto jurídico final: usuário vai mandar depois —
+  só trocar o texto), assinaturas (devedor/credor/testemunhas), rodapé com
+  paginação. O documento é função determinista dos dados já congelados em
+  `acordos`/`acordo_titulos`/`acordo_parcelas` — pode ser regenerado
+  idêntico a qualquer momento, por isso **não é persistido** (sem Supabase
+  Storage, green field que ficou de fora). Dois pontos de disparo: baixa
+  automaticamente ao criar o acordo (`AcordoModal`, não trava o fluxo se
+  falhar) e botão "Baixar Termo de Acordo" no header do
+  `AcordoDetailModal`. Testado com `esbuild` + PDF de exemplo gerado a
+  partir de dados mockados (sem browser disponível na sessão) — layout
+  conferido via leitura do PDF resultante; **ainda não testado com um
+  acordo real criado pelo usuário no app**.
+  `AcordoDetailModal` também ganhou: número do acordo (prefixo do `id`,
+  mesmo formato do PDF) no header, indicador explícito "Entrada paga/não
+  paga" (com atalho "Registrar" quando pendente) logo abaixo dos cards de
+  resumo. `CollectorDashboard` ganhou um campo "Buscar acordo pelo nº" (não
+  existia nenhuma tela de listagem de acordos pra pendurar isso — abre o
+  `AcordoDetailModal` direto pelo prefixo do id).
 
-Arquivos de referência na raiz do projeto (não commitados):
-`Termo_Acordo_Exemplo.pdf`, `Logo Focco Brasil.png`.
+Arquivo de referência na raiz do projeto (não commitado, só consulta):
+`Termo_Acordo_Exemplo.pdf`.
 
 ### Item 11 — título em acordo ativo pagável por fora — concluída 2026-11-02
 

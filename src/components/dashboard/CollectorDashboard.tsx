@@ -33,6 +33,7 @@ import {
   Eye,
   EyeOff,
   AlertTriangle,
+  Search,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
@@ -1584,6 +1585,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     salePayments,
     monthlyGoals,
     getAcordoAtivoDoCliente,
+    acordos,
   } = useCollection();
   const collectionTableRef = useRef<CollectionTableRef>(null);
 
@@ -1599,6 +1601,24 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   const [selectedAcordoId, setSelectedAcordoId] = useState<string | null>(
     null,
   );
+  const [buscaAcordoTermo, setBuscaAcordoTermo] = useState("");
+  const [buscaAcordoErro, setBuscaAcordoErro] = useState("");
+
+  /** Acha o acordo pelo "numero" exibido no Termo (prefixo do id, ver
+   * src/utils/termoAcordo.ts) -- atalho pra abrir o detalhe direto sem
+   * precisar achar o cliente na carteira primeiro. */
+  const buscarAcordoPorNumero = () => {
+    const termo = buscaAcordoTermo.trim().toUpperCase();
+    if (!termo) return;
+    const encontrado = acordos.find((a) => a.id.toUpperCase().startsWith(termo));
+    if (encontrado) {
+      setSelectedAcordoId(encontrado.id);
+      setBuscaAcordoTermo("");
+      setBuscaAcordoErro("");
+    } else {
+      setBuscaAcordoErro("Nenhum acordo encontrado com esse número.");
+    }
+  };
 
   // Usa a aba externa se fornecida, senão gerencia internamente
   const internalActiveTab: "overview" | "collections" | "route" | "visits" =
@@ -2796,6 +2816,36 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
   return (
     <div className="p-4 sm:p-6 lg:p-16 pt-16 lg:pt-16">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative w-full max-w-xs">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={buscaAcordoTermo}
+            onChange={(e) => {
+              setBuscaAcordoTermo(e.target.value);
+              setBuscaAcordoErro("");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") buscarAcordoPorNumero();
+            }}
+            placeholder="Buscar acordo pelo nº (ex: A1B2C3D4)"
+            className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-indigo-200 outline-none transition-all dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={buscarAcordoPorNumero}
+          disabled={!buscaAcordoTermo.trim()}
+          className="shrink-0 px-3 py-2 bg-gray-100 dark:bg-dark-bg-tertiary text-gray-700 dark:text-dark-text text-sm font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-dark-border disabled:opacity-50"
+        >
+          Buscar
+        </button>
+      </div>
+      {buscaAcordoErro && (
+        <p className="text-xs text-red-500 -mt-2 mb-3">{buscaAcordoErro}</p>
+      )}
+
       {/* Tab Content */}
       <TabTransition activeKey={activeTab}>{renderTabContent()}</TabTransition>
 
