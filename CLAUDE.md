@@ -43,6 +43,12 @@ contagem do arquivo que você mexeu (compare com `git show HEAD:<arquivo>`).
   `NULL` — um `IF` com condição `NULL` não executa o `THEN`, a exceção nunca
   dispara e a função roda como se fosse gestor (achado e corrigido em
   2026-11-03, migrations `20261103000007`/`8`, ver `docs/PROGRESSO.md`).
+- `CREATE OR REPLACE` de função existente: copie o corpo **de produção**
+  (`pg_get_functiondef` via Management API), nunca de uma migration antiga —
+  foi assim que guards de gestor sumiram de 4 RPCs (migration
+  `20261105000001`). Depois do `db push`, rode `npm run check:db` (só leitura:
+  falha se houver `<> 'manager'`, função liberada para `anon` ou
+  `SECURITY DEFINER` sem `search_path`).
 - Função nova **não** precisa mais de `REVOKE EXECUTE ... FROM anon` manual —
   `ALTER DEFAULT PRIVILEGES` (migration `20261103000008`) já fecha isso por
   padrão. Tabela nova continua precisando de RLS explícita `TO authenticated`
