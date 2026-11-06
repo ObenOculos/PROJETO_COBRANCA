@@ -1390,6 +1390,17 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               {group.apelido}
             </span>
           )}
+          {group.razaoSocial && (
+            <span
+              className="block truncate text-xs text-gray-600 dark:text-dark-text-secondary"
+              title={`Razão social: ${group.razaoSocial}`}
+            >
+              <span className="text-gray-500 dark:text-dark-text-secondary">
+                Razão social:{" "}
+              </span>
+              {group.razaoSocial}
+            </span>
+          )}
           {saleLabels.length > 0 && (
             <span
               className="block truncate text-[11px] text-gray-400"

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency } from "../../utils/formatters";
+import { nomeJuridicoCliente } from "../../utils/clienteNome";
 import { todayLocalStr } from "../../config/visitStatus";
 import {
   ACORDO_CANCEL_REASONS,
@@ -53,6 +54,7 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
     cancelarAcordo,
     getClientGroups,
     acordoConfiguracaoPadrao,
+    clientesRegistry,
   } = useCollection();
 
   const [acordo, setAcordo] = useState<Acordo | null>(null);
@@ -184,8 +186,12 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
         parcelas,
         empresa: acordoConfiguracaoPadrao,
         devedor: {
-          nome:
+          // Razao social do CPF/CNPJ (ERP) quando existe; senao o nome
+          // gravado no acordo.
+          nome: nomeJuridicoCliente(
+            clientesRegistry.get(acordo.clientDocument)?.razao_social,
             acordo.clientName || clientGroup?.client || acordo.clientDocument,
+          ),
           documento: acordo.clientDocument,
           endereco: endereco || "endereço não informado",
         },

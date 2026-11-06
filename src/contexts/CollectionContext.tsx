@@ -58,6 +58,7 @@ import {
   collectionsCache,
 } from "../utils/cache";
 import { calculateOverdueDays, formatCurrency } from "../utils/formatters";
+import { razaoSocialDistinta } from "../utils/clienteNome";
 import { isCancelado, isForaDaCobranca } from "../types/status";
 import {
   clientKey,
@@ -107,6 +108,7 @@ const mapRowToCollection = (
     ...mapRowFields(row),
     cliente: cadastro?.nome ?? row.cliente,
     apelido: cadastro?.apelido ?? null,
+    razao_social: cadastro?.razao_social ?? null,
     telefone: cadastro?.telefone ?? null,
     celular: cadastro?.celular ?? null,
     celular1: cadastro?.celular1 ?? null,
@@ -121,7 +123,13 @@ const mapRowFields = (
   row: BancoDadosRow,
 ): Omit<
   Collection,
-  "apelido" | "telefone" | "celular" | "celular1" | "celular2" | "email"
+  | "apelido"
+  | "razao_social"
+  | "telefone"
+  | "celular"
+  | "celular1"
+  | "celular2"
+  | "email"
 > => ({
   id_parcela: row.id_parcela,
   nome_da_loja: row.nome_da_loja,
@@ -2645,6 +2653,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           c.cliente?.toLowerCase().includes(searchLower) ||
           c.documento?.toLowerCase().includes(searchLower) ||
           c.apelido?.toLowerCase().includes(searchLower) ||
+          c.razao_social?.toLowerCase().includes(searchLower) ||
           c.nome_da_loja?.toLowerCase().includes(searchLower) ||
           c.cidade?.toLowerCase().includes(searchLower) ||
           c.numero_titulo?.toString().includes(searchLower) ||
@@ -2744,6 +2753,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               client: collection.cliente || "Cliente sem nome",
               document: clientId,
               apelido: collection.apelido || undefined,
+              razaoSocial: razaoSocialDistinta(
+                collection.razao_social,
+                collection.cliente,
+              ),
               phone: collection.telefone || undefined,
               mobile: collection.celular || undefined,
               address: collection.endereco || "",

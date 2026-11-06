@@ -31,6 +31,7 @@ import ClientDetailModal from "./dashboard/ClientDetailModal";
 import { countVendas, resolveSaleKey } from "../filters/sales";
 import { getClientPending } from "../filters/clientStatus";
 import { formatCurrency, formatDate } from "../utils/formatters";
+import { razaoSocialDistinta } from "../utils/clienteNome";
 import { parseAndNormalizeDate } from "../filters/dates";
 import { clientMatchesFilters, ClientFilters } from "../filters/predicates";
 import { computeClientFacets } from "../filters/facets";
@@ -88,6 +89,7 @@ interface ClientWithCollections {
   cliente: string;
   documento: string;
   apelido?: string;
+  razao_social?: string;
   uniqueKey: string; // Adicionado para identificar clientes de forma única (documento ou nome)
   collections: Collection[];
   collectorId?: string;
@@ -433,6 +435,10 @@ export const ClientAssignment = React.memo(
             cliente: collection.cliente || "Cliente sem nome",
             documento: collection.documento || "",
             apelido: collection.apelido || undefined,
+            razao_social: razaoSocialDistinta(
+              collection.razao_social,
+              collection.cliente,
+            ),
             uniqueKey: key,
             collections: [],
             collectorId: collectorId,
@@ -943,6 +949,9 @@ export const ClientAssignment = React.memo(
           Documento: client.documento || "",
           "Data de Nascimento": birthDate ? formatDate(birthDate) : "",
           Apelido: client.apelido ? client.apelido.toUpperCase() : "",
+          "Razão Social": client.razao_social
+            ? client.razao_social.toUpperCase()
+            : "",
           ...Object.fromEntries(
             phoneColumns.map((label, i) => [
               label,
@@ -1929,6 +1938,14 @@ export const ClientAssignment = React.memo(
                             {client.apelido && (
                               <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">
                                 "{client.apelido}"
+                              </span>
+                            )}
+                            {client.razao_social && (
+                              <span
+                                className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 truncate"
+                                title={`Razão social: ${client.razao_social}`}
+                              >
+                                {client.razao_social}
                               </span>
                             )}
                           </div>

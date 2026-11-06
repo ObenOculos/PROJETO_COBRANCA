@@ -428,7 +428,9 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           client.address.toLowerCase().includes(searchLower) ||
           client.city.toLowerCase().includes(searchLower) ||
           client.neighborhood.toLowerCase().includes(searchLower) ||
-          (client.apelido && client.apelido.toLowerCase().includes(searchLower))
+          (client.apelido && client.apelido.toLowerCase().includes(searchLower)) ||
+          (client.razaoSocial &&
+            client.razaoSocial.toLowerCase().includes(searchLower))
         );
       });
     }

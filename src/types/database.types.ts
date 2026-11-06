@@ -837,6 +837,14 @@ export type Database = {
           nome: string;
           reincidencia_reset_at: string | null;
           telefone: string | null;
+          razao_social: string | null;
+          contato_nome: string | null;
+          contato_telefone: string | null;
+          contato_telefone2: string | null;
+          vendedor_responsavel: string | null;
+          regiao: string | null;
+          observacao_erp: string | null;
+          erp_atualizado_em: string | null;
         };
         Insert: {
           apelido?: string | null;
@@ -851,6 +859,14 @@ export type Database = {
           nome: string;
           reincidencia_reset_at?: string | null;
           telefone?: string | null;
+          razao_social?: string | null;
+          contato_nome?: string | null;
+          contato_telefone?: string | null;
+          contato_telefone2?: string | null;
+          vendedor_responsavel?: string | null;
+          regiao?: string | null;
+          observacao_erp?: string | null;
+          erp_atualizado_em?: string | null;
         };
         Update: {
           apelido?: string | null;
@@ -865,6 +881,14 @@ export type Database = {
           nome?: string;
           reincidencia_reset_at?: string | null;
           telefone?: string | null;
+          razao_social?: string | null;
+          contato_nome?: string | null;
+          contato_telefone?: string | null;
+          contato_telefone2?: string | null;
+          vendedor_responsavel?: string | null;
+          regiao?: string | null;
+          observacao_erp?: string | null;
+          erp_atualizado_em?: string | null;
         };
         Relationships: [];
       };

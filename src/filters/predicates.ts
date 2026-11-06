@@ -15,6 +15,7 @@ export interface FilterableClient {
   cliente?: string | null;
   documento: string;
   apelido?: string | null;
+  razao_social?: string | null;
   collectorId?: string;
   cidade?: string | null;
   bairro?: string | null;
@@ -132,7 +133,8 @@ const matchesSearch = (client: FilterableClient, search?: string): boolean => {
   return Boolean(
     client.cliente?.toLowerCase().includes(term) ||
       client.documento?.includes(search ?? "") ||
-      client.apelido?.toLowerCase().includes(term),
+      client.apelido?.toLowerCase().includes(term) ||
+      client.razao_social?.toLowerCase().includes(term),
   );
 };
 

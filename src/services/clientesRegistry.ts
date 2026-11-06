@@ -33,7 +33,31 @@ export interface ClienteCadastro {
   celular1: string | null;
   celular2: string | null;
   email: string | null;
+  // Espelho do ERP Ciclone (migration 20261106000011). Somente leitura no
+  // app: o sync sobrescreve a cada rodada. Clientes fora do Ciclone: null.
+  // Opcionais porque a carga cai para colunas anteriores sem a migration.
+  razao_social?: string | null;
+  contato_nome?: string | null;
+  contato_telefone?: string | null;
+  contato_telefone2?: string | null;
+  vendedor_responsavel?: string | null;
+  regiao?: string | null;
+  observacao_erp?: string | null;
+  erp_atualizado_em?: string | null;
 }
+
+/** Campos do cadastro que vem do ERP Ciclone (ver ClienteCadastro). */
+export type DadosErpCliente = Pick<
+  ClienteCadastro,
+  | "razao_social"
+  | "contato_nome"
+  | "contato_telefone"
+  | "contato_telefone2"
+  | "vendedor_responsavel"
+  | "regiao"
+  | "observacao_erp"
+  | "erp_atualizado_em"
+>;
 
 // Documento (como gravado no banco) -> cadastro.
 export type ClientesRegistry = Map<string, ClienteCadastro>;
@@ -58,10 +82,16 @@ export const CADASTRO_CONTATO_COLUMNS = [
 
 export type CadastroContatoColumn = (typeof CADASTRO_CONTATO_COLUMNS)[number];
 
-// Colunas do cadastro completo (pos-migration 20260904000001).
-const REGISTRY_COLUMNS =
+// Colunas do cadastro pos-migration 20260904000001.
+const CADASTRO_COLUMNS =
   "id, documento, nome, data_nascimento, created_at, reincidencia_reset_at, " +
   "apelido, telefone, celular, celular1, celular2, email";
+
+// + espelho do ERP Ciclone (migration 20261106000011).
+const REGISTRY_COLUMNS =
+  CADASTRO_COLUMNS +
+  ", razao_social, contato_nome, contato_telefone, contato_telefone2, " +
+  "vendedor_responsavel, regiao, observacao_erp, erp_atualizado_em";
 
 // Colunas que `clientes` sempre teve. Usadas quando as novas ainda nao existem
 // (codigo publicado antes da migration): o app continua funcionando lendo
@@ -98,16 +128,25 @@ export const fetchClientesRegistry = async (): Promise<ClientesRegistry> => {
       : await fetchAllPages<ClienteCadastro>(buildPage);
   };
 
-  let rows: ClienteCadastro[];
-  try {
-    rows = await loadWith(REGISTRY_COLUMNS);
-  } catch (err) {
-    console.warn(
-      "Cadastro completo indisponivel; lendo so as colunas antigas. A migration 20260904000001 foi aplicada?",
-      err,
-    );
-    rows = await loadWith(LEGACY_COLUMNS);
+  // Do conjunto mais novo para o mais antigo: front publicado antes da
+  // migration correspondente continua carregando o que existe.
+  const tiers: Array<[string, string]> = [
+    [REGISTRY_COLUMNS, "20261106000011 (dados do ERP)"],
+    [CADASTRO_COLUMNS, "20260904000001 (apelido/contatos)"],
+  ];
+  let rows: ClienteCadastro[] | null = null;
+  for (const [columns, migration] of tiers) {
+    try {
+      rows = await loadWith(columns);
+      break;
+    } catch (err) {
+      console.warn(
+        `Cadastro de clientes: colunas da migration ${migration} indisponiveis; tentando o conjunto anterior.`,
+        err,
+      );
+    }
   }
+  if (rows === null) rows = await loadWith(LEGACY_COLUMNS);
 
   // A paginacao por OFFSET nao e estavel: se uma importacao insere linhas
   // durante a carga, as paginas seguintes escorregam e a mesma linha pode vir

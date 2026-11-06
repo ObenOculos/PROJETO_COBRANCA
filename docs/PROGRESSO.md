@@ -34,6 +34,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 23 | `AcordoModal` (parcelas) não bloqueia de verdade data anterior a hoje — só `min` do `<input type="date">`, sem validação no "Continuar" | Baixa | Pequeno |
 | 24 | Registrar contato + Reagendar + Agendar viram um botão só, "Atender" (RPC `registrar_contato`; modal em 2 etapas em 2026-11-06) — RPC testada ao vivo, falta testar o modal de 2 etapas e push do front | Média | Médio |
 | 25 | Distribuição da carteira por regra (faixas × lojas, várias por cobrador, ativa/pausada) — migrations 6–10 aplicadas; regras da Monalisa e do José cadastradas e 1ª distribuição aplicada em 2026-11-06 | Alta | Grande |
+| 26 | Razão social + contato/vendedor/região do Ciclone no cadastro do cliente — código pronto 2026-11-06; falta `db push` da `20261106000011` + 1 rodada do sync | Média | Pequeno/médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -83,6 +84,44 @@ pagas ficam baixadas e as a vencer ficam em aberto correndo juros 7")
     já paga) ou é baixada depois, no título novo da parcela 1?
 13. Depois do lançamento, o cliente paga **os boletos gerados no Ciclone**
     (e o app só acompanha), ou o cobrador também registra pagamento no app?
+
+### Item 26 — Dados de cadastro do Ciclone (razão social, contato) — 2026-11-06
+
+Pedido do usuário: muitos clientes do Ciclone não usam o nome da empresa e os
+cobradores ficam confusos. Diagnóstico: o sync gravava só o **nome fantasia**
+(`nomefantasia or nome`) e descartava a razão social — 1.828 dos 1.891
+clientes têm os dois diferentes ("OTICAS ELISA" × "LUCIANO DA SILVA MOURA
+LTDA"). Contato, vendedor e região também não vinham.
+
+Decisão (usuário, recomendada): `clientes.nome` **continua o fantasia** (busca,
+listas e histórico intactos); colunas novas para o resto.
+
+- **Migration `20261106000011_clientes_dados_erp`**: `razao_social`,
+  `contato_nome`, `contato_telefone`, `contato_telefone2`,
+  `vendedor_responsavel` (nome via `pg_funcionario`), `regiao`
+  (`pg_regiao.pgreg_descricao`), `observacao_erp`, `erp_atualizado_em`.
+  **Espelho do ERP**: o sync sobrescreve sempre (inclusive apagando);
+  diferente de nome/telefones/e-mail, que ele só preenche se vazios. Correção
+  desses campos é no Ciclone. Fora do Ciclone ficam `NULL`.
+- **Sync** (`Ciclone/Esquema_SQL/sync_cobranca/sync_financeiro.py`, fora do
+  git): `CAMPOS_ERP`/`CAMPOS_EDITAVEIS`; só regrava cliente com diferença;
+  `'null'` literal da observação vira `NULL`; se a migration não estiver
+  aplicada, segue sem os campos novos (warning no log) — os títulos não param.
+  Dry-run conferido 2026-11-06 (joins 1:1, 35.767 títulos, mesma contagem).
+- **Front**: regra única em `src/utils/clienteNome.ts`
+  (`razaoSocialDistinta` — só mostra se diferente do nome;
+  `nomeJuridicoCliente` — razão social para documento jurídico). Razão social
+  entra na busca (filtros, Atribuição, agenda do externo), na lista do
+  cobrador, na Atribuição (+ coluna no Excel), no cabeçalho e em "Ver Dados"
+  da ficha (com bloco "Falar com" e "Dados do Ciclone"), e no **Termo de
+  Acordo/resumo, que agora saem em nome da razão social** do CPF/CNPJ.
+  `clientesRegistry` tenta as colunas novas e cai para as anteriores sem a
+  migration.
+- **Ficou de fora**: situação do cadastro (`pgview_situacao`: E/P/I/B/S/A/V/C
+  — significado não confirmado), limite/obs. de crédito, e-mail financeiro
+  (10 clientes), endereços de cobrança/entrega (só 5/12 diferem).
+- Observação: a extração do sync leva ~2,5 min (antes ~25 s) — medido igual
+  sem os joins novos, vem do `LATERAL` de baixas da etapa 3a.
 
 ### Item 25 — Distribuição da carteira por regra — 2026-11-06
 

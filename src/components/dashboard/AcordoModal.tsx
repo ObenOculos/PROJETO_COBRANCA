@@ -24,6 +24,10 @@ import { todayLocalStr } from "../../config/visitStatus";
 import { ClientGroup } from "../../types";
 import { gerarPixCopiaECola } from "../../utils/pix";
 import {
+  nomeJuridicoCliente,
+  razaoSocialDistinta,
+} from "../../utils/clienteNome";
+import {
   gerarTermoAcordoPdf,
   nomeArquivoTermoAcordo,
   gerarResumoAcordoPdf,
@@ -92,8 +96,16 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     acordoConfiguracaoPadrao,
     fetchAcordoDetalhe,
     registrarPagamentoAcordo,
+    clientesRegistry,
   } = useCollection();
   const { user } = useAuth();
+
+  // Documento juridico (Termo / resumo) sai em nome da razao social do
+  // CPF/CNPJ; a tela segue mostrando o nome fantasia.
+  const razaoSocialCadastro =
+    clientesRegistry.get(client.document)?.razao_social ?? null;
+  const nomeDevedor = nomeJuridicoCliente(razaoSocialCadastro, client.client);
+  const razaoSocial = razaoSocialDistinta(razaoSocialCadastro, client.client);
 
   const titulosEmAberto = useMemo<TituloAberto[]>(() => {
     const list: TituloAberto[] = [];
@@ -468,7 +480,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
           parcelas: detalhe.parcelas,
           empresa: acordoConfiguracaoPadrao,
           devedor: {
-            nome: client.client,
+            nome: nomeDevedor,
             documento: client.document,
             endereco: endereco || "endereço não informado",
           },
@@ -645,7 +657,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     setGerandoResumoPdf(true);
     try {
       const pdf = await gerarResumoAcordoPdf({
-        devedor: { nome: client.client, documento: client.document },
+        devedor: { nome: nomeDevedor, documento: client.document },
         empresa: acordoConfiguracaoPadrao,
         totalNegociado,
         parcelas: parcelas.map((p) => ({
@@ -708,6 +720,11 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
               {" — "}
               {client.document}
             </p>
+            {razaoSocial && (
+              <p className="text-xs text-gray-600 dark:text-dark-text-secondary">
+                Razão social: {razaoSocial}
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}

@@ -35,6 +35,7 @@ import {
 } from "../../config/collectionAttempts";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useClientBirthDate } from "../../hooks/useClientBirthDate";
+import { razaoSocialDistinta } from "../../utils/clienteNome";
 import { useAuth } from "../../contexts/AuthContext";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 
@@ -167,8 +168,26 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     users,
     reincidenciaResets,
     getAcordoAtivoDoCliente,
+    clientesRegistry,
   } = useCollection();
   const { user } = useAuth();
+
+  // Espelho do ERP Ciclone (somente leitura). Lido direto do cadastro porque o
+  // ClientGroup chega de varias telas e nem todas montam esses campos.
+  const cadastroErp = clientesRegistry.get(clientGroup.document);
+  const razaoSocial = razaoSocialDistinta(
+    cadastroErp?.razao_social,
+    clientGroup.client,
+  );
+  const telefonesContato = [
+    cadastroErp?.contato_telefone,
+    cadastroErp?.contato_telefone2,
+  ].filter((t): t is string => Boolean(t?.trim()));
+  const temDadosErp = Boolean(
+    cadastroErp?.vendedor_responsavel ||
+      cadastroErp?.regiao ||
+      cadastroErp?.observacao_erp,
+  );
 
   const getCollectorName = (collectorId: string) => {
     const collector = users?.find((u) => u.id === collectorId);
@@ -703,6 +722,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
                   {clientGroup.client}
                 </h2>
+                {razaoSocial && (
+                  <p
+                    className="text-xs sm:text-sm text-gray-700 truncate"
+                    title={`Razão social: ${razaoSocial}`}
+                  >
+                    {razaoSocial}
+                  </p>
+                )}
                 <p className="text-xs sm:text-sm text-gray-500 truncate">
                   {clientGroup.document}
                 </p>
@@ -837,11 +864,23 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   <div className="bg-gray-50 p-4 rounded-2xl space-y-3 text-sm border border-gray-200">
                     {/* Client Info */}
                     <div className="flex justify-between">
-                      <span className="font-medium text-gray-600">Nome:</span>
+                      <span className="font-medium text-gray-600">
+                        {razaoSocial ? "Nome fantasia:" : "Nome:"}
+                      </span>
                       <span className="font-semibold text-gray-900 text-right">
                         {clientGroup.client || "-"}
                       </span>
                     </div>
+                    {razaoSocial && (
+                      <div className="flex justify-between gap-4">
+                        <span className="font-medium text-gray-600 shrink-0">
+                          Razão social:
+                        </span>
+                        <span className="font-semibold text-gray-900 text-right">
+                          {razaoSocial}
+                        </span>
+                      </div>
+                    )}
                     {clientGroup.apelido && (
                       <div className="flex justify-between">
                         <span className="font-medium text-gray-600">
@@ -907,13 +946,96 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                             </button>
                           </div>
                         )}
-                        {!clientGroup.phone && !clientGroup.mobile && (
-                          <p className="text-xs text-gray-500">
-                            Nenhum telefone cadastrado.
-                          </p>
-                        )}
+                        {!clientGroup.phone &&
+                          !clientGroup.mobile &&
+                          telefonesContato.length === 0 && (
+                            <p className="text-xs text-gray-500">
+                              Nenhum telefone cadastrado.
+                            </p>
+                          )}
                       </div>
                     </div>
+
+                    {/* Pessoa de contato (ERP Ciclone) */}
+                    {(cadastroErp?.contato_nome ||
+                      telefonesContato.length > 0) && (
+                      <div className="pt-4 mt-4 border-t border-gray-200">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                          Falar com
+                        </h4>
+                        <div className="space-y-2">
+                          {cadastroErp?.contato_nome && (
+                            <div className="flex items-center text-sm">
+                              <User className="h-4 w-4 text-gray-400 mr-2" />
+                              <span className="font-semibold text-gray-900">
+                                {cadastroErp.contato_nome}
+                              </span>
+                            </div>
+                          )}
+                          {telefonesContato.map((telefone) => (
+                            <div
+                              key={telefone}
+                              className="flex items-center justify-between text-sm"
+                            >
+                              <div className="flex items-center">
+                                <Phone className="h-4 w-4 text-gray-400 mr-2" />
+                                <span>{telefone}</span>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  window.open(`tel:${telefone}`, "_self")
+                                }
+                                className="text-[10px] font-bold text-blue-600"
+                              >
+                                Ligar
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Dados comerciais (ERP Ciclone) */}
+                    {temDadosErp && (
+                      <div className="pt-4 mt-4 border-t border-gray-200 space-y-2">
+                        <h4 className="text-sm font-semibold text-gray-700">
+                          Dados do Ciclone
+                        </h4>
+                        {cadastroErp?.vendedor_responsavel && (
+                          <div className="flex justify-between gap-4">
+                            <span className="font-medium text-gray-600 shrink-0">
+                              Vendedor:
+                            </span>
+                            <span className="font-semibold text-gray-900 text-right">
+                              {cadastroErp.vendedor_responsavel}
+                            </span>
+                          </div>
+                        )}
+                        {cadastroErp?.regiao && (
+                          <div className="flex justify-between gap-4">
+                            <span className="font-medium text-gray-600 shrink-0">
+                              Região:
+                            </span>
+                            <span className="font-semibold text-gray-900 text-right">
+                              {cadastroErp.regiao}
+                            </span>
+                          </div>
+                        )}
+                        {cadastroErp?.observacao_erp && (
+                          <div>
+                            <span className="font-medium text-gray-600">
+                              Observação do cadastro:
+                            </span>
+                            <p className="mt-1 text-gray-900 whitespace-pre-line break-words">
+                              {cadastroErp.observacao_erp}
+                            </p>
+                          </div>
+                        )}
+                        <p className="text-[11px] text-gray-500">
+                          Vem do cadastro do Ciclone; correções são feitas lá.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
