@@ -151,6 +151,19 @@ logo, aplicando as melhores propostas"):
   (situação "Cobrança Interna"), 310 saíram dela para sem cobrador (204 no
   buraco 61–365, 72 acima de 948, 34 de lojas fora das regras dela); José sem
   mudança. Ressimulação depois: 0 movimentos. Monalisa ficou com 845 clientes.
+- **Mesma noite, demais cobradores do Cedrus** (aplicado com "pode aplicar" do
+  usuário a cada passo): Jonathan (3–60 ativa em Excellence Eusébio — "Excellence"
+  do Cedrus assumido como Eusébio —, Messejana e Independência; 61–90, 91–365,
+  366–948 pausadas) +56; Aline Freitas (Poranga 3–60 ativa, 366–948 pausada)
+  +76; Aline (Itapipoca 3–60, 61–90, 91–365 e 366–948 com Itapipoca Ext, todas
+  ativas) +332; Vanessa (Quiterianópolis 3–60, 61–90, 366–948, todas pausadas)
+  0. Depois, a pedido ("clientes fora das faixas podem sair"), **retirados 782**
+  clientes que estavam fora das faixas ATIVAS (Monalisa 559: 350 em faixa
+  pausada + 209 abaixo da 1ª faixa; José 223: 33 + 190), via UPDATE em
+  transação com motivo `distribuicao_regra` — operação pontual, a regra do
+  plano (0010) continua mantendo pausada/abaixo da 1ª faixa nas próximas
+  distribuições. Carteiras finais: Aline 332, Monalisa 286, Aline Freitas 76,
+  José 56, Jonathan 56. Ressimulação: 0 movimentos.
 - Pendente: teste ao vivo de Usuários e do "Atender" (item 24); automação diária (fase 2) não feita;
   automação diária (fase 2) não feita de propósito; "Clientes urgentes" e
   o painel do Resumo seguem só por dias (sem loja).
