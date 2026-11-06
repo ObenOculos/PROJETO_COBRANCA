@@ -14,6 +14,16 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+// OBSOLETO desde a migration 20261106000005: a coluna users.password foi
+// removida (a senha vivia aqui em texto puro). O script so serviu para a
+// migracao inicial de 2026-10-27; usuario novo ganha login criando a conta
+// no Supabase Auth (Dashboard ou SQL) e preenchendo users.auth_user_id /
+// auth_email. A regra do e-mail sintetico (slugifyLogin) continua valendo.
+console.error(
+  "Script obsoleto: users.password nao existe mais (migration 20261106000005).",
+);
+process.exit(1);
+
 const APPLY = process.argv.includes("--apply");
 
 const url = process.env.VITE_SUPABASE_URL;

@@ -1,0 +1,13 @@
+-- Etapa 1 (auth), passo 4 que ficou pendente: remover a senha antiga de
+-- public.users.
+--
+-- Desde 2026-10-27 o login passa pelo Supabase Auth (senha com hash em
+-- auth.users) e o app nunca mais leu nem gravou users.password. A coluna
+-- ficou "so para rollback" -- mas 15 dos 19 usuarios ainda tinham a senha
+-- em texto puro aqui, a mesma do login atual (a migracao copiou sem forcar
+-- troca), e a politica authenticated_full_access deixa qualquer usuario
+-- logado ler a coluna pela API. Achado em 2026-11-06.
+--
+-- Conferido antes (Management API, so leitura): nenhuma funcao do schema
+-- public cita "password" e nenhuma view depende da coluna.
+alter table public.users drop column password;

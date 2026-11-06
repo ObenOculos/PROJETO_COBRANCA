@@ -1386,7 +1386,6 @@ export type Database = {
           id: string;
           login: string;
           name: string;
-          password: string | null;
           type: string;
         };
         Insert: {
@@ -1397,7 +1396,6 @@ export type Database = {
           id?: string;
           login: string;
           name: string;
-          password?: string | null;
           type: string;
         };
         Update: {
@@ -1408,7 +1406,6 @@ export type Database = {
           id?: string;
           login?: string;
           name?: string;
-          password?: string | null;
           type?: string;
         };
         Relationships: [];
