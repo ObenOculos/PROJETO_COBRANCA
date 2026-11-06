@@ -3,13 +3,16 @@ import {
   STATUS_COLORS,
   STATUS_LABELS,
   isAgrupado,
+  isRenegociado,
 } from "../types/status";
 
-// "Agrupado" nao entra no enum CollectionStatus de proposito: o enum alimenta
-// as opcoes de status escolhiveis a mao (AddTituloModal, getStatusOptions), e
-// agrupado so vem do ERP. Tratado a parte so na exibicao.
-const AGRUPADO_LABEL = "Agrupado";
-const AGRUPADO_COLOR = "bg-gray-200 text-gray-600";
+// "Agrupado"/"Renegociado" nao entram no enum CollectionStatus de proposito:
+// o enum alimenta as opcoes de status escolhiveis a mao (AddTituloModal,
+// getStatusOptions), e esses dois so vem do ERP. Tratados a parte so na
+// exibicao.
+const FORA_DA_COBRANCA_COLOR = "bg-gray-200 text-gray-600";
+const labelDoErp = (status: string | null | undefined): string | null =>
+  isAgrupado(status) ? "Agrupado" : isRenegociado(status) ? "Renegociado" : null;
 
 const normalizeStatus = (
   status: string | null | undefined,
@@ -46,13 +49,14 @@ const normalizeStatus = (
 };
 
 export const getStatusColor = (status: string | null | undefined): string => {
-  if (isAgrupado(status)) return AGRUPADO_COLOR;
+  if (labelDoErp(status)) return FORA_DA_COBRANCA_COLOR;
   const normalizedStatus = normalizeStatus(status);
   return STATUS_COLORS[normalizedStatus] || "bg-gray-100 text-gray-800";
 };
 
 export const getStatusLabel = (status: string | null | undefined): string => {
-  if (isAgrupado(status)) return AGRUPADO_LABEL;
+  const erp = labelDoErp(status);
+  if (erp) return erp;
   const normalizedStatus = normalizeStatus(status);
   return STATUS_LABELS[normalizedStatus] || "Indefinido";
 };

@@ -1582,8 +1582,8 @@ export const CollectionTable = React.forwardRef<
                       {clientGroup.sales.map((sale: SaleGroup) => {
                         // Determinar o status real da venda baseado nos valores.
                         // Venda totalmente fora da cobranca (todas as parcelas
-                        // canceladas ou agrupadas) recebe o selo correspondente
-                        // em vez de "Quitado" -- agrupado nao e pagamento.
+                        // canceladas, agrupadas ou renegociadas) recebe o selo
+                        // correspondente em vez de "Quitado" -- nao e pagamento.
                         let displayStatus: string;
                         let statusColor: string;
 

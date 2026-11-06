@@ -709,6 +709,49 @@ do Sistema de Cobrança como mais uma loja, com sincronização recorrente.
   cada um, com origem `erp_ou_manual` — registro novo, histórico preservado.
   **Ordem obrigatória:** front publicado antes da próxima rodada do sync (5h).
   O script fica fora do Git (pasta `Ciclone` não é repositório).
+- **Etapa 2 (2026-11-06) — o ERP vence a trava de título em acordo.**
+  Migration `20261106000001` (commit `f0c134c`, aplicada e conferida):
+  `trg_protege_titulo_em_acordo` deixa passar a escrita do sync
+  (`service_role` no JWT) em título que veio do Ciclone
+  (`ciclone_titulo_map`). Antes, a baixa/cancelamento do ERP num título em
+  acordo ativo seria recusada — título original preso no status antigo (o
+  bug do Cedrus) e o sync abortando a rodada inteira no primeiro lote
+  recusado. A trava segue para pagamento manual, Distribuir Pagamento,
+  upload e demais lojas. Consequência aceita: pagamento de acordo registrado
+  só no app sobre título Focco é sobrescrito pelo saldo do ERP na rodada
+  seguinte (o ledger do acordo fica); por isso o financeiro precisa lançar no
+  Ciclone.
+- **Etapa 3a (2026-11-06) — renegociação do Ciclone e recebido só em
+  dinheiro.** Pesquisa (só leitura) com as respostas da Márcia: no Ciclone a
+  renegociação **não** é fatura. É uma **baixa com forma de pagamento 100
+  "RENEGOCIAÇÃO"** (`fn_crbaixaformapagamento`, com
+  `fnbfp_numeronovodocumento`): os títulos em atraso são baixados (saldo 0,
+  situação continua `A`), `fn_crtitulobaixado` guarda por título
+  principal/juros/multa/desconto (o mesmo que `acordo_titulos` do app), e a
+  baixa gera títulos novos tipo 20 "RENEGOCIAÇÃO A RECEBER" com número = novo
+  documento (parcela 1 vence no dia = entrada). Caso conferido: 14.274,66 +
+  1.051,25 juros − 325,91 desconto = 15.000 = 1.000 + 28 × 500. Parcelas
+  pagas ficam como estão; quebra → nova renegociação sobre os tipo 20 (437
+  casos) ou SPC. O sync contava esses títulos baixados como "recebido".
+  Agora o principal encerrado (`valor − saldo`) é dividido pela proporção
+  das formas de cada baixa **ativa** (soma das formas = principal +
+  encargos, conferido nas 7.666): forma RENEGOCIAÇÃO e DESCONTO (14) vão para
+  `desconto`; só o resto é `valor_recebido`. Título encerrado só por
+  renegociação vira status `renegociado` (`isForaDaCobranca` no front, selo
+  "Renegociado"); se a baixa teve dinheiro (2 casos de Pix), segue
+  "recebido" pela parte em dinheiro. Baixa cancelada (`fncrb_situacao='C'`)
+  deixa de contar, inclusive na data de recebimento. Dry-run: recebido da
+  Focco cai de R$ 29,0 mi para R$ 14,16 mi (8.611 agrupados R$ 13,28 mi;
+  1.575 renegociados R$ 1,51 mi; R$ 60 mil de forma DESCONTO).
+  **Pendente:** (a) outras formas não monetárias seguem contando como
+  recebido — DEVOLUÇÃO (9, R$ 80 mil), TAXA DE ANTECIPAÇÃO (13, R$ 42 mil),
+  formas 99/101 — decidir com o negócio; (b) baixa paga em CHEQUE/CARTÃO/BLU
+  (formas 2/3/12) também gera título novo ("cheque em carteira" etc.), o
+  mesmo valor pode aparecer como recebido no original e como dívida no
+  título novo — investigar; (c) etapa 3b: ligar os títulos tipo 20 ao acordo
+  do app (hoje entram como dívida avulsa ao lado do acordo); (d) etapa 3c:
+  pacote por título (principal/juros/multa/desconto) para a Márcia lançar a
+  baixa.
 
 ### 1b. Desempenho por atribuição atual — ALTA
 

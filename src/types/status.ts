@@ -48,17 +48,41 @@ export const isCancelado = (status: string | null | undefined): boolean =>
 export const isAgrupado = (status: string | null | undefined): boolean =>
   (status ?? "").trim().toLowerCase() === "agrupado";
 
-/** Titulo que saiu da cobranca ativa na origem (cancelado ou agrupado):
- * fica fora de totais, carteira, atribuicao, rota/visitas e desempenho. */
-export const isForaDaCobranca = (status: string | null | undefined): boolean =>
-  isCancelado(status) || isAgrupado(status);
+// Titulo antigo encerrado por RENEGOCIACAO no ERP Ciclone: baixa com forma
+// de pagamento "RENEGOCIACAO" que gera titulos novos ("RENEGOCIACAO A
+// RECEBER"). Como o agrupado, nao e pagamento (o dinheiro entra nos titulos
+// novos) nem divida (ela mora neles). O sync grava status "renegociado" com a
+// parte renegociada em `desconto`. Se a mesma baixa teve dinheiro de verdade,
+// o sync mantem o titulo como recebido pela parte em dinheiro (nunca esconde
+// pagamento real). Ver docs/PROGRESSO.md.
+export const isRenegociado = (status: string | null | undefined): boolean =>
+  (status ?? "").trim().toLowerCase() === "renegociado";
 
-/** Selo de exibicao para um conjunto de parcelas fora da cobranca:
- * "Agrupado" so se todas forem agrupadas; senao "Cancelado". null se alguma
- * parcela ainda estiver na cobranca ativa (ou a lista for vazia). */
+/** Titulo que saiu da cobranca ativa na origem (cancelado, agrupado ou
+ * renegociado): fica fora de totais, carteira, atribuicao, rota/visitas e
+ * desempenho. */
+export const isForaDaCobranca = (status: string | null | undefined): boolean =>
+  isCancelado(status) || isAgrupado(status) || isRenegociado(status);
+
+export type SeloForaDaCobranca = "Cancelado" | "Agrupado" | "Renegociado";
+
+const seloDe = (status: string | null | undefined): SeloForaDaCobranca | null =>
+  isCancelado(status)
+    ? "Cancelado"
+    : isAgrupado(status)
+      ? "Agrupado"
+      : isRenegociado(status)
+        ? "Renegociado"
+        : null;
+
+/** Selo de exibicao para um conjunto de parcelas fora da cobranca: o motivo
+ * comum a todas; se os motivos forem diferentes, "Cancelado" (o mais
+ * generico). null se alguma parcela ainda estiver na cobranca ativa (ou a
+ * lista for vazia). */
 export const seloForaDaCobranca = (
   statuses: Array<string | null | undefined>,
-): "Cancelado" | "Agrupado" | null => {
+): SeloForaDaCobranca | null => {
   if (statuses.length === 0 || !statuses.every(isForaDaCobranca)) return null;
-  return statuses.every(isAgrupado) ? "Agrupado" : "Cancelado";
+  const selos = new Set(statuses.map(seloDe));
+  return selos.size === 1 ? (seloDe(statuses[0]) as SeloForaDaCobranca) : "Cancelado";
 };
