@@ -39,7 +39,7 @@ import {
   parseAndFormatDate,
   calculateOverdueDays,
 } from "../../utils/formatters";
-import { isCancelado } from "../../types/status";
+import { seloForaDaCobranca } from "../../types/status";
 import { getClientPaymentStatus } from "../../filters/clientStatus";
 import { countVendas, resolveSaleKey } from "../../filters/sales";
 import CollectionModal from "./CollectionModal";
@@ -1581,19 +1581,18 @@ export const CollectionTable = React.forwardRef<
                     <div className="space-y-3">
                       {clientGroup.sales.map((sale: SaleGroup) => {
                         // Determinar o status real da venda baseado nos valores.
-                        // Venda totalmente cancelada (todas as parcelas) recebe
-                        // o selo "Cancelado" (so aparece no filtro Cancelado).
+                        // Venda totalmente fora da cobranca (todas as parcelas
+                        // canceladas ou agrupadas) recebe o selo correspondente
+                        // em vez de "Quitado" -- agrupado nao e pagamento.
                         let displayStatus: string;
                         let statusColor: string;
 
-                        const allCancelled =
-                          sale.installments.length > 0 &&
-                          sale.installments.every((i: Collection) =>
-                            isCancelado(i.status),
-                          );
+                        const seloFora = seloForaDaCobranca(
+                          sale.installments.map((i: Collection) => i.status),
+                        );
 
-                        if (allCancelled) {
-                          displayStatus = "Cancelado";
+                        if (seloFora) {
+                          displayStatus = seloFora;
                           statusColor =
                             "bg-gray-200 text-gray-600 dark:bg-dark-bg-tertiary dark:text-dark-text-secondary";
                         } else if (

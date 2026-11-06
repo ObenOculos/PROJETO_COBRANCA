@@ -688,6 +688,27 @@ do Sistema de Cobrança como mais uma loja, com sincronização recorrente.
   (nada mudou desde a carga inicial) — confirma upsert idempotente de ponta
   a ponta. Os 32 títulos sem CPF/CNPJ válido (ignorados) são estáveis desde
   a carga original, não é regressão.
+- **Correção 2026-11-06 — status `F` do Ciclone = agrupado, não recebido.**
+  Pesquisa (só leitura) do agrupamento do Ciclone para a integração de
+  acordos: o agrupamento é a **fatura** (`fn_crfatura` + origens em
+  `fn_crfaturatitulo` + gerados em `fn_crfaturatitulogerado`), usada no
+  parcelamento normal de venda. Os títulos da NF viram origem (`F`, saldo 0,
+  sem baixa) e o ERP gera N títulos novos (implantação `M`, número = código
+  da fatura). Renegociação no Ciclone = cancelar a fatura (gerados → `C`,
+  origens voltam a `A`) e refaturar as mesmas origens. Não há trigger/função
+  no banco do ERP — a lógica é do aplicativo dele. O sync classificava `F`
+  pelo saldo 0 como **"recebido"**, duplicando o recebido (o pagamento real
+  entra depois nos gerados). Agora: `F` com saldo 0 → status `agrupado`,
+  `valor_recebido` 0, `desconto` = valor (mesma convenção do cancelado; saldo
+  zera sem inventar recebimento). Dry-run: 8.607 títulos saem de "recebido".
+  Front: `isAgrupado`/`isForaDaCobranca`/`seloForaDaCobranca` em
+  `types/status.ts` (agrupado sai da cobrança ativa como o cancelado, selo
+  "Agrupado"); `getStatusLabel`/`getStatusColor` reconhecem. Banco: nada a
+  mudar (funções de saldo/atraso já ignoram título com saldo 0). A primeira
+  rodada gera em `recebimentos_historico` a correção (recebido valor → 0) de
+  cada um, com origem `erp_ou_manual` — registro novo, histórico preservado.
+  **Ordem obrigatória:** front publicado antes da próxima rodada do sync (5h).
+  O script fica fora do Git (pasta `Ciclone` não é repositório).
 
 ### 1b. Desempenho por atribuição atual — ALTA
 

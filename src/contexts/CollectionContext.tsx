@@ -56,7 +56,7 @@ import {
   collectionsCache,
 } from "../utils/cache";
 import { calculateOverdueDays, formatCurrency } from "../utils/formatters";
-import { isCancelado } from "../types/status";
+import { isCancelado, isForaDaCobranca } from "../types/status";
 import {
   clientKey,
   getClientPaymentStatus,
@@ -246,10 +246,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     () => [...allCollections, ...settledCollections],
     [allCollections, settledCollections],
   );
-  // Titulos cancelados na origem (status === "Cancelado") saem de toda a
-  // cobranca ativa: totais, carteira, atribuicao, rota/visitas e desempenho.
+  // Titulos cancelados ou agrupados na origem (isForaDaCobranca) saem de toda
+  // a cobranca ativa: totais, carteira, atribuicao, rota/visitas e desempenho.
   const collections = useMemo(
-    () => rawCollections.filter((c) => !isCancelado(c.status)),
+    () => rawCollections.filter((c) => !isForaDaCobranca(c.status)),
     [rawCollections],
   );
   const [users, setUsers] = useState<User[]>([]);
@@ -3719,10 +3719,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           // Arredondar para 2 casas decimais para evitar problemas de precisão
           const roundTo2Decimals = (num: number) =>
             Math.round((num + Number.EPSILON) * 100) / 100;
-          // Totais ignoram parcelas canceladas (mas elas seguem em
+          // Totais ignoram parcelas canceladas/agrupadas (mas elas seguem em
           // `installments` para exibicao com selo no detalhe).
           const active = installments.filter(
-            (inst) => !isCancelado(inst.status),
+            (inst) => !isForaDaCobranca(inst.status),
           );
           const totalValue = roundTo2Decimals(
             active.reduce((sum, inst) => sum + inst.valor_original, 0),
@@ -3761,7 +3761,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const renegotiatedSaleGroups = (() => {
         if (individualInstallments.length === 0) return [];
         const activeIndividual = individualInstallments.filter(
-          (inst) => !isCancelado(inst.status),
+          (inst) => !isForaDaCobranca(inst.status),
         );
         const totalValue = activeIndividual.reduce(
           (sum, inst) => sum + inst.valor_original,

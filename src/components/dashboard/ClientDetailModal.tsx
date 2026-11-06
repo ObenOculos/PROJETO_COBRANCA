@@ -28,7 +28,7 @@ import {
   clientesReincidentes,
   rescheduleReasonLabel,
 } from "../../config/rescheduleReasons";
-import { isCancelado } from "../../types/status";
+import { isForaDaCobranca, seloForaDaCobranca } from "../../types/status";
 import {
   ATTEMPT_TYPE_LABELS,
   ATTEMPT_RESULT_LABELS,
@@ -1102,9 +1102,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       sale.saleNumber,
                       clientGroup.document,
                     );
-                    const saleAllCancelled =
-                      sale.installments.length > 0 &&
-                      sale.installments.every((i) => isCancelado(i.status));
+                    const saleSeloFora = seloForaDaCobranca(
+                      sale.installments.map((i) => i.status),
+                    );
 
                     return (
                       <div
@@ -1133,9 +1133,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                       ? "Venda Renegociada"
                                       : `Venda #${sale.saleNumber}`}
                                   </h4>
-                                  {saleAllCancelled ? (
+                                  {saleSeloFora ? (
                                     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs border bg-gray-200 text-gray-600 border-gray-300">
-                                      Cancelado
+                                      {saleSeloFora}
                                     </span>
                                   ) : (
                                     <StatusBadge status={saleBalance.status} />
@@ -1230,16 +1230,18 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                             <span className="font-mono text-xs text-gray-500">
                                               #{installment.id_parcela}
                                             </span>
-                                            {isCancelado(
+                                            {isForaDaCobranca(
                                               installment.status,
                                             ) && (
                                               <span className="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">
-                                                Cancelado
+                                                {seloForaDaCobranca([
+                                                  installment.status,
+                                                ])}
                                               </span>
                                             )}
                                             {isOverdue &&
                                               !isPaid &&
-                                              !isCancelado(
+                                              !isForaDaCobranca(
                                                 installment.status,
                                               ) && (
                                                 <span className="text-xs text-red-600 font-medium">

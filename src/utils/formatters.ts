@@ -2,7 +2,14 @@ import {
   CollectionStatus,
   STATUS_COLORS,
   STATUS_LABELS,
+  isAgrupado,
 } from "../types/status";
+
+// "Agrupado" nao entra no enum CollectionStatus de proposito: o enum alimenta
+// as opcoes de status escolhiveis a mao (AddTituloModal, getStatusOptions), e
+// agrupado so vem do ERP. Tratado a parte so na exibicao.
+const AGRUPADO_LABEL = "Agrupado";
+const AGRUPADO_COLOR = "bg-gray-200 text-gray-600";
 
 const normalizeStatus = (
   status: string | null | undefined,
@@ -39,11 +46,13 @@ const normalizeStatus = (
 };
 
 export const getStatusColor = (status: string | null | undefined): string => {
+  if (isAgrupado(status)) return AGRUPADO_COLOR;
   const normalizedStatus = normalizeStatus(status);
   return STATUS_COLORS[normalizedStatus] || "bg-gray-100 text-gray-800";
 };
 
 export const getStatusLabel = (status: string | null | undefined): string => {
+  if (isAgrupado(status)) return AGRUPADO_LABEL;
   const normalizedStatus = normalizeStatus(status);
   return STATUS_LABELS[normalizedStatus] || "Indefinido";
 };
