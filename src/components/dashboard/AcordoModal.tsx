@@ -9,8 +9,11 @@ import {
   Copy,
   CheckCircle2,
   QrCode,
+  FileDown,
+  MessageCircle,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { hasInstallmentBalance } from "../../filters/clientStatus";
 import {
   formatCurrency,
@@ -20,7 +23,12 @@ import {
 import { todayLocalStr } from "../../config/visitStatus";
 import { ClientGroup } from "../../types";
 import { gerarPixCopiaECola } from "../../utils/pix";
-import { gerarTermoAcordoPdf, nomeArquivoTermoAcordo } from "../../utils/termoAcordo";
+import {
+  gerarTermoAcordoPdf,
+  nomeArquivoTermoAcordo,
+  gerarResumoAcordoPdf,
+  nomeArquivoResumoAcordo,
+} from "../../utils/termoAcordo";
 
 interface AcordoModalProps {
   client: ClientGroup;
@@ -43,6 +51,16 @@ interface TituloAberto {
   vencido: boolean;
   diasAtraso: number;
 }
+
+type Etapa = 1 | 2 | 3 | 4 | 5;
+
+const ETAPAS: { numero: Etapa; label: string }[] = [
+  { numero: 1, label: "Títulos" },
+  { numero: 2, label: "Encargos" },
+  { numero: 3, label: "Parcelas" },
+  { numero: 4, label: "Pagamento" },
+  { numero: 5, label: "Entrada" },
+];
 
 const FORMAS_PAGAMENTO_PARCELAS = [
   "Boleto",
@@ -75,6 +93,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     fetchAcordoDetalhe,
     registrarPagamentoAcordo,
   } = useCollection();
+  const { user } = useAuth();
 
   const titulosEmAberto = useMemo<TituloAberto[]>(() => {
     const list: TituloAberto[] = [];
@@ -120,7 +139,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [aVencerPendentes, setAVencerPendentes] = useState<TituloAberto[]>([]);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<Etapa>(1);
   // O botao "Criar Acordo" nasce na mesma posicao em que "Continuar" estava:
   // num toque rapido (ghost click/replay de touch em mobile) o clique que
   // avanca a etapa pode "vazar" pro botao novo que aparece no mesmo lugar,
@@ -204,40 +223,87 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     [titulosComEncargo],
   );
 
-  const gerarParcelas = (saldo: number, n: number): ParcelaDraft[] => {
+  // "numeroInicial" rotula a parcela (#2, #3... quando vem depois da
+  // entrada, que e sempre #1); "offsetIntervalo" conta quantos intervalos
+  // de diasEntreParcelasPadrao se passaram desde hoje pra vencimento --
+  // sao coisas diferentes. A entrada ocupa o rotulo #1 mas NAO deve ocupar
+  // um intervalo de vencimento (ela e paga hoje, via Pix) -- por isso as
+  // demais parcelas recebem offsetIntervalo=1 pra 1a demais vencer em 1
+  // intervalo (nao 2). Ver bug relatado: 1a parcela nascia 2 meses na
+  // frente em vez de 1 porque o vencimento usava o rotulo (2) como se
+  // fosse o intervalo.
+  const gerarParcelas = (
+    saldo: number,
+    n: number,
+    numeroInicial = 1,
+    offsetIntervalo = numeroInicial,
+  ): ParcelaDraft[] => {
     if (n < 1 || saldo <= 0) return [];
     const valorBase = Math.floor((saldo / n) * 100) / 100;
     const draft: ParcelaDraft[] = [];
     let acumulado = 0;
-    for (let i = 1; i <= n; i++) {
-      const isLast = i === n;
+    for (let i = 0; i < n; i++) {
+      const isLast = i === n - 1;
       const valor = isLast
         ? Math.round((saldo - acumulado) * 100) / 100
         : valorBase;
       acumulado += valor;
       draft.push({
-        numero: i,
+        numero: numeroInicial + i,
         valor: valor.toFixed(2),
-        data: addDaysLocal(todayLocalStr(), diasEntreParcelasPadrao * i),
+        data: addDaysLocal(
+          todayLocalStr(),
+          diasEntreParcelasPadrao * (offsetIntervalo + i),
+        ),
       });
     }
     return draft;
   };
 
-  // Parcelas sao geradas automaticamente a partir do total negociado (saldo
-  // + multa + juros - desconto) — sem botao manual. parcelasDirty marca que
-  // o usuario editou algo a mao; se a selecao de titulos, os encargos ou o
-  // numero de parcelas mudarem depois disso, as parcelas sao recalculadas
-  // (nunca ficam desatualizadas) mas avisamos em vez de descartar
-  // silenciosamente a edicao.
+  // Entrada: campo proprio (nao mais derivado de parcelas[0]) -- e SEMPRE
+  // uma linha a parte (parcela "numero 1"), paga HOJE via Pix na criacao,
+  // nunca uma das N parcelas do cronograma (as "demais"). O valor da
+  // entrada desconta do total ANTES de dividir -- a reducao fica espalhada
+  // igualmente entre as N demais (igual um desconto aplicado no inicio da
+  // conta). Em todo caso, entrada + soma das demais == total negociado.
+  const [valorEntradaInput, setValorEntradaInput] = useState<string>(() => {
+    const base = gerarParcelas(totalNegociado, numeroParcelas);
+    return base[0]?.valor ?? "0.00";
+  });
+  const valorEntrada = Math.max(0, parseFloat(valorEntradaInput) || 0);
+
+  const montarParcelasComEntrada = (
+    entrada: number,
+    nParcelasInput: number,
+  ): ParcelaDraft[] => {
+    const entradaParcela: ParcelaDraft = {
+      numero: 1,
+      valor: Math.max(0, entrada).toFixed(2),
+      data: todayLocalStr(),
+    };
+    const restante = Math.round((totalNegociado - entrada) * 100) / 100;
+    return [entradaParcela, ...gerarParcelas(restante, nParcelasInput, 2, 1)];
+  };
+
+  // Parcelas sao geradas automaticamente a partir da entrada + total
+  // negociado (saldo + multa + juros - desconto) — sem botao manual.
+  // parcelasDirty marca que o usuario editou algo a mao (nas parcelas
+  // depois da entrada); se a selecao de titulos, os encargos, a entrada ou
+  // o numero de parcelas mudarem depois disso, as parcelas sao
+  // recalculadas (nunca ficam desatualizadas) mas avisamos em vez de
+  // descartar silenciosamente a edicao.
   const [parcelas, setParcelas] = useState<ParcelaDraft[]>(() =>
-    gerarParcelas(totalNegociado, numeroParcelas),
+    montarParcelasComEntrada(parseFloat(valorEntradaInput) || 0, numeroParcelas),
   );
   const [parcelasDirty, setParcelasDirty] = useState(false);
   const [recalcNotice, setRecalcNotice] = useState(false);
   const [mostrarTodasParcelas, setMostrarTodasParcelas] = useState(false);
+  // "Data da 1a parcela" se refere a 1a das DEMAIS (parcelas[1]) -- a
+  // entrada (parcelas[0]) e paga hoje via Pix, nao faz parte desse
+  // espacamento.
   const [dataPrimeiraParcela, setDataPrimeiraParcela] = useState(
-    () => parcelas[0]?.data ?? addDaysLocal(todayLocalStr(), diasEntreParcelasPadrao),
+    () =>
+      parcelas[1]?.data ?? addDaysLocal(todayLocalStr(), diasEntreParcelasPadrao),
   );
   const isFirstRender = useRef(true);
   const PARCELAS_VISIVEIS = 3;
@@ -247,15 +313,15 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
       isFirstRender.current = false;
       return;
     }
-    const novasParcelas = gerarParcelas(totalNegociado, numeroParcelas);
+    const novasParcelas = montarParcelasComEntrada(valorEntrada, numeroParcelas);
     setParcelas(novasParcelas);
     setDataPrimeiraParcela(
-      novasParcelas[0]?.data ?? addDaysLocal(todayLocalStr(), diasEntreParcelasPadrao),
+      novasParcelas[1]?.data ?? addDaysLocal(todayLocalStr(), diasEntreParcelasPadrao),
     );
     setRecalcNotice(parcelasDirty);
     setParcelasDirty(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalNegociado, numeroParcelas]);
+  }, [totalNegociado, numeroParcelas, valorEntrada]);
 
   /** Recalcula as datas de todas as parcelas a partir da data escolhida pro
    * cobrador, mantendo o espacamento padrao entre elas — evita digitar
@@ -263,10 +329,17 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   const aplicarDataBase = () => {
     if (!dataPrimeiraParcela) return;
     setParcelas((prev) =>
-      prev.map((p, i) => ({
-        ...p,
-        data: addDaysLocal(dataPrimeiraParcela, diasEntreParcelasPadrao * i),
-      })),
+      prev.map((p, i) =>
+        i === 0
+          ? p
+          : {
+              ...p,
+              data: addDaysLocal(
+                dataPrimeiraParcela,
+                diasEntreParcelasPadrao * (i - 1),
+              ),
+            },
+      ),
     );
     setParcelasDirty(true);
     setRecalcNotice(false);
@@ -281,7 +354,10 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     });
   };
 
+  // Parcela 0 (entrada) nao se edita aqui -- o valor dela vem do campo
+  // "Valor de entrada" acima, que já dispara o recalculo das demais.
   const updateParcela = (index: number, field: "valor" | "data", value: string) => {
+    if (index === 0) return;
     setParcelas((prev) =>
       prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)),
     );
@@ -290,6 +366,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   };
 
   const removerParcela = (index: number) => {
+    if (index === 0) return;
     setParcelas((prev) =>
       prev.filter((_, i) => i !== index).map((p, i) => ({ ...p, numero: i + 1 })),
     );
@@ -321,10 +398,11 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   );
   const totalBate = Math.abs(totalParcelas - totalNegociado) <= 0.01;
 
-  // Valor da entrada = 1a parcela (numero 1) -- nao e um campo a parte, so
-  // a primeira linha das parcelas negociadas (igual ao modelo de Termo de
-  // Acordo do usuario, onde a 1a parcela e so a de maior valor).
-  const valorEntrada = parseFloat(parcelas[0]?.valor || "0") || 0;
+  // A entrada (parcelas[0]) ja tem campo proprio (caixa "Entrada" acima) --
+  // nunca repete na lista "Demais parcelas". O valor/soma por tras continua
+  // intacto (parcelas completo, incluindo a entrada, e o que vai pro
+  // totalParcelas/criarAcordo).
+  const demaisIndices = parcelas.map((_, i) => i).slice(1);
 
   const doCreateAcordo = async () => {
     setLoading(true);
@@ -426,15 +504,15 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
 
   const handleVoltar = () => {
     setError("");
-    setStep((s) => (s === 3 ? 2 : 1));
+    setStep((s) => (s > 1 ? ((s - 1) as Etapa) : 1));
   };
 
   // Protecao contra "ghost click"/replay de touch no mobile: o botao final
   // ("Criar Acordo") nasce na mesma posicao em que o botao da etapa
   // anterior estava -- trava o submit por um instante ao entrar na ultima
-  // etapa (3, confirmacao da entrada) pra absorver isso.
+  // etapa (5, confirmacao da entrada) pra absorver isso.
   useEffect(() => {
-    if (step !== 3) {
+    if (step !== 5) {
       setStep2Armado(false);
       return;
     }
@@ -443,10 +521,21 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     return () => clearTimeout(timer);
   }, [step]);
 
-  /** Valida a etapa 2 (parcelas/encargos/testemunhas) e avanca pra
-   * confirmacao da entrada -- ou pede confirmacao de titulos a vencer
-   * antes, igual o fluxo anterior fazia no submit final. */
-  const handleAvancarParaEntrada = () => {
+  /** Valida a etapa 2 (multa/juros/desconto) e avanca pra parcelas. */
+  const handleAvancarEncargos = () => {
+    setError("");
+    const desconto = Number(descontoPercentual) || 0;
+    if (desconto > descontoMaximoPercentual + 0.001) {
+      setError(
+        `O desconto (${desconto}%) passa do máximo permitido (${descontoMaximoPercentual}%). Ajuste ou peça para o gestor liberar um desconto maior.`,
+      );
+      return;
+    }
+    setStep(3);
+  };
+
+  /** Valida a etapa 3 (entrada/parcelas) e avanca pra forma de pagamento. */
+  const handleAvancarParcelas = () => {
     setError("");
 
     if (parcelas.length === 0) {
@@ -465,13 +554,16 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
       );
       return;
     }
-    const desconto = Number(descontoPercentual) || 0;
-    if (desconto > descontoMaximoPercentual + 0.001) {
-      setError(
-        `O desconto (${desconto}%) passa do máximo permitido (${descontoMaximoPercentual}%). Ajuste ou peça para o gestor liberar um desconto maior.`,
-      );
-      return;
-    }
+
+    setStep(4);
+  };
+
+  /** Valida a etapa 4 (forma de pagamento/testemunhas) e avanca pra
+   * confirmacao da entrada -- ou pede confirmacao de titulos a vencer
+   * antes, igual o fluxo anterior fazia no submit final. */
+  const handleAvancarPagamento = () => {
+    setError("");
+
     if (!formaPagamentoParcelas) {
       setError("Escolha a forma de pagamento das parcelas.");
       return;
@@ -485,14 +577,14 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
       return;
     }
 
-    setStep(3);
+    setStep(5);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (step !== 3 || !step2Armado) return;
+    if (step !== 5 || !step2Armado) return;
     if (!entradaConfirmada) {
       setError("Confirme o recebimento do Pix da entrada antes de criar o acordo.");
       return;
@@ -503,14 +595,14 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
 
   const confirmarComAVencer = () => {
     setAVencerPendentes([]);
-    setStep(3);
+    setStep(5);
   };
 
-  // Gera o QR Code/copia-e-cola da entrada ao entrar na etapa 3 (ou se o
+  // Gera o QR Code/copia-e-cola da entrada ao entrar na etapa 5 (ou se o
   // valor da 1a parcela mudar depois de voltar e ajustar algo). Payload
   // 100% local (ver src/utils/pix.ts) -- sem chamada de rede.
   useEffect(() => {
-    if (step !== 3) return;
+    if (step !== 5) return;
     setEntradaConfirmada(false);
     if (!acordoConfiguracaoPadrao?.empresaChavePix || valorEntrada <= 0) {
       setPixCopiaECola("");
@@ -542,6 +634,60 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     } catch (err) {
       console.error("Erro ao copiar código Pix:", err);
     }
+  };
+
+  // "Mini-acordo": PDF curto do RASCUNHO (acordo ainda nao existe nesta
+  // etapa) pra mandar pro cliente antes/durante a cobranca da entrada --
+  // nao substitui o Termo de Acordo oficial, que so sai depois de criado.
+  const [gerandoResumoPdf, setGerandoResumoPdf] = useState(false);
+
+  const handleSalvarResumoPdf = async () => {
+    setGerandoResumoPdf(true);
+    try {
+      const pdf = await gerarResumoAcordoPdf({
+        devedor: { nome: client.client, documento: client.document },
+        empresa: acordoConfiguracaoPadrao,
+        totalNegociado,
+        parcelas: parcelas.map((p) => ({
+          numero: p.numero,
+          valor: parseFloat(p.valor) || 0,
+          data: p.data,
+        })),
+        formaPagamentoParcelas,
+        pixCopiaECola,
+      });
+      pdf.save(nomeArquivoResumoAcordo(client.client));
+    } catch (err) {
+      console.error("Erro ao gerar PDF do resumo do acordo:", err);
+      setError("Falha ao gerar o PDF do resumo. Tente novamente.");
+    } finally {
+      setGerandoResumoPdf(false);
+    }
+  };
+
+  const handleEnviarWhatsApp = () => {
+    const phone = (client.mobile || client.phone || "").replace(/\D/g, "");
+    if (!phone) {
+      setError("Este cliente não tem telefone cadastrado.");
+      return;
+    }
+    const linhasParcelas = parcelas
+      .map(
+        (p) =>
+          `${p.numero}/${parcelas.length}${p.numero === 1 ? " (entrada)" : ""} — ${formatCurrency(parseFloat(p.valor) || 0)} — venc. ${formatDate(p.data)}`,
+      )
+      .join("\n");
+    const mensagem =
+      `Olá ${client.client}, aqui está o resumo do acordo combinado${user?.name ? ` com ${user.name}` : ""}:\n\n` +
+      `Total negociado: ${formatCurrency(totalNegociado)}\n` +
+      `Parcelas:\n${linhasParcelas}\n\n` +
+      (pixCopiaECola
+        ? `Pix para pagar a entrada (${formatCurrency(valorEntrada)}):\n${pixCopiaECola}`
+        : `A entrada (${formatCurrency(valorEntrada)}) será combinada diretamente.`);
+    window.open(
+      `https://wa.me/55${phone}?text=${encodeURIComponent(mensagem)}`,
+      "_blank",
+    );
   };
 
   return (
@@ -576,39 +722,24 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
           className="flex flex-col flex-1 min-h-0"
         >
         <div className="p-6 space-y-5 overflow-y-auto minimal-scrollbar flex-1 min-h-0">
-          <div className="flex items-center gap-2">
-            <span
-              className={`flex items-center gap-1.5 text-xs font-bold ${step === 1 ? "text-indigo-600" : "text-gray-400"}`}
-            >
-              <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step === 1 ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-dark-bg-tertiary text-gray-400"}`}
-              >
-                1
-              </span>
-              Títulos
-            </span>
-            <span className="flex-1 h-px bg-gray-200 dark:bg-dark-border" />
-            <span
-              className={`flex items-center gap-1.5 text-xs font-bold ${step === 2 ? "text-indigo-600" : "text-gray-400"}`}
-            >
-              <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step === 2 ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-dark-bg-tertiary text-gray-400"}`}
-              >
-                2
-              </span>
-              Parcelas
-            </span>
-            <span className="flex-1 h-px bg-gray-200 dark:bg-dark-border" />
-            <span
-              className={`flex items-center gap-1.5 text-xs font-bold ${step === 3 ? "text-indigo-600" : "text-gray-400"}`}
-            >
-              <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step === 3 ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-dark-bg-tertiary text-gray-400"}`}
-              >
-                3
-              </span>
-              Entrada
-            </span>
+          <div className="flex items-center gap-1.5">
+            {ETAPAS.map(({ numero, label }, idx) => (
+              <React.Fragment key={numero}>
+                {idx > 0 && (
+                  <span className="flex-1 h-px bg-gray-200 dark:bg-dark-border" />
+                )}
+                <span
+                  className={`flex items-center gap-1 text-[11px] font-bold shrink-0 ${step === numero ? "text-indigo-600" : "text-gray-400"}`}
+                >
+                  <span
+                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 ${step === numero ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-dark-bg-tertiary text-gray-400"}`}
+                  >
+                    {numero}
+                  </span>
+                  <span className="hidden sm:inline">{label}</span>
+                </span>
+              </React.Fragment>
+            ))}
           </div>
 
           {error && (
@@ -731,10 +862,33 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                   </span>
                 </div>
               </div>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              <div className="space-y-2 p-3 bg-indigo-50 dark:bg-dark-bg-tertiary rounded-xl border border-indigo-100 dark:border-dark-border">
+                <label className="text-xs font-bold text-gray-400">
+                  Entrada (via Pix hoje, separada das parcelas abaixo)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={valorEntradaInput}
+                  onChange={(e) => setValorEntradaInput(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                />
+                <p className="text-xs text-indigo-600">
+                  O valor da entrada é descontado do total negociado antes de
+                  dividir — todas as parcelas abaixo nascem reduzidas
+                  igualmente.
+                </p>
+              </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-400">
-                  Número de parcelas
+                  Número de parcelas (sem contar a entrada)
                 </label>
                 <input
                   type="number"
@@ -745,11 +899,11 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                 />
               </div>
 
-              {parcelas.length > 0 && (
+              {demaisIndices.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-gray-400">
-                      Parcelas do acordo (ajuste livremente)
+                      Demais parcelas (ajuste livremente)
                     </label>
                     <button
                       type="button"
@@ -786,43 +940,46 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                   </div>
                   <div className="space-y-2">
                     {(mostrarTodasParcelas
-                      ? parcelas
-                      : parcelas.slice(0, PARCELAS_VISIVEIS)
-                    ).map((p, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 w-6 shrink-0">
-                          #{p.numero}
-                        </span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min={0}
-                          value={p.valor}
-                          onChange={(e) =>
-                            updateParcela(i, "valor", e.target.value)
-                          }
-                          className="flex-1 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-                        />
-                        <input
-                          type="date"
-                          value={p.data}
-                          min={todayLocalStr()}
-                          onChange={(e) =>
-                            updateParcela(i, "data", e.target.value)
-                          }
-                          className="flex-1 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removerParcela(i)}
-                          className="p-2 text-red-400 hover:text-red-600"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
+                      ? demaisIndices
+                      : demaisIndices.slice(0, PARCELAS_VISIVEIS)
+                    ).map((realIndex, posicao) => {
+                      const p = parcelas[realIndex];
+                      return (
+                        <div key={realIndex} className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400 w-6 shrink-0">
+                            #{posicao + 1}
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            value={p.valor}
+                            onChange={(e) =>
+                              updateParcela(realIndex, "valor", e.target.value)
+                            }
+                            className="flex-1 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                          />
+                          <input
+                            type="date"
+                            value={p.data}
+                            min={todayLocalStr()}
+                            onChange={(e) =>
+                              updateParcela(realIndex, "data", e.target.value)
+                            }
+                            className="flex-1 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removerParcela(realIndex)}
+                            className="p-2 text-red-400 hover:text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
-                  {parcelas.length > PARCELAS_VISIVEIS && (
+                  {demaisIndices.length > PARCELAS_VISIVEIS && (
                     <button
                       type="button"
                       onClick={() => setMostrarTodasParcelas((v) => !v)}
@@ -830,22 +987,22 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                     >
                       {mostrarTodasParcelas
                         ? "Mostrar menos"
-                        : `Mostrar mais (${parcelas.length - PARCELAS_VISIVEIS})`}
+                        : `Mostrar mais (${demaisIndices.length - PARCELAS_VISIVEIS})`}
                     </button>
                   )}
                   <p
                     className={`text-sm text-right font-bold ${totalBate ? "text-gray-900 dark:text-dark-text" : "text-red-600"}`}
                   >
-                    Total combinado: {formatCurrency(totalParcelas)}
+                    {`Entrada (${formatCurrency(valorEntrada)}) + demais parcelas (${formatCurrency(totalParcelas - valorEntrada)}) = ${formatCurrency(totalParcelas)}`}
                     {!totalBate && " — não bate com o total negociado"}
-                  </p>
-                  <p className="text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
-                    A 1ª parcela ({formatCurrency(parseFloat(parcelas[0]?.valor || "0") || 0)}) é a
-                    entrada — sempre via Pix, confirmada na próxima etapa.
                   </p>
                 </div>
               )}
+            </>
+          )}
 
+          {step === 4 && (
+            <>
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-400">
                   Forma de pagamento das demais parcelas
@@ -901,7 +1058,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
             </>
           )}
 
-          {step === 3 && (
+          {step === 5 && (
             <div className="space-y-4">
               <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
                 A entrada de <strong>{formatCurrency(valorEntrada)}</strong> precisa
@@ -952,6 +1109,32 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                 </div>
               )}
 
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleSalvarResumoPdf}
+                  disabled={gerandoResumoPdf}
+                  className="flex-1 px-3 py-2.5 border border-gray-200 dark:border-dark-border text-gray-700 dark:text-dark-text text-sm font-bold rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <FileDown className="w-4 h-4" />
+                  {gerandoResumoPdf ? "Gerando..." : "Salvar PDF"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleEnviarWhatsApp}
+                  className="flex-1 px-3 py-2.5 border border-gray-200 dark:border-dark-border text-gray-700 dark:text-dark-text text-sm font-bold rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary transition-all flex items-center justify-center gap-2"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Enviar por WhatsApp
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-400 -mt-2">
+                O resumo em PDF é informativo (mini-acordo) — o Termo de
+                Acordo oficial é gerado depois de criar o acordo. O WhatsApp
+                envia um texto com o resumo e o código Pix; o PDF não vai
+                anexado automaticamente.
+              </p>
+
               <label className="flex items-start gap-3 p-3 bg-green-50 dark:bg-dark-bg-tertiary border border-green-100 dark:border-dark-border rounded-xl cursor-pointer">
                 <input
                   type="checkbox"
@@ -987,7 +1170,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                 Continuar
               </button>
             </>
-          ) : step === 2 ? (
+          ) : step !== 5 ? (
             <>
               <button
                 type="button"
@@ -998,8 +1181,14 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
               </button>
               <button
                 type="button"
-                onClick={handleAvancarParaEntrada}
-                disabled={parcelas.length === 0}
+                onClick={
+                  step === 2
+                    ? handleAvancarEncargos
+                    : step === 3
+                      ? handleAvancarParcelas
+                      : handleAvancarPagamento
+                }
+                disabled={step === 3 && parcelas.length === 0}
                 className="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-all disabled:opacity-50"
               >
                 Continuar

@@ -655,3 +655,252 @@ export const nomeArquivoTermoAcordo = (acordo: Acordo): string =>
     /[\\/:*?"<>|]/g,
     "-",
   );
+
+export interface ParcelaResumo {
+  numero: number;
+  valor: number;
+  data: string;
+}
+
+export interface ResumoAcordoParams {
+  devedor: { nome: string; documento: string };
+  empresa: AcordoConfiguracaoPadrao | null;
+  totalNegociado: number;
+  parcelas: ParcelaResumo[];
+  formaPagamentoParcelas: string;
+  pixCopiaECola: string;
+}
+
+/** PDF curto ("mini-acordo") pra mandar pro cliente ANTES do acordo existir
+ * -- gerado a partir do rascunho (Etapa 3/5 do AcordoModal), sem id/witnesses.
+ * Documento informativo, nao substitui o Termo de Acordo (gerarTermoAcordoPdf),
+ * que so pode ser gerado depois que o acordo e as parcelas tem id real. */
+export const gerarResumoAcordoPdf = async ({
+  devedor,
+  empresa,
+  totalNegociado,
+  parcelas,
+  formaPagamentoParcelas,
+  pixCopiaECola,
+}: ResumoAcordoParams): Promise<jsPDF> => {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const marginX = 16;
+  const contentWidth = pageWidth - marginX * 2;
+  let y = 0;
+
+  const setColor = (c: RGB) => doc.setTextColor(c[0], c[1], c[2]);
+  const setFill = (c: RGB) => doc.setFillColor(c[0], c[1], c[2]);
+  const setDraw = (c: RGB) => doc.setDrawColor(c[0], c[1], c[2]);
+
+  const sectionTitle = (text: string) => {
+    setFill(PRIMARY);
+    doc.rect(marginX, y, 2.2, 4.6, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    setColor(PRIMARY_DARK);
+    doc.text(text.toUpperCase(), marginX + 4.5, y + 3.8);
+    y += 9;
+    doc.setFont("helvetica", "normal");
+    setColor(TEXT);
+  };
+
+  // ---------- Cabecalho ----------
+  setFill(PRIMARY);
+  doc.rect(0, 0, pageWidth, 3, "F");
+  y = 13;
+
+  let logoBottom = y;
+  try {
+    const logoImg = await loadImage(logoUrl);
+    const logoH = 10;
+    const logoW = (logoImg.width / logoImg.height) * logoH;
+    doc.addImage(logoImg, "PNG", marginX, y, logoW, logoH);
+    logoBottom = y + logoH;
+  } catch {
+    // segue sem logo se o navegador nao conseguir carregar a imagem
+  }
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  setColor(MUTED);
+  doc.text(
+    `Emitido em ${formatDateBr(new Date().toISOString().slice(0, 10))}`,
+    pageWidth - marginX,
+    y + 3,
+    { align: "right" },
+  );
+
+  y = Math.max(logoBottom, y + 10) + 16;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(19);
+  setColor(PRIMARY_DARK);
+  doc.text("Resumo do Acordo", pageWidth / 2, y, { align: "center" });
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(9.5);
+  setColor(MUTED);
+  doc.text("Proposta de parcelamento — documento informativo", pageWidth / 2, y + 5.5, {
+    align: "center",
+  });
+  doc.setFont("helvetica", "normal");
+  y += 12;
+
+  setDraw(LINE);
+  doc.setLineWidth(0.3);
+  doc.line(marginX, y, pageWidth - marginX, y);
+  y += 8;
+
+  // ---------- Cliente ----------
+  const empresaNome =
+    empresa?.empresaNome || "Focco Brasil Distribuidora de Produtos Ópticos";
+  const devedorDocFmt = formatCpfCnpj(devedor.documento);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  setColor(TEXT);
+  doc.text(devedor.nome, marginX, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  setColor(MUTED);
+  doc.text(`CPF/CNPJ: ${devedorDocFmt}`, marginX, y + 5);
+  y += 14;
+
+  // ---------- Parcelas ----------
+  sectionTitle("Parcelas propostas");
+
+  const parcelasOrdenadas = parcelas.slice().sort((a, b) => a.numero - b.numero);
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: marginX, right: marginX },
+    head: [["Parcela", "Vencimento", "Valor"]],
+    body: parcelasOrdenadas.map((p) => [
+      `${p.numero}/${parcelas.length}` + (p.numero === 1 ? "  (entrada)" : ""),
+      formatDateBr(p.data),
+      formatMoneyPdf(p.valor),
+    ]),
+    foot: [["", "Total", formatMoneyPdf(totalNegociado)]],
+    styles: {
+      fontSize: 8.2,
+      cellPadding: 2,
+      textColor: TEXT,
+      lineColor: LINE,
+      lineWidth: 0.2,
+    },
+    headStyles: { fillColor: PRIMARY, textColor: 255, fontStyle: "bold" },
+    footStyles: {
+      fillColor: PRIMARY_SOFT,
+      textColor: PRIMARY_DARK,
+      fontStyle: "bold",
+    },
+    alternateRowStyles: { fillColor: BG_SOFT },
+    columnStyles: { 2: { halign: "right" } },
+    theme: "grid",
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  y = (doc as any).lastAutoTable.finalY + 9;
+
+  // ---------- Pagamento ----------
+  const parcela1 = parcelasOrdenadas.find((p) => p.numero === 1);
+  const qrSize = 28;
+  const payCardH = qrSize + 8;
+  if (y + payCardH + 10 > pageHeight - 18) {
+    doc.addPage();
+    y = 16;
+  }
+  sectionTitle("Pagamento da entrada");
+  const payCardY = y;
+
+  setFill(BG_SOFT);
+  setDraw(LINE);
+  doc.roundedRect(marginX, payCardY, contentWidth, payCardH, 2, 2, "FD");
+
+  if (parcela1 && pixCopiaECola) {
+    try {
+      const qrDataUrl = await QRCode.toDataURL(pixCopiaECola, { margin: 0, width: 300 });
+      doc.addImage(qrDataUrl, "PNG", marginX + 4, payCardY + 4, qrSize, qrSize);
+
+      const textX = marginX + qrSize + 11;
+      const textW = contentWidth - qrSize - 15;
+      let ty = payCardY + 7;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      setColor(TEXT);
+      doc.text(`Entrada: ${formatMoneyPdf(parcela1.valor)} via Pix`, textX, ty);
+      ty += 5;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.3);
+      setColor(MUTED);
+      doc.text(
+        doc.splitTextToSize(
+          `Use o QR Code ao lado ou o código copia-e-cola para pagar a entrada. As demais ` +
+            `parcelas são pagas via ${formaPagamentoParcelas || "a combinar"}.`,
+          textW,
+        ),
+        textX,
+        ty,
+      );
+      ty += 9;
+      doc.setFont("courier", "normal");
+      doc.setFontSize(6.3);
+      setColor(MUTED);
+      doc.text(doc.splitTextToSize(pixCopiaECola, textW), textX, ty);
+      doc.setFont("helvetica", "normal");
+    } catch {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      setColor(TEXT);
+      doc.text(
+        `Forma de pagamento das parcelas: ${formaPagamentoParcelas || "a combinar"}.`,
+        marginX + 4,
+        payCardY + payCardH / 2,
+      );
+    }
+  } else {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    setColor(TEXT);
+    doc.text(
+      `Forma de pagamento das parcelas: ${formaPagamentoParcelas || "a combinar"}.`,
+      marginX + 4,
+      payCardY + payCardH / 2,
+    );
+  }
+
+  y = payCardY + payCardH + 10;
+
+  // ---------- Rodape ----------
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7.5);
+  setColor(MUTED);
+  doc.text(
+    doc.splitTextToSize(
+      "Documento informativo gerado automaticamente, sem valor de confissão de dívida. " +
+        "O Termo de Acordo oficial, com os termos definitivos, é emitido na criação do acordo.",
+      contentWidth,
+    ),
+    marginX,
+    y,
+  );
+
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    setDraw(LINE);
+    doc.setLineWidth(0.2);
+    doc.line(marginX, pageHeight - 12, pageWidth - marginX, pageHeight - 12);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    setColor(MUTED);
+    doc.text(`${empresaNome} — Resumo do Acordo`, marginX, pageHeight - 8);
+    doc.text(`Página ${p} de ${totalPages}`, pageWidth - marginX, pageHeight - 8, {
+      align: "right",
+    });
+  }
+
+  return doc;
+};
+
+export const nomeArquivoResumoAcordo = (clientName: string): string =>
+  `Resumo do Acordo - ${clientName}.pdf`.replace(/[\\/:*?"<>|]/g, "-");
