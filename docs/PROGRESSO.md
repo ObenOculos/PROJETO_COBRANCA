@@ -30,6 +30,40 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 19 | ~~`monthly_goals.visits_goal` muda de significado por perfil sem isso aparecer no schema/UI do %~~ | Média | Pequeno |
 | 20 | ~~Helper `WALLET_COLLECTOR_TYPES.includes(...)` repetido em 6+ lugares em vez de `isWalletCollectorType()` único~~ | Baixa | Pequeno |
 | 21 | Jurídico (`legal_collector`) é 100% idêntico a Interno/Terceirizado — zero modelagem de processo/protesto/prazo legal | A avaliar com o negócio | A analisar |
+| 22 | Sem tela de histórico de cancelamento de acordo e de agendamento/contato — só "Histórico de Contatos" (`collection_attempts`) aparece em "Ver Dados" | Baixa/Média | Pequeno/médio |
+| 23 | `AcordoModal` (parcelas) não bloqueia de verdade data anterior a hoje — só `min` do `<input type="date">`, sem validação no "Continuar" | Baixa | Pequeno |
+
+### Item 23 — validar data de parcela não pode ser anterior a hoje — 2026-11-04
+
+Observação do usuário: nada impede, de fato, criar uma parcela com
+vencimento no passado. Hoje o único freio é o atributo `min={todayLocalStr()}`
+no `<input type="date">` da etapa 3 (`AcordoModal.tsx`) — isso só restringe o
+calendário nativo do navegador; não há checagem equivalente em
+`handleAvancarParcelas` (que hoje só confere `valor > 0` e `data` não-vazia).
+Entrada ("Data da 1ª parcela"/`aplicarDataBase`) também não é validada.
+Falta: checar `p.data >= todayLocalStr()` (comparação de string
+`YYYY-MM-DD`, sem `Date`/fuso) nessa validação, com mensagem de erro
+específica. Não iniciado — só anotado a pedido do usuário.
+
+### Item 22 — histórico de cancelamento (acordo / agendamento) — 2026-11-04
+
+Observação do usuário ao cancelar manualmente em produção o Acordo e o
+agendamento/contato do cliente 924.457.801-87: hoje a única tela de
+histórico que ele vê é "Histórico de Contatos" dentro de `ClientDetailModal`
+→ "Ver Dados" (lê `collection_attempts`). Verificado no código:
+- **Acordo**: `cancelar_acordo` (migration `20261030000005`) grava o
+  cancelamento na própria linha (`status='cancelado'`, `motivo_cancelamento`,
+  `resolved_at`) — o fato fica no banco, mas não há nenhuma tela que liste
+  acordos cancelados/quebrados de um cliente.
+- **Agendamento/contato**: `cancelScheduledContact` (item 16, commit
+  `98a30e4`) grava `status='cancelada'` reaproveitando
+  `cancellation_request_date`/`_reason` na própria linha de
+  `scheduled_visits` — mesma situação, dado existe, sem tela.
+
+Não é perda de dado, é lacuna de UI. A avaliar: uma aba "Histórico" no
+`ClientDetailModal` que junte visitas/contatos cancelados + acordos
+cancelados/quebrados, ou basta listar na aba "Ver Dados" existente. Não
+iniciado.
 
 ### Item 21 — diagnóstico das modalidades de cobrança (externo/interno/terceirizado/jurídico) — 2026-11-04
 
@@ -368,6 +402,72 @@ etapas:
   resumo. `CollectorDashboard` ganhou um campo "Buscar acordo pelo nº" (não
   existia nenhuma tela de listagem de acordos pra pendurar isso — abre o
   `AcordoDetailModal` direto pelo prefixo do id).
+
+**Atualização 2026-11-04 (mesmo dia, sessão separada):** `AcordoModal`
+virou wizard de **5** passos (Títulos/Encargos/Parcelas/Pagamento/Entrada,
+não mais 3) e a lógica da entrada foi reescrita — ela é sempre uma linha
+separada (parcela nº1, paga hoje via Pix), nunca uma das N parcelas
+digitadas; o valor da entrada desconta do total negociado **antes** de
+dividir em N parcelas iguais (um modo alternativo "descontar só da 1ª" foi
+tentado e removido por complexidade/caso de borda sem necessidade de
+negócio real). Botões novos na etapa 5: "Salvar PDF" (mini-acordo
+informativo, `gerarResumoAcordoPdf` em `termoAcordo.ts`) e "Enviar por
+WhatsApp" (`wa.me`, texto com resumo + Pix — não anexa o PDF, limitação da
+própria API do WhatsApp Web).
+
+- **3d — bug do espelho de pagamento sem encargo — corrigido 2026-11-04,
+  aguardando `db push`.** Achado testando a entrada com um cliente real:
+  `registrar_pagamento_acordo` espelha o pagamento em
+  `BANCO_DADOS.valor_recebido` usando só `valor_original − valor_recebido −
+  desconto` como espaço por título — isso foi escrito em 20261031000001,
+  **antes** de existir multa/juros por título (que só chegou na Etapa 3b,
+  acima). Como ninguém atualizou o espelho, o espaço disponível ficava
+  travado no saldo original, menor que o total negociado sempre que há
+  multa/juros (ou seja, quase sempre que há atraso — o caso comum de
+  acordo). Pagamentos que ultrapassavam esse espaço não tinham onde ser
+  aplicados: o título virava "Pago" bem antes do acordo estar de fato
+  pago, e o cliente desaparecia da carteira (`hasOpenBalance` lê só
+  `BANCO_DADOS`) com parcelas do acordo ainda em aberto. O ledger do
+  próprio acordo (`acordo_pagamentos`) continuava correto — só o espelho
+  ficava errado. Corrigido na migration `20261104000007`: o espaço por
+  título agora soma `multa_valor + juros_valor − desconto_valor`
+  (congelados em `acordo_titulos`) ao saldo original ainda não recebido; o
+  status "Pago"/"Pago Parcial" passa a comparar contra esse espaço
+  estendido. **Pendências**: `db push` da migration, e limpeza manual do
+  cliente de teste 924.457.801-87 (título ficou "Pago" incorretamente
+  antes da correção — autorizado pelo usuário, "é só teste, pode limpar
+  depois").
+
+- **3e — 3d superada: imputação proporcional — 2026-11-05.** A 007 não
+  resolvia o sumiço (o título zerava assim que o pago no acordo cobria o
+  original; depois disso o espelho jogava encargo no título e deixava
+  `valor_recebido > valor_original`) e ainda perdeu o
+  `set_config('cobranca.permitir_pagamento_acordo')` da `20261102000005`
+  (corpo copiado de migration antiga) — **todo pagamento de acordo falhava**
+  no `trg_protege_titulo_em_acordo` desde que ela foi aplicada. Cliente de
+  teste 924.457.801-87 limpo em 2026-11-05. Decisão do negócio (chefe do
+  usuário, "abate nos dois"): cada pagamento abate valor original e
+  encargos **na proporção** em que compõem o valor negociado. Migration
+  `20261105000002_acordo_imputacao_proporcional`:
+  - `registrar_pagamento_acordo` espelha nos títulos só a parte de original
+    (`original/negociado`, limitado a 1), com alvo sobre o **acumulado**
+    pago (sem deriva de centavos); no pagamento que cumpre o acordo, alvo =
+    total de original. Título só zera quando o acordo acaba → cliente não
+    sai mais da carteira/visitas no meio do acordo. Se sobrar saldo no
+    título ao cumprir (negociado < original), é baixado como **desconto**.
+  - `acordo_pagamentos.valor_principal` / `valor_encargos` gravam a divisão
+    (NULL = pagamento anterior à regra).
+  - `recebimentos_historico`: origem nova `'acordo'` + coluna
+    `acordo_pagamento_id` (antes caía como `'erp_ou_manual'`).
+  - Testado com BEGIN/ROLLBACK em produção: 600 em 3× sobre 500 de original
+    (166,67/166,66/166,67 de original; cliente ativo até a última parcela) e
+    400 em 2× (R$ 100 baixados como desconto ao cumprir).
+  - **Pendente:** cláusula no termo (`termoAcordo.ts`) dizendo que os
+    pagamentos abatem original e encargos proporcionalmente — sem ela vale o
+    CC art. 354 (juros primeiro). Valor em aberto exibido no front segue
+    sendo o original restante dos títulos (o saldo com encargos fica na tela
+    do acordo); `scheduled_visits.total_pending_value` não é atualizado por
+    pagamento de acordo.
 
 Arquivo de referência na raiz do projeto (não commitado, só consulta):
 `Termo_Acordo_Exemplo.pdf`.
