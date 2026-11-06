@@ -46,8 +46,8 @@ export type Database = {
           desconto_maximo_percentual: number;
           desconto_padrao_percentual: number;
           dias_entre_parcelas: number;
-          empresa_cnpj: string | null;
           empresa_chave_pix: string | null;
+          empresa_cnpj: string | null;
           empresa_endereco: string | null;
           empresa_nome: string | null;
           id: string;
@@ -62,8 +62,8 @@ export type Database = {
           desconto_maximo_percentual?: number;
           desconto_padrao_percentual?: number;
           dias_entre_parcelas?: number;
-          empresa_cnpj?: string | null;
           empresa_chave_pix?: string | null;
+          empresa_cnpj?: string | null;
           empresa_endereco?: string | null;
           empresa_nome?: string | null;
           id?: string;
@@ -78,8 +78,8 @@ export type Database = {
           desconto_maximo_percentual?: number;
           desconto_padrao_percentual?: number;
           dias_entre_parcelas?: number;
-          empresa_cnpj?: string | null;
           empresa_chave_pix?: string | null;
+          empresa_cnpj?: string | null;
           empresa_endereco?: string | null;
           empresa_nome?: string | null;
           id?: string;
@@ -109,7 +109,9 @@ export type Database = {
           motivo: string | null;
           notes: string | null;
           registrado_por_id: string | null;
+          valor_encargos: number | null;
           valor_pago: number;
+          valor_principal: number | null;
         };
         Insert: {
           acordo_parcela_id: string;
@@ -121,7 +123,9 @@ export type Database = {
           motivo?: string | null;
           notes?: string | null;
           registrado_por_id?: string | null;
+          valor_encargos?: number | null;
           valor_pago: number;
+          valor_principal?: number | null;
         };
         Update: {
           acordo_parcela_id?: string;
@@ -133,7 +137,9 @@ export type Database = {
           motivo?: string | null;
           notes?: string | null;
           registrado_por_id?: string | null;
+          valor_encargos?: number | null;
           valor_pago?: number;
+          valor_principal?: number | null;
         };
         Relationships: [
           {
@@ -698,6 +704,107 @@ export type Database = {
           },
         ];
       };
+      ciclone_renegociacao_titulos: {
+        Row: {
+          baixa_uuid: string;
+          data_vencimento: string | null;
+          desconto: number | null;
+          id_parcela: number;
+          juros: number | null;
+          multa: number | null;
+          papel: string;
+          parcela: number | null;
+          principal: number | null;
+          valor: number | null;
+        };
+        Insert: {
+          baixa_uuid: string;
+          data_vencimento?: string | null;
+          desconto?: number | null;
+          id_parcela: number;
+          juros?: number | null;
+          multa?: number | null;
+          papel: string;
+          parcela?: number | null;
+          principal?: number | null;
+          valor?: number | null;
+        };
+        Update: {
+          baixa_uuid?: string;
+          data_vencimento?: string | null;
+          desconto?: number | null;
+          id_parcela?: number;
+          juros?: number | null;
+          multa?: number | null;
+          papel?: string;
+          parcela?: number | null;
+          principal?: number | null;
+          valor?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ciclone_renegociacao_titulos_baixa_uuid_fkey";
+            columns: ["baixa_uuid"];
+            isOneToOne: false;
+            referencedRelation: "ciclone_renegociacoes";
+            referencedColumns: ["baixa_uuid"];
+          },
+          {
+            foreignKeyName: "ciclone_renegociacao_titulos_id_parcela_fkey";
+            columns: ["id_parcela"];
+            isOneToOne: false;
+            referencedRelation: "BANCO_DADOS";
+            referencedColumns: ["id_parcela"];
+          },
+          {
+            foreignKeyName: "ciclone_renegociacao_titulos_id_parcela_fkey";
+            columns: ["id_parcela"];
+            isOneToOne: false;
+            referencedRelation: "banco_dados_clientes_ativos";
+            referencedColumns: ["id_parcela"];
+          },
+          {
+            foreignKeyName: "ciclone_renegociacao_titulos_id_parcela_fkey";
+            columns: ["id_parcela"];
+            isOneToOne: false;
+            referencedRelation: "banco_dados_clientes_quitados";
+            referencedColumns: ["id_parcela"];
+          },
+        ];
+      };
+      ciclone_renegociacoes: {
+        Row: {
+          baixa_uuid: string;
+          data_baixa: string;
+          documento: string;
+          novo_documento: string;
+          sincronizado_em: string;
+          situacao: string;
+          valor_renegociado: number;
+          valor_total_baixa: number;
+        };
+        Insert: {
+          baixa_uuid: string;
+          data_baixa: string;
+          documento: string;
+          novo_documento: string;
+          sincronizado_em?: string;
+          situacao: string;
+          valor_renegociado: number;
+          valor_total_baixa: number;
+        };
+        Update: {
+          baixa_uuid?: string;
+          data_baixa?: string;
+          documento?: string;
+          novo_documento?: string;
+          sincronizado_em?: string;
+          situacao?: string;
+          valor_renegociado?: number;
+          valor_total_baixa?: number;
+        };
+        Relationships: [];
+      };
       ciclone_titulo_map: {
         Row: {
           created_at: string;
@@ -935,15 +1042,15 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "manager_collector_links_manager_id_fkey";
-            columns: ["manager_id"];
+            foreignKeyName: "manager_collector_links_created_by_fkey";
+            columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "manager_collector_links_created_by_fkey";
-            columns: ["created_by"];
+            foreignKeyName: "manager_collector_links_manager_id_fkey";
+            columns: ["manager_id"];
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
@@ -990,6 +1097,7 @@ export type Database = {
       };
       recebimentos_historico: {
         Row: {
+          acordo_pagamento_id: string | null;
           chave_venda: number;
           cobrador_carteira_id: string | null;
           data_de_recebimento: string | null;
@@ -1005,6 +1113,7 @@ export type Database = {
           sale_payment_id: string | null;
         };
         Insert: {
+          acordo_pagamento_id?: string | null;
           chave_venda: number;
           cobrador_carteira_id?: string | null;
           data_de_recebimento?: string | null;
@@ -1020,6 +1129,7 @@ export type Database = {
           sale_payment_id?: string | null;
         };
         Update: {
+          acordo_pagamento_id?: string | null;
           chave_venda?: number;
           cobrador_carteira_id?: string | null;
           data_de_recebimento?: string | null;
@@ -1034,7 +1144,15 @@ export type Database = {
           registrado_em?: string;
           sale_payment_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "recebimentos_historico_acordo_pagamento_id_fkey";
+            columns: ["acordo_pagamento_id"];
+            isOneToOne: false;
+            referencedRelation: "acordo_pagamentos";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       saldo_por_documento_tbl: {
         Row: {
@@ -1170,7 +1288,6 @@ export type Database = {
           updated_at: string | null;
         };
         Insert: {
-          channel?: string;
           cancellation_approved_at?: string | null;
           cancellation_approved_by?: string | null;
           cancellation_rejected_at?: string | null;
@@ -1178,6 +1295,7 @@ export type Database = {
           cancellation_rejection_reason?: string | null;
           cancellation_request_date?: string | null;
           cancellation_request_reason?: string | null;
+          channel?: string;
           client_address?: string | null;
           client_city?: string | null;
           client_document: string;
@@ -1203,7 +1321,6 @@ export type Database = {
           updated_at?: string | null;
         };
         Update: {
-          channel?: string;
           cancellation_approved_at?: string | null;
           cancellation_approved_by?: string | null;
           cancellation_rejected_at?: string | null;
@@ -1211,6 +1328,7 @@ export type Database = {
           cancellation_rejection_reason?: string | null;
           cancellation_request_date?: string | null;
           cancellation_request_reason?: string | null;
+          channel?: string;
           client_address?: string | null;
           client_city?: string | null;
           client_document?: string;
@@ -1489,6 +1607,10 @@ export type Database = {
       };
     };
     Functions: {
+      acordo_lancamento_ciclone: {
+        Args: { p_acordo_id: string };
+        Returns: Json;
+      };
       app_current_user_id: { Args: never; Returns: string };
       app_current_user_type: { Args: never; Returns: string };
       atribuir_clientes_em_lote: {
@@ -1525,11 +1647,19 @@ export type Database = {
           collector_id: string;
           created_at: string;
           created_by_id: string | null;
+          desconto_percentual_aplicado: number;
+          forma_pagamento_parcelas: string | null;
           id: string;
+          juros_percentual_am_aplicado: number;
           motivo_cancelamento: string | null;
+          multa_percentual_aplicado: number;
           numero_parcelas: number;
           resolved_at: string | null;
           status: string;
+          testemunha1_cpf: string | null;
+          testemunha1_nome: string | null;
+          testemunha2_cpf: string | null;
+          testemunha2_nome: string | null;
           valor_negociado: number;
         };
         SetofOptions: {
@@ -1579,15 +1709,15 @@ export type Database = {
       clientes_fora_da_faixa: {
         Args: never;
         Returns: {
-          documento: string;
-          cliente: string | null;
-          collector_id: string;
-          collector_name: string | null;
           atraso_atual: number;
-          faixa_min: number;
-          faixa_max: number;
+          bloqueado_por: string;
+          cliente: string;
+          collector_id: string;
+          collector_name: string;
           dias_excedidos: number;
-          bloqueado_por: string | null;
+          documento: string;
+          faixa_max: number;
+          faixa_min: number;
         }[];
       };
       cobrador_na_data_em_lote: {
@@ -1599,56 +1729,92 @@ export type Database = {
         }[];
       };
       converter_valor_brasileiro: { Args: { valor: string }; Returns: number };
-      criar_acordo: {
-        Args: {
-          p_client_document: string;
-          p_desconto_percentual_aplicado?: number;
-          p_forma_pagamento_parcelas?: string;
-          p_juros_percentual_am_aplicado?: number;
-          p_multa_percentual_aplicado?: number;
-          p_parcelas: Json;
-          p_testemunha1_cpf?: string;
-          p_testemunha1_nome?: string;
-          p_testemunha2_cpf?: string;
-          p_testemunha2_nome?: string;
-          p_titulos: Json;
-        };
-        Returns: {
-          acordo_origem_id: string | null;
-          client_document: string;
-          client_name: string | null;
-          collector_id: string;
-          created_at: string;
-          created_by_id: string | null;
-          desconto_percentual_aplicado: number;
-          forma_pagamento_parcelas: string | null;
-          id: string;
-          juros_percentual_am_aplicado: number;
-          motivo_cancelamento: string | null;
-          multa_percentual_aplicado: number;
-          numero_parcelas: number;
-          resolved_at: string | null;
-          status: string;
-          testemunha1_cpf: string | null;
-          testemunha1_nome: string | null;
-          testemunha2_cpf: string | null;
-          testemunha2_nome: string | null;
-          valor_negociado: number;
-        };
-        SetofOptions: {
-          from: "*";
-          to: "acordos";
-          isOneToOne: true;
-          isSetofReturn: false;
-        };
-      };
+      criar_acordo:
+        | {
+            Args: {
+              p_client_document: string;
+              p_parcelas: Json;
+              p_titulos: Json;
+            };
+            Returns: {
+              acordo_origem_id: string | null;
+              client_document: string;
+              client_name: string | null;
+              collector_id: string;
+              created_at: string;
+              created_by_id: string | null;
+              desconto_percentual_aplicado: number;
+              forma_pagamento_parcelas: string | null;
+              id: string;
+              juros_percentual_am_aplicado: number;
+              motivo_cancelamento: string | null;
+              multa_percentual_aplicado: number;
+              numero_parcelas: number;
+              resolved_at: string | null;
+              status: string;
+              testemunha1_cpf: string | null;
+              testemunha1_nome: string | null;
+              testemunha2_cpf: string | null;
+              testemunha2_nome: string | null;
+              valor_negociado: number;
+            };
+            SetofOptions: {
+              from: "*";
+              to: "acordos";
+              isOneToOne: true;
+              isSetofReturn: false;
+            };
+          }
+        | {
+            Args: {
+              p_client_document: string;
+              p_desconto_percentual_aplicado?: number;
+              p_forma_pagamento_parcelas?: string;
+              p_juros_percentual_am_aplicado?: number;
+              p_multa_percentual_aplicado?: number;
+              p_parcelas: Json;
+              p_testemunha1_cpf?: string;
+              p_testemunha1_nome?: string;
+              p_testemunha2_cpf?: string;
+              p_testemunha2_nome?: string;
+              p_titulos: Json;
+            };
+            Returns: {
+              acordo_origem_id: string | null;
+              client_document: string;
+              client_name: string | null;
+              collector_id: string;
+              created_at: string;
+              created_by_id: string | null;
+              desconto_percentual_aplicado: number;
+              forma_pagamento_parcelas: string | null;
+              id: string;
+              juros_percentual_am_aplicado: number;
+              motivo_cancelamento: string | null;
+              multa_percentual_aplicado: number;
+              numero_parcelas: number;
+              resolved_at: string | null;
+              status: string;
+              testemunha1_cpf: string | null;
+              testemunha1_nome: string | null;
+              testemunha2_cpf: string | null;
+              testemunha2_nome: string | null;
+              valor_negociado: number;
+            };
+            SetofOptions: {
+              from: "*";
+              to: "acordos";
+              isOneToOne: true;
+              isSetofReturn: false;
+            };
+          };
       definir_configuracao_padrao_acordo: {
         Args: {
           p_desconto_maximo_percentual: number;
           p_desconto_padrao_percentual: number;
           p_dias_entre_parcelas: number;
-          p_empresa_cnpj: string;
           p_empresa_chave_pix: string;
+          p_empresa_cnpj: string;
           p_empresa_endereco: string;
           p_empresa_nome: string;
           p_juros_percentual_am: number;
@@ -1660,8 +1826,8 @@ export type Database = {
           desconto_maximo_percentual: number;
           desconto_padrao_percentual: number;
           dias_entre_parcelas: number;
-          empresa_cnpj: string | null;
           empresa_chave_pix: string | null;
+          empresa_cnpj: string | null;
           empresa_endereco: string | null;
           empresa_nome: string | null;
           id: string;
@@ -1670,10 +1836,17 @@ export type Database = {
           vigente_ate: string | null;
           vigente_desde: string;
         };
+        SetofOptions: {
+          from: "*";
+          to: "acordo_configuracao_padrao";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
       };
       definir_faixa_atraso_cobrador: {
         Args: {
           p_collector_id: string;
+          // Ajuste manual apos `supabase gen types`: NULL = faixa sem teto.
           p_max_dias: number | null;
           p_min_dias: number;
         };
@@ -1686,6 +1859,12 @@ export type Database = {
           min_dias: number;
           vigente_ate: string | null;
           vigente_desde: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "collector_overdue_ranges";
+          isOneToOne: true;
+          isSetofReturn: false;
         };
       };
       desvincular_cobrador: {
@@ -1700,10 +1879,7 @@ export type Database = {
           cobrador_nome: string;
         }[];
       };
-      executar_saida_carteira_fora_da_faixa: {
-        Args: never;
-        Returns: number;
-      };
+      executar_saida_carteira_fora_da_faixa: { Args: never; Returns: number };
       liberar_cliente_da_carteira: {
         Args: {
           p_documento: string;
@@ -1803,7 +1979,9 @@ export type Database = {
           motivo: string | null;
           notes: string | null;
           registrado_por_id: string | null;
+          valor_encargos: number | null;
           valor_pago: number;
+          valor_principal: number | null;
         };
         SetofOptions: {
           from: "*";
@@ -1871,6 +2049,12 @@ export type Database = {
           manager_id: string;
           vigente_ate: string | null;
           vigente_desde: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "manager_collector_links";
+          isOneToOne: true;
+          isSetofReturn: false;
         };
       };
     };

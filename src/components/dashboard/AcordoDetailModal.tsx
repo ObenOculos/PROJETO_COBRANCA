@@ -22,6 +22,7 @@ import {
   AcordoTitulo,
 } from "../../types";
 import { gerarTermoAcordoPdf, nomeArquivoTermoAcordo } from "../../utils/termoAcordo";
+import AcordoLancamentoCiclone from "./AcordoLancamentoCiclone";
 
 interface AcordoDetailModalProps {
   acordoId: string;
@@ -309,6 +310,8 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
                   </p>
                 </div>
               </div>
+
+              <AcordoLancamentoCiclone acordoId={acordo.id} />
 
               {(() => {
                 const entrada = parcelas.find((p) => p.numero === 1);

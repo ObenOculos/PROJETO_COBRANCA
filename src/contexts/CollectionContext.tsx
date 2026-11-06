@@ -32,6 +32,8 @@ import {
   AcordoParcela,
   AcordoPagamento,
   AcordoConfiguracaoPadrao,
+  AcordoLancamentoCiclone,
+  AcordoLancamentoCicloneStatus,
 } from "../types";
 import { supabase } from "../lib/supabase";
 import {
@@ -1913,6 +1915,53 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           createdAt: row.created_at,
         }),
       ),
+    };
+  };
+
+  // Conferencia so-leitura do acordo contra o lancamento no ERP Ciclone
+  // (RPC acordo_lancamento_ciclone, migration 20261106000002).
+  const fetchAcordoLancamentoCiclone = async (
+    acordoId: string,
+  ): Promise<AcordoLancamentoCiclone> => {
+    const { data, error: rpcError } = await supabase.rpc(
+      "acordo_lancamento_ciclone",
+      { p_acordo_id: acordoId },
+    );
+    if (rpcError) throw rpcError;
+    interface ParcelaRow {
+      ordem: number;
+      numero_app: number | null;
+      valor_app: number | null;
+      vencimento_app: string | null;
+      valor_erp: number | null;
+      vencimento_erp: string | null;
+      recebido_erp: number | null;
+      bate: boolean;
+    }
+    const raw = (data ?? {}) as {
+      status?: AcordoLancamentoCicloneStatus;
+      novo_documento?: string;
+      data_baixa?: string;
+      divergencias?: string[];
+      parcelas?: ParcelaRow[];
+    };
+    const num = (v: number | null | undefined) =>
+      v === null || v === undefined ? null : Number(v);
+    return {
+      status: raw.status ?? "nao_lancado",
+      novoDocumento: raw.novo_documento,
+      dataBaixa: raw.data_baixa,
+      divergencias: raw.divergencias ?? [],
+      parcelas: (raw.parcelas ?? []).map((p) => ({
+        ordem: p.ordem,
+        numeroApp: p.numero_app,
+        valorApp: num(p.valor_app),
+        vencimentoApp: p.vencimento_app,
+        valorErp: num(p.valor_erp),
+        vencimentoErp: p.vencimento_erp,
+        recebidoErp: num(p.recebido_erp),
+        bate: Boolean(p.bate),
+      })),
     };
   };
 
@@ -4962,6 +5011,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     definirConfiguracaoPadraoAcordo,
     criarAcordo,
     fetchAcordoDetalhe,
+    fetchAcordoLancamentoCiclone,
     registrarPagamentoAcordo,
     cancelarAcordo,
     addUser,

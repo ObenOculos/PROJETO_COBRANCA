@@ -501,6 +501,9 @@ export interface CollectionContextType {
     parcelas: AcordoParcela[];
     pagamentos: AcordoPagamento[];
   }>;
+  fetchAcordoLancamentoCiclone: (
+    acordoId: string,
+  ) => Promise<AcordoLancamentoCiclone>;
   registrarPagamentoAcordo: (params: {
     acordoParcelaId: string;
     valorPago: number;
@@ -739,6 +742,33 @@ export interface AcordoPagamento {
   motivo?: string | null;
   registradoPorId?: string | null;
   createdAt: string;
+}
+
+// Conferencia "acordo do app x lancamento no ERP Ciclone" (RPC
+// acordo_lancamento_ciclone, migration 20261106000002). So leitura.
+export type AcordoLancamentoCicloneStatus =
+  | "fora_do_ciclone" // titulos do acordo nao vem do Ciclone (outra loja)
+  | "nao_lancado" // nenhuma renegociacao do cliente com esses titulos ainda
+  | "lancado" // achou e bate: titulos, parcelas, valores e vencimentos
+  | "divergente"; // achou, mas algo difere (ver divergencias)
+
+export interface AcordoLancamentoCicloneParcela {
+  ordem: number;
+  numeroApp: number | null;
+  valorApp: number | null;
+  vencimentoApp: string | null;
+  valorErp: number | null;
+  vencimentoErp: string | null;
+  recebidoErp: number | null;
+  bate: boolean;
+}
+
+export interface AcordoLancamentoCiclone {
+  status: AcordoLancamentoCicloneStatus;
+  novoDocumento?: string;
+  dataBaixa?: string;
+  divergencias: string[];
+  parcelas: AcordoLancamentoCicloneParcela[];
 }
 
 // Configuracao padrao de acordo (multa/juros/desconto/dados da empresa),

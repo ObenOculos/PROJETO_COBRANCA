@@ -814,10 +814,20 @@ do Sistema de Cobrança como mais uma loja, com sincronização recorrente.
   (títulos, quantidade/total/valor/vencimento de parcelas) e as parcelas lado
   a lado com o recebido no ERP. Sync grava depois do `BANCO_DADOS` (dry-run:
   314 renegociações, 1.681 origens, 2.265 gerados; 5 puladas por conta
-  interna/sem CPF). Nada altera valor de título ou acordo. **Falta:** tela
-  no `AcordoDetailModal` (depois do `db push`, com tipos regenerados) e a
-  parte 2 — pagamento do Ciclone refletindo no acordo / quebra ciente do
-  ERP — que depende das perguntas 11-13.
+  interna/sem CPF). Nada altera valor de título ou acordo. Tela: quadro
+  "Lançamento no Ciclone" no `AcordoDetailModal`
+  (`AcordoLancamentoCiclone.tsx`): "Ainda não lançado" (âmbar) / "Lançado —
+  confere" (verde) / "Lançado com diferenças" (vermelho, com a lista e a
+  comparação parcela a parcela app × Ciclone × pago no Ciclone); some para
+  acordo de loja que não vem do Ciclone. `database.types.ts` regenerado do
+  schema real (`supabase gen types --schema public,graphql_public` +
+  prettier; único ajuste manual mantido: `p_max_dias` nulo em
+  `definir_faixa_atraso_cobrador`). Achado no caminho: função nova nascia
+  executável por `anon` via `PUBLIC` — corrigido na migration
+  `20261106000003`. **Falta:** teste com renegociação real (as tabelas só
+  enchem na rodada do sync das 5h; hoje não há acordo ativo) e a parte 2 —
+  pagamento do Ciclone refletindo no acordo / quebra ciente do ERP — que
+  depende das perguntas 11-13.
 
 ### 1b. Desempenho por atribuição atual — ALTA
 
