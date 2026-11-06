@@ -71,6 +71,56 @@ export const rescheduleReasonsForChannel = (
 ): readonly RescheduleReason[] =>
   RESCHEDULE_REASONS.filter((r) => !r.channels || r.channels.includes(channel));
 
+const formatBrazilianDate = (date: string, time?: string | null) => {
+  const [year, month, day] = date.split("-");
+  const formattedDate = `${day}/${month}/${year}`;
+  if (time) {
+    const [hours, minutes] = time.split(":");
+    return `${formattedDate} ${hours}:${minutes}`;
+  }
+  return formattedDate;
+};
+
+// Normaliza notas antigas de reagendamento (formato YYYY-MM-DD HH:mm:ss, sem
+// marcador) antes de acrescentar a nova linha.
+const formatExistingNotes = (notes: string) =>
+  notes
+    .replace(
+      /Reagendado de (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) para (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})/g,
+      (_, fromDate, fromTime, toDate, toTime) =>
+        `• Reagendado de ${formatBrazilianDate(fromDate, fromTime.substring(0, 5))} para ${formatBrazilianDate(toDate, toTime.substring(0, 5))}`,
+    )
+    .replace(/^Reagendado de/gm, "• Reagendado de")
+    .replace(/^• • Reagendado de/gm, "• Reagendado de");
+
+/**
+ * Notas gravadas num reagendamento: `original` (acumula o historico da visita
+ * empurrada) e `nova` (abre a visita seguinte). Fonte unica para
+ * CollectionContext.rescheduleVisit e a RPC registrar_contato.
+ *
+ * `reason` e a CHAVE do catalogo; na nota da original vai o rotulo legivel, e
+ * a chave vai para a coluna propria reschedule_reason.
+ */
+export const buildRescheduleNotes = (
+  current: Pick<ScheduledVisit, "scheduledDate" | "scheduledTime" | "notes">,
+  newDate: string,
+  newTime?: string,
+  reason?: string,
+): { original: string; nova: string } => {
+  const fromDateTime = formatBrazilianDate(
+    current.scheduledDate,
+    current.scheduledTime,
+  );
+  const toDateTime = formatBrazilianDate(newDate, newTime);
+  const reasonLabel = reason ? rescheduleReasonLabel(reason) : "";
+  const rescheduleNote = `• Reagendado de ${fromDateTime} para ${toDateTime}${reasonLabel ? `. Motivo: ${reasonLabel}` : ""}`;
+  const original = current.notes
+    ? `${formatExistingNotes(current.notes)}\n${rescheduleNote}`
+    : rescheduleNote;
+  const nova = `Visita reagendada de ${fromDateTime}${reason ? `. Motivo: ${reason}` : ""}`;
+  return { original, nova };
+};
+
 /** Chave usada quando a remarcacao e anterior a captura de motivo. */
 export const REASON_NAO_INFORMADO = "nao_informado";
 

@@ -66,7 +66,6 @@ import {
 
 import LogContactModal from "./LogContactModal";
 import ScheduleContactModal from "./ScheduleContactModal";
-import RescheduleContactModal from "./RescheduleContactModal";
 import CancelContactModal from "./CancelContactModal";
 import ContactScheduler from "./ContactScheduler";
 import ClientDetailModal from "./ClientDetailModal";
@@ -255,7 +254,6 @@ interface InternalCollectorWalletProps {
   onOpenDetail: (client: any) => void;
   onOpenAcordo: (client: ClientGroup) => void;
   onScheduleContact: (client: ClientGroup) => void;
-  onRescheduleContact: (visit: ScheduledVisit) => void;
   onCancelContact: (visit: ScheduledVisit) => void;
 }
 
@@ -268,7 +266,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   onOpenDetail,
   onOpenAcordo,
   onScheduleContact,
-  onRescheduleContact,
   onCancelContact,
 }) => {
   const {
@@ -1199,7 +1196,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             urgenteInfoByDocument={urgenteInfoByDocument}
             scheduledContactByDocument={scheduledContactByDocument}
             onScheduleContact={onScheduleContact}
-            onRescheduleContact={onRescheduleContact}
             onCancelContact={onCancelContact}
           />
         </>
@@ -1235,7 +1231,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                       urgenteInfo={urgenteInfoByDocument.get(group.document)}
                       scheduledContact={scheduledContactByDocument.get(group.document)}
                       onScheduleContact={onScheduleContact}
-                      onRescheduleContact={onRescheduleContact}
                       onCancelContact={onCancelContact}
                     />
                   ))
@@ -1334,7 +1329,6 @@ interface ClientQueueRowProps {
   /** Contato (ligacao/whatsapp) agendado em aberto deste cliente, se houver. */
   scheduledContact?: ScheduledVisit;
   onScheduleContact: (client: ClientGroup) => void;
-  onRescheduleContact: (visit: ScheduledVisit) => void;
   onCancelContact: (visit: ScheduledVisit) => void;
 }
 
@@ -1355,7 +1349,6 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   urgenteInfo,
   scheduledContact,
   onScheduleContact,
-  onRescheduleContact,
   onCancelContact,
 }) => {
   const { acordoAtivoOverdueMap } = useCollection();
@@ -1540,6 +1533,11 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               onOpenLog(group);
             }}
             className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100"
+            title={
+              scheduledContact
+                ? "Registrar contato / remarcar agendamento"
+                : "Registrar contato"
+            }
           >
             <MessageSquare className="w-4 h-4" />
           </button>
@@ -1553,21 +1551,20 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           >
             <Handshake className="w-4 h-4" />
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (scheduledContact) onRescheduleContact(scheduledContact);
-              else onScheduleContact(group);
-            }}
-            className="p-2 bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white rounded-xl transition-all border border-purple-100"
-            title={scheduledContact ? "Reagendar contato" : "Agendar contato"}
-          >
-            {scheduledContact ? (
-              <CalendarClock className="w-4 h-4" />
-            ) : (
+          {/* Com contato agendado, remarcar fica dentro do Registrar contato
+              (um botao so, LogContactModal); aqui so agendar quando nao ha. */}
+          {!scheduledContact && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onScheduleContact(group);
+              }}
+              className="p-2 bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white rounded-xl transition-all border border-purple-100"
+              title="Agendar contato"
+            >
               <CalendarPlus className="w-4 h-4" />
-            )}
-          </button>
+            </button>
+          )}
           {scheduledContact && (
             <button
               onClick={(e) => {
@@ -1661,7 +1658,6 @@ interface AgendaSectionProps {
   urgenteInfoByDocument: Map<string, { diasRestantes: number; semAcao: boolean }>;
   scheduledContactByDocument: Map<string, ScheduledVisit>;
   onScheduleContact: (client: ClientGroup) => void;
-  onRescheduleContact: (visit: ScheduledVisit) => void;
   onCancelContact: (visit: ScheduledVisit) => void;
 }
 
@@ -1688,7 +1684,6 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   urgenteInfoByDocument,
   scheduledContactByDocument,
   onScheduleContact,
-  onRescheduleContact,
   onCancelContact,
 }) => {
   const [page, setPage] = useState(1);
@@ -1735,7 +1730,6 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
                 urgenteInfo={urgenteInfoByDocument.get(group.document)}
                 scheduledContact={scheduledContactByDocument.get(group.document)}
                 onScheduleContact={onScheduleContact}
-                onRescheduleContact={onRescheduleContact}
                 onCancelContact={onCancelContact}
               />
             ))}
@@ -1862,17 +1856,15 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   // equivalente ao agendamento de visita do externo, ver ScheduleContactModal.
   const [scheduleContactClient, setScheduleContactClient] =
     useState<ClientGroup | null>(null);
-  const [rescheduleContactVisit, setRescheduleContactVisit] =
-    useState<ScheduledVisit | null>(null);
   // Cancelamento direto (sem aprovacao) de um contato agendado -- item 16,
   // docs/PROGRESSO.md. Visita presencial usa outro fluxo (com aprovacao do
   // gestor, ver requestVisitCancellation/VisitScheduler).
   const [cancelContactVisit, setCancelContactVisit] =
     useState<ScheduledVisit | null>(null);
   // Contato agendado ATIVO do cliente aberto no LogContactModal, se houver --
-  // ao registrar o resultado, fecha esse agendamento como "realizada" em vez
-  // de deixa-lo em aberto (ver LogContactModal.linkedScheduledVisitId).
-  const linkedScheduledVisitId = selectedClientForLog
+  // o registro decide o desfecho dele (concluir ou remarcar) na mesma
+  // transacao (ver LogContactModal.linkedVisit / RPC registrar_contato).
+  const linkedVisit = selectedClientForLog
     ? scheduledVisits.find(
         (v) =>
           v.clientDocument === selectedClientForLog.document &&
@@ -1880,7 +1872,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           v.channel &&
           v.channel !== "presencial" &&
           v.status === "agendada",
-      )?.id
+      )
     : undefined;
 
   // Usa a aba externa se fornecida, senão gerencia internamente
@@ -2638,7 +2630,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           }
         }}
         onScheduleContact={setScheduleContactClient}
-        onRescheduleContact={setRescheduleContactVisit}
         onCancelContact={setCancelContactVisit}
       />
     );
@@ -3101,7 +3092,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       {isLogModalOpen && selectedClientForLog && (
         <LogContactModal
           client={selectedClientForLog}
-          linkedScheduledVisitId={linkedScheduledVisitId}
+          linkedVisit={linkedVisit}
           onClose={() => {
             setIsLogModalOpen(false);
             setSelectedClientForLog(null);
@@ -3119,14 +3110,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           client={scheduleContactClient}
           onClose={() => setScheduleContactClient(null)}
           onSuccess={() => setScheduleContactClient(null)}
-        />
-      )}
-
-      {rescheduleContactVisit && (
-        <RescheduleContactModal
-          visit={rescheduleContactVisit}
-          onClose={() => setRescheduleContactVisit(null)}
-          onSuccess={() => setRescheduleContactVisit(null)}
         />
       )}
 

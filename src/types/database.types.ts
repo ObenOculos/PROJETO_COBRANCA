@@ -1901,6 +1901,31 @@ export type Database = {
         };
         Returns: undefined;
       };
+      registrar_contato: {
+        Args: {
+          p_data: string;
+          p_data_promessa?: string;
+          p_documento: string;
+          p_motivo_reagendamento?: string;
+          p_nome_cliente: string;
+          p_notas: string;
+          p_notas_proximo?: string;
+          p_notas_reagendamento_nova?: string;
+          p_notas_reagendamento_original?: string;
+          p_proxima_acao?: string;
+          p_proxima_data?: string;
+          p_proximo_canal?: string;
+          p_proximo_horario?: string;
+          p_reagendar?: boolean;
+          p_resultado: string;
+          p_rotulo_resultado?: string;
+          p_situacao_liberacao?: string;
+          p_tipo: string;
+          p_titulos: string[];
+          p_visita_id?: string;
+        };
+        Returns: Json;
+      };
       reagendar_visita: {
         Args: {
           p_motivo_chave?: string;

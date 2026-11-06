@@ -51,6 +51,32 @@ export const isEffectiveAttemptResult = (
 ): boolean => EFFECTIVE_ATTEMPT_RESULTS.has(result);
 
 /**
+ * Motivo de reagendamento (config/rescheduleReasons) quando um contato NAO
+ * efetivo empurra o agendamento ativo no "Registrar contato" -- o resultado
+ * da tentativa ja diz por que remarcou, o cobrador nao escolhe de novo.
+ */
+const RESCHEDULE_REASON_BY_ATTEMPT_RESULT: Partial<
+  Record<CollectionAttempt["result"], string>
+> = {
+  no_answer: "nao_atendeu_reagendar",
+  busy: "nao_atendeu_reagendar",
+};
+
+export const rescheduleReasonForAttemptResult = (
+  result: CollectionAttempt["result"],
+): string => RESCHEDULE_REASON_BY_ATTEMPT_RESULT[result] ?? "outro";
+
+/**
+ * Desfecho do agendamento ativo ao registrar um contato com proximo contato
+ * marcado: efetivo -> "realizada" (conta na meta) + novo agendamento de
+ * ACOMPANHAMENTO; nao efetivo -> "reagendada" (mesma cadeia, entra em
+ * Reincidentes). Sem proximo contato, sempre "realizada".
+ */
+export const attemptReschedulesActiveContact = (
+  result: CollectionAttempt["result"],
+): boolean => !isEffectiveAttemptResult(result);
+
+/**
  * Mesma classificacao, mas a partir do ROTULO gravado em
  * scheduled_visits.notes na conclusao de um contato agendado (Etapa 4) --
  * la nao sobra o `result` estruturado, so o texto exibido. Espelha o padrao

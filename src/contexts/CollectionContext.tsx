@@ -46,7 +46,7 @@ import {
   visitReleaseSituacao,
   lastVisitOutcomeByClient,
 } from "../config/visitOutcomes";
-import { rescheduleReasonLabel } from "../config/rescheduleReasons";
+import { buildRescheduleNotes } from "../config/rescheduleReasons";
 import { Database } from "../types/database.types";
 import { useAuth } from "./AuthContext";
 import { useLoading } from "./LoadingContext";
@@ -4822,63 +4822,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         throw new Error("Visita não encontrada no estado local");
       }
 
-      // Montar nota com informações do reagendamento
-      const formatBrazilianDate = (date: string, time?: string) => {
-        const [year, month, day] = date.split("-");
-        const formattedDate = `${day}/${month}/${year}`;
-        if (time) {
-          const [hours, minutes] = time.split(":");
-          return `${formattedDate} ${hours}:${minutes}`;
-        }
-        return formattedDate;
-      };
-
-      // Função para formatar datas existentes em notas antigas
-      const formatExistingNotes = (notes: string) => {
-        return (
-          notes
-            // Formatar notas com formato antigo (YYYY-MM-DD HH:mm:ss)
-            .replace(
-              /Reagendado de (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) para (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})/g,
-              (_, fromDate, fromTime, toDate, toTime) => {
-                const formattedFrom = formatBrazilianDate(
-                  fromDate,
-                  fromTime.substring(0, 5),
-                );
-                const formattedTo = formatBrazilianDate(
-                  toDate,
-                  toTime.substring(0, 5),
-                );
-                return `• Reagendado de ${formattedFrom} para ${formattedTo}`;
-              },
-            )
-            // Adicionar dots em notas que já estão no formato brasileiro mas sem dots
-            .replace(/^Reagendado de/gm, "• Reagendado de")
-            // Remover dots duplicados
-            .replace(/^• • Reagendado de/gm, "• Reagendado de")
-        );
-      };
-
-      const fromDateTime = formatBrazilianDate(
-        currentVisit.scheduledDate,
-        currentVisit.scheduledTime,
-      );
-      const toDateTime = formatBrazilianDate(newDate, newTime);
-
-      // `reason` chega como CHAVE do catalogo (config/rescheduleReasons); na
-      // nota gravamos o rotulo legivel, e a chave vai para a coluna propria
-      // reschedule_reason — que e a fonte usada para agrupar/filtrar.
-      const reasonLabel = reason ? rescheduleReasonLabel(reason) : "";
-      const rescheduleNote = `• Reagendado de ${fromDateTime} para ${toDateTime}${reasonLabel ? `. Motivo: ${reasonLabel}` : ""}`;
-
-      // Atualizar notas formatando as existentes e adicionando a nova
-      let updatedNotes = rescheduleNote;
-      if (currentVisit.notes) {
-        const formattedExistingNotes = formatExistingNotes(currentVisit.notes);
-        updatedNotes = `${formattedExistingNotes}\n${rescheduleNote}`;
-      }
-
-      const newVisitNotes = `Visita reagendada de ${fromDateTime}${reason ? `. Motivo: ${reason}` : ""}`;
+      // Notas da original e da nova: mesmo montador do registrar_contato
+      // (config/rescheduleReasons.buildRescheduleNotes).
+      const { original: updatedNotes, nova: newVisitNotes } =
+        buildRescheduleNotes(currentVisit, newDate, newTime, reason);
 
       // Checagem de conflito, UPDATE da original, INSERT da nova e o vínculo
       // entre elas — tudo numa unica transacao no banco (RPC reagendar_visita,

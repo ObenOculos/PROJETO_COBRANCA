@@ -1,31 +1,49 @@
-import React, { useMemo, useState } from "react";
-import { X, Save, Calendar, MessageSquare, AlertCircle } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  X,
+  Save,
+  Calendar,
+  Clock,
+  MessageSquare,
+  AlertCircle,
+  Info,
+} from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCollection } from "../../contexts/CollectionContext";
-import { todayLocalStr } from "../../config/visitStatus";
-import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
+import { addDaysLocalStr, todayLocalStr } from "../../config/visitStatus";
+import {
+  ATTEMPT_RESULT_LABELS,
+  attemptReschedulesActiveContact,
+  rescheduleReasonForAttemptResult,
+} from "../../config/collectionAttempts";
 import { releaseSituacaoForAttemptResult } from "../../config/visitOutcomes";
+import {
+  buildRescheduleNotes,
+  rescheduleReasonLabel,
+  rescheduleReasonsForChannel,
+} from "../../config/rescheduleReasons";
 import { hasInstallmentBalance } from "../../filters/clientStatus";
-import { ClientGroup, CollectionAttempt } from "../../types";
+import {
+  ClientGroup,
+  CollectionAttempt,
+  ScheduledVisit,
+  ScheduledVisitChannel,
+} from "../../types";
 
 interface LogContactModalProps {
   client: ClientGroup;
   onClose: () => void;
   onSuccess: () => void;
   /**
-   * Presente quando este contato veio de um agendamento ativo (ver
-   * ScheduleContactModal/InternalCollectorWallet) -- ao registrar, fecha
-   * esse agendamento como "realizada" em vez de deixa-lo em aberto.
+   * Contato agendado ATIVO deste cliente, do proprio cobrador, se houver. O
+   * registro decide o desfecho dele (concluir ou remarcar) na mesma
+   * transacao -- ver RPC registrar_contato.
    */
-  linkedScheduledVisitId?: string;
+  linkedVisit?: ScheduledVisit;
 }
 
-// Motivo do contato -> tipo/resultado de collection_attempts. "Contato
-// realizado" e "mensagem enviada" nao existiam no vocabulario original
-// (criado pro CollectionModal, que so cobre ligacao/visita de titulo
-// unico); estendidos em types/index.ts (CollectionAttempt) e no
-// ATTEMPT_RESULT_LABELS do CollectionModal.
+// Motivo do contato -> tipo/resultado de collection_attempts.
 const STATUS_TO_ATTEMPT: Record<
   string,
   { type: CollectionAttempt["type"]; result: CollectionAttempt["result"] }
@@ -39,29 +57,86 @@ const STATUS_TO_ATTEMPT: Record<
   contestou_divida: { type: "call", result: "disputed" },
 };
 
+const formatDateBR = (date: string) => {
+  const [y, m, d] = date.split("-");
+  return `${d}/${m}/${y}`;
+};
+
+const inputClass =
+  "w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none transition-all dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text";
+
+/**
+ * Registrar contato do cobrador de carteira -- um botao so para o que antes
+ * era "Registrar Interacao" + "Reagendar": grava a tentativa, decide o
+ * desfecho do contato agendado e marca o proximo, numa transacao
+ * (registrar_contato). Modo "so remarcar" cobre a remarcacao sem tentativa
+ * (agenda cheia, cliente pediu outro horario por mensagem).
+ */
 const LogContactModal: React.FC<LogContactModalProps> = ({
   client,
   onClose,
   onSuccess,
-  linkedScheduledVisitId,
+  linkedVisit,
 }) => {
   const { user } = useAuth();
-  const { refreshCollections, updateVisitStatus } = useCollection();
+  const { refreshCollections, fetchScheduledVisits, rescheduleVisit } =
+    useCollection();
+  const today = todayLocalStr();
+  const linkedChannel: ScheduledVisitChannel =
+    linkedVisit?.channel && linkedVisit.channel !== "presencial"
+      ? linkedVisit.channel
+      : "ligacao";
+
+  const [mode, setMode] = useState<"contato" | "remarcar">("contato");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("promessa_pagamento");
   const [notes, setNotes] = useState("");
   const [promiseDate, setPromiseDate] = useState("");
   const [error, setError] = useState("");
 
+  const [nextDate, setNextDate] = useState("");
+  const [nextDateTouched, setNextDateTouched] = useState(false);
+  const [nextTime, setNextTime] = useState(linkedVisit?.scheduledTime ?? "");
+  const [nextChannel, setNextChannel] =
+    useState<ScheduledVisitChannel>(linkedChannel);
+  const [nextChannelTouched, setNextChannelTouched] = useState(false);
+
+  const remarcarReasons = rescheduleReasonsForChannel(linkedChannel);
+  const [remarcarReason, setRemarcarReason] = useState(
+    remarcarReasons[0]?.key ?? "outro",
+  );
+  const [remarcarDate, setRemarcarDate] = useState(addDaysLocalStr(today, 1));
+
+  const { result } = STATUS_TO_ATTEMPT[status];
+  const releaseSituacao = releaseSituacaoForAttemptResult(result);
+  const reschedules = attemptReschedulesActiveContact(result);
+
+  // Sugestao do proximo contato pelo resultado, enquanto o cobrador nao
+  // mexeu no campo: nao atendeu/mensagem -> amanha; promessa -> dia seguinte
+  // ao prometido (conferir se pagou).
+  useEffect(() => {
+    if (!nextDateTouched) {
+      if (status === "nao_atende" || status === "mensagem_enviada") {
+        setNextDate(addDaysLocalStr(today, 1));
+      } else if (status === "promessa_pagamento" && promiseDate) {
+        setNextDate(addDaysLocalStr(promiseDate, 1));
+      } else {
+        setNextDate("");
+      }
+    }
+    if (!nextChannelTouched) {
+      setNextChannel(status === "mensagem_enviada" ? "whatsapp" : linkedChannel);
+    }
+  }, [status, promiseDate, nextDateTouched, nextChannelTouched, today, linkedChannel]);
+
   // Um contato de carteira fala da divida do cliente como um todo, mas
-  // collection_attempts e por titulo (collection_id) -- e assim que a aba
-  // "Tentativas" de cada titulo no CollectionModal ja funciona. Grava uma
-  // linha identica em cada titulo em aberto pra aparecer em todos eles.
+  // collection_attempts e por titulo (collection_id). Grava uma linha em
+  // cada titulo em aberto.
   const titulosEmAberto = useMemo(() => {
-    const ids: number[] = [];
+    const ids: string[] = [];
     client?.sales?.forEach((sale) => {
       sale.installments?.forEach((inst) => {
-        if (hasInstallmentBalance(inst)) ids.push(inst.id_parcela);
+        if (hasInstallmentBalance(inst)) ids.push(inst.id_parcela.toString());
       });
     });
     return ids;
@@ -69,20 +144,87 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
 
   if (!client) return null;
 
+  const effectiveNext = releaseSituacao ? "" : nextDate;
+
+  // O que vai acontecer ao salvar, em texto -- o cobrador ve antes.
+  const preview: string[] = [];
+  if (mode === "contato") {
+    if (releaseSituacao) {
+      preview.push(`O cliente sai da sua carteira (${releaseSituacao}).`);
+    }
+    if (linkedVisit) {
+      const when = formatDateBR(linkedVisit.scheduledDate);
+      if (effectiveNext && reschedules) {
+        preview.push(
+          `O contato agendado para ${when} será remarcado para ${formatDateBR(effectiveNext)} (motivo: ${rescheduleReasonLabel(rescheduleReasonForAttemptResult(result))}).`,
+        );
+      } else {
+        preview.push(`O contato agendado para ${when} será concluído.`);
+      }
+    }
+    if (effectiveNext && !(linkedVisit && reschedules)) {
+      preview.push(
+        `Próximo contato agendado para ${formatDateBR(effectiveNext)}.`,
+      );
+    }
+    if (!effectiveNext && !releaseSituacao) {
+      preview.push("Nenhum próximo contato será agendado.");
+    }
+  }
+
+  const errorMessage = (err: unknown) =>
+    err instanceof Error
+      ? err.message
+      : ((err as { message?: string })?.message ?? String(err));
+
+  const reload = async () => {
+    await Promise.all([refreshCollections(), fetchScheduledVisits(false)]);
+  };
+
+  const handleRemarcar = async () => {
+    if (!linkedVisit) return;
+    if (!remarcarDate || remarcarDate < today) {
+      setError("Escolha uma data a partir de hoje.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await rescheduleVisit(
+        linkedVisit.id,
+        remarcarDate,
+        nextTime || undefined,
+        remarcarReason,
+      );
+      onSuccess();
+    } catch (err) {
+      console.error("Erro ao remarcar contato:", err);
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === "remarcar") {
+      await handleRemarcar();
+      return;
+    }
     if (!notes.trim()) {
       setError("Por favor, adicione uma observação sobre o contato.");
       return;
     }
-
     if (!user?.id) {
       setError("Usuário não autenticado.");
       return;
     }
-
     if (titulosEmAberto.length === 0) {
       setError("Este cliente não tem título em aberto para registrar o contato.");
+      return;
+    }
+    if (effectiveNext && effectiveNext < today) {
+      setError("O próximo contato não pode ser em data passada.");
       return;
     }
 
@@ -90,63 +232,56 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
     setError("");
 
     try {
-      const { type, result } = STATUS_TO_ATTEMPT[status];
-      const date = todayLocalStr();
-      const rows = titulosEmAberto.map((collectionId) => ({
-        collection_id: collectionId.toString(),
-        date,
-        type,
-        result,
-        notes,
-        next_action:
-          status === "promessa_pagamento" ? "Promessa de pagamento" : null,
-        next_action_date:
-          status === "promessa_pagamento" && promiseDate ? promiseDate : null,
-        collector_id: user.id,
-      }));
+      const { type } = STATUS_TO_ATTEMPT[status];
+      const isPromise = status === "promessa_pagamento";
+      const reagendar = !!linkedVisit && !!effectiveNext && reschedules;
+      const motivo = reagendar
+        ? rescheduleReasonForAttemptResult(result)
+        : undefined;
+      const rescheduleNotes =
+        reagendar && linkedVisit
+          ? buildRescheduleNotes(
+              linkedVisit,
+              effectiveNext,
+              nextTime || undefined,
+              motivo,
+            )
+          : undefined;
+      const label = ATTEMPT_RESULT_LABELS[result];
 
-      const { error: insertError } = await supabase
-        .from("collection_attempts")
-        .insert(rows);
+      const { error: rpcError } = await supabase.rpc("registrar_contato", {
+        p_documento: client.document,
+        p_nome_cliente: client.client,
+        p_titulos: titulosEmAberto,
+        p_data: today,
+        p_tipo: type,
+        p_resultado: result,
+        p_notas: notes,
+        p_proxima_acao: isPromise ? "Promessa de pagamento" : undefined,
+        p_data_promessa: isPromise && promiseDate ? promiseDate : undefined,
+        p_visita_id: linkedVisit?.id,
+        p_rotulo_resultado: label,
+        p_reagendar: reagendar,
+        p_motivo_reagendamento: motivo,
+        p_notas_reagendamento_original: rescheduleNotes?.original,
+        p_notas_reagendamento_nova: rescheduleNotes?.nova,
+        p_proxima_data: effectiveNext || undefined,
+        p_proximo_horario: effectiveNext && nextTime ? nextTime : undefined,
+        p_proximo_canal: effectiveNext ? nextChannel : undefined,
+        p_notas_proximo:
+          effectiveNext && !reagendar
+            ? `Acompanhamento: ${label}${isPromise && promiseDate ? ` (promessa para ${formatDateBR(promiseDate)})` : ""}`
+            : undefined,
+        p_situacao_liberacao: releaseSituacao ?? undefined,
+      });
 
-      if (insertError) throw insertError;
+      if (rpcError) throw rpcError;
 
-      if (linkedScheduledVisitId) {
-        await updateVisitStatus(
-          linkedScheduledVisitId,
-          "realizada",
-          ATTEMPT_RESULT_LABELS[result],
-        );
-      }
-
-      // Mesma regra da visita presencial (config/visitOutcomes), ponto unico
-      // de decisao: cobranca por telefone/WhatsApp tambem pode encerrar o
-      // caso (hoje, so contestacao da divida/SPC) e devolver o cliente pra
-      // fila de Atribuicao.
-      const releaseSituacao = releaseSituacaoForAttemptResult(result);
-      if (releaseSituacao) {
-        const { error: releaseError } = await supabase.rpc(
-          "liberar_cliente_da_carteira",
-          {
-            p_documento: client.document,
-            p_situacao: releaseSituacao,
-            p_usuario_id: user.id,
-          },
-        );
-        if (releaseError) {
-          console.error(
-            `Erro ao liberar cliente da carteira (${releaseSituacao}):`,
-            releaseError,
-          );
-        }
-      }
-
-      await refreshCollections();
+      await reload();
       onSuccess();
     } catch (err) {
       console.error("Erro ao registrar contato:", err);
-      const message = err instanceof Error ? err.message : String(err);
-      setError("Falha ao salvar contato: " + message);
+      setError("Falha ao salvar contato: " + errorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -154,15 +289,17 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[100] backdrop-blur-sm">
-      <div className="bg-white dark:bg-dark-bg rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-200 dark:border-dark-border animate-in fade-in zoom-in duration-200">
+      <div className="bg-white dark:bg-dark-bg rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-200 dark:border-dark-border animate-in fade-in zoom-in duration-200 max-h-[95vh] flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50 dark:bg-dark-bg-secondary">
           <div>
             <h3 className="font-bold text-gray-900 dark:text-dark-text">
-              Registrar Interação
+              Registrar Contato
             </h3>
             <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
               {client.client}
+              {linkedVisit &&
+                ` · agendado para ${formatDateBR(linkedVisit.scheduledDate)}${linkedVisit.scheduledTime ? ` ${linkedVisit.scheduledTime.slice(0, 5)}` : ""}`}
             </p>
           </div>
           <button
@@ -173,74 +310,232 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="p-6 space-y-4 overflow-y-auto"
+        >
           {error && (
             <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" />
+              <AlertCircle className="w-4 h-4 shrink-0" />
               {error}
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-400">
-              Resultado do Contato
-            </label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none transition-all dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-            >
-              <option value="promessa_pagamento">Promessa de Pagamento</option>
-              <option value="contato_realizado">
-                Contato Realizado (Sem acordo)
-              </option>
-              <option value="nao_atende">Telefone não atende / Ocupado</option>
-              <option value="telefone_errado">
-                Telefone Errado / Inexistente
-              </option>
-              <option value="recusou_pagar">Recusou Pagar / Contestação</option>
-              <option value="mensagem_enviada">
-                Mensagem Enviada (WhatsApp/SMS)
-              </option>
-              <option value="contestou_divida">
-                Contestou a Dívida (SPC)
-              </option>
-            </select>
-          </div>
-
-          {status === "promessa_pagamento" && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-400">
-                Data da Promessa
-              </label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="date"
-                  value={promiseDate}
-                  onChange={(e) => setPromiseDate(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none transition-all dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-                  min={todayLocalStr()}
-                />
-              </div>
+          {linkedVisit && (
+            <div className="flex gap-2">
+              {(
+                [
+                  ["contato", "Fiz o contato"],
+                  ["remarcar", "Só remarcar (sem contato)"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setMode(key);
+                    setError("");
+                  }}
+                  className={`flex-1 px-3 py-2 rounded-xl border font-bold text-xs transition-all ${
+                    mode === key
+                      ? "bg-indigo-600 text-white border-indigo-600"
+                      : "bg-gray-50 text-gray-500 border-gray-200 dark:bg-dark-bg-secondary dark:border-dark-border"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-400">
-              Observações da Conversa
-            </label>
-            <div className="relative">
-              <MessageSquare className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ex: Cliente disse que pagará via PIX na sexta-feira após o almoço..."
-                rows={4}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none transition-all resize-none dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
-              />
-            </div>
-          </div>
+          {mode === "contato" ? (
+            <>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-400">
+                  Resultado do Contato
+                </label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="promessa_pagamento">
+                    Promessa de Pagamento
+                  </option>
+                  <option value="contato_realizado">
+                    Contato Realizado (Sem acordo)
+                  </option>
+                  <option value="nao_atende">
+                    Telefone não atende / Ocupado
+                  </option>
+                  <option value="telefone_errado">
+                    Telefone Errado / Inexistente
+                  </option>
+                  <option value="recusou_pagar">
+                    Recusou Pagar / Contestação
+                  </option>
+                  <option value="mensagem_enviada">
+                    Mensagem Enviada (WhatsApp/SMS)
+                  </option>
+                  <option value="contestou_divida">
+                    Contestou a Dívida (SPC)
+                  </option>
+                </select>
+              </div>
+
+              {status === "promessa_pagamento" && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-400">
+                    Data da Promessa
+                  </label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="date"
+                      value={promiseDate}
+                      onChange={(e) => setPromiseDate(e.target.value)}
+                      className={`${inputClass} pl-10`}
+                      min={today}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-400">
+                  Observações da Conversa
+                </label>
+                <div className="relative">
+                  <MessageSquare className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Ex: Cliente disse que pagará via PIX na sexta-feira após o almoço..."
+                    rows={3}
+                    className={`${inputClass} pl-10 py-3 resize-none`}
+                  />
+                </div>
+              </div>
+
+              {!releaseSituacao && (
+                <div className="space-y-2 pt-1">
+                  <label className="text-xs font-bold text-gray-400">
+                    Próximo contato {nextDate ? "" : "(opcional)"}
+                  </label>
+                  <div className="flex gap-2">
+                    {(["ligacao", "whatsapp"] as ScheduledVisitChannel[]).map(
+                      (c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => {
+                            setNextChannel(c);
+                            setNextChannelTouched(true);
+                          }}
+                          className={`flex-1 px-3 py-2 rounded-xl border font-bold text-xs transition-all ${
+                            nextChannel === c
+                              ? "bg-indigo-600 text-white border-indigo-600"
+                              : "bg-gray-50 text-gray-500 border-gray-200 dark:bg-dark-bg-secondary dark:border-dark-border"
+                          }`}
+                        >
+                          {c === "ligacao" ? "Ligação" : "WhatsApp"}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="date"
+                        value={nextDate}
+                        onChange={(e) => {
+                          setNextDate(e.target.value);
+                          setNextDateTouched(true);
+                        }}
+                        min={today}
+                        className={`${inputClass} pl-10`}
+                      />
+                    </div>
+                    <div className="relative">
+                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="time"
+                        value={nextTime}
+                        onChange={(e) => setNextTime(e.target.value)}
+                        disabled={!nextDate}
+                        className={`${inputClass} pl-10 disabled:opacity-50`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {preview.length > 0 && (
+                <div className="p-3 bg-indigo-50 dark:bg-dark-bg-secondary border border-indigo-100 dark:border-dark-border rounded-xl text-xs text-indigo-800 dark:text-dark-text-secondary flex gap-2">
+                  <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    {preview.map((p) => (
+                      <p key={p}>{p}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-400">Motivo</label>
+                <select
+                  value={remarcarReason}
+                  onChange={(e) => setRemarcarReason(e.target.value)}
+                  className={inputClass}
+                >
+                  {remarcarReasons.map((r) => (
+                    <option key={r.key} value={r.key}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-400">
+                    Nova data
+                  </label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="date"
+                      value={remarcarDate}
+                      onChange={(e) => setRemarcarDate(e.target.value)}
+                      min={today}
+                      required
+                      className={`${inputClass} pl-10`}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-400">
+                    Horário (opcional)
+                  </label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="time"
+                      value={nextTime}
+                      onChange={(e) => setNextTime(e.target.value)}
+                      className={`${inputClass} pl-10`}
+                    />
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                Nenhuma tentativa de contato é registrada — use quando não
+                houve contato com o cliente.
+              </p>
+            </>
+          )}
 
           <div className="pt-2 flex gap-3">
             <button
@@ -260,7 +555,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  Salvar Registro
+                  {mode === "remarcar" ? "Remarcar" : "Salvar Registro"}
                 </>
               )}
             </button>

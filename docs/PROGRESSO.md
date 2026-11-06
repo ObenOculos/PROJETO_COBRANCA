@@ -32,6 +32,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 21 | Jurídico (`legal_collector`) é 100% idêntico a Interno/Terceirizado — zero modelagem de processo/protesto/prazo legal | A avaliar com o negócio | A analisar |
 | 22 | Sem tela de histórico de cancelamento de acordo e de agendamento/contato — só "Histórico de Contatos" (`collection_attempts`) aparece em "Ver Dados" | Baixa/Média | Pequeno/médio |
 | 23 | `AcordoModal` (parcelas) não bloqueia de verdade data anterior a hoje — só `min` do `<input type="date">`, sem validação no "Continuar" | Baixa | Pequeno |
+| 24 | Registrar contato + Reagendar viram um botão só (RPC `registrar_contato`) — código pronto, **aguarda `db push` da `20261106000004` e teste ao vivo** | Média | Médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -81,6 +82,43 @@ pagas ficam baixadas e as a vencer ficam em aberto correndo juros 7")
     já paga) ou é baixada depois, no título novo da parcela 1?
 13. Depois do lançamento, o cliente paga **os boletos gerados no Ciclone**
     (e o app só acompanha), ou o cobrador também registra pagamento no app?
+
+### Item 24 — "Registrar contato" unificado (cobrador de carteira) — 2026-11-06
+
+Pedido do usuário: "Registrar Interação" e "Reagendar" eram dois botões de um
+fluxo só. Problemas encontrados no desenho antigo:
+- "Não atendeu" pelo Registrar marcava o agendamento como **realizada** e não
+  criava o próximo; o "Agendar" seguinte nascia **fora da cadeia** de
+  reagendamento (Reincidentes não via).
+- Reagendar **não gravava tentativa** nem observação: histórico de Tentativas
+  vazio e o cliente seguia na seção "Sem contato" mesmo ligando todo dia.
+
+Agora (decisões do usuário, com as recomendações):
+- Um modal (`LogContactModal`, título "Registrar Contato"): resultado,
+  observação, data da promessa e **próximo contato** (canal/data/hora,
+  sugerido pelo resultado: não atendeu/mensagem → amanhã; promessa → dia
+  seguinte ao prometido). Mostra antes de salvar o que vai acontecer.
+- **Contato efetivo** → agendamento ativo vira `realizada` (conta na meta) e
+  o próximo é um agendamento novo de **acompanhamento**. **Não efetivo** com
+  próximo → `reagendada` na mesma cadeia, motivo derivado do resultado
+  (`rescheduleReasonForAttemptResult`, `attemptReschedulesActiveContact` em
+  `config/collectionAttempts.ts`). Sem próximo → `realizada`, como antes.
+- Modo **"Só remarcar (sem contato)"** dentro do mesmo modal, com os motivos
+  de reagendamento — usa a `reagendar_visita` direto, sem tentativa.
+- Tudo numa transação: RPC `registrar_contato` (migration
+  `20261106000004`, `SECURITY INVOKER` — RLS de `collection_attempts` e
+  `scheduled_visits` faz o papel do guard). Confere que o agendamento ativo
+  que a tela viu ainda é o do banco; SPC libera a carteira na mesma transação
+  (antes um erro na liberação era só logado).
+- `RescheduleContactModal` removido; na linha da carteira o botão de
+  calendário só aparece para **agendar** quando não há contato agendado.
+- Montador das notas de reagendamento saiu do `CollectionContext` para
+  `config/rescheduleReasons.buildRescheduleNotes` (usado pelos dois caminhos).
+
+**Pendente**: `db push` + `npm run check:db`, depois teste ao vivo (registrar
+"não atendeu" com agendamento ativo → original `reagendada` com
+`rescheduled_to_id`; promessa → `realizada` + novo agendamento; SPC → sai da
+carteira; "só remarcar").
 
 ### Item 23 — validar data de parcela não pode ser anterior a hoje — 2026-11-04
 

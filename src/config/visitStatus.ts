@@ -125,6 +125,12 @@ export const lastVisitStatusByClient = (
 export const todayLocalStr = (now: Date = new Date()): string =>
   `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
+/** Soma `days` a uma data de calendario YYYY-MM-DD, no fuso local. */
+export const addDaysLocalStr = (date: string, days: number): string => {
+  const [y, m, d] = date.split("-").map(Number);
+  return todayLocalStr(new Date(y, m - 1, d + days));
+};
+
 /** Status de visita que ainda nao teve desfecho. */
 export const OPEN_VISIT_STATUSES: ReadonlyArray<ScheduledVisit["status"]> = [
   "agendada",
