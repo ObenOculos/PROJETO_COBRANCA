@@ -32,7 +32,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 21 | Jurídico (`legal_collector`) é 100% idêntico a Interno/Terceirizado — zero modelagem de processo/protesto/prazo legal | A avaliar com o negócio | A analisar |
 | 22 | Sem tela de histórico de cancelamento de acordo e de agendamento/contato — só "Histórico de Contatos" (`collection_attempts`) aparece em "Ver Dados" | Baixa/Média | Pequeno/médio |
 | 23 | `AcordoModal` (parcelas) não bloqueia de verdade data anterior a hoje — só `min` do `<input type="date">`, sem validação no "Continuar" | Baixa | Pequeno |
-| 24 | Registrar contato + Reagendar viram um botão só (RPC `registrar_contato`) — código pronto, **aguarda `db push` da `20261106000004` e teste ao vivo** | Média | Médio |
+| 24 | Registrar contato + Reagendar viram um botão só (RPC `registrar_contato`) — migration aplicada 2026-11-06 (`check:db` OK), **aguarda teste ao vivo** | Média | Médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -115,7 +115,7 @@ Agora (decisões do usuário, com as recomendações):
 - Montador das notas de reagendamento saiu do `CollectionContext` para
   `config/rescheduleReasons.buildRescheduleNotes` (usado pelos dois caminhos).
 
-**Pendente**: `db push` + `npm run check:db`, depois teste ao vivo (registrar
+Migration aplicada em 2026-11-06, `check:db` OK (função INVOKER, sem EXECUTE para anon). **Pendente**: teste ao vivo (registrar
 "não atendeu" com agendamento ativo → original `reagendada` com
 `rescheduled_to_id`; promessa → `realizada` + novo agendamento; SPC → sai da
 carteira; "só remarcar").
