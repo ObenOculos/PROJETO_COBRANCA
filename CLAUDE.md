@@ -50,8 +50,11 @@ contagem do arquivo que você mexeu (compare com `git show HEAD:<arquivo>`).
   falha se houver `<> 'manager'`, função liberada para `anon` ou
   `SECURITY DEFINER` sem `search_path`).
 - Função nova **não** precisa mais de `REVOKE EXECUTE ... FROM anon` manual —
-  `ALTER DEFAULT PRIVILEGES` (migration `20261103000008`) já fecha isso por
-  padrão. Tabela nova continua precisando de RLS explícita `TO authenticated`
+  `ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM
+  PUBLIC` (migration `20261106000003`) fecha isso por padrão. A `20261103000008`
+  sozinha não bastava: tirava só o grant direto a `anon` no schema, e `anon`
+  herdava o EXECUTE que o Postgres dá a `PUBLIC` no padrão global. Rode
+  `npm run check:db` depois de todo `db push` mesmo assim. Tabela nova continua precisando de RLS explícita `TO authenticated`
   (padrão desde a Etapa 2a/2b) — isso o default privileges não cobre.
 
 ## Mapa do código
