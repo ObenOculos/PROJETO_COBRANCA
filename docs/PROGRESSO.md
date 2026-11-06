@@ -462,9 +462,12 @@ própria API do WhatsApp Web).
   - Testado com BEGIN/ROLLBACK em produção: 600 em 3× sobre 500 de original
     (166,67/166,66/166,67 de original; cliente ativo até a última parcela) e
     400 em 2× (R$ 100 baixados como desconto ao cumprir).
-  - **Pendente:** cláusula no termo (`termoAcordo.ts`) dizendo que os
-    pagamentos abatem original e encargos proporcionalmente — sem ela vale o
-    CC art. 354 (juros primeiro). Valor em aberto exibido no front segue
+  - Cláusula Segunda do termo (`termoAcordo.ts`, 2026-11-06): diz que cada
+    pagamento abate original e encargos na proporção do negociado (com os
+    % e valores do acordo) e afasta o CC art. 354 (juros primeiro); se o
+    negociado for ≤ original, diz que tudo abate o original e que a
+    diferença vira desconto só ao quitar. Texto a validar com o jurídico.
+    Valor em aberto exibido no front segue
     sendo o original restante dos títulos (o saldo com encargos fica na tela
     do acordo); `scheduled_visits.total_pending_value` não é atualizado por
     pagamento de acordo.

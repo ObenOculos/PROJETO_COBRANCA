@@ -522,15 +522,63 @@ export const gerarTermoAcordoPdf = async ({
 
   // ---------- Clausulas gerais ----------
   sectionTitle("Cláusulas gerais");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  setColor(TEXT);
+
+  // Clausula Segunda -- imputacao PROPORCIONAL dos pagamentos (decisao
+  // 2026-11-05, migration 20261105000002). Os numeros saem da mesma conta
+  // que registrar_pagamento_acordo faz no banco: fracao de valor original =
+  // min(original, negociado) / negociado. Sem esta clausula vale o art. 354
+  // do Codigo Civil (juros primeiro), que contradiz o que o sistema grava.
+  const originalTotal = titulos.reduce(
+    (sum, t) => sum + Math.max(t.saldoNoMomento, 0),
+    0,
+  );
+  const negociado = acordo.valorNegociado;
+  const formatPct = (v: number) =>
+    v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const quitacao =
+    "Os títulos acima somente serão considerados quitados com o pagamento integral " +
+    "de todas as parcelas deste acordo.";
+  let textoClausula2: string;
+  if (negociado > originalTotal + 0.009 && negociado > 0) {
+    const pctOriginal = Math.round((originalTotal / negociado) * 10000) / 100;
+    const pctEncargos = Math.round((100 - pctOriginal) * 100) / 100;
+    textoClausula2 =
+      "Cláusula Segunda – Cada pagamento efetuado em razão deste acordo, inclusive a entrada, " +
+      "será imputado simultaneamente ao valor original dos títulos e aos encargos (multa e " +
+      "juros, deduzido o desconto), na mesma proporção em que compõem o total negociado: " +
+      `${formatPct(pctOriginal)}% ao valor original (${formatMoneyPdf(originalTotal)}) e ` +
+      `${formatPct(pctEncargos)}% aos encargos (${formatMoneyPdf(negociado - originalTotal)}). ` +
+      "As partes afastam, assim, a ordem de imputação prevista no art. 354 do Código Civil. " +
+      quitacao;
+  } else {
+    const diferenca = originalTotal - negociado;
+    textoClausula2 =
+      "Cláusula Segunda – Cada pagamento efetuado em razão deste acordo, inclusive a entrada, " +
+      "será imputado integralmente ao valor original dos títulos acima. " +
+      quitacao +
+      (diferenca > 0.009
+        ? ` A diferença de ${formatMoneyPdf(diferenca)} entre o valor original ` +
+          `(${formatMoneyPdf(originalTotal)}) e o total negociado (${formatMoneyPdf(negociado)}) ` +
+          "será concedida como desconto somente nessa ocasião."
+        : "");
+  }
+  const clausula2 = doc.splitTextToSize(textoClausula2, contentWidth);
+  ensureSpace(clausula2.length * 4.6 + 2);
+  doc.text(clausula2, marginX, y);
+  y += clausula2.length * 4.6 + 3;
+
   doc.setFont("helvetica", "italic");
   doc.setFontSize(7.5);
   setColor(MUTED);
-  doc.text("(texto jurídico final a definir)", marginX, y);
+  doc.text("(texto jurídico das demais cláusulas a definir)", marginX, y);
   y += 5.5;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
   setColor(TEXT);
-  ["Segunda", "Terceira", "Quarta"].forEach((ordinal) => {
+  ["Terceira", "Quarta"].forEach((ordinal) => {
     ensureSpace(6.5);
     doc.text(`Cláusula ${ordinal} – xxxxx`, marginX, y);
     y += 6;
@@ -541,7 +589,7 @@ export const gerarTermoAcordoPdf = async ({
   const fechamento = doc.splitTextToSize(
     "E por assim serem justas e contratadas, declaram-se cientes e esclarecidas quanto ao teor das " +
       "cláusulas deste instrumento, firmando-o em duas vias de igual teor e forma, na presença das " +
-      "testemunhas abaixo, para que produzam os devidos e efeitos legais.",
+      "testemunhas abaixo, para que produzam os devidos efeitos legais.",
     contentWidth,
   );
   doc.text(fechamento, marginX, y);
