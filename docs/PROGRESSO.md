@@ -123,7 +123,8 @@ agendamento → cria acompanhamento; (B) não atendeu com agendamento →
 `realizada` + novo agendamento no dia seguinte à promessa; (D) só remarcar →
 `reagendada` sem tentativa; (E) SPC → `realizada` + cliente liberado
 ("Aguardando Jurídico", sem cobrador). 5 tentativas por registro (5 títulos em
-aberto). Ficaram os registros de teste (notas "TESTE item 24").
+aberto). Registros de teste apagados depois, a pedido do usuário (cliente
+voltou a sem cobrador/sem situação).
 Observação: registrar ANTES do dia agendado sugere "amanhã", que pode ser a
 mesma data do agendamento atual (remarcação para o mesmo dia).
 
