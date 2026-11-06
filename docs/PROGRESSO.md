@@ -33,6 +33,48 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 22 | Sem tela de histórico de cancelamento de acordo e de agendamento/contato — só "Histórico de Contatos" (`collection_attempts`) aparece em "Ver Dados" | Baixa/Média | Pequeno/médio |
 | 23 | `AcordoModal` (parcelas) não bloqueia de verdade data anterior a hoje — só `min` do `<input type="date">`, sem validação no "Continuar" | Baixa | Pequeno |
 
+## Perguntas em aberto para o financeiro
+
+Lista viva: o usuário leva ao financeiro (Márcia) e traz as respostas. Ao
+responder, mover a resposta para a seção do assunto e riscar aqui.
+
+**Quebra do acordo** (mensagem do financeiro em 2026-11-06: "as parcelas
+pagas ficam baixadas e as a vencer ficam em aberto correndo juros 7")
+1. "Juros 7" é **7% ao mês**? A configuração atual dos acordos usa **8% a.m.**
+   — é a mesma taxa (erro de digitação) ou uma taxa só para depois da quebra?
+2. As parcelas a vencer **mantêm o vencimento** (não vence tudo de uma vez)?
+3. Os juros correm sobre a **parcela inteira** (que já tem juros embutidos =
+   juros sobre juros) ou **só sobre a parte de valor original**?
+4. Parcela atrasada depois da quebra leva **multa** também, ou só juros?
+5. Depois da quebra o cliente ainda pode **pagar as parcelas do acordo
+   quebrado**, ou só via novo acordo/SPC? (Hoje o app fecha o acordo
+   quebrado e não aceita mais pagamento nele.)
+
+**Formas de pagamento do Ciclone que não são dinheiro** (hoje contam como
+"recebido" no app; renegociação e desconto já foram corrigidos na etapa 3a)
+6. **DEVOLUÇÃO** (24 baixas, R$ 79,6 mil): é mercadoria devolvida abatendo a
+   dívida? Então não é recebimento — confirmar.
+7. **PERCAS** (12 baixas, R$ 102,7 mil): é baixa por perda (dívida
+   considerada incobrável)? Não é recebimento — confirmar.
+8. **CRÉDITO EM CARTEIRA** (7 baixas, R$ 15,2 mil): o que é? Crédito que o
+   cliente já tinha (adiantamento/devolução anterior)?
+9. **TAXA DE ANTECIPAÇÃO** (142 baixas, R$ 42,3 mil), **TAXA OPERADORA
+   CARTÃO** (3, R$ 7,2 mil) e **TAXA DE BOLETO** (1, R$ 700): são a tarifa
+   descontada do valor? O recebido deve ser o líquido (sem a taxa)?
+10. **CHEQUE / CARTÃO DE CRÉDITO / BLU** geram um título novo ao baixar
+    (cheque em carteira, recebível do cartão). O dinheiro conta como recebido
+    na baixa do título original ou só quando o cheque/cartão compensa?
+    (Hoje pode aparecer duas vezes: recebido no original e dívida no novo.)
+
+**Lançamento do acordo do app no Ciclone (etapa 3b)**
+11. Ao lançar a renegociação, a Márcia segue **exatamente as parcelas do
+    acordo do app** (quantidade, valores, vencimentos)? Se ela precisar
+    mudar algo, quem decide e o app deve aceitar a versão do Ciclone?
+12. A **entrada via Pix** entra na mesma baixa de renegociação (como parcela 1
+    já paga) ou é baixada depois, no título novo da parcela 1?
+13. Depois do lançamento, o cliente paga **os boletos gerados no Ciclone**
+    (e o app só acompanha), ou o cobrador também registra pagamento no app?
+
 ### Item 23 — validar data de parcela não pode ser anterior a hoje — 2026-11-04
 
 Observação do usuário: nada impede, de fato, criar uma parcela com
@@ -752,6 +794,23 @@ do Sistema de Cobrança como mais uma loja, com sincronização recorrente.
   do app (hoje entram como dívida avulsa ao lado do acordo); (d) etapa 3c:
   pacote por título (principal/juros/multa/desconto) para a Márcia lançar a
   baixa.
+- **Etapa 3b, parte 1 (2026-11-06) — espelho das renegociações e
+  conferência.** Migration `20261106000002`: `ciclone_renegociacoes`
+  (uma linha por baixa de renegociação: novo documento, cliente, data,
+  situação ativa/cancelada, valores) e `ciclone_renegociacao_titulos`
+  (origens com principal/juros/multa/desconto; gerados com parcela/
+  vencimento/valor), ambas só leitura para `authenticated` — só o sync grava.
+  Premissas conferidas nas 319 baixas (1 documento e 1 cliente por baixa;
+  gerados = empresa+cliente+número; soma = forma 100 em todas). RPC
+  `acordo_lancamento_ciclone(acordo_id)` (só leitura): `fora_do_ciclone` /
+  `nao_lancado` / `lancado` / `divergente` com a lista do que difere
+  (títulos, quantidade/total/valor/vencimento de parcelas) e as parcelas lado
+  a lado com o recebido no ERP. Sync grava depois do `BANCO_DADOS` (dry-run:
+  314 renegociações, 1.681 origens, 2.265 gerados; 5 puladas por conta
+  interna/sem CPF). Nada altera valor de título ou acordo. **Falta:** tela
+  no `AcordoDetailModal` (depois do `db push`, com tipos regenerados) e a
+  parte 2 — pagamento do Ciclone refletindo no acordo / quebra ciente do
+  ERP — que depende das perguntas 11-13.
 
 ### 1b. Desempenho por atribuição atual — ALTA
 
