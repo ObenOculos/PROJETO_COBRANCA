@@ -64,7 +64,7 @@ const reincidenciaTone = (n: number) =>
 /**
  * Local (visita presencial) ou canal (contato do cobrador de carteira),
  * reusado na tabela desktop e nos cards mobile -- so visita presencial tem
- * bairro/cidade preenchidos (ScheduleContactModal não grava endereço).
+ * bairro/cidade preenchidos (o agendamento de contato do "Atender"/LogContactModal não grava endereço).
  */
 const LocationOrChannelCell: React.FC<{
   visit: ScheduledVisit;

@@ -34,8 +34,8 @@ const CLIENTS_PER_PAGE = 25;
 // baixo, mesmos indicadores do gestor), mas sem herdar a complexidade de
 // rota/mapa/endereço: so filtra por nome/documento/cidade e agenda a mesma
 // data/hora para todos os selecionados. Ver docs/plans (plano salvo desta
-// feature) e ScheduleContactModal (agendamento individual, continua
-// existindo pra um contato pontual rápido).
+// feature) e LogContactModal ("Atender", etapa 2: agendamento individual
+// de um contato pontual).
 const ContactScheduler: React.FC<ContactSchedulerProps> = ({
   collectorId,
   onClose,

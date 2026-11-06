@@ -331,7 +331,11 @@ const CollectorsSummary: React.FC = () => {
         supabase
           .from("atribuicoes_historico")
           .select("documento, cliente_nome, cobrador_anterior_id, assigned_at")
-          .eq("motivo", "fora_da_faixa")
+          // fora_da_faixa = automacao antiga (nunca ligada);
+          // distribuicao_regra = Distribuicao da carteira. So quem SAIU de
+          // um cobrador (entrada de quem estava sem cobrador nao conta).
+          .in("motivo", ["fora_da_faixa", "distribuicao_regra"])
+          .not("cobrador_anterior_id", "is", null)
           .gte("assigned_at", `${dateFrom}T00:00:00`)
           .lte("assigned_at", `${dateTo}T23:59:59`)
           .order("assigned_at", { ascending: false }),
@@ -949,12 +953,10 @@ const CollectorsSummary: React.FC = () => {
         </div>
       )}
 
-      {/* Carteira automatica por faixa de atraso (etapas 7/8): dry-run de
-          quem sairia da carteira do proprio cobrador por ultrapassar a
-          faixa dele, e quem ja saiu (motivo fora_da_faixa em
-          atribuicoes_historico) no periodo filtrado acima. So leitura --
-          a execucao real (executar_saida_carteira_fora_da_faixa) existe no
-          banco mas nao esta ligada a nenhum botao aqui de proposito. */}
+      {/* Carteira automatica por faixa de atraso: so leitura -- quem saiu
+          das regras do proprio cobrador e quem ja foi movido no periodo
+          (atribuicoes_historico). Mover de fato e na tela Distribuicao da
+          carteira (simular -> aplicar). */}
       {currentUser?.type === "manager" && (
         <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border-2 border-pink-100 dark:border-pink-900/40 p-4 space-y-3">
           <button
@@ -1020,7 +1022,7 @@ const CollectorsSummary: React.FC = () => {
                               if (!!a.bloqueadoPor !== !!b.bloqueadoPor) {
                                 return a.bloqueadoPor ? 1 : -1;
                               }
-                              return b.diasExcedidos - a.diasExcedidos;
+                              return (b.diasExcedidos ?? 0) - (a.diasExcedidos ?? 0);
                             })
                             .map((c) => (
                               <tr key={c.documento}>
@@ -1034,10 +1036,14 @@ const CollectorsSummary: React.FC = () => {
                                   {c.atrasoAtual} dias
                                 </td>
                                 <td className="px-3 py-2 text-center text-gray-400">
-                                  {c.faixaMin}–{c.faixaMax}
+                                  {c.faixaMin != null
+                                    ? `${c.faixaMin}–${c.faixaMax}`
+                                    : "Loja fora das regras"}
                                 </td>
                                 <td className="px-3 py-2 text-center font-bold text-pink-600">
-                                  +{c.diasExcedidos} dias
+                                  {c.diasExcedidos != null
+                                    ? `+${c.diasExcedidos} dias`
+                                    : "—"}
                                 </td>
                                 <td className="px-3 py-2">
                                   {c.bloqueadoPor ? (
@@ -1048,7 +1054,7 @@ const CollectorsSummary: React.FC = () => {
                                     </span>
                                   ) : (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-50 text-pink-600 border border-pink-100">
-                                      Sairia agora
+                                      Fora da regra
                                     </span>
                                   )}
                                 </td>

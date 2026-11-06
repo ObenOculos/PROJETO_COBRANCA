@@ -42,13 +42,19 @@ export interface MonthlyGoal {
   updated_at: string;
 }
 
-// Faixa de dias de atraso que um cobrador atende (carteira automática).
-// Vigência: só a linha com vigenteAte null é a faixa atual do cobrador.
+// Regra da carteira: faixa de dias de atraso (inclusiva) x lojas que um
+// cobrador atende. Um cobrador pode ter VARIAS regras vigentes (vigenteAte
+// null); o banco nao deixa duas vigentes se sobreporem (mesma loja e faixas
+// que se cruzam). Atraso = parcela vencida mais antiga do cliente.
 export interface CollectorOverdueRange {
   id: string;
   collectorId: string;
   minDias: number;
   maxDias: number | null;
+  /** Lojas que a regra cobre; null = todas. */
+  lojas: string[] | null;
+  /** Regra desligada fica cadastrada, mas a distribuicao ignora. */
+  ativa: boolean;
   vigenteDesde: string;
   vigenteAte: string | null;
 }
@@ -63,18 +69,20 @@ export interface ManagerCollectorLink {
   vigenteAte: string | null;
 }
 
-// Linha do dry-run de clientes_fora_da_faixa() (carteira automática por
-// faixa de atraso). bloqueadoPor null = sairia de fato se a automação
-// estivesse ligada; "acordo_ativo"/"visita_agendada" explica por que não.
+// Linha de clientes_fora_da_faixa(): cliente de cobrador com regra que
+// nenhuma regra dele cobre mais. faixaMin/faixaMax/diasExcedidos = a regra
+// dele que o cliente acabou de passar; null quando a loja do cliente nem
+// esta nas regras dele. bloqueadoPor null = a distribuicao move;
+// "acordo_ativo"/"visita_agendada" explica por que nao.
 export interface ClienteForaDaFaixa {
   documento: string;
   cliente: string | null;
   collectorId: string;
   collectorName: string | null;
   atrasoAtual: number;
-  faixaMin: number;
-  faixaMax: number;
-  diasExcedidos: number;
+  faixaMin: number | null;
+  faixaMax: number | null;
+  diasExcedidos: number | null;
   bloqueadoPor: string | null;
 }
 
@@ -398,12 +406,19 @@ export interface CollectionContextType {
   fetchAllowedVisitDates: () => Promise<void>;
   fetchCollectorOverdueRanges: () => Promise<void>;
   fetchManagerCollectorLinks: () => Promise<void>;
-  /** Fecha a faixa vigente do cobrador (se houver) e abre uma nova. Só gestor. */
-  definirFaixaAtrasoCobrador: (
+  /** Cria (regraId null) ou edita uma regra da carteira (faixa x lojas) de
+   * um cobrador. O banco recusa sobreposicao com outra regra vigente. Só
+   * gestor. `lojas` null/vazio = todas as lojas. */
+  salvarRegraCarteira: (
+    regraId: string | null,
     collectorId: string,
     minDias: number,
     maxDias: number | null,
+    lojas: string[] | null,
+    ativa?: boolean,
   ) => Promise<void>;
+  /** Liga/desliga uma regra (ativar recusa conflito com regra ativa de outro). */
+  definirRegraCarteiraAtiva: (regraId: string, ativa: boolean) => Promise<void>;
   /** Fecha o vínculo vigente do cobrador (se houver) e abre um novo com o gestor informado. Só gestor. */
   vincularCobradorAGerente: (
     managerId: string,
@@ -411,6 +426,8 @@ export interface CollectionContextType {
   ) => Promise<void>;
   /** Fecha o vínculo vigente do cobrador, sem abrir um novo. Só gestor. */
   desvincularCobrador: (collectorId: string) => Promise<void>;
+  /** Encerra UMA regra da carteira (vigente_ate = hoje). Só gestor. */
+  encerrarRegraCarteira: (regraId: string) => Promise<void>;
   refreshData: () => Promise<void>;
   refreshCollections: () => Promise<void>;
   updateCollection: (id: number, updates: Partial<Collection>) => Promise<void>;

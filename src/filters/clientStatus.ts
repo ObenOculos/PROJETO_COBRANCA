@@ -175,3 +175,29 @@ export const clientMaxOverdueDays = (
   });
   return maxAtraso;
 };
+
+/**
+ * Loja de referencia do cliente para as regras da carteira: a da parcela em
+ * aberto mais antiga (menor vencimento) -- a mesma parcela que define o
+ * atraso. Empate pelo nome da loja. Espelho em SQL:
+ * cliente_loja_referencia (migration 20261106000008).
+ */
+export const clientReferenceStore = (
+  group: Pick<ClientGroup, "sales">,
+): string | null => {
+  let best: { venc: string; loja: string } | null = null;
+  group.sales?.forEach((sale) => {
+    sale.installments?.forEach((inst) => {
+      if (!hasInstallmentBalance(inst) || !inst.nome_da_loja) return;
+      const venc = inst.data_vencimento ?? "9999-12-31";
+      if (
+        !best ||
+        venc < best.venc ||
+        (venc === best.venc && inst.nome_da_loja < best.loja)
+      ) {
+        best = { venc, loja: inst.nome_da_loja };
+      }
+    });
+  });
+  return (best as { venc: string; loja: string } | null)?.loja ?? null;
+};

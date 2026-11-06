@@ -666,6 +666,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           collectorId: row.collector_id,
           minDias: row.min_dias,
           maxDias: row.max_dias,
+          lojas: row.lojas ?? null,
+          ativa: row.ativa ?? true,
           vigenteDesde: row.vigente_desde,
           vigenteAte: row.vigente_ate,
         })),
@@ -703,25 +705,53 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   }, [isOnline]);
 
-  // Fecha a faixa vigente do cobrador (se houver) e abre uma nova -- mesma
-  // RPC atomica do banco (migration 20261103000004), nunca dois passos
-  // separados (UPDATE+INSERT) pelo client.
-  const definirFaixaAtrasoCobrador = async (
+  // Cria/edita UMA regra da carteira (faixa x lojas) -- RPC atomica que
+  // encerra a versao anterior e recusa sobreposicao (migration
+  // 20261106000008). Erro do banco sobe com a mensagem de conflito.
+  const salvarRegraCarteira = async (
+    regraId: string | null,
     collectorId: string,
     minDias: number,
     maxDias: number | null,
+    lojas: string[] | null,
+    ativa = true,
   ) => {
+    const { error: rpcError } = await supabase.rpc("salvar_regra_carteira", {
+      p_regra_id: regraId,
+      p_collector_id: collectorId,
+      p_min_dias: minDias,
+      p_max_dias: maxDias,
+      p_lojas: lojas && lojas.length > 0 ? lojas : null,
+      p_ativa: ativa,
+    });
+    if (rpcError) {
+      console.error("Erro ao salvar regra da carteira:", rpcError);
+      throw new Error(rpcError.message);
+    }
+    await fetchCollectorOverdueRanges();
+  };
+
+  // Liga/desliga UMA regra (nova versao; migration 20261106000009).
+  const definirRegraCarteiraAtiva = async (regraId: string, ativa: boolean) => {
     const { error: rpcError } = await supabase.rpc(
-      "definir_faixa_atraso_cobrador",
-      {
-        p_collector_id: collectorId,
-        p_min_dias: minDias,
-        p_max_dias: maxDias,
-      },
+      "definir_regra_carteira_ativa",
+      { p_regra_id: regraId, p_ativa: ativa },
     );
     if (rpcError) {
-      console.error("Erro ao definir faixa de atraso:", rpcError);
-      throw rpcError;
+      console.error("Erro ao ativar/desativar regra:", rpcError);
+      throw new Error(rpcError.message);
+    }
+    await fetchCollectorOverdueRanges();
+  };
+
+  // Encerra UMA regra (vigente_ate = hoje), sem apagar historico.
+  const encerrarRegraCarteira = async (regraId: string) => {
+    const { error: rpcError } = await supabase.rpc("encerrar_regra_carteira", {
+      p_regra_id: regraId,
+    });
+    if (rpcError) {
+      console.error("Erro ao remover regra da carteira:", rpcError);
+      throw new Error(rpcError.message);
     }
     await fetchCollectorOverdueRanges();
   };
@@ -4936,9 +4966,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     fetchAllowedVisitDates,
     fetchCollectorOverdueRanges,
     fetchManagerCollectorLinks,
-    definirFaixaAtrasoCobrador,
+    salvarRegraCarteira,
+    definirRegraCarteiraAtiva,
     vincularCobradorAGerente,
     desvincularCobrador,
+    encerrarRegraCarteira,
     refreshData,
     refreshCollections,
     updateCollection,

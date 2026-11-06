@@ -920,7 +920,9 @@ export type Database = {
           collector_id: string;
           created_at: string;
           created_by: string | null;
+          ativa: boolean;
           id: string;
+          lojas: string[] | null;
           max_dias: number | null;
           min_dias: number;
           vigente_ate: string | null;
@@ -930,7 +932,9 @@ export type Database = {
           collector_id: string;
           created_at?: string;
           created_by?: string | null;
+          ativa?: boolean;
           id?: string;
+          lojas?: string[] | null;
           max_dias?: number | null;
           min_dias: number;
           vigente_ate?: string | null;
@@ -940,7 +944,9 @@ export type Database = {
           collector_id?: string;
           created_at?: string;
           created_by?: string | null;
+          ativa?: boolean;
           id?: string;
+          lojas?: string[] | null;
           max_dias?: number | null;
           min_dias?: number;
           vigente_ate?: string | null;
@@ -1840,18 +1846,26 @@ export type Database = {
           isSetofReturn: false;
         };
       };
-      definir_faixa_atraso_cobrador: {
+      // Migration 20261106000008: varias regras por cobrador.
+      salvar_regra_carteira: {
         Args: {
+          // NULL = regra nova; senao encerra esta e abre a versao nova.
+          p_regra_id: string | null;
           p_collector_id: string;
           // Ajuste manual apos `supabase gen types`: NULL = faixa sem teto.
           p_max_dias: number | null;
           p_min_dias: number;
+          // NULL = todas as lojas.
+          p_lojas?: string[] | null;
+          p_ativa?: boolean;
         };
         Returns: {
+          ativa: boolean;
           collector_id: string;
           created_at: string;
           created_by: string | null;
           id: string;
+          lojas: string[] | null;
           max_dias: number | null;
           min_dias: number;
           vigente_ate: string | null;
@@ -1868,15 +1882,28 @@ export type Database = {
         Args: { p_collector_id: string };
         Returns: undefined;
       };
-      distribuir_clientes_cobradores: {
-        Args: never;
-        Returns: {
-          clientes_atribuidos: number;
-          cobrador_id: string;
-          cobrador_nome: string;
-        }[];
+      definir_regra_carteira_ativa: {
+        Args: { p_regra_id: string; p_ativa: boolean };
+        Returns: Json;
       };
-      executar_saida_carteira_fora_da_faixa: { Args: never; Returns: number };
+      encerrar_regra_carteira: {
+        Args: { p_regra_id: string };
+        Returns: undefined;
+      };
+      // Migration 20261106000007 (resultado em jsonb, formato em
+      // src/components/dashboard/CarteiraDistribuicao.tsx).
+      distribuicao_carteira_previa: {
+        Args: { p_perfis: Json };
+        Returns: Json;
+      };
+      aplicar_distribuicao_carteira: {
+        Args: { p_perfis: Json };
+        Returns: Json;
+      };
+      lojas_carteira: {
+        Args: never;
+        Returns: { loja: string; clientes_em_aberto: number }[];
+      };
       liberar_cliente_da_carteira: {
         Args: {
           p_documento: string;

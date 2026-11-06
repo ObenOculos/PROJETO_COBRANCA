@@ -32,7 +32,8 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 21 | Jurídico (`legal_collector`) é 100% idêntico a Interno/Terceirizado — zero modelagem de processo/protesto/prazo legal | A avaliar com o negócio | A analisar |
 | 22 | Sem tela de histórico de cancelamento de acordo e de agendamento/contato — só "Histórico de Contatos" (`collection_attempts`) aparece em "Ver Dados" | Baixa/Média | Pequeno/médio |
 | 23 | `AcordoModal` (parcelas) não bloqueia de verdade data anterior a hoje — só `min` do `<input type="date">`, sem validação no "Continuar" | Baixa | Pequeno |
-| 24 | Registrar contato + Reagendar viram um botão só (RPC `registrar_contato`) — aplicado e testado ao vivo 2026-11-06, falta push do front | Média | Médio |
+| 24 | Registrar contato + Reagendar + Agendar viram um botão só, "Atender" (RPC `registrar_contato`; modal em 2 etapas em 2026-11-06) — RPC testada ao vivo, falta testar o modal de 2 etapas e push do front | Média | Médio |
+| 25 | Distribuição da carteira por regra (faixas × lojas, várias por cobrador, ativa/pausada) — migrations 6–10 aplicadas; regras da Monalisa e do José cadastradas e 1ª distribuição aplicada em 2026-11-06 | Alta | Grande |
 
 ## Perguntas em aberto para o financeiro
 
@@ -83,6 +84,77 @@ pagas ficam baixadas e as a vencer ficam em aberto correndo juros 7")
 13. Depois do lançamento, o cliente paga **os boletos gerados no Ciclone**
     (e o app só acompanha), ou o cobrador também registra pagamento no app?
 
+### Item 25 — Distribuição da carteira por regra — 2026-11-06
+
+Pedido do usuário: a faixa no cadastro de Usuários não fazia sentido sozinha
+(só alimentava "Clientes urgentes" e o painel do Resumo; nada entregava
+cliente a ninguém). Ideia dele: "José: 1 a 60 nas lojas X e Y; outro: 61 a
+120 na loja Z", centralizado. Crítica feita e recomendações aceitas ("faça
+logo, aplicando as melhores propostas"):
+- **Regra = faixa (inclusiva) + lojas** por cobrador, 1 vigente por cobrador
+  (`collector_overdue_ranges.lojas`, NULL = todas). Teto passou de exclusivo
+  para **inclusivo** ("1 a 60" cobre o dia 60): `faixa_cobre_cliente` no banco
+  e `faixaCobreAtraso`/`diasAteSairDaFaixa` em `filters/priority.ts`;
+  `clientes_fora_da_faixa` ajustada (corpo copiado de produção).
+- **Tela nova "Distribuição"** (`CarteiraDistribuicao.tsx`, menu do gestor):
+  regras editáveis por linha; cobertura por loja (barras, buracos "sem
+  cobertura", trechos "divididos"); **simular** (`distribuicao_carteira_previa`,
+  só leitura) e **aplicar** (`aplicar_distribuicao_carteira`, confirmação em 2
+  cliques, recalcula o plano no servidor, motivo `distribuicao_regra` no
+  histórico de atribuições).
+- Plano (`plano_distribuicao_carteira`, interna): só mexe em cliente sem
+  cobrador ou cujo cobrador tem regra que não o cobre mais; cobrador sem regra
+  = carteira manual intocada. Sobreposição divide pela carga (quem tem menos
+  clientes em aberto recebe). Loja do cliente = loja do título em aberto mais
+  atrasado. Fora: Falecido; "Aguardando <perfil>" só vai para aquele perfil.
+  Acordo/agendamento ativo travam. Regra de situação vem de
+  `config/profiles.distribuicaoPerfisPayload` (não duplicada no SQL).
+- `distribuir_clientes_cobradores()` (legada, qualquer logado executava,
+  distribuía tudo para `collector` inclusive inativos, sem auditoria) **removida**.
+- Usuários refeita: valores visíveis por linha (faixa+lojas → abre
+  Distribuição; gestor; meta do mês), busca, filtro por perfil, inativos
+  ocultos, ações visíveis, dark mode. "Faixa & Equipe" virou só gestor.
+  `encerrar_faixa_atraso_cobrador` (migration 6) permite remover a regra.
+- **Testado em transação desfeita (ROLLBACK) em produção** com as regras de
+  hoje (Francisco 1–60, José 3–948): ~4 s; 1.769 entram, 323 trocam, 309
+  ficam sem cobrador, 71 travados por agendamento, 1.286 sem regra. Nada
+  gravado (coluna `lojas` conferida inexistente depois).
+- **Revisão (mesmo dia), migration `20261106000008`**: comparando com o Cedrus
+  (a mesma cobradora com "3 a 60" e "366 a 948" nas mesmas lojas), o usuário
+  pediu **várias regras por cobrador**, **sem dois cobradores na mesma faixa
+  e loja**, e lembrou que o cliente sem tratamento migra entre cobradores e
+  volta a ficar sem ninguém se sair da faixa de todos; atraso sempre pela
+  **parcela vencida mais antiga** (loja = a dessa parcela). Feito: sai o índice
+  de 1 regra vigente; `salvar_regra_carteira` (cria/edita uma regra, recusa
+  sobreposição com mensagem "Conflito com a regra de X…", `LOCK` contra
+  corrida) e `encerrar_regra_carteira` substituem definir/encerrar por
+  cobrador; `cliente_loja_referencia` (SQL) e `clientReferenceStore` (TS);
+  plano e `clientes_fora_da_faixa` consideram qualquer regra do cobrador;
+  `executar_saida_carteira_fora_da_faixa` removida; Clientes urgentes emendam
+  regras contíguas do mesmo cobrador (`diasAteSairDasRegras`); tela com
+  "+ Adicionar faixa" por cobrador e "Conflito" em vermelho na cobertura.
+  Testado em transação desfeita como gestor: 2ª faixa da Monalisa aceita,
+  José 30–90 em Crateús recusado, José 61–365 (vizinha) aceito, plano ok.
+  Obs.: as 2 regras de teste (Francisco, José) foram encerradas pelo usuário
+  na tela; nenhuma distribuição aplicada ainda.
+- **Ativa/pausada e saída pelo teto (migrations `0009`/`0010`)**: regra tem
+  `ativa` (como a coluna "Ativo" do Cedrus). Decisões do usuário após ver a
+  simulação: inativa = **pausada** (não entrega cliente novo, mas o cobrador
+  mantém os que já tem nela); cliente **abaixo da primeira faixa** do cobrador
+  na loja fica com ele (atraso só cai quando paga — sem vai-e-vem); cliente no
+  **buraco entre faixas** do mesmo cobrador sai. Conflito só entre regras
+  ativas (rechecado ao ativar, `definir_regra_carteira_ativa`).
+- **Aplicado em produção 2026-11-06 19:12 UTC** (gestor Erick, pedido explícito
+  do usuário): regras do Cedrus — Monalisa 3–60 ativa (Crateus, Crateus Ext,
+  Novo Oriente) e 366–948 pausada (+ Independencia); José 3–60 e 61–90 ativas,
+  91–365 e 366–948 pausadas (Focco Brasil). Resultado: 71 entraram na Monalisa
+  (situação "Cobrança Interna"), 310 saíram dela para sem cobrador (204 no
+  buraco 61–365, 72 acima de 948, 34 de lojas fora das regras dela); José sem
+  mudança. Ressimulação depois: 0 movimentos. Monalisa ficou com 845 clientes.
+- Pendente: teste ao vivo de Usuários e do "Atender" (item 24); automação diária (fase 2) não feita;
+  automação diária (fase 2) não feita de propósito; "Clientes urgentes" e
+  o painel do Resumo seguem só por dias (sem loja).
+
 ### Item 24 — "Registrar contato" unificado (cobrador de carteira) — 2026-11-06
 
 Pedido do usuário: "Registrar Interação" e "Reagendar" eram dois botões de um
@@ -127,6 +199,25 @@ aberto). Registros de teste apagados depois, a pedido do usuário (cliente
 voltou a sem cobrador/sem situação).
 Observação: registrar ANTES do dia agendado sugere "amanhã", que pode ser a
 mesma data do agendamento atual (remarcação para o mesmo dia).
+
+**Revisão, mesmo dia — "Atender" em 2 etapas** (pedido do usuário: "Registrar
+contato" e "Agendar contato" faziam a mesma pergunta — quando falo com ele de
+novo — em dois botões). Só tela, sem migration; cada caminho chama o mesmo de antes:
+- Botão único **"Atender"** na linha da carteira (o de agendar sumiu;
+  `ScheduleContactModal` removido). **Cancelar agendamento continua botão
+  próprio** (ação diferente, com motivo).
+- Etapa 1 "O que aconteceu": **Fiz o contato** (resultado/observação/promessa)
+  ou **Não fiz contato** (com agendamento: motivo da remarcação; sem: só
+  agenda). Etapa 2 "Próximo contato" **obrigatória**: canal/data/hora
+  sugeridos, observação quando nasce agendamento novo, e checkbox "Não agendar
+  próximo contato" (antes, data vazia = sem próximo implícito; agora a escolha
+  é explícita). Resultado SPC salva direto da etapa 1.
+- Caminhos: fiz contato → `registrar_contato`; não fiz com agendamento →
+  `rescheduleVisit` (canal fixo, igual ao "só remarcar"); não fiz sem
+  agendamento → `scheduleVisit` (igual ao antigo Agendar). A observação do
+  agendamento de acompanhamento vai anexada em `p_notas_proximo`.
+- Trava de 400 ms no submit ao entrar na etapa 2 (ghost click, mesmo caso do
+  `AcordoModal`). Não testado ao vivo ainda.
 
 ### Item 23 — validar data de parcela não pode ser anterior a hoje — 2026-11-04
 
@@ -1038,6 +1129,16 @@ com o sistema no ar, não reconstruir do zero):**
   (`cancelar_vendas`, `process_payment`, etc.) continuam confiando em
   `p_usuario_id`/`p_collector_id` vindo do cliente sem checagem no servidor —
   só fica seguro de verdade na Etapa 2, com `auth.uid()`.
+- **Passo 4 (remover `users.password`), 2026-11-06**: tinha ficado pendente.
+  Achado ao provisionar 4 usuários novos: 15 dos 19 usuários ainda tinham a
+  senha em texto puro na coluna (a mesma do login atual) e a política
+  `authenticated_full_access` deixava qualquer logado ler. Migration
+  `20261106000005_remove_users_password.sql` (`drop column`, aplicada e conferida 2026-11-06); nenhuma função
+  ou view dependia dela (conferido via Management API). Tipos ajustados e
+  `scripts/migrate-users-to-auth.mjs` marcado obsoleto (sai com erro).
+  Usuário novo: criar conta no Auth à mão e preencher
+  `auth_user_id`/`auth_email` (SQL usado em 2026-11-06 para Jonathan,
+  Vanessa, Aline Freitas e Aline, senha inicial comum — trocar depois).
 
 **Concluído (2026-10-27/28) — Etapa 2a (RLS/privilégios), passo 2 da
 reorganização:**

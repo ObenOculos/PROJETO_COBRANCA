@@ -168,6 +168,25 @@ export const ALL_SITUACOES: readonly string[] = [
   ]),
 ];
 
+/**
+ * Parametro p_perfis das RPCs de distribuicao da carteira por regra
+ * (distribuicao_carteira_previa / aplicar_distribuicao_carteira, migration
+ * 20261106000007): a regra de situacao na atribuicao sai DAQUI (mesma de
+ * assignmentSituacaoRule), o banco nao reescreve a lista.
+ */
+export function distribuicaoPerfisPayload() {
+  const perfis: Record<string, { confirmar: string; manter: string[] }> = {};
+  (Object.keys(PRIMARY_SITUACAO) as Exclude<UserType, "manager">[]).forEach(
+    (type) => {
+      perfis[type] = {
+        confirmar: PRIMARY_SITUACAO[type],
+        manter: [...SITUACAO_BY_PROFILE[type]],
+      };
+    },
+  );
+  return { perfis, encerramento: [...ENCERRAMENTO_SITUACOES] };
+}
+
 /** All situacoes that exist outside the given profile's domain. */
 export function situacoesOutsideProfile(
   userType: Exclude<UserType, "manager">,

@@ -12,6 +12,7 @@ import {
   CloudUpload,
   FileSignature,
   PhoneCall,
+  Shuffle,
   LucideIcon,
 } from "lucide-react";
 
@@ -79,6 +80,12 @@ export const navigationItems: NavItemConfig[] = [
     id: "collectors-summary",
     managerName: "Resumo",
     managerIcon: ClipboardList,
+    roles: ["manager"],
+  },
+  {
+    id: "carteira-distribuicao",
+    managerName: "Distribuição",
+    managerIcon: Shuffle,
     roles: ["manager"],
   },
   {

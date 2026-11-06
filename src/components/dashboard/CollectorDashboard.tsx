@@ -34,7 +34,6 @@ import {
   EyeOff,
   AlertTriangle,
   CalendarClock,
-  CalendarPlus,
   CalendarX,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
@@ -53,11 +52,13 @@ import {
   hasOpenBalance,
   hasInstallmentBalance,
   clientMaxOverdueDays,
+  clientReferenceStore,
 } from "../../filters/clientStatus";
 import {
   priorityBucket,
   PRIORITY_COLOR_CLASSES,
   URGENTE_SAIDA_CARTEIRA_DIAS,
+  diasAteSairDasRegras,
 } from "../../filters/priority";
 import {
   SEM_CONTATO_DIAS,
@@ -65,7 +66,6 @@ import {
 } from "../../config/collectionAttempts";
 
 import LogContactModal from "./LogContactModal";
-import ScheduleContactModal from "./ScheduleContactModal";
 import CancelContactModal from "./CancelContactModal";
 import ContactScheduler from "./ContactScheduler";
 import ClientDetailModal from "./ClientDetailModal";
@@ -253,7 +253,6 @@ interface InternalCollectorWalletProps {
   onOpenLog: (client: any) => void;
   onOpenDetail: (client: any) => void;
   onOpenAcordo: (client: ClientGroup) => void;
-  onScheduleContact: (client: ClientGroup) => void;
   onCancelContact: (visit: ScheduledVisit) => void;
 }
 
@@ -265,7 +264,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   onOpenLog,
   onOpenDetail,
   onOpenAcordo,
-  onScheduleContact,
   onCancelContact,
 }) => {
   const {
@@ -505,13 +503,17 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return openClientGroups.filter((g) => matchedDocs.has(g.document));
   }, [openClientGroups, walletFiltersParaFiltragem, getFilteredCollections, user]);
 
-  // Faixa de atraso vigente DESTE cobrador (ver collector_overdue_ranges,
-  // cadastrada em Usuarios > Faixa & Equipe). Sem faixa cadastrada, ou faixa
-  // sem limite superior (maxDias null), a secao "Clientes urgentes" nao
-  // aparece -- nao ha "perto de sair" sem um teto definido.
-  const minhaFaixaAtraso = collectorOverdueRanges.find(
-    (r) => r.collectorId === user?.id,
+  // Regras vigentes DESTE cobrador (faixa x lojas, pode haver varias -- ver
+  // collector_overdue_ranges, cadastradas em Distribuicao da carteira). Sem
+  // regra com teto, "Clientes urgentes" fica vazia -- nao ha "perto de sair"
+  // sem um limite definido.
+  const minhasRegras = useMemo(
+    // Pausada (inativa) tambem conta: ela segura os clientes que o cobrador
+    // ja tem (migration 20261106000010), so nao entrega clientes novos.
+    () => collectorOverdueRanges.filter((r) => r.collectorId === user?.id),
+    [collectorOverdueRanges, user?.id],
   );
+  const temRegraComTeto = minhasRegras.some((r) => r.maxDias != null);
 
   // Clientes urgentes: dentro da MINHA faixa mas a poucos dias do teto dela
   // (URGENTE_SAIDA_CARTEIRA_DIAS). "Sem nenhuma acao" reusa lastContacts
@@ -520,16 +522,19 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // tentativa registrada, exatamente o que o pedido original definiu.
   const { urgentes, urgenteInfoByDocument } = useMemo(() => {
     const info = new Map<string, { diasRestantes: number; semAcao: boolean }>();
-    if (!minhaFaixaAtraso || minhaFaixaAtraso.maxDias == null) {
+    if (!temRegraComTeto) {
       return { urgentes: [] as ClientGroup[], urgenteInfoByDocument: info };
     }
-    const maxDias = minhaFaixaAtraso.maxDias;
     const ranked: { group: ClientGroup; diasRestantes: number }[] = [];
     walletFilteredGroups.forEach((group) => {
       const atraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
-      if (atraso < minhaFaixaAtraso.minDias || atraso >= maxDias) return;
-      const diasRestantes = maxDias - atraso;
-      if (diasRestantes > URGENTE_SAIDA_CARTEIRA_DIAS) return;
+      const diasRestantes = diasAteSairDasRegras(
+        minhasRegras,
+        atraso,
+        clientReferenceStore(group),
+      );
+      if (diasRestantes == null || diasRestantes > URGENTE_SAIDA_CARTEIRA_DIAS)
+        return;
       info.set(group.document, {
         diasRestantes,
         semAcao: !lastContacts[group.document],
@@ -541,7 +546,13 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       urgentes: ranked.map((r) => r.group),
       urgenteInfoByDocument: info,
     };
-  }, [walletFilteredGroups, minhaFaixaAtraso, lastContacts, acordoAtivoOverdueMap]);
+  }, [
+    walletFilteredGroups,
+    minhasRegras,
+    temRegraComTeto,
+    lastContacts,
+    acordoAtivoOverdueMap,
+  ]);
 
   // Ordenacao clicavel no cabecalho, compartilhada pela Carteira completa e
   // pelas categorias da Agenda (mesmas colunas, mesmo header -- ver
@@ -649,7 +660,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     };
 
     // Maior precedencia: o cobrador se comprometeu com uma data/hora pra
-    // este contato (ScheduleContactModal), diferente de promessa (compromisso
+    // este contato (LogContactModal, "Atender"), diferente de promessa (compromisso
     // do CLIENTE) -- so entra aqui quando chegou o dia ou passou.
     sortedWalletFilteredGroups.forEach((group) => {
       const contato = scheduledContactByDocument.get(group.document);
@@ -778,7 +789,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         accentBorderClass: "border-l-pink-400 dark:border-l-pink-600",
         groups: urgentes,
         emptyMessage:
-          minhaFaixaAtraso && minhaFaixaAtraso.maxDias != null
+          temRegraComTeto
             ? "Nenhum cliente perto de sair da sua faixa de atraso."
             : "Sua faixa de atraso ainda não foi configurada pelo gestor.",
       },
@@ -833,7 +844,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       promessas,
       acordosQuebrados,
       urgentes,
-      minhaFaixaAtraso,
+      temRegraComTeto,
       criticos,
       alertas,
       medios,
@@ -1195,7 +1206,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             onSort={toggleSort}
             urgenteInfoByDocument={urgenteInfoByDocument}
             scheduledContactByDocument={scheduledContactByDocument}
-            onScheduleContact={onScheduleContact}
             onCancelContact={onCancelContact}
           />
         </>
@@ -1230,7 +1240,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                       onOpenAcordo={onOpenAcordo}
                       urgenteInfo={urgenteInfoByDocument.get(group.document)}
                       scheduledContact={scheduledContactByDocument.get(group.document)}
-                      onScheduleContact={onScheduleContact}
                       onCancelContact={onCancelContact}
                     />
                   ))
@@ -1328,7 +1337,6 @@ interface ClientQueueRowProps {
   urgenteInfo?: { diasRestantes: number; semAcao: boolean };
   /** Contato (ligacao/whatsapp) agendado em aberto deste cliente, se houver. */
   scheduledContact?: ScheduledVisit;
-  onScheduleContact: (client: ClientGroup) => void;
   onCancelContact: (visit: ScheduledVisit) => void;
 }
 
@@ -1348,7 +1356,6 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   onOpenAcordo,
   urgenteInfo,
   scheduledContact,
-  onScheduleContact,
   onCancelContact,
 }) => {
   const { acordoAtivoOverdueMap } = useCollection();
@@ -1533,11 +1540,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               onOpenLog(group);
             }}
             className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100"
-            title={
-              scheduledContact
-                ? "Registrar contato / remarcar agendamento"
-                : "Registrar contato"
-            }
+            title="Atender (registrar contato / agendar próximo)"
           >
             <MessageSquare className="w-4 h-4" />
           </button>
@@ -1551,20 +1554,8 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           >
             <Handshake className="w-4 h-4" />
           </button>
-          {/* Com contato agendado, remarcar fica dentro do Registrar contato
-              (um botao so, LogContactModal); aqui so agendar quando nao ha. */}
-          {!scheduledContact && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onScheduleContact(group);
-              }}
-              className="p-2 bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white rounded-xl transition-all border border-purple-100"
-              title="Agendar contato"
-            >
-              <CalendarPlus className="w-4 h-4" />
-            </button>
-          )}
+          {/* Agendar/remarcar fica dentro do "Atender" (LogContactModal, etapa
+              2); cancelar continua aqui, e uma acao a parte com motivo. */}
           {scheduledContact && (
             <button
               onClick={(e) => {
@@ -1657,7 +1648,6 @@ interface AgendaSectionProps {
   onSort: (key: WalletSortKey) => void;
   urgenteInfoByDocument: Map<string, { diasRestantes: number; semAcao: boolean }>;
   scheduledContactByDocument: Map<string, ScheduledVisit>;
-  onScheduleContact: (client: ClientGroup) => void;
   onCancelContact: (visit: ScheduledVisit) => void;
 }
 
@@ -1683,7 +1673,6 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   onSort,
   urgenteInfoByDocument,
   scheduledContactByDocument,
-  onScheduleContact,
   onCancelContact,
 }) => {
   const [page, setPage] = useState(1);
@@ -1729,7 +1718,6 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
                 onOpenAcordo={onOpenAcordo}
                 urgenteInfo={urgenteInfoByDocument.get(group.document)}
                 scheduledContact={scheduledContactByDocument.get(group.document)}
-                onScheduleContact={onScheduleContact}
                 onCancelContact={onCancelContact}
               />
             ))}
@@ -1852,10 +1840,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   const [selectedAcordoId, setSelectedAcordoId] = useState<string | null>(
     null,
   );
-  // Agendamento de contato (ligacao/whatsapp) do cobrador de carteira --
-  // equivalente ao agendamento de visita do externo, ver ScheduleContactModal.
-  const [scheduleContactClient, setScheduleContactClient] =
-    useState<ClientGroup | null>(null);
   // Cancelamento direto (sem aprovacao) de um contato agendado -- item 16,
   // docs/PROGRESSO.md. Visita presencial usa outro fluxo (com aprovacao do
   // gestor, ver requestVisitCancellation/VisitScheduler).
@@ -2629,7 +2613,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             setIsAcordoModalOpen(true);
           }
         }}
-        onScheduleContact={setScheduleContactClient}
         onCancelContact={setCancelContactVisit}
       />
     );
@@ -3102,14 +3085,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             setSelectedClientForLog(null);
             // Opcional: recarregar dados ou mostrar notificação
           }}
-        />
-      )}
-
-      {scheduleContactClient && (
-        <ScheduleContactModal
-          client={scheduleContactClient}
-          onClose={() => setScheduleContactClient(null)}
-          onSuccess={() => setScheduleContactClient(null)}
         />
       )}
 

@@ -226,7 +226,7 @@ const AllowedVisitDatesManager: React.FC = () => {
   // Lista de cobradores -- so Externo (`collector`): e o unico perfil cuja
   // tela de agendamento (VisitScheduler/getNextAllowedVisitDate) de fato le
   // allowed_visit_dates. Carteira (interno/terceirizado/juridico) agenda
-  // contato por ScheduleContactModal/ContactScheduler, que nunca consulta
+  // contato por LogContactModal ("Atender")/ContactScheduler, que nunca consulta
   // essa tabela -- configurar data permitida pra eles e config morta, sem
   // nenhum aviso (item 18, docs/PROGRESSO.md). Confirmado em produção
   // (2026-11-04) que as 93 linhas existentes sao todas de `collector`.
