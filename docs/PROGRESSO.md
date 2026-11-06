@@ -37,6 +37,13 @@ uma etapa (mova o item para "Concluído", com data e commit).
 
 Lista viva: o usuário leva ao financeiro (Márcia) e traz as respostas. Ao
 responder, mover a resposta para a seção do assunto e riscar aqui.
+**Versão com um exemplo real do Ciclone por pergunta** (nomes de clientes e
+valores — por isso fora deste repositório):
+`Projetos_Dev/Ciclone/Esquema_SQL/saidas/perguntas_financeiro_2026-11-06.md`.
+Já respondido pelos dados: na 10, cartão e BLU não duplicam (o título novo
+fica no nome da operadora, que o sync ignora) — só o cheque fica em aberto;
+na 12, a entrada é a parcela 1 dos títulos novos, baixada por Pix no mesmo
+dia numa baixa separada (183 de 207) — só confirmar.
 
 **Quebra do acordo** (mensagem do financeiro em 2026-11-06: "as parcelas
 pagas ficam baixadas e as a vencer ficam em aberto correndo juros 7")
