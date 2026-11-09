@@ -35,7 +35,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 24 | Registrar contato + Reagendar + Agendar viram um botão só, "Atender" (RPC `registrar_contato`; modal em 2 etapas em 2026-11-06) — RPC testada ao vivo; front publicado (push 2026-11-09), falta testar o modal de 2 etapas | Média | Médio |
 | 25 | Distribuição da carteira por regra (faixas × lojas, várias por cobrador, ativa/pausada) — migrations 6–10 aplicadas; regras da Monalisa e do José cadastradas e 1ª distribuição aplicada em 2026-11-06 | Alta | Grande |
 | 26 | Razão social + contato/vendedor/região do Ciclone no cadastro do cliente — migration, sync e front no ar (2026-11-06); gestor testado na tela e cobrador/Termo conferidos por código+dados; "Atender" e agenda de contato com razão social/"Falar com" (`cf68ed7`); publicado (push 2026-11-09) — falta ver o PDF do Termo; telefone do ERP no card e saudação do WhatsApp a decidir | Média | Pequeno/médio |
-| 27 | ~~Detalhes do Cliente: parcela paga/atrasada decidida pelo texto do status ("recebido" do Ciclone aparecia atrasado)~~ — `15e780a`, publicado 2026-11-09, falta teste na tela | Alta | Pequeno |
+| 27 | ~~Detalhes do Cliente: parcela paga/atrasada decidida pelo texto do status ("recebido" do Ciclone aparecia atrasado)~~ — `15e780a`, publicado e testado no site 2026-11-09 | Alta | Pequeno |
 | 28 | ~~Busca por CPF/CNPJ exigia a máscara~~ — `f756638`, publicado 2026-11-09 (histórico de Autorizações, busca no servidor, ficou de fora) | Baixa | Pequeno |
 
 ## Perguntas em aberto para o financeiro
