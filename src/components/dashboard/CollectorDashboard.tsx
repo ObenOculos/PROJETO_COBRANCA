@@ -52,8 +52,10 @@ import {
   hasOpenBalance,
   hasInstallmentBalance,
   clientMaxOverdueDays,
+  clientOverdueAmount,
   clientReferenceStore,
 } from "../../filters/clientStatus";
+import { abrirWhatsApp } from "../../utils/whatsapp";
 import {
   priorityBucket,
   PRIORITY_COLOR_CLASSES,
@@ -1300,16 +1302,24 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   );
 };
 
-const handleWhatsApp = (client: any, user: any, formatCurrency: any) => {
-  const phone = (client.mobile || client.phone || "").replace(/\D/g, "");
+const handleWhatsApp = (
+  client: Pick<ClientGroup, "client" | "mobile" | "phone">,
+  user: { name?: string } | null | undefined,
+  valorEmAtraso: number,
+) => {
+  const phone = client.mobile || client.phone || "";
   // Botao fica desabilitado quando o cliente nao tem telefone (ver render
-  // acima); chegar aqui sem numero so aconteceria por um onClick direto,
-  // entao so ignora em vez de interromper com um dialog nativo.
-  if (!phone) return;
-  const message = encodeURIComponent(
-    `Olá ${client.client}, sou o ${user?.name} do setor de cobrança. Gostaria de falar sobre sua pendência de ${formatCurrency(client.pendingValue)}. Podemos conversar?`,
+  // acima); sem numero, abrirWhatsApp so ignora -- sem dialog nativo.
+  // Valor da mensagem = so o que ja venceu (clientOverdueAmount), nao o
+  // total em aberto com parcelas a vencer.
+  const assunto =
+    valorEmAtraso > 0.01
+      ? `sua pendência em atraso de ${formatCurrency(valorEmAtraso)}`
+      : "suas parcelas em aberto";
+  abrirWhatsApp(
+    phone,
+    `Olá ${client.client}, sou o ${user?.name} do setor de cobrança. Gostaria de falar sobre ${assunto}. Podemos conversar?`,
   );
-  window.open(`https://wa.me/55${phone}?text=${message}`, "_blank");
 };
 
 const handleCall = (client: Pick<ClientGroup, "mobile" | "phone">) => {
@@ -1543,7 +1553,11 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleWhatsApp(group, user, formatCurrency);
+              handleWhatsApp(
+                group,
+                user,
+                clientOverdueAmount(group, acordoAtivoOverdueMap),
+              );
             }}
             disabled={!(group.mobile || group.phone)}
             title={group.mobile || group.phone ? "Chamar no WhatsApp" : "Cliente sem telefone"}

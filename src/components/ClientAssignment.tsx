@@ -32,6 +32,7 @@ import { countVendas, resolveSaleKey } from "../filters/sales";
 import { getClientPending } from "../filters/clientStatus";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { razaoSocialDistinta } from "../utils/clienteNome";
+import { abrirWhatsApp } from "../utils/whatsapp";
 import { parseAndNormalizeDate } from "../filters/dates";
 import { clientMatchesFilters, ClientFilters } from "../filters/predicates";
 import { computeClientFacets } from "../filters/facets";
@@ -1997,15 +1998,14 @@ export const ClientAssignment = React.memo(
                                   >
                                     <Copy className="h-3 w-3" />
                                   </button>
-                                  <a
-                                    href={`https://wa.me/55${phoneNumber.replace(/\D/g, "")}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirWhatsApp(phoneNumber)}
                                     title="Conversar no WhatsApp"
                                     className="p-1 rounded bg-gray-50 hover:bg-green-50 text-gray-400 hover:text-green-600 dark:bg-dark-bg dark:hover:bg-green-900/30 dark:text-dark-text-secondary dark:hover:text-green-400 border border-gray-200 dark:border-dark-border transition-colors"
                                   >
                                     <Phone className="h-3 w-3" />
-                                  </a>
+                                  </button>
                                 </>
                               );
                             })()}

@@ -27,6 +27,7 @@ import {
   nomeJuridicoCliente,
   razaoSocialDistinta,
 } from "../../utils/clienteNome";
+import { abrirWhatsApp } from "../../utils/whatsapp";
 import {
   gerarTermoAcordoPdf,
   nomeArquivoTermoAcordo,
@@ -696,10 +697,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
       (pixCopiaECola
         ? `Pix para pagar a entrada (${formatCurrency(valorEntrada)}):\n${pixCopiaECola}`
         : `A entrada (${formatCurrency(valorEntrada)}) será combinada diretamente.`);
-    window.open(
-      `https://wa.me/55${phone}?text=${encodeURIComponent(mensagem)}`,
-      "_blank",
-    );
+    abrirWhatsApp(phone, mensagem);
   };
 
   return (

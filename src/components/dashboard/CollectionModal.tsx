@@ -21,6 +21,7 @@ import {
   getStatusLabel,
   getStatusColor,
 } from "../../utils/formatters";
+import { abrirWhatsApp } from "../../utils/whatsapp";
 import { Modal } from "../Modal";
 import TabTransition from "../common/TabTransition";
 import { todayLocalStr } from "../../config/visitStatus";
@@ -215,11 +216,6 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
       ? [{ id: "action", name: "Ações", icon: CheckCircle }]
       : []),
   ];
-
-  const formatWhatsApp = (num: string) => {
-    const clean = num.replace(/\D/g, "");
-    return `https://wa.me/55${clean}`;
-  };
 
   return (
     <Modal
@@ -435,10 +431,7 @@ const CollectionModal: React.FC<CollectionModalProps> = ({
                             <button
                               onClick={() =>
                                 collection.celular &&
-                                window.open(
-                                  formatWhatsApp(collection.celular),
-                                  "_blank",
-                                )
+                                abrirWhatsApp(collection.celular)
                               }
                               className="text-[10px] font-bold text-green-600"
                             >

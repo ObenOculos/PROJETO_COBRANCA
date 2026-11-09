@@ -37,6 +37,8 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 26 | Razão social + contato/vendedor/região do Ciclone no cadastro do cliente — migration, sync e front no ar (2026-11-06); gestor testado na tela e cobrador/Termo conferidos por código+dados; "Atender" e agenda de contato com razão social/"Falar com" (`cf68ed7`); publicado (push 2026-11-09) — falta ver o PDF do Termo; telefone do ERP no card e saudação do WhatsApp a decidir | Média | Pequeno/médio |
 | 27 | ~~Detalhes do Cliente: parcela paga/atrasada decidida pelo texto do status ("recebido" do Ciclone aparecia atrasado)~~ — `15e780a`, publicado e testado no site 2026-11-09 | Alta | Pequeno |
 | 28 | ~~Busca por CPF/CNPJ exigia a máscara~~ — `f756638`, publicado 2026-11-09 (histórico de Autorizações, busca no servidor, ficou de fora) | Baixa | Pequeno |
+| 31 | ~~Detalhes do Cliente: abas Todos / Em aberto / Pagos na lista de vendas~~ — 2026-11-09 | Média | Pequeno |
+| 32 | ~~WhatsApp: mensagem com o valor só em atraso + reaproveitar a mesma aba do WhatsApp Web no computador~~ — 2026-11-09 | Média | Pequeno |
 | 30 | "Distribuir Pagamento" dá 400 em venda do Ciclone com número > 2.147.483.647 (parâmetro/coluna `integer`; 562 clientes com saldo afetados) — migration `20261109000002` aplicada 2026-11-09, `check:db` OK; falta o usuário repetir o pagamento real | **Alta** | Pequeno |
 | 29 | Código do cliente do Ciclone (`pgcln_codigo`) no cadastro — migration `20261109000001` aplicada + `check:db` OK, sync rodado (1.888 clientes com código); falta publicar o front e testar na tela | Média | Pequeno |
 
@@ -105,6 +107,30 @@ parcelas recebidas do Ciclone verdes e sem atraso e "Maior atraso" igual ao
 card da carteira, "Atender" com razão social + "Falar com" e as 2 etapas
 (fechado sem gravar). Todos OK. Observação: cliente usado no teste do gestor
 não tinha cobrador (por isso não aparecia na carteira) — não é defeito.
+
+### Item 32 — WhatsApp: valor em atraso e aba única no computador — 2026-11-09
+
+- A mensagem do card citava `pendingValue` (total em aberto, com parcelas a
+  vencer). Agora cita só o vencido: regra nova `clientOverdueAmount`
+  (`filters/clientStatus`, mesmo recorte de `clientMaxOverdueDays`, ciente de
+  acordo ativo). Sem nada vencido: "suas parcelas em aberto", sem valor.
+- Pedido: "WhatsApp Web conectado dentro da plataforma". **Impossível
+  embutir**: o web.whatsapp.com bloqueia iframe (X-Frame-Options/CSP). Feito:
+  `src/utils/whatsapp.ts` (`abrirWhatsApp`) — no computador vai direto ao
+  `web.whatsapp.com/send` numa aba de nome fixo (`whatsapp_cobranca`),
+  reaproveitada a cada cliente (sem `noopener`, que faria o navegador ignorar
+  o nome; o vínculo é cortado com `opener = null`); no celular segue `wa.me`
+  (abre o app). Aplicado nos 4 pontos que montavam `wa.me` (card da carteira,
+  acordo, CollectionModal, Atribuição). WhatsApp de verdade dentro do app só
+  com a API oficial (WhatsApp Business) — projeto à parte, não avaliado.
+
+### Item 31 — Detalhes do Cliente: abas na lista de vendas — 2026-11-09
+
+Abas **Todos | Em aberto | Pagos** com contagem ("Em aberto" mostra quantas
+estão em atraso). Decisão do usuário: "Em aberto" (toda venda com saldo,
+mais atrasada primeiro) em vez de só "Em atraso", para venda só com parcela
+a vencer não sumir. Venda toda fora da cobrança só em "Todos". Abre em
+"Em aberto" quando há dívida.
 
 ### Item 30 — Número da venda do Ciclone não cabe em `integer` no pagamento — 2026-11-09
 

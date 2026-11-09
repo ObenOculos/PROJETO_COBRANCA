@@ -177,6 +177,45 @@ export const clientMaxOverdueDays = (
 };
 
 /**
+ * Valor EM ATRASO do cliente: soma do saldo so das parcelas ja vencidas --
+ * o que ele deve hoje, sem o que ainda vai vencer. Mesmo recorte de
+ * clientMaxOverdueDays: com acordo ATIVO conta as parcelas vencidas do
+ * acordo (nao o titulo original); sem acordo, as parcelas do titulo com
+ * saldo (hasInstallmentBalance) e vencimento passado.
+ */
+export const clientOverdueAmount = (
+  group: Pick<ClientGroup, "sales" | "document">,
+  acordoAtivoParcelas?: AcordoAtivoOverdueMap,
+): number => {
+  const parcelasAcordo = acordoAtivoParcelas?.get(group.document);
+  if (parcelasAcordo) {
+    return round2(
+      parcelasAcordo.reduce(
+        (sum, parcela) =>
+          round2(parcela.saldo) > 0.01 &&
+          calculateOverdueDays(parcela.dataVencimento) > 0
+            ? sum + parcela.saldo
+            : sum,
+        0,
+      ),
+    );
+  }
+
+  let total = 0;
+  group.sales?.forEach((sale) => {
+    sale.installments?.forEach((inst) => {
+      if (!hasInstallmentBalance(inst)) return;
+      if (calculateOverdueDays(inst.data_vencimento) <= 0) return;
+      total +=
+        (inst.valor_original || 0) -
+        (inst.valor_recebido || 0) -
+        (inst.desconto || 0);
+    });
+  });
+  return round2(total);
+};
+
+/**
  * Loja de referencia do cliente para as regras da carteira: a da parcela em
  * aberto mais antiga (menor vencimento) -- a mesma parcela que define o
  * atraso. Empate pelo nome da loja. Espelho em SQL:
