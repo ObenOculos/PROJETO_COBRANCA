@@ -12,6 +12,7 @@ import {
   Save,
   Plus,
   ListOrdered,
+  Pencil,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
@@ -109,6 +110,14 @@ const cardClass =
 
 const faixaTexto = (min: number, max: number | null) =>
   max == null ? `${min}+ dias` : `${min} a ${max} dias`;
+
+/** "Todas as lojas", "Crateus, Poranga" (até 3) ou "5 lojas". */
+const lojasTexto = (lojas: string[] | null) =>
+  lojas == null
+    ? "Todas as lojas"
+    : lojas.length <= 3
+      ? lojas.join(", ")
+      : `${lojas.length} lojas`;
 
 const rascunhoDe = (r?: CollectorOverdueRange): Rascunho => ({
   min: r ? String(r.minDias) : "",
@@ -601,6 +610,38 @@ const CarteiraDistribuicao: React.FC = () => {
   const [salvando, setSalvando] = useState<string | null>(null);
   const [erroRegra, setErroRegra] = useState<Record<string, string>>({});
   const [confirmRemover, setConfirmRemover] = useState<string | null>(null);
+  // Faixas abertas para edicao (as demais aparecem como texto).
+  const [editando, setEditando] = useState<Set<string>>(new Set());
+
+  // Clientes em aberto de cada cobrador hoje (cabecalho do cobrador). Leva
+  // alguns segundos: a tela abre sem e preenche depois.
+  // null = carregando; "erro" = sem a contagem (so nao mostra).
+  const [carteiraPorCobrador, setCarteiraPorCobrador] = useState<
+    Map<string, number> | null | "erro"
+  >(null);
+  useEffect(() => {
+    void (async () => {
+      const { data, error } = await supabase.rpc("carteira_por_cobrador");
+      if (error) {
+        console.warn("Tamanho das carteiras indisponível:", error.message);
+        setCarteiraPorCobrador("erro");
+        return;
+      }
+      setCarteiraPorCobrador(
+        new Map(
+          ((data ?? []) as { collector_id: string; clientes_em_aberto: number }[]).map(
+            (r) => [r.collector_id, r.clientes_em_aberto],
+          ),
+        ),
+      );
+    })();
+  }, []);
+  const carteiraTexto = (collectorId: string) => {
+    if (carteiraPorCobrador === "erro") return "";
+    if (!carteiraPorCobrador) return " · …";
+    const n = carteiraPorCobrador.get(collectorId) ?? 0;
+    return n === 0 ? " · nenhum cliente" : n === 1 ? " · 1 cliente" : ` · ${n} clientes`;
+  };
 
   const [previa, setPrevia] = useState<Previa | null>(null);
   const [previaDesatualizada, setPreviaDesatualizada] = useState(false);
@@ -704,6 +745,28 @@ const CarteiraDistribuicao: React.FC = () => {
     return m;
   }, [cobradores]);
 
+  // Quem tem faixa (ou esta criando a primeira) ganha cartao proprio; os
+  // demais ficam juntos numa linha no fim ("carteira manual").
+  const cobradoresComRegra = cobradores.filter(
+    (c) => (regrasPorCobrador.get(c.id)?.length ?? 0) > 0 || novos.has(c.id),
+  );
+  const cobradoresSemRegra = cobradores.filter(
+    (c) => !cobradoresComRegra.includes(c),
+  );
+
+  const abrirEdicao = (regraId: string) => {
+    setEditando((prev) => new Set(prev).add(regraId));
+    setConfirmRemover(null);
+  };
+  const fecharEdicao = (chave: string) => {
+    setEditando((prev) => {
+      const next = new Set(prev);
+      next.delete(chave);
+      return next;
+    });
+    limparLinha(chave);
+  };
+
   const chaveNova = (collectorId: string) => `novo:${collectorId}`;
 
   const rascunhoDaLinha = (
@@ -785,7 +848,7 @@ const CarteiraDistribuicao: React.FC = () => {
         r.lojas,
         regra?.ativa ?? true,
       );
-      limparLinha(chave);
+      fecharEdicao(chave);
       if (!regra) {
         setNovos((prev) => {
           const next = new Set(prev);
@@ -1028,13 +1091,38 @@ const CarteiraDistribuicao: React.FC = () => {
           Distribuição da carteira
         </h2>
         <p className="text-sm text-gray-600 dark:text-dark-text-secondary mt-1">
-          Defina a faixa de atraso e as lojas de cada cobrador. A distribuição
-          entrega os clientes sem cobrador a quem a regra cobre e move quem saiu
-          da regra do próprio cobrador. Cliente na carteira de quem não tem
-          regra só sai de lá se você marcar esse cobrador na simulação. Cliente
-          com acordo ou agendamento ativo não é movido. Nada muda sem você
-          simular e confirmar.
+          Defina a faixa de atraso e as lojas de cada cobrador, confira a
+          cobertura e distribua. Nada muda sem você simular e confirmar.
         </p>
+        <details className="mt-2 group">
+          <summary className="cursor-pointer text-xs font-semibold text-blue-700 dark:text-blue-300 select-none">
+            Como funciona
+          </summary>
+          <ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-dark-text-secondary list-disc pl-5">
+            <li>
+              Atraso = parcela vencida mais antiga do cliente; a loja é a dessa
+              parcela.
+            </li>
+            <li>
+              Faixa inclusiva: "3 a 60" cobre o dia 60 e a seguinte começa no
+              61. Fim vazio = sem limite.
+            </li>
+            <li>
+              Um cobrador pode ter várias faixas. Dois cobradores não podem ter
+              a mesma faixa ativa na mesma loja.
+            </li>
+            <li>
+              A distribuição entrega os clientes sem cobrador a quem a faixa
+              cobre e move quem saiu da faixa do próprio cobrador.
+            </li>
+            <li>
+              Cliente na carteira de quem não tem regra só sai de lá se você
+              marcar esse cobrador na simulação.
+            </li>
+            <li>Cliente com acordo ou agendamento ativo não é movido.</li>
+            <li>Faixa inativa fica cadastrada, mas a distribuição ignora.</li>
+          </ul>
+        </details>
         {lojasErro && (
           <p className="mt-3 text-sm text-red-600">{lojasErro}</p>
         )}
@@ -1047,14 +1135,10 @@ const CarteiraDistribuicao: React.FC = () => {
           1. Regras de cada cobrador
         </h3>
         <p className="text-xs text-gray-500 dark:text-dark-text-secondary mb-4">
-          Cada regra é uma faixa de atraso (pela parcela vencida mais antiga)
-          em algumas lojas. Um cobrador pode ter várias. Faixa inclusiva: "3 a
-          60" cobre o dia 60; a seguinte começa no 61. Fim vazio = sem limite.
-          Dois cobradores não podem ter a mesma faixa ativa na mesma loja.
-          Regra inativa fica cadastrada, mas a distribuição ignora.
+          Faixa de atraso × lojas que cada cobrador atende.
         </p>
         <div className="space-y-3">
-          {cobradores.map((c) => {
+          {cobradoresComRegra.map((c) => {
             const regras = regrasPorCobrador.get(c.id) ?? [];
             const adicionando = novos.has(c.id);
             const linhas: { chave: string; regra?: CollectorOverdueRange }[] = [
@@ -1067,16 +1151,16 @@ const CarteiraDistribuicao: React.FC = () => {
                 className="border border-gray-200 dark:border-dark-border rounded-xl"
               >
                 <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-gray-50 dark:bg-dark-bg rounded-t-xl">
-                  <div className="min-w-0 flex items-center gap-2">
+                  <div className="min-w-0 flex flex-wrap items-baseline gap-x-2">
                     <span
-                      className={`h-2.5 w-2.5 rounded-full shrink-0 ${corPorCobrador.get(c.id)}`}
+                      className={`h-2.5 w-2.5 rounded-full shrink-0 self-center ${corPorCobrador.get(c.id)}`}
                     />
                     <span className="font-semibold text-gray-900 dark:text-dark-text truncate">
                       {c.name}
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-dark-text-secondary shrink-0">
+                    <span className="text-xs text-gray-500 dark:text-dark-text-secondary">
                       {USER_TYPE_LABELS[c.type]}
-                      {regras.length === 0 && " · sem regra (carteira manual)"}
+                    {carteiraTexto(c.id)}
                     </span>
                   </div>
                   {!adicionando && (
@@ -1090,123 +1174,150 @@ const CarteiraDistribuicao: React.FC = () => {
                     </button>
                   )}
                 </div>
-                {linhas.length > 0 && (
-                  <div className="divide-y divide-gray-100 dark:divide-dark-border">
-                    {linhas.map(({ chave, regra }) => {
-                      const r = rascunhoDaLinha(chave, regra);
-                      const nova = !regra;
-                      const dirty = nova || alterada(regra!);
+                <div className="divide-y divide-gray-100 dark:divide-dark-border">
+                  {linhas.map(({ chave, regra }) => {
+                    const nova = !regra;
+                    const emEdicao = nova || editando.has(chave) || alterada(regra!);
+                    if (regra && !emEdicao) {
                       return (
                         <div key={chave} className="px-4 py-2.5">
-                          <div className="grid grid-cols-2 md:grid-cols-[90px_90px_minmax(0,1fr)_auto] gap-2 items-center">
-                            <input
-                              type="number"
-                              min={0}
-                              value={r.min}
-                              placeholder="De (dias)"
-                              onChange={(e) =>
-                                setRascunho(chave, { min: e.target.value }, r)
-                              }
-                              className={inputClass}
-                              aria-label={`Início da faixa de ${c.name}`}
-                            />
-                            <input
-                              type="number"
-                              min={0}
-                              value={r.max}
-                              placeholder="Até (vazio = sem limite)"
-                              onChange={(e) =>
-                                setRascunho(chave, { max: e.target.value }, r)
-                              }
-                              className={inputClass}
-                              aria-label={`Fim da faixa de ${c.name}`}
-                            />
-                            <div className="col-span-2 md:col-span-1">
-                              <LojasSelect
-                                lojas={lojas}
-                                value={r.lojas}
-                                onChange={(v) => setRascunho(chave, { lojas: v }, r)}
-                              />
-                            </div>
-                            <div className="col-span-2 md:col-span-1 flex items-center justify-end gap-1.5">
-                              {dirty && (
-                                <button
-                                  type="button"
-                                  onClick={() => void salvarRegra(chave, c.id, regra)}
-                                  disabled={salvando === chave}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
-                                >
-                                  <Save className="h-3.5 w-3.5" />
-                                  Salvar
-                                </button>
-                              )}
-                              {nova && (
-                                <button
-                                  type="button"
-                                  onClick={() => cancelarNova(c)}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg"
-                                >
-                                  Cancelar
-                                </button>
-                              )}
-                              {regra && dirty && (
-                                <button
-                                  type="button"
-                                  onClick={() => limparLinha(chave)}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg"
-                                >
-                                  Desfazer
-                                </button>
-                              )}
-                              {regra && !dirty && (
-                                <button
-                                  type="button"
-                                  onClick={() => void alternarAtiva(regra)}
-                                  disabled={salvando === chave}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border disabled:opacity-50 ${
-                                    regra.ativa
-                                      ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800"
-                                      : "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200 dark:bg-dark-bg dark:text-dark-text-secondary dark:border-dark-border"
-                                  }`}
-                                  title={
-                                    regra.ativa
-                                      ? "Ativa: a distribuição usa esta faixa. Clique para desativar."
-                                      : "Inativa: fica cadastrada, mas a distribuição ignora. Clique para ativar."
-                                  }
-                                >
-                                  {regra.ativa ? "Ativa" : "Inativa"}
-                                </button>
-                              )}
-                              {regra && !dirty && (
-                                <button
-                                  type="button"
-                                  onClick={() => void removerRegra(regra)}
-                                  disabled={salvando === chave}
-                                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 ${
-                                    confirmRemover === regra.id
-                                      ? "bg-red-600 text-white hover:bg-red-700"
-                                      : "text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                  }`}
-                                  title="Remover esta faixa"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  {confirmRemover === regra.id
-                                    ? "Confirmar remoção"
-                                    : "Remover"}
-                                </button>
-                              )}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                            <span
+                              className={`text-sm font-semibold whitespace-nowrap ${
+                                regra.ativa
+                                  ? "text-gray-900 dark:text-dark-text"
+                                  : "text-gray-400 dark:text-dark-text-secondary"
+                              }`}
+                            >
+                              {faixaTexto(regra.minDias, regra.maxDias)}
+                            </span>
+                            <span
+                              className={`text-sm min-w-0 truncate ${
+                                regra.ativa
+                                  ? "text-gray-600 dark:text-dark-text-secondary"
+                                  : "text-gray-400 dark:text-dark-text-secondary"
+                              }`}
+                              title={regra.lojas?.join(", ") ?? "Todas as lojas"}
+                            >
+                              {lojasTexto(regra.lojas)}
+                            </span>
+                            {!regra.ativa && (
+                              <span
+                                className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-500 border border-gray-200 dark:bg-dark-bg dark:text-dark-text-secondary dark:border-dark-border"
+                                title="Fica cadastrada, mas a distribuição ignora"
+                              >
+                                Inativa
+                              </span>
+                            )}
+                            <div className="ml-auto flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => abrirEdicao(regra.id)}
+                                disabled={salvando === chave}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:text-dark-text dark:hover:bg-dark-bg disabled:opacity-50"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void alternarAtiva(regra)}
+                                disabled={salvando === chave}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold disabled:opacity-50 ${
+                                  regra.ativa
+                                    ? "text-gray-600 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg"
+                                    : "text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-900/20"
+                                }`}
+                                title={
+                                  regra.ativa
+                                    ? "A distribuição deixa de usar esta faixa (fica cadastrada)"
+                                    : "A distribuição volta a usar esta faixa"
+                                }
+                              >
+                                {regra.ativa ? "Desativar" : "Ativar"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void removerRegra(regra)}
+                                onBlur={() =>
+                                  setConfirmRemover((atual) => (atual === regra.id ? null : atual))
+                                }
+                                disabled={salvando === chave}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold disabled:opacity-50 ${
+                                  confirmRemover === regra.id
+                                    ? "bg-red-600 text-white hover:bg-red-700"
+                                    : "text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                }`}
+                                title="Remover esta faixa"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                {confirmRemover === regra.id ? "Confirmar remoção" : "Remover"}
+                              </button>
                             </div>
                           </div>
                           {erroRegra[chave] && (
-                            <p className="mt-1.5 text-xs text-red-600">
-                              {erroRegra[chave]}
-                            </p>
+                            <p className="mt-1.5 text-xs text-red-600">{erroRegra[chave]}</p>
                           )}
                         </div>
                       );
-                    })}
-                  </div>
-                )}
+                    }
+                    const r = rascunhoDaLinha(chave, regra);
+                    return (
+                      <div key={chave} className="px-4 py-3 bg-blue-50/40 dark:bg-blue-900/10">
+                        <div className="grid grid-cols-2 md:grid-cols-[90px_90px_minmax(0,1fr)_auto] gap-2 items-center">
+                          <input
+                            type="number"
+                            min={0}
+                            value={r.min}
+                            placeholder="De (dias)"
+                            onChange={(e) => setRascunho(chave, { min: e.target.value }, r)}
+                            className={inputClass}
+                            aria-label={`Início da faixa de ${c.name}`}
+                            autoFocus={nova}
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            value={r.max}
+                            placeholder="Até (vazio = sem limite)"
+                            onChange={(e) => setRascunho(chave, { max: e.target.value }, r)}
+                            className={inputClass}
+                            aria-label={`Fim da faixa de ${c.name}`}
+                          />
+                          <div className="col-span-2 md:col-span-1">
+                            <LojasSelect
+                              lojas={lojas}
+                              value={r.lojas}
+                              onChange={(v) => setRascunho(chave, { lojas: v }, r)}
+                            />
+                          </div>
+                          <div className="col-span-2 md:col-span-1 flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => void salvarRegra(chave, c.id, regra)}
+                              disabled={salvando === chave || (!nova && !alterada(regra!))}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              <Save className="h-3.5 w-3.5" />
+                              Salvar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => (nova ? cancelarNova(c) : fecharEdicao(chave))}
+                              disabled={salvando === chave}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                        {erroRegra[chave] && (
+                          <p className="mt-1.5 text-xs text-red-600">{erroRegra[chave]}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
                 <FilaDoCobrador
                   regras={regras}
                   onSalvar={(pesos) => definirFilaCobranca(c.id, pesos)}
@@ -1220,6 +1331,41 @@ const CarteiraDistribuicao: React.FC = () => {
             </p>
           )}
         </div>
+
+        {cobradoresSemRegra.length > 0 && (
+          <div className="mt-4 rounded-xl border border-dashed border-gray-300 dark:border-dark-border px-4 py-3">
+            <p className="text-xs font-semibold text-gray-600 dark:text-dark-text-secondary">
+              Sem regra (carteira manual)
+            </p>
+            <p className="text-[11px] text-gray-500 dark:text-dark-text-secondary mb-2">
+              A distribuição não entrega clientes a eles. Só perdem cliente se
+              você marcar o nome na simulação.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {cobradoresSemRegra.map((c) => (
+                <span
+                  key={c.id}
+                  className="inline-flex items-center gap-1.5 pl-3 pr-1 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs dark:bg-dark-bg dark:border-dark-border"
+                >
+                  <span className="font-medium text-gray-900 dark:text-dark-text">{c.name}</span>
+                  <span className="text-gray-500 dark:text-dark-text-secondary">
+                    {USER_TYPE_LABELS[c.type]}
+                    {carteiraTexto(c.id)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => adicionarRegra(c)}
+                    className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full font-semibold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-900/20"
+                    title={`Adicionar uma faixa para ${c.name}`}
+                  >
+                    <Plus className="h-3 w-3" />
+                    Faixa
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 2. Cobertura por loja */}

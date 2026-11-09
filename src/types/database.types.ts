@@ -1967,6 +1967,11 @@ export type Database = {
         Args: { p_collector_id: string; p_pesos: Json };
         Returns: undefined;
       };
+      // Migration 20261109000014.
+      carteira_por_cobrador: {
+        Args: Record<PropertyKey, never>;
+        Returns: { collector_id: string; clientes_em_aberto: number }[];
+      };
       encerrar_regra_carteira: {
         Args: { p_regra_id: string };
         Returns: undefined;
