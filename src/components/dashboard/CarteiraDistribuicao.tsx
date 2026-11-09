@@ -13,7 +13,10 @@ import {
   Plus,
   ListOrdered,
   Pencil,
+  X,
+  ChevronRight,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
 import {
@@ -205,6 +208,18 @@ const LojasSelect: React.FC<{
 const faixaCurta = (r: CollectorOverdueRange) =>
   r.maxDias == null ? `${r.minDias}+` : `${r.minDias}–${r.maxDias}`;
 
+/** Resumo da fila para a linha fechada da sanfona. */
+const filaResumoCurto = (regras: CollectorOverdueRange[]) => {
+  const ativas = regras.filter((r) => r.ativa);
+  if (ativas.length < 2) return "fila: 1 faixa só";
+  if (!filaLigada(regras)) return "fila: ordem padrão";
+  const pesos = (t: "manha" | "tarde") =>
+    ativas.map((r) => pesoNaFila(r, regras, t) ?? 0).join("·");
+  return filaComTurnos(regras)
+    ? `fila: manhã ${pesos("manha")} / tarde ${pesos("tarde")}`
+    : `fila: ${pesos("manha")}`;
+};
+
 interface PesoRascunho {
   manha: string;
   tarde: string;
@@ -246,9 +261,10 @@ const lerValor = (s: string): number | null => {
  * filters/filaCobranca.ts; so faz sentido com 2+ faixas ativas.
  */
 const FilaDoCobrador: React.FC<{
+  nome: string;
   regras: CollectorOverdueRange[];
   onSalvar: (config: FilaConfigRegra[]) => Promise<void>;
-}> = ({ regras, onSalvar }) => {
+}> = ({ nome, regras, onSalvar }) => {
   const ativas = regras.filter((r) => r.ativa);
   const ligada = filaLigada(regras);
   const comTurnos = filaComTurnos(regras);
@@ -377,10 +393,19 @@ const FilaDoCobrador: React.FC<{
     }
   };
 
+  // Esc fecha o modal (sem salvar).
+  useEffect(() => {
+    if (!editando) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !salvando) setEditando(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [editando, salvando]);
+
   if (ativas.length < 2) return null;
 
-  if (!editando) {
-    return (
+  const linhaResumo = (
       <div className="px-4 py-2.5 border-t border-gray-100 dark:border-dark-border flex items-start justify-between gap-3 bg-blue-50/40 dark:bg-blue-900/10 rounded-b-xl">
         <div className="min-w-0 text-xs text-gray-600 dark:text-dark-text-secondary">
           <span className="inline-flex items-center gap-1 font-semibold text-gray-800 dark:text-dark-text">
@@ -409,18 +434,33 @@ const FilaDoCobrador: React.FC<{
           {ligada ? "Alterar" : "Configurar fila"}
         </button>
       </div>
-    );
-  }
+  );
+
+  if (!editando) return linhaResumo;
 
   const inputPeso =
     "px-2 py-1 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text";
 
   return (
-    <div className="px-4 py-3 border-t border-gray-100 dark:border-dark-border bg-blue-50/40 dark:bg-blue-900/10 rounded-b-xl space-y-3">
+    <>
+    {linhaResumo}
+    {createPortal(
+    <div
+      className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={() => !salvando && setEditando(false)}
+    >
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Fila de cobrança de ${nome}`}
+      className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-2xl border border-gray-200 dark:border-dark-border p-5 space-y-3"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-start justify-between gap-3">
       <div>
-        <p className="text-sm font-semibold text-gray-900 dark:text-dark-text flex items-center gap-1.5">
+        <p className="text-base font-bold text-gray-900 dark:text-dark-text flex items-center gap-1.5">
           <ListOrdered className="h-4 w-4 text-blue-600" />
-          Fila da lista "Ligar"
+          Fila da lista "Ligar" · {nome}
         </p>
         <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-0.5">
           Quantos clientes de cada faixa a cada rodada. O cobrador vê as faixas
@@ -429,6 +469,16 @@ const FilaDoCobrador: React.FC<{
           dívida vencida fora do valor, vai para o fim da lista (não sai da
           carteira).
         </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => setEditando(false)}
+        disabled={salvando}
+        className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg shrink-0"
+        aria-label="Fechar"
+      >
+        <X className="h-4 w-4 text-gray-500" />
+      </button>
       </div>
 
       <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-dark-text cursor-pointer">
@@ -584,6 +634,10 @@ const FilaDoCobrador: React.FC<{
         )}
       </div>
     </div>
+    </div>,
+    document.body,
+    )}
+    </>
   );
 };
 
@@ -756,6 +810,18 @@ const CarteiraDistribuicao: React.FC = () => {
   const cobradoresSemRegra = cobradores.filter(
     (c) => !cobradoresComRegra.includes(c),
   );
+
+  // Sanfona da secao 1: cobradores abertos (comeca tudo fechado).
+  const [abertos, setAbertos] = useState<Set<string>>(new Set());
+  const alternarAberto = (id: string) =>
+    setAbertos((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const todosAbertos =
+    cobradoresComRegra.length > 0 && cobradoresComRegra.every((c) => abertos.has(c.id));
 
   const abrirEdicao = (regraId: string) => {
     setEditando((prev) => new Set(prev).add(regraId));
@@ -1159,13 +1225,31 @@ const CarteiraDistribuicao: React.FC = () => {
 
       {/* 1. Regras */}
       <div className={cardClass}>
-        <h3 className="font-bold text-gray-900 dark:text-dark-text flex items-center gap-2 mb-1">
-          <Gauge className="h-4 w-4 text-gray-500" />
-          1. Regras de cada cobrador
-        </h3>
-        <p className="text-xs text-gray-500 dark:text-dark-text-secondary mb-4">
-          Faixa de atraso × lojas que cada cobrador atende.
-        </p>
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-bold text-gray-900 dark:text-dark-text flex items-center gap-2 mb-1">
+              <Gauge className="h-4 w-4 text-gray-500" />
+              1. Regras de cada cobrador
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+              Faixa de atraso × lojas que cada cobrador atende. Clique no nome
+              para ver e editar.
+            </p>
+          </div>
+          {cobradoresComRegra.length > 1 && (
+            <button
+              type="button"
+              onClick={() =>
+                setAbertos(
+                  todosAbertos ? new Set() : new Set(cobradoresComRegra.map((c) => c.id)),
+                )
+              }
+              className="shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg"
+            >
+              {todosAbertos ? "Fechar todos" : "Abrir todos"}
+            </button>
+          )}
+        </div>
         <div className="space-y-3">
           {cobradoresComRegra.map((c) => {
             const regras = regrasPorCobrador.get(c.id) ?? [];
@@ -1174,24 +1258,63 @@ const CarteiraDistribuicao: React.FC = () => {
               ...regras.map((regra) => ({ chave: regra.id, regra })),
               ...(adicionando ? [{ chave: chaveNova(c.id) }] : []),
             ];
+            // Sanfona: fica aberto se o gestor abriu ou se ha algo em
+            // andamento (faixa nova, edicao, erro) -- nunca esconde trabalho.
+            const emAndamento =
+              adicionando ||
+              regras.some(
+                (r) => editando.has(r.id) || alterada(r) || !!erroRegra[r.id],
+              );
+            const aberto = abertos.has(c.id) || emAndamento;
             return (
               <div
                 key={c.id}
                 className="border border-gray-200 dark:border-dark-border rounded-xl"
               >
-                <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-gray-50 dark:bg-dark-bg rounded-t-xl">
-                  <div className="min-w-0 flex flex-wrap items-baseline gap-x-2">
+                <div
+                  className={`flex items-center justify-between gap-3 px-4 py-2.5 bg-gray-50 dark:bg-dark-bg ${aberto ? "rounded-t-xl" : "rounded-xl"}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => alternarAberto(c.id)}
+                    disabled={emAndamento}
+                    aria-expanded={aberto}
+                    className="min-w-0 flex-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-left disabled:cursor-default"
+                  >
+                    <ChevronRight
+                      className={`h-4 w-4 text-gray-400 shrink-0 transition-transform ${aberto ? "rotate-90" : ""}`}
+                    />
                     <span
-                      className={`h-2.5 w-2.5 rounded-full shrink-0 self-center ${corPorCobrador.get(c.id)}`}
+                      className={`h-2.5 w-2.5 rounded-full shrink-0 ${corPorCobrador.get(c.id)}`}
                     />
                     <span className="font-semibold text-gray-900 dark:text-dark-text truncate">
                       {c.name}
                     </span>
                     <span className="text-xs text-gray-500 dark:text-dark-text-secondary">
                       {USER_TYPE_LABELS[c.type]}
-                    {carteiraTexto(c.id)}
+                      {carteiraTexto(c.id)}
                     </span>
-                  </div>
+                    {!aberto && regras.length > 0 && (
+                      <span className="w-full sm:w-auto sm:ml-2 flex flex-wrap items-center gap-1 text-xs">
+                        {regras.map((r) => (
+                          <span
+                            key={r.id}
+                            className={`px-1.5 py-0.5 rounded-md border ${
+                              r.ativa
+                                ? "bg-white border-gray-200 text-gray-700 dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                                : "border-dashed border-gray-300 text-gray-400 line-through dark:border-dark-border"
+                            }`}
+                            title={`${faixaTexto(r.minDias, r.maxDias)} · ${r.lojas?.join(", ") ?? "Todas as lojas"}${r.ativa ? "" : " (inativa)"}`}
+                          >
+                            {faixaCurta(r)}
+                          </span>
+                        ))}
+                        <span className="text-gray-500 dark:text-dark-text-secondary ml-1">
+                          · {filaResumoCurto(regras)}
+                        </span>
+                      </span>
+                    )}
+                  </button>
                   {!adicionando && (
                     <button
                       type="button"
@@ -1203,6 +1326,8 @@ const CarteiraDistribuicao: React.FC = () => {
                     </button>
                   )}
                 </div>
+                {aberto && (
+                <>
                 <div className="divide-y divide-gray-100 dark:divide-dark-border">
                   {linhas.map(({ chave, regra }) => {
                     const nova = !regra;
@@ -1348,9 +1473,12 @@ const CarteiraDistribuicao: React.FC = () => {
                   })}
                 </div>
                 <FilaDoCobrador
+                  nome={c.name}
                   regras={regras}
                   onSalvar={(pesos) => definirFilaCobranca(c.id, pesos)}
                 />
+                </>
+                )}
               </div>
             );
           })}
