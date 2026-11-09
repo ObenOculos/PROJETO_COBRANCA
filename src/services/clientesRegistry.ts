@@ -44,6 +44,9 @@ export interface ClienteCadastro {
   regiao?: string | null;
   observacao_erp?: string | null;
   erp_atualizado_em?: string | null;
+  // Codigo do cliente no Ciclone (migration 20261109000001); mais de um
+  // codigo para o mesmo documento vem separado por virgula.
+  codigo_cliente_erp?: string | null;
 }
 
 /** Campos do cadastro que vem do ERP Ciclone (ver ClienteCadastro). */
@@ -57,6 +60,7 @@ export type DadosErpCliente = Pick<
   | "regiao"
   | "observacao_erp"
   | "erp_atualizado_em"
+  | "codigo_cliente_erp"
 >;
 
 // Documento (como gravado no banco) -> cadastro.
@@ -92,6 +96,9 @@ const REGISTRY_COLUMNS =
   CADASTRO_COLUMNS +
   ", razao_social, contato_nome, contato_telefone, contato_telefone2, " +
   "vendedor_responsavel, regiao, observacao_erp, erp_atualizado_em";
+
+// + codigo do cliente no Ciclone (migration 20261109000001).
+const REGISTRY_CODIGO_COLUMNS = REGISTRY_COLUMNS + ", codigo_cliente_erp";
 
 // Colunas que `clientes` sempre teve. Usadas quando as novas ainda nao existem
 // (codigo publicado antes da migration): o app continua funcionando lendo
@@ -131,6 +138,7 @@ export const fetchClientesRegistry = async (): Promise<ClientesRegistry> => {
   // Do conjunto mais novo para o mais antigo: front publicado antes da
   // migration correspondente continua carregando o que existe.
   const tiers: Array<[string, string]> = [
+    [REGISTRY_CODIGO_COLUMNS, "20261109000001 (codigo do cliente no ERP)"],
     [REGISTRY_COLUMNS, "20261106000011 (dados do ERP)"],
     [CADASTRO_COLUMNS, "20260904000001 (apelido/contatos)"],
   ];

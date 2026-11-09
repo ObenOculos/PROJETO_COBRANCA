@@ -426,6 +426,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         return (
           client.client.toLowerCase().includes(searchLower) ||
           documentoCombina(client.document, searchTerm) ||
+          Boolean(client.codigoErp?.includes(searchTerm.trim())) ||
           client.address.toLowerCase().includes(searchLower) ||
           client.city.toLowerCase().includes(searchLower) ||
           client.neighborhood.toLowerCase().includes(searchLower) ||

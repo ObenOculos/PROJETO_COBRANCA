@@ -1418,6 +1418,12 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
                 CPF/CNPJ:{" "}
               </span>
               {group.document}
+              {group.codigoErp && (
+                <span title="Código do cliente no Ciclone">
+                  {" "}
+                  · Cód. {group.codigoErp}
+                </span>
+              )}
             </span>
             <button
               onClick={(e) => {

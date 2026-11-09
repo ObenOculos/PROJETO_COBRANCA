@@ -90,6 +90,7 @@ interface ClientWithCollections {
   documento: string;
   apelido?: string;
   razao_social?: string;
+  codigo_cliente_erp?: string;
   uniqueKey: string; // Adicionado para identificar clientes de forma única (documento ou nome)
   collections: Collection[];
   collectorId?: string;
@@ -439,6 +440,7 @@ export const ClientAssignment = React.memo(
               collection.razao_social,
               collection.cliente,
             ),
+            codigo_cliente_erp: collection.codigo_cliente_erp || undefined,
             uniqueKey: key,
             collections: [],
             collectorId: collectorId,
@@ -947,6 +949,7 @@ export const ClientAssignment = React.memo(
         return {
           Cliente: client.cliente ? client.cliente.toUpperCase() : "",
           Documento: client.documento || "",
+          "Código Ciclone": client.codigo_cliente_erp || "",
           "Data de Nascimento": birthDate ? formatDate(birthDate) : "",
           Apelido: client.apelido ? client.apelido.toUpperCase() : "",
           "Razão Social": client.razao_social
@@ -1934,6 +1937,14 @@ export const ClientAssignment = React.memo(
                             </button>
                             <span className="text-[10px] font-medium text-gray-450 tracking-tight mt-0.5">
                               {client.documento}
+                              {client.codigo_cliente_erp && (
+                                <span
+                                  className="ml-1.5 text-gray-500 dark:text-gray-400"
+                                  title="Código do cliente no Ciclone"
+                                >
+                                  · Cód. {client.codigo_cliente_erp}
+                                </span>
+                              )}
                             </span>
                             {client.apelido && (
                               <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">

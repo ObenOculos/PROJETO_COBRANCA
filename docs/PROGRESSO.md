@@ -32,11 +32,12 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 21 | Jurídico (`legal_collector`) é 100% idêntico a Interno/Terceirizado — zero modelagem de processo/protesto/prazo legal | A avaliar com o negócio | A analisar |
 | 22 | Sem tela de histórico de cancelamento de acordo e de agendamento/contato — só "Histórico de Contatos" (`collection_attempts`) aparece em "Ver Dados" | Baixa/Média | Pequeno/médio |
 | 23 | `AcordoModal` (parcelas) não bloqueia de verdade data anterior a hoje — só `min` do `<input type="date">`, sem validação no "Continuar" | Baixa | Pequeno |
-| 24 | Registrar contato + Reagendar + Agendar viram um botão só, "Atender" (RPC `registrar_contato`; modal em 2 etapas em 2026-11-06) — RPC testada ao vivo; front publicado (push 2026-11-09), falta testar o modal de 2 etapas | Média | Médio |
+| 24 | Registrar contato + Reagendar + Agendar viram um botão só, "Atender" (RPC `registrar_contato`; modal em 2 etapas em 2026-11-06) — RPC testada ao vivo; front publicado e 2 etapas conferidas no site (2026-11-09) — falta uma submissão real | Média | Médio |
 | 25 | Distribuição da carteira por regra (faixas × lojas, várias por cobrador, ativa/pausada) — migrations 6–10 aplicadas; regras da Monalisa e do José cadastradas e 1ª distribuição aplicada em 2026-11-06 | Alta | Grande |
 | 26 | Razão social + contato/vendedor/região do Ciclone no cadastro do cliente — migration, sync e front no ar (2026-11-06); gestor testado na tela e cobrador/Termo conferidos por código+dados; "Atender" e agenda de contato com razão social/"Falar com" (`cf68ed7`); publicado (push 2026-11-09) — falta ver o PDF do Termo; telefone do ERP no card e saudação do WhatsApp a decidir | Média | Pequeno/médio |
 | 27 | ~~Detalhes do Cliente: parcela paga/atrasada decidida pelo texto do status ("recebido" do Ciclone aparecia atrasado)~~ — `15e780a`, publicado e testado no site 2026-11-09 | Alta | Pequeno |
 | 28 | ~~Busca por CPF/CNPJ exigia a máscara~~ — `f756638`, publicado 2026-11-09 (histórico de Autorizações, busca no servidor, ficou de fora) | Baixa | Pequeno |
+| 29 | Código do cliente do Ciclone (`pgcln_codigo`) no cadastro — migration `20261109000001` aplicada + `check:db` OK, sync rodado (1.888 clientes com código); falta publicar o front e testar na tela | Média | Pequeno |
 
 ## Perguntas em aberto para o financeiro
 
@@ -94,9 +95,39 @@ push: 102/102 migrations locais aplicadas em produção (conferido via
 `supabase_migrations.schema_migrations`) e `npm run build` OK. Entraram no ar
 juntos: quadro "Lançamento no Ciclone" (acordo), "Atender" (item 24),
 distribuição da carteira (item 25), remoção de `users.password`, item 26,
-item 27 e item 28. **Sem teste na tela depois do deploy** — conferir no site:
-"Ver Vendas" de cliente do José (recebidas verdes, sem atraso), busca
-`08928105` acha Opticas Maranhão, "Atender" da Ótica Modelo com "Falar com".
+item 27 e item 28.
+
+**Testado no site publicado em 2026-11-09** (cobrador interno, só leitura;
+conferido no banco que nada foi gravado): busca por CPF/CNPJ só com números
+(carteira e agenda de contato), razão social na busca, "Ver Vendas" com
+parcelas recebidas do Ciclone verdes e sem atraso e "Maior atraso" igual ao
+card da carteira, "Atender" com razão social + "Falar com" e as 2 etapas
+(fechado sem gravar). Todos OK. Observação: cliente usado no teste do gestor
+não tinha cobrador (por isso não aparecia na carteira) — não é defeito.
+
+### Item 29 — Código do cliente do Ciclone — 2026-11-09 (em andamento)
+
+Pedido: o ERP e o financeiro identificam o cliente pelo código do Ciclone; o
+app só tinha CPF/CNPJ (o código da SSÓtica existe, mas não é usado — fora).
+Medido no Ciclone (só leitura): 1.890 CPF/CNPJ, 1.889 com um código só e 1
+com dois; faixa 100001–102423.
+- **Migration `20261109000001_clientes_codigo_cliente_erp`**: coluna
+  `clientes.codigo_cliente_erp text`, espelho do ERP (o sync sobrescreve).
+  Texto porque o documento com dois códigos guarda os dois ("100123, 100456").
+- **Sync** (`sync_financeiro.py`, fora do git; backup antes da edição): lê
+  `pgcln_codigo`, junta os códigos por documento (`juntar_codigos_cliente`) e
+  grava junto dos outros campos do ERP; sem a migration, segue sem a coluna
+  (`CAMPOS_ERP_OPCIONAIS`). Dry-run conferido.
+- **Front**: `clientesRegistry` tenta a coluna nova e cai para as anteriores;
+  "Cód. <código>" no card do cobrador, na Atribuição (+ coluna "Código
+  Ciclone" no Excel), na agenda de contato e na ficha (cabeçalho + "Dados do
+  Ciclone"); código entra na busca (carteira, Atribuição, agenda de contato e
+  de visitas).
+- **Ordem**: `db push` → `check:db` → sync → teste → commit → push do front.
+- **2026-11-09**: `db push` feito pelo usuário, `check:db` OK; sync manual às
+  10:22 gravou o código nos 1.888 clientes do Ciclone (100002–102423), sem
+  código repetido entre clientes e nenhum com dois códigos (o documento com
+  dois no ERP só tem títulos em um deles nas empresas sincronizadas).
 
 ### Item 28 — Busca por CPF/CNPJ só com os números — 2026-11-09 (`f756638`)
 

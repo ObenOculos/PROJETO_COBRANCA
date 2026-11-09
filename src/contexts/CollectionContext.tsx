@@ -110,6 +110,7 @@ const mapRowToCollection = (
     cliente: cadastro?.nome ?? row.cliente,
     apelido: cadastro?.apelido ?? null,
     razao_social: cadastro?.razao_social ?? null,
+    codigo_cliente_erp: cadastro?.codigo_cliente_erp ?? null,
     telefone: cadastro?.telefone ?? null,
     celular: cadastro?.celular ?? null,
     celular1: cadastro?.celular1 ?? null,
@@ -126,6 +127,7 @@ const mapRowFields = (
   Collection,
   | "apelido"
   | "razao_social"
+  | "codigo_cliente_erp"
   | "telefone"
   | "celular"
   | "celular1"
@@ -2655,6 +2657,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           documentoCombina(c.documento, filters.search) ||
           c.apelido?.toLowerCase().includes(searchLower) ||
           c.razao_social?.toLowerCase().includes(searchLower) ||
+          c.codigo_cliente_erp?.includes((filters.search ?? "").trim()) ||
           c.nome_da_loja?.toLowerCase().includes(searchLower) ||
           c.cidade?.toLowerCase().includes(searchLower) ||
           c.numero_titulo?.toString().includes(searchLower) ||
@@ -2758,6 +2761,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
                 collection.razao_social,
                 collection.cliente,
               ),
+              codigoErp: collection.codigo_cliente_erp || undefined,
               phone: collection.telefone || undefined,
               mobile: collection.celular || undefined,
               address: collection.endereco || "",

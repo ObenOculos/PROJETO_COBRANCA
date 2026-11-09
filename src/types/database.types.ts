@@ -845,6 +845,7 @@ export type Database = {
           regiao: string | null;
           observacao_erp: string | null;
           erp_atualizado_em: string | null;
+          codigo_cliente_erp: string | null;
         };
         Insert: {
           apelido?: string | null;
@@ -867,6 +868,7 @@ export type Database = {
           regiao?: string | null;
           observacao_erp?: string | null;
           erp_atualizado_em?: string | null;
+          codigo_cliente_erp?: string | null;
         };
         Update: {
           apelido?: string | null;
@@ -889,6 +891,7 @@ export type Database = {
           regiao?: string | null;
           observacao_erp?: string | null;
           erp_atualizado_em?: string | null;
+          codigo_cliente_erp?: string | null;
         };
         Relationships: [];
       };

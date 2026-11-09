@@ -214,6 +214,8 @@ export interface Collection {
   apelido: string | null;
   /** Razao social do cadastro (ERP Ciclone); `cliente` e o nome fantasia. */
   razao_social: string | null;
+  /** Codigo do cliente no ERP Ciclone (cadastro); null fora do Ciclone. */
+  codigo_cliente_erp?: string | null;
   endereco: string | null;
   numero: string | null;
   bairro: string | null;
@@ -264,6 +266,8 @@ export interface ClientGroup {
   apelido?: string;
   /** Razao social (ERP Ciclone), quando difere do nome exibido em `client`. */
   razaoSocial?: string;
+  /** Codigo do cliente no ERP Ciclone (pode ter mais de um, com virgula). */
+  codigoErp?: string;
   phone?: string;
   mobile?: string;
   address: string;

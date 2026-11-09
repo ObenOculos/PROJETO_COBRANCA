@@ -213,8 +213,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     cadastroErp?.contato_telefone,
     cadastroErp?.contato_telefone2,
   ].filter((t): t is string => Boolean(t?.trim()));
+  const codigoErp = cadastroErp?.codigo_cliente_erp?.trim() || undefined;
   const temDadosErp = Boolean(
-    cadastroErp?.vendedor_responsavel ||
+    codigoErp ||
+      cadastroErp?.vendedor_responsavel ||
       cadastroErp?.regiao ||
       cadastroErp?.observacao_erp,
   );
@@ -762,6 +764,12 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 )}
                 <p className="text-xs sm:text-sm text-gray-500 truncate">
                   {clientGroup.document}
+                  {codigoErp && (
+                    <span title="Código do cliente no Ciclone">
+                      {" "}
+                      · Cód. Ciclone {codigoErp}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
@@ -1031,6 +1039,16 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                         <h4 className="text-sm font-semibold text-gray-700">
                           Dados do Ciclone
                         </h4>
+                        {codigoErp && (
+                          <div className="flex justify-between gap-4">
+                            <span className="font-medium text-gray-600 shrink-0">
+                              Código do cliente:
+                            </span>
+                            <span className="font-semibold text-gray-900 text-right">
+                              {codigoErp}
+                            </span>
+                          </div>
+                        )}
                         {cadastroErp?.vendedor_responsavel && (
                           <div className="flex justify-between gap-4">
                             <span className="font-medium text-gray-600 shrink-0">

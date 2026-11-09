@@ -17,6 +17,7 @@ export interface FilterableClient {
   documento: string;
   apelido?: string | null;
   razao_social?: string | null;
+  codigo_cliente_erp?: string | null;
   collectorId?: string;
   cidade?: string | null;
   bairro?: string | null;
@@ -135,7 +136,8 @@ const matchesSearch = (client: FilterableClient, search?: string): boolean => {
     client.cliente?.toLowerCase().includes(term) ||
       documentoCombina(client.documento, search) ||
       client.apelido?.toLowerCase().includes(term) ||
-      client.razao_social?.toLowerCase().includes(term),
+      client.razao_social?.toLowerCase().includes(term) ||
+      client.codigo_cliente_erp?.includes(term.trim()),
   );
 };
 
