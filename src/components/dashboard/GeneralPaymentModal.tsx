@@ -694,7 +694,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           }
         }}
       >
-        <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
           {/* Header */}
           <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 sm:px-6 py-4 flex items-center justify-between">
             <div className="flex items-center flex-1 min-w-0">
@@ -730,9 +730,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           <div className="overflow-y-auto max-h-[calc(95vh-180px)] sm:max-h-[calc(90vh-180px)]">
             <form onSubmit={handleSubmit} className="p-4 sm:p-6">
               {acordoAtivo && (
-                <div className="mb-6 p-4 border border-amber-200 bg-amber-50 rounded-2xl flex items-start gap-3">
+                <div className="mb-6 p-4 border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 rounded-2xl flex items-start gap-3">
                   <Info className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-                  <p className="text-sm text-amber-700">
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
                     Este cliente tem um <strong>acordo ativo</strong>. Os
                     títulos vinculados a ele não podem ser pagos por aqui — o
                     sistema vai recusar e manter o valor neles; só títulos
@@ -742,56 +742,56 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 </div>
               )}
               {/* Resumo do Cliente */}
-              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-4 sm:p-6 mb-6 border border-purple-200">
-                <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center">
-                  <Receipt className="h-5 w-5 text-purple-600 mr-2" />
+              <div className="bg-gradient-to-r from-purple-50 dark:from-purple-900/20 to-indigo-50 dark:to-indigo-900/20 rounded-2xl p-4 sm:p-6 mb-6 border border-purple-200 dark:border-purple-800">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-dark-text mb-4 flex items-center">
+                  <Receipt className="h-5 w-5 text-purple-600 dark:text-purple-400 mr-2" />
                   Resumo Financeiro
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-4">
-                  <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
-                    <div className="text-base sm:text-xl font-bold text-gray-900">
+                  <div className="text-center p-3 sm:p-4 bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm">
+                    <div className="text-base sm:text-xl font-bold text-gray-900 dark:text-dark-text">
                       {formatCurrency(totalValue)}
                     </div>
-                    <div className="text-xs sm:text-sm text-gray-600">
+                    <div className="text-xs sm:text-sm text-gray-600 dark:text-dark-text-secondary">
                       Valor Total
                     </div>
                   </div>
 
-                  <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
-                    <div className="text-base sm:text-xl font-bold text-green-600">
+                  <div className="text-center p-3 sm:p-4 bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm">
+                    <div className="text-base sm:text-xl font-bold text-green-600 dark:text-green-400">
                       {formatCurrency(totalReceived)}
                     </div>
-                    <div className="text-xs sm:text-sm text-gray-600">
+                    <div className="text-xs sm:text-sm text-gray-600 dark:text-dark-text-secondary">
                       Já Recebido
                     </div>
                   </div>
 
                   {showDiscountBox ? (
-                    <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
-                      <div className="text-base sm:text-xl font-bold text-blue-600">
+                    <div className="text-center p-3 sm:p-4 bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm">
+                      <div className="text-base sm:text-xl font-bold text-blue-600 dark:text-blue-400">
                         {formatCurrency(discountAmount)}
                       </div>
-                      <div className="text-xs sm:text-sm text-gray-600">
+                      <div className="text-xs sm:text-sm text-gray-600 dark:text-dark-text-secondary">
                         Desconto Aplicado
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
-                      <div className="text-base sm:text-xl font-bold text-red-600">
+                    <div className="text-center p-3 sm:p-4 bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm">
+                      <div className="text-base sm:text-xl font-bold text-red-600 dark:text-red-400">
                         {formatCurrency(totalPending)}
                       </div>
-                      <div className="text-xs sm:text-sm text-gray-600">
+                      <div className="text-xs sm:text-sm text-gray-600 dark:text-dark-text-secondary">
                         Saldo Devedor
                       </div>
                     </div>
                   )}
 
-                  <div className="text-center p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
-                    <div className="text-base sm:text-xl font-bold text-purple-600">
+                  <div className="text-center p-3 sm:p-4 bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm">
+                    <div className="text-base sm:text-xl font-bold text-purple-600 dark:text-purple-400">
                       {clientSales?.length || 0}
                     </div>
-                    <div className="text-xs sm:text-sm text-gray-600">
+                    <div className="text-xs sm:text-sm text-gray-600 dark:text-dark-text-secondary">
                       Total Vendas
                     </div>
                   </div>
@@ -802,7 +802,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               <div className="mb-6">
                 <label
                   htmlFor="distribution-amount"
-                  className="block text-base font-semibold text-gray-900 mb-3"
+                  className="block text-base font-semibold text-gray-900 dark:text-dark-text mb-3"
                 >
                   Valor a Distribuir
                 </label>
@@ -815,7 +815,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     step="0.01"
                     value={distributionAmount}
                     onChange={(e) => setDistributionAmount(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base sm:text-2xl font-bold"
+                    className="w-full pl-12 pr-4 py-4 border-2 border-gray-300 dark:border-dark-border rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base sm:text-2xl font-bold dark:bg-dark-bg dark:text-dark-text"
                     placeholder="0,00"
                     required
                   />
@@ -830,7 +830,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       onClick={() =>
                         setDistributionAmount(totalPending.toFixed(2))
                       }
-                      className="px-3 py-1.5 sm:px-4 sm:py-2 text-sm bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 transition-colors font-medium w-full sm:w-auto"
+                      className="px-3 py-1.5 sm:px-4 sm:py-2 text-sm bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded-full hover:bg-purple-200 dark:hover:bg-purple-900/60 transition-colors font-medium w-full sm:w-auto"
                     >
                       Saldo Total ({formatCurrency(totalPending)})
                     </button>
@@ -838,7 +838,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       id="R$-100-button"
                       type="button"
                       onClick={() => setDistributionAmount("100")}
-                      className="px-4 py-2 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
+                      className="px-4 py-2 text-xs bg-gray-100 dark:bg-dark-bg-tertiary text-gray-700 dark:text-dark-text-secondary rounded-full hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary transition-colors"
                     >
                       R$ 100
                     </button>
@@ -846,7 +846,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       id="R$-500-button"
                       type="button"
                       onClick={() => setDistributionAmount("500")}
-                      className="px-4 py-2 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
+                      className="px-4 py-2 text-xs bg-gray-100 dark:bg-dark-bg-tertiary text-gray-700 dark:text-dark-text-secondary rounded-full hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary transition-colors"
                     >
                       R$ 500
                     </button>
@@ -854,7 +854,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       id="R$-1000-button"
                       type="button"
                       onClick={() => setDistributionAmount("1000")}
-                      className="px-4 py-2 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
+                      className="px-4 py-2 text-xs bg-gray-100 dark:bg-dark-bg-tertiary text-gray-700 dark:text-dark-text-secondary rounded-full hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary transition-colors"
                     >
                       R$ 1.000
                     </button>
@@ -866,8 +866,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   <label
                     className={`flex sm:inline-flex justify-center sm:justify-start items-center gap-2 px-4 py-2.5 rounded-full cursor-pointer transition-all ${
                       withDiscount
-                        ? "bg-purple-100 text-purple-700"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-150"
+                        ? "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300"
+                        : "bg-gray-100 dark:bg-dark-bg-tertiary text-gray-600 dark:text-dark-text-secondary hover:bg-gray-150"
                     }`}
                   >
                     <input
@@ -887,16 +887,16 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
                 {/* Valor acima do vencido: juros/multa ou adiantamento */}
                 {!withDiscount && !acordoAtivo && vencidoTotal > 0.01 && (
-                  <p className="mt-3 text-xs text-gray-500">
+                  <p className="mt-3 text-xs text-gray-500 dark:text-dark-text-secondary">
                     Vencido hoje:{" "}
-                    <span className="font-semibold text-red-600">
+                    <span className="font-semibold text-red-600 dark:text-red-400">
                       {formatCurrency(vencidoTotal)}
                     </span>
                   </p>
                 )}
                 {temExcedente && (
-                  <div className="mt-3 p-4 border border-amber-200 bg-amber-50 rounded-2xl">
-                    <p className="text-sm font-semibold text-amber-900 mb-2">
+                  <div className="mt-3 p-4 border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 rounded-2xl">
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-2">
                       O valor passa {formatCurrency(excedente)} do vencido.
                       Esse excedente é:
                     </p>
@@ -919,8 +919,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                           key={valor}
                           className={`flex-1 cursor-pointer rounded-2xl border-2 px-3 py-2 transition-colors ${
                             destinoExcedente === valor
-                              ? "border-amber-500 bg-white"
-                              : "border-amber-200 bg-amber-50 hover:bg-white"
+                              ? "border-amber-500 dark:border-amber-500 bg-white dark:bg-dark-bg-secondary"
+                              : "border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 hover:bg-white dark:hover:bg-dark-bg-tertiary"
                           }`}
                         >
                           <input
@@ -931,10 +931,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             onChange={() => setDestinoExcedente(valor)}
                             className="sr-only"
                           />
-                          <span className="block text-sm font-semibold text-gray-900">
+                          <span className="block text-sm font-semibold text-gray-900 dark:text-dark-text">
                             {rotulo}
                           </span>
-                          <span className="block text-xs text-gray-600">
+                          <span className="block text-xs text-gray-600 dark:text-dark-text-secondary">
                             {ajuda}
                           </span>
                         </label>
@@ -948,7 +948,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               <div className="mb-6">
                 <label
                   htmlFor="payment-method"
-                  className="block text-base font-semibold text-gray-900 mb-3"
+                  className="block text-base font-semibold text-gray-900 dark:text-dark-text mb-3"
                 >
                   Forma de Pagamento
                 </label>
@@ -957,7 +957,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   name="paymentMethod"
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-dark-border rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm dark:bg-dark-bg dark:text-dark-text"
                 >
                   <option value="dinheiro">Dinheiro</option>
                   <option value="pix">PIX</option>
@@ -970,7 +970,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               <div className="mb-6">
                 <label
                   htmlFor="observations"
-                  className="block text-base font-semibold text-gray-900 mb-3"
+                  className="block text-base font-semibold text-gray-900 dark:text-dark-text mb-3"
                 >
                   Observações
                 </label>
@@ -979,7 +979,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   name="observations"
                   value={observations}
                   onChange={(e) => setObservations(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-dark-border rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm dark:bg-dark-bg dark:text-dark-text"
                   rows={3}
                   placeholder="Adicione observações sobre este pagamento..."
                   required
@@ -993,21 +993,21 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     {saleDistribution.map((item) => (
                       <div
                         key={item.sale.saleNumber}
-                        className={`bg-white rounded-2xl border-2 p-4 transition-all duration-200 ${
+                        className={`bg-white dark:bg-dark-bg-secondary rounded-2xl border-2 p-4 transition-all duration-200 ${
                           item.appliedAmount > 0
-                            ? "border-purple-300 bg-purple-50 shadow-md"
-                            : "border-gray-200 hover:border-gray-300"
+                            ? "border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 shadow-md"
+                            : "border-gray-200 dark:border-dark-border hover:border-gray-300"
                         }`}
                       >
                         {/* Cabeçalho da Venda */}
                         <div className="flex items-center justify-between mb-3">
                           <div>
-                            <h4 className="text-base font-semibold text-gray-900">
+                            <h4 className="text-base font-semibold text-gray-900 dark:text-dark-text">
                               {item.sale.saleNumber === 0
                                 ? "Venda Renegociada"
                                 : `Venda #${item.sale.saleNumber}`}
                             </h4>
-                            <div className="text-sm text-gray-600">
+                            <div className="text-sm text-gray-600 dark:text-dark-text-secondary">
                               {item.sale.installments?.length || 0} parcela
                               {(item.sale.installments?.length || 0) !== 1
                                 ? "s"
@@ -1015,10 +1015,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-xs text-gray-600">
+                            <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
                               Valor Total
                             </div>
-                            <div className="font-semibold text-gray-900 text-base">
+                            <div className="font-semibold text-gray-900 dark:text-dark-text text-base">
                               {formatCurrency(item.sale.totalValue || 0)}
                             </div>
                           </div>
@@ -1026,29 +1026,29 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
                         {/* Informações de Pagamento */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                          <div className="bg-gray-50 rounded-2xl p-3">
-                            <div className="text-xs text-gray-600 mb-1">
+                          <div className="bg-gray-50 dark:bg-dark-bg-tertiary rounded-2xl p-3">
+                            <div className="text-xs text-gray-600 dark:text-dark-text-secondary mb-1">
                               Recebido Atualmente
                             </div>
-                            <div className="font-semibold text-gray-900 text-base">
+                            <div className="font-semibold text-gray-900 dark:text-dark-text text-base">
                               {formatCurrency(item.currentReceived)}
                             </div>
                           </div>
 
-                          <div className="bg-green-50 rounded-2xl p-3">
-                            <div className="text-xs text-gray-600 mb-1">
+                          <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-3">
+                            <div className="text-xs text-gray-600 dark:text-dark-text-secondary mb-1">
                               Novo Total Recebido
                             </div>
-                            <div className="font-semibold text-green-600 text-base">
+                            <div className="font-semibold text-green-600 dark:text-green-400 text-base">
                               {formatCurrency(item.newAmount)}
                             </div>
                           </div>
 
-                          <div className="bg-purple-50 rounded-2xl p-3">
-                            <div className="text-xs text-gray-600 mb-1">
+                          <div className="bg-purple-50 dark:bg-purple-900/20 rounded-2xl p-3">
+                            <div className="text-xs text-gray-600 dark:text-dark-text-secondary mb-1">
                               Valor Aplicado
                             </div>
-                            <div className="font-semibold text-purple-600 text-base">
+                            <div className="font-semibold text-purple-600 dark:text-purple-400 text-base">
                               +{formatCurrency(item.appliedAmount)}
                             </div>
                           </div>
@@ -1058,21 +1058,21 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         <div className="mt-3 flex items-center justify-between">
                           {item.willBeComplete ? (
                             item.appliedDiscount > 0 ? (
-                              <div className="flex items-center text-blue-600 text-sm font-medium">
+                              <div className="flex items-center text-blue-600 dark:text-blue-400 text-sm font-medium">
                                 <TrendingDown className="h-4 w-4 mr-1" />
                                 Quitado com Desconto:{" "}
                                 {formatCurrency(item.appliedDiscount)}
                               </div>
                             ) : (
-                              <div className="flex items-center text-green-600 text-sm font-medium">
+                              <div className="flex items-center text-green-600 dark:text-green-400 text-sm font-medium">
                                 <CheckCircle className="h-4 w-4 mr-1" />
                                 Venda Quitada
                               </div>
                             )
                           ) : (
-                            <div className="text-sm text-gray-600">
+                            <div className="text-sm text-gray-600 dark:text-dark-text-secondary">
                               Saldo devedor:{" "}
-                              <span className="font-medium text-red-600">
+                              <span className="font-medium text-red-600 dark:text-red-400">
                                 {formatCurrency(
                                   Math.max(
                                     0,
@@ -1094,7 +1094,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               {/* Botões de Ação -- sticky pra nunca ficar escondido rolando o
                   conteúdo (ex.: muitas vendas na distribuição, ou o aviso de
                   acordo ativo empurrando o resto pra baixo). */}
-              <div className="sticky bottom-0 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 mt-6 px-4 sm:px-6 py-4 sm:py-6 bg-white border-t border-gray-200 z-10">
+              <div className="sticky bottom-0 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 mt-6 px-4 sm:px-6 py-4 sm:py-6 bg-white dark:bg-dark-bg-secondary border-t border-gray-200 dark:border-dark-border z-10">
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:justify-end">
                   <button
                     id="confirm-button"
@@ -1118,7 +1118,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     id="cancel-button"
                     type="button"
                     onClick={onClose}
-                    className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors font-medium text-base"
+                    className="w-full sm:w-auto px-6 py-2 border border-gray-300 dark:border-dark-border text-gray-700 dark:text-dark-text-secondary rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary transition-colors font-medium text-base"
                   >
                     Cancelar
                   </button>
@@ -1129,18 +1129,18 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         </div>
         {showRescheduleModal && (
           <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[120]">
-            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
-              <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
-                <h3 className="text-base font-semibold text-gray-900 flex items-center">
-                  <RefreshCw className="h-5 w-5 mr-2 text-blue-600" />
+            <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-xl max-w-md w-full mx-4">
+              <div className="px-4 lg:px-6 py-4 border-b border-gray-200 dark:border-dark-border">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-dark-text flex items-center">
+                  <RefreshCw className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
                   {ehCarteira ? "Agendar próximo contato" : "Reagendar Visita"}
                 </h3>
               </div>
 
               <div className="px-4 lg:px-6 py-4">
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-sm text-gray-600 dark:text-dark-text-secondary mb-4">
                   Depois deste pagamento ainda ficam{" "}
-                  <strong className="text-red-600">
+                  <strong className="text-red-600 dark:text-red-400">
                     {formatCurrency(vencidoRestante)}
                   </strong>{" "}
                   vencidos.{" "}
@@ -1149,7 +1149,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     : "Agende a próxima visita."}
                 </p>
                 {ehCarteira && contatoAgendado && (
-                  <p className="text-xs text-gray-500 mb-4">
+                  <p className="text-xs text-gray-500 dark:text-dark-text-secondary mb-4">
                     O contato agendado para{" "}
                     {contatoAgendado.scheduledDate.split("-").reverse().join("/")}{" "}
                     será concluído com este pagamento.
@@ -1166,7 +1166,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                           className={`flex-1 px-3 py-2 rounded-2xl border text-sm font-medium transition-colors ${
                             rescheduleChannel === canal
                               ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-gray-50 text-gray-600 border-gray-200"
+                              : "bg-gray-50 dark:bg-dark-bg-tertiary text-gray-600 dark:text-dark-text-secondary border-gray-200 dark:border-dark-border"
                           }`}
                         >
                           {CHANNEL_LABEL[canal]}
@@ -1177,7 +1177,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   <div>
                     <label
                       htmlFor="reschedule-date"
-                      className="block text-sm font-medium text-gray-700 mb-2"
+                      className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-2"
                     >
                       {ehCarteira ? "Data do contato *" : "Nova Data *"}
                     </label>
@@ -1190,7 +1190,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         min={hoje}
                         value={rescheduleDate}
                         onChange={(e) => setRescheduleDate(e.target.value)}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base dark:bg-dark-bg dark:text-dark-text"
                         required
                       />
                     </div>
@@ -1199,7 +1199,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   <div>
                     <label
                       htmlFor="reschedule-time"
-                      className="block text-sm font-medium text-gray-700 mb-2"
+                      className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-2"
                     >
                       {ehCarteira ? "Horário (opcional)" : "Novo Horário *"}
                     </label>
@@ -1211,24 +1211,24 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         type="time"
                         value={rescheduleTime}
                         onChange={(e) => setRescheduleTime(e.target.value)}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base dark:bg-dark-bg dark:text-dark-text"
                         required={!ehCarteira}
                       />
                     </div>
                   </div>
                   {rescheduleError && (
-                    <p className="text-sm text-red-600">{rescheduleError}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400">{rescheduleError}</p>
                   )}
                 </div>
               </div>
 
-              <div className="px-4 lg:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
+              <div className="px-4 lg:px-6 py-4 border-t border-gray-200 dark:border-dark-border flex flex-col sm:flex-row gap-3">
                 <button
                   id="cancel-reschedule-button"
                   type="button"
                   onClick={() => setShowRescheduleModal(false)}
                   disabled={loading}
-                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-base"
+                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 dark:border-dark-border text-gray-700 dark:text-dark-text-secondary rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-base"
                 >
                   Voltar
                 </button>
