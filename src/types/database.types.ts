@@ -1213,6 +1213,7 @@ export type Database = {
           collector_name: string | null;
           created_at: string | null;
           discount_amount: number | null;
+          juros_amount: number;
           distribution_details: Json | null;
           estorno_de: string | null;
           id: string;
@@ -1234,6 +1235,7 @@ export type Database = {
           collector_name?: string | null;
           created_at?: string | null;
           discount_amount?: number | null;
+          juros_amount?: number;
           distribution_details?: Json | null;
           estorno_de?: string | null;
           id?: string;
@@ -1255,6 +1257,7 @@ export type Database = {
           collector_name?: string | null;
           created_at?: string | null;
           discount_amount?: number | null;
+          juros_amount?: number;
           distribution_details?: Json | null;
           estorno_de?: string | null;
           id?: string;
@@ -1952,6 +1955,7 @@ export type Database = {
           p_notes?: string;
           p_payment_amount: number;
           p_payment_method?: string;
+          p_juros_amount?: number;
           p_sale_number?: number;
         };
         Returns: undefined;

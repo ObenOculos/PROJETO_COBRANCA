@@ -3574,6 +3574,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             clientDocument: payment.clientDocument,
             paymentAmount: payment.paymentAmount || 0,
             discountAmount: payment.discountAmount || 0,
+            jurosAmount: payment.jurosAmount || 0,
             paymentMethod: payment.paymentMethod,
             notes: payment.notes,
             collectorId: collectorId,
@@ -3593,6 +3594,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         p_payment_method: payment.paymentMethod || "default",
         p_notes: payment.notes || "",
         p_sale_number: payment.saleNumber ?? undefined,
+        p_juros_amount: payment.jurosAmount || 0,
       });
 
       if (error) {

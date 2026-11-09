@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo } from "react";
+import React, { useState, useEffect, useMemo, memo } from "react";
 import {
   X,
   DollarSign,
@@ -11,12 +11,50 @@ import {
   Clock,
   Info,
 } from "lucide-react";
-import { ClientGroup, SaleGroup, ScheduledVisit } from "../../types";
+import {
+  ClientGroup,
+  CollectionAttempt,
+  SaleGroup,
+  ScheduledVisit,
+  ScheduledVisitChannel,
+} from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useOffline } from "../../hooks/useOffline";
 import { useNotifications } from "../../contexts/NotificationContext";
-import { formatCurrency } from "../../utils/formatters";
+import { calculateOverdueDays, formatCurrency } from "../../utils/formatters";
+import { supabase } from "../../lib/supabase";
+import { todayLocalStr } from "../../config/visitStatus";
+import {
+  channelsForCollectorType,
+  isWalletCollectorType,
+} from "../../config/profiles";
+import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
+import { isForaDaCobranca } from "../../types/status";
+import {
+  clientBalanceSplit,
+  hasInstallmentBalance,
+  round2,
+} from "../../filters/clientStatus";
+
+const CHANNEL_LABEL: Record<ScheduledVisitChannel, string> = {
+  presencial: "Visita",
+  ligacao: "Ligação",
+  whatsapp: "WhatsApp",
+};
+
+const FORMA_PAGAMENTO_LABEL: Record<string, string> = {
+  dinheiro: "Dinheiro",
+  pix: "PIX",
+  cartao_credito: "Cartão de crédito",
+  cartao_debito: "Cartão de débito",
+};
+
+/** Hora local "HH:MM" -- para barrar reagendamento hoje em horario que ja passou. */
+const horaLocalAgora = () => {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 
 interface GeneralPaymentModalProps {
   clientGroup: ClientGroup;
@@ -36,8 +74,14 @@ interface SaleDistributionItem {
 
 const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
   ({ clientGroup, clientSales, onClose, onSuccess }) => {
-    const { scheduleVisit, processSalePayment, getAcordoAtivoDoCliente } =
-      useCollection();
+    const {
+      scheduleVisit,
+      processSalePayment,
+      getAcordoAtivoDoCliente,
+      acordoAtivoOverdueMap,
+      scheduledVisits,
+      fetchScheduledVisits,
+    } = useCollection();
     const acordoAtivo = clientGroup.document
       ? getAcordoAtivoDoCliente(clientGroup.document)
       : undefined;
@@ -54,7 +98,91 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const [showRescheduleModal, setShowRescheduleModal] = useState(false);
     const [rescheduleDate, setRescheduleDate] = useState("");
     const [rescheduleTime, setRescheduleTime] = useState("");
+    const [rescheduleError, setRescheduleError] = useState("");
     const [observations, setObservations] = useState(""); // New state
+    // Excedente acima do vencido: juros/multa (nao abate parcela) ou
+    // adiantamento das proximas parcelas. Sem escolha = nao deixa confirmar.
+    const [destinoExcedente, setDestinoExcedente] = useState<
+      "juros" | "adiantamento" | null
+    >(null);
+
+    // Perfil de quem registra: cobrador de carteira agenda CONTATO
+    // (ligacao/WhatsApp) e registra a interacao; externo agenda VISITA; gestor
+    // so registra o pagamento.
+    const ehCarteira = isWalletCollectorType(user?.type);
+    const ehExterno = user?.type === "collector";
+    const canaisCarteira = channelsForCollectorType(user?.type).filter(
+      (c) => c !== "presencial",
+    );
+    const [rescheduleChannel, setRescheduleChannel] =
+      useState<ScheduledVisitChannel>(canaisCarteira[0] ?? "ligacao");
+    const hoje = todayLocalStr();
+
+    // Contato agendado ATIVO deste cliente, do proprio cobrador de carteira:
+    // o pagamento conclui ele (mesma regra do "Atender" -- RPC
+    // registrar_contato).
+    const contatoAgendado = useMemo(
+      () =>
+        ehCarteira && user
+          ? scheduledVisits.find(
+              (v) =>
+                v.clientDocument === clientGroup.document &&
+                v.status === "agendada" &&
+                v.collectorId === user.id &&
+                v.channel !== "presencial",
+            )
+          : undefined,
+      [ehCarteira, user, scheduledVisits, clientGroup.document],
+    );
+
+    // Parcelas em aberto na MESMA ordem em que o process_payment aplica
+    // (vencimento mais antigo primeiro): o vencido e pago antes do a vencer,
+    // mesmo quando esta em vendas diferentes. Com acordo ativo, os titulos
+    // do acordo nao sao pagaveis aqui e nao temos a lista deles nesta tela --
+    // ai a distribuicao segue a regra antiga (por venda) e o excedente nao e
+    // tratado como juros.
+    const parcelasAbertas = useMemo(() => {
+      const lista: {
+        sale: SaleGroup;
+        idParcela: number;
+        vencimento: string;
+        saldo: number;
+        vencida: boolean;
+      }[] = [];
+      (clientSales || []).forEach((sale) =>
+        sale.installments?.forEach((inst) => {
+          if (isForaDaCobranca(inst.status) || !hasInstallmentBalance(inst)) {
+            return;
+          }
+          lista.push({
+            sale,
+            idParcela: inst.id_parcela,
+            vencimento: inst.data_vencimento ?? "",
+            saldo: round2(
+              (inst.valor_original || 0) -
+                (inst.valor_recebido || 0) -
+                (inst.desconto || 0),
+            ),
+            vencida: calculateOverdueDays(inst.data_vencimento) > 0,
+          });
+        }),
+      );
+      return lista.sort(
+        (a, b) =>
+          a.vencimento.localeCompare(b.vencimento) || a.idParcela - b.idParcela,
+      );
+    }, [clientSales]);
+
+    // Vencido do cliente (mesma regra da carteira: clientBalanceSplit, que
+    // com acordo ativo segue o cronograma do acordo).
+    const vencidoTotal = useMemo(
+      () =>
+        clientBalanceSplit(
+          { document: clientGroup.document, sales: clientSales },
+          acordoAtivoOverdueMap,
+        ).vencido,
+      [clientGroup.document, clientSales, acordoAtivoOverdueMap],
+    );
 
     // Desabilitar scroll do body quando o modal estiver aberto
     useEffect(() => {
@@ -88,6 +216,32 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         : 0;
     const showDiscountBox = discountAmount >= 0 && withDiscount;
 
+    // Excedente sobre o vencido -- pergunta se e juros/multa ou adiantamento.
+    // So sem desconto e sem acordo ativo (ver parcelasAbertas).
+    const excedente =
+      !withDiscount && !acordoAtivo && vencidoTotal > 0.01
+        ? round2(Math.max(0, amountToDistribute - vencidoTotal))
+        : 0;
+    const temExcedente = excedente > 0.01;
+    const jurosValor = temExcedente && destinoExcedente === "juros" ? excedente : 0;
+    // Principal = o que abate parcelas.
+    const principal = round2(amountToDistribute - jurosValor);
+
+    // Vencido que sobra depois deste pagamento: decide se pede reagendamento.
+    const vencidoRestante = useMemo(() => {
+      if (withDiscount) return 0; // quitacao total
+      if (acordoAtivo) return vencidoTotal; // pagamento aqui nao abate o acordo
+      let resto = principal;
+      let sobra = 0;
+      parcelasAbertas.forEach((p) => {
+        const aplicado = Math.min(Math.max(resto, 0), p.saldo);
+        resto -= aplicado;
+        if (p.vencida) sobra += p.saldo - aplicado;
+      });
+      return round2(sobra);
+    }, [withDiscount, acordoAtivo, vencidoTotal, principal, parcelasAbertas]);
+    const precisaAcompanhamento = vencidoRestante > 0.01;
+
     // Calcular distribuição automática por venda
     const calculateSaleDistribution = React.useCallback(() => {
       const paymentAmount = parseFloat(distributionAmount) || 0;
@@ -95,6 +249,45 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       // sentido "quitar" sem receber nada (desconto de 100%).
       if (paymentAmount <= 0) {
         setSaleDistribution([]);
+        return;
+      }
+
+      // Sem desconto e sem acordo: distribui parcela a parcela, vencimento
+      // mais antigo primeiro (mesma ordem do process_payment), e soma por
+      // venda. Antes ia pela venda de MENOR saldo, o que podia mandar o
+      // dinheiro para parcela a vencer com outra venda em atraso.
+      if (!withDiscount && !acordoAtivo) {
+        const porVenda = new Map<number, { sale: SaleGroup; aplicado: number }>();
+        let resto = principal;
+        parcelasAbertas.forEach((p) => {
+          if (resto <= 0.001) return;
+          const aplicado = round2(Math.min(resto, p.saldo));
+          resto = round2(resto - aplicado);
+          const atual = porVenda.get(p.sale.saleNumber) ?? {
+            sale: p.sale,
+            aplicado: 0,
+          };
+          atual.aplicado = round2(atual.aplicado + aplicado);
+          porVenda.set(p.sale.saleNumber, atual);
+        });
+        const saldoDaVenda = (saleNumber: number) =>
+          round2(
+            parcelasAbertas
+              .filter((p) => p.sale.saleNumber === saleNumber)
+              .reduce((s, p) => s + p.saldo, 0),
+          );
+        setSaleDistribution(
+          Array.from(porVenda.values())
+            .filter((v) => v.aplicado > 0)
+            .map(({ sale, aplicado }) => ({
+              sale,
+              currentReceived: sale.totalReceived || 0,
+              appliedAmount: aplicado,
+              appliedDiscount: 0,
+              newAmount: (sale.totalReceived || 0) + aplicado,
+              willBeComplete: saldoDaVenda(sale.saleNumber) - aplicado <= 0.01,
+            })),
+        );
         return;
       }
 
@@ -133,7 +326,15 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       }
 
       setSaleDistribution(newDistribution);
-    }, [distributionAmount, clientSales, withDiscount, totalPending]);
+    }, [
+      distributionAmount,
+      clientSales,
+      withDiscount,
+      totalPending,
+      acordoAtivo,
+      principal,
+      parcelasAbertas,
+    ]);
 
     // Recalcular distribuição quando o valor mudar
     useEffect(() => {
@@ -190,9 +391,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         return;
       }
 
-      // Sem desconto, não permite pagar mais que o saldo devedor (o excedente
-      // seria descartado silenciosamente na distribuição).
-      if (!withDiscount && inputAmount > totalPending + 0.01) {
+      // Sem desconto, não permite abater mais que o saldo devedor (o excedente
+      // seria descartado silenciosamente na distribuição). Juros/multa não
+      // abatem parcela, por isso ficam fora desta conta.
+      if (!withDiscount && principal > totalPending + 0.01) {
         showErrorNotification(
           new Error(
             `O valor não pode ser maior que o saldo devedor (${formatCurrency(totalPending)}).`,
@@ -212,55 +414,197 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         return;
       }
 
-      const totalToDistribute =
-        inputAmount + (withDiscount ? calculatedDiscount : 0);
-      const newPendingValue = totalPending - totalToDistribute;
-
-      if (newPendingValue > 0.01 && !withDiscount) {
-        // Pagamento parcial, mostrar modal de reagendamento primeiro
-        setShowRescheduleModal(true);
-      } else {
-        // Pagamento integral ou com desconto, processar diretamente
-        try {
-          setLoading(true);
-
-          // Process each distributed sale individually
-          for (const item of saleDistribution) {
-            if (item.appliedAmount > 0 || item.appliedDiscount > 0) {
-              await processSalePayment(
-                {
-                  saleNumber: item.sale.saleNumber,
-                  clientDocument: clientGroup.document || "",
-                  paymentAmount: item.appliedAmount,
-                  paymentMethod: paymentMethod,
-                  notes: observations.trim(),
-                  discountAmount: item.appliedDiscount,
-                },
-                user.id,
-              );
-            }
-          }
-
-          // Verificar se houve desconto aplicado e notificar manager
-          const totalDiscountApplied = saleDistribution.reduce(
-            (sum, item) => sum + item.appliedDiscount,
-            0,
-          );
-
-          if (totalDiscountApplied > 0) {
-            notifyManagerAboutDiscount(totalDiscountApplied);
-          }
-
-          showSuccessNotification("Pagamento distribuído com sucesso!");
-          onSuccess();
-          onClose();
-        } catch (error) {
-          console.error("Erro ao aplicar distribuição:", error);
-          showErrorNotification(error);
-        } finally {
-          setLoading(false);
-        }
+      if (temExcedente && !destinoExcedente) {
+        showErrorNotification(
+          new Error(
+            `Informe se os ${formatCurrency(excedente)} acima do valor vencido são juros/multa ou adiantamento das próximas parcelas.`,
+          ),
+        );
+        return;
       }
+
+      // Ainda sobra valor VENCIDO: pede o proximo contato (carteira) ou a
+      // proxima visita (externo). Cliente que ficou em dia -- so parcelas a
+      // vencer -- nao precisa reagendar. Gestor so registra o pagamento.
+      if (precisaAcompanhamento && (ehCarteira || ehExterno)) {
+        setRescheduleError("");
+        setShowRescheduleModal(true);
+        return;
+      }
+
+      await registrarPagamento(null);
+    };
+
+    /**
+     * Texto automatico da interacao gravada junto do pagamento (Historico de
+     * Contatos): quanto, como, o que cada parcela recebeu e como o cliente
+     * ficou. Ex.: "Pagamento de R$ 150,61 (PIX): parcela de 05/11 quitada;
+     * R$ 3,11 de juros/multa. Cliente ficou sem valor vencido."
+     */
+    const resumoDoPagamento = (): string => {
+      const dataBR = (iso: string) =>
+        iso ? iso.slice(0, 10).split("-").reverse().slice(0, 2).join("/") : "?";
+      const partes: string[] = [];
+      if (withDiscount) {
+        partes.push(
+          `quitação com desconto de ${formatCurrency(Math.max(0, totalPending - amountToDistribute))}`,
+        );
+      } else if (!acordoAtivo) {
+        // Mesma alocacao da distribuicao (vencimento mais antigo primeiro).
+        let resto = principal;
+        parcelasAbertas.forEach((p) => {
+          if (resto <= 0.001) return;
+          const aplicado = round2(Math.min(resto, p.saldo));
+          resto = round2(resto - aplicado);
+          partes.push(
+            aplicado >= p.saldo - 0.01
+              ? `parcela de ${dataBR(p.vencimento)} quitada`
+              : `${formatCurrency(aplicado)} abatidos da parcela de ${dataBR(p.vencimento)}`,
+          );
+        });
+      }
+      if (jurosValor > 0) {
+        partes.push(`${formatCurrency(jurosValor)} de juros/multa`);
+      }
+      const forma = FORMA_PAGAMENTO_LABEL[paymentMethod] ?? paymentMethod;
+      const situacao = precisaAcompanhamento
+        ? `Ainda restam ${formatCurrency(vencidoRestante)} vencidos.`
+        : "Cliente ficou sem valor vencido.";
+      return `Pagamento de ${formatCurrency(amountToDistribute)} (${forma})${
+        partes.length ? `: ${partes.join("; ")}` : ""
+      }. ${situacao}`;
+    };
+
+    /**
+     * Grava o pagamento (uma chamada de process_payment por venda) e, para
+     * cobrador, o acompanhamento:
+     *  - carteira: interacao "Pagamento integral/parcial" + conclusao do
+     *    contato agendado + proximo contato, numa transacao (RPC
+     *    registrar_contato, a mesma do "Atender");
+     *  - externo: nova visita presencial, se ainda sobra vencido.
+     * O pagamento e o acompanhamento sao gravados em passos separados: se o
+     * segundo falhar, o pagamento continua valendo e o aviso diz o que faltou.
+     */
+    const registrarPagamento = async (
+      agendamento: {
+        data: string;
+        horario: string;
+        canal: ScheduledVisitChannel;
+      } | null,
+    ) => {
+      if (!user) return;
+      try {
+        setLoading(true);
+
+        // Juros/multa vao junto da primeira venda (um registro so).
+        let jurosPendente = jurosValor;
+        for (const item of saleDistribution) {
+          if (item.appliedAmount > 0 || item.appliedDiscount > 0) {
+            await processSalePayment(
+              {
+                saleNumber: item.sale.saleNumber,
+                clientDocument: clientGroup.document || "",
+                paymentAmount: item.appliedAmount,
+                paymentMethod: paymentMethod,
+                notes: observations.trim(),
+                discountAmount: item.appliedDiscount,
+                jurosAmount: jurosPendente,
+              },
+              user.id,
+            );
+            jurosPendente = 0;
+          }
+        }
+
+        // Verificar se houve desconto aplicado e notificar manager
+        const totalDiscountApplied = saleDistribution.reduce(
+          (sum, item) => sum + item.appliedDiscount,
+          0,
+        );
+        if (totalDiscountApplied > 0) {
+          notifyManagerAboutDiscount(totalDiscountApplied);
+        }
+      } catch (error) {
+        console.error("Erro ao aplicar distribuição:", error);
+        showErrorNotification(error);
+        setLoading(false);
+        return;
+      }
+
+      let avisoAcompanhamento: string | null = null;
+      try {
+        if (ehCarteira && isOnline) {
+          const resultado: CollectionAttempt["result"] = precisaAcompanhamento
+            ? "partial_payment"
+            : "full_payment";
+          const rotulo = ATTEMPT_RESULT_LABELS[resultado];
+          const titulos = Array.from(
+            new Set(parcelasAbertas.map((p) => p.idParcela.toString())),
+          );
+          const detalhe = resumoDoPagamento();
+          const { error } = await supabase.rpc("registrar_contato", {
+            p_documento: clientGroup.document,
+            p_nome_cliente: clientGroup.client,
+            p_titulos: titulos,
+            p_data: hoje,
+            p_tipo:
+              contatoAgendado?.channel === "whatsapp" ? "whatsapp" : "call",
+            p_resultado: resultado,
+            p_notas: `${detalhe}\nObs.: ${observations.trim()}`,
+            p_visita_id: contatoAgendado?.id,
+            p_rotulo_resultado: rotulo,
+            p_reagendar: false,
+            p_proxima_data: agendamento?.data || undefined,
+            p_proximo_horario: agendamento?.horario || undefined,
+            p_proximo_canal: agendamento ? agendamento.canal : undefined,
+            p_notas_proximo: agendamento
+              ? `Acompanhamento: ${rotulo} — restam ${formatCurrency(vencidoRestante)} vencidos`
+              : undefined,
+          });
+          if (error) throw error;
+        } else if (ehCarteira) {
+          avisoAcompanhamento =
+            "Pagamento na fila offline. Registre o contato pelo “Atender” quando voltar a conexão.";
+        } else if (ehExterno && agendamento) {
+          const visitData: Omit<ScheduledVisit, "id" | "createdAt"> = {
+            collectorId: user.id,
+            clientDocument: clientGroup.document,
+            clientName: clientGroup.client,
+            scheduledDate: agendamento.data,
+            scheduledTime: agendamento.horario,
+            status: "agendada",
+            notes: `Visita reagendada após pagamento parcial — restam ${formatCurrency(vencidoRestante)} vencidos.`,
+            clientAddress: clientGroup.address,
+            clientNeighborhood: clientGroup.neighborhood,
+            clientCity: clientGroup.city,
+            totalPendingValue: round2(totalPending - principal),
+            overdueCount: 0, // This might need adjustment based on real data
+            channel: "presencial",
+          };
+          await scheduleVisit(visitData);
+        }
+        if (ehCarteira || ehExterno) await fetchScheduledVisits(false);
+      } catch (error) {
+        console.error("Erro ao registrar acompanhamento do pagamento:", error);
+        const msg =
+          error instanceof Error
+            ? error.message
+            : ((error as { message?: string })?.message ?? String(error));
+        avisoAcompanhamento = `Pagamento registrado, mas ${ehCarteira ? "o contato" : "a visita"} não foi salvo: ${msg}`;
+      }
+
+      setLoading(false);
+      if (avisoAcompanhamento) {
+        showErrorNotification(new Error(avisoAcompanhamento));
+      } else {
+        showSuccessNotification(
+          agendamento
+            ? `Pagamento registrado e ${ehCarteira ? "próximo contato agendado" : "visita reagendada"}!`
+            : "Pagamento distribuído com sucesso!",
+        );
+      }
+      onSuccess();
+      onClose();
     };
 
     const showSuccessNotification = (message?: string) => {
@@ -313,77 +657,32 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     };
 
     const handleConfirmReschedule = async () => {
-      if (!rescheduleDate || !rescheduleTime) {
-        alert("Por favor, informe a data e a hora para o reagendamento.");
+      if (!rescheduleDate) {
+        setRescheduleError("Informe a data.");
         return;
       }
-
-      if (!user) {
-        alert("Usuário não identificado");
+      if (ehExterno && !rescheduleTime) {
+        setRescheduleError("Informe a data e o horário da visita.");
         return;
       }
-
-      try {
-        setLoading(true);
-
-        // Primeiro, processar o pagamento parcial
-        // Iterate over saleDistribution to process each distributed sale individually
-        for (const item of saleDistribution) {
-          if (item.appliedAmount > 0 || item.appliedDiscount > 0) {
-            await processSalePayment(
-              {
-                saleNumber: item.sale.saleNumber,
-                clientDocument: clientGroup.document || "",
-                paymentAmount: item.appliedAmount,
-                paymentMethod: paymentMethod,
-                notes: observations.trim(),
-                discountAmount: item.appliedDiscount,
-              },
-              user.id,
-            );
-          }
-        }
-
-        // Verificar se houve desconto aplicado e notificar manager
-        const totalDiscountApplied = saleDistribution.reduce(
-          (sum, item) => sum + item.appliedDiscount,
-          0,
-        );
-
-        if (totalDiscountApplied > 0) {
-          notifyManagerAboutDiscount(totalDiscountApplied);
-        }
-
-        // Depois, agendar a nova visita
-        const visitData: Omit<ScheduledVisit, "id" | "createdAt"> = {
-          collectorId: user.id,
-          clientDocument: clientGroup.document,
-          clientName: clientGroup.client,
-          scheduledDate: rescheduleDate,
-          scheduledTime: rescheduleTime,
-          status: "agendada",
-          notes: "Visita reagendada após pagamento parcial.",
-          clientAddress: clientGroup.address,
-          clientNeighborhood: clientGroup.neighborhood,
-          clientCity: clientGroup.city,
-          totalPendingValue:
-            totalPending - (parseFloat(distributionAmount) || 0),
-          overdueCount: 0, // This might need adjustment based on real data
-        };
-
-        await scheduleVisit(visitData);
-
-        showSuccessNotification(
-          "Pagamento realizado e visita reagendada com sucesso!",
-        );
-        onSuccess();
-        onClose();
-      } catch (error) {
-        console.error("Erro ao reagendar visita:", error);
-        showErrorNotification(error);
-      } finally {
-        setLoading(false);
+      if (rescheduleDate < hoje) {
+        setRescheduleError("A data não pode estar no passado.");
+        return;
       }
+      if (
+        rescheduleDate === hoje &&
+        rescheduleTime &&
+        rescheduleTime <= horaLocalAgora()
+      ) {
+        setRescheduleError("Esse horário de hoje já passou.");
+        return;
+      }
+      setRescheduleError("");
+      await registrarPagamento({
+        data: rescheduleDate,
+        horario: rescheduleTime,
+        canal: ehCarteira ? rescheduleChannel : "presencial",
+      });
     };
 
     return (
@@ -585,6 +884,64 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     </span>
                   </label>
                 </div>
+
+                {/* Valor acima do vencido: juros/multa ou adiantamento */}
+                {!withDiscount && !acordoAtivo && vencidoTotal > 0.01 && (
+                  <p className="mt-3 text-xs text-gray-500">
+                    Vencido hoje:{" "}
+                    <span className="font-semibold text-red-600">
+                      {formatCurrency(vencidoTotal)}
+                    </span>
+                  </p>
+                )}
+                {temExcedente && (
+                  <div className="mt-3 p-4 border border-amber-200 bg-amber-50 rounded-2xl">
+                    <p className="text-sm font-semibold text-amber-900 mb-2">
+                      O valor passa {formatCurrency(excedente)} do vencido.
+                      Esse excedente é:
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      {(
+                        [
+                          [
+                            "juros",
+                            "Juros / multa",
+                            "Fica registrado no pagamento e não abate nenhuma parcela.",
+                          ],
+                          [
+                            "adiantamento",
+                            "Adiantamento",
+                            "Abate as próximas parcelas a vencer.",
+                          ],
+                        ] as const
+                      ).map(([valor, rotulo, ajuda]) => (
+                        <label
+                          key={valor}
+                          className={`flex-1 cursor-pointer rounded-2xl border-2 px-3 py-2 transition-colors ${
+                            destinoExcedente === valor
+                              ? "border-amber-500 bg-white"
+                              : "border-amber-200 bg-amber-50 hover:bg-white"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="destinoExcedente"
+                            value={valor}
+                            checked={destinoExcedente === valor}
+                            onChange={() => setDestinoExcedente(valor)}
+                            className="sr-only"
+                          />
+                          <span className="block text-sm font-semibold text-gray-900">
+                            {rotulo}
+                          </span>
+                          <span className="block text-xs text-gray-600">
+                            {ajuda}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Forma de Pagamento */}
@@ -776,22 +1133,53 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
                 <h3 className="text-base font-semibold text-gray-900 flex items-center">
                   <RefreshCw className="h-5 w-5 mr-2 text-blue-600" />
-                  Reagendar Visita
+                  {ehCarteira ? "Agendar próximo contato" : "Reagendar Visita"}
                 </h3>
               </div>
 
               <div className="px-4 lg:px-6 py-4">
                 <p className="text-sm text-gray-600 mb-4">
-                  O cliente ainda possui saldo devedor. Por favor, agende uma
-                  nova visita.
+                  Depois deste pagamento ainda ficam{" "}
+                  <strong className="text-red-600">
+                    {formatCurrency(vencidoRestante)}
+                  </strong>{" "}
+                  vencidos.{" "}
+                  {ehCarteira
+                    ? "Quando você vai falar com o cliente de novo?"
+                    : "Agende a próxima visita."}
                 </p>
+                {ehCarteira && contatoAgendado && (
+                  <p className="text-xs text-gray-500 mb-4">
+                    O contato agendado para{" "}
+                    {contatoAgendado.scheduledDate.split("-").reverse().join("/")}{" "}
+                    será concluído com este pagamento.
+                  </p>
+                )}
                 <div className="space-y-4">
+                  {ehCarteira && canaisCarteira.length > 1 && (
+                    <div className="flex gap-2">
+                      {canaisCarteira.map((canal) => (
+                        <button
+                          key={canal}
+                          type="button"
+                          onClick={() => setRescheduleChannel(canal)}
+                          className={`flex-1 px-3 py-2 rounded-2xl border text-sm font-medium transition-colors ${
+                            rescheduleChannel === canal
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-gray-50 text-gray-600 border-gray-200"
+                          }`}
+                        >
+                          {CHANNEL_LABEL[canal]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div>
                     <label
                       htmlFor="reschedule-date"
                       className="block text-sm font-medium text-gray-700 mb-2"
                     >
-                      Nova Data *
+                      {ehCarteira ? "Data do contato *" : "Nova Data *"}
                     </label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -799,6 +1187,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         id="reschedule-date"
                         name="reschedule-date"
                         type="date"
+                        min={hoje}
                         value={rescheduleDate}
                         onChange={(e) => setRescheduleDate(e.target.value)}
                         className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
@@ -812,7 +1201,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       htmlFor="reschedule-time"
                       className="block text-sm font-medium text-gray-700 mb-2"
                     >
-                      Novo Horário *
+                      {ehCarteira ? "Horário (opcional)" : "Novo Horário *"}
                     </label>
                     <div className="relative">
                       <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -823,10 +1212,13 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         value={rescheduleTime}
                         onChange={(e) => setRescheduleTime(e.target.value)}
                         className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
-                        required
+                        required={!ehCarteira}
                       />
                     </div>
                   </div>
+                  {rescheduleError && (
+                    <p className="text-sm text-red-600">{rescheduleError}</p>
+                  )}
                 </div>
               </div>
 
@@ -838,17 +1230,21 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   disabled={loading}
                   className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-base"
                 >
-                  Cancelar
+                  Voltar
                 </button>
                 <button
                   id="confirm-reschedule-button"
                   type="button"
                   onClick={handleConfirmReschedule}
-                  disabled={loading || !rescheduleDate || !rescheduleTime}
+                  disabled={
+                    loading || !rescheduleDate || (!ehCarteira && !rescheduleTime)
+                  }
                   className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-base"
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  {loading ? "Agendando..." : "Confirmar Agendamento"}
+                  {loading
+                    ? "Salvando..."
+                    : "Confirmar pagamento e agendamento"}
                 </button>
               </div>
             </div>

@@ -110,6 +110,76 @@ card da carteira, "Atender" com razão social + "Falar com" e as 2 etapas
 (fechado sem gravar). Todos OK. Observação: cliente usado no teste do gestor
 não tinha cobrador (por isso não aparecia na carteira) — não é defeito.
 
+### Item 36 — "Distribuir Pagamento": juros, vencido × a vencer e acompanhamento por perfil — 2026-11-09
+
+**Caso real.** Cobrador interno recebeu a parcela vencida com juros. O
+excedente (juros) abateu a parcela seguinte, a vencer; o modal tratou como
+"pagamento parcial" porque o saldo TOTAL (com parcelas a vencer) não zerou e
+pediu reagendamento; o reagendamento virou **visita presencial** (invisível na
+agenda do cobrador de carteira, que só lê ligação/WhatsApp, e bloqueando novos
+agendamentos do cliente pelo índice de um ativo por cliente); nenhuma
+interação foi gravada. Limpeza feita com autorização: visita cancelada (status,
+sem apagar) e interação registrada.
+
+**Como juros funcionava.** App e `process_payment` não têm juros: tudo que
+passa da parcela abate a próxima. O Ciclone registra juros/multa à parte na
+baixa (`fntbd_valorjuro`/`fntbd_valormulta`) e o sync traz só o principal
+(valor − saldo) e **sobrescreve o recebido de todas as parcelas a cada
+execução**. Medido: das 104 mudanças de parcela feitas por pagamento no app,
+74 foram alteradas depois pelo sync, 59 para menos — parte é baixa ainda não
+lançada no Ciclone (tema da conciliação app × Ciclone, pendente da reunião).
+
+**Mudanças:**
+- Migration `20261109000008_pagamento_juros_separado`:
+  `sale_payments.juros_amount` (≥ 0) e `process_payment(..., p_juros_amount)`
+  (DROP + CREATE, corpo de produção). `payment_amount` continua sendo o
+  principal aplicado nas parcelas.
+- Modal: quando o valor passa do vencido, pergunta se o excedente é **juros/
+  multa** (não abate parcela) ou **adiantamento**. Distribuição parcela a
+  parcela, vencimento mais antigo primeiro (antes: venda de menor saldo
+  primeiro). Com acordo ativo segue a regra antiga, sem a pergunta.
+- Reagendar só se **sobrar vencido**. Carteira: grava a interação
+  ("Pagamento integral/parcial") + conclui o contato agendado + próximo
+  contato ligação/WhatsApp pela RPC `registrar_contato` (a mesma do
+  "Atender"). Externo: visita presencial. Gestor: só o pagamento.
+- Data/horário no passado bloqueados; sem `alert()` nessa janela.
+- Pagamento e acompanhamento em passos separados: se o segundo falhar, o
+  pagamento vale e o aviso diz o que faltou.
+- Histórico de Contatos (Detalhes do Cliente) agrupa as linhas gravadas
+  juntas: um contato de carteira grava uma linha por título em aberto e a
+  tela mostrava o mesmo contato repetido (4× num cliente com 4 títulos).
+- Limpeza do caso: a interação ficou duplicada (o cobrador registrou pelo
+  "Atender" minutos antes da limpeza); por decisão do usuário ficou a da
+  limpeza e as 4 linhas do cobrador foram apagadas (cópia guardada antes).
+
+### Item 35 — Detalhes do Cliente: velocidade e aba "Histórico" para todos — 2026-11-09
+
+**Travamento.** O saldo de cada venda (`calculateSaleBalance`) varria a lista
+inteira de títulos carregada a cada chamada, e o modal chamava isso 3× por
+venda ao abrir e 1× por venda visível a cada clique; as funções do contexto
+eram recriadas a cada atualização, então os `useMemo` do modal nunca
+aproveitavam. Corrigido sem mudar regra: índice "títulos por cliente"
+(`rawCollectionsByDocument`/`collectionsByDocument`) no `CollectionContext`,
+`calculateSaleBalance`/`getSalePayments` com `useCallback`, e no modal o
+saldo de cada venda é calculado uma vez (`saldoPorVenda`). A consulta de
+token a cada 3 s só roda com pedido pendente. Fica para depois (se ainda
+engasgar com atualização em tempo real): memoizar o `value` do contexto.
+
+**Histórico.** Antes: "Histórico" (carteira + baixas) só para o gestor, e o
+Histórico de Contatos/visitas/reagendamentos escondido dentro de "Ver Dados".
+Agora "Ver Dados" é só cadastro + Ciclone; "Histórico" existe para todos com
+contatos, visitas realizadas, reincidência e baixas. Só o gestor vê a linha do
+tempo da carteira e os nomes (quem registrou, carteira de quem). No banco,
+`atribuicoes_historico` e `recebimentos_historico` deixam de ser legíveis por
+qualquer logado (migration `20261109000007_historico_leitura_por_perfil`):
+gestor vê tudo; cobrador vê a atribuição em que está envolvido e as baixas de
+parcelas da carteira dele. Antes de aplicar, conferido que só telas de gestor
+leem essas tabelas e que os gatilhos que gravam são `SECURITY DEFINER`.
+Aplicada em 2026-11-09, `check:db` OK. Simulado no banco (transação
+descartada): cobrador interno com 1.122 clientes leu 2.860 atribuições (0 de
+outros) e 6.355 baixas de 1.057 clientes; gestor leu tudo (16.797 / 140.958).
+Falta teste na tela.
+
 ### Item 34 — Carteira: mostrar o que precisa ser cobrado — análise 2026-11-09
 
 Dúvida do usuário: cliente com ~R$ 450 só em parcelas a vencer na carteira

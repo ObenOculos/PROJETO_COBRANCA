@@ -30,6 +30,7 @@ export interface DistributePaymentAction {
     clientDocument: string;
     paymentAmount: number;
     discountAmount?: number;
+    jurosAmount?: number;
     paymentMethod?: string;
     notes?: string;
     collectorId: string;
@@ -321,6 +322,7 @@ export const useOffline = () => {
       p_payment_method: paymentData.paymentMethod || "default",
       p_notes: paymentData.notes || "",
       p_sale_number: paymentData.saleNumber ?? undefined,
+      p_juros_amount: paymentData.jurosAmount || 0,
     });
 
     if (error) {

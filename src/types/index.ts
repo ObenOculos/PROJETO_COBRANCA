@@ -697,6 +697,8 @@ export interface SalePaymentInput {
   paymentMethod?: string;
   notes?: string;
   discountAmount?: number;
+  /** Juros/multa pagos junto: registrados no pagamento, nao abatem parcela. */
+  jurosAmount?: number;
 }
 
 // Acordo de renegociacao (parcelamento futuro combinado com o cliente).
