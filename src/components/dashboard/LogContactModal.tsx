@@ -9,6 +9,7 @@ import {
   Info,
   ArrowLeft,
   ArrowRight,
+  Phone,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
@@ -107,8 +108,20 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
     fetchScheduledVisits,
     rescheduleVisit,
     scheduleVisit,
+    clientesRegistry,
   } = useCollection();
   const today = todayLocalStr();
+
+  // Pessoa de contato do ERP Ciclone (mesma origem do bloco "Falar com" da
+  // ficha): o cobrador esta ligando, precisa saber por quem perguntar.
+  const cadastroErp = clientesRegistry.get(client.document);
+  const contatoNome = cadastroErp?.contato_nome?.trim() || undefined;
+  const telefonesContato = [
+    cadastroErp?.contato_telefone,
+    cadastroErp?.contato_telefone2,
+  ]
+    .map((t) => t?.trim())
+    .filter((t): t is string => Boolean(t));
   const linkedChannel: ScheduledVisitChannel =
     linkedVisit?.channel && linkedVisit.channel !== "presencial"
       ? linkedVisit.channel
@@ -446,6 +459,14 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
               {linkedVisit &&
                 ` · agendado para ${formatDateBR(linkedVisit.scheduledDate)}${linkedVisit.scheduledTime ? ` ${linkedVisit.scheduledTime.slice(0, 5)}` : ""}`}
             </p>
+            {client.razaoSocial && (
+              <p
+                className="text-[11px] text-gray-400 dark:text-dark-text-secondary truncate"
+                title={`Razão social: ${client.razaoSocial}`}
+              >
+                {client.razaoSocial}
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -454,6 +475,30 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
+
+        {/* Pessoa de contato (ERP Ciclone) */}
+        {(contatoNome || telefonesContato.length > 0) && (
+          <div className="px-6 pt-4">
+            <div className="px-3 py-2 rounded-xl bg-gray-50 dark:bg-dark-bg-secondary border border-gray-100 dark:border-dark-border text-xs text-gray-600 dark:text-dark-text-secondary flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <span>
+                Falar com{" "}
+                <strong className="text-gray-900 dark:text-dark-text">
+                  {contatoNome ?? "contato do cadastro"}
+                </strong>
+              </span>
+              {telefonesContato.map((telefone) => (
+                <a
+                  key={telefone}
+                  href={`tel:${telefone}`}
+                  className="font-bold text-indigo-600 hover:text-indigo-700"
+                >
+                  {telefone}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Indicador de etapas */}
         {!skipStep2 && (

@@ -87,7 +87,9 @@ const ContactScheduler: React.FC<ContactSchedulerProps> = ({
       if (cityFilter && c.city !== cityFilter) return false;
       if (!term) return true;
       return (
-        c.client.toLowerCase().includes(term) || c.document.includes(term)
+        c.client.toLowerCase().includes(term) ||
+        Boolean(c.razaoSocial?.toLowerCase().includes(term)) ||
+        c.document.includes(term)
       );
     });
   }, [selectableClients, search, cityFilter]);
@@ -249,7 +251,7 @@ const ContactScheduler: React.FC<ContactSchedulerProps> = ({
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              placeholder="Buscar por nome ou CPF/CNPJ..."
+              placeholder="Buscar por nome, razão social ou CPF/CNPJ..."
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-200 outline-none transition-all dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
             />
           </div>
@@ -312,6 +314,14 @@ const ContactScheduler: React.FC<ContactSchedulerProps> = ({
                   <p className="text-sm font-bold text-gray-800 dark:text-dark-text truncate">
                     {c.client}
                   </p>
+                  {c.razaoSocial && (
+                    <p
+                      className="text-[11px] text-gray-500 dark:text-dark-text-secondary truncate"
+                      title={`Razão social: ${c.razaoSocial}`}
+                    >
+                      {c.razaoSocial}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-400">
                     {c.document} {c.city ? `• ${c.city}` : ""}
                   </p>
