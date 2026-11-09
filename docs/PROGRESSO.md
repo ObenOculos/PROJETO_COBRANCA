@@ -37,6 +37,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 26 | Razão social + contato/vendedor/região do Ciclone no cadastro do cliente — migration, sync e front no ar (2026-11-06); gestor testado na tela e cobrador/Termo conferidos por código+dados; "Atender" e agenda de contato com razão social/"Falar com" (`cf68ed7`); publicado (push 2026-11-09) — falta ver o PDF do Termo; telefone do ERP no card e saudação do WhatsApp a decidir | Média | Pequeno/médio |
 | 27 | ~~Detalhes do Cliente: parcela paga/atrasada decidida pelo texto do status ("recebido" do Ciclone aparecia atrasado)~~ — `15e780a`, publicado e testado no site 2026-11-09 | Alta | Pequeno |
 | 28 | ~~Busca por CPF/CNPJ exigia a máscara~~ — `f756638`, publicado 2026-11-09 (histórico de Autorizações, busca no servidor, ficou de fora) | Baixa | Pequeno |
+| 30 | "Distribuir Pagamento" dá 400 em venda do Ciclone com número > 2.147.483.647 (parâmetro/coluna `integer`; 562 clientes com saldo afetados) — migration `20261109000002` aplicada 2026-11-09, `check:db` OK; falta o usuário repetir o pagamento real | **Alta** | Pequeno |
 | 29 | Código do cliente do Ciclone (`pgcln_codigo`) no cadastro — migration `20261109000001` aplicada + `check:db` OK, sync rodado (1.888 clientes com código); falta publicar o front e testar na tela | Média | Pequeno |
 
 ## Perguntas em aberto para o financeiro
@@ -104,6 +105,33 @@ parcelas recebidas do Ciclone verdes e sem atraso e "Maior atraso" igual ao
 card da carteira, "Atender" com razão social + "Falar com" e as 2 etapas
 (fechado sem gravar). Todos OK. Observação: cliente usado no teste do gestor
 não tinha cobrador (por isso não aparecia na carteira) — não é defeito.
+
+### Item 30 — Número da venda do Ciclone não cabe em `integer` no pagamento — 2026-11-09
+
+Usuário: "Distribuir Pagamento" deu `400` num cliente real. Causa:
+`BANCO_DADOS.numero_titulo` é `bigint` (o Ciclone gera números como
+2603244482; o maior é 23121321703), mas o pagamento usava `integer` no
+parâmetro `p_sale_number` de `process_payment` e de
+`registrar_ajuste_recebimento` ("Editar Pagamentos") e na coluna
+`sale_payments.sale_number`. Acima de 2.147.483.647 o PostgREST recusa a
+chamada antes de executar — nada é gravado. 4.028 títulos acima do limite;
+562 clientes com saldo afetados (o cliente do relato tinha só esse título em
+aberto). Não tem relação com as mudanças do dia: o número vem do Ciclone desde
+a importação; foi a primeira tentativa de pagar uma dessas vendas pelo app.
+
+Migration `20261109000002_numero_venda_bigint_no_pagamento`: os três viram
+`bigint`. Corpos das funções **gerados de produção** (`pg_get_functiondef`)
+por script, trocando só o tipo — diff contra produção = só a assinatura.
+DROP + CREATE (o tipo do parâmetro é parte da assinatura) com EXECUTE para
+`authenticated`/`service_role`, como em produção. A view
+`daily_payment_report` depende da coluna e é recriada igual (definição,
+comentário e grants de produção). Front não muda (número JS cobre até 2^53).
+**Aplicada 2026-11-09** (`db push` do usuário): `check:db` OK; conferido no
+banco — só as assinaturas `bigint` existem (nenhuma sobrecarga `integer`
+sobrando), ACL/SECURITY DEFINER/search_path iguais aos de antes, coluna
+`bigint`, view com os mesmos grants respondendo; 1.133 pagamentos intactos.
+Pendência anotada: `GeneralPaymentModal` ainda usa `alert()` nativo em
+validações.
 
 ### Item 29 — Código do cliente do Ciclone — 2026-11-09 (em andamento)
 
