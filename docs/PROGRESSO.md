@@ -110,6 +110,17 @@ card da carteira, "Atender" com razão social + "Falar com" e as 2 etapas
 (fechado sem gravar). Todos OK. Observação: cliente usado no teste do gestor
 não tinha cobrador (por isso não aparecia na carteira) — não é defeito.
 
+### Item 38 — Carteira: filtro "já entrei em contato" — 2026-11-09
+
+Pedido dos cobradores: cliente contatado hoje continuava na agenda igual aos
+outros, sem filtro. Na tela do cobrador de carteira: card **"Contatados
+hoje"** (clicável, filtra), botões **Contato: Todos · Contatados hoje ·
+Últimos 7 dias · Sem contato há 7+ dias** (valem para a Agenda e a Carteira
+completa; os KPIs de valor seguem com a carteira inteira) e selo verde
+**"✓ Contatado hoje"** na coluna "Última interação". Regra: qualquer
+interação registrada (`collection_attempts`, mesma fonte da coluna "Última
+interação"). Só front. Falta testar na tela.
+
 ### Publicação 2026-11-09 (tarde) — itens 29 a 37
 
 Commits `25de5dd`…`6d48d2e` publicados na `master` ao longo do dia, cada um

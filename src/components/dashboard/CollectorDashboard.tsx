@@ -6,6 +6,7 @@ import {
   Target,
   Clock,
   CheckCircle,
+  UserCheck,
   Users,
   Calendar,
   Trophy,
@@ -486,6 +487,28 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return map;
   }, [myCollections, attemptsByCollection]);
 
+  // Filtro "ja entrei em contato": pela ULTIMA interacao registrada do
+  // cliente (lastContacts, mesma fonte da coluna "Ultima interacao"). Pedido
+  // dos cobradores (2026-11-09): achar facil quem ja foi contatado hoje /
+  // na semana, sem precisar ordenar a carteira e ir olhando.
+  type FiltroInteracao = "todos" | "hoje" | "semana" | "sem";
+  const [filtroInteracao, setFiltroInteracao] =
+    useState<FiltroInteracao>("todos");
+  const interacaoDoCliente = React.useCallback(
+    (documento: string): Exclude<FiltroInteracao, "todos"> => {
+      const last = lastContacts[documento];
+      if (!last) return "sem";
+      const hojeData = new Date(todayLocalStr() + "T00:00:00");
+      const dias = Math.floor(
+        (hojeData.getTime() - last.date.getTime()) / 86400000,
+      );
+      if (dias <= 0) return "hoje";
+      if (dias <= SEM_CONTATO_DIAS) return "semana";
+      return "sem";
+    },
+    [lastContacts],
+  );
+
   // Lista de trabalho: so quem ainda deve. Quem quitou segue atribuido e conta
   // no recebido (meta), mas sai da carteira.
   const openClientGroups = useMemo(
@@ -509,6 +532,27 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     );
     return openClientGroups.filter((g) => matchedDocs.has(g.document));
   }, [openClientGroups, walletFiltersParaFiltragem, getFilteredCollections, user]);
+
+  // Contagem por situacao de contato (botoes do filtro) e a lista que a
+  // Agenda e a Carteira completa mostram. "Ultimos 7 dias" inclui hoje.
+  const contagemInteracao = useMemo(() => {
+    const c = { hoje: 0, semana: 0, sem: 0 };
+    walletFilteredGroups.forEach((g) => {
+      const situacao = interacaoDoCliente(g.document);
+      c[situacao] += 1;
+    });
+    return { hoje: c.hoje, semana: c.hoje + c.semana, sem: c.sem };
+  }, [walletFilteredGroups, interacaoDoCliente]);
+  const gruposVisiveis = useMemo(() => {
+    if (filtroInteracao === "todos") return walletFilteredGroups;
+    return walletFilteredGroups.filter((g) => {
+      const situacao = interacaoDoCliente(g.document);
+      if (filtroInteracao === "semana") {
+        return situacao === "hoje" || situacao === "semana";
+      }
+      return situacao === filtroInteracao;
+    });
+  }, [walletFilteredGroups, filtroInteracao, interacaoDoCliente]);
 
   // Item 34: saldo de cada cliente dividido em VENCIDO (o que se cobra hoje)
   // e A VENCER (so negociavel). Calculado uma vez por cliente e reusado na
@@ -556,7 +600,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       return { urgentes: [] as ClientGroup[], urgenteInfoByDocument: info };
     }
     const ranked: { group: ClientGroup; diasRestantes: number }[] = [];
-    walletFilteredGroups.forEach((group) => {
+    gruposVisiveis.forEach((group) => {
       const atraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
       const diasRestantes = diasAteSairDasRegras(
         minhasRegras,
@@ -577,7 +621,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       urgenteInfoByDocument: info,
     };
   }, [
-    walletFilteredGroups,
+    gruposVisiveis,
     minhasRegras,
     temRegraComTeto,
     lastContacts,
@@ -600,7 +644,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   };
 
   const sortedWalletFilteredGroups = useMemo(() => {
-    if (!sortKey) return walletFilteredGroups;
+    if (!sortKey) return gruposVisiveis;
     const valueFor = (g: ClientGroup): number | string => {
       switch (sortKey) {
         case "cliente":
@@ -618,7 +662,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           return "";
       }
     };
-    return [...walletFilteredGroups].sort((a, b) => {
+    return [...gruposVisiveis].sort((a, b) => {
       const va = valueFor(a);
       const vb = valueFor(b);
       const cmp =
@@ -628,7 +672,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [
-    walletFilteredGroups,
+    gruposVisiveis,
     sortKey,
     sortDir,
     lastContacts,
@@ -896,11 +940,11 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [walletFilters, walletTab, sortKey, sortDir]);
+  }, [walletFilters, walletTab, sortKey, sortDir, filtroInteracao]);
 
   // Carteira completa: diretório com todo mundo em aberto, não só quem
   // sobrou da agenda — é a visão de "navegar tudo" que a Agenda não dá.
-  const totalPages = Math.ceil(walletFilteredGroups.length / itemsPerPage);
+  const totalPages = Math.ceil(gruposVisiveis.length / itemsPerPage);
   const paginatedClients = useMemo(() => {
     return sortedWalletFilteredGroups.slice(
       (currentPage - 1) * itemsPerPage,
@@ -1134,7 +1178,29 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <button
+          type="button"
+          onClick={() =>
+            setFiltroInteracao((f) => (f === "hoje" ? "todos" : "hoje"))
+          }
+          title="Clientes com qualquer interação registrada hoje — clique para filtrar"
+          className={`text-left rounded-2xl border p-3 flex items-center gap-2 transition-colors ${
+            filtroInteracao === "hoje"
+              ? "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-800"
+              : "bg-white dark:bg-dark-bg border-gray-200 dark:border-dark-border hover:bg-green-50 dark:hover:bg-green-900/10"
+          }`}
+        >
+          <UserCheck className="w-4 h-4 text-green-600 shrink-0" />
+          <div>
+            <p className="text-[11px] text-gray-500 leading-tight">
+              Contatados hoje
+            </p>
+            <p className="text-lg font-bold text-green-600 leading-tight">
+              {contagemInteracao.hoje}
+            </p>
+          </div>
+        </button>
         <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-3 flex items-center gap-2">
           <CalendarClock className="w-4 h-4 text-purple-600 shrink-0" />
           <div>
@@ -1218,6 +1284,45 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           </div>
         }
       />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-gray-500 dark:text-dark-text-secondary mr-1">
+          Contato:
+        </span>
+        {(
+          [
+            ["todos", "Todos", walletFilteredGroups.length],
+            ["hoje", "Contatados hoje", contagemInteracao.hoje],
+            ["semana", "Últimos 7 dias", contagemInteracao.semana],
+            ["sem", `Sem contato há ${SEM_CONTATO_DIAS}+ dias`, contagemInteracao.sem],
+          ] as const
+        ).map(([valor, rotulo, total]) => (
+          <button
+            key={valor}
+            type="button"
+            onClick={() => setFiltroInteracao(valor)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+              filtroInteracao === valor
+                ? valor === "sem"
+                  ? "bg-gray-700 text-white border-gray-700"
+                  : "bg-green-600 text-white border-green-600"
+                : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
+            }`}
+          >
+            {valor === "hoje" && <UserCheck className="w-3.5 h-3.5" />}
+            {rotulo}
+            <span
+              className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                filtroInteracao === valor
+                  ? "bg-white/20"
+                  : "bg-gray-100 dark:bg-dark-bg-tertiary text-gray-500 dark:text-dark-text-secondary"
+              }`}
+            >
+              {total}
+            </span>
+          </button>
+        ))}
+      </div>
 
       {walletTab === "agenda" ? (
         <>
@@ -1319,7 +1424,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             <div className="p-4 border-t border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50/30 dark:bg-dark-bg-secondary/30">
               <p className="text-xs text-gray-500">
                 Mostrando {paginatedClients.length} de{" "}
-                {walletFilteredGroups.length}
+                {gruposVisiveis.length}
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -1567,9 +1672,16 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
       <td className="px-6 py-4 max-w-xs" onClick={() => onOpenDetail(group)}>
         {lastContact ? (
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
-              {new Date(lastContact.date).toLocaleDateString("pt-BR")}
-            </span>
+            {todayLocalStr(new Date(lastContact.date)) === todayLocalStr() ? (
+              <span className="inline-flex items-center gap-1 w-fit px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                <UserCheck className="w-3 h-3" />
+                Contatado hoje
+              </span>
+            ) : (
+              <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
+                {new Date(lastContact.date).toLocaleDateString("pt-BR")}
+              </span>
+            )}
             <p className="text-xs text-gray-600 dark:text-dark-text-secondary line-clamp-2 italic">
               "{lastContact.note}"
             </p>
