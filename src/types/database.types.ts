@@ -948,6 +948,8 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           ativa: boolean;
+          fila_peso: number | null;
+          fila_peso_tarde: number | null;
           id: string;
           lojas: string[] | null;
           max_dias: number | null;
@@ -960,6 +962,8 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           ativa?: boolean;
+          fila_peso?: number | null;
+          fila_peso_tarde?: number | null;
           id?: string;
           lojas?: string[] | null;
           max_dias?: number | null;
@@ -972,6 +976,8 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           ativa?: boolean;
+          fila_peso?: number | null;
+          fila_peso_tarde?: number | null;
           id?: string;
           lojas?: string[] | null;
           max_dias?: number | null;
@@ -1915,6 +1921,11 @@ export type Database = {
       definir_regra_carteira_ativa: {
         Args: { p_regra_id: string; p_ativa: boolean };
         Returns: Json;
+      };
+      // Migration 20261109000010 (Fila de Cobranca).
+      definir_fila_cobranca: {
+        Args: { p_collector_id: string; p_pesos: Json };
+        Returns: undefined;
       };
       encerrar_regra_carteira: {
         Args: { p_regra_id: string };

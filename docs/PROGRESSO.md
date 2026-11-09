@@ -43,6 +43,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 32 | ~~WhatsApp: mensagem com o valor só em atraso + reaproveitar a mesma aba do WhatsApp Web no computador~~ — 2026-11-09 | Média | Pequeno |
 | 30 | "Distribuir Pagamento" dá 400 em venda do Ciclone com número > 2.147.483.647 (parâmetro/coluna `integer`; 562 clientes com saldo afetados) — migration `20261109000002` aplicada 2026-11-09, `check:db` OK; falta o usuário repetir o pagamento real | **Alta** | Pequeno |
 | 29 | Código do cliente do Ciclone (`pgcln_codigo`) no cadastro — migration `20261109000001` aplicada + `check:db` OK, sync rodado (1.888 clientes com código); falta publicar o front e testar na tela | Média | Pequeno |
+| 39 | Fila de Cobrança: gestor define, na Distribuição, quantos clientes de cada faixa a cada rodada da lista "Ligar" (manhã/tarde opcional) — etapa 1 (configuração) pronta, migration `20261109000010` sem `db push`; etapa 2 (lista intercalada + "deixar para depois") e 3 (supervisão) não iniciadas | Alta | Grande, em etapas |
 
 ## Perguntas em aberto para o financeiro
 
@@ -109,6 +110,40 @@ parcelas recebidas do Ciclone verdes e sem atraso e "Maior atraso" igual ao
 card da carteira, "Atender" com razão social + "Falar com" e as 2 etapas
 (fechado sem gravar). Todos OK. Observação: cliente usado no teste do gestor
 não tinha cobrador (por isso não aparecia na carteira) — não é defeito.
+
+### Item 39 — Fila de Cobrança — etapa 1 em 2026-11-09
+
+Pedido do Fábio/Jaqueline (modelo do Cedrus): o gestor organiza o trabalho
+do cobrador de carteira sem ele trocar filtro — faixas intercaladas numa
+proporção (ex.: a cada 10, 5 de 3–60, 2 de 61–90, 2 de 91–365, 1 de 366+),
+com regras diferentes de manhã e de tarde.
+
+**Decisões fechadas com o usuário:**
+- Dentro da faixa, ordem de hoje (maior atraso primeiro).
+- A fila é a lista de hoje (aba "Ligar"), não um modo "um cliente por vez".
+- "Para hoje" (retornos, promessas, acordo quebrado) segue no topo, fixo.
+- Manhã/Tarde (virada às 12h) é opcional, o gestor liga; padrão desligado.
+- Sem configuração a lista fica como hoje (fila desligada).
+- Etapa 2: "Deixar para depois" na linha, motivo de lista curta, cliente
+  vai para o fim da lista de hoje.
+
+**Etapa 1 (feita, sem commit):** peso na própria regra
+(`collector_overdue_ranges.fila_peso`/`fila_peso_tarde`), mudança por versão
+nova (histórico de quem mudou). RPC `definir_fila_cobranca` grava todas as
+regras do cobrador de uma vez; `salvar_regra_carteira` e
+`definir_regra_carteira_ativa` (corpo de produção) passam a carregar o peso
+para a versão nova. Testada em produção dentro de transação revertida (anon
+recusado, validações, versões, desligar). Tela: bloco "Fila da lista
+Ligar" no cartão de cada cobrador com 2+ faixas ativas na Distribuição,
+com prévia da ordem. Regra única em `src/filters/filaCobranca.ts`
+(`intercalarPorPeso` = round-robin ponderado suave; 5/2/2/1 dá
+A B C A A D A B C A). Peso 0 = fim da lista no turno; faixa nova sem peso
+vale 1.
+
+**Falta:** `db push` da `20261109000010` + `check:db`; teste na tela; etapa 2
+(aplicar a fila na aba "Ligar" do `CollectorDashboard`); etapa 3
+(supervisão: previstos × trabalhados por faixa; referência é o HTML do
+Cedrus que está na raiz, fora do Git).
 
 ### Item 38 — Carteira: filtro "já entrei em contato" — 2026-11-09
 

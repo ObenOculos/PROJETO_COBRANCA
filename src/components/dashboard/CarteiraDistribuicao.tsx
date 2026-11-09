@@ -11,6 +11,7 @@ import {
   Trash2,
   Save,
   Plus,
+  ListOrdered,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
@@ -19,6 +20,13 @@ import {
   USER_TYPE_LABELS,
   distribuicaoPerfisPayload,
 } from "../../config/profiles";
+import {
+  FILA_VIRADA_HORA,
+  filaComTurnos,
+  filaLigada,
+  pesoNaFila,
+  rodadaDaFila,
+} from "../../filters/filaCobranca";
 
 // Formato do jsonb de distribuicao_carteira_previa (migration 20261106000007).
 // "retido" (migration 20261109000005): cliente que uma regra cobre, mas que
@@ -174,6 +182,270 @@ const LojasSelect: React.FC<{
   );
 };
 
+const faixaCurta = (r: CollectorOverdueRange) =>
+  r.maxDias == null ? `${r.minDias}+` : `${r.minDias}–${r.maxDias}`;
+
+interface PesoRascunho {
+  manha: string;
+  tarde: string;
+}
+
+/**
+ * Fila de Cobranca do cobrador (item 39): quantos clientes de cada faixa a
+ * cada rodada da lista "Ligar", com manha/tarde opcional. Regras em
+ * filters/filaCobranca.ts; so faz sentido com 2+ faixas ativas.
+ */
+const FilaDoCobrador: React.FC<{
+  regras: CollectorOverdueRange[];
+  onSalvar: (
+    pesos: { regraId: string; peso: number; pesoTarde: number | null }[],
+  ) => Promise<void>;
+}> = ({ regras, onSalvar }) => {
+  const ativas = regras.filter((r) => r.ativa);
+  const ligada = filaLigada(regras);
+  const comTurnos = filaComTurnos(regras);
+  const [editando, setEditando] = useState(false);
+  const [turnos, setTurnos] = useState(false);
+  const [valores, setValores] = useState<Record<string, PesoRascunho>>({});
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  // Mesmo rotulo para duas faixas iguais em lojas diferentes: diferencia
+  // pela loja.
+  const rotulo = (r: CollectorOverdueRange) => {
+    const repetida = ativas.some((o) => o.id !== r.id && faixaCurta(o) === faixaCurta(r));
+    if (!repetida) return faixaCurta(r);
+    const lojas = r.lojas == null ? "todas" : r.lojas.length === 1 ? r.lojas[0] : `${r.lojas.length} lojas`;
+    return `${faixaCurta(r)} (${lojas})`;
+  };
+
+  const abrir = () => {
+    const v: Record<string, PesoRascunho> = {};
+    ativas.forEach((r) => {
+      const manha = ligada
+        ? (pesoNaFila(r, regras, "manha") ?? 1)
+        : 1;
+      const tarde = ligada ? (pesoNaFila(r, regras, "tarde") ?? manha) : manha;
+      v[r.id] = { manha: String(manha), tarde: String(tarde) };
+    });
+    setValores(v);
+    setTurnos(comTurnos);
+    setErro("");
+    setEditando(true);
+  };
+
+  const numero = (s: string | undefined) => {
+    if (s == null || s.trim() === "") return NaN;
+    const n = Number(s);
+    return Number.isInteger(n) ? n : NaN;
+  };
+
+  const previa = (turno: "manha" | "tarde") =>
+    rodadaDaFila(
+      ativas.map((r) => {
+        const n = numero(turno === "manha" ? valores[r.id]?.manha : valores[r.id]?.tarde);
+        return { rotulo: rotulo(r), peso: Number.isNaN(n) ? 0 : Math.max(0, n) };
+      }),
+    );
+
+  const resumo = (turno: "manha" | "tarde") => {
+    const itens = ativas
+      .map((r) => ({ r, p: pesoNaFila(r, regras, turno) ?? 0 }))
+      .filter(({ p }) => p > 0);
+    const soma = itens.reduce((s, { p }) => s + p, 0);
+    return `a cada ${soma} clientes: ${itens.map(({ r, p }) => `${p} de ${rotulo(r)} dias`).join(" · ")}`;
+  };
+
+  const salvar = async (desligar = false) => {
+    setErro("");
+    // Desligar = lista vazia.
+    const pesos: { regraId: string; peso: number; pesoTarde: number | null }[] = [];
+    if (!desligar) {
+      for (const r of ativas) {
+        const m = numero(valores[r.id]?.manha);
+        const t = turnos ? numero(valores[r.id]?.tarde) : null;
+        if (Number.isNaN(m) || m < 0 || m > 99 || (t != null && (Number.isNaN(t) || t < 0 || t > 99))) {
+          setErro("Use números inteiros de 0 a 99.");
+          return;
+        }
+        pesos.push({ regraId: r.id, peso: m, pesoTarde: t });
+      }
+      const soma = (k: "peso" | "pesoTarde") => pesos.reduce((s, p) => s + (p[k] ?? 0), 0);
+      if (soma("peso") === 0 || (turnos && soma("pesoTarde") === 0)) {
+        setErro(
+          turnos
+            ? "Coloque ao menos uma faixa com número maior que zero na manhã e na tarde."
+            : "Coloque ao menos uma faixa com número maior que zero.",
+        );
+        return;
+      }
+    }
+    setSalvando(true);
+    try {
+      await onSalvar(pesos);
+      setEditando(false);
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Erro ao salvar a fila.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  if (ativas.length < 2) return null;
+
+  if (!editando) {
+    return (
+      <div className="px-4 py-2.5 border-t border-gray-100 dark:border-dark-border flex items-start justify-between gap-3 bg-blue-50/40 dark:bg-blue-900/10 rounded-b-xl">
+        <div className="min-w-0 text-xs text-gray-600 dark:text-dark-text-secondary">
+          <span className="inline-flex items-center gap-1 font-semibold text-gray-800 dark:text-dark-text">
+            <ListOrdered className="h-3.5 w-3.5" />
+            Fila da lista "Ligar":
+          </span>{" "}
+          {!ligada ? (
+            "ordem padrão (maior atraso primeiro, sem intercalar as faixas)."
+          ) : comTurnos ? (
+            <>
+              <span className="block sm:inline">Manhã {resumo("manha")}.</span>{" "}
+              <span className="block sm:inline">Tarde {resumo("tarde")}.</span>
+            </>
+          ) : (
+            `${resumo("manha")}.`
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={abrir}
+          className="shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:text-blue-300 dark:hover:bg-blue-900/30"
+        >
+          {ligada ? "Alterar" : "Configurar fila"}
+        </button>
+      </div>
+    );
+  }
+
+  const inputPeso =
+    "w-16 px-2 py-1 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text";
+
+  return (
+    <div className="px-4 py-3 border-t border-gray-100 dark:border-dark-border bg-blue-50/40 dark:bg-blue-900/10 rounded-b-xl space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-gray-900 dark:text-dark-text flex items-center gap-1.5">
+          <ListOrdered className="h-4 w-4 text-blue-600" />
+          Fila da lista "Ligar"
+        </p>
+        <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-0.5">
+          Quantos clientes de cada faixa a cada rodada. O cobrador vê as faixas
+          misturadas nessa proporção; dentro da faixa, maior atraso primeiro.
+          Retornos e promessas continuam em "Para hoje". Faixa com 0 vai para o
+          fim da lista.
+        </p>
+      </div>
+
+      <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-dark-text cursor-pointer">
+        <input
+          type="checkbox"
+          checked={turnos}
+          onChange={(e) => setTurnos(e.target.checked)}
+        />
+        Separar manhã e tarde (muda às {FILA_VIRADA_HORA}h)
+      </label>
+
+      <table className="text-sm">
+        <thead>
+          <tr className="text-xs text-gray-500 dark:text-dark-text-secondary">
+            <th className="text-left font-medium pr-4 pb-1">Faixa (dias)</th>
+            <th className="font-medium px-1 pb-1">{turnos ? "Manhã" : "Clientes"}</th>
+            {turnos && <th className="font-medium px-1 pb-1">Tarde</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {ativas.map((r) => (
+            <tr key={r.id}>
+              <td className="pr-4 py-0.5 text-gray-800 dark:text-dark-text">{rotulo(r)}</td>
+              <td className="px-1 py-0.5">
+                <input
+                  type="number"
+                  min={0}
+                  max={99}
+                  value={valores[r.id]?.manha ?? ""}
+                  onChange={(e) =>
+                    setValores((p) => ({ ...p, [r.id]: { ...p[r.id], manha: e.target.value } }))
+                  }
+                  className={inputPeso}
+                  aria-label={`${turnos ? "Manhã" : "Clientes"} da faixa ${rotulo(r)}`}
+                />
+              </td>
+              {turnos && (
+                <td className="px-1 py-0.5">
+                  <input
+                    type="number"
+                    min={0}
+                    max={99}
+                    value={valores[r.id]?.tarde ?? ""}
+                    onChange={(e) =>
+                      setValores((p) => ({ ...p, [r.id]: { ...p[r.id], tarde: e.target.value } }))
+                    }
+                    className={inputPeso}
+                    aria-label={`Tarde da faixa ${rotulo(r)}`}
+                  />
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className="text-xs text-gray-600 dark:text-dark-text-secondary space-y-0.5">
+        {(turnos ? (["manha", "tarde"] as const) : (["manha"] as const)).map((t) => {
+          const ordem = previa(t);
+          return (
+            <p key={t}>
+              <span className="font-semibold">
+                {turnos ? (t === "manha" ? "Manhã" : "Tarde") : "Ordem"}:
+              </span>{" "}
+              {ordem.length > 0 ? ordem.join(" | ") : "—"}
+              {ordem.length > 0 && " | e repete"}
+            </p>
+          );
+        })}
+      </div>
+
+      {erro && <p className="text-xs text-red-600">{erro}</p>}
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => void salvar()}
+          disabled={salvando}
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+        >
+          <Save className="h-3.5 w-3.5" />
+          Salvar fila
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditando(false)}
+          disabled={salvando}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg"
+        >
+          Cancelar
+        </button>
+        {ligada && (
+          <button
+            type="button"
+            onClick={() => void salvar(true)}
+            disabled={salvando}
+            className="ml-auto px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg"
+            title="Volta a lista para a ordem padrão (maior atraso primeiro)"
+          >
+            Desligar fila
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 /**
  * Distribuicao da carteira por regra: o gestor define, por cobrador, a
  * faixa de atraso e as lojas que ele atende; a tela mostra a cobertura por
@@ -188,6 +460,7 @@ const CarteiraDistribuicao: React.FC = () => {
     salvarRegraCarteira,
     definirRegraCarteiraAtiva,
     encerrarRegraCarteira,
+    definirFilaCobranca,
   } = useCollection();
 
   const [lojas, setLojas] = useState<LojaCarteira[]>([]);
@@ -805,6 +1078,10 @@ const CarteiraDistribuicao: React.FC = () => {
                     })}
                   </div>
                 )}
+                <FilaDoCobrador
+                  regras={regras}
+                  onSalvar={(pesos) => definirFilaCobranca(c.id, pesos)}
+                />
               </div>
             );
           })}

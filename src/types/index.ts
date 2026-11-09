@@ -55,6 +55,12 @@ export interface CollectorOverdueRange {
   lojas: string[] | null;
   /** Regra desligada fica cadastrada, mas a distribuicao ignora. */
   ativa: boolean;
+  /** Fila de Cobrança (item 39): clientes desta faixa a cada rodada da
+   * lista "Ligar" (manhã, ou o dia todo sem turnos). null = fila desligada.
+   * Regras em `filters/filaCobranca.ts`. */
+  filaPeso: number | null;
+  /** Peso a partir das 12h; null = sem turnos. */
+  filaPesoTarde: number | null;
   vigenteDesde: string;
   vigenteAte: string | null;
 }
@@ -427,6 +433,12 @@ export interface CollectionContextType {
   ) => Promise<void>;
   /** Liga/desliga uma regra (ativar recusa conflito com regra ativa de outro). */
   definirRegraCarteiraAtiva: (regraId: string, ativa: boolean) => Promise<void>;
+  /** Define a Fila de Cobrança do cobrador (pesos por regra; turnos se
+   * pesoTarde preenchido em todas). Lista vazia desliga. Só gestor. */
+  definirFilaCobranca: (
+    collectorId: string,
+    pesos: { regraId: string; peso: number; pesoTarde: number | null }[],
+  ) => Promise<void>;
   /** Fecha o vínculo vigente do cobrador (se houver) e abre um novo com o gestor informado. Só gestor. */
   vincularCobradorAGerente: (
     managerId: string,

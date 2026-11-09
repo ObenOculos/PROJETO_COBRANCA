@@ -701,6 +701,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           maxDias: row.max_dias,
           lojas: row.lojas ?? null,
           ativa: row.ativa ?? true,
+          // Sem a migration 20261109000010 as colunas nao vem: fila desligada.
+          filaPeso: row.fila_peso ?? null,
+          filaPesoTarde: row.fila_peso_tarde ?? null,
           vigenteDesde: row.vigente_desde,
           vigenteAte: row.vigente_ate,
         })),
@@ -772,6 +775,28 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     );
     if (rpcError) {
       console.error("Erro ao ativar/desativar regra:", rpcError);
+      throw new Error(rpcError.message);
+    }
+    await fetchCollectorOverdueRanges();
+  };
+
+  // Fila de Cobranca do cobrador (item 39, migration 20261109000010): grava
+  // os pesos de todas as regras dele de uma vez, criando versao nova so das
+  // que mudaram. Lista vazia desliga a fila.
+  const definirFilaCobranca = async (
+    collectorId: string,
+    pesos: { regraId: string; peso: number; pesoTarde: number | null }[],
+  ) => {
+    const { error: rpcError } = await supabase.rpc("definir_fila_cobranca", {
+      p_collector_id: collectorId,
+      p_pesos: pesos.map((p) => ({
+        regra_id: p.regraId,
+        peso: p.peso,
+        peso_tarde: p.pesoTarde,
+      })),
+    });
+    if (rpcError) {
+      console.error("Erro ao salvar a fila de cobrança:", rpcError);
       throw new Error(rpcError.message);
     }
     await fetchCollectorOverdueRanges();
@@ -5013,6 +5038,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     fetchManagerCollectorLinks,
     salvarRegraCarteira,
     definirRegraCarteiraAtiva,
+    definirFilaCobranca,
     vincularCobradorAGerente,
     desvincularCobrador,
     encerrarRegraCarteira,
