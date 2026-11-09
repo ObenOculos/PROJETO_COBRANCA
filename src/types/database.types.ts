@@ -1920,11 +1920,11 @@ export type Database = {
       // Migration 20261106000007 (resultado em jsonb, formato em
       // src/components/dashboard/CarteiraDistribuicao.tsx).
       distribuicao_carteira_previa: {
-        Args: { p_perfis: Json };
+        Args: { p_perfis: Json; p_retirar_de?: string[] };
         Returns: Json;
       };
       aplicar_distribuicao_carteira: {
-        Args: { p_perfis: Json };
+        Args: { p_perfis: Json; p_retirar_de?: string[] };
         Returns: Json;
       };
       lojas_carteira: {

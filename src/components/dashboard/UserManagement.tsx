@@ -99,6 +99,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
     collectorOverdueRanges,
     managerCollectorLinks,
     monthlyGoals,
+    refreshCollections,
   } = useCollection();
   const { user: currentUser } = useAuth();
   const [clearVisitsFor, setClearVisitsFor] = useState<{
@@ -129,6 +130,12 @@ const UserManagement: React.FC<UserManagementProps> = ({
     const isDeactivating = u.active ?? true; // estado atual ativo => vamos desativar
     try {
       await updateUser(u.id, { active: !isDeactivating });
+      // Desativar cobrador libera a carteira dele no banco (gatilho
+      // trg_users_libera_carteira_ao_inativar, migration 20261109000004):
+      // recarrega os clientes para a tela refletir.
+      if (isDeactivating && isCollectorType(u.type)) {
+        await refreshCollections();
+      }
       // Ao desativar um cobrador com visitas pendentes, oferece limpá-las.
       if (
         isDeactivating &&

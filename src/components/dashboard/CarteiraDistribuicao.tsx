@@ -21,7 +21,10 @@ import {
 } from "../../config/profiles";
 
 // Formato do jsonb de distribuicao_carteira_previa (migration 20261106000007).
-type AcaoDistribuicao = "entra" | "troca" | "sai";
+// "retido" (migration 20261109000005): cliente que uma regra cobre, mas que
+// esta na carteira de um cobrador ativo SEM regra -- so sai de la se o gestor
+// marcar aquele cobrador; nunca e aplicado sem isso.
+type AcaoDistribuicao = "entra" | "troca" | "sai" | "retido";
 interface ItemPrevia {
   documento: string;
   cliente: string | null;
@@ -60,6 +63,7 @@ const ACAO_LABEL: Record<AcaoDistribuicao, string> = {
   entra: "Entra (estava sem cobrador)",
   troca: "Troca de cobrador",
   sai: "Fica sem cobrador",
+  retido: "Com outro cobrador (só sai se você marcar)",
 };
 const BLOQUEIO_LABEL = {
   acordo_ativo: "acordo ativo",
@@ -200,6 +204,10 @@ const CarteiraDistribuicao: React.FC = () => {
   const [erroDistribuicao, setErroDistribuicao] = useState("");
   const [resultado, setResultado] = useState<string>("");
   const [filtroAcao, setFiltroAcao] = useState<AcaoDistribuicao | "travados" | "">("");
+  // Cobradores sem regra dos quais o GESTOR decidiu retirar os clientes que
+  // as regras cobrem (p_retirar_de). Comeca vazio: a distribuicao nunca tira
+  // de outra carteira sem essa escolha explicita.
+  const [retirarDe, setRetirarDe] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     void (async () => {
@@ -440,6 +448,7 @@ const CarteiraDistribuicao: React.FC = () => {
     try {
       const { data, error } = await supabase.rpc("distribuicao_carteira_previa", {
         p_perfis: distribuicaoPerfisPayload(),
+        p_retirar_de: Array.from(retirarDe),
       });
       if (error) throw error;
       setPrevia(data as unknown as Previa);
@@ -454,15 +463,49 @@ const CarteiraDistribuicao: React.FC = () => {
     }
   };
 
+  // Cobradores sem regra que seguram clientes cobertos pelas regras: os
+  // "retidos" desta simulacao + os ja marcados (depois de marcar e simular,
+  // os clientes deles viram "troca" e deixam de aparecer como retidos).
+  const outrasCarteiras = useMemo(() => {
+    if (!previa) return [];
+    const porCobrador = new Map<string, { clientes: number; travados: number }>();
+    previa.itens.forEach((i) => {
+      if (!i.cobrador_atual) return;
+      const marcado = retirarDe.has(i.cobrador_atual);
+      if (i.acao !== "retido" && !(marcado && i.acao === "troca")) return;
+      const v = porCobrador.get(i.cobrador_atual) ?? { clientes: 0, travados: 0 };
+      v.clientes++;
+      if (i.bloqueado_por) v.travados++;
+      porCobrador.set(i.cobrador_atual, v);
+    });
+    retirarDe.forEach((id) => {
+      if (!porCobrador.has(id)) porCobrador.set(id, { clientes: 0, travados: 0 });
+    });
+    return Array.from(porCobrador.entries()).sort((a, b) => b[1].clientes - a[1].clientes);
+  }, [previa, retirarDe]);
+
+  const alternarRetirarDe = (id: string) => {
+    setRetirarDe((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    // A simulacao atual nao reflete a nova escolha: obriga simular de novo.
+    setPreviaDesatualizada(true);
+    setConfirmAplicar(false);
+  };
+
   const resumo = useMemo(() => {
     if (!previa) return null;
-    const livres = previa.itens.filter((i) => !i.bloqueado_por);
+    const itensPlano = previa.itens.filter((i) => i.acao !== "retido");
+    const livres = itensPlano.filter((i) => !i.bloqueado_por);
     const porCobrador = new Map<string, { recebe: number; perde: number; travados: number }>();
     const get = (id: string) => {
       if (!porCobrador.has(id)) porCobrador.set(id, { recebe: 0, perde: 0, travados: 0 });
       return porCobrador.get(id)!;
     };
-    previa.itens.forEach((i) => {
+    itensPlano.forEach((i) => {
       if (i.bloqueado_por) {
         if (i.cobrador_atual) get(i.cobrador_atual).travados++;
         else if (i.cobrador_destino) get(i.cobrador_destino).travados++;
@@ -475,7 +518,7 @@ const CarteiraDistribuicao: React.FC = () => {
       entra: livres.filter((i) => i.acao === "entra").length,
       troca: livres.filter((i) => i.acao === "troca").length,
       sai: livres.filter((i) => i.acao === "sai").length,
-      travados: previa.itens.length - livres.length,
+      travados: itensPlano.length - livres.length,
       semRegra: previa.sem_regra_por_loja.reduce((a, s) => a + s.clientes, 0),
       porCobrador: Array.from(porCobrador.entries()).sort(
         (a, b) => b[1].recebe + b[1].perde - (a[1].recebe + a[1].perde),
@@ -488,7 +531,7 @@ const CarteiraDistribuicao: React.FC = () => {
     if (!previa) return [];
     return previa.itens.filter((i) =>
       filtroAcao === ""
-        ? true
+        ? i.acao !== "retido"
         : filtroAcao === "travados"
           ? !!i.bloqueado_por
           : i.acao === filtroAcao && !i.bloqueado_por,
@@ -505,6 +548,7 @@ const CarteiraDistribuicao: React.FC = () => {
     try {
       const { data, error } = await supabase.rpc("aplicar_distribuicao_carteira", {
         p_perfis: distribuicaoPerfisPayload(),
+        p_retirar_de: Array.from(retirarDe),
       });
       if (error) throw error;
       const r = data as unknown as {
@@ -537,8 +581,10 @@ const CarteiraDistribuicao: React.FC = () => {
         <p className="text-sm text-gray-600 dark:text-dark-text-secondary mt-1">
           Defina a faixa de atraso e as lojas de cada cobrador. A distribuição
           entrega os clientes sem cobrador a quem a regra cobre e move quem saiu
-          da regra do próprio cobrador. Cobrador sem regra continua com a
-          carteira manual. Nada muda sem você simular e confirmar.
+          da regra do próprio cobrador. Cliente na carteira de quem não tem
+          regra só sai de lá se você marcar esse cobrador na simulação. Cliente
+          com acordo ou agendamento ativo não é movido. Nada muda sem você
+          simular e confirmar.
         </p>
         {lojasErro && (
           <p className="mt-3 text-sm text-red-600">{lojasErro}</p>
@@ -883,6 +929,49 @@ const CarteiraDistribuicao: React.FC = () => {
               </div>
             </div>
 
+            {outrasCarteiras.length > 0 && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 dark:bg-amber-900/20 dark:border-amber-800">
+                <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                  Existem clientes atrelados a outro cobrador nesta distribuição.
+                  Deseja retirar de algum deles?
+                </p>
+                <p className="text-xs text-amber-800 dark:text-amber-300 mt-1">
+                  São clientes que as regras cobrem, mas que estão na carteira de
+                  um cobrador sem regra. Só os cobradores marcados perdem esses
+                  clientes para o dono da regra; os demais ficam como estão.
+                  Clientes que nenhuma regra cobre não saem de ninguém.
+                </p>
+                <div className="mt-3 space-y-1.5">
+                  {outrasCarteiras.map(([id, v]) => (
+                    <label
+                      key={id}
+                      className="flex items-center gap-2 text-sm text-gray-900 dark:text-dark-text cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={retirarDe.has(id)}
+                        onChange={() => alternarRetirarDe(id)}
+                        disabled={simulando || aplicando}
+                        className="h-4 w-4 accent-amber-600"
+                      />
+                      <span className="font-medium">{nomePorId.get(id) ?? id}</span>
+                      <span className="text-xs text-gray-600 dark:text-dark-text-secondary">
+                        {v.clientes} cliente{v.clientes !== 1 ? "s" : ""}
+                        {v.travados > 0 &&
+                          ` (${v.travados} travado${v.travados !== 1 ? "s" : ""} por acordo/agendamento)`}
+                        {retirarDe.has(id) && " · será retirado"}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {previaDesatualizada && (
+                  <p className="text-xs font-semibold text-amber-900 dark:text-amber-200 mt-2">
+                    Simule de novo para ver o efeito da sua escolha.
+                  </p>
+                )}
+              </div>
+            )}
+
             {resumo.porCobrador.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -991,7 +1080,12 @@ const CarteiraDistribuicao: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3 pt-2 border-t border-gray-100 dark:border-dark-border">
               {confirmAplicar && (
                 <span className="text-sm text-gray-700 dark:text-dark-text-secondary">
-                  Isto muda o cobrador de {resumo.totalMudancas} cliente(s). Confirma?
+                  Isto muda o cobrador de {resumo.totalMudancas} cliente(s)
+                  {retirarDe.size > 0 &&
+                    `, retirando clientes de: ${Array.from(retirarDe)
+                      .map((id) => nomePorId.get(id) ?? id)
+                      .join(", ")}`}
+                  . Confirma?
                 </span>
               )}
               {confirmAplicar && (

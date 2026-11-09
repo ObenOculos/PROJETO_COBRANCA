@@ -37,6 +37,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 26 | Razão social + contato/vendedor/região do Ciclone no cadastro do cliente — migration, sync e front no ar (2026-11-06); gestor testado na tela e cobrador/Termo conferidos por código+dados; "Atender" e agenda de contato com razão social/"Falar com" (`cf68ed7`); publicado (push 2026-11-09) — falta ver o PDF do Termo; telefone do ERP no card e saudação do WhatsApp a decidir | Média | Pequeno/médio |
 | 27 | ~~Detalhes do Cliente: parcela paga/atrasada decidida pelo texto do status ("recebido" do Ciclone aparecia atrasado)~~ — `15e780a`, publicado e testado no site 2026-11-09 | Alta | Pequeno |
 | 28 | ~~Busca por CPF/CNPJ exigia a máscara~~ — `f756638`, publicado 2026-11-09 (histórico de Autorizações, busca no servidor, ficou de fora) | Baixa | Pequeno |
+| 33 | Distribuição: tirar cliente de outra carteira só com o gestor marcando o cobrador (checkbox na simulação); "regra mestre" (`0003`) desfeita sem ter sido usada; inativo libera a carteira (`0004`, aplicado) — migration `0005` pronta, falta `db push` e teste na tela | **Alta** | Médio |
 | 31 | ~~Detalhes do Cliente: abas Todos / Em aberto / Pagos na lista de vendas~~ — 2026-11-09 | Média | Pequeno |
 | 32 | ~~WhatsApp: mensagem com o valor só em atraso + reaproveitar a mesma aba do WhatsApp Web no computador~~ — 2026-11-09 | Média | Pequeno |
 | 30 | "Distribuir Pagamento" dá 400 em venda do Ciclone com número > 2.147.483.647 (parâmetro/coluna `integer`; 562 clientes com saldo afetados) — migration `20261109000002` aplicada 2026-11-09, `check:db` OK; falta o usuário repetir o pagamento real | **Alta** | Pequeno |
@@ -107,6 +108,52 @@ parcelas recebidas do Ciclone verdes e sem atraso e "Maior atraso" igual ao
 card da carteira, "Atender" com razão social + "Falar com" e as 2 etapas
 (fechado sem gravar). Todos OK. Observação: cliente usado no teste do gestor
 não tinha cobrador (por isso não aparecia na carteira) — não é defeito.
+
+### Item 33 — Distribuição: regras mestre — 2026-11-09
+
+Usuário: "Jonathan tem 73 clientes, acho que deveria ter mais". Medido: as 4
+faixas dele (todas ativas desde depois de 06/11; 3–60 e 61–90 nas 3 lojas,
+91–365 em Eusébio/Messejana, 366–948 em Eusébio) cobrem 723 clientes com
+saldo; 73 com ele, **650 com cobradores sem regra** (Samila 469, Carlos 79,
+Beatriz 70, Francisco 21, Jurídica 11), nenhum sem cobrador. Não era erro: o
+plano (item 25) tratava carteira de cobrador sem regra como manual.
+
+Decisão do usuário: "as regras da Distribuição são mestre; o que estiver lá
+é o que deve ser". Casos de borda perguntados, respostas: cliente coberto
+vai para o dono da regra **venha de qualquer cobrador** (inclusive externo e
+Jurídica); cliente que nenhuma regra cobre, com cobrador sem regra, **sai**
+(fica sem cobrador). Migration `20261109000003_distribuicao_regra_mestre`:
+`plano_distribuicao_carteira` copiada de produção sem o bloco "cobrador sem
+regra: não mexe" (diff = só esse bloco). Travas mantidas (acordo/agendamento
+ativo, Falecido, "Aguardando <perfil>"). Texto da tela Distribuição
+atualizado. **A migration não move ninguém**: só o "Aplicar" da tela move.
+Impacto esperado grande (todo cobrador sem regra perde a carteira ao
+aplicar) — simular e mostrar por cobrador antes.
+
+**Inativos (migration `20261109000004`, aplicada 2026-11-09)** — pedido do
+usuário: "quando o usuário fica inativo, todos os seus clientes devem ficar
+sem cobrador e vazio". Gatilho `trg_users_libera_carteira_ao_inativar`
+(`active` → false: `user_id` e `situacao` NULL, motivo `cobrador_inativado`
+no histórico, usa a exceção `cobranca.liberacao_autorizada` do
+`protege_atribuicao`) + liberação única de quem já estava inativo: 17.105
+parcelas / 1.828 clientes (Beatriz 811, Samila 766, Luís 251), conferido no
+histórico. Tela Usuários recarrega os clientes ao desativar. Usuário
+confirmou: "a lógica dos inativos está correta".
+
+**Mudança de rumo (mesmo dia, antes de qualquer aplicação):** o usuário
+reviu a regra mestre ("acho que fiz besteira"; "a base do Francisco não é
+para sair"; "esse sistema não deveria retirar da outra carteira — o gestor
+deve ter a responsabilidade"). Nenhuma distribuição tinha sido aplicada com
+a `0003`. Migration `20261109000005_distribuicao_retirar_com_selecao`:
+plano/prévia/aplicar ganham `p_retirar_de uuid[] DEFAULT '{}'` (DROP +
+CREATE; prévia e aplicar copiadas de produção trocando só assinatura e a
+chamada ao plano). Cobrador **ativo sem regra** = carteira manual: cliente
+que nenhuma regra cobre fica; cliente coberto volta como ação `retido` e só
+vai para o dono da regra se o gestor marcou aquele cobrador. Cobrador com
+regra: como antes da `0003`. Inativo não segura nada. Tela: aviso "Existem
+clientes atrelados a outro cobrador nesta distribuição" com checkbox por
+cobrador (desmarcados), marcar exige simular de novo, confirmação cita de
+quem retira. Front publicado chama sem o parâmetro → nada é retirado.
 
 ### Item 32 — WhatsApp: valor em atraso e aba única no computador — 2026-11-09
 
