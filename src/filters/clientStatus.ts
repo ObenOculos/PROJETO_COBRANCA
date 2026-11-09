@@ -176,44 +176,65 @@ export const clientMaxOverdueDays = (
   return maxAtraso;
 };
 
+/** Saldo do cliente dividido entre o que ja venceu e o que ainda vai vencer. */
+export interface ClientBalanceSplit {
+  /** Parcelas com vencimento passado: o que precisa ser cobrado hoje. */
+  vencido: number;
+  /** Parcelas dentro do prazo: so negociavel, nao atrasado. */
+  aVencer: number;
+}
+
 /**
- * Valor EM ATRASO do cliente: soma do saldo so das parcelas ja vencidas --
- * o que ele deve hoje, sem o que ainda vai vencer. Mesmo recorte de
- * clientMaxOverdueDays: com acordo ATIVO conta as parcelas vencidas do
- * acordo (nao o titulo original); sem acordo, as parcelas do titulo com
- * saldo (hasInstallmentBalance) e vencimento passado.
+ * Divide o saldo do cliente em VENCIDO e A VENCER -- fonte unica do valor que
+ * a carteira cobra (item 34: a carteira mostrava vencido + a vencer como se
+ * fosse tudo pendencia). Mesmo recorte de clientMaxOverdueDays: com acordo
+ * ATIVO usa as parcelas do acordo (nao o titulo original); sem acordo, as
+ * parcelas do titulo com saldo (hasInstallmentBalance).
+ */
+export const clientBalanceSplit = (
+  group: Pick<ClientGroup, "sales" | "document">,
+  acordoAtivoParcelas?: AcordoAtivoOverdueMap,
+): ClientBalanceSplit => {
+  let vencido = 0;
+  let aVencer = 0;
+  const parcelasAcordo = acordoAtivoParcelas?.get(group.document);
+  if (parcelasAcordo) {
+    parcelasAcordo.forEach((parcela) => {
+      if (round2(parcela.saldo) <= 0.01) return;
+      if (calculateOverdueDays(parcela.dataVencimento) > 0) {
+        vencido += parcela.saldo;
+      } else {
+        aVencer += parcela.saldo;
+      }
+    });
+    return { vencido: round2(vencido), aVencer: round2(aVencer) };
+  }
+
+  group.sales?.forEach((sale) => {
+    sale.installments?.forEach((inst) => {
+      if (!hasInstallmentBalance(inst)) return;
+      const saldo =
+        (inst.valor_original || 0) -
+        (inst.valor_recebido || 0) -
+        (inst.desconto || 0);
+      if (calculateOverdueDays(inst.data_vencimento) > 0) {
+        vencido += saldo;
+      } else {
+        aVencer += saldo;
+      }
+    });
+  });
+  return { vencido: round2(vencido), aVencer: round2(aVencer) };
+};
+
+/**
+ * Valor EM ATRASO do cliente: so o que ja venceu (ver clientBalanceSplit).
+ * Usado na mensagem do WhatsApp e na carteira.
  */
 export const clientOverdueAmount = (
   group: Pick<ClientGroup, "sales" | "document">,
   acordoAtivoParcelas?: AcordoAtivoOverdueMap,
-): number => {
-  const parcelasAcordo = acordoAtivoParcelas?.get(group.document);
-  if (parcelasAcordo) {
-    return round2(
-      parcelasAcordo.reduce(
-        (sum, parcela) =>
-          round2(parcela.saldo) > 0.01 &&
-          calculateOverdueDays(parcela.dataVencimento) > 0
-            ? sum + parcela.saldo
-            : sum,
-        0,
-      ),
-    );
-  }
-
-  let total = 0;
-  group.sales?.forEach((sale) => {
-    sale.installments?.forEach((inst) => {
-      if (!hasInstallmentBalance(inst)) return;
-      if (calculateOverdueDays(inst.data_vencimento) <= 0) return;
-      total +=
-        (inst.valor_original || 0) -
-        (inst.valor_recebido || 0) -
-        (inst.desconto || 0);
-    });
-  });
-  return round2(total);
-};
+): number => clientBalanceSplit(group, acordoAtivoParcelas).vencido;
 
 /**
  * Loja de referencia do cliente para as regras da carteira: a da parcela em

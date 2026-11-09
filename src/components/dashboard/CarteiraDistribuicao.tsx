@@ -65,6 +65,10 @@ const ACAO_LABEL: Record<AcaoDistribuicao, string> = {
   sai: "Fica sem cobrador",
   retido: "Com outro cobrador (só sai se você marcar)",
 };
+// Acima disto (dias sem nenhuma baixa externa nova), a loja aparece como
+// desatualizada no passo "Simular e aplicar".
+const DIAS_DADOS_ANTIGOS = 2;
+
 const BLOQUEIO_LABEL = {
   acordo_ativo: "acordo ativo",
   agendamento_ativo: "agendamento ativo",
@@ -222,6 +226,49 @@ const CarteiraDistribuicao: React.FC = () => {
       setLojas((data ?? []) as LojaCarteira[]);
     })();
   }, []);
+
+  // Item 34: quando os pagamentos de cada loja chegaram ao sistema (ultima
+  // baixa vinda de fora do app). Distribuir com pagamento atrasado no sistema
+  // entrega cliente que ja pagou. Sem a migration 20261109000006, so nao
+  // mostra o aviso.
+  const [ultimaBaixaPorLoja, setUltimaBaixaPorLoja] = useState<
+    Map<string, string | null>
+  >(new Map());
+  useEffect(() => {
+    void (async () => {
+      const { data, error } = await supabase.rpc("lojas_ultima_baixa_externa");
+      if (error) {
+        console.warn("Atualização das lojas indisponível:", error.message);
+        return;
+      }
+      setUltimaBaixaPorLoja(
+        new Map(
+          ((data ?? []) as { loja: string; ultima_baixa: string | null }[]).map(
+            (l) => [l.loja, l.ultima_baixa],
+          ),
+        ),
+      );
+    })();
+  }, []);
+
+  // Lojas com clientes em aberto cujos pagamentos nao chegam ha mais de
+  // DIAS_DADOS_ANTIGOS dias (ou nunca chegaram).
+  const lojasDesatualizadas = useMemo(() => {
+    if (ultimaBaixaPorLoja.size === 0) return [];
+    const agora = Date.now();
+    return lojas
+      .filter((l) => l.clientes_em_aberto > 0)
+      .map((l) => {
+        const ultima = ultimaBaixaPorLoja.get(l.loja) ?? null;
+        const dias =
+          ultima == null
+            ? null
+            : Math.floor((agora - new Date(ultima).getTime()) / 86400000);
+        return { loja: l.loja, ultima, dias };
+      })
+      .filter((l) => l.dias == null || l.dias > DIAS_DADOS_ANTIGOS)
+      .sort((a, b) => (b.dias ?? Infinity) - (a.dias ?? Infinity));
+  }, [lojas, ultimaBaixaPorLoja]);
 
   const cobradores = useMemo(
     () =>
@@ -881,6 +928,32 @@ const CarteiraDistribuicao: React.FC = () => {
           </button>
         </div>
 
+        {lojasDesatualizadas.length > 0 && (
+          <div className="mb-3 p-3 rounded-lg bg-amber-50 text-amber-900 text-sm dark:bg-amber-900/20 dark:text-amber-200">
+            <p className="font-semibold">
+              Pagamentos possivelmente desatualizados
+            </p>
+            <p className="text-xs mt-0.5">
+              Estas lojas não recebem baixa nova (importação ou sync) há mais
+              de {DIAS_DADOS_ANTIGOS} dias. Se houver pagamento ainda não
+              importado, a distribuição pode entregar cliente que já pagou.
+              Importe antes de aplicar.
+            </p>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {lojasDesatualizadas.map((l) => (
+                <span
+                  key={l.loja}
+                  className="px-2 py-0.5 rounded-full text-xs bg-white/70 border border-amber-200 dark:bg-dark-bg dark:border-amber-800"
+                >
+                  {l.loja}:{" "}
+                  {l.dias == null
+                    ? "nenhuma baixa importada"
+                    : `última baixa há ${l.dias} dias`}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {erroDistribuicao && (
           <p className="mb-3 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{erroDistribuicao}</p>
         )}

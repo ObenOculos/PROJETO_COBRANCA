@@ -52,8 +52,9 @@ import {
   hasOpenBalance,
   hasInstallmentBalance,
   clientMaxOverdueDays,
-  clientOverdueAmount,
+  clientBalanceSplit,
   clientReferenceStore,
+  ClientBalanceSplit,
 } from "../../filters/clientStatus";
 import { abrirWhatsApp } from "../../utils/whatsapp";
 import {
@@ -235,7 +236,7 @@ const WalletTableHead: React.FC<WalletTableHeadProps> = ({
         onSort={onSort}
       />
       <SortableTh
-        label="Valor Pendente"
+        label="Em atraso"
         sortKeyName="valorPendente"
         align="right"
         activeKey={sortKey}
@@ -505,6 +506,29 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return openClientGroups.filter((g) => matchedDocs.has(g.document));
   }, [openClientGroups, walletFiltersParaFiltragem, getFilteredCollections, user]);
 
+  // Item 34: saldo de cada cliente dividido em VENCIDO (o que se cobra hoje)
+  // e A VENCER (so negociavel). Calculado uma vez por cliente e reusado na
+  // ordenacao, nos cards e na contagem de clientes em dia.
+  const saldoPorDocumento = useMemo(() => {
+    const mapa = new Map<string, ClientBalanceSplit>();
+    walletFilteredGroups.forEach((g) =>
+      mapa.set(g.document, clientBalanceSplit(g, acordoAtivoOverdueMap)),
+    );
+    return mapa;
+  }, [walletFilteredGroups, acordoAtivoOverdueMap]);
+
+  // Item 34: cliente sem nada vencido CONTINUA na carteira, na Agenda e na
+  // Carteira completa (decisao do gerente, 2026-11-09: "nao e para sair da
+  // carteira, so deixar claro quando a divida e vencida ou a vencer"). So a
+  // exibicao separa os dois valores; aqui so contamos quantos estao em dia.
+  const clientesEmDia = useMemo(
+    () =>
+      walletFilteredGroups.filter(
+        (g) => (saldoPorDocumento.get(g.document)?.vencido ?? 0) <= 0.01,
+      ).length,
+    [walletFilteredGroups, saldoPorDocumento],
+  );
+
   // Regras vigentes DESTE cobrador (faixa x lojas, pode haver varias -- ver
   // collector_overdue_ranges, cadastradas em Distribuicao da carteira). Sem
   // regra com teto, "Clientes urgentes" fica vazia -- nao ha "perto de sair"
@@ -584,7 +608,8 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         case "atraso":
           return clientMaxOverdueDays(g, acordoAtivoOverdueMap);
         case "valorPendente":
-          return g.pendingValue;
+          // Item 34: ordena pelo que ja venceu, nao pelo saldo total.
+          return saldoPorDocumento.get(g.document)?.vencido ?? 0;
         default:
           return "";
       }
@@ -598,7 +623,14 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           : (va as number) - (vb as number);
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [walletFilteredGroups, sortKey, sortDir, lastContacts, acordoAtivoOverdueMap]);
+  }, [
+    walletFilteredGroups,
+    sortKey,
+    sortDir,
+    lastContacts,
+    acordoAtivoOverdueMap,
+    saldoPorDocumento,
+  ]);
 
   // Agenda priorizada: cada cliente cai em UMA só categoria (a de maior
   // precedencia), quem sobra vai pra "Em tratamento" (nao fica invisivel
@@ -887,8 +919,14 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             p.collectorId === user?.id && p.paymentDate.startsWith(mesAtual),
         )
         .reduce((sum, p) => sum + p.paymentAmount, 0) + acordoPagamentosMes;
+    // Item 34: o volume da carteira e o que JA VENCEU. O a vencer aparece a
+    // parte, como informacao (o cliente continua na carteira).
     const totalPending = walletFilteredGroups.reduce(
-      (sum, g) => sum + g.pendingValue,
+      (sum, g) => sum + (saldoPorDocumento.get(g.document)?.vencido ?? 0),
+      0,
+    );
+    const totalAVencer = walletFilteredGroups.reduce(
+      (sum, g) => sum + (saldoPorDocumento.get(g.document)?.aVencer ?? 0),
       0,
     );
     const goal = monthlyGoals.find(
@@ -914,7 +952,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
     return {
       totalClients: walletFilteredGroups.length,
+      clientesEmDia,
       totalPending,
+      totalAVencer,
       totalReceived,
       progress: hasGoal
         ? Math.min((totalReceived / targetValue) * 100, 100)
@@ -927,6 +967,8 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     };
   }, [
     walletFilteredGroups,
+    clientesEmDia,
+    saldoPorDocumento,
     myCollections,
     monthlyGoals,
     user?.id,
@@ -1043,6 +1085,11 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           <p className="text-2xl font-bold text-gray-900 dark:text-dark-text">
             {stats.totalClients}
           </p>
+          {stats.clientesEmDia > 0 && (
+            <p className="text-[10px] text-gray-400 mt-1">
+              {stats.clientesEmDia} em dia (só parcelas a vencer)
+            </p>
+          )}
         </div>
         <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 shadow-sm">
           <div className="flex items-center gap-3 mb-2">
@@ -1050,12 +1097,17 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               <Zap className="w-4 h-4" />
             </div>
             <p className="text-sm font-medium text-gray-500">
-              Volume em Aberto
+              Volume em Atraso
             </p>
           </div>
           <p className="text-2xl font-bold text-red-600 dark:text-red-400">
             {formatCurrency(stats.totalPending)}
           </p>
+          {stats.totalAVencer > 0.01 && (
+            <p className="text-[10px] text-gray-400 mt-1">
+              + {formatCurrency(stats.totalAVencer)} a vencer (ainda no prazo)
+            </p>
+          )}
         </div>
         <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 shadow-sm">
           <div className="flex items-center gap-3 mb-2">
@@ -1072,7 +1124,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             )}
           </p>
           <p className="text-[10px] text-gray-400 mt-1">
-            Volume em aberto ÷ clientes na carteira
+            Volume em atraso ÷ clientes na carteira
           </p>
         </div>
       </div>
@@ -1370,6 +1422,9 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
 }) => {
   const { acordoAtivoOverdueMap } = useCollection();
   const maxAtraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
+  // Item 34: vencido (o que se cobra) x a vencer (ainda no prazo).
+  const saldo = clientBalanceSplit(group, acordoAtivoOverdueMap);
+  const emDia = saldo.vencido <= 0.01;
   const phoneValue = group.mobile || group.phone;
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   // saleNumber 0 = parcela avulsa (sem numero_titulo nem venda_n, ver
@@ -1459,6 +1514,14 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               Em acordo
             </span>
           )}
+          {emDia && (
+            <span
+              className="w-fit px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-200"
+              title="Nenhuma parcela vencida: o saldo deste cliente ainda está dentro do prazo"
+            >
+              Em dia — só parcelas a vencer
+            </span>
+          )}
           {urgenteInfo && (
             <span
               className={`w-fit px-2 py-0.5 rounded-full text-[10px] font-bold border ${
@@ -1529,12 +1592,21 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
       </td>
       <td className="px-6 py-4 text-right" onClick={() => onOpenDetail(group)}>
         <div className="flex flex-col">
-          <span className="font-bold text-red-600 dark:text-red-400">
-            {formatCurrency(group.pendingValue)}
-          </span>
-          <span className="text-[10px] text-gray-400">
-            Total: {formatCurrency(group.totalValue)}
-          </span>
+          {emDia ? (
+            <span className="font-bold text-gray-400">{formatCurrency(0)}</span>
+          ) : (
+            <span className="font-bold text-red-600 dark:text-red-400">
+              {formatCurrency(saldo.vencido)}
+            </span>
+          )}
+          {saldo.aVencer > 0.01 && (
+            <span
+              className="text-[10px] font-semibold text-gray-500 dark:text-dark-text-secondary"
+              title="Parcelas ainda dentro do prazo: não estão atrasadas"
+            >
+              + {formatCurrency(saldo.aVencer)} a vencer
+            </span>
+          )}
         </div>
       </td>
       <td className="px-6 py-4">
@@ -1553,11 +1625,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleWhatsApp(
-                group,
-                user,
-                clientOverdueAmount(group, acordoAtivoOverdueMap),
-              );
+              handleWhatsApp(group, user, saldo.vencido);
             }}
             disabled={!(group.mobile || group.phone)}
             title={group.mobile || group.phone ? "Chamar no WhatsApp" : "Cliente sem telefone"}

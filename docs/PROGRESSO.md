@@ -37,6 +37,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 26 | Razão social + contato/vendedor/região do Ciclone no cadastro do cliente — migration, sync e front no ar (2026-11-06); gestor testado na tela e cobrador/Termo conferidos por código+dados; "Atender" e agenda de contato com razão social/"Falar com" (`cf68ed7`); publicado (push 2026-11-09) — falta ver o PDF do Termo; telefone do ERP no card e saudação do WhatsApp a decidir | Média | Pequeno/médio |
 | 27 | ~~Detalhes do Cliente: parcela paga/atrasada decidida pelo texto do status ("recebido" do Ciclone aparecia atrasado)~~ — `15e780a`, publicado e testado no site 2026-11-09 | Alta | Pequeno |
 | 28 | ~~Busca por CPF/CNPJ exigia a máscara~~ — `f756638`, publicado 2026-11-09 (histórico de Autorizações, busca no servidor, ficou de fora) | Baixa | Pequeno |
+| 34 | ~~Carteira mostrava saldo total (vencido + a vencer) como "pendente"~~ — vencido em destaque + "a vencer" separado, selo "Em dia", aviso de loja desatualizada na Distribuição (2026-11-09); falta `db push` da `20261109000006` e teste na tela | Média/Alta | Médio |
 | 33 | Distribuição: tirar cliente de outra carteira só com o gestor marcando o cobrador (checkbox na simulação); "regra mestre" (`0003`) desfeita sem ter sido usada; inativo libera a carteira (`0004`, aplicado) — migration `0005` pronta, falta `db push` e teste na tela | **Alta** | Médio |
 | 31 | ~~Detalhes do Cliente: abas Todos / Em aberto / Pagos na lista de vendas~~ — 2026-11-09 | Média | Pequeno |
 | 32 | ~~WhatsApp: mensagem com o valor só em atraso + reaproveitar a mesma aba do WhatsApp Web no computador~~ — 2026-11-09 | Média | Pequeno |
@@ -108,6 +109,64 @@ parcelas recebidas do Ciclone verdes e sem atraso e "Maior atraso" igual ao
 card da carteira, "Atender" com razão social + "Falar com" e as 2 etapas
 (fechado sem gravar). Todos OK. Observação: cliente usado no teste do gestor
 não tinha cobrador (por isso não aparecia na carteira) — não é defeito.
+
+### Item 34 — Carteira: mostrar o que precisa ser cobrado — análise 2026-11-09
+
+Dúvida do usuário: cliente com ~R$ 450 só em parcelas a vencer na carteira
+de um cobrador interno — deveria estar lá? Análise (sem mudar código):
+- **Seleção correta com os dados do momento**: a parcela vencida em 30/10
+  foi paga em 04/11 na loja, mas o pagamento só entrou no sistema em 09/11
+  (importação). Em 06/11 a distribuição via 7 dias de atraso → faixa 3–60.
+  Hoje atraso 0; continua com o cobrador pela regra "abaixo da 1ª faixa fica
+  com ele" (item 25, sem vai-e-vem).
+- **Exibição inconsistente**: a carteira lista todo cliente com saldo e
+  mostra `pendingValue` (vencido + a vencer) na linha, "Valor Pendente" e
+  "Volume em Aberto". Medido: 329 clientes em carteiras sem nada vencido; %
+  a vencer do volume exibido vai de 0% (Jurídica) a 82% (Vanessa); Monalisa
+  22%, Jonathan 20%, José 26%. E a mensagem do WhatsApp (item 32) já usa só
+  o vencido — dois números diferentes para o mesmo cliente.
+- **Contradição na regra**: "carteira só com atrasados" × "abaixo da 1ª faixa
+  fica com o cobrador": tirar o cliente quando o atraso zera traz o
+  vai-e-vem de volta (sai hoje, volta 3 dias após a próxima parcela, talvez
+  para outro cobrador pela carga). E "a cobrar" (vencido) ≠ "negociável"
+  (total, o acordo inclui parcelas a vencer).
+
+**Recomendações aceitas pelo usuário** ("a lógica interna não estava
+errada, só a forma como estávamos vendo"):
+1. Valor principal da carteira = só o vencido (`clientOverdueAmount`, regra
+   única) na linha, ordenação, volume e meta; "+ R$ X a vencer" secundário;
+   total completo só no Detalhes do Cliente.
+2. Cliente sem nada vencido continua com o cobrador, mas numa seção/aba
+   "Em dia (aguardando vencimento)", fora da fila, das contagens e do volume.
+3. Distribuir só com dados atualizados: sync/importação antes de simular;
+   avaliar aviso de importação antiga por loja.
+
+**Decisão do gerente (mesmo dia):** "não é para sair da carteira, só deixar
+claro quando a dívida é vencida ou a vencer". A aba "Em dia" que tirava
+esses clientes da fila foi desfeita antes do commit; a regra "abaixo da 1ª
+faixa fica com o cobrador" (item 25) continua.
+
+**Implementado (2026-11-09):**
+- `clientBalanceSplit` (`filters/clientStatus`, regra única, ciente de
+  acordo ativo): saldo do cliente em `vencido` × `aVencer`;
+  `clientOverdueAmount` passa a usá-la.
+- Carteira do cobrador de carteira (`CollectorDashboard`,
+  `InternalCollectorWallet`): coluna "Em atraso" (era "Valor Pendente")
+  mostra só o vencido, com "+ R$ X a vencer" abaixo; selo verde "Em dia — só
+  parcelas a vencer" quando nada venceu; ordenação por valor usa o vencido;
+  card "Volume em Atraso" (era "Volume em Aberto") só com o vencido + linha
+  "+ R$ X a vencer (ainda no prazo)"; "Total de Clientes" mostra quantos estão
+  em dia; ticket médio sobre o vencido. Todos os clientes continuam na Agenda
+  e na Carteira completa. WhatsApp usa o mesmo `vencido`.
+- Migration `20261109000006_lojas_ultima_baixa_externa` (só leitura, só
+  gestor): por loja, quando a última baixa vinda de fora do app
+  (`recebimentos_historico.origem <> 'app'`) entrou no sistema — não há log
+  de importação. Tela Distribuição, passo 3: aviso âmbar com as lojas com
+  cliente em aberto sem baixa nova há mais de 2 dias (ou nunca). Sem a
+  migration, o aviso só não aparece. Em 09/11: Itapipoca Ext sem baixa
+  desde 06/10.
+- Fora do escopo: a tela do cobrador externo (rota/visitas) segue com o
+  saldo total.
 
 ### Item 33 — Distribuição: regras mestre — 2026-11-09
 

@@ -1923,6 +1923,10 @@ export type Database = {
         Args: { p_perfis: Json; p_retirar_de?: string[] };
         Returns: Json;
       };
+      lojas_ultima_baixa_externa: {
+        Args: Record<PropertyKey, never>;
+        Returns: { loja: string; ultima_baixa: string | null }[];
+      };
       aplicar_distribuicao_carteira: {
         Args: { p_perfis: Json; p_retirar_de?: string[] };
         Returns: Json;
