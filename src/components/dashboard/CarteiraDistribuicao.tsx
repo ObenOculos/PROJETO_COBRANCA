@@ -86,6 +86,9 @@ const ACAO_LABEL: Record<AcaoDistribuicao, string> = {
 // desatualizada no passo "Simular e aplicar".
 const DIAS_DADOS_ANTIGOS = 2;
 
+// Marcas da regua da cobertura por loja (dias de atraso).
+const MARCAS_ESCALA = [30, 60, 90, 180, 365, 730];
+
 const BLOQUEIO_LABEL = {
   acordo_ativo: "acordo ativo",
   agendamento_ativo: "agendamento ativo",
@@ -917,14 +920,19 @@ const CarteiraDistribuicao: React.FC = () => {
         .map((r) => ({ c: porId.get(r.collectorId)!, r }))
         .sort((a, b) => a.r.minDias - b.r.minDias);
       const ativas = regras.filter(({ r }) => r.ativa);
-      const buracos: string[] = [];
-      let cursor = 1;
+      // Buraco = trecho sem cobrador ENTRE faixas desta loja. Antes da
+      // primeira (carencia, ex. 1 a 2 dias) e acima do ultimo teto e de
+      // proposito: so informacao (foraInicio/foraFim), nao problema.
+      const buracos: { ini: number; fim: number }[] = [];
+      const primeira = ativas.length ? ativas[0].r.minDias : null;
+      const foraInicio = primeira != null && primeira > 1 ? primeira - 1 : null;
+      let cursor = primeira ?? 1;
       for (const { r } of ativas) {
         if (cursor === Infinity) break;
-        if (r.minDias > cursor) buracos.push(faixaTexto(cursor, r.minDias - 1));
+        if (r.minDias > cursor) buracos.push({ ini: cursor, fim: r.minDias - 1 });
         cursor = Math.max(cursor, r.maxDias == null ? Infinity : r.maxDias + 1);
       }
-      if (cursor !== Infinity) buracos.push(`${cursor}+ dias`);
+      const foraFim = ativas.length > 0 && cursor !== Infinity ? cursor - 1 : null;
       const conflitos: string[] = [];
       for (let i = 0; i < ativas.length; i++) {
         for (let j = i + 1; j < ativas.length; j++) {
@@ -940,9 +948,25 @@ const CarteiraDistribuicao: React.FC = () => {
           }
         }
       }
-      return { loja: l, regras, ativas, buracos, conflitos };
+      const problema =
+        conflitos.length > 0 ||
+        buracos.length > 0 ||
+        (l.clientes_em_aberto > 0 && ativas.length === 0);
+      return { loja: l, regras, ativas, buracos, conflitos, foraInicio, foraFim, problema };
     });
   }, [lojas, cobradores, collectorOverdueRanges]);
+
+  const lojasComProblema = cobertura.filter((c) => c.problema).length;
+  // Com problema, a tela ja abre filtrada neles; o gestor desmarca para ver tudo.
+  const [soProblemas, setSoProblemas] = useState(true);
+  const coberturaVisivel = useMemo(() => {
+    const ordenada = [...cobertura].sort(
+      (a, b) => Number(b.problema) - Number(a.problema),
+    );
+    return soProblemas && lojasComProblema > 0
+      ? ordenada.filter((c) => c.problema)
+      : ordenada;
+  }, [cobertura, soProblemas, lojasComProblema]);
 
   // Escala do grafico: ate o maior teto definido + folga (min. 180 dias).
   const escalaMax = useMemo(() => {
@@ -951,6 +975,11 @@ const CarteiraDistribuicao: React.FC = () => {
       .filter((n) => Number.isFinite(n));
     return Math.max(180, ...tetos.map((t) => t + 30));
   }, [collectorOverdueRanges]);
+
+  // Escala comprimida (raiz quadrada): com teto perto de 1000 dias, uma
+  // escala linear espremia "3 a 60" e "61 a 90" num canto da barra.
+  const posEscala = (dias: number) =>
+    (Math.sqrt(Math.min(Math.max(dias, 0), escalaMax)) / Math.sqrt(escalaMax)) * 100;
 
   const simular = async () => {
     setSimulando(true);
@@ -1370,86 +1399,154 @@ const CarteiraDistribuicao: React.FC = () => {
 
       {/* 2. Cobertura por loja */}
       <div className={cardClass}>
-        <h3 className="font-bold text-gray-900 dark:text-dark-text flex items-center gap-2 mb-1">
-          <Store className="h-4 w-4 text-gray-500" />
-          2. Cobertura por loja
-        </h3>
-        <p className="text-xs text-gray-500 dark:text-dark-text-secondary mb-4">
-          Cada barra é uma faixa de um cobrador naquela loja (escala de 0 a{" "}
-          {escalaMax} dias). Cliente num trecho sem cobertura fica sem
-          cobrador.
-        </p>
-        <div className="space-y-4">
-          {cobertura.map(({ loja, regras, ativas, buracos, conflitos }) => (
-            <div key={loja.loja}>
-              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1.5">
-                <span className="font-semibold text-sm text-gray-900 dark:text-dark-text">
-                  {loja.loja}
-                </span>
-                <span className="text-xs text-gray-500">
-                  {loja.clientes_em_aberto} clientes em aberto
-                </span>
-              </div>
-              <div className="space-y-1">
-                {regras.length === 0 && (
-                  <div className="h-5 rounded bg-amber-50 dark:bg-amber-900/20 border border-dashed border-amber-300 text-[11px] text-amber-700 dark:text-amber-300 flex items-center px-2">
-                    Nenhum cobrador nesta loja
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
+          <div>
+            <h3 className="font-bold text-gray-900 dark:text-dark-text flex items-center gap-2">
+              <Store className="h-4 w-4 text-gray-500" />
+              2. Cobertura por loja
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-1">
+              Uma barra por loja, de 0 a {escalaMax} dias de atraso (os
+              primeiros dias ocupam mais espaço). Cada cor é um cobrador.
+            </p>
+          </div>
+          {lojasComProblema > 0 && (
+            <label className="inline-flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-dark-text cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={soProblemas}
+                onChange={(e) => setSoProblemas(e.target.checked)}
+              />
+              Só lojas com problema ({lojasComProblema})
+            </label>
+          )}
+        </div>
+
+        {/* Legenda */}
+        {cobradoresComRegra.length > 0 && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 text-xs text-gray-700 dark:text-dark-text-secondary">
+            {cobradoresComRegra.map((c) => (
+              <span key={c.id} className="inline-flex items-center gap-1.5">
+                <span className={`h-2.5 w-2.5 rounded-sm ${corPorCobrador.get(c.id)}`} />
+                {c.name}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Regua (mesma escala das barras) */}
+        <div className="relative h-4 mb-1 text-[10px] text-gray-400 select-none" aria-hidden>
+          {MARCAS_ESCALA.filter((d) => d < escalaMax).map((d) => (
+            <span
+              key={d}
+              className="absolute -translate-x-1/2 border-l border-gray-300 dark:border-dark-border pl-0.5"
+              style={{ left: `${posEscala(d)}%` }}
+            >
+              {d}
+            </span>
+          ))}
+        </div>
+
+        {lojasComProblema === 0 && lojas.length > 0 && (
+          <p className="mb-3 p-2.5 rounded-lg bg-green-50 text-green-800 text-xs dark:bg-green-900/20 dark:text-green-300 flex items-center gap-1.5">
+            <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+            Todas as lojas cobertas, sem conflito.
+          </p>
+        )}
+
+        <div className="space-y-3">
+          {coberturaVisivel.map(
+            ({ loja, regras, ativas, buracos, conflitos, foraInicio, foraFim, problema }) => (
+              <div key={loja.loja}>
+                <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+                  <span className="font-semibold text-sm text-gray-900 dark:text-dark-text flex items-center gap-1.5">
+                    {problema && <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />}
+                    {loja.loja}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {loja.clientes_em_aberto} clientes em aberto
+                  </span>
+                </div>
+                {ativas.length === 0 ? (
+                  <div className="h-6 rounded bg-amber-50 dark:bg-amber-900/20 border border-dashed border-amber-300 text-[11px] text-amber-700 dark:text-amber-300 flex items-center px-2">
+                    {regras.length === 0
+                      ? "Nenhum cobrador nesta loja"
+                      : "Só faixas inativas: ninguém recebe clientes aqui"}
+                  </div>
+                ) : (
+                  <div className="relative h-6 rounded bg-gray-100 dark:bg-dark-bg overflow-hidden">
+                    {ativas.map(({ c, r }) => {
+                      const left = posEscala(r.minDias);
+                      const width = Math.max(posEscala(r.maxDias ?? escalaMax) - left, 1);
+                      return (
+                        <div
+                          key={r.id}
+                          className={`absolute top-0 h-6 ${corPorCobrador.get(c.id)} border-r border-white/70 dark:border-dark-bg flex items-center overflow-hidden`}
+                          style={{ left: `${left}%`, width: `${width}%` }}
+                          title={`${c.name}: ${faixaTexto(r.minDias, r.maxDias)}`}
+                        >
+                          <span className="px-1.5 text-[11px] font-semibold text-white truncate">
+                            {c.name.split(" ")[0]} · {faixaCurta(r)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {buracos.map((b) => (
+                      <div
+                        key={`b${b.ini}`}
+                        className="absolute top-0 h-6 bg-amber-200/70 dark:bg-amber-800/50 border-x border-dashed border-amber-500"
+                        style={{
+                          left: `${posEscala(b.ini)}%`,
+                          width: `${Math.max(posEscala(b.fim) - posEscala(b.ini), 1)}%`,
+                        }}
+                        title={`Sem cobrador: ${faixaTexto(b.ini, b.fim)}`}
+                      />
+                    ))}
                   </div>
                 )}
-                {regras.map(({ c, r }) => {
-                  const ini = Math.min(r.minDias, escalaMax);
-                  const fim = Math.min(r.maxDias ?? escalaMax, escalaMax);
-                  const left = (ini / escalaMax) * 100;
-                  const width = Math.max(((fim - ini) / escalaMax) * 100, 1.5);
-                  return (
-                    <div
-                      key={r.id}
-                      className="relative h-5 rounded bg-gray-100 dark:bg-dark-bg"
-                      title={`${c.name}: ${faixaTexto(r.minDias, r.maxDias)}${r.ativa ? "" : " (inativa)"}`}
-                    >
-                      <div
-                        className={`absolute top-0 h-5 rounded ${r.ativa ? corPorCobrador.get(c.id) : "bg-gray-300 dark:bg-gray-600 opacity-60"} ${r.maxDias == null ? "rounded-r-none" : ""}`}
-                        style={{ left: `${left}%`, width: `${width}%` }}
-                      />
-                      <span className="absolute inset-y-0 left-1.5 flex items-center text-[11px] font-semibold text-gray-800 dark:text-dark-text">
-                        <span className="px-1 rounded bg-white/80 dark:bg-dark-bg-secondary/80">
-                          {c.name} · {faixaTexto(r.minDias, r.maxDias)}
-                          {!r.ativa && " · inativa"}
-                        </span>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              {ativas.length === 0 && regras.length > 0 && (
-                <p className="mt-1.5 text-[11px] text-amber-700 dark:text-amber-300">
-                  Só regras inativas nesta loja: ninguém recebe clientes aqui.
-                </p>
-              )}
-              {(buracos.length > 0 || conflitos.length > 0) && (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {conflitos.map((d) => (
-                    <span
-                      key={d}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
-                    >
-                      <AlertTriangle className="h-3 w-3" />
-                      Conflito {d}
-                    </span>
-                  ))}
-                  {ativas.length > 0 &&
-                    buracos.map((b) => (
+                {(conflitos.length > 0 || buracos.length > 0 || foraInicio != null || foraFim != null) && (
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {conflitos.map((d) => (
                       <span
-                        key={b}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800"
+                        key={d}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
                       >
-                        Sem cobertura: {b}
+                        <AlertTriangle className="h-3 w-3" />
+                        Conflito {d}
                       </span>
                     ))}
-                </div>
-              )}
-            </div>
-          ))}
+                    {buracos.map((b) => (
+                      <span
+                        key={`t${b.ini}`}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800"
+                      >
+                        Sem cobrador: {faixaTexto(b.ini, b.fim)}
+                      </span>
+                    ))}
+                    {foraInicio != null && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] text-gray-500 bg-gray-50 border border-gray-200 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary">
+                        Até {foraInicio} {foraInicio === 1 ? "dia" : "dias"}: ninguém cobra
+                      </span>
+                    )}
+                    {foraFim != null && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] text-gray-500 bg-gray-50 border border-gray-200 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary">
+                        Acima de {foraFim} dias: ninguém cobra
+                      </span>
+                    )}
+                  </div>
+                )}
+                {regras.length > ativas.length && ativas.length > 0 && (
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    Inativas aqui:{" "}
+                    {regras
+                      .filter(({ r }) => !r.ativa)
+                      .map(({ c, r }) => `${c.name} (${faixaTexto(r.minDias, r.maxDias)})`)
+                      .join(", ")}
+                  </p>
+                )}
+              </div>
+            ),
+          )}
           {lojas.length === 0 && !lojasErro && (
             <p className="text-sm text-gray-500">Carregando lojas…</p>
           )}
