@@ -34,7 +34,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 23 | `AcordoModal` (parcelas) não bloqueia de verdade data anterior a hoje — só `min` do `<input type="date">`, sem validação no "Continuar" | Baixa | Pequeno |
 | 24 | Registrar contato + Reagendar + Agendar viram um botão só, "Atender" (RPC `registrar_contato`; modal em 2 etapas em 2026-11-06) — RPC testada ao vivo, falta testar o modal de 2 etapas e push do front | Média | Médio |
 | 25 | Distribuição da carteira por regra (faixas × lojas, várias por cobrador, ativa/pausada) — migrations 6–10 aplicadas; regras da Monalisa e do José cadastradas e 1ª distribuição aplicada em 2026-11-06 | Alta | Grande |
-| 26 | Razão social + contato/vendedor/região do Ciclone no cadastro do cliente — código pronto 2026-11-06; falta `db push` da `20261106000011` + 1 rodada do sync | Média | Pequeno/médio |
+| 26 | Razão social + contato/vendedor/região do Ciclone no cadastro do cliente — migration, sync e front no ar (2026-11-06); gestor testado na tela e cobrador/Termo conferidos por código+dados (2026-11-09); falta ver o PDF do Termo e levar razão social/"Falar com" ao "Atender" e à agenda de contato | Média | Pequeno/médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -122,6 +122,38 @@ listas e histórico intactos); colunas novas para o resto.
   (10 clientes), endereços de cobrança/entrega (só 5/12 diferem).
 - Observação: a extração do sync leva ~2,5 min (antes ~25 s) — medido igual
   sem os joins novos, vem do `LATERAL` de baixas da etapa 3a.
+- **No ar em 2026-11-06**: `db push` da 0011 + `check:db` OK; sync manual às
+  17:13 (1.888 clientes com dados do ERP: razão social 1.888, contato 632,
+  telefone 184, vendedor 1.879, região 1.644). Front em `9907c12`.
+- **Teste 2026-11-09**:
+  - *Gestor, na tela* (OK): Lista de Clientes mostra a razão social sob o
+    fantasia e a busca por "M DE JESUS PEREIRA" acha a Ótica Modelo; ficha
+    "Ver Dados" com razão social, "Falar com" (Manoel de Jesus Pereira +
+    botão Ligar) e "Dados do Ciclone" (vendedor, região BA/SE-1).
+  - *Cobrador, por código + dados de produção* (servidor de dev caiu por
+    memória antes do teste na tela): o nome exibido vem de `clientes.nome`
+    (= fantasia; `mapRowToCollection`), e a RLS `select_dono_ou_gestor` deixa
+    o cobrador ler o cadastro dos clientes dele. Hoje só **José – Cobrança
+    Interna** tem clientes do Ciclone (263; + 3 do Cobrador Externo Teste):
+    todos com cadastro, nome e razão social; 255 com razão ≠ fantasia; os 8
+    iguais são 4 CPFs (sem fantasia) e 4 CNPJs cujo nome no ERP já é a razão
+    (Otica Nacional Ltda, Oticas Universal Ltda, Fc/Vc Comercio).
+  - *Termo de Acordo, por código*: os 3 pontos (resumo "Salvar PDF", Termo na
+    criação, Termo reaberto no detalhe) usam `nomeJuridicoCliente`, com a
+    mesma chave de `clientesRegistry` da ficha. **Falta abrir o PDF**
+    (quebra de linha de razão social longa) — login `jose_focco`.
+- **Onde a informação aparece / falta (levantado 2026-11-09):**
+  - Já tem razão social: lista do cobrador (card), Atribuição (+ Excel),
+    ficha (cabeçalho + "Ver Dados"), `AcordoModal`, Termo/resumo, buscas.
+  - "Falar com"/vendedor/região: **só** na ficha "Ver Dados".
+  - **Falta onde o cobrador está falando com o cliente** (prioridade):
+    `LogContactModal` (botão "Atender") e `ContactScheduler` (agenda de
+    contato do interno — o José é interno) mostram só o fantasia; o modal de
+    telefones do card (`CollectorDashboard`) não oferece o telefone do
+    contato do ERP; a mensagem de WhatsApp do card diz "Olá <fantasia>" — o
+    `contato_nome` seria o natural.
+  - Fantasia basta (não mexer): telas de gestor (Acompanhamento de Visitas,
+    pedidos de cancelamento), relatório de caixa, mapa de rota, notificações.
 
 ### Item 25 — Distribuição da carteira por regra — 2026-11-06
 
