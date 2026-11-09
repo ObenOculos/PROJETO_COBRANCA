@@ -343,18 +343,38 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         console.error("Erro ao buscar histórico de contatos do cliente:", error);
         return;
       }
-      setContactAttempts(
-        (data || []).map((row) => ({
+      // Um contato de carteira grava UMA linha por titulo em aberto
+      // (registrar_contato); na tela e um contato so. Agrupa as linhas
+      // gravadas juntas (mesmo instante, tipo, resultado e observacao) e
+      // junta as vendas envolvidas.
+      const porContato = new Map<string, ContactAttemptRow>();
+      (data || []).forEach((row) => {
+        const chave = [
+          row.created_at,
+          row.type,
+          row.result,
+          row.notes ?? "",
+        ].join("|");
+        const venda = idToSale.get(row.collection_id) ?? "Título";
+        const atual = porContato.get(chave);
+        if (atual) {
+          if (!atual.saleDescription.split(", ").includes(venda)) {
+            atual.saleDescription += `, ${venda}`;
+          }
+          return;
+        }
+        porContato.set(chave, {
           id: row.id,
-          saleDescription: idToSale.get(row.collection_id) ?? "Título",
+          saleDescription: venda,
           date: row.date,
           type: row.type,
           result: row.result,
           notes: row.notes,
           nextAction: row.next_action,
           nextActionDate: row.next_action_date,
-        })),
-      );
+        });
+      });
+      setContactAttempts(Array.from(porContato.values()));
     })();
     return () => {
       cancelled = true;
@@ -515,8 +535,11 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       handleTokenRejected as EventListener,
     );
 
-    // Fallback: verificar periodicamente
-    const interval = setInterval(checkTokenStatus, 3000);
+    // Fallback: verificar periodicamente -- so enquanto ha pedido de token
+    // pendente (sem pedido, o timer rodava a toa com o modal aberto).
+    const interval = authRequestSent
+      ? setInterval(checkTokenStatus, 3000)
+      : undefined;
 
     return () => {
       window.removeEventListener(
@@ -527,7 +550,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         "tokenRejected",
         handleTokenRejected as EventListener,
       );
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
     };
   }, [
     authRequestSent,
@@ -578,16 +601,28 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     acordoAtivoOverdueMap,
   );
 
+  // Saldo de cada venda calculado UMA vez e reaproveitado (pendencia, abas e
+  // lista). Antes era recalculado em cada uso e a cada clique no modal.
+  const saldoPorVenda = React.useMemo(() => {
+    const saldos = new Map<number, ReturnType<typeof calculateSaleBalance>>();
+    clientSales.forEach((sale) => {
+      saldos.set(
+        sale.saleNumber,
+        calculateSaleBalance(sale.saleNumber, clientGroup.document),
+      );
+    });
+    return saldos;
+  }, [clientSales, calculateSaleBalance, clientGroup.document]);
+  const saldoDaVenda = (saleNumber: number) =>
+    saldoPorVenda.get(saleNumber) ??
+    calculateSaleBalance(saleNumber, clientGroup.document);
+
   // Calcular se há pendências reais considerando descontos
   const hasRealPendingValue = React.useMemo(() => {
-    return clientSales.some((sale) => {
-      const saleBalance = calculateSaleBalance(
-        sale.saleNumber,
-        clientGroup.document,
-      );
-      return saleBalance.remainingBalance > 0.01;
-    });
-  }, [clientSales, calculateSaleBalance, clientGroup.document]);
+    return Array.from(saldoPorVenda.values()).some(
+      (saldo) => saldo.remainingBalance > 0.01,
+    );
+  }, [saldoPorVenda]);
 
   // Abas da lista de vendas. "Em aberto" = venda com saldo (mesma conta do
   // "Falta" do cabecalho da venda), mais atrasada primeiro; "Pagos" = sem
@@ -599,10 +634,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     const classificadas = clientSales.map((sale) => {
       const fora =
         seloForaDaCobranca(sale.installments.map((i) => i.status)) !== null;
-      const saldo = calculateSaleBalance(
-        sale.saleNumber,
-        clientGroup.document,
-      ).remainingBalance;
+      const saldo = saldoPorVenda.get(sale.saleNumber)?.remainingBalance ?? 0;
       let maiorAtraso = 0;
       sale.installments.forEach((inst) => {
         if (isForaDaCobranca(inst.status) || !hasInstallmentBalance(inst)) {
@@ -622,7 +654,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       pagos: classificadas.filter((c) => !c.fora && !c.aberto).map((c) => c.sale),
       emAtraso: abertas.filter((c) => c.maiorAtraso > 0).length,
     };
-  }, [clientSales, calculateSaleBalance, clientGroup.document]);
+  }, [clientSales, saldoPorVenda]);
   const abaEfetiva: AbaVendas =
     abaVendas ?? (vendasPorAba.aberto.length > 0 ? "aberto" : "todos");
   const vendasVisiveis = vendasPorAba[abaEfetiva];
@@ -832,9 +864,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               de fora por omissao de quando esses perfis foram criados. */}
           {(isCollectorType(userType) || userType === "manager") && (
             <div
-              className={`mt-4 px-4 lg:px-6 py-0 grid grid-cols-2 gap-3 ${
-                userType === "manager" ? "sm:grid-cols-5" : "sm:grid-cols-4"
-              }`}
+              className="mt-4 px-4 lg:px-6 py-0 grid grid-cols-2 gap-3 sm:grid-cols-5"
             >
               <button
                 id="view-client-data"
@@ -862,20 +892,24 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   <span className="hidden sm:inline">Ver Vendas</span>
                 </span>
               </button>
-              {/* Linha do tempo de carteira e baixas: so gestor, pois mostra
-                  outros cobradores e quem fez cada mudanca. */}
-              {userType === "manager" && (
-                <button
-                  id="view-client-history"
-                  name="viewClientHistory"
-                  onClick={() => setView("historico")}
-                  className="flex items-center px-3 py-2 bg-slate-700 text-white rounded-2xl hover:bg-slate-800 transition-colors text-sm font-medium shadow-sm"
-                  title="Quem teve o cliente na carteira e cada baixa registrada"
-                >
-                  <History className="h-5 w-5 mr-2" />
-                  <span className="text-xs sm:text-sm">Histórico</span>
-                </button>
-              )}
+              {/* Historico para todos: contatos, visitas, reagendamentos e
+                  baixas. A linha do tempo da carteira (quem teve o cliente e
+                  quem transferiu) so aparece para o gestor -- e o banco so a
+                  entrega para ele (migration 20261109000007). */}
+              <button
+                id="view-client-history"
+                name="viewClientHistory"
+                onClick={() => setView("historico")}
+                className="flex items-center px-3 py-2 bg-slate-700 text-white rounded-2xl hover:bg-slate-800 transition-colors text-sm font-medium shadow-sm"
+                title={
+                  userType === "manager"
+                    ? "Contatos, visitas, baixas e quem teve o cliente na carteira"
+                    : "Contatos, visitas e baixas do cliente"
+                }
+              >
+                <History className="h-5 w-5 mr-2" />
+                <span className="text-xs sm:text-sm">Histórico</span>
+              </button>
               {hasRealPendingValue && (
                 <button
                   id="distribute-payment"
@@ -926,10 +960,176 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           {/* Sales and Collections, Client Data or History */}
           {view === "historico" ? (
             <div className="overflow-y-auto max-h-[60vh] p-4 lg:p-6">
-              <ClientHistoryViewer
-                clientDocument={clientGroup.document}
-                users={users ?? []}
-              />
+              <div className="space-y-8">
+                {/* Histórico de Contatos (collection_attempts) -- ligação,
+                    WhatsApp, mensagem registrados pelo cobrador de carteira.
+                    Visualmente distinto do bloco de visitas abaixo, que é do
+                    cobrador externo (scheduled_visits). */}
+                {contactAttempts.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                      <MessageCircle className="h-5 w-5 mr-2 text-indigo-600" />
+                      Histórico de Contatos
+                    </h3>
+                    <ul className="space-y-3 max-h-80 overflow-y-auto pr-2">
+                      {contactAttempts.map((attempt) => (
+                        <li
+                          key={attempt.id}
+                          className="bg-gray-50 p-4 rounded-2xl border border-gray-200"
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-800">
+                              <History className="w-4 h-4 text-indigo-500" />
+                              {ATTEMPT_TYPE_LABELS[
+                                attempt.type as keyof typeof ATTEMPT_TYPE_LABELS
+                              ] ?? attempt.type}
+                            </span>
+                            <span className="text-[10px] text-gray-400">
+                              {formatDate(attempt.date)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-400 mb-1">
+                            {attempt.saleDescription}
+                          </p>
+                          <p className="text-xs font-semibold text-gray-600 mb-1">
+                            {ATTEMPT_RESULT_LABELS[
+                              attempt.result as keyof typeof ATTEMPT_RESULT_LABELS
+                            ] ?? attempt.result}
+                          </p>
+                          {attempt.notes && (
+                            <p className="text-xs text-gray-500 whitespace-pre-wrap">
+                              {attempt.notes}
+                            </p>
+                          )}
+                          {attempt.nextAction && (
+                            <p className="text-[11px] text-gray-400 mt-2">
+                              Próxima ação: {attempt.nextAction}
+                              {attempt.nextActionDate
+                                ? ` (${formatDate(attempt.nextActionDate)})`
+                                : ""}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Visit History */}
+                {clientVisits.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                      <Clock className="h-5 w-5 mr-2 text-blue-600" />
+                      Histórico de Acompanhamento
+                    </h3>
+                    <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
+                      {clientVisits.map((visit) => (
+                        <div
+                          key={visit.id}
+                          className="bg-gray-50 p-4 rounded-2xl border border-gray-200"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                {getStatusVisitBadge(visit.status)}
+                                <span className="text-xs text-gray-500">
+                                  {formatVisitDate(visit.scheduledDate)}
+                                  {visit.scheduledTime &&
+                                    ` às ${formatHorario(visit.scheduledTime)}`}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center text-sm text-gray-600 mb-2">
+                                <User className="h-4 w-4 mr-1" />
+                                <span className="font-medium">
+                                  {getCollectorName(visit.collectorId)}
+                                </span>
+                              </div>
+
+                              {visit.notes && (
+                                <div className="bg-white p-3 rounded-2xl border border-gray-200">
+                                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+                                    {visit.notes}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center text-xs text-gray-400">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {visit.updatedAt ? (
+                                <>
+                                  Finalizada em{" "}
+                                  {formatVisitDate(visit.updatedAt.split("T")[0])}
+                                </>
+                              ) : (
+                                <>
+                                  Registrada em{" "}
+                                  {formatVisitDate(visit.createdAt.split("T")[0])}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Reincidência de reagendamentos — contexto rápido antes do
+                    histórico, para o gestor não precisar abrir visita por visita. */}
+                {reincidencia && (
+                  <div>
+                    <div className="border border-amber-200 rounded-2xl overflow-hidden">
+                      <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+                        <RefreshCw className="h-4 w-4 text-amber-600 shrink-0" />
+                        <span className="text-sm font-semibold text-amber-900">
+                          Reagendado {reincidencia.totalRemarcacoes}x
+                        </span>
+                        {reincidencia.maiorCadeia >= 2 && (
+                          <span
+                            className="text-[10px] font-medium text-amber-700 bg-white border border-amber-200 rounded-md px-1.5 py-0.5"
+                            title="Maior sequência da MESMA cobrança sendo empurrada."
+                          >
+                            seq. {reincidencia.maiorCadeia}x
+                          </span>
+                        )}
+                        <div className="flex flex-wrap gap-1.5 ml-auto">
+                          {reincidencia.motivos.map((m) => (
+                            <span
+                              key={m.key}
+                              className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-white text-amber-800 border border-amber-200"
+                            >
+                              {m.label} ({m.count})
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <ol className="divide-y divide-amber-100 bg-white">
+                        {reincidencia.elos.map((step, i) => (
+                          <li
+                            key={step.visitId}
+                            className="px-4 py-2 text-xs text-gray-600 flex items-center gap-2"
+                          >
+                            <span className="w-5 shrink-0 text-gray-400 tabular-nums">
+                              {i + 1}.
+                            </span>
+                            <span className="font-semibold text-gray-800 tabular-nums">
+                              {parseAndFormatDate(step.date)}
+                            </span>
+                            <span className="text-gray-400">—</span>
+                            <span>{rescheduleReasonLabel(step.reasonKey)}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  </div>
+                )}
+                <ClientHistoryViewer
+                  clientDocument={clientGroup.document}
+                  users={users ?? []}
+                  mostrarCarteira={userType === "manager"}
+                />
+              </div>
             </div>
           ) : view === "dados" ? (
             <div className="overflow-y-auto max-h-[60vh] p-4 lg:p-6">
@@ -1134,170 +1334,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   initialData={clientGroup}
                 />
               </div>
-              {/* Reincidência de reagendamentos — contexto rápido antes do
-                  histórico, para o gestor não precisar abrir visita por visita. */}
-              {reincidencia && (
-                <div className="mt-8 lg:col-span-2">
-                  <div className="border border-amber-200 rounded-2xl overflow-hidden">
-                    <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
-                      <RefreshCw className="h-4 w-4 text-amber-600 shrink-0" />
-                      <span className="text-sm font-semibold text-amber-900">
-                        Reagendado {reincidencia.totalRemarcacoes}x
-                      </span>
-                      {reincidencia.maiorCadeia >= 2 && (
-                        <span
-                          className="text-[10px] font-medium text-amber-700 bg-white border border-amber-200 rounded-md px-1.5 py-0.5"
-                          title="Maior sequência da MESMA cobrança sendo empurrada."
-                        >
-                          seq. {reincidencia.maiorCadeia}x
-                        </span>
-                      )}
-                      <div className="flex flex-wrap gap-1.5 ml-auto">
-                        {reincidencia.motivos.map((m) => (
-                          <span
-                            key={m.key}
-                            className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-white text-amber-800 border border-amber-200"
-                          >
-                            {m.label} ({m.count})
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <ol className="divide-y divide-amber-100 bg-white">
-                      {reincidencia.elos.map((step, i) => (
-                        <li
-                          key={step.visitId}
-                          className="px-4 py-2 text-xs text-gray-600 flex items-center gap-2"
-                        >
-                          <span className="w-5 shrink-0 text-gray-400 tabular-nums">
-                            {i + 1}.
-                          </span>
-                          <span className="font-semibold text-gray-800 tabular-nums">
-                            {parseAndFormatDate(step.date)}
-                          </span>
-                          <span className="text-gray-400">—</span>
-                          <span>{rescheduleReasonLabel(step.reasonKey)}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                </div>
-              )}
-
-              {/* Histórico de Contatos (collection_attempts) -- ligação,
-                  WhatsApp, mensagem registrados pelo cobrador de carteira.
-                  Visualmente distinto do bloco de visitas abaixo, que é do
-                  cobrador externo (scheduled_visits). */}
-              {contactAttempts.length > 0 && (
-                <div className="mt-8 space-y-4 lg:col-span-2">
-                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                    <MessageCircle className="h-5 w-5 mr-2 text-indigo-600" />
-                    Histórico de Contatos
-                  </h3>
-                  <ul className="space-y-3 max-h-48 overflow-y-auto pr-2">
-                    {contactAttempts.map((attempt) => (
-                      <li
-                        key={attempt.id}
-                        className="bg-gray-50 p-4 rounded-2xl border border-gray-200"
-                      >
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-800">
-                            <History className="w-4 h-4 text-indigo-500" />
-                            {ATTEMPT_TYPE_LABELS[
-                              attempt.type as keyof typeof ATTEMPT_TYPE_LABELS
-                            ] ?? attempt.type}
-                          </span>
-                          <span className="text-[10px] text-gray-400">
-                            {formatDate(attempt.date)}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-400 mb-1">
-                          {attempt.saleDescription}
-                        </p>
-                        <p className="text-xs font-semibold text-gray-600 mb-1">
-                          {ATTEMPT_RESULT_LABELS[
-                            attempt.result as keyof typeof ATTEMPT_RESULT_LABELS
-                          ] ?? attempt.result}
-                        </p>
-                        {attempt.notes && (
-                          <p className="text-xs text-gray-500 whitespace-pre-wrap">
-                            {attempt.notes}
-                          </p>
-                        )}
-                        {attempt.nextAction && (
-                          <p className="text-[11px] text-gray-400 mt-2">
-                            Próxima ação: {attempt.nextAction}
-                            {attempt.nextActionDate
-                              ? ` (${formatDate(attempt.nextActionDate)})`
-                              : ""}
-                          </p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Visit History */}
-              {clientVisits.length > 0 && (
-                <div className="mt-8 space-y-4 lg:col-span-2">
-                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                    <Clock className="h-5 w-5 mr-2 text-blue-600" />
-                    Histórico de Acompanhamento
-                  </h3>
-                  <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
-                    {clientVisits.map((visit) => (
-                      <div
-                        key={visit.id}
-                        className="bg-gray-50 p-4 rounded-2xl border border-gray-200"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              {getStatusVisitBadge(visit.status)}
-                              <span className="text-xs text-gray-500">
-                                {formatVisitDate(visit.scheduledDate)}
-                                {visit.scheduledTime &&
-                                  ` às ${formatHorario(visit.scheduledTime)}`}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center text-sm text-gray-600 mb-2">
-                              <User className="h-4 w-4 mr-1" />
-                              <span className="font-medium">
-                                {getCollectorName(visit.collectorId)}
-                              </span>
-                            </div>
-
-                            {visit.notes && (
-                              <div className="bg-white p-3 rounded-2xl border border-gray-200">
-                                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-                                  {visit.notes}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex items-center text-xs text-gray-400">
-                            <Clock className="h-3 w-3 mr-1" />
-                            {visit.updatedAt ? (
-                              <>
-                                Finalizada em{" "}
-                                {formatVisitDate(visit.updatedAt.split("T")[0])}
-                              </>
-                            ) : (
-                              <>
-                                Registrada em{" "}
-                                {formatVisitDate(visit.createdAt.split("T")[0])}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           ) : (
             <div className="overflow-y-auto max-h-[60vh]">
@@ -1381,10 +1417,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     </p>
                   )}
                   {vendasVisiveis.map((sale) => {
-                    const saleBalance = calculateSaleBalance(
-                      sale.saleNumber,
-                      clientGroup.document,
-                    );
+                    const saleBalance = saldoDaVenda(sale.saleNumber);
                     const saleSeloFora = seloForaDaCobranca(
                       sale.installments.map((i) => i.status),
                     );

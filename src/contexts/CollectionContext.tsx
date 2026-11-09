@@ -265,6 +265,28 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     () => rawCollections.filter((c) => !isForaDaCobranca(c.status)),
     [rawCollections],
   );
+  // Indices por documento do cliente, montados uma vez a cada mudanca dos
+  // dados. calculateSaleBalance/getSalesByClient olham so as parcelas do
+  // cliente em vez de varrer a base inteira a cada chamada (o modal Detalhes
+  // do Cliente chamava isso dezenas de vezes por clique). Mesma ordem e mesmo
+  // conteudo do filtro antigo -- so mais rapido.
+  const rawCollectionsByDocument = useMemo(() => {
+    const porDocumento = new Map<string | null, Collection[]>();
+    rawCollections.forEach((c) => {
+      const lista = porDocumento.get(c.documento);
+      if (lista) lista.push(c);
+      else porDocumento.set(c.documento, [c]);
+    });
+    return porDocumento;
+  }, [rawCollections]);
+  const collectionsByDocument = useMemo(() => {
+    const porDocumento = new Map<string | null, Collection[]>();
+    rawCollectionsByDocument.forEach((lista, documento) => {
+      const ativas = lista.filter((c) => !isForaDaCobranca(c.status));
+      if (ativas.length > 0) porDocumento.set(documento, ativas);
+    });
+    return porDocumento;
+  }, [rawCollectionsByDocument]);
   const [users, setUsers] = useState<User[]>([]);
   const [salePayments, setSalePayments] = useState<SalePayment[]>([]);
   const [scheduledVisits, setScheduledVisits] = useState<ScheduledVisit[]>([]);
@@ -3706,24 +3728,28 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }
     };
 
-  const getSalePayments = (
-    saleNumber: number,
-    clientDocument: string,
-  ): SalePayment[] => {
-    return salePayments.filter(
-      (payment) =>
-        payment.saleNumber === saleNumber &&
-        payment.clientDocument === clientDocument,
-    );
-  };
+  // useCallback: identidade estavel entre renders, para os useMemo de quem
+  // consome (getSalesByClient, Detalhes do Cliente) nao recalcularem a toa.
+  const getSalePayments = React.useCallback(
+    (saleNumber: number, clientDocument: string): SalePayment[] => {
+      return salePayments.filter(
+        (payment) =>
+          payment.saleNumber === saleNumber &&
+          payment.clientDocument === clientDocument,
+      );
+    },
+    [salePayments],
+  );
 
-  const calculateSaleBalance = (
+  const calculateSaleBalance = React.useCallback((
     saleNumber: number,
     clientDocument: string,
   ): SaleBalance => {
-    const saleInstallments = collections.filter(
+    // So as parcelas ativas do cliente (indice), em vez da base inteira.
+    const saleInstallments = (
+      collectionsByDocument.get(clientDocument) ?? []
+    ).filter(
       (collection) =>
-        collection.documento === clientDocument &&
         // Identidade da venda = numero_titulo (fallback venda_n); 0 = avulsa.
         resolveSaleKey(collection) === saleNumber,
     );
@@ -3782,7 +3808,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       status,
       installmentBreakdown,
     };
-  };
+  }, [collectionsByDocument]);
 
   const getSalesByClient = React.useCallback(
     (clientDocument: string): SaleGroup[] => {
@@ -3793,8 +3819,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const salesMap = new Map<number, Collection[]>();
       const individualInstallments: Collection[] = [];
 
-      rawCollections
-        .filter((collection) => collection.documento === clientDocument)
+      (rawCollectionsByDocument.get(clientDocument) ?? [])
         .forEach((collection) => {
           // Identidade da venda = numero_titulo (com fallback venda_n). Ver
           // src/filters/sales. Key 0 = parcela avulsa (sem título e sem venda_n).
@@ -3894,7 +3919,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // Retornar vendas agrupadas + venda renegociada
       return [...saleGroups, ...renegotiatedSaleGroups];
     },
-    [rawCollections, calculateSaleBalance, getSalePayments],
+    [rawCollectionsByDocument, calculateSaleBalance, getSalePayments],
   );
   // NOVO: Função para pré-carregar dados dos clientes em batch
   const prefetchClientsData = React.useCallback(

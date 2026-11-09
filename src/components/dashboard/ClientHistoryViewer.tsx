@@ -44,6 +44,10 @@ type Evento =
 interface ClientHistoryViewerProps {
   clientDocument: string;
   users: User[];
+  // Gestor: linha do tempo da carteira + nomes de quem registrou/de quem era a
+  // carteira. Cobrador: so as baixas, sem nomes de outros cobradores (o banco
+  // tambem filtra -- migration 20261109000007).
+  mostrarCarteira?: boolean;
 }
 
 const formatDateTime = (iso: string) =>
@@ -58,6 +62,7 @@ const delta = (antes: number | null, depois: number | null) =>
 const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
   clientDocument,
   users,
+  mostrarCarteira = true,
 }) => {
   const [carteira, setCarteira] = useState<CarteiraRow[]>([]);
   const [recebimentos, setRecebimentos] = useState<RecebimentoRow[]>([]);
@@ -73,7 +78,8 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
     const load = async () => {
       setLoading(true);
       const [carteiraRows, recebimentoRows] = await Promise.all([
-        fetchAllRows<CarteiraRow>(
+        mostrarCarteira
+          ? fetchAllRows<CarteiraRow>(
           (from, to) =>
             supabase
               .from("atribuicoes_historico")
@@ -83,7 +89,8 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
               .order("id", { ascending: true })
               .range(from, to),
           () => cancelled,
-        ),
+        )
+          : Promise.resolve([] as CarteiraRow[]),
         fetchAllRows<RecebimentoRow>(
           (from, to) =>
             supabase
@@ -129,7 +136,7 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [clientDocument]);
+  }, [clientDocument, mostrarCarteira]);
 
   const userName = (id: string | null | undefined) => {
     if (!id) return null;
@@ -237,7 +244,7 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
       app: {
         icon: <Smartphone className="h-4 w-4 text-emerald-600" />,
         titulo: `Pagamento registrado no app${
-          ev.pagamento?.collector_name
+          mostrarCarteira && ev.pagamento?.collector_name
             ? ` por ${ev.pagamento.collector_name}`
             : ""
         }`,
@@ -277,9 +284,11 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
             ? ` · ${ev.pagamento.payment_method}`
             : ""}
         </p>
-        <p className="text-xs text-gray-500 mt-0.5 ml-6">
-          Carteira de: {donos.join(", ")}
-        </p>
+        {mostrarCarteira && (
+          <p className="text-xs text-gray-500 mt-0.5 ml-6">
+            Carteira de: {donos.join(", ")}
+          </p>
+        )}
       </>
     );
   };
@@ -288,7 +297,9 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 flex items-center">
         <History className="h-5 w-5 mr-2 text-blue-600" />
-        Histórico de carteira e recebimentos
+        {mostrarCarteira
+          ? "Histórico de carteira e recebimentos"
+          : "Recebimentos e baixas"}
       </h3>
 
       {loading ? (
@@ -322,10 +333,11 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
       )}
 
       <p className="text-xs text-gray-400">
-        Carteira registrada desde 18/05/2026; recebimentos desde 06/10/2026 (o
-        que já estava recebido aparece como "Recebido até o início do
-        histórico"). O mérito do cobrador é o pagamento registrado no app; a
-        baixa do ERP confirma depois e pode repetir o mesmo valor.
+        {mostrarCarteira && "Carteira registrada desde 18/05/2026. "}
+        Recebimentos desde 06/10/2026 (o que já estava recebido aparece como
+        "Recebido até o início do histórico"). O mérito do cobrador é o
+        pagamento registrado no app; a baixa do ERP confirma depois e pode
+        repetir o mesmo valor.
       </p>
     </div>
   );
