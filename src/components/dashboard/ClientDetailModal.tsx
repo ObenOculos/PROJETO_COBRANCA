@@ -18,7 +18,12 @@ import {
   RefreshCw,
   History,
 } from "lucide-react";
-import { ClientGroup, UserType, isCollectorType } from "../../types";
+import {
+  ClientGroup,
+  Collection,
+  UserType,
+  isCollectorType,
+} from "../../types";
 import {
   formatCurrency,
   calculateOverdueDays,
@@ -29,6 +34,12 @@ import {
   rescheduleReasonLabel,
 } from "../../config/rescheduleReasons";
 import { isForaDaCobranca, seloForaDaCobranca } from "../../types/status";
+import {
+  clientMaxOverdueDays,
+  hasInstallmentBalance,
+  round2,
+} from "../../filters/clientStatus";
+import { parseAndNormalizeDate } from "../../filters/dates";
 import {
   ATTEMPT_TYPE_LABELS,
   ATTEMPT_RESULT_LABELS,
@@ -94,9 +105,11 @@ const formatDate = (dateString: string | null): string => {
 const formatDaysOverdue = (days: number | null): string => {
   if (!days || days <= 0) return "";
 
+  // Os dias que sobram sao o resto DEPOIS de tirar anos e meses: `days % 30`
+  // sozinho ignorava os anos (400 dias saia "1ano 1mês 10d" em vez de 5d).
   const years = Math.floor(days / 365);
   const months = Math.floor((days % 365) / 30);
-  const remainingDays = days % 30;
+  const remainingDays = (days % 365) % 30;
 
   const parts: string[] = [];
 
@@ -138,22 +151,38 @@ const StatusBadge: React.FC<{
   );
 };
 
-// Indicador de status para parcelas (dot)
-const InstallmentStatusDot: React.FC<{
-  status: string | null;
-  daysOverdue: number | null;
-}> = ({ status, daysOverdue }) => {
-  const isPaid = status?.toLowerCase().includes("pago");
-  const isOverdue = (daysOverdue ?? 0) > 0;
+// Situacao de uma parcela no detalhe. Decidida pelos VALORES (saldo), nao
+// pelo texto de `status`: o Ciclone grava "recebido" (sem "pago") e ha
+// "Pago"/"Pago Parcial" com saldo -- ver hasInstallmentBalance.
+type SituacaoParcela = "fora" | "quitada" | "atrasada" | "a_vencer";
 
-  const dotColor = isPaid
-    ? "bg-green-500"
-    : isOverdue
-      ? "bg-red-500"
-      : "bg-gray-400";
-
-  return <div className={`w-2 h-2 rounded-full ${dotColor} flex-shrink-0`} />;
+const situacaoParcela = (
+  installment: Pick<
+    Collection,
+    "status" | "valor_original" | "valor_recebido" | "desconto"
+  >,
+  diasAtraso: number,
+): SituacaoParcela => {
+  if (isForaDaCobranca(installment.status)) return "fora";
+  if (!hasInstallmentBalance(installment)) return "quitada";
+  return diasAtraso > 0 ? "atrasada" : "a_vencer";
 };
+
+const DOT_SITUACAO: Record<SituacaoParcela, string> = {
+  fora: "bg-gray-300",
+  quitada: "bg-green-500",
+  atrasada: "bg-red-500",
+  a_vencer: "bg-gray-400",
+};
+
+// Indicador de status para parcelas (dot)
+const InstallmentStatusDot: React.FC<{ situacao: SituacaoParcela }> = ({
+  situacao,
+}) => (
+  <div
+    className={`w-2 h-2 rounded-full ${DOT_SITUACAO[situacao]} flex-shrink-0`}
+  />
+);
 
 const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   clientGroup,
@@ -169,6 +198,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     reincidenciaResets,
     getAcordoAtivoDoCliente,
     clientesRegistry,
+    acordoAtivoOverdueMap,
   } = useCollection();
   const { user } = useAuth();
 
@@ -530,18 +560,18 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
   // Obter vendas do cliente usando a nova estrutura
   const clientSales = React.useMemo(() => {
-    const sales = getSalesByClient(clientGroup.document);
-    console.log(
-      "Vendas do Cliente recalculadas:",
-      sales.map((sale) => ({
-        saleNumber: sale.saleNumber,
-        totalValue: sale.totalValue,
-        totalReceived: sale.totalReceived,
-        pendingValue: sale.pendingValue,
-      })),
-    );
-    return sales;
+    return getSalesByClient(clientGroup.document);
   }, [getSalesByClient, clientGroup.document, refreshKey]);
+
+  // Atraso do cliente: MESMA regra da carteira (clientMaxOverdueDays) -- com
+  // acordo ativo segue o cronograma do acordo, nao o vencimento original dos
+  // titulos. Montado sobre clientSales (com quitados/cancelados) porque o
+  // clientGroup recebido pode vir de telas que nao trazem todas as vendas.
+  const acordoAtivo = getAcordoAtivoDoCliente(clientGroup.document);
+  const atrasoCliente = clientMaxOverdueDays(
+    { document: clientGroup.document, sales: clientSales },
+    acordoAtivoOverdueMap,
+  );
 
   // Calcular se há pendências reais considerando descontos
   const hasRealPendingValue = React.useMemo(() => {
@@ -1218,6 +1248,35 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   {clientSales.length !== 1 ? "s" : ""})
                 </h3>
 
+                {hasRealPendingValue && (
+                  <div
+                    className={`mb-4 px-3 py-2 rounded-xl border text-xs flex flex-wrap items-center gap-x-2 gap-y-1 ${
+                      atrasoCliente > 0
+                        ? "bg-red-50 border-red-200 text-red-700"
+                        : "bg-gray-50 border-gray-200 text-gray-600"
+                    }`}
+                  >
+                    <Clock className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      {atrasoCliente > 0 ? (
+                        <>
+                          Maior atraso:{" "}
+                          <strong>{formatDaysOverdue(atrasoCliente)}</strong> (
+                          {atrasoCliente} dia{atrasoCliente !== 1 ? "s" : ""})
+                        </>
+                      ) : (
+                        "Sem parcela vencida em aberto"
+                      )}
+                    </span>
+                    {acordoAtivo && (
+                      <span className="text-gray-600">
+                        · cliente em acordo: o atraso segue as parcelas do
+                        acordo, não o vencimento original dos títulos abaixo
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   {clientSales.map((sale) => {
                     const saleBalance = calculateSaleBalance(
@@ -1318,23 +1377,38 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
                               {/* Mobile: Cards compactos */}
                               <div className="space-y-1.5">
-                                {sale.installments.map((installment) => {
-                                  const isPaid =
-                                    installment.status
-                                      ?.toLowerCase()
-                                      .includes("pago") || false;
-                                  const actualAtraso = !isPaid
-                                    ? calculateOverdueDays(
-                                        installment.data_vencimento,
-                                      )
-                                    : 0;
-                                  const isOverdue = actualAtraso > 0;
-
-                                  // Usar valor_original se valor_reajustado for 0
-                                  const installmentValue =
-                                    installment.valor_reajustado > 0
-                                      ? installment.valor_reajustado
-                                      : installment.valor_original;
+                                {[...sale.installments]
+                                  .sort(
+                                    (a, b) =>
+                                      (parseAndNormalizeDate(
+                                        a.data_vencimento,
+                                      )?.getTime() ?? 0) -
+                                        (parseAndNormalizeDate(
+                                          b.data_vencimento,
+                                        )?.getTime() ?? 0) ||
+                                      a.id_parcela - b.id_parcela,
+                                  )
+                                  .map((installment) => {
+                                  const diasVencida = calculateOverdueDays(
+                                    installment.data_vencimento,
+                                  );
+                                  const situacao = situacaoParcela(
+                                    installment,
+                                    diasVencida,
+                                  );
+                                  const actualAtraso =
+                                    situacao === "atrasada" ? diasVencida : 0;
+                                  // Mesma base dos totais da venda (Total /
+                                  // Pago / Falta): valor_original.
+                                  const saldoParcela = round2(
+                                    (installment.valor_original || 0) -
+                                      (installment.valor_recebido || 0) -
+                                      (installment.desconto || 0),
+                                  );
+                                  const reajusteDiferente =
+                                    installment.valor_reajustado > 0 &&
+                                    round2(installment.valor_reajustado) !==
+                                      round2(installment.valor_original);
 
                                   return (
                                     <div
@@ -1344,8 +1418,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                       {/* Left: ID, Data, Status */}
                                       <div className="flex items-center gap-2 min-w-0 flex-1">
                                         <InstallmentStatusDot
-                                          status={installment.status}
-                                          daysOverdue={actualAtraso}
+                                          situacao={situacao}
                                         />
                                         <div className="min-w-0">
                                           <div className="flex items-center gap-2">
@@ -1361,17 +1434,24 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                                 ])}
                                               </span>
                                             )}
-                                            {isOverdue &&
-                                              !isPaid &&
-                                              !isForaDaCobranca(
-                                                installment.status,
-                                              ) && (
-                                                <span className="text-xs text-red-600 font-medium">
-                                                  {formatDaysOverdue(
-                                                    actualAtraso,
-                                                  )}
-                                                </span>
-                                              )}
+                                            {actualAtraso > 0 && (
+                                              <span
+                                                className={`text-xs font-medium ${
+                                                  acordoAtivo
+                                                    ? "text-gray-500"
+                                                    : "text-red-600"
+                                                }`}
+                                                title={
+                                                  acordoAtivo
+                                                    ? "Vencimento original do título; com acordo ativo o atraso do cliente segue as parcelas do acordo"
+                                                    : `${actualAtraso} dias de atraso`
+                                                }
+                                              >
+                                                {formatDaysOverdue(
+                                                  actualAtraso,
+                                                )}
+                                              </span>
+                                            )}
                                           </div>
                                           <div className="text-xs text-gray-600 truncate">
                                             {formatDate(
@@ -1384,8 +1464,21 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                       {/* Right: Valores */}
                                       <div className="text-right flex-shrink-0">
                                         <div className="font-medium text-xs text-gray-900">
-                                          {formatCurrency(installmentValue)}
+                                          {formatCurrency(
+                                            installment.valor_original,
+                                          )}
                                         </div>
+                                        {reajusteDiferente && (
+                                          <div
+                                            className="text-[10px] text-gray-400"
+                                            title="Valor reajustado informado na origem; os totais usam o valor original"
+                                          >
+                                            reaj.{" "}
+                                            {formatCurrency(
+                                              installment.valor_reajustado,
+                                            )}
+                                          </div>
+                                        )}
                                         {installment.valor_recebido > 0 && (
                                           <div className="text-xs text-green-600">
                                             ✓{" "}
@@ -1394,6 +1487,25 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                             )}
                                           </div>
                                         )}
+                                        {situacao !== "fora" &&
+                                          (installment.desconto || 0) > 0.01 && (
+                                            <div className="text-[10px] text-blue-600">
+                                              desc.{" "}
+                                              {formatCurrency(
+                                                installment.desconto || 0,
+                                              )}
+                                            </div>
+                                          )}
+                                        {(situacao === "atrasada" ||
+                                          situacao === "a_vencer") &&
+                                          (installment.valor_recebido > 0 ||
+                                            (installment.desconto || 0) >
+                                              0.01) && (
+                                            <div className="text-[10px] font-semibold text-red-600">
+                                              falta{" "}
+                                              {formatCurrency(saldoParcela)}
+                                            </div>
+                                          )}
                                       </div>
                                     </div>
                                   );
