@@ -9,6 +9,7 @@ import { Collection } from "../types";
 import { parseAndNormalizeDate, toYYYYMMDD } from "./dates";
 import { getClientPaymentStatus, normalizePaymentStatus } from "./clientStatus";
 import { NOT_SCHEDULED_FILTER_VALUE } from "../config/visitStatus";
+import { documentoCombina } from "./documento";
 
 /** Forma minima de cliente que os predicados precisam para filtrar. */
 export interface FilterableClient {
@@ -132,7 +133,7 @@ const matchesSearch = (client: FilterableClient, search?: string): boolean => {
   if (!term) return true;
   return Boolean(
     client.cliente?.toLowerCase().includes(term) ||
-      client.documento?.includes(search ?? "") ||
+      documentoCombina(client.documento, search) ||
       client.apelido?.toLowerCase().includes(term) ||
       client.razao_social?.toLowerCase().includes(term),
   );

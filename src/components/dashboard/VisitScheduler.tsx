@@ -42,6 +42,7 @@ import {
 import { PAYABLE_STATUSES } from "../../types/status";
 import { parseAndNormalizeDate } from "../../filters/dates";
 import { hasOpenBalance } from "../../filters/clientStatus";
+import { documentoCombina } from "../../filters/documento";
 import { VISIT_OUTCOMES, exactVisitOutcome } from "../../config/visitOutcomes";
 import {
   visitStatusLabel,
@@ -424,7 +425,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       filteredClients = filteredClients.filter((client) => {
         return (
           client.client.toLowerCase().includes(searchLower) ||
-          client.document.toLowerCase().includes(searchLower) ||
+          documentoCombina(client.document, searchTerm) ||
           client.address.toLowerCase().includes(searchLower) ||
           client.city.toLowerCase().includes(searchLower) ||
           client.neighborhood.toLowerCase().includes(searchLower) ||
@@ -713,14 +714,12 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         return false;
       }
       if (!term) return true;
-      return [
-        v.clientName,
-        v.clientDocument,
-        v.clientNeighborhood,
-        v.clientCity,
-      ]
-        .filter(Boolean)
-        .some((s) => String(s).toLocaleLowerCase("pt-BR").includes(term));
+      return (
+        documentoCombina(v.clientDocument, term) ||
+        [v.clientName, v.clientNeighborhood, v.clientCity]
+          .filter(Boolean)
+          .some((s) => String(s).toLocaleLowerCase("pt-BR").includes(term))
+      );
     });
 
     // Mais atrasada primeiro = data agendada mais antiga.
@@ -1027,7 +1026,6 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         .toLowerCase();
     const term = normalize(visitSearch.trim());
     if (term.length < 2) return [];
-    const termDigits = visitSearch.replace(/\D/g, "");
 
     const pending = isVisitOpen;
 
@@ -1055,11 +1053,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
             .join(" "),
         );
         if (haystack.includes(term)) return true;
-        // Documento: compara so os digitos, para "123.456" achar "123456..."
-        return (
-          termDigits.length >= 3 &&
-          visit.clientDocument.replace(/\D/g, "").includes(termDigits)
-        );
+        return documentoCombina(visit.clientDocument, visitSearch);
       })
       .sort((a, b) => {
         // Pendentes primeiro; dentro de cada grupo, data mais proxima antes.

@@ -14,6 +14,7 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { useCollection } from "../../contexts/CollectionContext";
 import { todayLocalStr } from "../../config/visitStatus";
+import { documentoCombina } from "../../filters/documento";
 import { ScheduledVisit, ScheduledVisitChannel } from "../../types";
 
 interface ContactSchedulerProps {
@@ -89,7 +90,7 @@ const ContactScheduler: React.FC<ContactSchedulerProps> = ({
       return (
         c.client.toLowerCase().includes(term) ||
         Boolean(c.razaoSocial?.toLowerCase().includes(term)) ||
-        c.document.includes(term)
+        documentoCombina(c.document, term)
       );
     });
   }, [selectableClients, search, cityFilter]);

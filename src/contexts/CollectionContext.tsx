@@ -69,6 +69,7 @@ import {
   normalizePaymentStatus,
 } from "../filters/clientStatus";
 import { resolveSaleKey } from "../filters/sales";
+import { documentoCombina } from "../filters/documento";
 import { toYYYYMMDD } from "../filters/dates";
 import {
   ClientesRegistry,
@@ -2651,7 +2652,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       filtered = filtered.filter(
         (c) =>
           c.cliente?.toLowerCase().includes(searchLower) ||
-          c.documento?.toLowerCase().includes(searchLower) ||
+          documentoCombina(c.documento, filters.search) ||
           c.apelido?.toLowerCase().includes(searchLower) ||
           c.razao_social?.toLowerCase().includes(searchLower) ||
           c.nome_da_loja?.toLowerCase().includes(searchLower) ||

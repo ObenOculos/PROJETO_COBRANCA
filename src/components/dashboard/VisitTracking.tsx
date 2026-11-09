@@ -28,6 +28,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { ScheduledVisit, isCollectorType, UserType } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import { distinctSorted } from "../../filters/facets";
+import { documentoCombina } from "../../filters/documento";
 import VisitScheduler from "./VisitScheduler"; // Import the VisitScheduler component
 import AllowedVisitDatesManager from "./AllowedVisitDatesManager"; // Import the AllowedVisitDatesManager component
 import ClearVisitsModal, { pendingVisitsCount } from "./ClearVisitsModal";
@@ -513,7 +514,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
       if (
         !clientName.includes(searchTerm) &&
-        !clientDocument.includes(searchTerm) &&
+        !documentoCombina(clientDocument, searchTerm) &&
         !clientAddress.includes(searchTerm) &&
         !visitNotes.includes(searchTerm)
       ) {

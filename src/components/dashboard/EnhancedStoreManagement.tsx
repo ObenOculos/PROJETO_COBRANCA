@@ -28,6 +28,7 @@ import Pagination from "../common/Pagination";
 import FilterBar from "../common/FilterBar";
 import { Collection, FilterOptions, isCollectorType } from "../../types";
 import { countVendas, resolveSaleKey } from "../../filters/sales";
+import { documentoCombina } from "../../filters/documento";
 import {
   clientKey,
   getClientPaymentStatus,
@@ -1119,7 +1120,6 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
 
   const filteredClients = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const digits = term.replace(/\D/g, "");
     const list = clientBreakdown.filter((c) => {
       if (statusFilter && c.status !== statusFilter) return false;
       if (cityFilter && c.city !== cityFilter) return false;
@@ -1127,7 +1127,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
       if (!term) return true;
       return (
         c.name.toLowerCase().includes(term) ||
-        (digits.length > 0 && c.document.replace(/\D/g, "").includes(digits))
+        documentoCombina(c.document, term)
       );
     });
     if (clientSort === "name") {
