@@ -7,6 +7,7 @@ import {
   Clock,
   CheckCircle,
   UserCheck,
+  PhoneCall,
   Users,
   Calendar,
   Trophy,
@@ -33,9 +34,7 @@ import {
   X,
   Eye,
   EyeOff,
-  AlertTriangle,
   CalendarClock,
-  CalendarX,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
@@ -69,8 +68,10 @@ import {
   diasAteSairDasRegras,
 } from "../../filters/priority";
 import {
+  ATTEMPT_RESULT_LABELS,
   SEM_CONTATO_DIAS,
   countsTowardVisitsGoal,
+  isEffectiveAttemptResult,
 } from "../../config/collectionAttempts";
 
 import LogContactModal from "./LogContactModal";
@@ -109,6 +110,20 @@ const INITIAL_CARD_IDS = [
   "clientsByCity",
 ];
 
+/** Ultima interacao do cliente (qualquer resultado) + o ultimo contato
+ * EFETIVO (falou com o cliente: promessa, pagamento, recusa, acordo...).
+ * A Agenda usa o efetivo para "Ja contatados"; tentativa sem sucesso (nao
+ * atendeu, ocupado, telefone errado, mensagem enviada) deixa o cliente em
+ * "Ligar" com o selo "Tentou hoje". A promessa vem do efetivo, para uma
+ * tentativa sem sucesso depois nao apagar a data prometida. */
+interface UltimoContato {
+  note: string;
+  date: Date;
+  result: string;
+  nextActionDate: string | null;
+  efetivo: { date: Date; result: string; nextActionDate: string | null } | null;
+}
+
 // Busca em lotes porque .in() tem limite pratico de tamanho de URL/query.
 const chunk = <T,>(arr: T[], size: number): T[][] => {
   const out: T[][] = [];
@@ -116,23 +131,23 @@ const chunk = <T,>(arr: T[], size: number): T[][] => {
   return out;
 };
 
-// As 7 categorias da agenda priorizada, nesta ordem de precedência (ver
-// useMemo em InternalCollectorWallet) — cada cliente cai numa só.
-// "urgente" (Clientes urgentes — perto de sair da faixa de atraso do
-// cobrador, ver collector_overdue_ranges) é a única exceção: fica de fora
-// dessa exclusividade de proposito, porque responde uma pergunta diferente
-// ("vou perder este cliente da carteira?") das outras 7, que respondem "o
-// que eu faco agora?" — um cliente pode aparecer ali E em outra categoria.
-type AgendaSubTab =
-  | "agendados"
-  | "promessas"
-  | "quebrado"
-  | "urgente"
-  | "critico"
-  | "alerta"
-  | "medio"
-  | "semContato"
-  | "tratamento";
+// Agenda em 3 abas, pelo que o cobrador FAZ (reorganizada em 2026-11-09 a
+// pedido dos cobradores -- antes eram 9 categorias misturando "o que fazer",
+// "quao atrasado" e "ja falei?"). Cada cliente cai em uma so:
+//  - paraHoje: compromisso que chegou (contato agendado, promessa vencendo)
+//    ou alerta sem contato recente (acordo quebrado, perto de sair da faixa);
+//  - aContatar: sem contato nos ultimos SEM_CONTATO_DIAS dias;
+//  - contatados: contato nos ultimos SEM_CONTATO_DIAS dias.
+// Ao registrar o contato o cliente sai de "A contatar" e vai para "Ja
+// contatados" na hora; a faixa de atraso vira subfiltro/selo.
+type AgendaSubTab = "paraHoje" | "aContatar" | "contatados";
+type MotivoParaHoje = "agendado" | "promessa" | "quebrado" | "urgente";
+
+interface AgendaSubfiltro {
+  key: string;
+  label: string;
+  count: number;
+}
 
 interface AgendaCategoriaConfig {
   key: AgendaSubTab;
@@ -141,8 +156,12 @@ interface AgendaCategoriaConfig {
   /** Classe do pill quando esta e a aba ativa. */
   activeClass: string;
   accentBorderClass: string;
+  /** Total da aba (sem subfiltro). */
+  total: number;
+  /** Clientes da aba ja com o subfiltro aplicado. */
   groups: ClientGroup[];
   emptyMessage: string;
+  subfiltros: AgendaSubfiltro[];
 }
 
 // Colunas ordenaveis, compartilhadas pela tabela da Carteira completa e
@@ -226,7 +245,7 @@ const WalletTableHead: React.FC<WalletTableHeadProps> = ({
         onSort={onSort}
       />
       <SortableTh
-        label="Retorno"
+        label="Próximo passo"
         sortKeyName="retorno"
         activeKey={sortKey}
         dir={sortDir}
@@ -253,15 +272,18 @@ const WalletTableHead: React.FC<WalletTableHeadProps> = ({
   </thead>
 );
 
+/** Canal que o cobrador acabou de usar (botao Telefone/WhatsApp da linha):
+ * o Atender abre ja com ele marcado. */
+type CanalUsado = "ligacao" | "whatsapp";
+
 interface InternalCollectorWalletProps {
   clientGroups: any[];
   user: any;
   monthlyGoals: any[];
   myCollections: any[];
-  onOpenLog: (client: any) => void;
+  onOpenLog: (client: any, canal?: CanalUsado) => void;
   onOpenDetail: (client: any) => void;
   onOpenAcordo: (client: ClientGroup) => void;
-  onCancelContact: (visit: ScheduledVisit) => void;
 }
 
 const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
@@ -272,7 +294,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   onOpenLog,
   onOpenDetail,
   onOpenAcordo,
-  onCancelContact,
 }) => {
   const {
     getAcordoAtivoDoCliente,
@@ -284,6 +305,40 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     acordos,
     scheduledVisits,
   } = useCollection();
+
+  // Depois de tocar em WhatsApp, o cobrador sai para a conversa (outra aba
+  // ou o app). Quando ele volta para esta tela, o Atender abre sozinho para
+  // registrar como foi -- sem isso o contato acontecia e nao era registrado.
+  const pendenteAtender = useRef<{
+    group: ClientGroup;
+    canal: CanalUsado;
+    desde: number;
+  } | null>(null);
+  useEffect(() => {
+    const aoVoltar = () => {
+      if (document.visibilityState !== "visible") return;
+      const pend = pendenteAtender.current;
+      if (!pend || Date.now() - pend.desde < 1500) return;
+      pendenteAtender.current = null;
+      onOpenLog(pend.group, pend.canal);
+    };
+    window.addEventListener("focus", aoVoltar);
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => {
+      window.removeEventListener("focus", aoVoltar);
+      document.removeEventListener("visibilitychange", aoVoltar);
+    };
+  }, [onOpenLog]);
+  const aposContato = React.useCallback(
+    (group: ClientGroup, canal: CanalUsado) => {
+      if (canal === "whatsapp") {
+        pendenteAtender.current = { group, canal, desde: Date.now() };
+      } else {
+        onOpenLog(group, canal);
+      }
+    },
+    [onOpenLog],
+  );
 
   // Contato (ligacao/whatsapp) agendado em aberto, por cliente -- equivalente
   // ao agendamento do cobrador externo, mas so os canais de carteira (visita
@@ -304,7 +359,10 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return map;
   }, [scheduledVisits, user?.id]);
   const [walletTab, setWalletTab] = useState<"agenda" | "carteira">("agenda");
-  const [agendaSubTab, setAgendaSubTab] = useState<AgendaSubTab>("promessas");
+  // null = ainda nao escolhida: abre em "Para hoje" se houver algo, senao
+  // em "A contatar".
+  const [agendaSubTab, setAgendaSubTab] = useState<AgendaSubTab | null>(null);
+  const [agendaSubfiltro, setAgendaSubfiltro] = useState("todos");
   // Modo foco: oculta os cards de desempenho (Recuperação do Mês, Total de
   // Clientes etc.) pra sobrar só a lista de trabalho. Preferencia pessoal de
   // tela, guardada no navegador -- nao sincroniza entre dispositivos.
@@ -361,16 +419,14 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // status "realizada") -- buscado a parte aqui porque o CollectionContext
   // nao carrega collection_attempts globalmente, so sob demanda por titulo
   // (CollectionModal).
+  type TentativaResumo = {
+    date: string;
+    result: string;
+    notes: string | null;
+    nextActionDate: string | null;
+  };
   const [attemptsByCollection, setAttemptsByCollection] = useState<
-    Record<
-      string,
-      {
-        date: string;
-        result: string;
-        notes: string | null;
-        nextActionDate: string | null;
-      }
-    >
+    Record<string, TentativaResumo & { efetivo: TentativaResumo | null }>
   >({});
 
   useEffect(() => {
@@ -390,12 +446,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     (async () => {
       const map: Record<
         string,
-        {
-          date: string;
-          result: string;
-          notes: string | null;
-          nextActionDate: string | null;
-        }
+        TentativaResumo & { efetivo: TentativaResumo | null }
       > = {};
       for (const batch of chunk(ids, 300)) {
         const { data, error } = await supabase
@@ -407,14 +458,26 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           console.error("Erro ao buscar últimos contatos da carteira:", error);
           continue;
         }
+        // Linhas em ordem do mais recente: a 1a de cada titulo e a ultima
+        // interacao; a 1a efetiva e o ultimo contato efetivo.
         (data || []).forEach((row) => {
-          if (!map[row.collection_id]) {
+          const resumo: TentativaResumo = {
+            date: row.date,
+            result: row.result,
+            notes: row.notes,
+            nextActionDate: row.next_action_date,
+          };
+          const efetiva = isEffectiveAttemptResult(
+            row.result as Parameters<typeof isEffectiveAttemptResult>[0],
+          );
+          const atual = map[row.collection_id];
+          if (!atual) {
             map[row.collection_id] = {
-              date: row.date,
-              result: row.result,
-              notes: row.notes,
-              nextActionDate: row.next_action_date,
+              ...resumo,
+              efetivo: efetiva ? resumo : null,
             };
+          } else if (!atual.efetivo && efetiva) {
+            atual.efetivo = resumo;
           }
         });
       }
@@ -465,10 +528,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   }, [user?.id]);
 
   const lastContacts = useMemo(() => {
-    const map: Record<
-      string,
-      { note: string; date: Date; result: string; nextActionDate: string | null }
-    > = {};
+    const map: Record<string, UltimoContato> = {};
     (myCollections || []).forEach((c) => {
       if (!c.documento || !c.id_parcela) return;
       const attempt = attemptsByCollection[c.id_parcela.toString()];
@@ -481,26 +541,35 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           date,
           result: attempt.result,
           nextActionDate: attempt.nextActionDate,
+          efetivo: current?.efetivo ?? null,
         };
+      }
+      const alvo = map[c.documento];
+      if (attempt.efetivo) {
+        const dataEfetivo = new Date(attempt.efetivo.date + "T00:00:00");
+        if (!alvo.efetivo || dataEfetivo > alvo.efetivo.date) {
+          alvo.efetivo = {
+            date: dataEfetivo,
+            result: attempt.efetivo.result,
+            nextActionDate: attempt.efetivo.nextActionDate,
+          };
+        }
       }
     });
     return map;
   }, [myCollections, attemptsByCollection]);
 
-  // Filtro "ja entrei em contato": pela ULTIMA interacao registrada do
-  // cliente (lastContacts, mesma fonte da coluna "Ultima interacao"). Pedido
-  // dos cobradores (2026-11-09): achar facil quem ja foi contatado hoje /
-  // na semana, sem precisar ordenar a carteira e ir olhando.
-  type FiltroInteracao = "todos" | "hoje" | "semana" | "sem";
-  const [filtroInteracao, setFiltroInteracao] =
-    useState<FiltroInteracao>("todos");
+  // Situacao de contato do cliente pela ULTIMA interacao registrada
+  // (lastContacts, mesma fonte da coluna "Ultima interacao"): hoje, nos
+  // ultimos SEM_CONTATO_DIAS dias, ou sem contato recente. Decide as abas
+  // "A contatar" / "Ja contatados" da Agenda.
   const interacaoDoCliente = React.useCallback(
-    (documento: string): Exclude<FiltroInteracao, "todos"> => {
-      const last = lastContacts[documento];
-      if (!last) return "sem";
+    (documento: string): "hoje" | "semana" | "sem" => {
+      const efetivo = lastContacts[documento]?.efetivo;
+      if (!efetivo) return "sem";
       const hojeData = new Date(todayLocalStr() + "T00:00:00");
       const dias = Math.floor(
-        (hojeData.getTime() - last.date.getTime()) / 86400000,
+        (hojeData.getTime() - efetivo.date.getTime()) / 86400000,
       );
       if (dias <= 0) return "hoje";
       if (dias <= SEM_CONTATO_DIAS) return "semana";
@@ -533,26 +602,19 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return openClientGroups.filter((g) => matchedDocs.has(g.document));
   }, [openClientGroups, walletFiltersParaFiltragem, getFilteredCollections, user]);
 
-  // Contagem por situacao de contato (botoes do filtro) e a lista que a
-  // Agenda e a Carteira completa mostram. "Ultimos 7 dias" inclui hoje.
-  const contagemInteracao = useMemo(() => {
-    const c = { hoje: 0, semana: 0, sem: 0 };
-    walletFilteredGroups.forEach((g) => {
-      const situacao = interacaoDoCliente(g.document);
-      c[situacao] += 1;
-    });
-    return { hoje: c.hoje, semana: c.hoje + c.semana, sem: c.sem };
-  }, [walletFilteredGroups, interacaoDoCliente]);
-  const gruposVisiveis = useMemo(() => {
-    if (filtroInteracao === "todos") return walletFilteredGroups;
-    return walletFilteredGroups.filter((g) => {
-      const situacao = interacaoDoCliente(g.document);
-      if (filtroInteracao === "semana") {
-        return situacao === "hoje" || situacao === "semana";
-      }
-      return situacao === filtroInteracao;
-    });
-  }, [walletFilteredGroups, filtroInteracao, interacaoDoCliente]);
+  // Tentou hoje sem falar com o cliente (nao atendeu, ocupado...).
+  const tentouHojeSemSucesso = React.useCallback(
+    (documento: string) => {
+      const last = lastContacts[documento];
+      return (
+        !!last &&
+        todayLocalStr(last.date) === todayLocalStr() &&
+        interacaoDoCliente(documento) !== "hoje"
+      );
+    },
+    [lastContacts, interacaoDoCliente],
+  );
+
 
   // Item 34: saldo de cada cliente dividido em VENCIDO (o que se cobra hoje)
   // e A VENCER (so negociavel). Calculado uma vez por cliente e reusado na
@@ -594,13 +656,13 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // (mesma fonte do balde "Sem contato") -- ausencia de entrada ali so
   // acontece quando nenhum titulo em aberto do cliente tem uma unica
   // tentativa registrada, exatamente o que o pedido original definiu.
-  const { urgentes, urgenteInfoByDocument } = useMemo(() => {
+  const { urgenteInfoByDocument } = useMemo(() => {
     const info = new Map<string, { diasRestantes: number; semAcao: boolean }>();
     if (!temRegraComTeto) {
       return { urgentes: [] as ClientGroup[], urgenteInfoByDocument: info };
     }
     const ranked: { group: ClientGroup; diasRestantes: number }[] = [];
-    gruposVisiveis.forEach((group) => {
+    walletFilteredGroups.forEach((group) => {
       const atraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
       const diasRestantes = diasAteSairDasRegras(
         minhasRegras,
@@ -621,7 +683,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       urgenteInfoByDocument: info,
     };
   }, [
-    gruposVisiveis,
+    walletFilteredGroups,
     minhasRegras,
     temRegraComTeto,
     lastContacts,
@@ -644,7 +706,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   };
 
   const sortedWalletFilteredGroups = useMemo(() => {
-    if (!sortKey) return gruposVisiveis;
+    if (!sortKey) return walletFilteredGroups;
     const valueFor = (g: ClientGroup): number | string => {
       switch (sortKey) {
         case "cliente":
@@ -652,7 +714,11 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         case "ultimaInteracao":
           return lastContacts[g.document]?.date?.getTime() ?? -Infinity;
         case "retorno":
-          return lastContacts[g.document]?.nextActionDate ?? "";
+          return (
+            scheduledContactByDocument.get(g.document)?.scheduledDate ??
+            lastContacts[g.document]?.efetivo?.nextActionDate ??
+            ""
+          );
         case "atraso":
           return clientMaxOverdueDays(g, acordoAtivoOverdueMap);
         case "valorPendente":
@@ -662,7 +728,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           return "";
       }
     };
-    return [...gruposVisiveis].sort((a, b) => {
+    return [...walletFilteredGroups].sort((a, b) => {
       const va = valueFor(a);
       const vb = valueFor(b);
       const cmp =
@@ -672,279 +738,262 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [
-    gruposVisiveis,
+    walletFilteredGroups,
     sortKey,
     sortDir,
     lastContacts,
     acordoAtivoOverdueMap,
     saldoPorDocumento,
+    scheduledContactByDocument,
   ]);
 
-  // Agenda priorizada: cada cliente cai em UMA só categoria (a de maior
-  // precedencia), quem sobra vai pra "Em tratamento" (nao fica invisivel
-  // mais). Ordem pensada pelo que é mais acionável agora: uma promessa
-  // vencendo ou um acordo quebrado é alguém esperando contato; atraso por
-  // faixa (90/60/30 — mesmos limiares de priorityBucket, que já usa o maior
-  // atraso entre as parcelas em aberto = o do boleto vencido mais antigo)
-  // vem depois; silêncio e "tudo em dia" por último.
+  // Agenda em 3 abas (ver AgendaSubTab): cada cliente cai em uma so --
+  // "Para hoje", "A contatar" ou "Ja contatados". A faixa de atraso (90/60/30,
+  // priorityBucket) virou subfiltro de "A contatar" e selo na linha.
   const today = todayLocalStr();
-  const todayDate = new Date(today + "T00:00:00");
 
-  // Acompanhamento diario dos contatos agendados (ligacao/whatsapp) deste
-  // cobrador -- mesma proposta do Acompanhamento de Visitas do externo, só
-  // que aqui é a visão do próprio cobrador sobre o dia, não a do gestor
-  // (essa fica em VisitTracking.tsx).
-  const dailyContactStats = useMemo(() => {
-    const mine = scheduledVisits.filter(
-      (v) =>
-        v.collectorId === user?.id && v.channel && v.channel !== "presencial",
-    );
-    return {
-      agendadosHoje: mine.filter(
-        (v) => v.status === "agendada" && v.scheduledDate === today,
-      ).length,
-      atrasados: mine.filter((v) => isVisitOverdue(v, today)).length,
-      concluidosHoje: mine.filter(
-        (v) => v.status === "realizada" && v.dataVisitaRealizada === today,
-      ).length,
-      reagendadosHoje: mine.filter(
-        (v) =>
-          v.status === "reagendada" &&
-          v.updatedAt &&
-          todayLocalStr(new Date(v.updatedAt)) === today,
-      ).length,
-    };
-  }, [scheduledVisits, user?.id, today]);
+  const { paraHoje, aContatar, contatados, motivoParaHoje } = useMemo(() => {
+    const paraHoje: ClientGroup[] = [];
+    const aContatar: ClientGroup[] = [];
+    const contatados: ClientGroup[] = [];
+    const motivoParaHoje = new Map<string, MotivoParaHoje>();
 
-  const {
-    agendados,
-    promessas,
-    acordosQuebrados,
-    criticos,
-    alertas,
-    medios,
-    semContato,
-    emTratamento,
-  } = useMemo(() => {
-    const claimed = new Set<string>();
-    const agendados: ClientGroup[] = [];
-    const promessas: ClientGroup[] = [];
-    const acordosQuebrados: ClientGroup[] = [];
-    const criticos: ClientGroup[] = [];
-    const alertas: ClientGroup[] = [];
-    const medios: ClientGroup[] = [];
-    const semContato: ClientGroup[] = [];
-    const emTratamento: ClientGroup[] = [];
+    sortedWalletFilteredGroups.forEach((group) => {
+      const doc = group.document;
+      const contatoRecente = interacaoDoCliente(doc) !== "sem";
+      const agendado = scheduledContactByDocument.get(doc);
+      const retorno = lastContacts[doc]?.efetivo?.nextActionDate;
+      // Compromisso que chegou fica em "Para hoje" ate ser resolvido
+      // (registrar o contato conclui o agendamento / troca a promessa).
+      // Acordo quebrado e "perto de sair da faixa" so enquanto nao houve
+      // contato recente -- depois de falar com o cliente, vao para
+      // "Ja contatados" (o selo de urgencia continua na linha).
+      let motivo: MotivoParaHoje | null = null;
+      if (agendado && agendado.scheduledDate <= today) motivo = "agendado";
+      else if (!agendado && retorno && retorno <= today) motivo = "promessa";
+      else if (!contatoRecente && getAcordoQuebradoDoCliente(doc))
+        motivo = "quebrado";
+      else if (!contatoRecente && urgenteInfoByDocument.has(doc))
+        motivo = "urgente";
 
-    const claim = (list: ClientGroup[], group: ClientGroup) => {
-      list.push(group);
-      claimed.add(group.document);
-    };
-
-    // Maior precedencia: o cobrador se comprometeu com uma data/hora pra
-    // este contato (LogContactModal, "Atender"), diferente de promessa (compromisso
-    // do CLIENTE) -- so entra aqui quando chegou o dia ou passou.
-    sortedWalletFilteredGroups.forEach((group) => {
-      const contato = scheduledContactByDocument.get(group.document);
-      if (contato && contato.scheduledDate <= today) claim(agendados, group);
-    });
-    sortedWalletFilteredGroups.forEach((group) => {
-      if (claimed.has(group.document)) return;
-      const nextActionDate = lastContacts[group.document]?.nextActionDate;
-      if (nextActionDate && nextActionDate <= today) claim(promessas, group);
-    });
-    sortedWalletFilteredGroups.forEach((group) => {
-      if (claimed.has(group.document)) return;
-      if (getAcordoQuebradoDoCliente(group.document))
-        claim(acordosQuebrados, group);
-    });
-    sortedWalletFilteredGroups.forEach((group) => {
-      if (claimed.has(group.document)) return;
-      const bucket = priorityBucket(clientMaxOverdueDays(group, acordoAtivoOverdueMap));
-      if (bucket === "critical") claim(criticos, group);
-      else if (bucket === "high") claim(alertas, group);
-      else if (bucket === "medium") claim(medios, group);
-    });
-    sortedWalletFilteredGroups.forEach((group) => {
-      if (claimed.has(group.document)) return;
-      const last = lastContacts[group.document];
-      const diasSemContato = last
-        ? Math.floor((todayDate.getTime() - last.date.getTime()) / 86400000)
-        : Infinity;
-      if (diasSemContato > SEM_CONTATO_DIAS) claim(semContato, group);
-    });
-    // Resto: ja tem contato recente, nao esta em nenhuma faixa de atraso que
-    // exija atencao agora e nao tem acordo quebrado — "ja sendo cuidado".
-    sortedWalletFilteredGroups.forEach((group) => {
-      if (claimed.has(group.document)) return;
-      claim(emTratamento, group);
+      if (motivo) {
+        paraHoje.push(group);
+        motivoParaHoje.set(doc, motivo);
+      } else if (contatoRecente) {
+        contatados.push(group);
+      } else {
+        aContatar.push(group);
+      }
     });
 
-    return {
-      agendados,
-      promessas,
-      acordosQuebrados,
-      criticos,
-      alertas,
-      medios,
-      semContato,
-      emTratamento,
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Ordem padrao (sem coluna clicada): o que importa em cada aba.
+    if (!sortKey) {
+      const ordemMotivo: MotivoParaHoje[] = [
+        "agendado",
+        "promessa",
+        "quebrado",
+        "urgente",
+      ];
+      paraHoje.sort(
+        (a, b) =>
+          ordemMotivo.indexOf(motivoParaHoje.get(a.document)!) -
+            ordemMotivo.indexOf(motivoParaHoje.get(b.document)!) ||
+          (urgenteInfoByDocument.get(a.document)?.diasRestantes ?? 0) -
+            (urgenteInfoByDocument.get(b.document)?.diasRestantes ?? 0),
+      );
+      // Maior atraso primeiro; cliente em dia (so a vencer) no fim.
+      const temVencido = (g: ClientGroup) =>
+        (saldoPorDocumento.get(g.document)?.vencido ?? 0) > 0.01 ? 1 : 0;
+      const tentou = (g: ClientGroup) =>
+        tentouHojeSemSucesso(g.document) ? 1 : 0;
+      aContatar.sort(
+        (a, b) =>
+          temVencido(b) - temVencido(a) ||
+          tentou(a) - tentou(b) ||
+          clientMaxOverdueDays(b, acordoAtivoOverdueMap) -
+            clientMaxOverdueDays(a, acordoAtivoOverdueMap),
+      );
+      // Contato mais recente primeiro.
+      contatados.sort(
+        (a, b) =>
+          (lastContacts[b.document]?.date.getTime() ?? 0) -
+          (lastContacts[a.document]?.date.getTime() ?? 0),
+      );
+    }
+
+    return { paraHoje, aContatar, contatados, motivoParaHoje };
   }, [
     sortedWalletFilteredGroups,
+    sortKey,
+    interacaoDoCliente,
+    tentouHojeSemSucesso,
     scheduledContactByDocument,
     lastContacts,
     getAcordoQuebradoDoCliente,
+    urgenteInfoByDocument,
+    saldoPorDocumento,
     acordoAtivoOverdueMap,
     today,
   ]);
 
-  // Ao digitar uma busca, tenta manter o cobrador DENTRO da Agenda: as 7
-  // categorias acima (exceto "urgente", que nao e exclusiva -- ver comentario
-  // la em cima) particionam TODO o conjunto filtrado, entao um termo que
-  // isola um unico cliente (ex.: CPF ou numero de acordo) cai inteiro numa
-  // unica categoria -- pula pra ela (ex.: "Em tratamento") em vez de deixar
-  // a busca parecer vazia na aba atual. Se a busca espalhar clientes por
-  // mais de uma categoria (ou nao achar ninguem), cai pra Carteira completa,
-  // que mostra a lista inteira de uma vez. So reage a busca MUDAR -- nao a
-  // cada recalculo das categorias (ex.: ordenacao), senao o cobrador seria
-  // chutado de volta toda hora com uma busca ainda digitada.
+  // Faixa de atraso do cliente para o subfiltro de "A contatar".
+  const faixaDoCliente = React.useCallback(
+    (g: ClientGroup): "critical" | "high" | "medium" | "low" | "emDia" =>
+      (saldoPorDocumento.get(g.document)?.vencido ?? 0) <= 0.01
+        ? "emDia"
+        : priorityBucket(clientMaxOverdueDays(g, acordoAtivoOverdueMap)),
+    [saldoPorDocumento, acordoAtivoOverdueMap],
+  );
+
+  // Ao digitar uma busca, tenta manter o cobrador DENTRO da Agenda: as 3
+  // abas particionam TODO o conjunto filtrado, entao um termo que isola um
+  // unico cliente (ex.: CPF ou numero de acordo) cai inteiro numa aba so --
+  // pula pra ela em vez de deixar a busca parecer vazia na aba atual. Se a
+  // busca espalhar clientes por mais de uma aba (ou nao achar ninguem), cai
+  // pra Carteira completa. So reage a busca MUDAR.
   useEffect(() => {
     if (!(walletFilters.search || "").trim()) return;
-    // Na Carteira completa a busca ja aparece direto na lista (igual CPF) --
-    // so remaneja de aba/subaba quando o cobrador esta na Agenda.
     if (walletTab !== "agenda") return;
-    const categoriasExclusivas: { key: AgendaSubTab; groups: ClientGroup[] }[] = [
-      { key: "agendados", groups: agendados },
-      { key: "promessas", groups: promessas },
-      { key: "quebrado", groups: acordosQuebrados },
-      { key: "critico", groups: criticos },
-      { key: "alerta", groups: alertas },
-      { key: "medio", groups: medios },
-      { key: "semContato", groups: semContato },
-      { key: "tratamento", groups: emTratamento },
+    const abas: { key: AgendaSubTab; groups: ClientGroup[] }[] = [
+      { key: "paraHoje", groups: paraHoje },
+      { key: "aContatar", groups: aContatar },
+      { key: "contatados", groups: contatados },
     ];
-    const comResultado = categoriasExclusivas.filter((c) => c.groups.length > 0);
+    const comResultado = abas.filter((c) => c.groups.length > 0);
     if (comResultado.length === 1) {
       setAgendaSubTab(comResultado[0].key);
+      setAgendaSubfiltro("todos");
     } else {
       setWalletTab("carteira");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletFilters.search]);
 
-  const agendaCategorias: AgendaCategoriaConfig[] = useMemo(
-    () => [
+  const agendaCategorias: AgendaCategoriaConfig[] = useMemo(() => {
+    const contar = <K extends string>(
+      lista: ClientGroup[],
+      chave: (g: ClientGroup) => K,
+    ) => {
+      const m = new Map<K, number>();
+      lista.forEach((g) => m.set(chave(g), (m.get(chave(g)) ?? 0) + 1));
+      return m;
+    };
+    const aplicar = <K extends string>(
+      lista: ClientGroup[],
+      chave: (g: ClientGroup) => K,
+      aba: AgendaSubTab,
+    ) =>
+      agendaSubTab === aba && agendaSubfiltro !== "todos"
+        ? lista.filter((g) => chave(g) === agendaSubfiltro)
+        : lista;
+
+    const motivoDe = (g: ClientGroup) => motivoParaHoje.get(g.document)!;
+    const porMotivo = contar(paraHoje, motivoDe);
+    const porFaixa = contar(aContatar, faixaDoCliente);
+    const quandoContatou = (g: ClientGroup) =>
+      interacaoDoCliente(g.document) === "hoje" ? "hoje" : "antes";
+    const porQuando = contar(contatados, quandoContatou);
+
+    return [
       {
-        key: "agendados",
-        label: "Agendados para hoje",
+        key: "paraHoje",
+        label: "Para hoje",
         icon: <CalendarClock className="w-4 h-4" />,
         activeClass: "bg-purple-600 text-white",
         accentBorderClass: "border-l-purple-400 dark:border-l-purple-600",
-        groups: agendados,
-        emptyMessage: "Nenhum contato agendado para hoje ou atrasado.",
+        total: paraHoje.length,
+        groups: aplicar(paraHoje, motivoDe, "paraHoje"),
+        emptyMessage:
+          "Nada marcado para hoje: nenhum contato agendado, promessa vencendo, acordo quebrado ou cliente saindo da sua carteira.",
+        subfiltros: [
+          { key: "agendado", label: "Contato agendado", count: porMotivo.get("agendado") ?? 0 },
+          { key: "promessa", label: "Promessa vencendo", count: porMotivo.get("promessa") ?? 0 },
+          { key: "quebrado", label: "Acordo quebrado", count: porMotivo.get("quebrado") ?? 0 },
+          {
+            key: "urgente",
+            label: "Vai sair da carteira",
+            count: porMotivo.get("urgente") ?? 0,
+          },
+        ],
       },
       {
-        key: "promessas",
-        label: "Promessas vencendo",
-        icon: <Clock className="w-4 h-4" />,
+        key: "aContatar",
+        label: "Ligar",
+        icon: <PhoneCall className="w-4 h-4" />,
         activeClass: "bg-indigo-600 text-white",
         accentBorderClass: "border-l-indigo-400 dark:border-l-indigo-600",
-        groups: promessas,
-        emptyMessage: "Nenhuma promessa vencendo hoje ou atrasada.",
+        total: aContatar.length,
+        groups: aplicar(aContatar, faixaDoCliente, "aContatar"),
+        emptyMessage: `Você falou com todos os clientes nos últimos ${SEM_CONTATO_DIAS} dias.`,
+        subfiltros: [
+          { key: "critical", label: "Crítico +90d", count: porFaixa.get("critical") ?? 0 },
+          { key: "high", label: "60-90d", count: porFaixa.get("high") ?? 0 },
+          { key: "medium", label: "30-60d", count: porFaixa.get("medium") ?? 0 },
+          { key: "low", label: "Até 30d", count: porFaixa.get("low") ?? 0 },
+          { key: "emDia", label: "Em dia", count: porFaixa.get("emDia") ?? 0 },
+        ],
       },
       {
-        key: "quebrado",
-        label: "Acordo quebrado",
-        icon: <AlertCircle className="w-4 h-4" />,
-        activeClass: "bg-red-600 text-white",
-        accentBorderClass: "border-l-red-400 dark:border-l-red-600",
-        groups: acordosQuebrados,
-        emptyMessage: "Nenhum acordo quebrado.",
-      },
-      {
-        key: "urgente",
-        label: "Clientes urgentes",
-        icon: <AlertTriangle className="w-4 h-4" />,
-        activeClass: "bg-pink-600 text-white",
-        accentBorderClass: "border-l-pink-400 dark:border-l-pink-600",
-        groups: urgentes,
-        emptyMessage:
-          temRegraComTeto
-            ? "Nenhum cliente perto de sair da sua faixa de atraso."
-            : "Sua faixa de atraso ainda não foi configurada pelo gestor.",
-      },
-      {
-        key: "critico",
-        label: "Crítico (+90 dias)",
-        icon: <Flame className="w-4 h-4" />,
-        activeClass: "bg-orange-600 text-white",
-        accentBorderClass: "border-l-orange-400 dark:border-l-orange-600",
-        groups: criticos,
-        emptyMessage: "Nenhum cliente crítico (+90 dias).",
-      },
-      {
-        key: "alerta",
-        label: "Alerta (60-90 dias)",
-        icon: <Flame className="w-4 h-4" />,
-        activeClass: "bg-amber-500 text-white",
-        accentBorderClass: "border-l-amber-400 dark:border-l-amber-600",
-        groups: alertas,
-        emptyMessage: "Nenhum cliente em alerta (60-90 dias).",
-      },
-      {
-        key: "medio",
-        label: "Médio (30-60 dias)",
-        icon: <CalendarRange className="w-4 h-4" />,
-        activeClass: "bg-yellow-500 text-white",
-        accentBorderClass: "border-l-yellow-400 dark:border-l-yellow-600",
-        groups: medios,
-        emptyMessage: "Nenhum cliente no atraso médio (30-60 dias).",
-      },
-      {
-        key: "semContato",
-        label: `Sem contato (${SEM_CONTATO_DIAS}+ dias)`,
-        icon: <CalendarDays className="w-4 h-4" />,
-        activeClass: "bg-gray-600 text-white",
-        accentBorderClass: "border-l-gray-300 dark:border-l-gray-600",
-        groups: semContato,
-        emptyMessage: "Nenhum cliente sem contato.",
-      },
-      {
-        key: "tratamento",
-        label: "Em tratamento",
-        icon: <CheckCircle className="w-4 h-4" />,
+        key: "contatados",
+        label: "Já contatados",
+        icon: <UserCheck className="w-4 h-4" />,
         activeClass: "bg-green-600 text-white",
         accentBorderClass: "border-l-green-400 dark:border-l-green-600",
-        groups: emTratamento,
-        emptyMessage: "Nenhum cliente em tratamento.",
+        total: contatados.length,
+        groups: aplicar(contatados, quandoContatou, "contatados"),
+        emptyMessage: `Você ainda não falou com nenhum cliente nos últimos ${SEM_CONTATO_DIAS} dias.`,
+        subfiltros: [
+          { key: "hoje", label: "Hoje", count: porQuando.get("hoje") ?? 0 },
+          {
+            key: "antes",
+            label: `1 a ${SEM_CONTATO_DIAS} dias atrás`,
+            count: porQuando.get("antes") ?? 0,
+          },
+        ],
       },
-    ],
-    [
-      agendados,
-      promessas,
-      acordosQuebrados,
-      urgentes,
-      temRegraComTeto,
-      criticos,
-      alertas,
-      medios,
-      semContato,
-      emTratamento,
-    ],
-  );
+    ];
+  }, [
+    paraHoje,
+    aContatar,
+    contatados,
+    motivoParaHoje,
+    faixaDoCliente,
+    interacaoDoCliente,
+    agendaSubTab,
+    agendaSubfiltro,
+  ]);
+
+  const abaAgendaEfetiva: AgendaSubTab =
+    agendaSubTab ?? (paraHoje.length > 0 ? "paraHoje" : "aContatar");
+  const trocarAbaAgenda = (aba: AgendaSubTab, subfiltro = "todos") => {
+    setAgendaSubTab(aba);
+    setAgendaSubfiltro(subfiltro);
+  };
 
   const categoriaAtiva =
-    agendaCategorias.find((c) => c.key === agendaSubTab) ?? agendaCategorias[0];
+    agendaCategorias.find((c) => c.key === abaAgendaEfetiva) ??
+    agendaCategorias[0];
+  const subfiltrosVisiveis = categoriaAtiva.subfiltros.filter(
+    (sub) => sub.count > 0,
+  );
+  // Subfiltro escolhido que ficou vazio (ex.: o ultimo cliente dele foi
+  // atendido) volta para "Todos", senao a lista ficaria vazia sem botao.
+  useEffect(() => {
+    if (
+      agendaSubfiltro !== "todos" &&
+      !subfiltrosVisiveis.some((sub) => sub.key === agendaSubfiltro)
+    ) {
+      setAgendaSubfiltro("todos");
+    }
+  }, [agendaSubfiltro, subfiltrosVisiveis]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [walletFilters, walletTab, sortKey, sortDir, filtroInteracao]);
+  }, [walletFilters, walletTab, sortKey, sortDir]);
 
   // Carteira completa: diretório com todo mundo em aberto, não só quem
   // sobrou da agenda — é a visão de "navegar tudo" que a Agenda não dá.
-  const totalPages = Math.ceil(gruposVisiveis.length / itemsPerPage);
+  const totalPages = Math.ceil(walletFilteredGroups.length / itemsPerPage);
   const paginatedClients = useMemo(() => {
     return sortedWalletFilteredGroups.slice(
       (currentPage - 1) * itemsPerPage,
@@ -1178,75 +1227,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <button
-          type="button"
-          onClick={() =>
-            setFiltroInteracao((f) => (f === "hoje" ? "todos" : "hoje"))
-          }
-          title="Clientes com qualquer interação registrada hoje — clique para filtrar"
-          className={`text-left rounded-2xl border p-3 flex items-center gap-2 transition-colors ${
-            filtroInteracao === "hoje"
-              ? "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-800"
-              : "bg-white dark:bg-dark-bg border-gray-200 dark:border-dark-border hover:bg-green-50 dark:hover:bg-green-900/10"
-          }`}
-        >
-          <UserCheck className="w-4 h-4 text-green-600 shrink-0" />
-          <div>
-            <p className="text-[11px] text-gray-500 leading-tight">
-              Contatados hoje
-            </p>
-            <p className="text-lg font-bold text-green-600 leading-tight">
-              {contagemInteracao.hoje}
-            </p>
-          </div>
-        </button>
-        <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-3 flex items-center gap-2">
-          <CalendarClock className="w-4 h-4 text-purple-600 shrink-0" />
-          <div>
-            <p className="text-[11px] text-gray-500 leading-tight">
-              Agendados hoje
-            </p>
-            <p className="text-lg font-bold text-gray-900 dark:text-dark-text leading-tight">
-              {dailyContactStats.agendadosHoje}
-            </p>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-3 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-          <div>
-            <p className="text-[11px] text-gray-500 leading-tight">
-              Atrasados
-            </p>
-            <p className="text-lg font-bold text-red-600 leading-tight">
-              {dailyContactStats.atrasados}
-            </p>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-3 flex items-center gap-2">
-          <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
-          <div>
-            <p className="text-[11px] text-gray-500 leading-tight">
-              Concluídos hoje
-            </p>
-            <p className="text-lg font-bold text-gray-900 dark:text-dark-text leading-tight">
-              {dailyContactStats.concluidosHoje}
-            </p>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-3 flex items-center gap-2">
-          <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-          <div>
-            <p className="text-[11px] text-gray-500 leading-tight">
-              Reagendados hoje
-            </p>
-            <p className="text-lg font-bold text-gray-900 dark:text-dark-text leading-tight">
-              {dailyContactStats.reagendadosHoje}
-            </p>
-          </div>
-        </div>
-      </div>
-
       <FilterBar
         filters={walletFilters}
         onFilterChange={setWalletFilters}
@@ -1285,55 +1265,16 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold text-gray-500 dark:text-dark-text-secondary mr-1">
-          Contato:
-        </span>
-        {(
-          [
-            ["todos", "Todos", walletFilteredGroups.length],
-            ["hoje", "Contatados hoje", contagemInteracao.hoje],
-            ["semana", "Últimos 7 dias", contagemInteracao.semana],
-            ["sem", `Sem contato há ${SEM_CONTATO_DIAS}+ dias`, contagemInteracao.sem],
-          ] as const
-        ).map(([valor, rotulo, total]) => (
-          <button
-            key={valor}
-            type="button"
-            onClick={() => setFiltroInteracao(valor)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
-              filtroInteracao === valor
-                ? valor === "sem"
-                  ? "bg-gray-700 text-white border-gray-700"
-                  : "bg-green-600 text-white border-green-600"
-                : "bg-white dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
-            }`}
-          >
-            {valor === "hoje" && <UserCheck className="w-3.5 h-3.5" />}
-            {rotulo}
-            <span
-              className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                filtroInteracao === valor
-                  ? "bg-white/20"
-                  : "bg-gray-100 dark:bg-dark-bg-tertiary text-gray-500 dark:text-dark-text-secondary"
-              }`}
-            >
-              {total}
-            </span>
-          </button>
-        ))}
-      </div>
-
       {walletTab === "agenda" ? (
         <>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {agendaCategorias.map((categoria) => (
               <button
                 key={categoria.key}
                 type="button"
-                onClick={() => setAgendaSubTab(categoria.key)}
+                onClick={() => trocarAbaAgenda(categoria.key)}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-colors ${
-                  agendaSubTab === categoria.key
+                  abaAgendaEfetiva === categoria.key
                     ? categoria.activeClass
                     : "bg-white dark:bg-dark-bg text-gray-500 border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
                 }`}
@@ -1342,16 +1283,46 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                 {categoria.label}
                 <span
                   className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                    agendaSubTab === categoria.key
+                    abaAgendaEfetiva === categoria.key
                       ? "bg-white/20"
                       : "bg-gray-100 dark:bg-dark-bg-tertiary text-gray-500 dark:text-dark-text-secondary"
                   }`}
                 >
-                  {categoria.groups.length}
+                  {categoria.total}
                 </span>
               </button>
             ))}
           </div>
+          {/* Subfiltro da aba ativa, segmentado por "|". So aparece o que tem
+              cliente; sem nenhum, a linha some. */}
+          {subfiltrosVisiveis.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-1 text-xs">
+            {[
+              { key: "todos", label: "Todos", count: categoriaAtiva.total },
+              ...subfiltrosVisiveis,
+            ].map((sub, i) => (
+              <React.Fragment key={sub.key}>
+                {i > 0 && (
+                  <span className="text-gray-300 dark:text-dark-border px-1 select-none">
+                    |
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setAgendaSubfiltro(sub.key)}
+                  className={`px-1.5 py-0.5 rounded-md transition-colors ${
+                    agendaSubfiltro === sub.key
+                      ? "font-bold text-gray-900 dark:text-dark-text bg-gray-100 dark:bg-dark-bg-tertiary"
+                      : "text-gray-500 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+                  }`}
+                >
+                  {sub.label}{" "}
+                  <span className="tabular-nums text-gray-400">({sub.count})</span>
+                </button>
+              </React.Fragment>
+            ))}
+          </div>
+          )}
           <AgendaSection
             accentBorderClass={categoriaAtiva.accentBorderClass}
             groups={categoriaAtiva.groups}
@@ -1369,7 +1340,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             onSort={toggleSort}
             urgenteInfoByDocument={urgenteInfoByDocument}
             scheduledContactByDocument={scheduledContactByDocument}
-            onCancelContact={onCancelContact}
+            aposContato={aposContato}
           />
         </>
       ) : (
@@ -1403,7 +1374,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                       onOpenAcordo={onOpenAcordo}
                       urgenteInfo={urgenteInfoByDocument.get(group.document)}
                       scheduledContact={scheduledContactByDocument.get(group.document)}
-                      onCancelContact={onCancelContact}
+                      aposContato={aposContato}
                     />
                   ))
                 ) : (
@@ -1424,7 +1395,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             <div className="p-4 border-t border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50/30 dark:bg-dark-bg-secondary/30">
               <p className="text-xs text-gray-500">
                 Mostrando {paginatedClients.length} de{" "}
-                {gruposVisiveis.length}
+                {walletFilteredGroups.length}
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -1492,15 +1463,17 @@ const handleCall = (client: Pick<ClientGroup, "mobile" | "phone">) => {
 interface ClientQueueRowProps {
   group: ClientGroup;
   lastContact:
-    | { note: string; date: Date; result: string; nextActionDate: string | null }
+    | UltimoContato
     | undefined;
   acordoAtivo: boolean;
   copiedDoc: string | null;
   copyDocument: (document: string) => void;
   user: User | null;
   onOpenDetail: (client: ClientGroup) => void;
-  onOpenLog: (client: ClientGroup) => void;
+  onOpenLog: (client: ClientGroup, canal?: CanalUsado) => void;
   onOpenAcordo: (client: ClientGroup) => void;
+  /** Chamado depois de Telefone/WhatsApp: abre o Atender para registrar. */
+  aposContato: (client: ClientGroup, canal: CanalUsado) => void;
   /** Presente quando o cliente esta perto de sair da faixa de atraso do
    * cobrador (ver urgentes/urgenteInfoByDocument em InternalCollectorWallet).
    * Mostrado em qualquer aba, nao so "Clientes urgentes" -- e informacao
@@ -1508,7 +1481,6 @@ interface ClientQueueRowProps {
   urgenteInfo?: { diasRestantes: number; semAcao: boolean };
   /** Contato (ligacao/whatsapp) agendado em aberto deste cliente, se houver. */
   scheduledContact?: ScheduledVisit;
-  onCancelContact: (visit: ScheduledVisit) => void;
 }
 
 // Linha da agenda/fila de atendimento, reusada em cada secao priorizada
@@ -1527,7 +1499,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   onOpenAcordo,
   urgenteInfo,
   scheduledContact,
-  onCancelContact,
+  aposContato,
 }) => {
   const { acordoAtivoOverdueMap } = useCollection();
   const maxAtraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
@@ -1536,6 +1508,15 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   const emDia = saldo.vencido <= 0.01;
   const phoneValue = group.mobile || group.phone;
   const [showPhoneModal, setShowPhoneModal] = useState(false);
+  // Fechar o telefone depois de Ligar/Copiar abre o Atender.
+  const usouTelefone = useRef(false);
+  const fecharTelefone = () => {
+    setShowPhoneModal(false);
+    if (usouTelefone.current) {
+      usouTelefone.current = false;
+      aposContato(group, "ligacao");
+    }
+  };
   // saleNumber 0 = parcela avulsa (sem numero_titulo nem venda_n, ver
   // resolveSaleKey em filters/sales.ts) -- na pratica, titulo que nasceu de
   // uma renegociacao em vez de vir com numero de venda do ERP.
@@ -1644,38 +1625,27 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               {urgenteInfo.diasRestantes === 1 ? "dia" : "dias"} na carteira
             </span>
           )}
-          {scheduledContact && (
-            <span
-              className={`w-fit inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                isVisitOverdue(scheduledContact)
-                  ? "bg-red-50 text-red-600 border-red-200"
-                  : "bg-purple-50 text-purple-600 border-purple-100"
-              }`}
-              title="Retorno marcado pelo cobrador no Atender (contato agendado)"
-            >
-              <CalendarClock className="w-3 h-3" />
-              {isVisitOverdue(scheduledContact)
-                ? "Agendamento atrasado: "
-                : "Agendado: "}
-              {scheduledContact.channel === "whatsapp" ? "WhatsApp" : "ligação"}
-              {" em "}
-              {new Date(
-                scheduledContact.scheduledDate + "T00:00:00",
-              ).toLocaleDateString("pt-BR")}
-              {scheduledContact.scheduledTime
-                ? ` às ${formatHorario(scheduledContact.scheduledTime)}`
-                : ""}
-            </span>
-          )}
         </div>
       </td>
       <td className="px-6 py-4 max-w-xs" onClick={() => onOpenDetail(group)}>
         {lastContact ? (
           <div className="flex flex-col gap-1">
-            {todayLocalStr(new Date(lastContact.date)) === todayLocalStr() ? (
+            {lastContact.efetivo &&
+            todayLocalStr(lastContact.efetivo.date) === todayLocalStr() ? (
               <span className="inline-flex items-center gap-1 w-fit px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                 <UserCheck className="w-3 h-3" />
-                Contatado hoje
+                Falou hoje
+              </span>
+            ) : todayLocalStr(lastContact.date) === todayLocalStr() ? (
+              <span
+                className="inline-flex items-center gap-1 w-fit px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                title="Tentou hoje, mas ainda não falou com o cliente — continua em Ligar"
+              >
+                <Clock className="w-3 h-3" />
+                Tentou hoje:{" "}
+                {ATTEMPT_RESULT_LABELS[
+                  lastContact.result as keyof typeof ATTEMPT_RESULT_LABELS
+                ] ?? lastContact.result}
               </span>
             ) : (
               <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
@@ -1690,15 +1660,53 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           <span className="text-xs text-gray-300 italic">Sem registros</span>
         )}
       </td>
+      {/* Proximo passo: dois fatos diferentes, com nome claro --
+          "Ligar/WhatsApp em" = contato que o COBRADOR agendou (scheduled_visits);
+          "Prometeu pagar em" = data que o CLIENTE prometeu (promessa
+          registrada no Atender, collection_attempts.next_action_date). */}
       <td className="px-6 py-4" onClick={() => onOpenDetail(group)}>
-        {lastContact?.nextActionDate ? (
-          <span className="inline-flex items-center gap-1 w-fit px-2 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
-            <Clock className="w-3 h-3" />
-            Retorno:{" "}
-            {new Date(
-              lastContact.nextActionDate + "T00:00:00",
-            ).toLocaleDateString("pt-BR")}
-          </span>
+        {scheduledContact || lastContact?.efetivo?.nextActionDate ? (
+          <div className="flex flex-col gap-1">
+            {scheduledContact && (
+              <span
+                className={`inline-flex items-center gap-1 w-fit px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${
+                  isVisitOverdue(scheduledContact)
+                    ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"
+                    : "bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-900/20 dark:border-purple-800 dark:text-purple-300"
+                }`}
+                title="Contato que você agendou no Atender"
+              >
+                <CalendarClock className="w-3 h-3" />
+                {isVisitOverdue(scheduledContact) ? "Atrasado: " : ""}
+                {scheduledContact.channel === "whatsapp" ? "WhatsApp" : "Ligar"}
+                {" em "}
+                {new Date(
+                  scheduledContact.scheduledDate + "T00:00:00",
+                ).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                {scheduledContact.scheduledTime
+                  ? ` às ${formatHorario(scheduledContact.scheduledTime)}`
+                  : ""}
+              </span>
+            )}
+            {lastContact?.efetivo?.nextActionDate && (
+              <span
+                className={`inline-flex items-center gap-1 w-fit px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${
+                  lastContact.efetivo.nextActionDate < todayLocalStr()
+                    ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"
+                    : "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300"
+                }`}
+                title="Data em que o cliente prometeu pagar"
+              >
+                <Clock className="w-3 h-3" />
+                {lastContact.efetivo.nextActionDate < todayLocalStr()
+                  ? "Promessa venceu "
+                  : "Prometeu pagar "}
+                {new Date(
+                  lastContact.efetivo.nextActionDate + "T00:00:00",
+                ).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+              </span>
+            )}
+          </div>
         ) : (
           <span className="text-xs text-gray-300 italic">—</span>
         )}
@@ -1746,6 +1754,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
             onClick={(e) => {
               e.stopPropagation();
               handleWhatsApp(group, user, saldo.vencido);
+              aposContato(group, "whatsapp");
             }}
             disabled={!(group.mobile || group.phone)}
             title={group.mobile || group.phone ? "Chamar no WhatsApp" : "Cliente sem telefone"}
@@ -1758,10 +1767,11 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               e.stopPropagation();
               onOpenLog(group);
             }}
-            className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100"
-            title="Atender (registrar contato / agendar próximo)"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl transition-all text-xs font-bold shadow-sm"
+            title="Registrar como foi o contato e agendar o próximo"
           >
             <MessageSquare className="w-4 h-4" />
+            Atender
           </button>
           <button
             onClick={(e) => {
@@ -1773,20 +1783,8 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           >
             <Handshake className="w-4 h-4" />
           </button>
-          {/* Agendar/remarcar fica dentro do "Atender" (LogContactModal, etapa
-              2); cancelar continua aqui, e uma acao a parte com motivo. */}
-          {scheduledContact && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onCancelContact(scheduledContact);
-              }}
-              className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl transition-all border border-red-100"
-              title="Cancelar contato agendado"
-            >
-              <CalendarX className="w-4 h-4" />
-            </button>
-          )}
+          {/* Agendar, remarcar e cancelar o contato agendado ficam dentro do
+              "Atender" (LogContactModal). */}
         </div>
       </td>
     </tr>
@@ -1795,7 +1793,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
       createPortal(
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[100] backdrop-blur-sm"
-          onClick={() => setShowPhoneModal(false)}
+          onClick={fecharTelefone}
         >
           <div
             className="bg-white dark:bg-dark-bg rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden border border-gray-200 dark:border-dark-border"
@@ -1806,7 +1804,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
                 {group.client}
               </h3>
               <button
-                onClick={() => setShowPhoneModal(false)}
+                onClick={fecharTelefone}
                 className="p-1.5 hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary rounded-full transition-colors"
               >
                 <X className="w-4 h-4 text-gray-500" />
@@ -1818,7 +1816,10 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               </p>
               <div className="flex gap-3">
                 <button
-                  onClick={() => copyDocument(phoneValue)}
+                  onClick={() => {
+                    usouTelefone.current = true;
+                    copyDocument(phoneValue);
+                  }}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-dark-bg-secondary text-gray-700 dark:text-dark-text font-bold text-sm rounded-xl hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary transition-colors"
                 >
                   {copiedDoc === phoneValue ? (
@@ -1829,7 +1830,10 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
                   {copiedDoc === phoneValue ? "Copiado!" : "Copiar"}
                 </button>
                 <button
-                  onClick={() => handleCall(group)}
+                  onClick={() => {
+                    usouTelefone.current = true;
+                    handleCall(group);
+                  }}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-colors"
                 >
                   <Phone className="w-4 h-4" />
@@ -1851,23 +1855,20 @@ interface AgendaSectionProps {
   accentBorderClass: string;
   groups: ClientGroup[];
   emptyMessage: string;
-  lastContacts: Record<
-    string,
-    { note: string; date: Date; result: string; nextActionDate: string | null }
-  >;
+  lastContacts: Record<string, UltimoContato>;
   getAcordoAtivoDoCliente: (clientDocument: string) => unknown;
   copiedDoc: string | null;
   copyDocument: (document: string) => void;
   user: User | null;
   onOpenDetail: (client: ClientGroup) => void;
-  onOpenLog: (client: ClientGroup) => void;
+  onOpenLog: (client: ClientGroup, canal?: CanalUsado) => void;
   onOpenAcordo: (client: ClientGroup) => void;
+  aposContato: (client: ClientGroup, canal: CanalUsado) => void;
   sortKey: WalletSortKey | null;
   sortDir: "asc" | "desc";
   onSort: (key: WalletSortKey) => void;
   urgenteInfoByDocument: Map<string, { diasRestantes: number; semAcao: boolean }>;
   scheduledContactByDocument: Map<string, ScheduledVisit>;
-  onCancelContact: (visit: ScheduledVisit) => void;
 }
 
 // Conteudo da categoria ativa da agenda priorizada: borda colorida conforme
@@ -1892,7 +1893,7 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   onSort,
   urgenteInfoByDocument,
   scheduledContactByDocument,
-  onCancelContact,
+  aposContato,
 }) => {
   const [page, setPage] = useState(1);
   useEffect(() => {
@@ -1937,7 +1938,7 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
                 onOpenAcordo={onOpenAcordo}
                 urgenteInfo={urgenteInfoByDocument.get(group.document)}
                 scheduledContact={scheduledContactByDocument.get(group.document)}
-                onCancelContact={onCancelContact}
+                aposContato={aposContato}
               />
             ))}
           </tbody>
@@ -2062,6 +2063,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   // Cancelamento direto (sem aprovacao) de um contato agendado -- item 16,
   // docs/PROGRESSO.md. Visita presencial usa outro fluxo (com aprovacao do
   // gestor, ver requestVisitCancellation/VisitScheduler).
+  const [canalUsadoLog, setCanalUsadoLog] = useState<CanalUsado | undefined>(
+    undefined,
+  );
   const [cancelContactVisit, setCancelContactVisit] =
     useState<ScheduledVisit | null>(null);
   // Contato agendado ATIVO do cliente aberto no LogContactModal, se houver --
@@ -2815,8 +2819,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         user={user}
         monthlyGoals={monthlyGoals}
         myCollections={myCollections}
-        onOpenLog={(client) => {
+        onOpenLog={(client, canal) => {
           setSelectedClientForLog(client);
+          setCanalUsadoLog(canal);
           setIsLogModalOpen(true);
         }}
         onOpenDetail={(client) => {
@@ -2832,7 +2837,6 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             setIsAcordoModalOpen(true);
           }
         }}
-        onCancelContact={setCancelContactVisit}
       />
     );
 
@@ -3295,6 +3299,12 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         <LogContactModal
           client={selectedClientForLog}
           linkedVisit={linkedVisit}
+          canalUsado={canalUsadoLog}
+          onCancelarAgendamento={(visita) => {
+            setIsLogModalOpen(false);
+            setSelectedClientForLog(null);
+            setCancelContactVisit(visita);
+          }}
           onClose={() => {
             setIsLogModalOpen(false);
             setSelectedClientForLog(null);

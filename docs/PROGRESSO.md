@@ -121,6 +121,48 @@ completa; os KPIs de valor seguem com a carteira inteira) e selo verde
 interação registrada (`collection_attempts`, mesma fonte da coluna "Última
 interação"). Só front. Falta testar na tela.
 
+**Revisão no mesmo dia (feedback: "fica confuso ter tudo isso").** A Agenda
+misturava três perguntas em 12 botões ("o que fazer hoje", "quão atrasado",
+"já falei?"). Virou **3 abas pelo que o cobrador faz**: **Para hoje**
+(contato agendado ou promessa que chegou; acordo quebrado e "perto de sair
+da faixa" só sem contato recente) · **A contatar** (sem contato há 7+ dias;
+maior atraso primeiro, em dia no fim) · **Já contatados** (contato nos
+últimos 7 dias). Subfiltro da aba separado por "|" (motivo / faixa de atraso
+/ hoje × antes). Ao registrar o contato o cliente passa de "A contatar" para
+"Já contatados". Saíram a fileira "Contato:" e as abas por faixa,
+"Sem contato" e "Em tratamento"; o card "Contatados hoje" abre "Já
+contatados › Hoje".
+
+**"Retorno" × "Agendado".** Eram dois fatos com nome confuso: "Retorno" era
+a data que o **cliente prometeu pagar** e o selo "Agendado" o contato que o
+**cobrador marcou** (o Atender sugere o dia seguinte à promessa). Viraram
+uma coluna só, **"Próximo passo"**: "Ligar/WhatsApp em dd/mm às hh:mm"
+(vermelho "Atrasado:" se passou) e "Prometeu pagar dd/mm" (vermelho
+"Promessa venceu" se passou). O selo saiu da coluna do nome. Com contato
+agendado ativo, a promessa vencida não joga o cliente em "Para hoje" — o
+agendamento manda.
+
+**Fluxo pela perspectiva do cobrador (mesmo dia).** Simulando o dia dele:
+(1) "Não atende"/"Ocupado"/"Telefone errado"/"Mensagem enviada" jogavam o
+cliente em "Já contatados" por 7 dias sem ele ter falado com ninguém;
+(2) Telefone/WhatsApp só abriam a ligação/conversa — o contato acontecia e
+não era registrado; (3) 9 números no topo, vários de acompanhamento do
+gestor; (4) jargão ("faixa"); (5) 5 botões iguais na linha. Mudanças:
+- **"Já contatados" só com contato efetivo** (mesma regra da meta,
+  `isEffectiveAttemptResult`). Tentativa sem sucesso deixa o cliente em
+  **"Ligar"** (antes "A contatar"), no fim da lista, com o selo
+  **"Tentou hoje: Não atendeu"**; contato efetivo mostra **"Falou hoje"**.
+  A promessa vem do último contato efetivo (uma tentativa depois não apaga
+  a data prometida).
+- **Atender abre sozinho** depois de WhatsApp (quando o cobrador volta para
+  a tela) e ao fechar o telefone depois de Ligar/Copiar, já com o canal
+  marcado ("Você abriu o WhatsApp deste cliente. Como foi?").
+- **Cards de contadores do dia removidos** (o usuário também dispensou um
+  card de progresso).
+- "Perto de sair da faixa" → **"Vai sair da carteira"**.
+- **Atender** virou o botão principal da linha (azul, com texto);
+  **"Cancelar este agendamento"** foi para dentro do Atender.
+
 ### Publicação 2026-11-09 (tarde) — itens 29 a 37
 
 Commits `25de5dd`…`6d48d2e` publicados na `master` ao longo do dia, cada um

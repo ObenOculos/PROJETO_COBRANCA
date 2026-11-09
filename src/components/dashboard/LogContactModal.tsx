@@ -45,6 +45,11 @@ interface LogContactModalProps {
    * transacao -- ver RPC registrar_contato.
    */
   linkedVisit?: ScheduledVisit;
+  /** Canal que o cobrador acabou de usar (Telefone/WhatsApp na carteira):
+   * a tentativa e o proximo contato ja saem com ele. */
+  canalUsado?: "ligacao" | "whatsapp";
+  /** Cancelar o contato agendado (motivo no modal proprio). */
+  onCancelarAgendamento?: (visit: ScheduledVisit) => void;
 }
 
 // Motivo do contato -> tipo/resultado de collection_attempts.
@@ -102,6 +107,8 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   onClose,
   onSuccess,
   linkedVisit,
+  canalUsado,
+  onCancelarAgendamento,
 }) => {
   const { user } = useAuth();
   const {
@@ -143,8 +150,9 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   const [nextDate, setNextDate] = useState("");
   const [nextDateTouched, setNextDateTouched] = useState(false);
   const [nextTime, setNextTime] = useState(linkedVisit?.scheduledTime ?? "");
-  const [nextChannel, setNextChannel] =
-    useState<ScheduledVisitChannel>(linkedChannel);
+  const [nextChannel, setNextChannel] = useState<ScheduledVisitChannel>(
+    linkedVisit ? linkedChannel : (canalUsado ?? linkedChannel),
+  );
   const [nextChannelTouched, setNextChannelTouched] = useState(false);
   const [semProximo, setSemProximo] = useState(false);
   const [scheduleNotes, setScheduleNotes] = useState("");
@@ -356,7 +364,10 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
     setError("");
 
     try {
-      const { type } = STATUS_TO_ATTEMPT[status];
+      // Veio do botao WhatsApp: a tentativa e por WhatsApp, qualquer que seja
+      // o resultado (o mapa STATUS_TO_ATTEMPT assume ligacao).
+      const type =
+        canalUsado === "whatsapp" ? "whatsapp" : STATUS_TO_ATTEMPT[status].type;
       const isPromise = status === "promessa_pagamento";
       const reagendar = !!linkedVisit && !!effectiveNext && reschedules;
       const motivo = reagendar
@@ -467,6 +478,22 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
               >
                 {client.razaoSocial}
               </p>
+            )}
+            {canalUsado && (
+              <p className="mt-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                {canalUsado === "whatsapp"
+                  ? "Você abriu o WhatsApp deste cliente. Como foi?"
+                  : "Você ligou para este cliente. Como foi?"}
+              </p>
+            )}
+            {linkedVisit && onCancelarAgendamento && (
+              <button
+                type="button"
+                onClick={() => onCancelarAgendamento(linkedVisit)}
+                className="mt-1 text-[11px] font-semibold text-red-600 hover:underline"
+              >
+                Cancelar este agendamento
+              </button>
             )}
           </div>
           <button
