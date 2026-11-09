@@ -43,7 +43,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 32 | ~~WhatsApp: mensagem com o valor só em atraso + reaproveitar a mesma aba do WhatsApp Web no computador~~ — 2026-11-09 | Média | Pequeno |
 | 30 | "Distribuir Pagamento" dá 400 em venda do Ciclone com número > 2.147.483.647 (parâmetro/coluna `integer`; 562 clientes com saldo afetados) — migration `20261109000002` aplicada 2026-11-09, `check:db` OK; falta o usuário repetir o pagamento real | **Alta** | Pequeno |
 | 29 | Código do cliente do Ciclone (`pgcln_codigo`) no cadastro — migration `20261109000001` aplicada + `check:db` OK, sync rodado (1.888 clientes com código); falta publicar o front e testar na tela | Média | Pequeno |
-| 39 | Fila de Cobrança: gestor define, na Distribuição, quantos clientes de cada faixa a cada rodada da lista "Ligar" (manhã/tarde opcional) — etapa 1 (configuração) commitada, `0010` aplicada; ordenação e faixa de dívida por faixa (`0011` aplicada); etapa 2 (lista intercalada + "Deixar para depois") feita, `0012` aplicada, `0013` (só INSERT/SELECT no privilégio) sem `db push`, falta teste na tela; etapa 3 (supervisão) não iniciada | Alta | Grande, em etapas |
+| 39 | Fila de Cobrança: gestor define, na Distribuição, quantos clientes de cada faixa a cada rodada da lista "Ligar" (manhã/tarde opcional) — etapa 1 (configuração) commitada, `0010` aplicada; ordenação e faixa de dívida por faixa (`0011` aplicada); etapa 2 (lista intercalada + "Deixar para depois") feita, `0012` aplicada, `0013` (só INSERT/SELECT no privilégio) aplicada, falta teste na tela; etapa 3 (supervisão) não iniciada | Alta | Grande, em etapas |
 
 ## Perguntas em aberto para o financeiro
 
@@ -179,7 +179,9 @@ menos; a `20261109000013` fecha só na `fila_adiamentos`. Avaliar revogar
 `TRUNCATE`/`REFERENCES`/`TRIGGER` de `authenticated` em todas as tabelas e
 incluir a checagem no `check:db`.
 
-**Falta:** `db push` da `20261109000013` + `check:db`; teste na tela (gestor
+`0013` aplicada 2026-11-09 (`check:db` OK; só INSERT/SELECT conferido).
+
+**Falta:** teste na tela (gestor
 configura a fila de um cobrador → login do cobrador → aba Ligar intercalada →
 Depois); etapa 3
 (aplicar a fila na aba "Ligar" do `CollectorDashboard`); etapa 3
