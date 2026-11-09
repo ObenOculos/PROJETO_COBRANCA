@@ -184,6 +184,8 @@ const InstallmentStatusDot: React.FC<{ situacao: SituacaoParcela }> = ({
   />
 );
 
+type AbaVendas = "todos" | "aberto" | "pagos";
+
 const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   clientGroup,
   userType,
@@ -585,6 +587,44 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       return saleBalance.remainingBalance > 0.01;
     });
   }, [clientSales, calculateSaleBalance, clientGroup.document]);
+
+  // Abas da lista de vendas. "Em aberto" = venda com saldo (mesma conta do
+  // "Falta" do cabecalho da venda), mais atrasada primeiro; "Pagos" = sem
+  // saldo. Venda toda fora da cobranca (cancelada/agrupada/renegociada no
+  // ERP) so aparece em "Todos". Sem escolha do usuario, abre em "Em aberto"
+  // quando ha divida.
+  const [abaVendas, setAbaVendas] = useState<AbaVendas | null>(null);
+  const vendasPorAba = React.useMemo(() => {
+    const classificadas = clientSales.map((sale) => {
+      const fora =
+        seloForaDaCobranca(sale.installments.map((i) => i.status)) !== null;
+      const saldo = calculateSaleBalance(
+        sale.saleNumber,
+        clientGroup.document,
+      ).remainingBalance;
+      let maiorAtraso = 0;
+      sale.installments.forEach((inst) => {
+        if (isForaDaCobranca(inst.status) || !hasInstallmentBalance(inst)) {
+          return;
+        }
+        const dias = calculateOverdueDays(inst.data_vencimento);
+        if (dias > maiorAtraso) maiorAtraso = dias;
+      });
+      return { sale, fora, aberto: !fora && saldo > 0.01, maiorAtraso };
+    });
+    const abertas = classificadas
+      .filter((c) => c.aberto)
+      .sort((a, b) => b.maiorAtraso - a.maiorAtraso);
+    return {
+      todos: clientSales,
+      aberto: abertas.map((c) => c.sale),
+      pagos: classificadas.filter((c) => !c.fora && !c.aberto).map((c) => c.sale),
+      emAtraso: abertas.filter((c) => c.maiorAtraso > 0).length,
+    };
+  }, [clientSales, calculateSaleBalance, clientGroup.document]);
+  const abaEfetiva: AbaVendas =
+    abaVendas ?? (vendasPorAba.aberto.length > 0 ? "aberto" : "todos");
+  const vendasVisiveis = vendasPorAba[abaEfetiva];
 
   const handleGeneralPaymentSuccess = async () => {
     // Pequeno delay para garantir que a operação no banco seja concluída
@@ -1295,8 +1335,51 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   </div>
                 )}
 
+                {/* Abas: Todos | Em aberto | Pagos */}
+                <div
+                  role="tablist"
+                  className="mb-3 flex gap-1 p-1 bg-gray-100 rounded-xl text-xs"
+                >
+                  {(
+                    [
+                      ["todos", "Todos", vendasPorAba.todos.length],
+                      ["aberto", "Em aberto", vendasPorAba.aberto.length],
+                      ["pagos", "Pagos", vendasPorAba.pagos.length],
+                    ] as const
+                  ).map(([aba, rotulo, total]) => (
+                    <button
+                      key={aba}
+                      type="button"
+                      role="tab"
+                      aria-selected={abaEfetiva === aba}
+                      onClick={() => setAbaVendas(aba)}
+                      className={`flex-1 px-2 py-1.5 rounded-lg font-semibold transition-colors ${
+                        abaEfetiva === aba
+                          ? "bg-white text-gray-900 shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      {rotulo} ({total})
+                      {aba === "aberto" && vendasPorAba.emAtraso > 0 && (
+                        <span className="ml-1 text-red-600">
+                          · {vendasPorAba.emAtraso} em atraso
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="space-y-3">
-                  {clientSales.map((sale) => {
+                  {vendasVisiveis.length === 0 && (
+                    <p className="py-6 text-center text-xs text-gray-400">
+                      {abaEfetiva === "aberto"
+                        ? "Nenhuma venda com saldo em aberto."
+                        : abaEfetiva === "pagos"
+                          ? "Nenhuma venda quitada."
+                          : "Nenhuma venda."}
+                    </p>
+                  )}
+                  {vendasVisiveis.map((sale) => {
                     const saleBalance = calculateSaleBalance(
                       sale.saleNumber,
                       clientGroup.document,
