@@ -164,10 +164,12 @@ lançada no Ciclone (tema da conciliação app × Ciclone, pendente da reunião)
   multa** (não abate parcela) ou **adiantamento**. Distribuição parcela a
   parcela, vencimento mais antigo primeiro (antes: venda de menor saldo
   primeiro). Com acordo ativo segue a regra antiga, sem a pergunta.
-- Reagendar só se **sobrar vencido**. Carteira: grava a interação
-  ("Pagamento integral/parcial") + conclui o contato agendado + próximo
-  contato ligação/WhatsApp pela RPC `registrar_contato` (a mesma do
-  "Atender"). Externo: visita presencial. Gestor: só o pagamento.
+- Reagendar só se **sobrar vencido**, e **só para o cobrador externo**
+  (visita presencial). Decisão do usuário (2026-11-09): o cobrador de
+  carteira **não agenda** no "Distribuir Pagamento" — só grava a interação
+  ("Pagamento integral/parcial", com resumo automático). Se ficou sem
+  vencido, a interação conclui o contato agendado (RPC `registrar_contato`);
+  se foi parcial, o contato agendado fica como está. Gestor: só o pagamento.
 - Data/horário no passado bloqueados; sem `alert()` nessa janela.
 - Pagamento e acompanhamento em passos separados: se o segundo falhar, o
   pagamento vale e o aviso diz o que faltou.

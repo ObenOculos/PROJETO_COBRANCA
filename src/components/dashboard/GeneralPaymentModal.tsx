@@ -16,7 +16,6 @@ import {
   CollectionAttempt,
   SaleGroup,
   ScheduledVisit,
-  ScheduledVisitChannel,
 } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -25,10 +24,7 @@ import { useNotifications } from "../../contexts/NotificationContext";
 import { calculateOverdueDays, formatCurrency } from "../../utils/formatters";
 import { supabase } from "../../lib/supabase";
 import { todayLocalStr } from "../../config/visitStatus";
-import {
-  channelsForCollectorType,
-  isWalletCollectorType,
-} from "../../config/profiles";
+import { isWalletCollectorType } from "../../config/profiles";
 import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
 import { isForaDaCobranca } from "../../types/status";
 import {
@@ -36,12 +32,6 @@ import {
   hasInstallmentBalance,
   round2,
 } from "../../filters/clientStatus";
-
-const CHANNEL_LABEL: Record<ScheduledVisitChannel, string> = {
-  presencial: "Visita",
-  ligacao: "Ligação",
-  whatsapp: "WhatsApp",
-};
 
 const FORMA_PAGAMENTO_LABEL: Record<string, string> = {
   dinheiro: "Dinheiro",
@@ -106,16 +96,12 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       "juros" | "adiantamento" | null
     >(null);
 
-    // Perfil de quem registra: cobrador de carteira agenda CONTATO
-    // (ligacao/WhatsApp) e registra a interacao; externo agenda VISITA; gestor
-    // so registra o pagamento.
+    // Perfil de quem registra: cobrador de carteira so registra a interacao
+    // (agenda o proximo contato pelo "Atender", nao aqui -- decisao do
+    // usuario em 2026-11-09); externo reagenda a VISITA quando sobra vencido;
+    // gestor so registra o pagamento.
     const ehCarteira = isWalletCollectorType(user?.type);
     const ehExterno = user?.type === "collector";
-    const canaisCarteira = channelsForCollectorType(user?.type).filter(
-      (c) => c !== "presencial",
-    );
-    const [rescheduleChannel, setRescheduleChannel] =
-      useState<ScheduledVisitChannel>(canaisCarteira[0] ?? "ligacao");
     const hoje = todayLocalStr();
 
     // Contato agendado ATIVO deste cliente, do proprio cobrador de carteira:
@@ -423,10 +409,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         return;
       }
 
-      // Ainda sobra valor VENCIDO: pede o proximo contato (carteira) ou a
-      // proxima visita (externo). Cliente que ficou em dia -- so parcelas a
-      // vencer -- nao precisa reagendar. Gestor so registra o pagamento.
-      if (precisaAcompanhamento && (ehCarteira || ehExterno)) {
+      // Ainda sobra valor VENCIDO: so o cobrador EXTERNO reagenda a visita
+      // aqui. Cliente que ficou em dia -- so parcelas a vencer -- nao precisa.
+      if (precisaAcompanhamento && ehExterno) {
         setRescheduleError("");
         setShowRescheduleModal(true);
         return;
@@ -479,8 +464,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
      * Grava o pagamento (uma chamada de process_payment por venda) e, para
      * cobrador, o acompanhamento:
      *  - carteira: interacao "Pagamento integral/parcial" + conclusao do
-     *    contato agendado + proximo contato, numa transacao (RPC
-     *    registrar_contato, a mesma do "Atender");
+     *    contato agendado, numa transacao (RPC registrar_contato, a mesma do
+     *    "Atender"); sem agendar proximo contato;
      *  - externo: nova visita presencial, se ainda sobra vencido.
      * O pagamento e o acompanhamento sao gravados em passos separados: se o
      * segundo falhar, o pagamento continua valendo e o aviso diz o que faltou.
@@ -489,7 +474,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       agendamento: {
         data: string;
         horario: string;
-        canal: ScheduledVisitChannel;
       } | null,
     ) => {
       if (!user) return;
@@ -542,26 +526,41 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             new Set(parcelasAbertas.map((p) => p.idParcela.toString())),
           );
           const detalhe = resumoDoPagamento();
-          const { error } = await supabase.rpc("registrar_contato", {
-            p_documento: clientGroup.document,
-            p_nome_cliente: clientGroup.client,
-            p_titulos: titulos,
-            p_data: hoje,
-            p_tipo:
-              contatoAgendado?.channel === "whatsapp" ? "whatsapp" : "call",
-            p_resultado: resultado,
-            p_notas: `${detalhe}\nObs.: ${observations.trim()}`,
-            p_visita_id: contatoAgendado?.id,
-            p_rotulo_resultado: rotulo,
-            p_reagendar: false,
-            p_proxima_data: agendamento?.data || undefined,
-            p_proximo_horario: agendamento?.horario || undefined,
-            p_proximo_canal: agendamento ? agendamento.canal : undefined,
-            p_notas_proximo: agendamento
-              ? `Acompanhamento: ${rotulo} — restam ${formatCurrency(vencidoRestante)} vencidos`
-              : undefined,
-          });
-          if (error) throw error;
+          const tipo =
+            contatoAgendado?.channel === "whatsapp" ? "whatsapp" : "call";
+          const notas = `${detalhe}\nObs.: ${observations.trim()}`;
+          if (precisaAcompanhamento && contatoAgendado) {
+            // Parcial com contato agendado: so registra a interacao e deixa o
+            // agendamento como esta (o cobrador segue acompanhando por ele).
+            // A RPC registrar_contato concluiria o agendamento.
+            const { error } = await supabase.from("collection_attempts").insert(
+              titulos.map((t) => ({
+                collection_id: t,
+                date: hoje,
+                type: tipo,
+                result: resultado,
+                notes: notas,
+                collector_id: user.id,
+              })),
+            );
+            if (error) throw error;
+          } else {
+            // Ficou sem vencido (ou nao havia agendamento): interacao +
+            // conclusao do contato agendado, numa transacao.
+            const { error } = await supabase.rpc("registrar_contato", {
+              p_documento: clientGroup.document,
+              p_nome_cliente: clientGroup.client,
+              p_titulos: titulos,
+              p_data: hoje,
+              p_tipo: tipo,
+              p_resultado: resultado,
+              p_notas: notas,
+              p_visita_id: contatoAgendado?.id,
+              p_rotulo_resultado: rotulo,
+              p_reagendar: false,
+            });
+            if (error) throw error;
+          }
         } else if (ehCarteira) {
           avisoAcompanhamento =
             "Pagamento na fila offline. Registre o contato pelo “Atender” quando voltar a conexão.";
@@ -590,7 +589,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           error instanceof Error
             ? error.message
             : ((error as { message?: string })?.message ?? String(error));
-        avisoAcompanhamento = `Pagamento registrado, mas ${ehCarteira ? "o contato" : "a visita"} não foi salvo: ${msg}`;
+        avisoAcompanhamento = `Pagamento registrado, mas ${ehCarteira ? "o contato não foi salvo" : "a visita não foi salva"}: ${msg}`;
       }
 
       setLoading(false);
@@ -599,7 +598,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       } else {
         showSuccessNotification(
           agendamento
-            ? `Pagamento registrado e ${ehCarteira ? "próximo contato agendado" : "visita reagendada"}!`
+            ? "Pagamento registrado e visita reagendada!"
             : "Pagamento distribuído com sucesso!",
         );
       }
@@ -661,7 +660,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         setRescheduleError("Informe a data.");
         return;
       }
-      if (ehExterno && !rescheduleTime) {
+      if (!rescheduleTime) {
         setRescheduleError("Informe a data e o horário da visita.");
         return;
       }
@@ -681,7 +680,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       await registrarPagamento({
         data: rescheduleDate,
         horario: rescheduleTime,
-        canal: ehCarteira ? rescheduleChannel : "presencial",
       });
     };
 
@@ -1133,7 +1131,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               <div className="px-4 lg:px-6 py-4 border-b border-gray-200 dark:border-dark-border">
                 <h3 className="text-base font-semibold text-gray-900 dark:text-dark-text flex items-center">
                   <RefreshCw className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
-                  {ehCarteira ? "Agendar próximo contato" : "Reagendar Visita"}
+                  Reagendar Visita
                 </h3>
               </div>
 
@@ -1144,42 +1142,15 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     {formatCurrency(vencidoRestante)}
                   </strong>{" "}
                   vencidos.{" "}
-                  {ehCarteira
-                    ? "Quando você vai falar com o cliente de novo?"
-                    : "Agende a próxima visita."}
+                  Agende a próxima visita.
                 </p>
-                {ehCarteira && contatoAgendado && (
-                  <p className="text-xs text-gray-500 dark:text-dark-text-secondary mb-4">
-                    O contato agendado para{" "}
-                    {contatoAgendado.scheduledDate.split("-").reverse().join("/")}{" "}
-                    será concluído com este pagamento.
-                  </p>
-                )}
                 <div className="space-y-4">
-                  {ehCarteira && canaisCarteira.length > 1 && (
-                    <div className="flex gap-2">
-                      {canaisCarteira.map((canal) => (
-                        <button
-                          key={canal}
-                          type="button"
-                          onClick={() => setRescheduleChannel(canal)}
-                          className={`flex-1 px-3 py-2 rounded-2xl border text-sm font-medium transition-colors ${
-                            rescheduleChannel === canal
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-gray-50 dark:bg-dark-bg-tertiary text-gray-600 dark:text-dark-text-secondary border-gray-200 dark:border-dark-border"
-                          }`}
-                        >
-                          {CHANNEL_LABEL[canal]}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                   <div>
                     <label
                       htmlFor="reschedule-date"
                       className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-2"
                     >
-                      {ehCarteira ? "Data do contato *" : "Nova Data *"}
+                      Nova Data *
                     </label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -1201,7 +1172,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       htmlFor="reschedule-time"
                       className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-2"
                     >
-                      {ehCarteira ? "Horário (opcional)" : "Novo Horário *"}
+                      Novo Horário *
                     </label>
                     <div className="relative">
                       <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -1212,7 +1183,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         value={rescheduleTime}
                         onChange={(e) => setRescheduleTime(e.target.value)}
                         className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base dark:bg-dark-bg dark:text-dark-text"
-                        required={!ehCarteira}
+                        required
                       />
                     </div>
                   </div>
@@ -1237,7 +1208,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   type="button"
                   onClick={handleConfirmReschedule}
                   disabled={
-                    loading || !rescheduleDate || (!ehCarteira && !rescheduleTime)
+                    loading || !rescheduleDate || !rescheduleTime
                   }
                   className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-base"
                 >
