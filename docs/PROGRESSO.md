@@ -32,9 +32,11 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 21 | Jurídico (`legal_collector`) é 100% idêntico a Interno/Terceirizado — zero modelagem de processo/protesto/prazo legal | A avaliar com o negócio | A analisar |
 | 22 | Sem tela de histórico de cancelamento de acordo e de agendamento/contato — só "Histórico de Contatos" (`collection_attempts`) aparece em "Ver Dados" | Baixa/Média | Pequeno/médio |
 | 23 | `AcordoModal` (parcelas) não bloqueia de verdade data anterior a hoje — só `min` do `<input type="date">`, sem validação no "Continuar" | Baixa | Pequeno |
-| 24 | Registrar contato + Reagendar + Agendar viram um botão só, "Atender" (RPC `registrar_contato`; modal em 2 etapas em 2026-11-06) — RPC testada ao vivo, falta testar o modal de 2 etapas e push do front | Média | Médio |
+| 24 | Registrar contato + Reagendar + Agendar viram um botão só, "Atender" (RPC `registrar_contato`; modal em 2 etapas em 2026-11-06) — RPC testada ao vivo; front publicado (push 2026-11-09), falta testar o modal de 2 etapas | Média | Médio |
 | 25 | Distribuição da carteira por regra (faixas × lojas, várias por cobrador, ativa/pausada) — migrations 6–10 aplicadas; regras da Monalisa e do José cadastradas e 1ª distribuição aplicada em 2026-11-06 | Alta | Grande |
-| 26 | Razão social + contato/vendedor/região do Ciclone no cadastro do cliente — migration, sync e front no ar (2026-11-06); gestor testado na tela e cobrador/Termo conferidos por código+dados (2026-11-09); falta ver o PDF do Termo e levar razão social/"Falar com" ao "Atender" e à agenda de contato | Média | Pequeno/médio |
+| 26 | Razão social + contato/vendedor/região do Ciclone no cadastro do cliente — migration, sync e front no ar (2026-11-06); gestor testado na tela e cobrador/Termo conferidos por código+dados; "Atender" e agenda de contato com razão social/"Falar com" (`cf68ed7`); publicado (push 2026-11-09) — falta ver o PDF do Termo; telefone do ERP no card e saudação do WhatsApp a decidir | Média | Pequeno/médio |
+| 27 | ~~Detalhes do Cliente: parcela paga/atrasada decidida pelo texto do status ("recebido" do Ciclone aparecia atrasado)~~ — `15e780a`, publicado 2026-11-09, falta teste na tela | Alta | Pequeno |
+| 28 | ~~Busca por CPF/CNPJ exigia a máscara~~ — `f756638`, publicado 2026-11-09 (histórico de Autorizações, busca no servidor, ficou de fora) | Baixa | Pequeno |
 
 ## Perguntas em aberto para o financeiro
 
@@ -84,6 +86,48 @@ pagas ficam baixadas e as a vencer ficam em aberto correndo juros 7")
     já paga) ou é baixada depois, no título novo da parcela 1?
 13. Depois do lançamento, o cliente paga **os boletos gerados no Ciclone**
     (e o app só acompanha), ou o cobrador também registra pagamento no app?
+
+### Publicação 2026-11-09
+
+Push de 13 commits (`47f2503`…`15e780a`) para a `master` → Vercel. Antes do
+push: 102/102 migrations locais aplicadas em produção (conferido via
+`supabase_migrations.schema_migrations`) e `npm run build` OK. Entraram no ar
+juntos: quadro "Lançamento no Ciclone" (acordo), "Atender" (item 24),
+distribuição da carteira (item 25), remoção de `users.password`, item 26,
+item 27 e item 28. **Sem teste na tela depois do deploy** — conferir no site:
+"Ver Vendas" de cliente do José (recebidas verdes, sem atraso), busca
+`08928105` acha Opticas Maranhão, "Atender" da Ótica Modelo com "Falar com".
+
+### Item 28 — Busca por CPF/CNPJ só com os números — 2026-11-09 (`f756638`)
+
+O documento é gravado formatado e a busca comparava o texto cru: era preciso
+digitar a máscara. Regra única `documentoCombina` (`src/filters/documento.ts`):
+o texto cru continua valendo; termo só com números/pontuação e 3+ dígitos
+compara só os dígitos dos dois lados; termo com letras ("otica 2") não entra
+na comparação por dígitos. Aplicada nas 8 buscas por documento (filtros da
+carteira/Atribuição em `predicates.ts` e `CollectionContext`, agenda de
+contato, Acompanhamento de Visitas, Gestão de Lojas e 3 buscas do
+`VisitScheduler` — duas delas já tinham regra própria por dígitos, agora
+unificadas). Fora: histórico de Autorizações (busca feita no servidor).
+
+### Item 27 — Detalhes do Cliente: parcelas pelo saldo — 2026-11-09 (`15e780a`)
+
+Usuário: "algo de errado na lógica das parcelas, no que condiz a atraso".
+O modal decidia "paga" por `status.includes("pago")`. Medido em produção:
+18.628 parcelas `recebido` (Ciclone, sem "pago") apareciam com bolinha
+vermelha e atraso desde o vencimento; 42 `Pago`/`Pago Parcial` com saldo
+apareciam quitadas, sem atraso. Correções em `ClientDetailModal.tsx`:
+- situação da parcela por `hasInstallmentBalance` (fora da cobrança → cinza,
+  sem atraso);
+- `formatDaysOverdue`: os dias restantes não descontavam os anos (400 dias
+  saíam "1ano 1mês 10d"; certo 5d);
+- valor da parcela = `valor_original` (base dos totais Total/Pago/Falta),
+  com "reaj." quando o reajustado difere (~460 parcelas); "desc." e "falta"
+  em parcela parcial;
+- resumo "Maior atraso" na aba Vendas via `clientMaxOverdueDays` (mesma regra
+  da carteira, ciente de acordo ativo) e aviso de acordo ativo — atraso dos
+  títulos originais em cinza nesse caso;
+- parcelas em ordem de vencimento; removido `console.log` a cada recálculo.
 
 ### Item 26 — Dados de cadastro do Ciclone (razão social, contato) — 2026-11-06
 
@@ -146,9 +190,10 @@ listas e histórico intactos); colunas novas para o resto.
   - Já tem razão social: lista do cobrador (card), Atribuição (+ Excel),
     ficha (cabeçalho + "Ver Dados"), `AcordoModal`, Termo/resumo, buscas.
   - "Falar com"/vendedor/região: **só** na ficha "Ver Dados".
-  - **Falta onde o cobrador está falando com o cliente** (prioridade):
-    `LogContactModal` (botão "Atender") e `ContactScheduler` (agenda de
-    contato do interno — o José é interno) mostram só o fantasia; o modal de
+  - **Onde o cobrador está falando com o cliente**: `LogContactModal`
+    ("Atender": razão social + faixa "Falar com" com telefone clicável) e
+    `ContactScheduler` (razão social na lista e na busca) — **feito
+    2026-11-09, `cf68ed7`**. A decidir com o usuário: o modal de
     telefones do card (`CollectorDashboard`) não oferece o telefone do
     contato do ERP; a mensagem de WhatsApp do card diz "Olá <fantasia>" — o
     `contato_nome` seria o natural.
