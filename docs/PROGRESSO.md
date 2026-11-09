@@ -167,6 +167,17 @@ faixa fica com o cobrador" (item 25) continua.
   desde 06/10.
 - Fora do escopo: a tela do cobrador externo (rota/visitas) segue com o
   saldo total.
+- **Selo do contato agendado (mesmo dia):** dúvida do usuário sobre a data
+  "Ligação: 10/11 10:00:00" num card com último contato em 09/11 — conferido
+  no banco: não era erro nem fuso (era o retorno agendado para o dia
+  seguinte; `scheduled_date` é data pura). Selo passou a dizer "Agendado:
+  ligação em dd/mm/aaaa às hh:mm" ("Agendamento atrasado" quando passou).
+  Horário sem segundos via `formatHorario` (`utils/formatters`) no card,
+  Detalhes do Cliente, Detalhes da Venda, Acompanhamento de Visitas e
+  Atender.
+- **Limpeza de teste (09/11, pedido do usuário):** removido um registro de
+  contato de teste (8 linhas de `collection_attempts`, uma por parcela) de
+  um cliente usado em teste; histórico de atribuições e parcelas mantidos.
 
 ### Item 33 — Distribuição: regras mestre — 2026-11-09
 

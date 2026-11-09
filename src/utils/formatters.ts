@@ -283,6 +283,13 @@ export const calculateDaysSinceLastVisit = (
   }
 };
 
+/**
+ * Horario para exibicao: "10:00:00" (como o Postgres devolve `time`) vira
+ * "10:00". Vazio/nulo vira "".
+ */
+export const formatHorario = (horario: string | null | undefined): string =>
+  (horario ?? "").trim().slice(0, 5);
+
 export const calculateOverdueDays = (
   dueDateStr: string | null | undefined,
 ): number => {

@@ -28,6 +28,7 @@ import {
   formatCurrency,
   calculateOverdueDays,
   parseAndFormatDate,
+  formatHorario,
 } from "../../utils/formatters";
 import {
   clientesReincidentes,
@@ -1257,7 +1258,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               <span className="text-xs text-gray-500">
                                 {formatVisitDate(visit.scheduledDate)}
                                 {visit.scheduledTime &&
-                                  ` às ${visit.scheduledTime}`}
+                                  ` às ${formatHorario(visit.scheduledTime)}`}
                               </span>
                             </div>
 

@@ -26,7 +26,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import * as XLSX from "xlsx";
 import { useAuth } from "../../contexts/AuthContext";
 import { ScheduledVisit, isCollectorType, UserType } from "../../types";
-import { formatCurrency } from "../../utils/formatters";
+import { formatCurrency, formatHorario } from "../../utils/formatters";
 import { distinctSorted } from "../../filters/facets";
 import { documentoCombina } from "../../filters/documento";
 import VisitScheduler from "./VisitScheduler"; // Import the VisitScheduler component
@@ -1806,7 +1806,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                           <Calendar className="h-3.5 w-3.5 mr-2.5 text-blue-500 shrink-0" />
                                           {formatSafeDate(visit.scheduledDate)}{" "}
                                           {visit.scheduledTime &&
-                                            `ÀS ${visit.scheduledTime}`}
+                                            `ÀS ${formatHorario(visit.scheduledTime)}`}
                                         </div>
                                         <div className="flex items-center text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
                                           <LocationOrChannelCell

@@ -18,6 +18,7 @@ import {
   formatCurrency,
   formatDate,
   getStatusLabel,
+  formatHorario,
 } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useClientBirthDate } from "../../hooks/useClientBirthDate";
@@ -664,7 +665,7 @@ const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                                 <span className="text-xs text-gray-500">
                                   {formatVisitDate(visit.scheduledDate)}
                                   {visit.scheduledTime &&
-                                    ` às ${visit.scheduledTime}`}
+                                    ` às ${formatHorario(visit.scheduledTime)}`}
                                 </span>
                               </div>
                               <div className="flex items-center text-sm text-gray-600 mb-2">

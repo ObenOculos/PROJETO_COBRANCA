@@ -15,6 +15,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCollection } from "../../contexts/CollectionContext";
 import { addDaysLocalStr, todayLocalStr } from "../../config/visitStatus";
+import { formatHorario } from "../../utils/formatters";
 import {
   ATTEMPT_RESULT_LABELS,
   attemptReschedulesActiveContact,
@@ -457,7 +458,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
             <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
               {client.client}
               {linkedVisit &&
-                ` · agendado para ${formatDateBR(linkedVisit.scheduledDate)}${linkedVisit.scheduledTime ? ` ${linkedVisit.scheduledTime.slice(0, 5)}` : ""}`}
+                ` · agendado para ${formatDateBR(linkedVisit.scheduledDate)}${linkedVisit.scheduledTime ? ` ${formatHorario(linkedVisit.scheduledTime)}` : ""}`}
             </p>
             {client.razaoSocial && (
               <p

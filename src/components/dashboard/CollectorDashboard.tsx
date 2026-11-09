@@ -44,7 +44,11 @@ import RadialApprovalChart from "./RadialApprovalChart";
 import TabTransition from "../common/TabTransition";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
+import {
+  formatCurrency,
+  calculateOverdueDays,
+  formatHorario,
+} from "../../utils/formatters";
 import { FilterOptions, ClientGroup, User, ScheduledVisit } from "../../types";
 import { Notification } from "../../contexts/NotificationContext";
 import { resolveSaleKey } from "../../filters/sales";
@@ -1542,15 +1546,19 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
                   ? "bg-red-50 text-red-600 border-red-200"
                   : "bg-purple-50 text-purple-600 border-purple-100"
               }`}
+              title="Retorno marcado pelo cobrador no Atender (contato agendado)"
             >
               <CalendarClock className="w-3 h-3" />
-              {scheduledContact.channel === "whatsapp" ? "WhatsApp" : "Ligação"}
-              {": "}
+              {isVisitOverdue(scheduledContact)
+                ? "Agendamento atrasado: "
+                : "Agendado: "}
+              {scheduledContact.channel === "whatsapp" ? "WhatsApp" : "ligação"}
+              {" em "}
               {new Date(
                 scheduledContact.scheduledDate + "T00:00:00",
               ).toLocaleDateString("pt-BR")}
               {scheduledContact.scheduledTime
-                ? ` ${scheduledContact.scheduledTime}`
+                ? ` às ${formatHorario(scheduledContact.scheduledTime)}`
                 : ""}
             </span>
           )}
