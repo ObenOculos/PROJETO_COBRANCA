@@ -110,6 +110,44 @@ card da carteira, "Atender" com razão social + "Falar com" e as 2 etapas
 (fechado sem gravar). Todos OK. Observação: cliente usado no teste do gestor
 não tinha cobrador (por isso não aparecia na carteira) — não é defeito.
 
+### Publicação 2026-11-09 (tarde) — itens 29 a 37
+
+Commits `25de5dd`…`6d48d2e` publicados na `master` ao longo do dia, cada um
+com `npm run build` OK antes do push. Migrations `20261109000001`…`0009`
+todas aplicadas em produção (`db push` pelo usuário) com `npm run check:db`
+OK depois de cada uma. A 0009 cancelou os 20 agendamentos presos (0 órfãos
+restantes conferido no banco).
+
+| Item | O que | Commit |
+|---|---|---|
+| 29 | Código do cliente do Ciclone | `25de5dd` |
+| 30 | Pagamento: venda do Ciclone em bigint (400 no Distribuir) | `a63fa1d` |
+| 31 | Detalhes do Cliente: abas Todos / Em aberto / Pagos | `105c621` |
+| 32 | WhatsApp: valor só em atraso, aba única no computador | `af82e92` |
+| 33 | Distribuição: retirar de outra carteira só marcando; inativo libera | `86332b9` |
+| 34 | Carteira: vencido × a vencer; aviso de loja desatualizada | `7bce278` |
+| — | Selo "Agendado: ligação em dd/mm às hh:mm" | `3cc012a` |
+| 35 | Detalhes do Cliente mais rápido; "Histórico" para todos; RLS do histórico | `a335caf` |
+| 36 | Distribuir Pagamento: juros, ordem por vencimento, interação automática; só externo reagenda; modo noturno | `ef14834`, `6d48d2e`, `1047006` |
+| 37 | Agendamento segue o cliente ao sair da carteira | `44a69ce` |
+
+**Falta testar no site** (nada destes foi testado na tela ainda):
+- Item 34: coluna "Em atraso" com "+ a vencer", selo "Em dia", aviso de
+  loja desatualizada na Distribuição (hoje só uma loja externa está velha).
+- Item 35: modal mais leve; aba "Histórico" do cobrador sem nomes de outros
+  cobradores; gestor vê a linha do tempo da carteira.
+- Item 36: pergunta juros × adiantamento; interno pagando a menos não pede
+  agendamento e grava "Pagamento parcial" com resumo; externo reagenda a
+  visita (sem data/hora no passado); modo noturno do modal.
+- Item 37: ao remover/redistribuir um cliente com agendamento, ele é
+  cancelado (ou vai junto para cobrador de perfil compatível).
+
+**Pendências que continuam abertas:** conciliação pagamento no app × baixa no
+Ciclone (o sync sobrescreve o recebido todo dia; 59 de 104 mudanças do app
+baixadas depois — levar para a reunião); pagamento real da loja com venda
+grande (item 30) a repetir; tela do externo ainda mostra saldo total (item
+34); memoizar o `value` do `CollectionContext` se o modal ainda engasgar.
+
 ### Item 37 — Agendamento segue o cliente quando ele sai da carteira — 2026-11-09
 
 **Achado.** Nenhum caminho que tira o cliente da carteira (inativar cobrador,
