@@ -23,6 +23,7 @@ import {
   ScheduledVisit,
   AllowedVisitDate,
   CollectorOverdueRange,
+  FilaConfigRegra,
   ManagerCollectorLink,
   isCollectorType,
   CollectionsScope,
@@ -704,6 +705,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           // Sem a migration 20261109000010 as colunas nao vem: fila desligada.
           filaPeso: row.fila_peso ?? null,
           filaPesoTarde: row.fila_peso_tarde ?? null,
+          // Sem a migration 20261109000011: ordem padrao e sem limite de valor.
+          filaOrdem: row.fila_ordem === "valor" ? "valor" : "atraso",
+          filaSaldoMin: row.fila_saldo_min != null ? Number(row.fila_saldo_min) : null,
+          filaSaldoMax: row.fila_saldo_max != null ? Number(row.fila_saldo_max) : null,
           vigenteDesde: row.vigente_desde,
           vigenteAte: row.vigente_ate,
         })),
@@ -785,14 +790,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   // que mudaram. Lista vazia desliga a fila.
   const definirFilaCobranca = async (
     collectorId: string,
-    pesos: { regraId: string; peso: number; pesoTarde: number | null }[],
+    config: FilaConfigRegra[],
   ) => {
     const { error: rpcError } = await supabase.rpc("definir_fila_cobranca", {
       p_collector_id: collectorId,
-      p_pesos: pesos.map((p) => ({
+      p_pesos: config.map((p) => ({
         regra_id: p.regraId,
         peso: p.peso,
         peso_tarde: p.pesoTarde,
+        ordem: p.ordem,
+        saldo_min: p.saldoMin,
+        saldo_max: p.saldoMax,
       })),
     });
     if (rpcError) {

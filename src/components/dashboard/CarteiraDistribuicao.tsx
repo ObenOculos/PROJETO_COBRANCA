@@ -15,12 +15,20 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
-import { CollectorOverdueRange, User, UserType, isCollectorType } from "../../types";
+import {
+  CollectorOverdueRange,
+  FilaConfigRegra,
+  FilaOrdem,
+  User,
+  UserType,
+  isCollectorType,
+} from "../../types";
 import {
   USER_TYPE_LABELS,
   distribuicaoPerfisPayload,
 } from "../../config/profiles";
 import {
+  FILA_ORDEM_LABEL,
   FILA_VIRADA_HORA,
   filaComTurnos,
   filaLigada,
@@ -188,7 +196,37 @@ const faixaCurta = (r: CollectorOverdueRange) =>
 interface PesoRascunho {
   manha: string;
   tarde: string;
+  ordem: FilaOrdem;
+  saldoMin: string;
+  saldoMax: string;
 }
+
+const brl = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+
+/** "R$ 50 a R$ 1.000", "a partir de R$ 50", "até R$ 1.000" ou "". */
+const faixaValorTexto = (min: number | null, max: number | null) =>
+  min != null && max != null
+    ? `${brl(min)} a ${brl(max)}`
+    : min != null
+      ? `a partir de ${brl(min)}`
+      : max != null
+        ? `até ${brl(max)}`
+        : "";
+
+/** "1.234,56" / "1234.56" / "" -> número (NaN se inválido) ou null. */
+const lerValor = (s: string): number | null => {
+  const t = s.trim().replace(/\s|R\$/g, "");
+  if (t === "") return null;
+  // Com virgula: ponto e milhar. Sem virgula, "1.000"/"12.500" tambem e
+  // milhar (grupos de 3); "50.5" fica decimal.
+  const normal = t.includes(",")
+    ? t.replace(/\./g, "").replace(",", ".")
+    : /^\d{1,3}(\.\d{3})+$/.test(t)
+      ? t.replace(/\./g, "")
+      : t;
+  return Number(normal);
+};
 
 /**
  * Fila de Cobranca do cobrador (item 39): quantos clientes de cada faixa a
@@ -197,9 +235,7 @@ interface PesoRascunho {
  */
 const FilaDoCobrador: React.FC<{
   regras: CollectorOverdueRange[];
-  onSalvar: (
-    pesos: { regraId: string; peso: number; pesoTarde: number | null }[],
-  ) => Promise<void>;
+  onSalvar: (config: FilaConfigRegra[]) => Promise<void>;
 }> = ({ regras, onSalvar }) => {
   const ativas = regras.filter((r) => r.ativa);
   const ligada = filaLigada(regras);
@@ -226,7 +262,13 @@ const FilaDoCobrador: React.FC<{
         ? (pesoNaFila(r, regras, "manha") ?? 1)
         : 1;
       const tarde = ligada ? (pesoNaFila(r, regras, "tarde") ?? manha) : manha;
-      v[r.id] = { manha: String(manha), tarde: String(tarde) };
+      v[r.id] = {
+        manha: String(manha),
+        tarde: String(tarde),
+        ordem: ligada ? r.filaOrdem : "atraso",
+        saldoMin: ligada && r.filaSaldoMin != null ? String(r.filaSaldoMin).replace(".", ",") : "",
+        saldoMax: ligada && r.filaSaldoMax != null ? String(r.filaSaldoMax).replace(".", ",") : "",
+      };
     });
     setValores(v);
     setTurnos(comTurnos);
@@ -256,19 +298,51 @@ const FilaDoCobrador: React.FC<{
     return `a cada ${soma} clientes: ${itens.map(({ r, p }) => `${p} de ${rotulo(r)} dias`).join(" · ")}`;
   };
 
+  // Ordem e valor que fogem do padrao, para o resumo fechado.
+  const extras = ativas
+    .map((r) => {
+      const partes = [
+        r.filaOrdem === "valor" ? "maior dívida primeiro" : "",
+        faixaValorTexto(r.filaSaldoMin, r.filaSaldoMax),
+      ].filter(Boolean);
+      return partes.length > 0 ? `${rotulo(r)}: ${partes.join(", ")}` : "";
+    })
+    .filter(Boolean);
+
   const salvar = async (desligar = false) => {
     setErro("");
     // Desligar = lista vazia.
-    const pesos: { regraId: string; peso: number; pesoTarde: number | null }[] = [];
+    const pesos: FilaConfigRegra[] = [];
     if (!desligar) {
       for (const r of ativas) {
-        const m = numero(valores[r.id]?.manha);
-        const t = turnos ? numero(valores[r.id]?.tarde) : null;
+        const v = valores[r.id];
+        const m = numero(v?.manha);
+        const t = turnos ? numero(v?.tarde) : null;
         if (Number.isNaN(m) || m < 0 || m > 99 || (t != null && (Number.isNaN(t) || t < 0 || t > 99))) {
           setErro("Use números inteiros de 0 a 99.");
           return;
         }
-        pesos.push({ regraId: r.id, peso: m, pesoTarde: t });
+        const saldoMin = lerValor(v?.saldoMin ?? "");
+        const saldoMax = lerValor(v?.saldoMax ?? "");
+        if (
+          (saldoMin != null && (Number.isNaN(saldoMin) || saldoMin < 0)) ||
+          (saldoMax != null && (Number.isNaN(saldoMax) || saldoMax < 0))
+        ) {
+          setErro(`Valor da dívida inválido na faixa ${rotulo(r)}. Use só números, ex.: 50 ou 1.000,00.`);
+          return;
+        }
+        if (saldoMin != null && saldoMax != null && saldoMax < saldoMin) {
+          setErro(`Na faixa ${rotulo(r)}, o "até" da dívida deve ser maior que o "de".`);
+          return;
+        }
+        pesos.push({
+          regraId: r.id,
+          peso: m,
+          pesoTarde: t,
+          ordem: v?.ordem ?? "atraso",
+          saldoMin,
+          saldoMax,
+        });
       }
       const soma = (k: "peso" | "pesoTarde") => pesos.reduce((s, p) => s + (p[k] ?? 0), 0);
       if (soma("peso") === 0 || (turnos && soma("pesoTarde") === 0)) {
@@ -311,6 +385,9 @@ const FilaDoCobrador: React.FC<{
           ) : (
             `${resumo("manha")}.`
           )}
+          {ligada && extras.length > 0 && (
+            <span className="block">{extras.join(" · ")}.</span>
+          )}
         </div>
         <button
           type="button"
@@ -324,7 +401,7 @@ const FilaDoCobrador: React.FC<{
   }
 
   const inputPeso =
-    "w-16 px-2 py-1 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text";
+    "px-2 py-1 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text";
 
   return (
     <div className="px-4 py-3 border-t border-gray-100 dark:border-dark-border bg-blue-50/40 dark:bg-blue-900/10 rounded-b-xl space-y-3">
@@ -335,9 +412,10 @@ const FilaDoCobrador: React.FC<{
         </p>
         <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-0.5">
           Quantos clientes de cada faixa a cada rodada. O cobrador vê as faixas
-          misturadas nessa proporção; dentro da faixa, maior atraso primeiro.
-          Retornos e promessas continuam em "Para hoje". Faixa com 0 vai para o
-          fim da lista.
+          misturadas nessa proporção, cada uma na ordem escolhida. Retornos e
+          promessas continuam em "Para hoje". Faixa com 0, ou cliente com
+          dívida vencida fora do valor, vai para o fim da lista (não sai da
+          carteira).
         </p>
       </div>
 
@@ -350,12 +428,17 @@ const FilaDoCobrador: React.FC<{
         Separar manhã e tarde (muda às {FILA_VIRADA_HORA}h)
       </label>
 
+      <div className="overflow-x-auto">
       <table className="text-sm">
         <thead>
           <tr className="text-xs text-gray-500 dark:text-dark-text-secondary">
             <th className="text-left font-medium pr-4 pb-1">Faixa (dias)</th>
             <th className="font-medium px-1 pb-1">{turnos ? "Manhã" : "Clientes"}</th>
             {turnos && <th className="font-medium px-1 pb-1">Tarde</th>}
+            <th className="text-left font-medium pl-3 pr-1 pb-1">Ordenar por</th>
+            <th className="text-left font-medium pl-3 pb-1" colSpan={2}>
+              Dívida vencida (R$, vazio = sem limite)
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -371,7 +454,7 @@ const FilaDoCobrador: React.FC<{
                   onChange={(e) =>
                     setValores((p) => ({ ...p, [r.id]: { ...p[r.id], manha: e.target.value } }))
                   }
-                  className={inputPeso}
+                  className={`${inputPeso} w-16`}
                   aria-label={`${turnos ? "Manhã" : "Clientes"} da faixa ${rotulo(r)}`}
                 />
               </td>
@@ -385,15 +468,61 @@ const FilaDoCobrador: React.FC<{
                     onChange={(e) =>
                       setValores((p) => ({ ...p, [r.id]: { ...p[r.id], tarde: e.target.value } }))
                     }
-                    className={inputPeso}
+                    className={`${inputPeso} w-16`}
                     aria-label={`Tarde da faixa ${rotulo(r)}`}
                   />
                 </td>
               )}
+              <td className="pl-3 pr-1 py-0.5">
+                <select
+                  value={valores[r.id]?.ordem ?? "atraso"}
+                  onChange={(e) =>
+                    setValores((p) => ({
+                      ...p,
+                      [r.id]: { ...p[r.id], ordem: e.target.value as FilaOrdem },
+                    }))
+                  }
+                  className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
+                  aria-label={`Ordenar a faixa ${rotulo(r)} por`}
+                >
+                  {(Object.keys(FILA_ORDEM_LABEL) as FilaOrdem[]).map((o) => (
+                    <option key={o} value={o}>
+                      {FILA_ORDEM_LABEL[o]}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td className="pl-3 py-0.5">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="de"
+                  value={valores[r.id]?.saldoMin ?? ""}
+                  onChange={(e) =>
+                    setValores((p) => ({ ...p, [r.id]: { ...p[r.id], saldoMin: e.target.value } }))
+                  }
+                  className={`${inputPeso} w-24`}
+                  aria-label={`Dívida vencida mínima da faixa ${rotulo(r)}`}
+                />
+              </td>
+              <td className="pl-1 py-0.5">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="até"
+                  value={valores[r.id]?.saldoMax ?? ""}
+                  onChange={(e) =>
+                    setValores((p) => ({ ...p, [r.id]: { ...p[r.id], saldoMax: e.target.value } }))
+                  }
+                  className={`${inputPeso} w-24`}
+                  aria-label={`Dívida vencida máxima da faixa ${rotulo(r)}`}
+                />
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
 
       <div className="text-xs text-gray-600 dark:text-dark-text-secondary space-y-0.5">
         {(turnos ? (["manha", "tarde"] as const) : (["manha"] as const)).map((t) => {

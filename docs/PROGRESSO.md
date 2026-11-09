@@ -43,7 +43,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 32 | ~~WhatsApp: mensagem com o valor só em atraso + reaproveitar a mesma aba do WhatsApp Web no computador~~ — 2026-11-09 | Média | Pequeno |
 | 30 | "Distribuir Pagamento" dá 400 em venda do Ciclone com número > 2.147.483.647 (parâmetro/coluna `integer`; 562 clientes com saldo afetados) — migration `20261109000002` aplicada 2026-11-09, `check:db` OK; falta o usuário repetir o pagamento real | **Alta** | Pequeno |
 | 29 | Código do cliente do Ciclone (`pgcln_codigo`) no cadastro — migration `20261109000001` aplicada + `check:db` OK, sync rodado (1.888 clientes com código); falta publicar o front e testar na tela | Média | Pequeno |
-| 39 | Fila de Cobrança: gestor define, na Distribuição, quantos clientes de cada faixa a cada rodada da lista "Ligar" (manhã/tarde opcional) — etapa 1 (configuração) pronta, migration `20261109000010` sem `db push`; etapa 2 (lista intercalada + "deixar para depois") e 3 (supervisão) não iniciadas | Alta | Grande, em etapas |
+| 39 | Fila de Cobrança: gestor define, na Distribuição, quantos clientes de cada faixa a cada rodada da lista "Ligar" (manhã/tarde opcional) — etapa 1 (configuração) commitada, `0010` aplicada; ordenação e faixa de dívida por faixa (`0011`, sem `db push`); etapa 2 (lista intercalada + "deixar para depois") e 3 (supervisão) não iniciadas | Alta | Grande, em etapas |
 
 ## Perguntas em aberto para o financeiro
 
@@ -140,7 +140,21 @@ com prévia da ordem. Regra única em `src/filters/filaCobranca.ts`
 A B C A A D A B C A). Peso 0 = fim da lista no turno; faixa nova sem peso
 vale 1.
 
-**Falta:** `db push` da `20261109000010` + `check:db`; teste na tela; etapa 2
+**`0010` aplicada 2026-11-09** (`db push` do usuário, `check:db` OK).
+
+**Ordenação e faixa de dívida (pedido após ver o "Grupo do Contato Ativo" do
+Cedrus, onde cada grupo tem ordenação própria e faixa de saldo):** migration
+`20261109000011` — por regra, `fila_ordem` (`atraso` padrão / `valor` = maior
+dívida vencida primeiro) e `fila_saldo_min`/`fila_saldo_max` (dívida
+**vencida**, R$; fora do valor o cliente vai para o fim da lista, não sai da
+carteira). As três RPCs (corpo de produção da 0010) carregam as colunas.
+Testada em transação revertida. Tela: colunas "Ordenar por" e "Dívida
+vencida de/até" no bloco da fila. `montarFilaLigar` (filters/filaCobranca)
+já monta a lista: intercaladas → tentou hoje → fim (sem faixa / fora do
+valor / peso 0) → em dia → deixados para depois; conferida com cenário
+fictício.
+
+**Falta:** `db push` da `20261109000011` + `check:db`; teste na tela; etapa 2
 (aplicar a fila na aba "Ligar" do `CollectorDashboard`); etapa 3
 (supervisão: previstos × trabalhados por faixa; referência é o HTML do
 Cedrus que está na raiz, fora do Git).

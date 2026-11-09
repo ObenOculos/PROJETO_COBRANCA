@@ -950,6 +950,9 @@ export type Database = {
           ativa: boolean;
           fila_peso: number | null;
           fila_peso_tarde: number | null;
+          fila_ordem: string;
+          fila_saldo_min: number | null;
+          fila_saldo_max: number | null;
           id: string;
           lojas: string[] | null;
           max_dias: number | null;
@@ -964,6 +967,9 @@ export type Database = {
           ativa?: boolean;
           fila_peso?: number | null;
           fila_peso_tarde?: number | null;
+          fila_ordem?: string;
+          fila_saldo_min?: number | null;
+          fila_saldo_max?: number | null;
           id?: string;
           lojas?: string[] | null;
           max_dias?: number | null;
@@ -978,6 +984,9 @@ export type Database = {
           ativa?: boolean;
           fila_peso?: number | null;
           fila_peso_tarde?: number | null;
+          fila_ordem?: string;
+          fila_saldo_min?: number | null;
+          fila_saldo_max?: number | null;
           id?: string;
           lojas?: string[] | null;
           max_dias?: number | null;

@@ -46,6 +46,18 @@ export interface MonthlyGoal {
 // cobrador atende. Um cobrador pode ter VARIAS regras vigentes (vigenteAte
 // null); o banco nao deixa duas vigentes se sobreporem (mesma loja e faixas
 // que se cruzam). Atraso = parcela vencida mais antiga do cliente.
+export type FilaOrdem = "atraso" | "valor";
+
+/** Configuração da Fila de Cobrança de UMA regra (RPC definir_fila_cobranca). */
+export interface FilaConfigRegra {
+  regraId: string;
+  peso: number;
+  pesoTarde: number | null;
+  ordem: FilaOrdem;
+  saldoMin: number | null;
+  saldoMax: number | null;
+}
+
 export interface CollectorOverdueRange {
   id: string;
   collectorId: string;
@@ -61,6 +73,11 @@ export interface CollectorOverdueRange {
   filaPeso: number | null;
   /** Peso a partir das 12h; null = sem turnos. */
   filaPesoTarde: number | null;
+  /** Ordem dentro da faixa: maior atraso (padrão) ou maior dívida vencida. */
+  filaOrdem: FilaOrdem;
+  /** Dívida vencida (R$) para entrar na fila; fora vai para o fim. null = sem limite. */
+  filaSaldoMin: number | null;
+  filaSaldoMax: number | null;
   vigenteDesde: string;
   vigenteAte: string | null;
 }
@@ -437,7 +454,7 @@ export interface CollectionContextType {
    * pesoTarde preenchido em todas). Lista vazia desliga. Só gestor. */
   definirFilaCobranca: (
     collectorId: string,
-    pesos: { regraId: string; peso: number; pesoTarde: number | null }[],
+    config: FilaConfigRegra[],
   ) => Promise<void>;
   /** Fecha o vínculo vigente do cobrador (se houver) e abre um novo com o gestor informado. Só gestor. */
   vincularCobradorAGerente: (
