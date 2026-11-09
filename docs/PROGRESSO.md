@@ -110,6 +110,32 @@ card da carteira, "Atender" com razão social + "Falar com" e as 2 etapas
 (fechado sem gravar). Todos OK. Observação: cliente usado no teste do gestor
 não tinha cobrador (por isso não aparecia na carteira) — não é defeito.
 
+### Item 37 — Agendamento segue o cliente quando ele sai da carteira — 2026-11-09
+
+**Achado.** Nenhum caminho que tira o cliente da carteira (inativar cobrador,
+distribuição, remover cobrador, liberar) mexia no agendamento ativo; só a
+quitação total cancelava. O agendamento ficava com quem não tem mais o
+cliente (a RLS esconde dele), aparecia atrasado no Acompanhamento e, pelo
+índice de um agendamento ativo por cliente, **bloqueava o novo cobrador de
+agendar**. Em produção: 20 visitas presenciais presas (16 de cobrador
+inativado, de abril/2026; 4 de clientes removidos de um externo). Os
+agendamentos de contato da carteira estavam todos com o dono certo.
+Observação: `atribuir_clientes_em_lote` recusa cliente com agendamento ativo,
+então a transferência "leva o agendamento junto" quase nunca acontece.
+
+**Regra nova** (migration `20261109000009_agendamento_segue_carteira`,
+gatilho por comando em `BANCO_DADOS` quando `user_id` muda): agendamento
+ativo cujo cobrador não tem mais parcela do cliente passa para o novo
+cobrador se o canal for do perfil dele (presencial = Externo; ligação/
+WhatsApp = carteira); senão é **cancelado** ("cliente saiu da carteira do
+cobrador", `cancellation_approved_by = 'sistema (saiu da carteira)'`). A
+mesma migration cancela os 20 presos. Testado em transação descartada:
+remover cobrador → cancela; passar para outro interno → agendamento vai junto;
+a migration inteira cancela exatamente 20.
+
+**Modo noturno** no "Distribuir Pagamento" (classes `dark:` no padrão do
+AcordoModal/Atender).
+
 ### Item 36 — "Distribuir Pagamento": juros, vencido × a vencer e acompanhamento por perfil — 2026-11-09
 
 **Caso real.** Cobrador interno recebeu a parcela vencida com juros. O
