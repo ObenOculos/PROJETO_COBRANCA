@@ -74,6 +74,17 @@ import {
   isEffectiveAttemptResult,
 } from "../../config/collectionAttempts";
 
+import {
+  MOTIVO_ADIAMENTO_LABEL,
+  MOTIVO_ADIAMENTO_SELO,
+  MotivoAdiamento,
+  TurnoFila,
+  filaLigada,
+  montarFilaLigar,
+  turnoDaFila,
+} from "../../filters/filaCobranca";
+import { AdiamentoDoDia, useFilaAdiamentos } from "../../hooks/useFilaAdiamentos";
+
 import LogContactModal from "./LogContactModal";
 import CancelContactModal from "./CancelContactModal";
 import ContactScheduler from "./ContactScheduler";
@@ -305,6 +316,17 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     acordos,
     scheduledVisits,
   } = useCollection();
+
+  // Fila de Cobranca (item 39): "deixar para depois" do dia e o turno
+  // (manha/tarde) que a fila do gestor usa -- reavaliado a cada minuto para
+  // a lista mudar sozinha as 12h.
+  const { adiamentos, adiar } = useFilaAdiamentos(user?.id);
+  const [turnoFila, setTurnoFila] = useState<TurnoFila>(() => turnoDaFila());
+  useEffect(() => {
+    const t = window.setInterval(() => setTurnoFila(turnoDaFila()), 60_000);
+    return () => window.clearInterval(t);
+  }, []);
+  const [adiandoGroup, setAdiandoGroup] = useState<ClientGroup | null>(null);
 
   // Depois de tocar em WhatsApp, o cobrador sai para a conversa (outra aba
   // ou o app). Quando ele volta para esta tela, o Atender abre sozinho para
@@ -801,18 +823,34 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           (urgenteInfoByDocument.get(a.document)?.diasRestantes ?? 0) -
             (urgenteInfoByDocument.get(b.document)?.diasRestantes ?? 0),
       );
-      // Maior atraso primeiro; cliente em dia (so a vencer) no fim.
-      const temVencido = (g: ClientGroup) =>
-        (saldoPorDocumento.get(g.document)?.vencido ?? 0) > 0.01 ? 1 : 0;
-      const tentou = (g: ClientGroup) =>
-        tentouHojeSemSucesso(g.document) ? 1 : 0;
-      aContatar.sort(
-        (a, b) =>
-          temVencido(b) - temVencido(a) ||
-          tentou(a) - tentou(b) ||
-          clientMaxOverdueDays(b, acordoAtivoOverdueMap) -
-            clientMaxOverdueDays(a, acordoAtivoOverdueMap),
-      );
+      // Fila de Cobranca (item 39): com a fila configurada pelo gestor, as
+      // faixas do cobrador saem intercaladas (filters/filaCobranca). Sem
+      // fila: maior atraso primeiro; cliente em dia (so a vencer) no fim.
+      // Nos dois casos, "deixado para depois" hoje vai para o fim.
+      const fila = montarFilaLigar(aContatar, minhasRegras, turnoFila, (g) => ({
+        atraso: clientMaxOverdueDays(g, acordoAtivoOverdueMap),
+        loja: clientReferenceStore(g),
+        vencido: saldoPorDocumento.get(g.document)?.vencido ?? 0,
+        tentouHoje: tentouHojeSemSucesso(g.document),
+        adiadoHoje: adiamentos.has(g.document),
+      }));
+      if (fila) {
+        aContatar.splice(0, aContatar.length, ...fila.lista);
+      } else {
+        const temVencido = (g: ClientGroup) =>
+          (saldoPorDocumento.get(g.document)?.vencido ?? 0) > 0.01 ? 1 : 0;
+        const tentou = (g: ClientGroup) =>
+          tentouHojeSemSucesso(g.document) ? 1 : 0;
+        const adiado = (g: ClientGroup) => (adiamentos.has(g.document) ? 1 : 0);
+        aContatar.sort(
+          (a, b) =>
+            adiado(a) - adiado(b) ||
+            temVencido(b) - temVencido(a) ||
+            tentou(a) - tentou(b) ||
+            clientMaxOverdueDays(b, acordoAtivoOverdueMap) -
+              clientMaxOverdueDays(a, acordoAtivoOverdueMap),
+        );
+      }
       // Contato mais recente primeiro.
       contatados.sort(
         (a, b) =>
@@ -834,7 +872,11 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     saldoPorDocumento,
     acordoAtivoOverdueMap,
     today,
+    minhasRegras,
+    turnoFila,
+    adiamentos,
   ]);
+  const filaDoGestorLigada = filaLigada(minhasRegras);
 
   // Faixa de atraso do cliente para o subfiltro de "A contatar".
   const faixaDoCliente = React.useCallback(
@@ -1341,7 +1383,23 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             urgenteInfoByDocument={urgenteInfoByDocument}
             scheduledContactByDocument={scheduledContactByDocument}
             aposContato={aposContato}
+            adiamentos={adiamentos}
+            onAdiar={
+              abaAgendaEfetiva === "aContatar" ? setAdiandoGroup : undefined
+            }
+            aviso={
+              abaAgendaEfetiva === "aContatar" && filaDoGestorLigada && !sortKey
+                ? `Ordem definida pela gestão (${turnoFila === "manha" ? "manhã" : "tarde"}): siga de cima para baixo.`
+                : undefined
+            }
           />
+          {adiandoGroup && (
+            <DeixarParaDepoisModal
+              group={adiandoGroup}
+              onClose={() => setAdiandoGroup(null)}
+              onConfirm={(motivo, obs) => adiar(adiandoGroup.document, motivo, obs)}
+            />
+          )}
         </>
       ) : (
         <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden">
@@ -1481,6 +1539,10 @@ interface ClientQueueRowProps {
   urgenteInfo?: { diasRestantes: number; semAcao: boolean };
   /** Contato (ligacao/whatsapp) agendado em aberto deste cliente, se houver. */
   scheduledContact?: ScheduledVisit;
+  /** Fila de Cobranca: deixado para depois hoje (selo). */
+  adiamento?: AdiamentoDoDia;
+  /** Presente so na aba "Ligar": mostra o botao "Depois". */
+  onAdiar?: (group: ClientGroup) => void;
 }
 
 // Linha da agenda/fila de atendimento, reusada em cada secao priorizada
@@ -1500,6 +1562,8 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   urgenteInfo,
   scheduledContact,
   aposContato,
+  adiamento,
+  onAdiar,
 }) => {
   const { acordoAtivoOverdueMap } = useCollection();
   const maxAtraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
@@ -1623,6 +1687,14 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               {urgenteInfo.semAcao ? "Sem nenhuma ação — " : ""}
               Faltam {urgenteInfo.diasRestantes}{" "}
               {urgenteInfo.diasRestantes === 1 ? "dia" : "dias"} na carteira
+            </span>
+          )}
+          {adiamento && (
+            <span
+              className="w-fit px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200 dark:bg-dark-bg-tertiary dark:text-dark-text-secondary dark:border-dark-border"
+              title={adiamento.observacao ?? undefined}
+            >
+              Deixado para depois: {MOTIVO_ADIAMENTO_SELO[adiamento.motivo]}
             </span>
           )}
         </div>
@@ -1783,6 +1855,18 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           >
             <Handshake className="w-4 h-4" />
           </button>
+          {onAdiar && !adiamento && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAdiar(group);
+              }}
+              className="px-2.5 py-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-dark-text-secondary dark:hover:bg-dark-bg-tertiary rounded-xl transition-all text-xs font-semibold"
+              title="Deixar para depois: vai para o fim da lista de hoje"
+            >
+              Depois
+            </button>
+          )}
           {/* Agendar, remarcar e cancelar o contato agendado ficam dentro do
               "Atender" (LogContactModal). */}
         </div>
@@ -1849,6 +1933,129 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   );
 };
 
+/** "Deixar para depois" (Fila de Cobranca, item 39): motivo de lista curta;
+ * o cliente vai para o fim da lista "Ligar" so hoje. */
+const DeixarParaDepoisModal: React.FC<{
+  group: ClientGroup;
+  onClose: () => void;
+  onConfirm: (motivo: MotivoAdiamento, observacao: string | null) => Promise<void>;
+}> = ({ group, onClose, onConfirm }) => {
+  const [motivo, setMotivo] = useState<MotivoAdiamento | null>(null);
+  const [obs, setObs] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const confirmar = async () => {
+    if (!motivo) {
+      setErro("Escolha o motivo.");
+      return;
+    }
+    if (motivo === "outro" && !obs.trim()) {
+      setErro("Escreva o motivo.");
+      return;
+    }
+    setSalvando(true);
+    setErro("");
+    try {
+      await onConfirm(motivo, obs.trim() || null);
+      onClose();
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Erro ao salvar.");
+      setSalvando(false);
+    }
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[100] backdrop-blur-sm"
+      onClick={() => !salvando && onClose()}
+    >
+      <div
+        className="bg-white dark:bg-dark-bg rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden border border-gray-200 dark:border-dark-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50 dark:bg-dark-bg-secondary">
+          <div className="min-w-0">
+            <h3 className="font-bold text-gray-900 dark:text-dark-text">
+              Deixar para depois
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-dark-text-secondary truncate">
+              {group.client}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={salvando}
+            className="p-1.5 hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary rounded-full transition-colors"
+          >
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+        <div className="p-5 space-y-3">
+          <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+            O cliente vai para o fim da lista de hoje. Amanhã volta ao lugar
+            normal.
+          </p>
+          <div className="space-y-1.5">
+            {(Object.keys(MOTIVO_ADIAMENTO_LABEL) as MotivoAdiamento[]).map((m) => (
+              <label
+                key={m}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer text-sm ${
+                  motivo === m
+                    ? "border-indigo-400 bg-indigo-50 text-indigo-900 dark:bg-indigo-900/20 dark:text-indigo-200 dark:border-indigo-700"
+                    : "border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-dark-border dark:text-dark-text dark:hover:bg-dark-bg-secondary"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="motivo-adiamento"
+                  checked={motivo === m}
+                  onChange={() => {
+                    setMotivo(m);
+                    setErro("");
+                  }}
+                />
+                {MOTIVO_ADIAMENTO_LABEL[m]}
+              </label>
+            ))}
+          </div>
+          {motivo && (
+            <textarea
+              value={obs}
+              onChange={(e) => {
+                setObs(e.target.value);
+                setErro("");
+              }}
+              rows={2}
+              maxLength={300}
+              placeholder={motivo === "outro" ? "Qual o motivo?" : "Observação (opcional)"}
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
+            />
+          )}
+          {erro && <p className="text-xs text-red-600">{erro}</p>}
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={onClose}
+              disabled={salvando}
+              className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-dark-bg-secondary text-gray-700 dark:text-dark-text font-bold text-sm rounded-xl hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary transition-colors"
+            >
+              Voltar
+            </button>
+            <button
+              onClick={() => void confirmar()}
+              disabled={salvando}
+              className="flex-1 px-4 py-2.5 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            >
+              {salvando ? "Salvando..." : "Deixar para depois"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+};
+
 const AGENDA_PREVIEW_COUNT = 5;
 
 interface AgendaSectionProps {
@@ -1869,6 +2076,12 @@ interface AgendaSectionProps {
   onSort: (key: WalletSortKey) => void;
   urgenteInfoByDocument: Map<string, { diasRestantes: number; semAcao: boolean }>;
   scheduledContactByDocument: Map<string, ScheduledVisit>;
+  /** Fila de Cobranca: deixados para depois hoje (selo na linha). */
+  adiamentos?: Map<string, AdiamentoDoDia>;
+  /** So na aba "Ligar": botao "Depois" na linha. */
+  onAdiar?: (group: ClientGroup) => void;
+  /** Linha de aviso acima da lista (ex.: ordem definida pela gestao). */
+  aviso?: string;
 }
 
 // Conteudo da categoria ativa da agenda priorizada: borda colorida conforme
@@ -1894,6 +2107,9 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   urgenteInfoByDocument,
   scheduledContactByDocument,
   aposContato,
+  adiamentos,
+  onAdiar,
+  aviso,
 }) => {
   const [page, setPage] = useState(1);
   useEffect(() => {
@@ -1920,6 +2136,11 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
     <div
       className={`bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border border-l-4 ${accentBorderClass} shadow-sm overflow-hidden`}
     >
+      {aviso && (
+        <p className="px-6 pt-3 text-xs text-gray-500 dark:text-dark-text-secondary">
+          {aviso}
+        </p>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <WalletTableHead sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
@@ -1939,6 +2160,8 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
                 urgenteInfo={urgenteInfoByDocument.get(group.document)}
                 scheduledContact={scheduledContactByDocument.get(group.document)}
                 aposContato={aposContato}
+                adiamento={adiamentos?.get(group.document)}
+                onAdiar={onAdiar}
               />
             ))}
           </tbody>

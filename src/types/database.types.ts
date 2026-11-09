@@ -1011,6 +1011,37 @@ export type Database = {
           },
         ];
       };
+      // Migration 20261109000012 (Fila de Cobranca: deixar para depois).
+      fila_adiamentos: {
+        Row: {
+          collector_id: string;
+          created_at: string;
+          dia: string;
+          documento: string;
+          id: string;
+          motivo: string;
+          observacao: string | null;
+        };
+        Insert: {
+          collector_id: string;
+          created_at?: string;
+          dia?: string;
+          documento: string;
+          id?: string;
+          motivo: string;
+          observacao?: string | null;
+        };
+        Update: {
+          collector_id?: string;
+          created_at?: string;
+          dia?: string;
+          documento?: string;
+          id?: string;
+          motivo?: string;
+          observacao?: string | null;
+        };
+        Relationships: [];
+      };
       enderecos_historico: {
         Row: {
           bairro: string | null;

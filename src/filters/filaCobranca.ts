@@ -202,6 +202,23 @@ export function montarFilaLigar<T>(
   return { lista, motivoFim };
 }
 
+/** "Deixar para depois" (tabela fila_adiamentos, migration 20261109000012):
+ * o cliente vai para o fim da lista "Ligar" só no dia do registro. */
+export type MotivoAdiamento = "ligar_mais_tarde" | "sem_telefone" | "outro";
+
+export const MOTIVO_ADIAMENTO_LABEL: Record<MotivoAdiamento, string> = {
+  ligar_mais_tarde: "Cliente pediu para ligar mais tarde",
+  sem_telefone: "Sem telefone válido",
+  outro: "Outro motivo",
+};
+
+/** Texto do selo na linha (curto). */
+export const MOTIVO_ADIAMENTO_SELO: Record<MotivoAdiamento, string> = {
+  ligar_mais_tarde: "pediu para ligar mais tarde",
+  sem_telefone: "sem telefone válido",
+  outro: "outro motivo",
+};
+
 /** Uma rodada da fila (para prévia na tela do gestor): rótulos na ordem. */
 export const rodadaDaFila = (
   faixas: { rotulo: string; peso: number }[],

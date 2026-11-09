@@ -43,7 +43,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 32 | ~~WhatsApp: mensagem com o valor só em atraso + reaproveitar a mesma aba do WhatsApp Web no computador~~ — 2026-11-09 | Média | Pequeno |
 | 30 | "Distribuir Pagamento" dá 400 em venda do Ciclone com número > 2.147.483.647 (parâmetro/coluna `integer`; 562 clientes com saldo afetados) — migration `20261109000002` aplicada 2026-11-09, `check:db` OK; falta o usuário repetir o pagamento real | **Alta** | Pequeno |
 | 29 | Código do cliente do Ciclone (`pgcln_codigo`) no cadastro — migration `20261109000001` aplicada + `check:db` OK, sync rodado (1.888 clientes com código); falta publicar o front e testar na tela | Média | Pequeno |
-| 39 | Fila de Cobrança: gestor define, na Distribuição, quantos clientes de cada faixa a cada rodada da lista "Ligar" (manhã/tarde opcional) — etapa 1 (configuração) commitada, `0010` aplicada; ordenação e faixa de dívida por faixa (`0011`, sem `db push`); etapa 2 (lista intercalada + "deixar para depois") e 3 (supervisão) não iniciadas | Alta | Grande, em etapas |
+| 39 | Fila de Cobrança: gestor define, na Distribuição, quantos clientes de cada faixa a cada rodada da lista "Ligar" (manhã/tarde opcional) — etapa 1 (configuração) commitada, `0010` aplicada; ordenação e faixa de dívida por faixa (`0011` aplicada); etapa 2 (lista intercalada + "Deixar para depois") feita, `0012` sem `db push`, falta teste na tela; etapa 3 (supervisão) não iniciada | Alta | Grande, em etapas |
 
 ## Perguntas em aberto para o financeiro
 
@@ -154,7 +154,24 @@ já monta a lista: intercaladas → tentou hoje → fim (sem faixa / fora do
 valor / peso 0) → em dia → deixados para depois; conferida com cenário
 fictício.
 
-**Falta:** `db push` da `20261109000011` + `check:db`; teste na tela; etapa 2
+`0011` aplicada 2026-11-09 (`check:db` OK).
+
+**Etapa 2 (feita, 2026-11-09):** aba "Ligar" do cobrador de carteira usa
+`montarFilaLigar` quando o gestor ligou a fila (sem coluna clicada no
+cabeçalho); turno reavaliado a cada minuto (muda sozinho às 12h); aviso
+"Ordem definida pela gestão (manhã/tarde)" acima da lista. Sem fila, a
+ordem é a de antes. **Deixar para depois**: botão "Depois" só na aba
+Ligar → modal com 3 motivos (pediu para ligar mais tarde / sem telefone
+válido / outro, com texto obrigatório) → selo "Deixado para depois: …" e
+o cliente vai para o fim da lista só hoje (com ou sem fila). Tabela
+`fila_adiamentos` (migration `20261109000012`): só INSERT/SELECT, RLS —
+cobrador grava só cliente da própria carteira, só no dia de hoje; gestor lê
+tudo. Testada como cobrador (`SET ROLE authenticated`) em transação
+revertida. Hook `src/hooks/useFilaAdiamentos.ts` (fora do contexto).
+
+**Falta:** `db push` da `20261109000012` + `check:db`; teste na tela (gestor
+configura a fila de um cobrador → login do cobrador → aba Ligar intercalada →
+Depois); etapa 3
 (aplicar a fila na aba "Ligar" do `CollectorDashboard`); etapa 3
 (supervisão: previstos × trabalhados por faixa; referência é o HTML do
 Cedrus que está na raiz, fora do Git).
