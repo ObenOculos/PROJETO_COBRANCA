@@ -215,8 +215,10 @@ manual no SQL Editor deixa de ser necessário para usuário novo.
 modal (senha + confirmação) → RPC `redefinir_senha_usuario` (migration
 `20261110000002`, só gestor, troca só o hash em `auth.users`; erro se o
 usuário não tiver conta de login). O modelo SQL fica só como reserva.
-**Falta:** `db push` + `check:db`, teste na tela (criar e entrar com o
-login novo; redefinir e entrar com a senha nova).
+Migrations `0001`/`0002` aplicadas e conferidas em produção 2026-11-10
+(gestor-only, sem `anon`, `check:db` OK).
+**Falta:** teste na tela (criar e entrar com o login novo; redefinir e
+entrar com a senha nova) e push do front.
 
 ### Item 38 — Carteira: filtro "já entrei em contato" — 2026-11-09
 
