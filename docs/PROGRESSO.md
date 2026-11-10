@@ -211,8 +211,12 @@ e-mail confirmado, formato copiado da conta de `jose_focco`) +
 sintético = slug do login `@collectors.internal` (sufixo `-2`… se colidir).
 Login duplicado é recusado sem diferenciar maiúscula. O provisionamento
 manual no SQL Editor deixa de ser necessário para usuário novo.
+**Redefinir senha** (mesmo dia): botão de chave na linha do usuário abre
+modal (senha + confirmação) → RPC `redefinir_senha_usuario` (migration
+`20261110000002`, só gestor, troca só o hash em `auth.users`; erro se o
+usuário não tiver conta de login). O modelo SQL fica só como reserva.
 **Falta:** `db push` + `check:db`, teste na tela (criar e entrar com o
-login novo). Não feito: gestor redefinir senha pela tela.
+login novo; redefinir e entrar com a senha nova).
 
 ### Item 38 — Carteira: filtro "já entrei em contato" — 2026-11-09
 

@@ -570,6 +570,8 @@ export interface CollectionContextType {
     user: Pick<User, "name" | "login" | "type">,
     senha: string,
   ) => Promise<void>;
+  /** Gestor redefine a senha de login — RPC redefinir_senha_usuario. */
+  redefinirSenhaUsuario: (userId: string, senha: string) => Promise<void>;
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
   setMonthlyGoal: (

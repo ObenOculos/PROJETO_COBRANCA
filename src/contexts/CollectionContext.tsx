@@ -2221,6 +2221,19 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
+  const redefinirSenhaUsuario = async (userId: string, senha: string) => {
+    // Só troca o hash da senha no Auth (migration 20261110000002). Sem
+    // setError global: o erro aparece no próprio modal.
+    const { error: rpcError } = await supabase.rpc("redefinir_senha_usuario", {
+      p_user_id: userId,
+      p_senha: senha,
+    });
+    if (rpcError) {
+      console.error("Erro ao redefinir senha:", rpcError);
+      throw new Error(rpcError.message);
+    }
+  };
+
   const updateUser = async (id: string, updates: Partial<User>) => {
     try {
       const dbUpdates: any = {};
@@ -5080,6 +5093,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     registrarPagamentoAcordo,
     cancelarAcordo,
     addUser,
+    redefinirSenhaUsuario,
     updateUser,
     deleteUser,
     setMonthlyGoal,

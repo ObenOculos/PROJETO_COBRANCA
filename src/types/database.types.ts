@@ -1977,6 +1977,11 @@ export type Database = {
         Args: { p_name: string; p_login: string; p_type: string; p_senha: string };
         Returns: string;
       };
+      // Migration 20261110000002.
+      redefinir_senha_usuario: {
+        Args: { p_user_id: string; p_senha: string };
+        Returns: undefined;
+      };
       encerrar_regra_carteira: {
         Args: { p_regra_id: string };
         Returns: undefined;

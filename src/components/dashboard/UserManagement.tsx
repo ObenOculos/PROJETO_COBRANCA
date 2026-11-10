@@ -11,6 +11,7 @@ import {
   Target,
   Search,
   Users as UsersIcon,
+  KeyRound,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -26,6 +27,7 @@ import { todayLocalStr } from "../../config/visitStatus";
 import { formatCurrencyCompact } from "../../utils/formatters";
 import FaixaEquipeModal from "./FaixaEquipeModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
+import RedefinirSenhaModal from "./RedefinirSenhaModal";
 
 const TYPE_BADGE_CLASS: Record<UserRoleType, string> = {
   manager:
@@ -113,6 +115,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
   const [userToDelete, setUserToDelete] = useState<UserType | null>(null);
   const [faixaEquipeFor, setFaixaEquipeFor] = useState<UserType | null>(null);
   const [metaFor, setMetaFor] = useState<UserType | null>(null);
+  const [senhaFor, setSenhaFor] = useState<UserType | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -527,6 +530,14 @@ const UserManagement: React.FC<UserManagementProps> = ({
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setSenhaFor(user)}
+                      className={iconButtonClass}
+                      title="Redefinir senha"
+                    >
+                      <KeyRound className="h-4 w-4" />
+                    </button>
                     {currentUser?.id !== user.id && (
                       <button
                         type="button"
@@ -748,6 +759,13 @@ const UserManagement: React.FC<UserManagementProps> = ({
         <FaixaEquipeModal
           collector={faixaEquipeFor}
           onClose={() => setFaixaEquipeFor(null)}
+        />
+      )}
+
+      {senhaFor && (
+        <RedefinirSenhaModal
+          user={senhaFor}
+          onClose={() => setSenhaFor(null)}
         />
       )}
 
