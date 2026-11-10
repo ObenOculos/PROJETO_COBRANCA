@@ -47,6 +47,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 40 | Fila de Cobrança em lotes substitui a Agenda do cobrador de carteira (lote = soma das quantidades do gestor; próximo só com o atual todo registrado) + filtros da Agenda na Carteira completa — código feito 2026-11-10, migration `20261110000003` aplicada (`check:db` OK), 1º lote do José conferido no banco (5/2/2/1); falta teste completo na tela e push | Alta | Grande |
 | 41 | Gestor atende e faz acordo pelo cobrador (escolhe "em nome de": cobrador da carteira ou ele) — botões no detalhe do cliente (Cobranças etc.); migration `20261110000004` aplicada (`check:db` OK); falta teste na tela e push | Alta | Médio |
 | 42 | `CollectionModal` (Cobranças → título → aba "Ações", só cobrador): grava status, recebimento e tentativa direto na tabela, sem as RPCs (sem histórico de pagamento, sem regra de acordo/agendamento) e usa `alert`/`confirm` nativos — avaliar remover ou trocar pelos modais novos | Média | Pequeno/médio |
+| 43 | Unificar as janelas do cliente numa "Ficha do cliente" (`ClientDetailModal`): etapa 1 (Cobranças abre a Ficha) feita 2026-11-10; 2 (aposentar `SaleDetailsModal`), 3 (aposentar `CollectionModal`, item 42), 4 (linha do cobrador) a fazer | Média | Médio, em etapas |
 
 ## Perguntas em aberto para o financeiro
 
@@ -198,6 +199,26 @@ cobrador entre ~61/91 e 365 dias.
 **Falta:** teste na tela do cobrador (aba Ligar intercalada → Depois);
 etapa 3 (supervisão: previstos × trabalhados por faixa; referência é o
 HTML do Cedrus que está na raiz, fora do Git).
+
+### Item 43 — Ficha do cliente única — 2026-11-10
+
+Achado no teste do item 41: a Cobranças do gestor (lista por venda do
+`CollectionTable`) não abria o detalhe do cliente — clicar no cliente
+expandia as vendas e "Ver detalhes da venda" abria o `SaleDetailsModal`.
+Existiam 3 janelas para ver um cliente (detalhe do cliente, detalhe da venda,
+título/`CollectionModal`). Pedido do usuário: unificar. Plano aprovado:
+uma "Ficha do cliente" (`ClientDetailModal`) como porta única, em etapas.
+
+**Etapa 1 (feita):** na Cobranças, clicar no cliente abre a Ficha; a seta
+"Ver vendas aqui" mostra/esconde as vendas na lista; "Ver detalhes da venda"
+abre a Ficha na aba Todos com a venda expandida e rolada até ela (prop
+`vendaInicial`; sem o cliente carregado cai na janela antiga). Visto no
+navegador local como gestor (só abrindo, sem gravar).
+**Próximas:** 2) levar o que faltar do `SaleDetailsModal` (pagamentos/visitas
+por venda, "Atualizar endereço") e trocar as notificações; 3) remover a aba
+"Ações" do `CollectionModal` (item 42); 4) conferir a linha do cobrador.
+Observação: a Ficha mostra as vendas que o gestor consultou na Cobranças
+(filtro "Em atraso" etc.) — conferir no teste do acordo se faltam títulos.
 
 ### Item 41 — Gestor atende e faz acordo pelo cobrador — 2026-11-10
 

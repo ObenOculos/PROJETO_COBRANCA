@@ -282,6 +282,21 @@ export const CollectionTable = React.forwardRef<
     const handleCloseClientModal = () => {
       setSelectedClientGroup(null);
       setIsClientModalOpen(false);
+      setVendaInicialFicha(undefined);
+    };
+
+    // Ficha do cliente a partir do documento (a lista por venda nao guarda o
+    // ClientGroup completo). Sem o cliente carregado devolve false e quem
+    // chamou mantem o comportamento antigo.
+    const [vendaInicialFicha, setVendaInicialFicha] = useState<
+      number | undefined
+    >(undefined);
+    const abrirFicha = (documento: string, venda?: number): boolean => {
+      const grupo = clientGroups.find((cg) => cg.document === documento);
+      if (!grupo) return false;
+      setVendaInicialFicha(venda);
+      handleViewClient(grupo);
+      return true;
     };
 
     const handleExportXLSX = () => {
@@ -1457,9 +1472,8 @@ export const CollectionTable = React.forwardRef<
                 {/* Cabeçalho do Cliente */}
                 <div
                   className={`flex items-center bg-white dark:bg-dark-bg-secondary rounded-2xl border border-gray-200 dark:border-dark-border ${isDeleteMode ? "" : "cursor-pointer"} overflow-hidden`}
-                  onClick={() =>
-                    !isDeleteMode && toggleClientExpansion(clientGroup.document)
-                  }
+                  onClick={() => !isDeleteMode && abrirFicha(clientGroup.document)}
+                  title="Abrir a ficha do cliente"
                 >
                   {isDeleteMode && (
                     <div className="p-4">
@@ -1544,9 +1558,28 @@ export const CollectionTable = React.forwardRef<
                       </div>
                     </div>
 
-                    {/* Seta para Mobile - na parte inferior */}
-                    <div className="flex sm:hidden justify-center mt-3 pt-3 border-t border-gray-100 dark:border-dark-border">
-                      <button className="p-2 rounded-full bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
+                    {/* Seta: mostra/esconde as vendas aqui na lista (clicar
+                        no cliente abre a ficha). */}
+                    <div className="flex justify-center sm:justify-end mt-3 pt-3 sm:mt-2 sm:pt-0 border-t sm:border-0 border-gray-100 dark:border-dark-border">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isDeleteMode)
+                            toggleClientExpansion(clientGroup.document);
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-xs text-blue-700 dark:text-blue-400"
+                        title={
+                          expandedClients.has(clientGroup.document)
+                            ? "Esconder as vendas"
+                            : "Mostrar as vendas aqui"
+                        }
+                      >
+                        <span className="hidden sm:inline">
+                          {expandedClients.has(clientGroup.document)
+                            ? "Esconder vendas"
+                            : "Ver vendas aqui"}
+                        </span>
                         {expandedClients.has(clientGroup.document) ? (
                           <ChevronUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         ) : (
@@ -1710,13 +1743,22 @@ export const CollectionTable = React.forwardRef<
                                           c !== undefined,
                                       ) as Collection[];
 
-                                    if (saleCollections.length > 0) {
+                                    // Ficha do cliente aberta nesta venda
+                                    // (substitui a janela de detalhe da
+                                    // venda -- unificacao, etapa 1).
+                                    if (
+                                      !abrirFicha(
+                                        clientGroup.document,
+                                        sale.saleNumber,
+                                      ) &&
+                                      saleCollections.length > 0
+                                    ) {
                                       setSelectedSale(saleCollections);
                                       setIsSaleModalOpen(true);
                                     }
                                   }}
                                   className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-colors text-sm font-medium"
-                                  title="Ver detalhes da venda"
+                                  title="Abrir a ficha do cliente nesta venda"
                                 >
                                   <Eye className="h-4 w-4 mr-2" />
                                   <span>Detalhes</span>
@@ -1916,6 +1958,19 @@ export const CollectionTable = React.forwardRef<
                 setSelectedSale([]);
                 setIsSaleModalOpen(false);
               }}
+            />,
+            document.body,
+          )}
+
+        {/* Ficha do cliente (unificacao, etapa 1) */}
+        {isClientModalOpen &&
+          selectedClientGroup &&
+          createPortal(
+            <ClientDetailModal
+              clientGroup={selectedClientGroup}
+              userType={userType}
+              vendaInicial={vendaInicialFicha}
+              onClose={handleCloseClientModal}
             />,
             document.body,
           )}

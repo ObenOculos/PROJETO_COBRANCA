@@ -64,6 +64,9 @@ interface ClientDetailModalProps {
   clientGroup: ClientGroup;
   userType: UserType;
   onClose: () => void;
+  /** Abre ja na lista de vendas com esta venda expandida (ex.: "Ver
+   * detalhes da venda" na Cobrancas). */
+  vendaInicial?: number;
 }
 
 // ============================================
@@ -197,6 +200,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   clientGroup,
   userType,
   onClose,
+  vendaInicial,
 }) => {
   const {
     getSalesByClient,
@@ -393,7 +397,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   const [showAcordoAtivoConfirm, setShowAcordoAtivoConfirm] = useState(false);
   const [isGeneralEditModalOpen, setIsGeneralEditModalOpen] = useState(false);
   const [view, setView] = useState<"vendas" | "dados" | "historico">("vendas");
-  const [expandedSales, setExpandedSales] = useState<Set<number>>(new Set());
+  const [expandedSales, setExpandedSales] = useState<Set<number>>(
+    () => new Set(vendaInicial != null ? [vendaInicial] : []),
+  );
   const [refreshKey, setRefreshKey] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authToken, setAuthToken] = useState("");
@@ -681,7 +687,20 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   // saldo. Venda toda fora da cobranca (cancelada/agrupada/renegociada no
   // ERP) so aparece em "Todos". Sem escolha do usuario, abre em "Em aberto"
   // quando ha divida.
-  const [abaVendas, setAbaVendas] = useState<AbaVendas | null>(null);
+  // Aberta numa venda especifica: aba "Todos" (a venda pode estar paga).
+  const [abaVendas, setAbaVendas] = useState<AbaVendas | null>(
+    vendaInicial != null ? "todos" : null,
+  );
+  // ...e rola ate ela.
+  useEffect(() => {
+    if (vendaInicial == null) return;
+    const t = window.setTimeout(() => {
+      document
+        .getElementById(`ficha-venda-${vendaInicial}`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [vendaInicial]);
   const vendasPorAba = React.useMemo(() => {
     const classificadas = clientSales.map((sale) => {
       const fora =
@@ -1554,6 +1573,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     return (
                       <div
                         key={sale.saleNumber}
+                        id={`ficha-venda-${sale.saleNumber}`}
                         className="border border-gray-200 rounded-xl overflow-hidden bg-white"
                       >
                         {/* Sale Header - Minimalista */}
