@@ -58,6 +58,7 @@ import GeneralPaymentEditModal from "./GeneralPaymentEditModal";
 import LogContactModal from "./LogContactModal";
 import AcordoModal from "./AcordoModal";
 import AcordoDetailModal from "./AcordoDetailModal";
+import HistoricoAcordosAgendamentos from "./HistoricoAcordosAgendamentos";
 import { USER_TYPE_LABELS, isWalletCollectorType } from "../../config/profiles";
 
 interface ClientDetailModalProps {
@@ -1165,6 +1166,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     </ul>
                   </div>
                 )}
+
+                {/* Acordos (criado/cancelado/quebrado/cumprido) e
+                    agendamentos cancelados -- item 22. */}
+                <HistoricoAcordosAgendamentos
+                  clientDocument={clientGroup.document}
+                  users={users ?? []}
+                  scheduledVisits={scheduledVisits ?? []}
+                />
 
                 {/* Visit History */}
                 {clientVisits.length > 0 && (

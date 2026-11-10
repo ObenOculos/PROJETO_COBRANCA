@@ -30,7 +30,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 19 | ~~`monthly_goals.visits_goal` muda de significado por perfil sem isso aparecer no schema/UI do %~~ | Média | Pequeno |
 | 20 | ~~Helper `WALLET_COLLECTOR_TYPES.includes(...)` repetido em 6+ lugares em vez de `isWalletCollectorType()` único~~ | Baixa | Pequeno |
 | 21 | Jurídico (`legal_collector`) é 100% idêntico a Interno/Terceirizado — zero modelagem de processo/protesto/prazo legal | A avaliar com o negócio | A analisar |
-| 22 | Sem tela de histórico de cancelamento de acordo e de agendamento/contato — só "Histórico de Contatos" (`collection_attempts`) aparece em "Ver Dados" | Baixa/Média | Pequeno/médio |
+| 22 | ~~Sem histórico de cancelamento de acordo e de agendamento~~ — bloco "Acordos e agendamentos cancelados" no Histórico da ficha, 2026-11-10 (item 45) | Baixa/Média | Pequeno/médio |
 | 23 | `AcordoModal` (parcelas) não bloqueia de verdade data anterior a hoje — só `min` do `<input type="date">`, sem validação no "Continuar" | Baixa | Pequeno |
 | 24 | Registrar contato + Reagendar + Agendar viram um botão só, "Atender" (RPC `registrar_contato`; modal em 2 etapas em 2026-11-06) — RPC testada ao vivo; front publicado e 2 etapas conferidas no site (2026-11-09) — falta uma submissão real | Média | Médio |
 | 25 | Distribuição da carteira por regra (faixas × lojas, várias por cobrador, ativa/pausada) — migrations 6–10 aplicadas; regras da Monalisa e do José cadastradas e 1ª distribuição aplicada em 2026-11-06 | Alta | Grande |
@@ -49,6 +49,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 42 | ~~`CollectionModal` grava status/recebimento/tentativa direto, sem RPC~~ — era código morto (nenhuma tela abria); removido com o `addAttempt` do contexto em 2026-11-10 (item 43, etapa 3) | Média | Pequeno/médio |
 | 43 | Ficha do cliente única (`ClientDetailModal`) — 4 etapas feitas 2026-11-10 (sem push, sem teste do usuário) | Média | Médio, em etapas |
 | 44 | Carregamento parcial/inconsistente (precisava de F5 2–3 vezes) — nova tentativa em erro passageiro, sem lista incompleta, caches das derivações por carga, corrida da carga de títulos; feito 2026-11-10, sem teste no navegador (extensão caiu), sem push | Alta | Médio |
+| 45 | Acordo cancelado: juros já pagos passam a abater a dívida original + histórico de acordos/agendamentos cancelados na ficha — migration `20261110000005` (ajusta também a OTICA FERNANDA) sem `db push`, sem teste | Alta | Médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -200,6 +201,36 @@ cobrador entre ~61/91 e 365 dias.
 **Falta:** teste na tela do cobrador (aba Ligar intercalada → Depois);
 etapa 3 (supervisão: previstos × trabalhados por faixa; referência é o
 HTML do Cedrus que está na raiz, fora do Git).
+
+### Item 45 — Acordo cancelado e histórico — 2026-11-10
+
+Caso real (cobrador José): acordo de 2 parcelas criado, entrada de R$ 500
+registrada e acordo cancelado 43 s depois ("Erro no lançamento"). Pela
+imputação proporcional, R$ 476,49 abateram o título e R$ 23,51 ficaram como
+juros de um acordo que deixou de valer. O cancelamento não deixava rastro no
+histórico da ficha.
+
+**Decisões do usuário:** ao cancelar, os juros já pagos abatem a dívida
+original (qualquer motivo de cancelamento; quebra continua com a regra do
+financeiro); o Histórico mostra criado/cancelado/quebrado/cumprido e
+agendamento cancelado; o cliente do caso real é ajustado.
+
+**Banco** (`20261110000005`, sem `db push`): `acordos.encargos_reimputados`;
+origem `acordo_cancelado` em `recebimentos_historico`;
+`reimputar_encargos_acordo_cancelado` (interna, idempotente, abate nos
+títulos do acordo do mais antigo para o mais novo, nunca além do saldo);
+`cancelar_acordo` (corpo de produção) chama no fim; ajuste dos já cancelados
+na própria migration (em 2026-11-10 só o da OTICA FERNANDA, R$ 23,51).
+Pagamento original não é alterado (registro novo).
+
+**App:** `HistoricoAcordosAgendamentos` no Histórico da ficha; rótulos de
+origem `acordo` (antes aparecia "Origem desconhecida (acordo)") e
+`acordo_cancelado` no `ClientHistoryViewer`.
+
+**Atenção:** o título é do Ciclone e o sync das 5h faz o ERP vencer — se a
+baixa dos R$ 500 não for lançada no Ciclone, o abatimento some do app no
+dia seguinte (o registro do pagamento fica no acordo). Avisar o financeiro.
+**Falta:** `db push` + `check:db`, conferir o título no banco, teste na tela.
 
 ### Item 44 — Carregamento confiável — 2026-11-10
 

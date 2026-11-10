@@ -3,6 +3,7 @@ import {
   ArrowRightLeft,
   Camera,
   FileSpreadsheet,
+  Handshake,
   History,
   LogIn,
   LogOut,
@@ -268,6 +269,14 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
       foto_inicial: {
         icon: <Camera className="h-4 w-4 text-gray-500" />,
         titulo: "Recebido até o início do histórico",
+      },
+      acordo: {
+        icon: <Handshake className="h-4 w-4 text-amber-600" />,
+        titulo: "Pagamento de parcela de acordo",
+      },
+      acordo_cancelado: {
+        icon: <Handshake className="h-4 w-4 text-gray-500" />,
+        titulo: "Acordo cancelado: juros já pagos abatidos da dívida",
       },
     }[ev.origem] ?? {
       icon: <History className="h-4 w-4 text-gray-400" />,

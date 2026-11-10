@@ -281,6 +281,8 @@ export type Database = {
           created_at: string;
           created_by_id: string | null;
           desconto_percentual_aplicado: number;
+          // Migration 20261110000005.
+          encargos_reimputados: number | null;
           forma_pagamento_parcelas: string | null;
           id: string;
           juros_percentual_am_aplicado: number;
