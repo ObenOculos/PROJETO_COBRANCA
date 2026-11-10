@@ -46,8 +46,8 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 39 | Fila de Cobrança: gestor define, na Distribuição, quantos clientes de cada faixa a cada rodada da lista "Ligar" (manhã/tarde opcional) — etapa 1 (configuração) commitada, `0010` aplicada; ordenação e faixa de dívida por faixa (`0011` aplicada); etapa 2 (lista intercalada + "Deixar para depois") feita, `0012` aplicada, `0013` (só INSERT/SELECT no privilégio) aplicada, falta teste na tela; etapa 3 (supervisão) não iniciada | Alta | Grande, em etapas |
 | 40 | Fila de Cobrança em lotes substitui a Agenda do cobrador de carteira (lote = soma das quantidades do gestor; próximo só com o atual todo registrado) + filtros da Agenda na Carteira completa — código feito 2026-11-10, migration `20261110000003` aplicada (`check:db` OK), 1º lote do José conferido no banco (5/2/2/1); falta teste completo na tela e push | Alta | Grande |
 | 41 | Gestor atende e faz acordo pelo cobrador (escolhe "em nome de": cobrador da carteira ou ele) — botões no detalhe do cliente (Cobranças etc.); migration `20261110000004` aplicada (`check:db` OK); falta teste na tela e push | Alta | Médio |
-| 42 | `CollectionModal` (Cobranças → título → aba "Ações", só cobrador): grava status, recebimento e tentativa direto na tabela, sem as RPCs (sem histórico de pagamento, sem regra de acordo/agendamento) e usa `alert`/`confirm` nativos — avaliar remover ou trocar pelos modais novos | Média | Pequeno/médio |
-| 43 | Unificar as janelas do cliente numa "Ficha do cliente" (`ClientDetailModal`): etapa 1 (Cobranças abre a Ficha) feita 2026-11-10; 2 (aposentar `SaleDetailsModal`), 3 (aposentar `CollectionModal`, item 42), 4 (linha do cobrador) a fazer | Média | Médio, em etapas |
+| 42 | ~~`CollectionModal` grava status/recebimento/tentativa direto, sem RPC~~ — era código morto (nenhuma tela abria); removido com o `addAttempt` do contexto em 2026-11-10 (item 43, etapa 3) | Média | Pequeno/médio |
+| 43 | Ficha do cliente única (`ClientDetailModal`) — 4 etapas feitas 2026-11-10 (sem push, sem teste do usuário) | Média | Médio, em etapas |
 
 ## Perguntas em aberto para o financeiro
 
@@ -214,9 +214,20 @@ uma "Ficha do cliente" (`ClientDetailModal`) como porta única, em etapas.
 abre a Ficha na aba Todos com a venda expandida e rolada até ela (prop
 `vendaInicial`; sem o cliente carregado cai na janela antiga). Visto no
 navegador local como gestor (só abrindo, sem gravar).
-**Próximas:** 2) levar o que faltar do `SaleDetailsModal` (pagamentos/visitas
-por venda, "Atualizar endereço") e trocar as notificações; 3) remover a aba
-"Ações" do `CollectionModal` (item 42); 4) conferir a linha do cobrador.
+**Etapa 2 (feita):** `SaleDetailsModal` removido. "Detalhes" da venda, o
+`openSaleDetails` da tabela (usado pelo ManagerDashboard) e as notificações
+de venda abrem a Ficha na venda. Parcelas, endereço (com atualizar),
+visitas e pagamentos já estavam na Ficha; faltava a observação do
+pagamento — agora no Histórico (`ClientHistoryViewer`). Visto no navegador.
+**Etapa 3 (feita):** `CollectionModal` era código morto (o estado que o abria
+nunca virava true); removido com `addAttempt` (único insert em
+`collection_attempts` fora da RPC além do pagamento parcial com contato
+agendado do `GeneralPaymentModal`, que é proposital e ficou).
+**Etapa 4 (feita):** a Ficha mostra Atender / Fazer acordo / Ver acordo
+também para cobrador de carteira (sempre no próprio nome, sem a escolha
+do gestor). A linha da Fila/Carteira continua com os mesmos botões.
+Resultado: uma janela para ver o cliente; os modais de ação (Atender,
+Acordo, Detalhe do acordo, Distribuir pagamento) já eram únicos.
 Observação: a Ficha mostra as vendas que o gestor consultou na Cobranças
 (filtro "Em atraso" etc.) — conferir no teste do acordo se faltam títulos.
 

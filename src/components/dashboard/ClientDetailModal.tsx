@@ -632,6 +632,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   // da carteira do cliente ou no dele. Mesmos modais do cobrador (Atender,
   // Acordo) -- a regra fica num lugar so.
   const souGestor = userType === "manager";
+  // Ficha unica (item 43, etapa 4): cobrador de carteira tambem atende e faz
+  // acordo por aqui, sempre no proprio nome (sem a escolha do gestor).
+  const podeAtender = souGestor || isWalletCollectorType(userType);
   const cobradorDaCarteira = React.useMemo(() => {
     const ids = new Set<string>();
     clientSales.forEach((sale) =>
@@ -931,11 +934,13 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           {/* Todo perfil de cobranca precisa consultar dados/vendas e registrar
               recebimento na propria carteira — Terceirizado e Juridico ficavam
               de fora por omissao de quando esses perfis foram criados. */}
-          {/* Gestor: atender e fazer acordo pelo cobrador */}
-          {souGestor && (hasRealPendingValue || acordoAtivo) && (
+          {/* Atender e acordo (gestor escolhe em nome de quem) */}
+          {podeAtender && (hasRealPendingValue || acordoAtivo) && (
             <div className="mt-4 mx-4 lg:mx-6 p-3 rounded-2xl border border-indigo-100 bg-indigo-50/50 dark:bg-indigo-900/10 dark:border-indigo-900/30 flex flex-col lg:flex-row lg:items-center gap-3">
               <div className="flex-1 min-w-0 text-xs text-gray-600 dark:text-dark-text-secondary">
-                {cobradorDaCarteira ? (
+                {!souGestor ? (
+                  <span>Registrar contato ou negociar com este cliente.</span>
+                ) : cobradorDaCarteira ? (
                   <label className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-gray-700 dark:text-dark-text">
                       Registrar em nome de:
