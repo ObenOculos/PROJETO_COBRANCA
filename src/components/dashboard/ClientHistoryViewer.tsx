@@ -29,6 +29,8 @@ interface PagamentoApp {
   payment_method: string | null;
   payment_amount: number;
   payment_date: string | null;
+  /** Observacao digitada ao registrar o pagamento. */
+  notes: string | null;
 }
 
 type Evento =
@@ -117,7 +119,7 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
         const { data, error } = await supabase
           .from("sale_payments")
           .select(
-            "id, collector_name, payment_method, payment_amount, payment_date",
+            "id, collector_name, payment_method, payment_amount, payment_date, notes",
           )
           .in("id", ids);
         if (error) console.error("Erro ao buscar pagamentos do app:", error);
@@ -284,6 +286,11 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
             ? ` · ${ev.pagamento.payment_method}`
             : ""}
         </p>
+        {ev.pagamento?.notes?.trim() && (
+          <p className="text-xs text-gray-500 mt-0.5 ml-6 whitespace-pre-wrap">
+            Obs.: {ev.pagamento.notes.trim()}
+          </p>
+        )}
         {mostrarCarteira && (
           <p className="text-xs text-gray-500 mt-0.5 ml-6">
             Carteira de: {donos.join(", ")}
