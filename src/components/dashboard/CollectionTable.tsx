@@ -1502,9 +1502,10 @@ export const CollectionTable = React.forwardRef<
                       </div>
                     </div>
 
-                    {/* Seta: mostra/esconde as vendas aqui na lista (clicar
-                        no cliente abre a ficha). */}
-                    <div className="flex justify-center sm:justify-end mt-3 pt-3 sm:mt-2 sm:pt-0 border-t sm:border-0 border-gray-100 dark:border-dark-border">
+                    {/* Seta (celular): mostra/esconde as vendas aqui na
+                        lista -- clicar no cliente abre a ficha. No desktop a
+                        seta e a faixa ao lado do excluir (abaixo). */}
+                    <div className="flex sm:hidden justify-center mt-3 pt-3 border-t border-gray-100 dark:border-dark-border">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1512,18 +1513,13 @@ export const CollectionTable = React.forwardRef<
                           if (!isDeleteMode)
                             toggleClientExpansion(clientGroup.document);
                         }}
-                        className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-xs text-blue-700 dark:text-blue-400"
+                        className="p-2 rounded-full bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
                         title={
                           expandedClients.has(clientGroup.document)
                             ? "Esconder as vendas"
                             : "Mostrar as vendas aqui"
                         }
                       >
-                        <span className="hidden sm:inline">
-                          {expandedClients.has(clientGroup.document)
-                            ? "Esconder vendas"
-                            : "Ver vendas aqui"}
-                        </span>
                         {expandedClients.has(clientGroup.document) ? (
                           <ChevronUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         ) : (
@@ -1532,6 +1528,32 @@ export const CollectionTable = React.forwardRef<
                       </button>
                     </div>
                   </div>
+                  {/* Seta (desktop): faixa da altura do cartao, ao lado do
+                      excluir -- mesmo formato dele. */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isDeleteMode)
+                        toggleClientExpansion(clientGroup.document);
+                    }}
+                    className={`hidden sm:flex items-center justify-center w-12 self-stretch flex-shrink-0 border-l border-gray-200 dark:border-dark-border transition-colors ${
+                      expandedClients.has(clientGroup.document)
+                        ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+                        : "bg-gray-50 text-gray-500 hover:bg-blue-50 hover:text-blue-600 dark:bg-dark-bg dark:text-dark-text-secondary dark:hover:bg-blue-900/20"
+                    }`}
+                    title={
+                      expandedClients.has(clientGroup.document)
+                        ? "Esconder as vendas"
+                        : "Mostrar as vendas aqui"
+                    }
+                  >
+                    {expandedClients.has(clientGroup.document) ? (
+                      <ChevronUp className="h-5 w-5" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5" />
+                    )}
+                  </button>
                   {userType === "manager" && (
                     <button
                       onClick={async (e) => {
