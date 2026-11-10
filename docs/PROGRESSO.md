@@ -44,7 +44,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 30 | "Distribuir Pagamento" dá 400 em venda do Ciclone com número > 2.147.483.647 (parâmetro/coluna `integer`; 562 clientes com saldo afetados) — migration `20261109000002` aplicada 2026-11-09, `check:db` OK; falta o usuário repetir o pagamento real | **Alta** | Pequeno |
 | 29 | Código do cliente do Ciclone (`pgcln_codigo`) no cadastro — migration `20261109000001` aplicada + `check:db` OK, sync rodado (1.888 clientes com código); falta publicar o front e testar na tela | Média | Pequeno |
 | 39 | Fila de Cobrança: gestor define, na Distribuição, quantos clientes de cada faixa a cada rodada da lista "Ligar" (manhã/tarde opcional) — etapa 1 (configuração) commitada, `0010` aplicada; ordenação e faixa de dívida por faixa (`0011` aplicada); etapa 2 (lista intercalada + "Deixar para depois") feita, `0012` aplicada, `0013` (só INSERT/SELECT no privilégio) aplicada, falta teste na tela; etapa 3 (supervisão) não iniciada | Alta | Grande, em etapas |
-| 40 | Fila de Cobrança em lotes substitui a Agenda do cobrador de carteira (lote = soma das quantidades do gestor; próximo só com o atual todo registrado) + filtros da Agenda na Carteira completa — código feito 2026-11-10, migration `20261110000003` sem `db push`, sem teste na tela | Alta | Grande |
+| 40 | Fila de Cobrança em lotes substitui a Agenda do cobrador de carteira (lote = soma das quantidades do gestor; próximo só com o atual todo registrado) + filtros da Agenda na Carteira completa — código feito 2026-11-10, migration `20261110000003` aplicada (`check:db` OK), 1º lote do José conferido no banco (5/2/2/1); falta teste completo na tela e push | Alta | Grande |
 
 ## Perguntas em aberto para o financeiro
 
@@ -238,8 +238,12 @@ completa"; lote abre sozinho quando não há lote ou o atual acabou; relê após
 Atender/acordo/detalhe/cancelar contato; busca leva para a Carteira).
 Distribuição: textos da fila falam em lote.
 
-**Falta:** `db push` + `check:db`, teste na tela do cobrador (grava lote em
-produção ao abrir a tela), push. Etapa 3 (supervisão) pode usar
+`0003` aplicada 2026-11-10 (`check:db` OK; tabelas só SELECT para
+`authenticated`, nada para `anon`). Primeiro lote real: José, turno tarde,
+10 clientes = 5 (1–60) + 2 (61–90) + 2 (91–365) + 1 (366–1460, com alerta),
+conforme a Distribuição.
+**Falta:** teste completo na tela (registrar os 10 e ver o próximo lote
+abrir), push. Etapa 3 (supervisão) pode usar
 `fila_lote_itens` (previstos × registrados por faixa).
 
 ### Senha de login — 2026-11-10
