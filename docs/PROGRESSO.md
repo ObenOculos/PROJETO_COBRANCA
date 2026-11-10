@@ -49,7 +49,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 42 | ~~`CollectionModal` grava status/recebimento/tentativa direto, sem RPC~~ — era código morto (nenhuma tela abria); removido com o `addAttempt` do contexto em 2026-11-10 (item 43, etapa 3) | Média | Pequeno/médio |
 | 43 | Ficha do cliente única (`ClientDetailModal`) — 4 etapas feitas 2026-11-10 (sem push, sem teste do usuário) | Média | Médio, em etapas |
 | 44 | Carregamento parcial/inconsistente (precisava de F5 2–3 vezes) — nova tentativa em erro passageiro, sem lista incompleta, caches das derivações por carga, corrida da carga de títulos; feito 2026-11-10, sem teste no navegador (extensão caiu), sem push | Alta | Médio |
-| 45 | Acordo cancelado: quem cancela escolhe estornar (refazer) ou manter (desistiu) o valor pago + histórico de acordos/agendamentos cancelados — `0005` aplicada; `0006` (estorna a entrada da OTICA FERNANDA) sem `db push` | Alta | Médio |
+| 45 | Acordo cancelado: quem cancela escolhe estornar (refazer) ou manter (desistiu) o valor pago + histórico de acordos/agendamentos cancelados — `0005`/`0006` aplicadas (entrada da OTICA FERNANDA estornada); falta teste na tela | Alta | Médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -249,7 +249,10 @@ funções internas `estornar_pagamentos_acordo_cancelado` e
 `estornar_valor_no_titulo`. A migration estorna a entrada da OTICA FERNANDA
 (pedido do usuário; o título volta a R$ 1.357,56 em aberto). Tela: escolha
 no cancelamento do `AcordoDetailModal`; histórico mostra o destino.
-**Falta:** `db push` (antes do push do front) + `check:db` + conferência.
+`0006` aplicada e conferida 2026-11-10 (`check:db` OK): título da OTICA
+FERNANDA de volta a R$ 1.357,56 em aberto (em_atraso), estorno −500
+(−476,49/−23,51) ligado à entrada, `destino_pagamentos = estornar`; funções
+internas sem EXECUTE para `authenticated`. Falta teste na tela.
 
 ### Item 44 — Carregamento confiável — 2026-11-10
 
