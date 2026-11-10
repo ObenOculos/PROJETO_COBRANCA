@@ -254,6 +254,17 @@ FERNANDA de volta a R$ 1.357,56 em aberto (em_atraso), estorno −500
 (−476,49/−23,51) ligado à entrada, `destino_pagamentos = estornar`; funções
 internas sem EXECUTE para `authenticated`. Falta teste na tela.
 
+**Imputação revista (migration `20261110000007`):** o usuário: "a entrada
+não pega juros e multa". Regra nova: a **entrada** (parcela 1) abate 100% do
+valor original; as **demais** dividem o original restante e os encargos na
+proporção (substitui o "abate nos dois" de 2026-11-05 só para a entrada).
+`registrar_pagamento_acordo` (corpo de produção) muda só o cálculo de
+`valor_principal`. Termo: Cláusula Segunda reescrita (entrada integral ao
+original + percentual das demais). Acordo ativo da OTICA FERNANDA corrigido
+na migration: estorno da entrada como foi imputada (476,49/23,51) + novo
+lançamento de 500 todo em original (título 476,49 → 500,00).
+**Falta:** `db push` (antes do push do front) + `check:db` + conferência.
+
 ### Item 44 — Carregamento confiável — 2026-11-10
 
 Relato: às vezes a página abre com valores incompletos e só acerta depois de

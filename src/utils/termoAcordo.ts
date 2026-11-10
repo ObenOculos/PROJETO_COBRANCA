@@ -526,11 +526,12 @@ export const gerarTermoAcordoPdf = async ({
   doc.setFontSize(9.5);
   setColor(TEXT);
 
-  // Clausula Segunda -- imputacao PROPORCIONAL dos pagamentos (decisao
-  // 2026-11-05, migration 20261105000002). Os numeros saem da mesma conta
-  // que registrar_pagamento_acordo faz no banco: fracao de valor original =
-  // min(original, negociado) / negociado. Sem esta clausula vale o art. 354
-  // do Codigo Civil (juros primeiro), que contradiz o que o sistema grava.
+  // Clausula Segunda -- imputacao dos pagamentos, mesma conta que
+  // registrar_pagamento_acordo faz no banco (migration 20261110000007):
+  // a ENTRADA (parcela 1) vai inteira para o valor original; as DEMAIS
+  // dividem o original restante e os encargos na proporcao. Sem esta
+  // clausula vale o art. 354 do Codigo Civil (juros primeiro), que
+  // contradiz o que o sistema grava.
   const originalTotal = titulos.reduce(
     (sum, t) => sum + Math.max(t.saldoNoMomento, 0),
     0,
@@ -543,14 +544,26 @@ export const gerarTermoAcordoPdf = async ({
     "de todas as parcelas deste acordo.";
   let textoClausula2: string;
   if (negociado > originalTotal + 0.009 && negociado > 0) {
-    const pctOriginal = Math.round((originalTotal / negociado) * 10000) / 100;
+    const entrada = parcela1?.valorParcela ?? 0;
+    const entradaOriginal = Math.min(entrada, originalTotal);
+    const restoOriginal = Math.round((originalTotal - entradaOriginal) * 100) / 100;
+    const restoTotal = Math.round((negociado - entrada) * 100) / 100;
+    const encargos = Math.round((negociado - originalTotal) * 100) / 100;
+    const pctOriginal =
+      restoTotal > 0.009
+        ? Math.round((restoOriginal / restoTotal) * 10000) / 100
+        : 0;
     const pctEncargos = Math.round((100 - pctOriginal) * 100) / 100;
     textoClausula2 =
-      "Cláusula Segunda – Cada pagamento efetuado em razão deste acordo, inclusive a entrada, " +
-      "será imputado simultaneamente ao valor original dos títulos e aos encargos (multa e " +
-      "juros, deduzido o desconto), na mesma proporção em que compõem o total negociado: " +
-      `${formatPct(pctOriginal)}% ao valor original (${formatMoneyPdf(originalTotal)}) e ` +
-      `${formatPct(pctEncargos)}% aos encargos (${formatMoneyPdf(negociado - originalTotal)}). ` +
+      `Cláusula Segunda – A entrada (${formatMoneyPdf(entrada)}) será imputada integralmente ` +
+      "ao valor original dos títulos acima, sem incidência de encargos. " +
+      (restoTotal > 0.009
+        ? "Cada uma das demais parcelas será imputada simultaneamente ao valor original " +
+          "restante e aos encargos (multa e juros, deduzido o desconto), na mesma proporção " +
+          `em que os compõem: ${formatPct(pctOriginal)}% ao valor original restante ` +
+          `(${formatMoneyPdf(restoOriginal)}) e ${formatPct(pctEncargos)}% aos encargos ` +
+          `(${formatMoneyPdf(encargos)}). `
+        : "") +
       "As partes afastam, assim, a ordem de imputação prevista no art. 354 do Código Civil. " +
       quitacao;
   } else {
