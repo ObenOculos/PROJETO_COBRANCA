@@ -50,7 +50,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 43 | Ficha do cliente única (`ClientDetailModal`) — 4 etapas feitas 2026-11-10 (sem push, sem teste do usuário) | Média | Médio, em etapas |
 | 44 | Carregamento parcial/inconsistente (precisava de F5 2–3 vezes) — nova tentativa em erro passageiro, sem lista incompleta, caches das derivações por carga, corrida da carga de títulos; feito 2026-11-10, sem teste no navegador (extensão caiu), sem push | Alta | Médio |
 | 45 | Acordo cancelado: quem cancela escolhe estornar (refazer) ou manter (desistiu) o valor pago + histórico de acordos/agendamentos cancelados — `0005`/`0006` aplicadas (entrada da OTICA FERNANDA estornada); falta teste na tela | Alta | Médio |
-| 46 | Atender: "Cliente diz que já pagou" (comprovante → registro do pagamento) e "Cliente informa venda cancelada" (parcelas da venda vão para conferência do gestor) — migration `20261110000008` sem `db push`, sem teste | Alta | Médio |
+| 46 | Atender: "Cliente diz que já pagou" (comprovante → registro do pagamento) e "Cliente informa venda cancelada" (parcelas da venda vão para conferência do gestor) — migration `20261110000008` aplicada (`check:db` OK); falta teste na tela | Alta | Médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -226,7 +226,8 @@ situação "Aguardando conferência" (outras vendas ficam). Gestor: painel
 (confirmar = `cancelar_vendas` com registro em `vendas_canceladas`;
 devolver = parcelas voltam a quem tinha a carteira). Venda em acordo ativo
 é recusada (cancelar o acordo antes).
-**Falta:** `db push` (antes do push do front) + `check:db` + teste na tela.
+`0008` aplicada 2026-11-10 (`check:db` OK; tabela só SELECT para
+`authenticated`, funções fechadas para `anon`). **Falta:** teste na tela.
 
 ### Item 45 — Acordo cancelado e histórico — 2026-11-10
 
