@@ -49,7 +49,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 42 | ~~`CollectionModal` grava status/recebimento/tentativa direto, sem RPC~~ — era código morto (nenhuma tela abria); removido com o `addAttempt` do contexto em 2026-11-10 (item 43, etapa 3) | Média | Pequeno/médio |
 | 43 | Ficha do cliente única (`ClientDetailModal`) — 4 etapas feitas 2026-11-10 (sem push, sem teste do usuário) | Média | Médio, em etapas |
 | 44 | Carregamento parcial/inconsistente (precisava de F5 2–3 vezes) — nova tentativa em erro passageiro, sem lista incompleta, caches das derivações por carga, corrida da carga de títulos; feito 2026-11-10, sem teste no navegador (extensão caiu), sem push | Alta | Médio |
-| 45 | Acordo cancelado: juros já pagos passam a abater a dívida original + histórico de acordos/agendamentos cancelados na ficha — migration `20261110000005` (ajusta também a OTICA FERNANDA) sem `db push`, sem teste | Alta | Médio |
+| 45 | Acordo cancelado: juros já pagos passam a abater a dívida original + histórico de acordos/agendamentos cancelados na ficha — migration `20261110000005` aplicada e conferida (OTICA FERNANDA: recebido 500,00); falta teste na tela e push | Alta | Médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -230,7 +230,11 @@ origem `acordo` (antes aparecia "Origem desconhecida (acordo)") e
 **Atenção:** o título é do Ciclone e o sync das 5h faz o ERP vencer — se a
 baixa dos R$ 500 não for lançada no Ciclone, o abatimento some do app no
 dia seguinte (o registro do pagamento fica no acordo). Avisar o financeiro.
-**Falta:** `db push` + `check:db`, conferir o título no banco, teste na tela.
+`0005` aplicada 2026-11-10 (`check:db` OK): título da OTICA FERNANDA com
+recebido 500,00 (falta 857,56), `encargos_reimputados` 23,51, histórico com
+a linha `acordo_cancelado` (476,49 → 500,00); função interna sem EXECUTE
+para `anon`/`authenticated`.
+**Falta:** teste na tela e push.
 
 ### Item 44 — Carregamento confiável — 2026-11-10
 
