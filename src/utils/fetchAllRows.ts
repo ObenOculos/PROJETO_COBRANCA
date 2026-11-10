@@ -1,7 +1,13 @@
+import { comRetentativa } from "./supabaseRetry";
+
 /**
  * Pagina uma consulta do Supabase em blocos de 1000 (limite padrão do PostgREST)
  * até trazer todas as linhas. Todo fetch volumoso precisa paginar — sem isso, a
  * resposta é cortada em ~1000 registros silenciosamente.
+ *
+ * Falha passageira tenta de novo (comRetentativa). Se a página falhar de vez,
+ * LANÇA o erro: antes devolvia o que já tinha como se fosse tudo, e a tela
+ * mostrava números incompletos sem aviso.
  *
  * @param runPage  recebe o intervalo [from, to] e roda a página da query
  * @param shouldCancel  opcional; se retornar true, interrompe (ex.: cleanup de effect)
@@ -18,10 +24,12 @@ export async function fetchAllRows<T>(
   let from = 0;
 
   while (!shouldCancel?.()) {
-    const { data, error } = await runPage(from, from + PAGE - 1);
+    const { data, error } = await comRetentativa(() =>
+      runPage(from, from + PAGE - 1),
+    );
     if (error) {
       console.error("Erro ao paginar consulta do Supabase:", error);
-      break;
+      throw error;
     }
     if (!data || data.length === 0) break;
     all.push(...data);

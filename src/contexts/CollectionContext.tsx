@@ -53,7 +53,6 @@ import { useLoading } from "./LoadingContext";
 import { useOffline } from "../hooks/useOffline";
 import {
   dataCache,
-  statsCache,
   userCache,
   collectionsCache,
 } from "../utils/cache";
@@ -83,6 +82,7 @@ import {
   fetchAllPages,
   fetchAllPagesByIdRange,
 } from "../utils/supabasePagination";
+import { comRetentativa } from "../utils/supabaseRetry";
 import { todayLocalStr } from "../config/visitStatus";
 
 // Linha crua de BANCO_DADOS. Nao ha tipos gerados para o schema, entao o alias
@@ -207,7 +207,6 @@ const COLLECTIONS_CONCURRENCY = 8;
 // Intervalo minimo entre publicacoes parciais no estado durante a carga.
 // Cada publicacao redispara os consumidores de `collections` (notificacoes,
 // derivacoes), entao vale espacar em vez de publicar a cada lote.
-const PROGRESSIVE_FLUSH_MS = 2500;
 
 // Realtime: uma importacao em massa dispara centenas de eventos em BANCO_DADOS,
 // e cada recarga varre a tabela inteira. Em vez de recarregar por evento,
@@ -358,8 +357,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const realtimeBurstStartRef = React.useRef<number | null>(null);
   // Uma carga de BANCO_DADOS por vez: duas concorrentes escreveriam em
   // setAllCollections fora de ordem, e a mais lenta sobrescreveria a mais nova.
-  const collectionsLoadInFlightRef = React.useRef(false);
-  const collectionsReloadQueuedRef = React.useRef(false);
+  // Quem pede durante uma carga recebe a promessa da PROXIMA (que traz os
+  // dados novos) -- antes recebia "pronto" na hora, com os dados velhos.
+  const collectionsLoadRef = React.useRef<Promise<void> | null>(null);
+  const collectionsNextLoadRef = React.useRef<Promise<void> | null>(null);
+  const collectionsNextUseCacheRef = React.useRef(true);
   // Só publica progresso enquanto a tela de loading do boot está no ar. Num
   // refresh em segundo plano (realtime, pos-importacao) isso abriria o overlay
   // de tela cheia por cima do app em uso.
@@ -515,14 +517,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         let hasMore = true;
 
         while (hasMore) {
-          const { data: pageData, error: pageError } = await supabase
-            .from("scheduled_visits")
-            .select("*")
-            .order("scheduled_date", { ascending: true })
-            // Desempate unico: so por data a ordem entre paginas nao e
-            // estavel e visitas podiam ser puladas ou vir repetidas.
-            .order("id", { ascending: true })
-            .range(from, from + pageSize - 1);
+          const { data: pageData, error: pageError } = await comRetentativa(
+            () =>
+              supabase
+                .from("scheduled_visits")
+                .select("*")
+                .order("scheduled_date", { ascending: true })
+                // Desempate unico: so por data a ordem entre paginas nao e
+                // estavel e visitas podiam ser puladas ou vir repetidas.
+                .order("id", { ascending: true })
+                .range(from, from + pageSize - 1),
+          );
 
           if (pageError) {
             console.error("Erro ao carregar página de visitas:", pageError);
@@ -916,7 +921,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const fetchData = async () => {
         try {
           await Promise.all([
-            fetchUsers(),
+            // Sem cache no boot: a lista de usuarios ficava ate 30 min no
+            // localStorage e sobrevivia ao F5 (usuario novo/desativado nao
+            // aparecia para os outros).
+            fetchUsers(false),
             fetchSalePayments(),
             fetchScheduledVisits(),
             fetchMonthlyGoals(),
@@ -1102,25 +1110,49 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     };
   }, []);
 
-  const fetchCollections = async (
+  // Uma carga por vez (ver collectionsLoadRef). Pedido durante uma carga:
+  // agenda UMA recarga para depois dela (pedidos repetidos se juntam) e
+  // devolve a promessa dessa recarga. A recarga le o escopo do ref na hora
+  // de rodar -- ensureAllCollections ja o deixa em "all" antes de pedir.
+  const fetchCollections = (
     useCache = true,
-    requestedScope: CollectionsScope = collectionsScopeRef.current,
+    requestedScope?: CollectionsScope,
+  ): Promise<void> => {
+    if (!collectionsLoadRef.current) {
+      const carga = loadCollectionsOnce(
+        useCache,
+        requestedScope ?? collectionsScopeRef.current,
+      ).finally(() => {
+        collectionsLoadRef.current = null;
+      });
+      collectionsLoadRef.current = carga;
+      return carga;
+    }
+    collectionsNextUseCacheRef.current =
+      collectionsNextUseCacheRef.current && useCache;
+    if (!collectionsNextLoadRef.current) {
+      console.log("Carga de collections em andamento; recarga enfileirada.");
+      collectionsNextLoadRef.current = collectionsLoadRef.current
+        .catch(() => undefined)
+        .then(() => {
+          collectionsNextLoadRef.current = null;
+          const useCacheProxima = collectionsNextUseCacheRef.current;
+          collectionsNextUseCacheRef.current = true;
+          return fetchCollections(useCacheProxima);
+        });
+    }
+    return collectionsNextLoadRef.current;
+  };
+
+  const loadCollectionsOnce = async (
+    useCache: boolean,
+    requestedScope: CollectionsScope,
   ) => {
     // Cobrador nunca usa a view: a carteira dele ja e o recorte, e ele precisa
     // do historico completo em maos para trabalhar offline.
     const scope: CollectionsScope =
       user?.type === "collector" ? "all" : requestedScope;
 
-    // Uma carga por vez. Duas concorrentes escreveriam em setAllCollections
-    // fora de ordem, e a mais lenta sobrescreveria o resultado mais novo.
-    // Enfileira e deixa o `finally` da carga atual disparar a recarga.
-    if (collectionsLoadInFlightRef.current) {
-      collectionsReloadQueuedRef.current = true;
-      console.log("Carga de collections em andamento; recarga enfileirada.");
-      return;
-    }
-
-    collectionsLoadInFlightRef.current = true;
     try {
       setError(null);
 
@@ -1215,17 +1247,23 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // passageiro no servidor vira "cliente sem titulo nenhum" pro usuario.
       const fetchScopeStats = async () => {
         const [countRes, minRes, maxRes] = await Promise.all([
-          applyCollectorFilter(
-            supabase
-              .from(source)
-              .select("id_parcela", { count: "exact", head: true }),
+          comRetentativa(() =>
+            applyCollectorFilter(
+              supabase
+                .from(source)
+                .select("id_parcela", { count: "exact", head: true }),
+            ),
           ),
-          applyCollectorFilter(supabase.from(source).select("id_parcela"))
-            .order("id_parcela", { ascending: true })
-            .limit(1),
-          applyCollectorFilter(supabase.from(source).select("id_parcela"))
-            .order("id_parcela", { ascending: false })
-            .limit(1),
+          comRetentativa(() =>
+            applyCollectorFilter(supabase.from(source).select("id_parcela"))
+              .order("id_parcela", { ascending: true })
+              .limit(1),
+          ),
+          comRetentativa(() =>
+            applyCollectorFilter(supabase.from(source).select("id_parcela"))
+              .order("id_parcela", { ascending: false })
+              .limit(1),
+          ),
         ]);
 
         const error =
@@ -1257,10 +1295,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }
 
       if (statsError) {
-        console.warn(
-          `Nao foi possivel obter estatisticas de ${source}.`,
-          statsError,
-        );
+        // Sem os limites de id nao ha como montar as faixas: tratar como
+        // "escopo vazio" apagaria a carteira da tela. Falha e mantem o que
+        // ja estava carregado.
+        throw statsError;
       }
 
       const total = statsError ? null : count;
@@ -1271,11 +1309,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // junto, senao as parcelas sairiam com os contatos antigos.
       const registry = await loadClientesRegistry(!useCache);
 
-      // Publica em lotes enquanto carrega. A tela de loading fica no ar ate o
-      // fim, mas se o timeout de seguranca estourar antes o app renderiza com
-      // os dados parciais em vez de uma tela vazia.
+      // So o conjunto COMPLETO vai para a tela. Antes, no boot, lotes
+      // parciais eram publicados a cada 2,5s; se uma faixa falhava no meio,
+      // a tela ficava com a carteira pela metade ate um F5. Em erro, o que
+      // ja estava carregado continua (nada e substituido).
       const buffer: Collection[] = [];
-      let lastFlush = Date.now();
 
       const onBatch = (batchRows: BancoDadosRow[], loadedCount: number) => {
         for (const row of batchRows)
@@ -1286,18 +1324,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             true,
             `Carregando títulos... ${loadedCount.toLocaleString("pt-BR")} de ${total.toLocaleString("pt-BR")}`,
           );
-        }
-
-        // Publicacao parcial so no boot, onde a tela de loading esta por cima
-        // e o ganho e nao ficar vazio se o timeout estourar. Num refresh em
-        // segundo plano seria o oposto: os totais oscilariam na cara do usuario
-        // enquanto ele usa o app, entao ali so publicamos o conjunto final.
-        if (
-          reportLoadProgressRef.current &&
-          Date.now() - lastFlush >= PROGRESSIVE_FLUSH_MS
-        ) {
-          lastFlush = Date.now();
-          setAllCollections(buffer.slice());
         }
       };
 
@@ -1353,16 +1379,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
     } catch (err) {
       console.error("Erro ao carregar collections:", err);
-      setError(err instanceof Error ? err.message : "Erro ao carregar dados");
+      setError(
+        "Não foi possível carregar todos os títulos (instabilidade na conexão). Atualize a página em instantes.",
+      );
     } finally {
       setLoading(false);
-      collectionsLoadInFlightRef.current = false;
-
-      // Eventos que chegaram durante esta carga viram uma unica recarga agora.
-      if (collectionsReloadQueuedRef.current) {
-        collectionsReloadQueuedRef.current = false;
-        void refreshCollections();
-      }
     }
   };
 
@@ -1483,17 +1504,22 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       };
 
       const [minRes, maxRes] = await Promise.all([
-        supabase
-          .from(source)
-          .select("id_parcela")
-          .order("id_parcela", { ascending: true })
-          .limit(1),
-        supabase
-          .from(source)
-          .select("id_parcela")
-          .order("id_parcela", { ascending: false })
-          .limit(1),
+        comRetentativa(() =>
+          supabase
+            .from(source)
+            .select("id_parcela")
+            .order("id_parcela", { ascending: true })
+            .limit(1),
+        ),
+        comRetentativa(() =>
+          supabase
+            .from(source)
+            .select("id_parcela")
+            .order("id_parcela", { ascending: false })
+            .limit(1),
+        ),
       ]);
+      if (minRes.error || maxRes.error) throw minRes.error || maxRes.error;
       const min = (minRes.data?.[0]?.id_parcela as number | undefined) ?? null;
       const max = (maxRes.data?.[0]?.id_parcela as number | undefined) ?? null;
 
@@ -1553,10 +1579,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       console.log("Buscando usuários...");
 
-      const { data, error: supabaseError } = await supabase
-        .from("users")
-        .select("*")
-        .order("name", { ascending: true });
+      const { data, error: supabaseError } = await comRetentativa(() =>
+        supabase.from("users").select("*").order("name", { ascending: true }),
+      );
 
       if (supabaseError) {
         console.error("Erro ao buscar usuários:", supabaseError);
@@ -2742,9 +2767,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     return filtered;
   };
 
-  const getClientGroups = useMemo(
-    () =>
-      (collectorId?: string): ClientGroup[] => {
+  // Derivacoes (grupos por cliente, estatisticas, desempenho): o resultado
+  // vale so para os dados de AGORA -- o Map vive dentro do useMemo e e
+  // recriado sempre que `collections`/`users` mudam. Antes ficava no
+  // dataCache/statsCache por 2-10 min (as estatisticas em sessionStorage,
+  // sobrevivendo ao F5), e a invalidacao usava nomes errados: um calculo
+  // feito com dados incompletos continuava valendo depois da carga completa.
+  const getClientGroups = useMemo(() => {
+    const memo = new Map<string, ClientGroup[]>();
+    return (collectorId?: string): ClientGroup[] => {
         // Sem collections carregadas ainda não dá pra saber se é "sem
         // cliente mesmo" ou "dados a caminho" — nunca ler nem gravar cache
         // aqui, senão uma chamada antecipada (antes do fetch terminar)
@@ -2754,7 +2785,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
         const cacheKey = `client-groups-${collectorId || "all"}`;
 
-        const cachedData = dataCache.get<ClientGroup[]>(cacheKey);
+        const cachedData = memo.get(cacheKey);
         if (cachedData) {
           return cachedData;
         }
@@ -2915,15 +2946,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           a.client.localeCompare(b.client),
         );
 
-        dataCache.set(cacheKey, result);
+        memo.set(cacheKey, result);
 
         return result;
-      },
-    [collections],
-  );
+    };
+    // `users` define o perfil do cobrador filtrado (ver profileType acima).
+  }, [collections, users]);
 
-  const getDashboardStats = useMemo(
-    () => (): DashboardStats => {
+  const getDashboardStats = useMemo(() => {
+    let memo: DashboardStats | null = null;
+    return (): DashboardStats => {
       // Idem getClientGroups: nunca ler/gravar cache com collections ainda
       // vazio (chamada antecipada antes do fetch terminar gravaria zero em
       // sessionStorage e isso sobrevive a um F5).
@@ -2941,13 +2973,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         };
       }
 
-      const cacheKey = "dashboard-stats";
-
-      // Try to get from cache first
-      const cachedData = statsCache.get<DashboardStats>(cacheKey);
-      if (cachedData) {
-        return cachedData;
-      }
+      if (memo) return memo;
 
       const totalPending = collections.filter(
         (c) => c.status?.toLowerCase() === "pendente",
@@ -2986,26 +3012,19 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         collectorsCount,
       };
 
-      // Cache the result
-      statsCache.set(cacheKey, result);
+      memo = result;
 
       return result;
-    },
-    [collections, users],
-  );
+    };
+  }, [collections, users]);
 
-  const getCollectorPerformance = useMemo(
-    () => (): CollectorPerformance[] => {
+  const getCollectorPerformance = useMemo(() => {
+    let memo: CollectorPerformance[] | null = null;
+    return (): CollectorPerformance[] => {
       // Idem getClientGroups/getDashboardStats.
       if (collections.length === 0) return [];
 
-      const cacheKey = "collector-performance";
-
-      // Try to get from cache first
-      const cachedData = statsCache.get<CollectorPerformance[]>(cacheKey);
-      if (cachedData) {
-        return cachedData;
-      }
+      if (memo) return memo;
 
       const collectors = users.filter((u) => isCollectorType(u.type));
 
@@ -3110,13 +3129,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // Sort by conversionRate descending before caching and returning
       result.sort((a, b) => b.conversionRate - a.conversionRate);
 
-      // Cache the result
-      statsCache.set(cacheKey, result);
+      memo = result;
 
       return result;
-    },
-    [collections, users],
-  );
+    };
+  }, [collections, users]);
 
   const getCollectorCollections = (collectorId: string): Collection[] => {
     const profileUser = users.find((u) => u.id === collectorId);
@@ -3518,14 +3535,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         let from = 0;
         let hasMore = true;
         while (hasMore) {
-          const { data: pageData, error } = await supabase
-            .from("sale_payments")
-            .select("*")
-            .order("payment_date", { ascending: false })
-            // Desempate unico: varios pagamentos na mesma data deixavam a
-            // ordem entre paginas instavel (pagamento pulado ou duplicado).
-            .order("id", { ascending: true })
-            .range(from, from + pageSize - 1);
+          const { data: pageData, error } = await comRetentativa(() =>
+            supabase
+              .from("sale_payments")
+              .select("*")
+              .order("payment_date", { ascending: false })
+              // Desempate unico: varios pagamentos na mesma data deixavam a
+              // ordem entre paginas instavel (pagamento pulado ou duplicado).
+              .order("id", { ascending: true })
+              .range(from, from + pageSize - 1),
+          );
 
           if (error) {
             console.error("Erro ao buscar pagamentos:", error);
@@ -3574,11 +3593,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
     } catch (err) {
       console.error("Erro ao carregar pagamentos de venda:", err);
+      // Mantem a lista anterior: zerar mostrava "Recuperação do mês R$ 0" e
+      // pagamentos sumidos por causa de uma falha passageira.
       setError(
-        err instanceof Error ? err.message : "Erro ao carregar pagamentos",
+        "Não foi possível carregar os pagamentos (instabilidade na conexão). Atualize a página em instantes.",
       );
-      // Em caso de erro, definir array vazio
-      setSalePayments([]);
     }
   };
 

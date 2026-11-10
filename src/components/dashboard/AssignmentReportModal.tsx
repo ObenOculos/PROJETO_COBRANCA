@@ -81,6 +81,9 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
   const [collectorId, setCollectorId] = useState<string>("");
   const [records, setRecords] = useState<AssignmentRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  // Falha da consulta (depois das novas tentativas): mostra aviso em vez de
+  // uma lista incompleta.
+  const [erroCarga, setErroCarga] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   // Mapa id -> nome para resolver cobradores e gestores.
@@ -105,6 +108,7 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
 
     const load = async () => {
       setLoading(true);
+      setErroCarga(false);
       setExpandedKey(null);
 
       // Janela [from 00:00, to+1 00:00) em horário local, convertida para ISO.
@@ -142,7 +146,14 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
       }
     };
 
-    load();
+    load().catch((err) => {
+      console.error("Erro ao carregar o relatório de atribuições:", err);
+      if (!cancelled) {
+        setRecords([]);
+        setErroCarga(true);
+        setLoading(false);
+      }
+    });
     return () => {
       cancelled = true;
     };
@@ -285,6 +296,11 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
             <div className="flex items-center justify-center py-16 text-gray-400">
               <Loader2 className="h-6 w-6 animate-spin mr-2" />
               Carregando...
+            </div>
+          ) : erroCarga ? (
+            <div className="text-center py-16 text-red-600 text-sm">
+              Não foi possível carregar as atribuições. Feche e abra o
+              relatório de novo.
             </div>
           ) : events.length === 0 ? (
             <div className="text-center py-16 text-gray-500 dark:text-dark-text-secondary text-sm">

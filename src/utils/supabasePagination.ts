@@ -4,6 +4,11 @@
 // que cresca alem disso passa a retornar dados truncados _silenciosamente_ —
 // nao ha erro, so faltam registros. Todo fetch volumoso precisa passar por aqui.
 
+import { comRetentativa } from "./supabaseRetry";
+
+// Toda pagina passa por comRetentativa: uma falha passageira no meio de uma
+// carga grande era a origem de "carregou so parte, da F5 de novo".
+
 export const DEFAULT_PAGE_SIZE = 1000;
 
 // Quantas paginas buscar ao mesmo tempo. O gargalo do carregamento nao e o
@@ -46,7 +51,9 @@ export async function fetchAllPages<T>(
   let loaded = 0;
 
   for (;;) {
-    const { data, error } = await buildPage(from, from + pageSize - 1);
+    const { data, error } = await comRetentativa(() =>
+      buildPage(from, from + pageSize - 1),
+    );
     if (error) throw error;
     if (!data || data.length === 0) break;
 
@@ -91,7 +98,9 @@ export async function fetchPagesInParallel<T>(
 
     const results = await Promise.all(
       slice.map(async (from) => {
-        const { data, error } = await buildPage(from, from + pageSize - 1);
+        const { data, error } = await comRetentativa(() =>
+          buildPage(from, from + pageSize - 1),
+        );
         if (error) throw error;
         return data ?? [];
       }),
@@ -176,7 +185,9 @@ export async function fetchAllPagesByIdRange<T>(
     const bucketRows: T[] = [];
     let cursor = lo;
     for (;;) {
-      const { data, error } = await buildRangeQuery(cursor, hi);
+      const { data, error } = await comRetentativa(() =>
+        buildRangeQuery(cursor, hi),
+      );
       if (error) throw error;
       if (!data || data.length === 0) break;
 

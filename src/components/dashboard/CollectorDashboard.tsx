@@ -86,6 +86,7 @@ import {
 } from "../../filters/filaCobranca";
 import { AdiamentoDoDia, useFilaAdiamentos } from "../../hooks/useFilaAdiamentos";
 import { useFilaLote } from "../../hooks/useFilaLote";
+import { comRetentativa } from "../../utils/supabaseRetry";
 
 import LogContactModal from "./LogContactModal";
 import CancelContactModal from "./CancelContactModal";
@@ -309,6 +310,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     acordoAtivoOverdueMap,
     acordos,
     scheduledVisits,
+    // Carga dos titulos em andamento: o lote da fila so e montado com a
+    // carteira inteira em maos.
+    loading: carregandoTitulos,
   } = useCollection();
 
   // Fila de Cobranca (item 39): "deixar para depois" do dia e o turno
@@ -450,6 +454,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // Ja leu os contatos? O lote da fila so e montado depois (senao entraria
   // quem foi contatado ontem).
   const [attemptsCarregados, setAttemptsCarregados] = useState(false);
+  const [attemptsFalharam, setAttemptsFalharam] = useState(false);
 
   useEffect(() => {
     const ids = Array.from(
@@ -465,6 +470,10 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       setAttemptsCarregados(true);
       return;
     }
+    // Releitura (carteira mudou): ate terminar, os contatos em maos sao da
+    // carga anterior -- o lote da fila espera.
+    setAttemptsCarregados(false);
+    setAttemptsFalharam(false);
     let cancelled = false;
     (async () => {
       const map: Record<
@@ -472,14 +481,19 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         TentativaResumo & { efetivo: TentativaResumo | null }
       > = {};
       for (const batch of chunk(ids, 300)) {
-        const { data, error } = await supabase
-          .from("collection_attempts")
-          .select("collection_id, date, result, notes, next_action_date, created_at")
-          .in("collection_id", batch)
-          .order("created_at", { ascending: false });
+        const { data, error } = await comRetentativa(() =>
+          supabase
+            .from("collection_attempts")
+            .select("collection_id, date, result, notes, next_action_date, created_at")
+            .in("collection_id", batch)
+            .order("created_at", { ascending: false }),
+        );
         if (error) {
+          // Sem os contatos de um lote nao da para saber quem ja foi
+          // contatado: nao libera o lote da fila com dado faltando.
           console.error("Erro ao buscar últimos contatos da carteira:", error);
-          continue;
+          if (!cancelled) setAttemptsFalharam(true);
+          return;
         }
         // Linhas em ordem do mais recente: a 1a de cada titulo e a ultima
         // interacao; a 1a efetiva e o ultimo contato efetivo.
@@ -854,7 +868,10 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   } = useFilaLote(user?.id);
   const loteTodoFinalizado = !!lote && lote.itens.every((i) => i.finalizado);
   const dadosDaFilaProntos =
-    attemptsCarregados && adiamentosCarregados && loteCarregado;
+    !carregandoTitulos &&
+    attemptsCarregados &&
+    adiamentosCarregados &&
+    loteCarregado;
 
   // Registro novo (Atender, depois, pagamento...): rele a situacao do lote.
   useEffect(() => {
@@ -1282,9 +1299,10 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               aposContato={aposContato}
             />
           )}
-          {erroLote ? (
+          {erroLote || attemptsFalharam ? (
             <div className="bg-white dark:bg-dark-bg rounded-2xl border border-red-200 dark:border-red-900/40 shadow-sm p-6 text-center text-sm text-red-600 dark:text-red-400">
-              {erroLote}
+              {erroLote ??
+                "Não foi possível carregar os contatos da sua carteira (instabilidade na conexão). Atualize a página em instantes."}
             </div>
           ) : !dadosDaFilaProntos ? (
             <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm p-8 text-center text-sm text-gray-400">

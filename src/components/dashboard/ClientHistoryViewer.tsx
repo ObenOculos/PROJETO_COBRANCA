@@ -72,6 +72,9 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
     new Map(),
   );
   const [loading, setLoading] = useState(true);
+  // Falha da consulta (depois das novas tentativas): aviso em vez de um
+  // historico incompleto.
+  const [erroCarga, setErroCarga] = useState(false);
 
   useEffect(() => {
     if (!clientDocument) return;
@@ -79,6 +82,7 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
 
     const load = async () => {
       setLoading(true);
+      setErroCarga(false);
       const [carteiraRows, recebimentoRows] = await Promise.all([
         mostrarCarteira
           ? fetchAllRows<CarteiraRow>(
@@ -134,7 +138,13 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
       }
     };
 
-    load();
+    load().catch((err) => {
+      console.error("Erro ao carregar o histórico do cliente:", err);
+      if (!cancelled) {
+        setErroCarga(true);
+        setLoading(false);
+      }
+    });
     return () => {
       cancelled = true;
     };
@@ -312,6 +322,10 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
       {loading ? (
         <p className="text-sm text-gray-500 animate-pulse">
           Carregando histórico...
+        </p>
+      ) : erroCarga ? (
+        <p className="text-sm text-red-600">
+          Não foi possível carregar o histórico. Feche e abra a ficha de novo.
         </p>
       ) : eventos.length === 0 ? (
         <p className="text-sm text-gray-500">

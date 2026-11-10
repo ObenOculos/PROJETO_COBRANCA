@@ -118,7 +118,11 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
         () => cancelled,
       );
       if (!cancelled) setAssignmentRecords(records);
-    })();
+    })().catch((err) =>
+      // Sem historico de atribuicao o modal mostra so o resto (nao numeros
+      // de uma lista pela metade).
+      console.error("Erro ao carregar histórico de atribuições:", err),
+    );
 
     return () => {
       cancelled = true;
@@ -167,7 +171,9 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
       );
     };
 
-    loadNewClients();
+    loadNewClients().catch((err) =>
+      console.error("Erro ao carregar clientes novos do mês passado:", err),
+    );
     return () => {
       cancelled = true;
     };

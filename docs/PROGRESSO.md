@@ -48,6 +48,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 41 | Gestor atende e faz acordo pelo cobrador (escolhe "em nome de": cobrador da carteira ou ele) — botões no detalhe do cliente (Cobranças etc.); migration `20261110000004` aplicada (`check:db` OK); falta teste na tela e push | Alta | Médio |
 | 42 | ~~`CollectionModal` grava status/recebimento/tentativa direto, sem RPC~~ — era código morto (nenhuma tela abria); removido com o `addAttempt` do contexto em 2026-11-10 (item 43, etapa 3) | Média | Pequeno/médio |
 | 43 | Ficha do cliente única (`ClientDetailModal`) — 4 etapas feitas 2026-11-10 (sem push, sem teste do usuário) | Média | Médio, em etapas |
+| 44 | Carregamento parcial/inconsistente (precisava de F5 2–3 vezes) — nova tentativa em erro passageiro, sem lista incompleta, caches das derivações por carga, corrida da carga de títulos; feito 2026-11-10, sem teste no navegador (extensão caiu), sem push | Alta | Médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -199,6 +200,42 @@ cobrador entre ~61/91 e 365 dias.
 **Falta:** teste na tela do cobrador (aba Ligar intercalada → Depois);
 etapa 3 (supervisão: previstos × trabalhados por faixa; referência é o
 HTML do Cedrus que está na raiz, fora do Git).
+
+### Item 44 — Carregamento confiável — 2026-11-10
+
+Relato: às vezes a página abre com valores incompletos e só acerta depois de
+2–3 F5. Não é limite do Supabase (o teto de ~1000 linhas por resposta já é
+paginado); são falhas passageiras tratadas como sucesso + caches velhas.
+
+**Causas encontradas:**
+1. Estatísticas do painel e desempenho por cobrador guardadas no
+   `statsCache` (**sessionStorage, 2 min, sobrevive ao F5**); a invalidação
+   apagava `dashboard-stats` no cache errado e o prefixo `performance` (a
+   chave era `collector-performance`) — nunca limpava. Grupos por cliente
+   no `dataCache` (10 min) sem ligação com a carga que os gerou.
+2. Boot publicava lotes parciais de títulos a cada 2,5 s; se uma faixa
+   falhava, a tela ficava com a carteira pela metade.
+3. `fetchAllRows` engolia erro de página e devolvia o que tinha como se
+   fosse tudo; `sale_payments` em erro virava lista vazia ("Recuperação do
+   mês R$ 0"); limites de id com erro viravam "escopo vazio".
+4. `fetchCollections` chamado durante outra carga voltava "pronto" na hora
+   (com os dados velhos) — `requestCollections`/`ensureAllCollections`
+   seguiam com a tela incompleta.
+5. Nenhuma requisição tentava de novo em 502/503/504, timeout ou queda de
+   rede. Usuários vinham do `localStorage` (30 min) mesmo após F5.
+
+**Correções:** `utils/supabaseRetry.ts` (`comRetentativa`: até 3 novas
+tentativas com espera crescente só para erro passageiro; resposta 5xx sem
+corpo conta como erro) em todos os helpers de paginação, `fetchAllRows`,
+usuários, visitas, pagamentos, limites de faixa e contatos da carteira.
+`fetchAllRows` lança em falha definitiva (4 telas mostram aviso).
+Títulos: só o conjunto completo vai para a tela; em erro fica o anterior +
+mensagem. `fetchCollections` vira fila de promessas (quem pede durante uma
+carga espera a próxima). Derivações com memo dentro do `useMemo` (morre
+quando os dados mudam). Boot busca usuários sem cache. Fila: lote só com a
+carteira inteira e os contatos da carga atual (erro → aviso, sem lote).
+**Falta:** teste no navegador (abrir/F5 como gestor e cobrador, Cobranças,
+Desempenho, Fila) e push.
 
 ### Item 43 — Ficha do cliente única — 2026-11-10
 
