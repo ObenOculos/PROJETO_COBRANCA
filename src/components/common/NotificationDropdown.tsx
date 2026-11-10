@@ -18,16 +18,21 @@ import {
 import { useNotifications } from "../../contexts/NotificationContext";
 import { useCollection } from "../../contexts/CollectionContext";
 import type { Notification } from "../../contexts/NotificationContext";
-import SaleDetailsModal from "../dashboard/SaleDetailsModal";
+import ClientDetailModal from "../dashboard/ClientDetailModal";
+import { useAuth } from "../../contexts/AuthContext";
+import type { ClientGroup } from "../../types";
 import { resolveSaleKey } from "../../filters/sales";
 
 const NotificationDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [selectedSaleCollections, setSelectedSaleCollections] = useState<any[]>(
-    [],
-  );
-  const [showSaleModal, setShowSaleModal] = useState(false);
+  // Notificacao de venda abre a ficha do cliente ja na venda (a janela de
+  // detalhe da venda foi aposentada -- unificacao, etapa 2).
+  const [fichaAberta, setFichaAberta] = useState<{
+    grupo: ClientGroup;
+    venda: number;
+  } | null>(null);
+  const { user } = useAuth();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const {
@@ -39,7 +44,7 @@ const NotificationDropdown: React.FC = () => {
     clearAllNotifications,
   } = useNotifications();
 
-  const { collections } = useCollection();
+  const { collections, getClientGroups } = useCollection();
 
   // Function to extract sale info from notification
   const extractSaleInfoFromNotification = useCallback(
@@ -70,9 +75,17 @@ const NotificationDropdown: React.FC = () => {
             c.documento === saleInfo.clientDocument,
         );
 
-        if (saleCollections.length > 0) {
-          setSelectedSaleCollections(saleCollections);
-          setShowSaleModal(true);
+        const grupo =
+          saleCollections.length > 0
+            ? getClientGroups().find(
+                (g) => g.document === saleInfo.clientDocument,
+              )
+            : undefined;
+        if (grupo) {
+          setFichaAberta({
+            grupo,
+            venda: Number(resolveSaleKey(saleCollections[0])),
+          });
           markAsRead(notification.id);
           handleCloseDropdown();
           return;
@@ -87,7 +100,7 @@ const NotificationDropdown: React.FC = () => {
       );
       handleCloseDropdown();
     },
-    [collections, markAsRead, extractSaleInfoFromNotification],
+    [collections, getClientGroups, markAsRead, extractSaleInfoFromNotification],
   );
 
   // Memoized functions to prevent unnecessary re-renders
@@ -531,14 +544,13 @@ const NotificationDropdown: React.FC = () => {
         )}
       </div>
 
-      {/* Sale Details Modal */}
-      {showSaleModal && selectedSaleCollections.length > 0 && (
-        <SaleDetailsModal
-          collections={selectedSaleCollections}
-          onClose={() => {
-            setShowSaleModal(false);
-            setSelectedSaleCollections([]);
-          }}
+      {/* Ficha do cliente na venda da notificacao */}
+      {fichaAberta && (
+        <ClientDetailModal
+          clientGroup={fichaAberta.grupo}
+          userType={user?.type || "collector"}
+          vendaInicial={fichaAberta.venda}
+          onClose={() => setFichaAberta(null)}
         />
       )}
     </>

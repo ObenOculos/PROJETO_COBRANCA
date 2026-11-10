@@ -44,7 +44,6 @@ import { getClientPaymentStatus } from "../../filters/clientStatus";
 import { countVendas, resolveSaleKey } from "../../filters/sales";
 import CollectionModal from "./CollectionModal";
 import ClientDetailModal from "./ClientDetailModal";
-import SaleDetailsModal from "./SaleDetailsModal";
 import ConfirmationModal from "../common/ConfirmationModal";
 import { useCollection } from "../../contexts/CollectionContext";
 
@@ -116,10 +115,8 @@ export const CollectionTable = React.forwardRef<
       useState<Collection | null>(null);
     const [selectedClientGroup, setSelectedClientGroup] =
       useState<ClientGroup | null>(null);
-    const [selectedSale, setSelectedSale] = useState<Collection[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isClientModalOpen, setIsClientModalOpen] = useState(false);
-    const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
 
     // State for delete confirmation modal
     const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -136,31 +133,10 @@ export const CollectionTable = React.forwardRef<
     const [bulkMotivoErro, setBulkMotivoErro] = useState(false);
 
     useImperativeHandle(ref, () => ({
+      // Abre a ficha do cliente ja na venda (unificacao, etapa 2: a janela
+      // de detalhe da venda foi aposentada).
       openSaleDetails: (saleNumber: number, clientDocument: string) => {
-        const clientGroup = clientGroups.find(
-          (cg) => cg.document === clientDocument,
-        );
-        if (clientGroup) {
-          const sale = clientGroup.sales.find(
-            (s) => s.saleNumber === saleNumber,
-          );
-          if (sale) {
-            const saleCollections = sale.installments
-              .map((inst: Collection) =>
-                collections.find(
-                  (c: Collection) => c.id_parcela === inst.id_parcela,
-                ),
-              )
-              .filter(
-                (c: Collection | undefined) => c !== undefined,
-              ) as Collection[];
-
-            if (saleCollections.length > 0) {
-              setSelectedSale(saleCollections);
-              setIsSaleModalOpen(true);
-            }
-          }
-        }
+        abrirFicha(clientDocument, saleNumber);
       },
     }));
 
@@ -286,8 +262,7 @@ export const CollectionTable = React.forwardRef<
     };
 
     // Ficha do cliente a partir do documento (a lista por venda nao guarda o
-    // ClientGroup completo). Sem o cliente carregado devolve false e quem
-    // chamou mantem o comportamento antigo.
+    // ClientGroup completo). Devolve false se o cliente nao esta carregado.
     const [vendaInicialFicha, setVendaInicialFicha] = useState<
       number | undefined
     >(undefined);
@@ -1129,23 +1104,12 @@ export const CollectionTable = React.forwardRef<
               <ClientDetailModal
                 clientGroup={selectedClientGroup}
                 userType={userType}
+                vendaInicial={vendaInicialFicha}
                 onClose={handleCloseClientModal}
               />,
               document.body,
             )}
-          {/* Sale Details Modal - Renderizado via Portal */}
-          {isSaleModalOpen &&
-            selectedSale.length > 0 &&
-            createPortal(
-              <SaleDetailsModal
-                collections={selectedSale}
-                onClose={() => {
-                  setSelectedSale([]);
-                  setIsSaleModalOpen(false);
-                }}
-              />,
-              document.body,
-            )}
+
           {/* Confirmation Modal for Delete Client */}
           {clientToDelete && (
             <DeleteSalesModal
@@ -1731,31 +1695,11 @@ export const CollectionTable = React.forwardRef<
                                   name={`viewSale${sale.saleNumber}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const saleCollections = sale.installments
-                                      .map((inst: Collection) =>
-                                        collections.find(
-                                          (c: Collection) =>
-                                            c.id_parcela === inst.id_parcela,
-                                        ),
-                                      )
-                                      .filter(
-                                        (c: Collection | undefined) =>
-                                          c !== undefined,
-                                      ) as Collection[];
-
-                                    // Ficha do cliente aberta nesta venda
-                                    // (substitui a janela de detalhe da
-                                    // venda -- unificacao, etapa 1).
-                                    if (
-                                      !abrirFicha(
-                                        clientGroup.document,
-                                        sale.saleNumber,
-                                      ) &&
-                                      saleCollections.length > 0
-                                    ) {
-                                      setSelectedSale(saleCollections);
-                                      setIsSaleModalOpen(true);
-                                    }
+                                    // Ficha do cliente aberta nesta venda.
+                                    abrirFicha(
+                                      clientGroup.document,
+                                      sale.saleNumber,
+                                    );
                                   }}
                                   className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-colors text-sm font-medium"
                                   title="Abrir a ficha do cliente nesta venda"
@@ -1944,20 +1888,6 @@ export const CollectionTable = React.forwardRef<
               collection={selectedCollection}
               userType={userType}
               onClose={handleCloseModal}
-            />,
-            document.body,
-          )}
-
-        {/* Sale Details Modal - Renderizado via Portal */}
-        {isSaleModalOpen &&
-          selectedSale.length > 0 &&
-          createPortal(
-            <SaleDetailsModal
-              collections={selectedSale}
-              onClose={() => {
-                setSelectedSale([]);
-                setIsSaleModalOpen(false);
-              }}
             />,
             document.body,
           )}
