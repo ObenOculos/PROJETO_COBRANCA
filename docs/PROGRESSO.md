@@ -263,7 +263,9 @@ proporção (substitui o "abate nos dois" de 2026-11-05 só para a entrada).
 original + percentual das demais). Acordo ativo da OTICA FERNANDA corrigido
 na migration: estorno da entrada como foi imputada (476,49/23,51) + novo
 lançamento de 500 todo em original (título 476,49 → 500,00).
-**Falta:** `db push` (antes do push do front) + `check:db` + conferência.
+`0007` aplicada e conferida 2026-11-10 (`check:db` OK): título com 500,00
+recebidos (falta 857,56), parcela 1 com líquido 500 (500 − 500 + 500, o
+estorno ligado ao lançamento original). Falta teste na tela (Termo novo).
 
 ### Item 44 — Carregamento confiável — 2026-11-10
 
