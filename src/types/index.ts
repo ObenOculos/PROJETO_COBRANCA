@@ -277,7 +277,9 @@ export interface CollectionAttempt {
     | "agreement"
     | "disputed"
     // Cliente diz que ja pagou (com ou sem comprovante em maos).
-    | "claims_paid";
+    | "claims_paid"
+    // Cliente informa que a venda foi cancelada (vai para conferencia).
+    | "sale_cancel_reported";
   notes?: string;
   nextAction?: string;
   nextActionDate?: string;

@@ -15,7 +15,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCollection } from "../../contexts/CollectionContext";
 import { addDaysLocalStr, todayLocalStr } from "../../config/visitStatus";
-import { formatHorario } from "../../utils/formatters";
+import { formatCurrency, formatHorario } from "../../utils/formatters";
 import {
   ATTEMPT_RESULT_LABELS,
   attemptReschedulesActiveContact,
@@ -72,6 +72,7 @@ const STATUS_TO_ATTEMPT: Record<
   mensagem_enviada: { type: "whatsapp", result: "message_sent" },
   contestou_divida: { type: "call", result: "disputed" },
   diz_que_pagou: { type: "call", result: "claims_paid" },
+  venda_cancelada: { type: "call", result: "sale_cancel_reported" },
 };
 
 const CHANNEL_LABEL: Record<ScheduledVisitChannel, string> = {
@@ -170,6 +171,10 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   const [scheduleNotes, setScheduleNotes] = useState("");
   // "Cliente diz que ja pagou": o comprovante ja chegou? (obrigatorio)
   const [comprovante, setComprovante] = useState<"sim" | "nao" | "">("");
+  // "Cliente informa venda cancelada": vendas marcadas (chave da venda).
+  const [vendasCanceladas, setVendasCanceladas] = useState<Set<number>>(
+    new Set(),
+  );
 
   const remarcarReasons = rescheduleReasonsForChannel(linkedChannel);
   const [remarcarReason, setRemarcarReason] = useState(
@@ -186,8 +191,13 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
     mode === "contato" && status === "diz_que_pagou" && comprovante === "sim";
   // Resultado que tira o cliente da carteira (ou que segue para o registro
   // do pagamento): nao ha proximo contato a marcar, salva direto da etapa 1.
+  // Venda informada como cancelada: vai para conferencia do gestor, sem
+  // proximo contato por ela.
+  const informaVendaCancelada =
+    mode === "contato" && status === "venda_cancelada";
   const skipStep2 =
-    mode === "contato" && (!!releaseSituacao || pagouComComprovante);
+    mode === "contato" &&
+    (!!releaseSituacao || pagouComComprovante || informaVendaCancelada);
 
   // Sugestao do proximo contato, enquanto o cobrador nao mexeu no campo:
   // nao atendeu/mensagem -> amanha; promessa -> dia seguinte ao prometido
@@ -230,6 +240,33 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   // Um contato de carteira fala da divida do cliente como um todo, mas
   // collection_attempts e por titulo (collection_id). Grava uma linha em
   // cada titulo em aberto.
+  // Vendas do cliente com saldo em aberto (para marcar a cancelada).
+  const vendasEmAberto = useMemo(
+    () =>
+      (client?.sales ?? [])
+        .map((sale) => ({
+          chave: sale.saleNumber,
+          parcelas: sale.installments.filter((i) => hasInstallmentBalance(i)),
+        }))
+        .filter((v) => v.parcelas.length > 0)
+        .map((v) => ({
+          chave: v.chave,
+          aberto: v.parcelas.reduce(
+            (s, i) =>
+              s + (i.valor_original - (i.valor_recebido || 0) - (i.desconto || 0)),
+            0,
+          ),
+          qtd: v.parcelas.length,
+        })),
+    [client],
+  );
+  // Uma venda so: ja vem marcada.
+  useEffect(() => {
+    if (status === "venda_cancelada" && vendasEmAberto.length === 1) {
+      setVendasCanceladas(new Set([vendasEmAberto[0].chave]));
+    }
+  }, [status, vendasEmAberto]);
+
   const titulosEmAberto = useMemo(() => {
     const ids: string[] = [];
     client?.sales?.forEach((sale) => {
@@ -245,7 +282,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   const effectiveNext =
     mode === "sem_contato"
       ? nextDate
-      : releaseSituacao || semProximo || pagouComComprovante
+      : releaseSituacao || semProximo || pagouComComprovante || informaVendaCancelada
         ? ""
         : nextDate;
   // Remarcacao sem contato mantem o canal do agendamento (rescheduleVisit
@@ -266,6 +303,11 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
     if (pagouComComprovante) {
       preview.push(
         "Depois de salvar, abre o registro do pagamento para lançar o valor do comprovante.",
+      );
+    }
+    if (informaVendaCancelada) {
+      preview.push(
+        "As parcelas em aberto da(s) venda(s) marcada(s) saem da carteira até o gestor conferir. As outras vendas do cliente continuam.",
       );
     }
     if (linkedVisit) {
@@ -313,6 +355,8 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
     if (mode === "sem_contato") return null;
     if (status === "diz_que_pagou" && !comprovante)
       return "Informe se o cliente já enviou o comprovante.";
+    if (status === "venda_cancelada" && vendasCanceladas.size === 0)
+      return "Marque qual venda o cliente informou como cancelada.";
     if (!notes.trim()) return "Por favor, adicione uma observação sobre o contato.";
     if (titulosEmAberto.length === 0)
       return "Este cliente não tem título em aberto para registrar o contato.";
@@ -380,7 +424,13 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
       setError("Usuário não autenticado.");
       return;
     }
-    if (!releaseSituacao && !semProximo && !nextDate) {
+    if (
+      !releaseSituacao &&
+      !semProximo &&
+      !pagouComComprovante &&
+      !informaVendaCancelada &&
+      !nextDate
+    ) {
       setError(
         "Escolha a data do próximo contato ou marque “Não agendar próximo contato”.",
       );
@@ -399,6 +449,25 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
       // o resultado (o mapa STATUS_TO_ATTEMPT assume ligacao).
       const type =
         canalUsado === "whatsapp" ? "whatsapp" : STATUS_TO_ATTEMPT[status].type;
+
+      if (informaVendaCancelada) {
+        // Registra o atendimento, a informacao e tira as parcelas da
+        // carteira numa transacao (migration 20261110000008).
+        const { error: vendaError } = await supabase.rpc(
+          "informar_venda_cancelada",
+          {
+            p_documento: client.document,
+            p_chaves: Array.from(vendasCanceladas),
+            p_observacao: notes,
+            p_tipo_contato: type,
+            p_em_nome_de: emNomeDe ?? undefined,
+          },
+        );
+        if (vendaError) throw vendaError;
+        await reload();
+        onSuccess();
+        return;
+      }
       const isPromise = status === "promessa_pagamento";
       const reagendar = !!linkedVisit && !!effectiveNext && reschedules;
       const motivo = reagendar
@@ -638,6 +707,9 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
                       <option value="diz_que_pagou">
                         Cliente diz que já pagou
                       </option>
+                      <option value="venda_cancelada">
+                        Cliente informa venda cancelada
+                      </option>
                       <option value="contato_realizado">
                         Contato Realizado (Sem acordo)
                       </option>
@@ -658,6 +730,56 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
                       </option>
                     </select>
                   </div>
+
+                  {status === "venda_cancelada" && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-400">
+                        Qual venda foi cancelada?
+                      </label>
+                      {vendasEmAberto.length === 0 ? (
+                        <p className="text-xs text-gray-500">
+                          Este cliente não tem venda em aberto.
+                        </p>
+                      ) : (
+                        <div className="space-y-1">
+                          {vendasEmAberto.map((v) => (
+                            <label
+                              key={v.chave}
+                              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-dark-border text-sm cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={vendasCanceladas.has(v.chave)}
+                                onChange={() =>
+                                  setVendasCanceladas((prev) => {
+                                    const nova = new Set(prev);
+                                    if (nova.has(v.chave)) nova.delete(v.chave);
+                                    else nova.add(v.chave);
+                                    return nova;
+                                  })
+                                }
+                              />
+                              <span className="flex-1">
+                                {v.chave === 0 ? "Parcelas avulsas" : `Venda #${v.chave}`}
+                                <span className="text-xs text-gray-400">
+                                  {" "}
+                                  · {v.qtd} parcela{v.qtd !== 1 ? "s" : ""} em aberto
+                                </span>
+                              </span>
+                              <span className="font-semibold tabular-nums">
+                                {formatCurrency(v.aberto)}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                        Nas observações, conte o que o cliente disse (onde e
+                        quando cancelou, com quem falou). O gestor confere antes
+                        de cancelar.
+                      </p>
+                    </div>
+                  )}
 
                   {status === "diz_que_pagou" && (
                     <div className="space-y-1.5">

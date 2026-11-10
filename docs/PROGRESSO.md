@@ -50,6 +50,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 43 | Ficha do cliente única (`ClientDetailModal`) — 4 etapas feitas 2026-11-10 (sem push, sem teste do usuário) | Média | Médio, em etapas |
 | 44 | Carregamento parcial/inconsistente (precisava de F5 2–3 vezes) — nova tentativa em erro passageiro, sem lista incompleta, caches das derivações por carga, corrida da carga de títulos; feito 2026-11-10, sem teste no navegador (extensão caiu), sem push | Alta | Médio |
 | 45 | Acordo cancelado: quem cancela escolhe estornar (refazer) ou manter (desistiu) o valor pago + histórico de acordos/agendamentos cancelados — `0005`/`0006` aplicadas (entrada da OTICA FERNANDA estornada); falta teste na tela | Alta | Médio |
+| 46 | Atender: "Cliente diz que já pagou" (comprovante → registro do pagamento) e "Cliente informa venda cancelada" (parcelas da venda vão para conferência do gestor) — migration `20261110000008` sem `db push`, sem teste | Alta | Médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -201,6 +202,31 @@ cobrador entre ~61/91 e 365 dias.
 **Falta:** teste na tela do cobrador (aba Ligar intercalada → Depois);
 etapa 3 (supervisão: previstos × trabalhados por faixa; referência é o
 HTML do Cedrus que está na raiz, fora do Git).
+
+### Item 46 — "Já pagou" e "venda cancelada" no Atender — 2026-11-10
+
+Reclamação dos cobradores: o cliente diz que já pagou (ou que a venda foi
+cancelada) e não há opção no Resultado do Contato para registrar o
+atendimento.
+
+**"Cliente diz que já pagou"** (só tela): pergunta se o comprovante chegou.
+*Sim* → salva o atendimento (resultado `claims_paid`, efetivo) e abre o
+registro do pagamento (ficha → Distribuir Pagamento com
+`contatoJaRegistrado`, sem gravar um 2º contato; ou a parcela do acordo).
+*Ainda não* → retorno sugerido para amanhã. O fluxo real (decisão do
+usuário): o cliente manda o comprovante e o cobrador registra o pagamento.
+
+**"Cliente informa venda cancelada"** (migration `20261110000008`, decisão:
+conferência, não cancelamento direto — a venda é do Ciclone e o ERP vence no
+sync): o cobrador marca a(s) venda(s) e descreve. `informar_venda_cancelada`
+registra o atendimento (`sale_cancel_reported`) nas parcelas da venda, grava
+`vendas_conferencia` (fato) e tira as parcelas em aberto da carteira com
+situação "Aguardando conferência" (outras vendas ficam). Gestor: painel
+"Vendas aguardando conferência" na Cobranças → `decidir_venda_cancelada`
+(confirmar = `cancelar_vendas` com registro em `vendas_canceladas`;
+devolver = parcelas voltam a quem tinha a carteira). Venda em acordo ativo
+é recusada (cancelar o acordo antes).
+**Falta:** `db push` (antes do push do front) + `check:db` + teste na tela.
 
 ### Item 45 — Acordo cancelado e histórico — 2026-11-10
 

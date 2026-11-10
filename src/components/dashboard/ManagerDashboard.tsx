@@ -18,6 +18,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { FilterOptions } from "../../types";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 import { CollectionTableRef } from "./CollectionTable";
+import VendasAguardandoConferencia from "./VendasAguardandoConferencia";
 import { Notification } from "../../contexts/NotificationContext";
 
 // O gestor carrega por padrao so os clientes com algo em aberto (metade das
@@ -338,7 +339,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             </div>
 
             {collectionsView === "table" ? (
-              <div>
+              <div className="space-y-3 sm:space-y-4">
+                {/* Vendas informadas como canceladas no atendimento: so
+                    aparece com pendencia (migration 20261110000008). */}
+                <VendasAguardandoConferencia />
                 <div
                   className={`${isFilterVisible ? "block" : "hidden"} md:block`}
                 >

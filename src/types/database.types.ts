@@ -272,6 +272,27 @@ export type Database = {
           },
         ];
       };
+      // Migration 20261110000008 (so leitura pelo app).
+      vendas_conferencia: {
+        Row: {
+          id: string;
+          documento: string;
+          chave_venda: number;
+          parcelas: number[];
+          valor_em_aberto: number;
+          cobrador_id: string | null;
+          informado_por: string;
+          informado_em: string;
+          observacao: string;
+          status: string;
+          decidido_por: string | null;
+          decidido_em: string | null;
+          decisao_motivo: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       acordos: {
         Row: {
           acordo_origem_id: string | null;
@@ -1986,6 +2007,21 @@ export type Database = {
       criar_usuario_com_login: {
         Args: { p_name: string; p_login: string; p_type: string; p_senha: string };
         Returns: string;
+      };
+      // Migration 20261110000008.
+      informar_venda_cancelada: {
+        Args: {
+          p_documento: string;
+          p_chaves: number[];
+          p_observacao: string;
+          p_tipo_contato?: string;
+          p_em_nome_de?: string;
+        };
+        Returns: number;
+      };
+      decidir_venda_cancelada: {
+        Args: { p_conferencia_id: string; p_decisao: string; p_motivo: string };
+        Returns: unknown;
       };
       // Migration 20261110000003.
       fila_lote_atual: {
