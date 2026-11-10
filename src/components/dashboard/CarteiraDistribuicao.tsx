@@ -1539,16 +1539,40 @@ const CarteiraDistribuicao: React.FC = () => {
             </p>
           </div>
           {lojasComProblema > 0 && (
-            <label className="inline-flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-dark-text cursor-pointer shrink-0">
-              <input
-                type="checkbox"
-                checked={soProblemas}
-                onChange={(e) => setSoProblemas(e.target.checked)}
-              />
-              Só lojas com problema ({lojasComProblema})
-            </label>
+            <div
+              role="group"
+              aria-label="Quais lojas mostrar"
+              className="inline-flex shrink-0 rounded-lg border border-gray-200 dark:border-dark-border p-0.5 text-xs font-semibold"
+            >
+              {[
+                { valor: true, texto: `Com falha na cobertura (${lojasComProblema})` },
+                { valor: false, texto: `Todas as lojas (${cobertura.length})` },
+              ].map((op) => (
+                <button
+                  key={op.texto}
+                  type="button"
+                  aria-pressed={soProblemas === op.valor}
+                  onClick={() => setSoProblemas(op.valor)}
+                  className={`px-2.5 py-1 rounded-md ${
+                    soProblemas === op.valor
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-600 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg"
+                  }`}
+                >
+                  {op.texto}
+                </button>
+              ))}
+            </div>
           )}
         </div>
+        {lojasComProblema > 0 && (
+          <p className="-mt-1 mb-3 text-[11px] text-gray-500 dark:text-dark-text-secondary">
+            Falha = trecho de atraso sem cobrador entre as faixas da loja, dois
+            cobradores na mesma faixa, ou loja com clientes e nenhuma faixa
+            ativa. O cinza ("ninguém cobra" antes da primeira ou depois da
+            última faixa) é só informação.
+          </p>
+        )}
 
         {/* Legenda */}
         {cobradoresComRegra.length > 0 && (
