@@ -181,12 +181,26 @@ incluir a checagem no `check:db`.
 
 `0013` aplicada 2026-11-09 (`check:db` OK; só INSERT/SELECT conferido).
 
-**Falta:** teste na tela (gestor
-configura a fila de um cobrador → login do cobrador → aba Ligar intercalada →
-Depois); etapa 3
-(aplicar a fila na aba "Ligar" do `CollectorDashboard`); etapa 3
-(supervisão: previstos × trabalhados por faixa; referência é o HTML do
-Cedrus que está na raiz, fora do Git).
+**Tela da Distribuição reorganizada (2026-11-10):** regras como texto com
+Editar/Desativar/Remover; cobradores em sanfona (fechado mostra faixas,
+tamanho da carteira e resumo da fila; abre sozinho se há edição em
+andamento); "Configurar fila" virou modal; sem regra numa caixa só. Cobertura
+com uma barra por loja (escala raiz quadrada + régua) e seletor "Com falha
+na cobertura | Todas as lojas" (falha = buraco entre faixas, conflito, ou
+loja com clientes sem faixa ativa; antes da 1ª/depois da última faixa é só
+informação). Migration `20261109000014` (`carteira_por_cobrador()`, leitura,
+SECURITY INVOKER) aplicada, `check:db` OK. Visto ao vivo: 6 lojas sem
+cobrador entre ~61/91 e 365 dias.
+
+**Falta:** teste na tela do cobrador (aba Ligar intercalada → Depois);
+etapa 3 (supervisão: previstos × trabalhados por faixa; referência é o
+HTML do Cedrus que está na raiz, fora do Git).
+
+### Senha de login — 2026-11-10
+
+Sem tela de troca de senha: modelo SQL em `scripts/sql/trocar-senha-usuario.sql`
+(conferência + UPDATE em `auth.users`, rodar no SQL Editor; não commitar com
+senha preenchida).
 
 ### Item 38 — Carteira: filtro "já entrei em contato" — 2026-11-09
 
