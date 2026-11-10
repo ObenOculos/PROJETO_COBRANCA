@@ -67,8 +67,8 @@ export interface CollectorOverdueRange {
   lojas: string[] | null;
   /** Regra desligada fica cadastrada, mas a distribuicao ignora. */
   ativa: boolean;
-  /** Fila de Cobrança (item 39): clientes desta faixa a cada rodada da
-   * lista "Ligar" (manhã, ou o dia todo sem turnos). null = fila desligada.
+  /** Fila de Cobrança (itens 39/40): clientes desta faixa em cada lote
+   * (manhã, ou o dia todo sem turnos). null = fila desligada.
    * Regras em `filters/filaCobranca.ts`. */
   filaPeso: number | null;
   /** Peso a partir das 12h; null = sem turnos. */

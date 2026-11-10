@@ -2,20 +2,20 @@ import { CollectorOverdueRange, FilaOrdem } from "../types";
 import { faixaCobreAtraso } from "./priority";
 
 /**
- * Fila de Cobrança (item 39). O gestor define, por regra (faixa x lojas) do
- * cobrador, "a cada rodada, quantos clientes desta faixa"; a lista "Ligar"
- * intercala as faixas nessa proporção. Dentro da faixa a ordem é a de sempre
+ * Fila de Cobrança (itens 39 e 40). O gestor define, por regra (faixa x
+ * lojas) do cobrador, "a cada rodada, quantos clientes desta faixa"; o lote
+ * do cobrador intercala as faixas nessa proporção (montarLoteFila). Dentro da faixa a ordem é a de sempre
  * (maior atraso primeiro).
  *
  * - Fila desligada (nenhuma regra ativa com peso): lista na ordem padrão.
  * - Turnos opcionais: com `filaPesoTarde` preenchido, `filaPeso` vale até
  *   12h e `filaPesoTarde` depois.
- * - Peso 0 no turno: a faixa não é intercalada, vai para o fim da lista.
+ * - Peso 0 no turno: a faixa não entra no lote nesse turno.
  * - Regra ativa sem peso num cobrador com fila (faixa criada depois): vale 1.
  * - Ordem dentro da faixa configurável: maior atraso (padrão) ou maior dívida
  *   vencida (`filaOrdem`).
  * - Faixa de dívida vencida (`filaSaldoMin`/`filaSaldoMax`): cliente fora do
- *   valor não entra na intercalação, vai para o fim (não some da carteira).
+ *   valor não entra no lote (continua na Carteira completa).
  *
  * Banco: colunas fila_* de collector_overdue_ranges e RPC
  * definir_fila_cobranca (migrations 20261109000010 e 0011).
@@ -93,117 +93,119 @@ export const saldoNaFaixaDaFila = (
   (regra.filaSaldoMin == null || vencido >= regra.filaSaldoMin - 0.005) &&
   (regra.filaSaldoMax == null || vencido <= regra.filaSaldoMax + 0.005);
 
-/** Por que o cliente ficou no fim da lista em vez de entrar na intercalação. */
-export type MotivoFimDaFila =
-  | "tentouHoje"
-  | "foraDoValor"
-  | "foraDoTurno"
-  | "semFaixa"
-  | "emDia"
-  | "adiado";
+/** Tamanho do lote quando o gestor não configurou a fila do cobrador. */
+export const LOTE_PADRAO = 10;
 
-export interface DadosClienteFila {
+/** Alerta que põe o cliente na frente da faixa dele no lote. */
+export type UrgenciaLote = "quebrado" | "urgente";
+
+export interface DadosClienteLote {
   atraso: number;
   loja: string | null;
   vencido: number;
-  tentouHoje: boolean;
-  /** "Deixar para depois" registrado hoje. */
-  adiadoHoje: boolean;
+  urgencia: UrgenciaLote | null;
+}
+
+export interface ItemDoLote<T> {
+  item: T;
+  /** Regra (versão) da Distribuição pela qual entrou; null sem fila. */
+  regraId: string | null;
+  urgencia: UrgenciaLote | null;
 }
 
 /**
- * Monta a lista "Ligar" com a fila ligada. Ordem:
- *  1. faixas intercaladas pelo peso do turno (dentro da faixa, pela ordem da
- *     regra);
- *  2. quem já tentou hoje sem falar (mesma intercalação);
- *  3. fim: fora do valor / peso 0 no turno / sem faixa, maior atraso primeiro;
- *  4. em dia (nada vencido);
- *  5. deixados para depois hoje.
- * Com a fila desligada devolve null (o chamador mantém a ordem padrão).
+ * Tamanho do lote no turno = soma das quantidades que o gestor configurou
+ * (ex.: 5+2+2+1 = 10). Fila desligada: LOTE_PADRAO.
  */
-export function montarFilaLigar<T>(
-  itens: T[],
+export const tamanhoDoLote = (
   regrasDoCobrador: CollectorOverdueRange[],
   turno: TurnoFila,
-  dados: (item: T) => DadosClienteFila,
-): { lista: T[]; motivoFim: Map<T, MotivoFimDaFila> } | null {
-  if (!filaLigada(regrasDoCobrador)) return null;
-  const ativas = regrasDoCobrador.filter((r) => r.ativa);
-  const motivoFim = new Map<T, MotivoFimDaFila>();
-  const porRegra = new Map<string, { item: T; d: DadosClienteFila }[]>();
-  const tentouPorRegra = new Map<string, { item: T; d: DadosClienteFila }[]>();
-  const fim: { item: T; d: DadosClienteFila }[] = [];
-  const emDia: { item: T; d: DadosClienteFila }[] = [];
-  const adiados: { item: T; d: DadosClienteFila }[] = [];
+): number => {
+  if (!filaLigada(regrasDoCobrador)) return LOTE_PADRAO;
+  return regrasDoCobrador
+    .filter((r) => r.ativa)
+    .reduce((s, r) => s + Math.max(0, pesoNaFila(r, regrasDoCobrador, turno) ?? 0), 0);
+};
 
-  itens.forEach((item) => {
-    const d = dados(item);
-    const entrada = { item, d };
-    if (d.adiadoHoje) {
-      motivoFim.set(item, "adiado");
-      adiados.push(entrada);
-      return;
-    }
-    if (d.vencido <= 0.01) {
-      motivoFim.set(item, "emDia");
-      emDia.push(entrada);
-      return;
-    }
-    const regra = ativas.find((r) => faixaCobreAtraso(r, d.atraso, d.loja));
-    if (!regra) {
-      motivoFim.set(item, "semFaixa");
-      fim.push(entrada);
-      return;
-    }
-    if (!saldoNaFaixaDaFila(regra, d.vencido)) {
-      motivoFim.set(item, "foraDoValor");
-      fim.push(entrada);
-      return;
-    }
-    if ((pesoNaFila(regra, regrasDoCobrador, turno) ?? 0) <= 0) {
-      motivoFim.set(item, "foraDoTurno");
-      fim.push(entrada);
-      return;
-    }
-    const destino = d.tentouHoje ? tentouPorRegra : porRegra;
-    if (d.tentouHoje) motivoFim.set(item, "tentouHoje");
-    if (!destino.has(regra.id)) destino.set(regra.id, []);
-    destino.get(regra.id)!.push(entrada);
+/**
+ * Fila de Cobrança em lotes (item 40, 2026-11-10): monta o PRÓXIMO lote do
+ * cobrador. O banco (abrir_lote_fila) grava e só aceita lote novo com o
+ * anterior todo finalizado.
+ *
+ * `candidatos`: quem o chamador já considerou disponível (cliente com dívida
+ * vencida, sem compromisso marcado, sem contato recente, não tentado nem
+ * deixado para depois hoje).
+ *
+ * Fila ligada: só entram clientes das faixas definidas pelo gestor (com o
+ * valor dentro da faixa de dívida e quantidade > 0 no turno), intercaladas
+ * na proporção; dentro da faixa, alerta primeiro (acordo quebrado, depois
+ * "vai sair da carteira") e então a ordem da regra. Faixa sem clientes
+ * suficientes: as vagas vão para as outras, na mesma proporção.
+ * Fila desligada: alerta primeiro e depois maior atraso, LOTE_PADRAO clientes.
+ */
+export function montarLoteFila<T>(
+  candidatos: T[],
+  regrasDoCobrador: CollectorOverdueRange[],
+  turno: TurnoFila,
+  dados: (item: T) => DadosClienteLote,
+): ItemDoLote<T>[] {
+  const tamanho = tamanhoDoLote(regrasDoCobrador, turno);
+  const ativas = regrasDoCobrador.filter((r) => r.ativa);
+  const entradas = candidatos
+    .map((item) => ({ item, d: dados(item) }))
+    .filter((e) => e.d.vencido > 0.01);
+
+  const pesoUrgencia = (u: UrgenciaLote | null) =>
+    u === "quebrado" ? 0 : u === "urgente" ? 1 : 2;
+  type Entrada = (typeof entradas)[number];
+  const porAtraso = (a: Entrada, b: Entrada) =>
+    b.d.atraso - a.d.atraso || b.d.vencido - a.d.vencido;
+  const porValor = (a: Entrada, b: Entrada) =>
+    b.d.vencido - a.d.vencido || b.d.atraso - a.d.atraso;
+  const alertaPrimeiro =
+    (ordem: (a: Entrada, b: Entrada) => number) => (a: Entrada, b: Entrada) =>
+      pesoUrgencia(a.d.urgencia) - pesoUrgencia(b.d.urgencia) || ordem(a, b);
+
+  if (!filaLigada(regrasDoCobrador)) {
+    return entradas
+      .sort(alertaPrimeiro(porAtraso))
+      .slice(0, tamanho)
+      .map((e) => ({
+        item: e.item,
+        regraId:
+          ativas.find((r) => faixaCobreAtraso(r, e.d.atraso, e.d.loja))?.id ?? null,
+        urgencia: e.d.urgencia,
+      }));
+  }
+
+  const porRegra = new Map<string, Entrada[]>();
+  entradas.forEach((e) => {
+    const regra = ativas.find((r) => faixaCobreAtraso(r, e.d.atraso, e.d.loja));
+    if (!regra) return;
+    if (!saldoNaFaixaDaFila(regra, e.d.vencido)) return;
+    if ((pesoNaFila(regra, regrasDoCobrador, turno) ?? 0) <= 0) return;
+    if (!porRegra.has(regra.id)) porRegra.set(regra.id, []);
+    porRegra.get(regra.id)!.push(e);
   });
 
-  const porAtraso = (
-    a: { d: DadosClienteFila },
-    b: { d: DadosClienteFila },
-  ) => b.d.atraso - a.d.atraso || b.d.vencido - a.d.vencido;
-  const porValor = (
-    a: { d: DadosClienteFila },
-    b: { d: DadosClienteFila },
-  ) => b.d.vencido - a.d.vencido || b.d.atraso - a.d.atraso;
-
-  const intercalar = (grupos: Map<string, { item: T; d: DadosClienteFila }[]>) =>
-    intercalarPorPeso(
-      ativas.map((r) => {
-        const lista = grupos.get(r.id) ?? [];
-        lista.sort(r.filaOrdem === "valor" ? porValor : porAtraso);
-        return {
-          peso: pesoNaFila(r, regrasDoCobrador, turno) ?? 0,
-          itens: lista.map((e) => e.item),
-        };
-      }),
-    );
-
-  const lista = [
-    ...intercalar(porRegra),
-    ...intercalar(tentouPorRegra),
-    ...fim.sort(porAtraso).map((e) => e.item),
-    ...emDia.sort(porAtraso).map((e) => e.item),
-    ...adiados.sort(porAtraso).map((e) => e.item),
-  ];
-  return { lista, motivoFim };
+  return intercalarPorPeso(
+    ativas.map((r) => {
+      const lista = porRegra.get(r.id) ?? [];
+      lista.sort(alertaPrimeiro(r.filaOrdem === "valor" ? porValor : porAtraso));
+      return {
+        peso: pesoNaFila(r, regrasDoCobrador, turno) ?? 0,
+        itens: lista.map((e) => ({
+          item: e.item,
+          regraId: r.id,
+          urgencia: e.d.urgencia,
+        })),
+      };
+    }),
+  ).slice(0, tamanho);
 }
 
 /** "Deixar para depois" (tabela fila_adiamentos, migration 20261109000012):
- * o cliente vai para o fim da lista "Ligar" só no dia do registro. */
+ * conta como cliente finalizado no lote (migration 20261110000003). */
 export type MotivoAdiamento = "ligar_mais_tarde" | "sem_telefone" | "outro";
 
 export const MOTIVO_ADIAMENTO_LABEL: Record<MotivoAdiamento, string> = {

@@ -1977,6 +1977,33 @@ export type Database = {
         Args: { p_name: string; p_login: string; p_type: string; p_senha: string };
         Returns: string;
       };
+      // Migration 20261110000003.
+      fila_lote_atual: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          lote_id: string;
+          criado_em: string;
+          turno: string | null;
+          tamanho_previsto: number;
+          documento: string;
+          posicao: number;
+          regra_id: string | null;
+          urgencia: string | null;
+          finalizado: boolean;
+        }[];
+      };
+      abrir_lote_fila: {
+        Args: {
+          p_itens: Json;
+          p_turno: string | null;
+          p_tamanho_previsto: number;
+        };
+        Returns: string | null;
+      };
+      fila_item_finalizado: {
+        Args: { p_collector: string; p_documento: string; p_desde: string };
+        Returns: boolean;
+      };
       // Migration 20261110000002.
       redefinir_senha_usuario: {
         Args: { p_user_id: string; p_senha: string };

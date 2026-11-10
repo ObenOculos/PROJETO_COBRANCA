@@ -19,6 +19,8 @@ export function useFilaAdiamentos(collectorId: string | null | undefined) {
     new Map(),
   );
   const [dia, setDia] = useState(todayLocalStr());
+  // Já leu os adiamentos do dia? (o lote da fila só é montado depois)
+  const [carregado, setCarregado] = useState(false);
 
   // Vira o dia com a tela aberta: os adiamentos de ontem deixam de valer.
   useEffect(() => {
@@ -45,6 +47,7 @@ export function useFilaAdiamentos(collectorId: string | null | undefined) {
         // Sem a migration: só não há "deixar para depois".
         console.warn("Adiamentos da fila indisponíveis:", error.message);
         setAdiamentos(new Map());
+        setCarregado(true);
         return;
       }
       // Ordem por created_at: o último registro do cliente vale.
@@ -56,6 +59,7 @@ export function useFilaAdiamentos(collectorId: string | null | undefined) {
           ]),
         ),
       );
+      setCarregado(true);
     })();
     return () => {
       cancelado = true;
@@ -85,5 +89,5 @@ export function useFilaAdiamentos(collectorId: string | null | undefined) {
     [collectorId],
   );
 
-  return { adiamentos, adiar };
+  return { adiamentos, adiar, carregado };
 }

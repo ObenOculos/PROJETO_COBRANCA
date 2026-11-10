@@ -7,7 +7,6 @@ import {
   Clock,
   CheckCircle,
   UserCheck,
-  PhoneCall,
   Users,
   Calendar,
   Trophy,
@@ -79,11 +78,14 @@ import {
   MOTIVO_ADIAMENTO_SELO,
   MotivoAdiamento,
   TurnoFila,
+  UrgenciaLote,
   filaLigada,
-  montarFilaLigar,
+  montarLoteFila,
+  tamanhoDoLote,
   turnoDaFila,
 } from "../../filters/filaCobranca";
 import { AdiamentoDoDia, useFilaAdiamentos } from "../../hooks/useFilaAdiamentos";
+import { useFilaLote } from "../../hooks/useFilaLote";
 
 import LogContactModal from "./LogContactModal";
 import CancelContactModal from "./CancelContactModal";
@@ -123,9 +125,9 @@ const INITIAL_CARD_IDS = [
 
 /** Ultima interacao do cliente (qualquer resultado) + o ultimo contato
  * EFETIVO (falou com o cliente: promessa, pagamento, recusa, acordo...).
- * A Agenda usa o efetivo para "Ja contatados"; tentativa sem sucesso (nao
- * atendeu, ocupado, telefone errado, mensagem enviada) deixa o cliente em
- * "Ligar" com o selo "Tentou hoje". A promessa vem do efetivo, para uma
+ * O efetivo decide "Ja contatados" (e quem fica fora do proximo lote da
+ * fila); tentativa sem sucesso (nao atendeu, ocupado, telefone errado,
+ * mensagem enviada) mostra o selo "Tentou hoje". A promessa vem do efetivo, para uma
  * tentativa sem sucesso depois nao apagar a data prometida. */
 interface UltimoContato {
   note: string;
@@ -142,41 +144,26 @@ const chunk = <T,>(arr: T[], size: number): T[][] => {
   return out;
 };
 
-// Agenda em 3 abas, pelo que o cobrador FAZ (reorganizada em 2026-11-09 a
-// pedido dos cobradores -- antes eram 9 categorias misturando "o que fazer",
-// "quao atrasado" e "ja falei?"). Cada cliente cai em uma so:
-//  - paraHoje: compromisso que chegou (contato agendado, promessa vencendo)
-//    ou alerta sem contato recente (acordo quebrado, perto de sair da faixa);
-//  - aContatar: sem contato nos ultimos SEM_CONTATO_DIAS dias;
-//  - contatados: contato nos ultimos SEM_CONTATO_DIAS dias.
-// Ao registrar o contato o cliente sai de "A contatar" e vai para "Ja
-// contatados" na hora; a faixa de atraso vira subfiltro/selo.
-type AgendaSubTab = "paraHoje" | "aContatar" | "contatados";
+// Cobrador de carteira em duas telas (item 40, 2026-11-10, orientacao do
+// gestor -- substitui a Agenda de 3 abas do item 38):
+//  - "Fila de Cobranca": o trabalho do dia. Compromissos com data (contato
+//    agendado, promessa vencendo) no topo, fora da contagem; abaixo, o LOTE
+//    montado pela regra do gestor (faixas intercaladas, alerta primeiro
+//    dentro da faixa). O proximo lote so vem com este todo finalizado
+//    (qualquer registro conta -- ver fila_item_finalizado no banco).
+//  - "Carteira completa": consulta de todos os clientes, com os filtros que
+//    eram abas da Agenda (Para hoje, Sem contato, Ja contatados) e faixa.
 type MotivoParaHoje = "agendado" | "promessa" | "quebrado" | "urgente";
-
-interface AgendaSubfiltro {
-  key: string;
-  label: string;
-  count: number;
-}
-
-interface AgendaCategoriaConfig {
-  key: AgendaSubTab;
-  label: string;
-  icon: React.ReactNode;
-  /** Classe do pill quando esta e a aba ativa. */
-  activeClass: string;
-  accentBorderClass: string;
-  /** Total da aba (sem subfiltro). */
-  total: number;
-  /** Clientes da aba ja com o subfiltro aplicado. */
-  groups: ClientGroup[];
-  emptyMessage: string;
-  subfiltros: AgendaSubfiltro[];
-}
+type SituacaoCarteira =
+  | "todos"
+  | "paraHoje"
+  | "semContato"
+  | "contatadosHoje"
+  | "contatadosAntes";
+type FaixaCarteira = "todas" | "critical" | "high" | "medium" | "low" | "emDia";
 
 // Colunas ordenaveis, compartilhadas pela tabela da Carteira completa e
-// pelas listas da Agenda (mesmo cabecalho nos dois, ver WalletTableHead).
+// pelas listas da Fila (mesmo cabecalho nos dois, ver WalletTableHead).
 type WalletSortKey =
   | "cliente"
   | "ultimaInteracao"
@@ -191,7 +178,8 @@ interface SortableThProps {
   widthClass?: string;
   activeKey: WalletSortKey | null;
   dir: "asc" | "desc";
-  onSort: (key: WalletSortKey) => void;
+  /** Sem onSort a coluna nao e clicavel (lista da Fila). */
+  onSort?: (key: WalletSortKey) => void;
 }
 
 const SortableTh: React.FC<SortableThProps> = ({
@@ -204,10 +192,12 @@ const SortableTh: React.FC<SortableThProps> = ({
   onSort,
 }) => (
   <th
-    className={`px-6 py-4 cursor-pointer select-none hover:text-indigo-600 transition-colors ${
+    className={`px-6 py-4 select-none ${
+      onSort ? "cursor-pointer hover:text-indigo-600 transition-colors" : ""
+    } ${
       align === "center" ? "text-center" : align === "right" ? "text-right" : ""
     } ${widthClass ?? ""}`}
-    onClick={() => onSort(sortKeyName)}
+    onClick={onSort ? () => onSort(sortKeyName) : undefined}
   >
     <span
       className={`inline-flex items-center gap-1 ${
@@ -228,11 +218,11 @@ const SortableTh: React.FC<SortableThProps> = ({
 interface WalletTableHeadProps {
   sortKey: WalletSortKey | null;
   sortDir: "asc" | "desc";
-  onSort: (key: WalletSortKey) => void;
+  onSort?: (key: WalletSortKey) => void;
 }
 
-// Cabecalho clicavel reusado pela tabela de "Carteira completa" e pela lista
-// de cada categoria da Agenda -- mesmas colunas nos dois lugares, um so JSX.
+// Cabecalho reusado pela tabela da "Carteira completa" (clicavel) e pelas
+// listas da Fila (sem clique) -- mesmas colunas nos dois lugares.
 const WalletTableHead: React.FC<WalletTableHeadProps> = ({
   sortKey,
   sortDir,
@@ -295,6 +285,9 @@ interface InternalCollectorWalletProps {
   onOpenLog: (client: any, canal?: CanalUsado) => void;
   onOpenDetail: (client: any) => void;
   onOpenAcordo: (client: ClientGroup) => void;
+  /** Muda a cada registro feito nos modais (Atender, acordo, detalhe): o
+   * lote da fila relê a situação dos clientes. */
+  versaoRegistros: number;
 }
 
 const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
@@ -305,6 +298,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   onOpenLog,
   onOpenDetail,
   onOpenAcordo,
+  versaoRegistros,
 }) => {
   const {
     getAcordoAtivoDoCliente,
@@ -320,7 +314,11 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // Fila de Cobranca (item 39): "deixar para depois" do dia e o turno
   // (manha/tarde) que a fila do gestor usa -- reavaliado a cada minuto para
   // a lista mudar sozinha as 12h.
-  const { adiamentos, adiar } = useFilaAdiamentos(user?.id);
+  const {
+    adiamentos,
+    adiar,
+    carregado: adiamentosCarregados,
+  } = useFilaAdiamentos(user?.id);
   const [turnoFila, setTurnoFila] = useState<TurnoFila>(() => turnoDaFila());
   useEffect(() => {
     const t = window.setInterval(() => setTurnoFila(turnoDaFila()), 60_000);
@@ -380,11 +378,11 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     });
     return map;
   }, [scheduledVisits, user?.id]);
-  const [walletTab, setWalletTab] = useState<"agenda" | "carteira">("agenda");
-  // null = ainda nao escolhida: abre em "Para hoje" se houver algo, senao
-  // em "A contatar".
-  const [agendaSubTab, setAgendaSubTab] = useState<AgendaSubTab | null>(null);
-  const [agendaSubfiltro, setAgendaSubfiltro] = useState("todos");
+  const [walletTab, setWalletTab] = useState<"fila" | "carteira">("fila");
+  // Filtros da Carteira completa (eram as abas da Agenda).
+  const [situacaoCarteira, setSituacaoCarteira] =
+    useState<SituacaoCarteira>("todos");
+  const [faixaCarteira, setFaixaCarteira] = useState<FaixaCarteira>("todas");
   // Modo foco: oculta os cards de desempenho (Recuperação do Mês, Total de
   // Clientes etc.) pra sobrar só a lista de trabalho. Preferencia pessoal de
   // tela, guardada no navegador -- nao sincroniza entre dispositivos.
@@ -406,7 +404,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       return next;
     });
   };
-  // Filtro único (Agenda e Carteira completa usam o mesmo), reaproveitando o
+  // Filtro único da Carteira completa, reaproveitando o
   // motor do FilterBar/getFilteredCollections da tela de Cobrança -- ele
   // filtra por título; aqui a tabela é por cliente, então o resultado vira
   // um conjunto de documentos usado pra recortar openClientGroups.
@@ -450,6 +448,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   const [attemptsByCollection, setAttemptsByCollection] = useState<
     Record<string, TentativaResumo & { efetivo: TentativaResumo | null }>
   >({});
+  // Ja leu os contatos? O lote da fila so e montado depois (senao entraria
+  // quem foi contatado ontem).
+  const [attemptsCarregados, setAttemptsCarregados] = useState(false);
 
   useEffect(() => {
     const ids = Array.from(
@@ -462,6 +463,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     );
     if (ids.length === 0) {
       setAttemptsByCollection({});
+      setAttemptsCarregados(true);
       return;
     }
     let cancelled = false;
@@ -503,12 +505,15 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           }
         });
       }
-      if (!cancelled) setAttemptsByCollection(map);
+      if (!cancelled) {
+        setAttemptsByCollection(map);
+        setAttemptsCarregados(true);
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [myCollections]);
+  }, [myCollections, versaoRegistros]);
 
   // Pagamento de parcela de acordo registrado por ESTE cobrador neste mes.
   // Nao vem de `salePayments` (sale_payments) -- registrar_pagamento_acordo
@@ -583,8 +588,8 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
   // Situacao de contato do cliente pela ULTIMA interacao registrada
   // (lastContacts, mesma fonte da coluna "Ultima interacao"): hoje, nos
-  // ultimos SEM_CONTATO_DIAS dias, ou sem contato recente. Decide as abas
-  // "A contatar" / "Ja contatados" da Agenda.
+  // ultimos SEM_CONTATO_DIAS dias, ou sem contato recente. Decide quem pode
+  // entrar no lote da Fila e os filtros "Sem contato" / "Ja contatados".
   const interacaoDoCliente = React.useCallback(
     (documento: string): "hoje" | "semana" | "sem" => {
       const efetivo = lastContacts[documento]?.efetivo;
@@ -607,7 +612,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     [clientGroups],
   );
 
-  // Mesmo motor de filtro do FilterBar (titulo a titulo) pra Agenda e
+  // Mesmo motor de filtro do FilterBar (titulo a titulo) pra
   // Carteira completa -- recortado de volta pra cliente via o conjunto de
   // documentos que sobrou.
   const walletFilteredGroups = useMemo(() => {
@@ -649,7 +654,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return mapa;
   }, [walletFilteredGroups, acordoAtivoOverdueMap]);
 
-  // Item 34: cliente sem nada vencido CONTINUA na carteira, na Agenda e na
+  // Item 34: cliente sem nada vencido CONTINUA na carteira e na
   // Carteira completa (decisao do gerente, 2026-11-09: "nao e para sair da
   // carteira, so deixar claro quando a divida e vencida ou a vencer"). So a
   // exibicao separa os dois valores; aqui so contamos quantos estao em dia.
@@ -684,7 +689,8 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       return { urgentes: [] as ClientGroup[], urgenteInfoByDocument: info };
     }
     const ranked: { group: ClientGroup; diasRestantes: number }[] = [];
-    walletFilteredGroups.forEach((group) => {
+    // Carteira inteira, nao so o filtrado: o lote da fila ignora a busca.
+    openClientGroups.forEach((group) => {
       const atraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
       const diasRestantes = diasAteSairDasRegras(
         minhasRegras,
@@ -705,17 +711,15 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       urgenteInfoByDocument: info,
     };
   }, [
-    walletFilteredGroups,
+    openClientGroups,
     minhasRegras,
     temRegraComTeto,
     lastContacts,
     acordoAtivoOverdueMap,
   ]);
 
-  // Ordenacao clicavel no cabecalho, compartilhada pela Carteira completa e
-  // pelas categorias da Agenda (mesmas colunas, mesmo header -- ver
-  // WalletTableHead). Nula = ordem padrao (precedencia da Agenda / vinda do
-  // filtro na Carteira completa).
+  // Ordenacao clicavel no cabecalho da Carteira completa (WalletTableHead).
+  // Nula = ordem vinda do filtro. Na Fila a ordem e a do lote (sem clique).
   const [sortKey, setSortKey] = useState<WalletSortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const toggleSort = (key: WalletSortKey) => {
@@ -769,279 +773,229 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     scheduledContactByDocument,
   ]);
 
-  // Agenda em 3 abas (ver AgendaSubTab): cada cliente cai em uma so --
-  // "Para hoje", "A contatar" ou "Ja contatados". A faixa de atraso (90/60/30,
-  // priorityBucket) virou subfiltro de "A contatar" e selo na linha.
   const today = todayLocalStr();
 
-  const { paraHoje, aContatar, contatados, motivoParaHoje } = useMemo(() => {
-    const paraHoje: ClientGroup[] = [];
-    const aContatar: ClientGroup[] = [];
-    const contatados: ClientGroup[] = [];
-    const motivoParaHoje = new Map<string, MotivoParaHoje>();
-
-    sortedWalletFilteredGroups.forEach((group) => {
-      const doc = group.document;
+  // Por que o cliente e "para hoje": compromisso com data (contato agendado,
+  // promessa vencendo) -- fica acima do lote na Fila -- ou alerta sem
+  // contato recente (acordo quebrado, perto de sair da faixa) -- entra no
+  // lote na frente da faixa dele.
+  const motivoParaHojeDe = React.useCallback(
+    (doc: string): MotivoParaHoje | null => {
       const contatoRecente = interacaoDoCliente(doc) !== "sem";
       const agendado = scheduledContactByDocument.get(doc);
       const retorno = lastContacts[doc]?.efetivo?.nextActionDate;
-      // Compromisso que chegou fica em "Para hoje" ate ser resolvido
-      // (registrar o contato conclui o agendamento / troca a promessa).
-      // Acordo quebrado e "perto de sair da faixa" so enquanto nao houve
-      // contato recente -- depois de falar com o cliente, vao para
-      // "Ja contatados" (o selo de urgencia continua na linha).
-      let motivo: MotivoParaHoje | null = null;
-      if (agendado && agendado.scheduledDate <= today) motivo = "agendado";
-      else if (!agendado && retorno && retorno <= today) motivo = "promessa";
-      else if (!contatoRecente && getAcordoQuebradoDoCliente(doc))
-        motivo = "quebrado";
-      else if (!contatoRecente && urgenteInfoByDocument.has(doc))
-        motivo = "urgente";
+      if (agendado && agendado.scheduledDate <= today) return "agendado";
+      if (!agendado && retorno && retorno <= today) return "promessa";
+      if (!contatoRecente && getAcordoQuebradoDoCliente(doc)) return "quebrado";
+      if (!contatoRecente && urgenteInfoByDocument.has(doc)) return "urgente";
+      return null;
+    },
+    [
+      interacaoDoCliente,
+      scheduledContactByDocument,
+      lastContacts,
+      getAcordoQuebradoDoCliente,
+      urgenteInfoByDocument,
+      today,
+    ],
+  );
 
-      if (motivo) {
-        paraHoje.push(group);
-        motivoParaHoje.set(doc, motivo);
-      } else if (contatoRecente) {
-        contatados.push(group);
-      } else {
-        aContatar.push(group);
-      }
+  // Fila: compromissos de hoje (fora da contagem do lote), agendado primeiro.
+  const compromissosHoje = useMemo(() => {
+    const ordem: MotivoParaHoje[] = ["agendado", "promessa"];
+    return openClientGroups
+      .filter((g) => {
+        const m = motivoParaHojeDe(g.document);
+        return m === "agendado" || m === "promessa";
+      })
+      .sort(
+        (a, b) =>
+          ordem.indexOf(motivoParaHojeDe(a.document)!) -
+          ordem.indexOf(motivoParaHojeDe(b.document)!),
+      );
+  }, [openClientGroups, motivoParaHojeDe]);
+
+  // Quem pode entrar no PROXIMO lote: deve algo vencido (montarLoteFila
+  // confere), sem compromisso marcado (hoje ou futuro), sem contato efetivo
+  // nos ultimos SEM_CONTATO_DIAS dias, nao tentado nem deixado para depois
+  // hoje.
+  const candidatosLote = useMemo(
+    () =>
+      openClientGroups.filter((g) => {
+        const doc = g.document;
+        if (scheduledContactByDocument.has(doc)) return false;
+        if (lastContacts[doc]?.efetivo?.nextActionDate) {
+          const retorno = lastContacts[doc]!.efetivo!.nextActionDate!;
+          if (retorno >= today || motivoParaHojeDe(doc) === "promessa")
+            return false;
+        }
+        if (interacaoDoCliente(doc) !== "sem") return false;
+        if (tentouHojeSemSucesso(doc)) return false;
+        if (adiamentos.has(doc)) return false;
+        return true;
+      }),
+    [
+      openClientGroups,
+      scheduledContactByDocument,
+      lastContacts,
+      today,
+      motivoParaHojeDe,
+      interacaoDoCliente,
+      tentouHojeSemSucesso,
+      adiamentos,
+    ],
+  );
+
+  const {
+    lote,
+    carregado: loteCarregado,
+    erro: erroLote,
+    recarregar: recarregarLote,
+    abrirLote,
+  } = useFilaLote(user?.id);
+  const loteTodoFinalizado = !!lote && lote.itens.every((i) => i.finalizado);
+  const dadosDaFilaProntos =
+    attemptsCarregados && adiamentosCarregados && loteCarregado;
+
+  // Registro novo (Atender, depois, pagamento...): rele a situacao do lote.
+  useEffect(() => {
+    if (loteCarregado) void recarregarLote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versaoRegistros, adiamentos, attemptsByCollection]);
+
+  // Sem lote aberto (ou com o atual todo finalizado): monta o proximo com a
+  // regra do gestor e grava. O banco recusa abrir outro se ainda houver
+  // pendente, entao chamada repetida e segura; em erro nao tenta de novo.
+  const abrindoLote = useRef(false);
+  useEffect(() => {
+    if (!dadosDaFilaProntos || abrindoLote.current || erroLote) return;
+    if (lote && !loteTodoFinalizado) return;
+    const proximo = montarLoteFila(
+      candidatosLote,
+      minhasRegras,
+      turnoFila,
+      (g) => {
+        const m = motivoParaHojeDe(g.document);
+        return {
+          atraso: clientMaxOverdueDays(g, acordoAtivoOverdueMap),
+          loja: clientReferenceStore(g),
+          vencido: clientBalanceSplit(g, acordoAtivoOverdueMap).vencido,
+          urgencia: (m === "quebrado" || m === "urgente"
+            ? m
+            : null) as UrgenciaLote | null,
+        };
+      },
+    );
+    if (proximo.length === 0) return;
+    abrindoLote.current = true;
+    void abrirLote(
+      proximo.map((p) => ({
+        documento: p.item.document,
+        regraId: p.regraId,
+        urgencia: p.urgencia,
+      })),
+      filaLigada(minhasRegras) ? turnoFila : null,
+      tamanhoDoLote(minhasRegras, turnoFila),
+    ).finally(() => {
+      abrindoLote.current = false;
     });
-
-    // Ordem padrao (sem coluna clicada): o que importa em cada aba.
-    if (!sortKey) {
-      const ordemMotivo: MotivoParaHoje[] = [
-        "agendado",
-        "promessa",
-        "quebrado",
-        "urgente",
-      ];
-      paraHoje.sort(
-        (a, b) =>
-          ordemMotivo.indexOf(motivoParaHoje.get(a.document)!) -
-            ordemMotivo.indexOf(motivoParaHoje.get(b.document)!) ||
-          (urgenteInfoByDocument.get(a.document)?.diasRestantes ?? 0) -
-            (urgenteInfoByDocument.get(b.document)?.diasRestantes ?? 0),
-      );
-      // Fila de Cobranca (item 39): com a fila configurada pelo gestor, as
-      // faixas do cobrador saem intercaladas (filters/filaCobranca). Sem
-      // fila: maior atraso primeiro; cliente em dia (so a vencer) no fim.
-      // Nos dois casos, "deixado para depois" hoje vai para o fim.
-      const fila = montarFilaLigar(aContatar, minhasRegras, turnoFila, (g) => ({
-        atraso: clientMaxOverdueDays(g, acordoAtivoOverdueMap),
-        loja: clientReferenceStore(g),
-        vencido: saldoPorDocumento.get(g.document)?.vencido ?? 0,
-        tentouHoje: tentouHojeSemSucesso(g.document),
-        adiadoHoje: adiamentos.has(g.document),
-      }));
-      if (fila) {
-        aContatar.splice(0, aContatar.length, ...fila.lista);
-      } else {
-        const temVencido = (g: ClientGroup) =>
-          (saldoPorDocumento.get(g.document)?.vencido ?? 0) > 0.01 ? 1 : 0;
-        const tentou = (g: ClientGroup) =>
-          tentouHojeSemSucesso(g.document) ? 1 : 0;
-        const adiado = (g: ClientGroup) => (adiamentos.has(g.document) ? 1 : 0);
-        aContatar.sort(
-          (a, b) =>
-            adiado(a) - adiado(b) ||
-            temVencido(b) - temVencido(a) ||
-            tentou(a) - tentou(b) ||
-            clientMaxOverdueDays(b, acordoAtivoOverdueMap) -
-              clientMaxOverdueDays(a, acordoAtivoOverdueMap),
-        );
-      }
-      // Contato mais recente primeiro.
-      contatados.sort(
-        (a, b) =>
-          (lastContacts[b.document]?.date.getTime() ?? 0) -
-          (lastContacts[a.document]?.date.getTime() ?? 0),
-      );
-    }
-
-    return { paraHoje, aContatar, contatados, motivoParaHoje };
   }, [
-    sortedWalletFilteredGroups,
-    sortKey,
-    interacaoDoCliente,
-    tentouHojeSemSucesso,
-    scheduledContactByDocument,
-    lastContacts,
-    getAcordoQuebradoDoCliente,
-    urgenteInfoByDocument,
-    saldoPorDocumento,
-    acordoAtivoOverdueMap,
-    today,
+    dadosDaFilaProntos,
+    erroLote,
+    lote,
+    loteTodoFinalizado,
+    candidatosLote,
     minhasRegras,
     turnoFila,
-    adiamentos,
+    motivoParaHojeDe,
+    acordoAtivoOverdueMap,
+    abrirLote,
   ]);
-  const filaDoGestorLigada = filaLigada(minhasRegras);
 
-  // Faixa de atraso do cliente para o subfiltro de "A contatar".
+  // Clientes do lote na ordem entregue: pendentes e ja feitos.
+  const { lotePendentes, loteFeitos } = useMemo(() => {
+    const porDoc = new Map(clientGroups.map((g) => [g.document, g]));
+    const pendentes: ClientGroup[] = [];
+    const feitos: ClientGroup[] = [];
+    (lote?.itens ?? []).forEach((i) => {
+      const g = porDoc.get(i.documento);
+      if (!g) return; // saiu da carteira (conta como finalizado)
+      (i.finalizado ? feitos : pendentes).push(g);
+    });
+    return { lotePendentes: pendentes, loteFeitos: feitos };
+  }, [lote, clientGroups]);
+
+  // Faixa de atraso do cliente (filtro da Carteira completa).
   const faixaDoCliente = React.useCallback(
-    (g: ClientGroup): "critical" | "high" | "medium" | "low" | "emDia" =>
+    (g: ClientGroup): Exclude<FaixaCarteira, "todas"> =>
       (saldoPorDocumento.get(g.document)?.vencido ?? 0) <= 0.01
         ? "emDia"
         : priorityBucket(clientMaxOverdueDays(g, acordoAtivoOverdueMap)),
     [saldoPorDocumento, acordoAtivoOverdueMap],
   );
+  const situacaoDoCliente = React.useCallback(
+    (g: ClientGroup): Exclude<SituacaoCarteira, "todos"> => {
+      if (motivoParaHojeDe(g.document)) return "paraHoje";
+      const i = interacaoDoCliente(g.document);
+      return i === "hoje"
+        ? "contatadosHoje"
+        : i === "semana"
+          ? "contatadosAntes"
+          : "semContato";
+    },
+    [motivoParaHojeDe, interacaoDoCliente],
+  );
 
-  // Ao digitar uma busca, tenta manter o cobrador DENTRO da Agenda: as 3
-  // abas particionam TODO o conjunto filtrado, entao um termo que isola um
-  // unico cliente (ex.: CPF ou numero de acordo) cai inteiro numa aba so --
-  // pula pra ela em vez de deixar a busca parecer vazia na aba atual. Se a
-  // busca espalhar clientes por mais de uma aba (ou nao achar ninguem), cai
-  // pra Carteira completa. So reage a busca MUDAR.
+  const contagemCarteira = useMemo(() => {
+    const situacao = new Map<string, number>();
+    const faixa = new Map<string, number>();
+    walletFilteredGroups.forEach((g) => {
+      const s = situacaoDoCliente(g);
+      situacao.set(s, (situacao.get(s) ?? 0) + 1);
+      const f = faixaDoCliente(g);
+      faixa.set(f, (faixa.get(f) ?? 0) + 1);
+    });
+    return { situacao, faixa };
+  }, [walletFilteredGroups, situacaoDoCliente, faixaDoCliente]);
+
+  const carteiraFiltrada = useMemo(
+    () =>
+      sortedWalletFilteredGroups.filter(
+        (g) =>
+          (situacaoCarteira === "todos" ||
+            situacaoDoCliente(g) === situacaoCarteira) &&
+          (faixaCarteira === "todas" || faixaDoCliente(g) === faixaCarteira),
+      ),
+    [
+      sortedWalletFilteredGroups,
+      situacaoCarteira,
+      faixaCarteira,
+      situacaoDoCliente,
+      faixaDoCliente,
+    ],
+  );
+
+  // Busca digitada com a Fila aberta: vai para a Carteira completa (a fila
+  // e um lote fixo, a busca e na carteira toda).
   useEffect(() => {
     if (!(walletFilters.search || "").trim()) return;
-    if (walletTab !== "agenda") return;
-    const abas: { key: AgendaSubTab; groups: ClientGroup[] }[] = [
-      { key: "paraHoje", groups: paraHoje },
-      { key: "aContatar", groups: aContatar },
-      { key: "contatados", groups: contatados },
-    ];
-    const comResultado = abas.filter((c) => c.groups.length > 0);
-    if (comResultado.length === 1) {
-      setAgendaSubTab(comResultado[0].key);
-      setAgendaSubfiltro("todos");
-    } else {
-      setWalletTab("carteira");
-    }
+    if (walletTab === "fila") setWalletTab("carteira");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletFilters.search]);
 
-  const agendaCategorias: AgendaCategoriaConfig[] = useMemo(() => {
-    const contar = <K extends string>(
-      lista: ClientGroup[],
-      chave: (g: ClientGroup) => K,
-    ) => {
-      const m = new Map<K, number>();
-      lista.forEach((g) => m.set(chave(g), (m.get(chave(g)) ?? 0) + 1));
-      return m;
-    };
-    const aplicar = <K extends string>(
-      lista: ClientGroup[],
-      chave: (g: ClientGroup) => K,
-      aba: AgendaSubTab,
-    ) =>
-      agendaSubTab === aba && agendaSubfiltro !== "todos"
-        ? lista.filter((g) => chave(g) === agendaSubfiltro)
-        : lista;
-
-    const motivoDe = (g: ClientGroup) => motivoParaHoje.get(g.document)!;
-    const porMotivo = contar(paraHoje, motivoDe);
-    const porFaixa = contar(aContatar, faixaDoCliente);
-    const quandoContatou = (g: ClientGroup) =>
-      interacaoDoCliente(g.document) === "hoje" ? "hoje" : "antes";
-    const porQuando = contar(contatados, quandoContatou);
-
-    return [
-      {
-        key: "paraHoje",
-        label: "Para hoje",
-        icon: <CalendarClock className="w-4 h-4" />,
-        activeClass: "bg-purple-600 text-white",
-        accentBorderClass: "border-l-purple-400 dark:border-l-purple-600",
-        total: paraHoje.length,
-        groups: aplicar(paraHoje, motivoDe, "paraHoje"),
-        emptyMessage:
-          "Nada marcado para hoje: nenhum contato agendado, promessa vencendo, acordo quebrado ou cliente saindo da sua carteira.",
-        subfiltros: [
-          { key: "agendado", label: "Contato agendado", count: porMotivo.get("agendado") ?? 0 },
-          { key: "promessa", label: "Promessa vencendo", count: porMotivo.get("promessa") ?? 0 },
-          { key: "quebrado", label: "Acordo quebrado", count: porMotivo.get("quebrado") ?? 0 },
-          {
-            key: "urgente",
-            label: "Vai sair da carteira",
-            count: porMotivo.get("urgente") ?? 0,
-          },
-        ],
-      },
-      {
-        key: "aContatar",
-        label: "Ligar",
-        icon: <PhoneCall className="w-4 h-4" />,
-        activeClass: "bg-indigo-600 text-white",
-        accentBorderClass: "border-l-indigo-400 dark:border-l-indigo-600",
-        total: aContatar.length,
-        groups: aplicar(aContatar, faixaDoCliente, "aContatar"),
-        emptyMessage: `Você falou com todos os clientes nos últimos ${SEM_CONTATO_DIAS} dias.`,
-        subfiltros: [
-          { key: "critical", label: "Crítico +90d", count: porFaixa.get("critical") ?? 0 },
-          { key: "high", label: "60-90d", count: porFaixa.get("high") ?? 0 },
-          { key: "medium", label: "30-60d", count: porFaixa.get("medium") ?? 0 },
-          { key: "low", label: "Até 30d", count: porFaixa.get("low") ?? 0 },
-          { key: "emDia", label: "Em dia", count: porFaixa.get("emDia") ?? 0 },
-        ],
-      },
-      {
-        key: "contatados",
-        label: "Já contatados",
-        icon: <UserCheck className="w-4 h-4" />,
-        activeClass: "bg-green-600 text-white",
-        accentBorderClass: "border-l-green-400 dark:border-l-green-600",
-        total: contatados.length,
-        groups: aplicar(contatados, quandoContatou, "contatados"),
-        emptyMessage: `Você ainda não falou com nenhum cliente nos últimos ${SEM_CONTATO_DIAS} dias.`,
-        subfiltros: [
-          { key: "hoje", label: "Hoje", count: porQuando.get("hoje") ?? 0 },
-          {
-            key: "antes",
-            label: `1 a ${SEM_CONTATO_DIAS} dias atrás`,
-            count: porQuando.get("antes") ?? 0,
-          },
-        ],
-      },
-    ];
-  }, [
-    paraHoje,
-    aContatar,
-    contatados,
-    motivoParaHoje,
-    faixaDoCliente,
-    interacaoDoCliente,
-    agendaSubTab,
-    agendaSubfiltro,
-  ]);
-
-  const abaAgendaEfetiva: AgendaSubTab =
-    agendaSubTab ?? (paraHoje.length > 0 ? "paraHoje" : "aContatar");
-  const trocarAbaAgenda = (aba: AgendaSubTab, subfiltro = "todos") => {
-    setAgendaSubTab(aba);
-    setAgendaSubfiltro(subfiltro);
-  };
-
-  const categoriaAtiva =
-    agendaCategorias.find((c) => c.key === abaAgendaEfetiva) ??
-    agendaCategorias[0];
-  const subfiltrosVisiveis = categoriaAtiva.subfiltros.filter(
-    (sub) => sub.count > 0,
-  );
-  // Subfiltro escolhido que ficou vazio (ex.: o ultimo cliente dele foi
-  // atendido) volta para "Todos", senao a lista ficaria vazia sem botao.
-  useEffect(() => {
-    if (
-      agendaSubfiltro !== "todos" &&
-      !subfiltrosVisiveis.some((sub) => sub.key === agendaSubfiltro)
-    ) {
-      setAgendaSubfiltro("todos");
-    }
-  }, [agendaSubfiltro, subfiltrosVisiveis]);
-
   useEffect(() => {
     setCurrentPage(1);
-  }, [walletFilters, walletTab, sortKey, sortDir]);
+  }, [walletFilters, walletTab, sortKey, sortDir, situacaoCarteira, faixaCarteira]);
 
-  // Carteira completa: diretório com todo mundo em aberto, não só quem
-  // sobrou da agenda — é a visão de "navegar tudo" que a Agenda não dá.
-  const totalPages = Math.ceil(walletFilteredGroups.length / itemsPerPage);
+  // Carteira completa: diretório com todo mundo em aberto, não só o lote
+  // da fila — é a visão de consulta.
+  const totalPages = Math.ceil(carteiraFiltrada.length / itemsPerPage);
   const paginatedClients = useMemo(() => {
-    return sortedWalletFilteredGroups.slice(
+    return carteiraFiltrada.slice(
       (currentPage - 1) * itemsPerPage,
       currentPage * itemsPerPage,
     );
-  }, [sortedWalletFilteredGroups, currentPage]);
+  }, [carteiraFiltrada, currentPage]);
 
   const stats = useMemo(() => {
     const mesAtual = todayLocalStr().slice(0, 7);
@@ -1281,15 +1235,15 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           <div className="flex gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => setWalletTab("agenda")}
+              onClick={() => setWalletTab("fila")}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-                walletTab === "agenda"
+                walletTab === "fila"
                   ? "bg-indigo-600 text-white"
                   : "text-gray-500 hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
               }`}
             >
               <Rocket className="w-4 h-4" />
-              Agenda
+              Fila de Cobrança
             </button>
             <button
               type="button"
@@ -1307,92 +1261,87 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         }
       />
 
-      {walletTab === "agenda" ? (
+      {walletTab === "fila" ? (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            {agendaCategorias.map((categoria) => (
-              <button
-                key={categoria.key}
-                type="button"
-                onClick={() => trocarAbaAgenda(categoria.key)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-colors ${
-                  abaAgendaEfetiva === categoria.key
-                    ? categoria.activeClass
-                    : "bg-white dark:bg-dark-bg text-gray-500 border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
-                }`}
-              >
-                {categoria.icon}
-                {categoria.label}
-                <span
-                  className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                    abaAgendaEfetiva === categoria.key
-                      ? "bg-white/20"
-                      : "bg-gray-100 dark:bg-dark-bg-tertiary text-gray-500 dark:text-dark-text-secondary"
-                  }`}
-                >
-                  {categoria.total}
-                </span>
-              </button>
-            ))}
-          </div>
-          {/* Subfiltro da aba ativa, segmentado por "|". So aparece o que tem
-              cliente; sem nenhum, a linha some. */}
-          {subfiltrosVisiveis.length > 0 && (
-          <div className="flex flex-wrap items-center gap-x-1 gap-y-1 text-xs">
-            {[
-              { key: "todos", label: "Todos", count: categoriaAtiva.total },
-              ...subfiltrosVisiveis,
-            ].map((sub, i) => (
-              <React.Fragment key={sub.key}>
-                {i > 0 && (
-                  <span className="text-gray-300 dark:text-dark-border px-1 select-none">
-                    |
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setAgendaSubfiltro(sub.key)}
-                  className={`px-1.5 py-0.5 rounded-md transition-colors ${
-                    agendaSubfiltro === sub.key
-                      ? "font-bold text-gray-900 dark:text-dark-text bg-gray-100 dark:bg-dark-bg-tertiary"
-                      : "text-gray-500 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
-                  }`}
-                >
-                  {sub.label}{" "}
-                  <span className="tabular-nums text-gray-400">({sub.count})</span>
-                </button>
-              </React.Fragment>
-            ))}
-          </div>
+          {compromissosHoje.length > 0 && (
+            <AgendaSection
+              titulo={`Marcados para hoje (${compromissosHoje.length})`}
+              subtitulo="Contato agendado e promessa vencendo. Não contam no lote."
+              accentBorderClass="border-l-purple-400 dark:border-l-purple-600"
+              groups={compromissosHoje}
+              emptyMessage=""
+              lastContacts={lastContacts}
+              getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
+              copiedDoc={copiedDoc}
+              copyDocument={copyDocument}
+              user={user}
+              onOpenDetail={onOpenDetail}
+              onOpenLog={onOpenLog}
+              onOpenAcordo={onOpenAcordo}
+              urgenteInfoByDocument={urgenteInfoByDocument}
+              scheduledContactByDocument={scheduledContactByDocument}
+              aposContato={aposContato}
+            />
           )}
-          <AgendaSection
-            accentBorderClass={categoriaAtiva.accentBorderClass}
-            groups={categoriaAtiva.groups}
-            emptyMessage={categoriaAtiva.emptyMessage}
-            lastContacts={lastContacts}
-            getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
-            copiedDoc={copiedDoc}
-            copyDocument={copyDocument}
-            user={user}
-            onOpenDetail={onOpenDetail}
-            onOpenLog={onOpenLog}
-            onOpenAcordo={onOpenAcordo}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={toggleSort}
-            urgenteInfoByDocument={urgenteInfoByDocument}
-            scheduledContactByDocument={scheduledContactByDocument}
-            aposContato={aposContato}
-            adiamentos={adiamentos}
-            onAdiar={
-              abaAgendaEfetiva === "aContatar" ? setAdiandoGroup : undefined
-            }
-            aviso={
-              abaAgendaEfetiva === "aContatar" && filaDoGestorLigada && !sortKey
-                ? `Ordem definida pela gestão (${turnoFila === "manha" ? "manhã" : "tarde"}): siga de cima para baixo.`
-                : undefined
-            }
-          />
+          {erroLote ? (
+            <div className="bg-white dark:bg-dark-bg rounded-2xl border border-red-200 dark:border-red-900/40 shadow-sm p-6 text-center text-sm text-red-600 dark:text-red-400">
+              {erroLote}
+            </div>
+          ) : !dadosDaFilaProntos ? (
+            <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm p-8 text-center text-sm text-gray-400">
+              Montando a sua fila...
+            </div>
+          ) : (
+            <AgendaSection
+              titulo={
+                lote && lotePendentes.length > 0
+                  ? `Sua fila: faltam ${lotePendentes.length} de ${lote.itens.length}`
+                  : "Sua fila"
+              }
+              subtitulo={
+                lote && lotePendentes.length > 0
+                  ? `Ordem definida pela gestão${lote.turno ? ` (${lote.turno === "manha" ? "manhã" : "tarde"})` : ""}. Os próximos clientes chegam quando você registrar estes.`
+                  : undefined
+              }
+              accentBorderClass="border-l-indigo-400 dark:border-l-indigo-600"
+              groups={lotePendentes}
+              pageSize={lotePendentes.length || 10}
+              emptyMessage={`Nenhum cliente na fila agora: os clientes das faixas definidas pela gestão já foram contatados nos últimos ${SEM_CONTATO_DIAS} dias, tentados ou deixados para depois hoje. Consulte a Carteira completa.`}
+              lastContacts={lastContacts}
+              getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
+              copiedDoc={copiedDoc}
+              copyDocument={copyDocument}
+              user={user}
+              onOpenDetail={onOpenDetail}
+              onOpenLog={onOpenLog}
+              onOpenAcordo={onOpenAcordo}
+              urgenteInfoByDocument={urgenteInfoByDocument}
+              scheduledContactByDocument={scheduledContactByDocument}
+              aposContato={aposContato}
+              adiamentos={adiamentos}
+              onAdiar={setAdiandoGroup}
+            />
+          )}
+          {lotePendentes.length > 0 && loteFeitos.length > 0 && (
+            <AgendaSection
+              titulo={`Já registrados neste lote (${loteFeitos.length})`}
+              accentBorderClass="border-l-green-400 dark:border-l-green-600"
+              groups={loteFeitos}
+              emptyMessage=""
+              lastContacts={lastContacts}
+              getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
+              copiedDoc={copiedDoc}
+              copyDocument={copyDocument}
+              user={user}
+              onOpenDetail={onOpenDetail}
+              onOpenLog={onOpenLog}
+              onOpenAcordo={onOpenAcordo}
+              urgenteInfoByDocument={urgenteInfoByDocument}
+              scheduledContactByDocument={scheduledContactByDocument}
+              aposContato={aposContato}
+              adiamentos={adiamentos}
+            />
+          )}
           {adiandoGroup && (
             <DeixarParaDepoisModal
               group={adiandoGroup}
@@ -1407,6 +1356,40 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             <h3 className="font-bold text-gray-900 dark:text-dark-text">
               Carteira completa
             </h3>
+            <CarteiraChips
+              valor={situacaoCarteira}
+              onChange={(v) => setSituacaoCarteira(v as SituacaoCarteira)}
+              total={walletFilteredGroups.length}
+              opcoes={[
+                { key: "paraHoje", label: "Para hoje" },
+                { key: "semContato", label: "Sem contato" },
+                { key: "contatadosHoje", label: "Contatados hoje" },
+                {
+                  key: "contatadosAntes",
+                  label: `Contatados 1 a ${SEM_CONTATO_DIAS} dias atrás`,
+                },
+              ].map((o) => ({
+                ...o,
+                count: contagemCarteira.situacao.get(o.key) ?? 0,
+              }))}
+            />
+            <CarteiraChips
+              valor={faixaCarteira}
+              onChange={(v) => setFaixaCarteira(v as FaixaCarteira)}
+              total={walletFilteredGroups.length}
+              todosKey="todas"
+              todosLabel="Todas as faixas"
+              opcoes={[
+                { key: "critical", label: "Crítico +90d" },
+                { key: "high", label: "60-90d" },
+                { key: "medium", label: "30-60d" },
+                { key: "low", label: "Até 30d" },
+                { key: "emDia", label: "Em dia" },
+              ].map((o) => ({
+                ...o,
+                count: contagemCarteira.faixa.get(o.key) ?? 0,
+              }))}
+            />
           </div>
 
           <div className="overflow-x-auto">
@@ -1453,7 +1436,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             <div className="p-4 border-t border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50/30 dark:bg-dark-bg-secondary/30">
               <p className="text-xs text-gray-500">
                 Mostrando {paginatedClients.length} de{" "}
-                {walletFilteredGroups.length}
+                {carteiraFiltrada.length}
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -1541,7 +1524,7 @@ interface ClientQueueRowProps {
   scheduledContact?: ScheduledVisit;
   /** Fila de Cobranca: deixado para depois hoje (selo). */
   adiamento?: AdiamentoDoDia;
-  /** Presente so na aba "Ligar": mostra o botao "Depois". */
+  /** Presente so no lote da fila: mostra o botao "Depois". */
   onAdiar?: (group: ClientGroup) => void;
 }
 
@@ -1862,7 +1845,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
                 onAdiar(group);
               }}
               className="px-2.5 py-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-dark-text-secondary dark:hover:bg-dark-bg-tertiary rounded-xl transition-all text-xs font-semibold"
-              title="Deixar para depois: vai para o fim da lista de hoje"
+              title="Deixar para depois: sai do lote atual"
             >
               Depois
             </button>
@@ -1934,7 +1917,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
 };
 
 /** "Deixar para depois" (Fila de Cobranca, item 39): motivo de lista curta;
- * o cliente vai para o fim da lista "Ligar" so hoje. */
+ * conta como registrado no lote (item 40) e o cliente nao volta hoje. */
 const DeixarParaDepoisModal: React.FC<{
   group: ClientGroup;
   onClose: () => void;
@@ -1993,8 +1976,8 @@ const DeixarParaDepoisModal: React.FC<{
         </div>
         <div className="p-5 space-y-3">
           <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
-            O cliente vai para o fim da lista de hoje. Amanhã volta ao lugar
-            normal.
+            O cliente sai do seu lote atual e não volta para a fila hoje.
+            Ele continua na Carteira completa.
           </p>
           <div className="space-y-1.5">
             {(Object.keys(MOTIVO_ADIAMENTO_LABEL) as MotivoAdiamento[]).map((m) => (
@@ -2058,7 +2041,66 @@ const DeixarParaDepoisModal: React.FC<{
 
 const AGENDA_PREVIEW_COUNT = 5;
 
+// Filtro de uma linha da Carteira completa, segmentado por "|". So aparece
+// opcao com cliente; a escolhida que esvazia volta para "Todos".
+interface CarteiraChipsProps {
+  valor: string;
+  onChange: (valor: string) => void;
+  total: number;
+  opcoes: { key: string; label: string; count: number }[];
+  todosKey?: string;
+  todosLabel?: string;
+}
+const CarteiraChips: React.FC<CarteiraChipsProps> = ({
+  valor,
+  onChange,
+  total,
+  opcoes,
+  todosKey = "todos",
+  todosLabel = "Todos",
+}) => {
+  const visiveis = opcoes.filter((o) => o.count > 0);
+  useEffect(() => {
+    if (valor !== todosKey && !visiveis.some((o) => o.key === valor)) {
+      onChange(todosKey);
+    }
+  }, [valor, todosKey, visiveis, onChange]);
+  if (visiveis.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs">
+      {[{ key: todosKey, label: todosLabel, count: total }, ...visiveis].map(
+        (o, i) => (
+          <React.Fragment key={o.key}>
+            {i > 0 && (
+              <span className="text-gray-300 dark:text-dark-border px-1 select-none">
+                |
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => onChange(o.key)}
+              className={`px-1.5 py-0.5 rounded-md transition-colors ${
+                valor === o.key
+                  ? "font-bold text-gray-900 dark:text-dark-text bg-gray-100 dark:bg-dark-bg-tertiary"
+                  : "text-gray-500 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+              }`}
+            >
+              {o.label}{" "}
+              <span className="tabular-nums text-gray-400">({o.count})</span>
+            </button>
+          </React.Fragment>
+        ),
+      )}
+    </div>
+  );
+};
+
 interface AgendaSectionProps {
+  /** Titulo e linha explicativa acima da lista. */
+  titulo?: string;
+  subtitulo?: string;
+  /** Clientes por pagina (padrao AGENDA_PREVIEW_COUNT). */
+  pageSize?: number;
   accentBorderClass: string;
   groups: ClientGroup[];
   emptyMessage: string;
@@ -2071,25 +2113,22 @@ interface AgendaSectionProps {
   onOpenLog: (client: ClientGroup, canal?: CanalUsado) => void;
   onOpenAcordo: (client: ClientGroup) => void;
   aposContato: (client: ClientGroup, canal: CanalUsado) => void;
-  sortKey: WalletSortKey | null;
-  sortDir: "asc" | "desc";
-  onSort: (key: WalletSortKey) => void;
   urgenteInfoByDocument: Map<string, { diasRestantes: number; semAcao: boolean }>;
   scheduledContactByDocument: Map<string, ScheduledVisit>;
   /** Fila de Cobranca: deixados para depois hoje (selo na linha). */
   adiamentos?: Map<string, AdiamentoDoDia>;
-  /** So na aba "Ligar": botao "Depois" na linha. */
+  /** So no lote da fila: botao "Depois" na linha. */
   onAdiar?: (group: ClientGroup) => void;
-  /** Linha de aviso acima da lista (ex.: ordem definida pela gestao). */
-  aviso?: string;
 }
 
-// Conteudo da categoria ativa da agenda priorizada: borda colorida conforme
-// a urgencia, paginacao propria (AGENDA_PREVIEW_COUNT por pagina). O
-// titulo/icone/contagem ja aparecem no pill da aba (ver agendaCategorias em
-// InternalCollectorWallet) -- aqui o cabecalho ordenavel (mesmo da Carteira
-// completa, ver WalletTableHead) + a lista, ou o aviso de categoria vazia.
+// Bloco de lista da Fila de Cobranca (compromissos, lote, ja registrados):
+// borda colorida, titulo, paginacao propria. Mesmas colunas da Carteira
+// completa (WalletTableHead), sem ordenacao por clique -- a ordem e a do
+// lote definida pela gestao.
 const AgendaSection: React.FC<AgendaSectionProps> = ({
+  titulo,
+  subtitulo,
+  pageSize = AGENDA_PREVIEW_COUNT,
   accentBorderClass,
   groups,
   emptyMessage,
@@ -2101,49 +2140,56 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   onOpenDetail,
   onOpenLog,
   onOpenAcordo,
-  sortKey,
-  sortDir,
-  onSort,
   urgenteInfoByDocument,
   scheduledContactByDocument,
   aposContato,
   adiamentos,
   onAdiar,
-  aviso,
 }) => {
   const [page, setPage] = useState(1);
   useEffect(() => {
     setPage(1);
   }, [groups]);
 
+  const cabecalho = titulo ? (
+    <div className="px-6 pt-4 pb-2">
+      <h3 className="font-bold text-gray-900 dark:text-dark-text">{titulo}</h3>
+      {subtitulo && (
+        <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-0.5">
+          {subtitulo}
+        </p>
+      )}
+    </div>
+  ) : null;
+
   if (groups.length === 0) {
     return (
       <div
-        className={`bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border border-l-4 ${accentBorderClass} shadow-sm p-8 text-center text-sm text-gray-400`}
+        className={`bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border border-l-4 ${accentBorderClass} shadow-sm`}
       >
-        {emptyMessage}
+        {cabecalho}
+        <p className="p-8 pt-4 text-center text-sm text-gray-400">
+          {emptyMessage}
+        </p>
       </div>
     );
   }
 
-  const totalPages = Math.ceil(groups.length / AGENDA_PREVIEW_COUNT);
+  const tamanhoPagina = Math.max(1, pageSize);
+  const totalPages = Math.ceil(groups.length / tamanhoPagina);
   const visible = groups.slice(
-    (page - 1) * AGENDA_PREVIEW_COUNT,
-    page * AGENDA_PREVIEW_COUNT,
+    (page - 1) * tamanhoPagina,
+    page * tamanhoPagina,
   );
 
   return (
     <div
       className={`bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border border-l-4 ${accentBorderClass} shadow-sm overflow-hidden`}
     >
-      {aviso && (
-        <p className="px-6 pt-3 text-xs text-gray-500 dark:text-dark-text-secondary">
-          {aviso}
-        </p>
-      )}
+      {cabecalho}
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
-          <WalletTableHead sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+          <WalletTableHead sortKey={null} sortDir="desc" />
           <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
             {visible.map((group) => (
               <ClientQueueRow
@@ -2273,6 +2319,8 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
 
   // Estados para modais (centralizados para evitar problemas de stacking context)
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  // Muda a cada registro feito nos modais: o lote da Fila de Cobranca rele.
+  const [versaoRegistros, setVersaoRegistros] = useState(0);
   const [selectedClientForLog, setSelectedClientForLog] = useState<any>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedClientForDetail, setSelectedClientForDetail] =
@@ -3042,6 +3090,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         user={user}
         monthlyGoals={monthlyGoals}
         myCollections={myCollections}
+        versaoRegistros={versaoRegistros}
         onOpenLog={(client, canal) => {
           setSelectedClientForLog(client);
           setCanalUsadoLog(canal);
@@ -3535,7 +3584,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           onSuccess={() => {
             setIsLogModalOpen(false);
             setSelectedClientForLog(null);
-            // Opcional: recarregar dados ou mostrar notificação
+            setVersaoRegistros((v) => v + 1);
           }}
         />
       )}
@@ -3544,7 +3593,10 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         <CancelContactModal
           visit={cancelContactVisit}
           onClose={() => setCancelContactVisit(null)}
-          onSuccess={() => setCancelContactVisit(null)}
+          onSuccess={() => {
+            setCancelContactVisit(null);
+            setVersaoRegistros((v) => v + 1);
+          }}
         />
       )}
 
@@ -3555,6 +3607,8 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           onClose={() => {
             setIsDetailModalOpen(false);
             setSelectedClientForDetail(null);
+            // Pode ter registrado pagamento no detalhe: o lote da fila rele.
+            setVersaoRegistros((v) => v + 1);
           }}
         />
       )}
@@ -3569,6 +3623,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
           onSuccess={() => {
             setIsAcordoModalOpen(false);
             setSelectedClientForAcordo(null);
+            setVersaoRegistros((v) => v + 1);
           }}
         />
       )}

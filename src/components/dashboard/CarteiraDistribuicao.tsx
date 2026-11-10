@@ -256,8 +256,8 @@ const lerValor = (s: string): number | null => {
 };
 
 /**
- * Fila de Cobranca do cobrador (item 39): quantos clientes de cada faixa a
- * cada rodada da lista "Ligar", com manha/tarde opcional. Regras em
+ * Fila de Cobranca do cobrador (itens 39/40): quantos clientes de cada faixa
+ * em cada lote da fila, com manha/tarde opcional. Regras em
  * filters/filaCobranca.ts; so faz sentido com 2+ faixas ativas.
  */
 const FilaDoCobrador: React.FC<{
@@ -410,7 +410,7 @@ const FilaDoCobrador: React.FC<{
         <div className="min-w-0 text-xs text-gray-600 dark:text-dark-text-secondary">
           <span className="inline-flex items-center gap-1 font-semibold text-gray-800 dark:text-dark-text">
             <ListOrdered className="h-3.5 w-3.5" />
-            Fila da lista "Ligar":
+            Fila de Cobrança:
           </span>{" "}
           {!ligada ? (
             "ordem padrão (maior atraso primeiro, sem intercalar as faixas)."
@@ -460,13 +460,16 @@ const FilaDoCobrador: React.FC<{
       <div>
         <p className="text-base font-bold text-gray-900 dark:text-dark-text flex items-center gap-1.5">
           <ListOrdered className="h-4 w-4 text-blue-600" />
-          Fila da lista "Ligar" · {nome}
+          Fila de Cobrança · {nome}
         </p>
         <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-0.5">
-          Quantos clientes de cada faixa a cada rodada. O cobrador vê as faixas
-          misturadas nessa proporção, cada uma na ordem escolhida. Retornos e
-          promessas continuam em "Para hoje". Faixa com 0, ou cliente com
-          dívida vencida fora do valor, vai para o fim da lista (não sai da
+          Quantos clientes de cada faixa em cada lote. O cobrador recebe um
+          lote com a soma dessas quantidades, faixas misturadas nessa
+          proporção e cada uma na ordem escolhida; o próximo lote só vem
+          quando ele registrar todos. Acordo quebrado e "vai sair da
+          carteira" entram primeiro na faixa deles; contato agendado e
+          promessa ficam fora do lote, no topo. Faixa com 0, ou cliente com
+          dívida vencida fora do valor, não entra na fila (continua na
           carteira).
         </p>
       </div>

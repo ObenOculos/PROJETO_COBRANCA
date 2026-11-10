@@ -44,6 +44,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 30 | "Distribuir Pagamento" dá 400 em venda do Ciclone com número > 2.147.483.647 (parâmetro/coluna `integer`; 562 clientes com saldo afetados) — migration `20261109000002` aplicada 2026-11-09, `check:db` OK; falta o usuário repetir o pagamento real | **Alta** | Pequeno |
 | 29 | Código do cliente do Ciclone (`pgcln_codigo`) no cadastro — migration `20261109000001` aplicada + `check:db` OK, sync rodado (1.888 clientes com código); falta publicar o front e testar na tela | Média | Pequeno |
 | 39 | Fila de Cobrança: gestor define, na Distribuição, quantos clientes de cada faixa a cada rodada da lista "Ligar" (manhã/tarde opcional) — etapa 1 (configuração) commitada, `0010` aplicada; ordenação e faixa de dívida por faixa (`0011` aplicada); etapa 2 (lista intercalada + "Deixar para depois") feita, `0012` aplicada, `0013` (só INSERT/SELECT no privilégio) aplicada, falta teste na tela; etapa 3 (supervisão) não iniciada | Alta | Grande, em etapas |
+| 40 | Fila de Cobrança em lotes substitui a Agenda do cobrador de carteira (lote = soma das quantidades do gestor; próximo só com o atual todo registrado) + filtros da Agenda na Carteira completa — código feito 2026-11-10, migration `20261110000003` sem `db push`, sem teste na tela | Alta | Grande |
 
 ## Perguntas em aberto para o financeiro
 
@@ -195,6 +196,51 @@ cobrador entre ~61/91 e 365 dias.
 **Falta:** teste na tela do cobrador (aba Ligar intercalada → Depois);
 etapa 3 (supervisão: previstos × trabalhados por faixa; referência é o
 HTML do Cedrus que está na raiz, fora do Git).
+
+### Item 40 — Fila de Cobrança em lotes (substitui a Agenda) — 2026-11-10
+
+Orientação do gestor: a Agenda deixa de existir; o cobrador de carteira tem
+**Fila de Cobrança** (trabalho do dia, controlado) e **Carteira completa**
+(consulta de todos). A fila mostra só os clientes definidos na Distribuição,
+nas quantidades/faixas/ordem do gestor, em lotes: ex. José 5 (1–60) + 2
+(61–90) + 2 (91–365) + 1 (366–1460) = 10; os próximos 10 só depois de
+finalizar os 10. Substitui a decisão do item 39 "fila = lista do dia".
+
+**Decisões (2026-11-10, todas as recomendadas):**
+- Finalizado = qualquer registro depois que o lote abriu: "Atender"
+  (inclusive não atendeu), "Deixar para depois", pagamento; ou o cliente
+  saiu da carteira / quitou. Nunca trava.
+- Urgências: compromisso com data (contato agendado, promessa vencendo) fica
+  acima do lote, fora da contagem; alerta (acordo quebrado, vai sair da
+  carteira) entra no lote primeiro dentro da faixa dele.
+- Lote não terminado continua no dia seguinte.
+- Carteira completa ganha os filtros da Agenda: Para hoje | Sem contato |
+  Contatados hoje | Contatados 1–7 dias, e faixa de atraso.
+- Padrões assumidos: tamanho = soma das quantidades do turno em que o lote
+  abriu; faixa sem clientes suficientes cede vagas às outras na proporção;
+  sem fila configurada, lote de 10 por maior atraso; candidato = dívida
+  vencida, sem compromisso marcado, sem contato efetivo em 7 dias, não
+  tentado nem deixado para depois hoje; faixa com 0 ou fora do valor não
+  entra (só "exclusivamente os clientes definidos pelo gestor").
+
+**Banco** (`20261110000003`, sem `db push`): `fila_lotes` (um aberto por
+cobrador, índice único parcial) e `fila_lote_itens` (posição, regra, alerta)
+— fato histórico, só SELECT para `authenticated` (dono ou gestor), escrita só
+por função. `fila_item_finalizado` (regra única do "finalizado"),
+`fila_lote_atual()` (INVOKER) e `abrir_lote_fila(itens, turno, tamanho)`
+(DEFINER, só cobrador, lock por cobrador; com pendente devolve o lote aberto
+em vez de criar; valida carteira/saldo/regra).
+
+**App:** `montarLoteFila`/`tamanhoDoLote` em `filters/filaCobranca.ts`
+(substituem `montarFilaLigar`; cenário fictício conferido), hook
+`useFilaLote`, `CollectorDashboard` (abas "Fila de Cobrança" | "Carteira
+completa"; lote abre sozinho quando não há lote ou o atual acabou; relê após
+Atender/acordo/detalhe/cancelar contato; busca leva para a Carteira).
+Distribuição: textos da fila falam em lote.
+
+**Falta:** `db push` + `check:db`, teste na tela do cobrador (grava lote em
+produção ao abrir a tela), push. Etapa 3 (supervisão) pode usar
+`fila_lote_itens` (previstos × registrados por faixa).
 
 ### Senha de login — 2026-11-10
 
