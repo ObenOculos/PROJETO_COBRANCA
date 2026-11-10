@@ -50,6 +50,10 @@ interface LogContactModalProps {
   canalUsado?: "ligacao" | "whatsapp";
   /** Cancelar o contato agendado (motivo no modal proprio). */
   onCancelarAgendamento?: (visit: ScheduledVisit) => void;
+  /** Gestor atendendo pelo cobrador: o contato e o proximo agendamento
+   * ficam em nome deste usuario (cobrador da carteira). Ausente = de quem
+   * esta logado. */
+  emNomeDe?: string | null;
 }
 
 // Motivo do contato -> tipo/resultado de collection_attempts.
@@ -109,8 +113,11 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   linkedVisit,
   canalUsado,
   onCancelarAgendamento,
+  emNomeDe,
 }) => {
   const { user } = useAuth();
+  // Em nome de quem fica o registro (o gestor pode escolher o cobrador).
+  const responsavelId = emNomeDe ?? user?.id;
   const {
     refreshCollections,
     fetchScheduledVisits,
@@ -320,7 +327,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
         );
       } else {
         await scheduleVisit({
-          collectorId: user.id,
+          collectorId: responsavelId ?? user.id,
           clientDocument: client.document,
           clientName: client.client,
           scheduledDate: nextDate,
@@ -409,6 +416,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
             ? `Acompanhamento: ${label}${isPromise && promiseDate ? ` (promessa para ${formatDateBR(promiseDate)})` : ""}${obsAgendamento ? ` — ${obsAgendamento}` : ""}`
             : undefined,
         p_situacao_liberacao: releaseSituacao ?? undefined,
+        p_em_nome_de: emNomeDe ?? undefined,
       });
 
       if (rpcError) throw rpcError;

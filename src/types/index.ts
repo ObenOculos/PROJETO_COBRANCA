@@ -548,6 +548,8 @@ export interface CollectionContextType {
     testemunha1Cpf: string;
     testemunha2Nome: string;
     testemunha2Cpf: string;
+    /** Gestor: em nome de quem fica o acordo (cobrador da carteira). */
+    emNomeDe?: string | null;
   }) => Promise<Acordo>;
   fetchAcordoDetalhe: (acordoId: string) => Promise<{
     acordo: Acordo;

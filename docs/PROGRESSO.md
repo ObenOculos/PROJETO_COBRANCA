@@ -45,6 +45,8 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 29 | Código do cliente do Ciclone (`pgcln_codigo`) no cadastro — migration `20261109000001` aplicada + `check:db` OK, sync rodado (1.888 clientes com código); falta publicar o front e testar na tela | Média | Pequeno |
 | 39 | Fila de Cobrança: gestor define, na Distribuição, quantos clientes de cada faixa a cada rodada da lista "Ligar" (manhã/tarde opcional) — etapa 1 (configuração) commitada, `0010` aplicada; ordenação e faixa de dívida por faixa (`0011` aplicada); etapa 2 (lista intercalada + "Deixar para depois") feita, `0012` aplicada, `0013` (só INSERT/SELECT no privilégio) aplicada, falta teste na tela; etapa 3 (supervisão) não iniciada | Alta | Grande, em etapas |
 | 40 | Fila de Cobrança em lotes substitui a Agenda do cobrador de carteira (lote = soma das quantidades do gestor; próximo só com o atual todo registrado) + filtros da Agenda na Carteira completa — código feito 2026-11-10, migration `20261110000003` aplicada (`check:db` OK), 1º lote do José conferido no banco (5/2/2/1); falta teste completo na tela e push | Alta | Grande |
+| 41 | Gestor atende e faz acordo pelo cobrador (escolhe "em nome de": cobrador da carteira ou ele) — botões no detalhe do cliente (Cobranças etc.); migration `20261110000004` sem `db push`, sem teste | Alta | Médio |
+| 42 | `CollectionModal` (Cobranças → título → aba "Ações", só cobrador): grava status, recebimento e tentativa direto na tabela, sem as RPCs (sem histórico de pagamento, sem regra de acordo/agendamento) e usa `alert`/`confirm` nativos — avaliar remover ou trocar pelos modais novos | Média | Pequeno/médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -196,6 +198,42 @@ cobrador entre ~61/91 e 365 dias.
 **Falta:** teste na tela do cobrador (aba Ligar intercalada → Depois);
 etapa 3 (supervisão: previstos × trabalhados por faixa; referência é o
 HTML do Cedrus que está na raiz, fora do Git).
+
+### Item 41 — Gestor atende e faz acordo pelo cobrador — 2026-11-10
+
+Pedido: o gestor precisa fazer os acordos e atendimentos que o cobrador faz.
+Levantamento: o gestor já tinha no detalhe do cliente Ver Dados/Vendas/
+Histórico/Distribuir/Editar Pagamentos; faltavam Atender e Acordo (só na
+tela do cobrador). No banco, `criar_acordo`/pagamento/cancelamento de
+acordo já aceitavam o gestor, mas gravavam tudo em nome de quem registrou.
+
+**Decisões do usuário:** em cada registro o gestor/diretor escolhe se fica
+no nome dele ou no do cobrador ("um pouco dos dois"); o próximo contato
+agendado segue a mesma escolha; registro do gestor conta como "registrado"
+no lote da Fila do cobrador. O usuário sugeriu reaproveitar a tela
+Cobranças: o detalhe do cliente que ela abre recebeu os botões (o
+`CollectionModal` antigo não foi reaproveitado — ver item 42).
+
+**Banco** (`20261110000004`, corpos de produção): `registrar_contato` e
+`criar_acordo` ganham `p_em_nome_de uuid` (fim, default NULL; DROP + CREATE
+pela assinatura, GRANT explícito). Só o gestor usa, e só para o cobrador
+cuja carteira tem o cliente (acordo: só perfil de carteira). Autor fica em
+`collection_attempts.registrado_por_id` (coluna nova),
+`scheduled_visits.scheduled_by_manager_id` e `acordos.created_by_id`.
+`fila_item_finalizado`: contato/pagamento de qualquer um e acordo criado
+contam.
+
+**App:** no detalhe do cliente (gestor, com saldo ou acordo): "Registrar em
+nome de: [cobrador da carteira | Eu]" + Atender / Fazer acordo / Ver acordo,
+abrindo `LogContactModal`/`AcordoModal`/`AcordoDetailModal` (props
+`emNomeDe`). Títulos em aberto com mais de um cobrador: só "Eu". Acordo em
+nome de cobrador de visita cai no nome do gestor (avisado na tela).
+
+**Limitações conhecidas:** gestor "Eu" com próximo contato agendado — não
+há lista de retornos do gestor (o agendamento existe e trava agendamento de
+outro no mesmo cliente). Pagamento de parcela de acordo pelo gestor
+continua em nome do gestor (não foi perguntado).
+**Falta:** `db push` + `check:db`, teste na tela, push.
 
 ### Item 40 — Fila de Cobrança em lotes (substitui a Agenda) — 2026-11-10
 

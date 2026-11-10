@@ -17,6 +17,8 @@ import {
   Clock,
   RefreshCw,
   History,
+  PhoneCall,
+  Handshake,
 } from "lucide-react";
 import {
   ClientGroup,
@@ -53,6 +55,10 @@ import { AuthorizationHistoryService } from "../../services/authorizationHistory
 
 import GeneralPaymentModal from "./GeneralPaymentModal";
 import GeneralPaymentEditModal from "./GeneralPaymentEditModal";
+import LogContactModal from "./LogContactModal";
+import AcordoModal from "./AcordoModal";
+import AcordoDetailModal from "./AcordoDetailModal";
+import { USER_TYPE_LABELS, isWalletCollectorType } from "../../config/profiles";
 
 interface ClientDetailModalProps {
   clientGroup: ClientGroup;
@@ -617,6 +623,52 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     saldoPorVenda.get(saleNumber) ??
     calculateSaleBalance(saleNumber, clientGroup.document);
 
+  // Gestor atende e faz acordo pelo cobrador (2026-11-10, migration
+  // 20261110000004): em cada registro escolhe se fica em nome do cobrador
+  // da carteira do cliente ou no dele. Mesmos modais do cobrador (Atender,
+  // Acordo) -- a regra fica num lugar so.
+  const souGestor = userType === "manager";
+  const cobradorDaCarteira = React.useMemo(() => {
+    const ids = new Set<string>();
+    clientSales.forEach((sale) =>
+      sale.installments.forEach((i) => {
+        if (i.user_id && hasInstallmentBalance(i)) ids.add(i.user_id);
+      }),
+    );
+    // Titulos em aberto com mais de um cobrador: ambiguo, so "eu".
+    if (ids.size !== 1) return null;
+    return users?.find((u) => u.id === Array.from(ids)[0]) ?? null;
+  }, [clientSales, users]);
+  const [emNomeDoCobrador, setEmNomeDoCobrador] = useState(true);
+  const emNomeDe =
+    souGestor && emNomeDoCobrador && cobradorDaCarteira
+      ? cobradorDaCarteira.id
+      : null;
+  // Acordo em nome de cobrador de visita nao existe (perfil sem acordo).
+  const acordoEmNomeDe =
+    emNomeDe && cobradorDaCarteira && isWalletCollectorType(cobradorDaCarteira.type)
+      ? emNomeDe
+      : null;
+  const [isAtenderOpen, setIsAtenderOpen] = useState(false);
+  const [isAcordoOpen, setIsAcordoOpen] = useState(false);
+  const [acordoDetalheId, setAcordoDetalheId] = useState<string | null>(null);
+  // O ClientGroup recebido pode nao trazer todas as vendas: os modais
+  // recebem as vendas completas do cliente.
+  const clienteCompleto = React.useMemo(
+    () => ({ ...clientGroup, sales: clientSales }),
+    [clientGroup, clientSales],
+  );
+  // Contato agendado ativo (ligacao/WhatsApp) do responsavel escolhido: o
+  // Atender conclui ou remarca ele na mesma transacao.
+  const contatoAgendadoDoResponsavel = scheduledVisits.find(
+    (v) =>
+      v.clientDocument === clientGroup.document &&
+      v.status === "agendada" &&
+      !!v.channel &&
+      v.channel !== "presencial" &&
+      v.collectorId === (emNomeDe ?? user?.id),
+  );
+
   // Calcular se há pendências reais considerando descontos
   const hasRealPendingValue = React.useMemo(() => {
     return Array.from(saldoPorVenda.values()).some(
@@ -862,6 +914,83 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           {/* Todo perfil de cobranca precisa consultar dados/vendas e registrar
               recebimento na propria carteira — Terceirizado e Juridico ficavam
               de fora por omissao de quando esses perfis foram criados. */}
+          {/* Gestor: atender e fazer acordo pelo cobrador */}
+          {souGestor && (hasRealPendingValue || acordoAtivo) && (
+            <div className="mt-4 mx-4 lg:mx-6 p-3 rounded-2xl border border-indigo-100 bg-indigo-50/50 dark:bg-indigo-900/10 dark:border-indigo-900/30 flex flex-col lg:flex-row lg:items-center gap-3">
+              <div className="flex-1 min-w-0 text-xs text-gray-600 dark:text-dark-text-secondary">
+                {cobradorDaCarteira ? (
+                  <label className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-gray-700 dark:text-dark-text">
+                      Registrar em nome de:
+                    </span>
+                    <select
+                      value={emNomeDoCobrador ? "cobrador" : "eu"}
+                      onChange={(e) =>
+                        setEmNomeDoCobrador(e.target.value === "cobrador")
+                      }
+                      className="px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
+                    >
+                      <option value="cobrador">
+                        {cobradorDaCarteira.name} (
+                        {USER_TYPE_LABELS[cobradorDaCarteira.type] ?? "cobrador"}, dono da carteira)
+                      </option>
+                      <option value="eu">Eu ({user?.name ?? "gestor"})</option>
+                    </select>
+                    <span className="w-full text-[11px] text-gray-500">
+                      {emNomeDoCobrador
+                        ? "Conta para o cobrador e o próximo contato vai para a agenda dele. Fica registrado que foi você."
+                        : "Conta para você e o próximo contato fica na sua agenda."}
+                      {emNomeDoCobrador && !acordoEmNomeDe
+                        ? " Acordo de cobrador de visita fica no seu nome."
+                        : ""}
+                    </span>
+                  </label>
+                ) : (
+                  <span>
+                    Cliente sem cobrador de carteira definido: o registro fica
+                    no seu nome.
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2 shrink-0">
+                {hasRealPendingValue && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAtenderOpen(true)}
+                    className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm font-medium shadow-sm"
+                    title="Registrar contato e agendar o próximo"
+                  >
+                    <PhoneCall className="h-4 w-4" />
+                    Atender
+                  </button>
+                )}
+                {acordoAtivo ? (
+                  <button
+                    type="button"
+                    onClick={() => setAcordoDetalheId(acordoAtivo.id)}
+                    className="flex items-center gap-2 px-3 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 text-sm font-medium shadow-sm"
+                    title="Ver o acordo ativo, registrar pagamento de parcela"
+                  >
+                    <Handshake className="h-4 w-4" />
+                    Ver acordo
+                  </button>
+                ) : (
+                  hasRealPendingValue && (
+                    <button
+                      type="button"
+                      onClick={() => setIsAcordoOpen(true)}
+                      className="flex items-center gap-2 px-3 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 text-sm font-medium shadow-sm"
+                      title="Negociar a dívida em parcelas"
+                    >
+                      <Handshake className="h-4 w-4" />
+                      Fazer acordo
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+
           {(isCollectorType(userType) || userType === "manager") && (
             <div
               className="mt-4 px-4 lg:px-6 py-0 grid grid-cols-2 gap-3 sm:grid-cols-5"
@@ -1906,6 +2035,31 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Gestor: Atender / Acordo (mesmos modais do cobrador) */}
+      {isAtenderOpen && (
+        <LogContactModal
+          client={clienteCompleto}
+          linkedVisit={contatoAgendadoDoResponsavel}
+          emNomeDe={emNomeDe}
+          onClose={() => setIsAtenderOpen(false)}
+          onSuccess={() => setIsAtenderOpen(false)}
+        />
+      )}
+      {isAcordoOpen && (
+        <AcordoModal
+          client={clienteCompleto}
+          emNomeDe={acordoEmNomeDe}
+          onClose={() => setIsAcordoOpen(false)}
+          onSuccess={() => setIsAcordoOpen(false)}
+        />
+      )}
+      {acordoDetalheId && (
+        <AcordoDetailModal
+          acordoId={acordoDetalheId}
+          onClose={() => setAcordoDetalheId(null)}
+        />
       )}
 
       {/* General Payment Modal */}

@@ -1848,6 +1848,7 @@ export type Database = {
             Args: {
               p_client_document: string;
               p_desconto_percentual_aplicado?: number;
+              p_em_nome_de?: string;
               p_forma_pagamento_parcelas?: string;
               p_juros_percentual_am_aplicado?: number;
               p_multa_percentual_aplicado?: number;
@@ -2072,6 +2073,7 @@ export type Database = {
           p_resultado: string;
           p_rotulo_resultado?: string;
           p_situacao_liberacao?: string;
+          p_em_nome_de?: string;
           p_tipo: string;
           p_titulos: string[];
           p_visita_id?: string;

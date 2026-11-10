@@ -1826,6 +1826,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     testemunha1Cpf: string;
     testemunha2Nome: string;
     testemunha2Cpf: string;
+    emNomeDe?: string | null;
   }): Promise<Acordo> => {
     const { data, error: rpcError } = await supabase
       .rpc("criar_acordo", {
@@ -1851,6 +1852,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         p_testemunha1_cpf: params.testemunha1Cpf,
         p_testemunha2_nome: params.testemunha2Nome,
         p_testemunha2_cpf: params.testemunha2Cpf,
+        // Gestor fazendo pelo cobrador (migration 20261110000004).
+        p_em_nome_de: params.emNomeDe ?? undefined,
       })
       .single();
 

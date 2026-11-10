@@ -39,6 +39,9 @@ interface AcordoModalProps {
   client: ClientGroup;
   onClose: () => void;
   onSuccess: () => void;
+  /** Gestor: acordo em nome do cobrador da carteira (null/ausente = de
+   * quem esta logado). */
+  emNomeDe?: string | null;
 }
 
 interface ParcelaDraft {
@@ -91,6 +94,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   client,
   onClose,
   onSuccess,
+  emNomeDe,
 }) => {
   const {
     criarAcordo,
@@ -443,6 +447,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
         testemunha1Cpf: testemunha1Cpf.trim(),
         testemunha2Nome: testemunha2Nome.trim(),
         testemunha2Cpf: testemunha2Cpf.trim(),
+        emNomeDe,
       });
 
       // Entrada (1a parcela) ja foi confirmada via Pix pelo cobrador antes
