@@ -437,8 +437,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // Ultimo contato registrado por cliente (collection_attempts, ver
   // LogContactModal.tsx). Antes lia de scheduled_visits (visita falsa com
   // status "realizada") -- buscado a parte aqui porque o CollectionContext
-  // nao carrega collection_attempts globalmente, so sob demanda por titulo
-  // (CollectionModal).
+  // nao carrega collection_attempts globalmente.
   type TentativaResumo = {
     date: string;
     result: string;

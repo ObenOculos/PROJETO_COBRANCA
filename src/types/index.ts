@@ -491,10 +491,6 @@ export interface CollectionContextType {
     clientIdentifiers: { document?: string; clientName?: string }[],
   ) => void;
   applyLocalStatus: (idParcelas: number[], situacao: string | null) => void;
-  addAttempt: (
-    collectionId: number,
-    attempt: Omit<CollectionAttempt, "id">,
-  ) => Promise<void>;
   // Acordos de renegociacao (perfis carteira: Interno/Terceirizado/
   // Juridico). Ver supabase/migrations/20261030000005_criar_acordos_renegociacao.sql.
   acordos: Acordo[];

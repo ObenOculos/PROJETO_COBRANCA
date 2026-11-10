@@ -11,7 +11,6 @@ import {
   User,
   UserType,
   MonthlyGoal,
-  CollectionAttempt,
   DashboardStats,
   CollectorPerformance,
   ClientGroup,
@@ -1624,37 +1623,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       console.error("Erro ao atualizar collection:", err);
       setError(
         err instanceof Error ? err.message : "Erro ao atualizar cobrança",
-      );
-    }
-  };
-
-  const addAttempt = async (
-    collectionId: number,
-    attempt: Omit<CollectionAttempt, "id">,
-  ) => {
-    try {
-      const { error: supabaseError } = await supabase
-        .from("collection_attempts")
-        .insert({
-          collection_id: collectionId.toString(),
-          date: attempt.date,
-          type: attempt.type,
-          result: attempt.result,
-          notes: attempt.notes,
-          next_action: attempt.nextAction,
-          next_action_date: attempt.nextActionDate,
-          collector_id: user?.id ?? null,
-        });
-
-      if (supabaseError) {
-        throw supabaseError;
-      }
-
-      console.log("Tentativa adicionada para cobrança:", collectionId, attempt);
-    } catch (err) {
-      console.error("Erro ao adicionar tentativa:", err);
-      setError(
-        err instanceof Error ? err.message : "Erro ao adicionar tentativa",
       );
     }
   };
@@ -5081,7 +5049,6 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     applyLocalAssignment,
     applyLocalRemoval,
     applyLocalStatus,
-    addAttempt,
     acordos,
     fetchAcordos,
     getAcordoAtivoDoCliente,

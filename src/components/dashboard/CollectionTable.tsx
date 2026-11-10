@@ -42,7 +42,6 @@ import {
 import { seloForaDaCobranca } from "../../types/status";
 import { getClientPaymentStatus } from "../../filters/clientStatus";
 import { countVendas, resolveSaleKey } from "../../filters/sales";
-import CollectionModal from "./CollectionModal";
 import ClientDetailModal from "./ClientDetailModal";
 import ConfirmationModal from "../common/ConfirmationModal";
 import { useCollection } from "../../contexts/CollectionContext";
@@ -111,11 +110,8 @@ export const CollectionTable = React.forwardRef<
       fetchAllCurrentAddresses();
     }, [userType]); // Refetch if userType changes, though it's unlikely.
 
-    const [selectedCollection, setSelectedCollection] =
-      useState<Collection | null>(null);
     const [selectedClientGroup, setSelectedClientGroup] =
       useState<ClientGroup | null>(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
     const [isClientModalOpen, setIsClientModalOpen] = useState(false);
 
     // State for delete confirmation modal
@@ -243,11 +239,6 @@ export const CollectionTable = React.forwardRef<
 
     const collapseAll = () => {
       setExpandedClients(new Set());
-    };
-
-    const handleCloseModal = () => {
-      setSelectedCollection(null);
-      setIsModalOpen(false);
     };
 
     const handleViewClient = (clientGroup: ClientGroup) => {
@@ -1086,17 +1077,6 @@ export const CollectionTable = React.forwardRef<
               </div>
             </div>
           )}
-          {/* Collection Modal - Renderizado via Portal */}
-          {isModalOpen &&
-            selectedCollection &&
-            createPortal(
-              <CollectionModal
-                collection={selectedCollection}
-                userType={userType}
-                onClose={handleCloseModal}
-              />,
-              document.body,
-            )}
           {/* Client Detail Modal - Renderizado via Portal */}
           {isClientModalOpen &&
             selectedClientGroup &&
@@ -1879,18 +1859,6 @@ export const CollectionTable = React.forwardRef<
             </div>
           </div>
         )}
-
-        {/* Collection Modal - Renderizado via Portal */}
-        {isModalOpen &&
-          selectedCollection &&
-          createPortal(
-            <CollectionModal
-              collection={selectedCollection}
-              userType={userType}
-              onClose={handleCloseModal}
-            />,
-            document.body,
-          )}
 
         {/* Ficha do cliente (unificacao, etapa 1) */}
         {isClientModalOpen &&

@@ -1,5 +1,5 @@
 // Fonte unica de verdade pra regras sobre collection_attempts (tentativas
-// de contato/cobranca registradas por CollectionModal e LogContactModal).
+// de contato/cobranca registradas pelo Atender -- LogContactModal).
 import { CollectionAttempt, ScheduledVisit } from "../types";
 
 /** Dias sem nenhum contato registrado pra um cliente entrar na secao "Sem

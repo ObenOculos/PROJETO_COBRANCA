@@ -305,11 +305,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   }, [clientGroup.document, scheduledVisits, reincidenciaResets]);
 
   // Histórico completo de collection_attempts do cliente (ligação/WhatsApp/
-  // mensagem registrados por LogContactModal ou CollectionModal), em TODOS
+  // mensagem registrados pelo Atender -- RPC registrar_contato), em TODOS
   // os títulos dele -- não só os em aberto (diferente do attemptsByCollection
-  // da agenda do cobrador, que só olha título pendente). Nunca existiu uma
-  // visão agregada disso antes; a aba "Tentativas" do CollectionModal só
-  // mostra um título por vez.
+  // da tela do cobrador, que só olha título pendente).
   interface ContactAttemptRow {
     id: string;
     saleDescription: string;
