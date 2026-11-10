@@ -45,7 +45,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 29 | Código do cliente do Ciclone (`pgcln_codigo`) no cadastro — migration `20261109000001` aplicada + `check:db` OK, sync rodado (1.888 clientes com código); falta publicar o front e testar na tela | Média | Pequeno |
 | 39 | Fila de Cobrança: gestor define, na Distribuição, quantos clientes de cada faixa a cada rodada da lista "Ligar" (manhã/tarde opcional) — etapa 1 (configuração) commitada, `0010` aplicada; ordenação e faixa de dívida por faixa (`0011` aplicada); etapa 2 (lista intercalada + "Deixar para depois") feita, `0012` aplicada, `0013` (só INSERT/SELECT no privilégio) aplicada, falta teste na tela; etapa 3 (supervisão) não iniciada | Alta | Grande, em etapas |
 | 40 | Fila de Cobrança em lotes substitui a Agenda do cobrador de carteira (lote = soma das quantidades do gestor; próximo só com o atual todo registrado) + filtros da Agenda na Carteira completa — código feito 2026-11-10, migration `20261110000003` aplicada (`check:db` OK), 1º lote do José conferido no banco (5/2/2/1); falta teste completo na tela e push | Alta | Grande |
-| 41 | Gestor atende e faz acordo pelo cobrador (escolhe "em nome de": cobrador da carteira ou ele) — botões no detalhe do cliente (Cobranças etc.); migration `20261110000004` sem `db push`, sem teste | Alta | Médio |
+| 41 | Gestor atende e faz acordo pelo cobrador (escolhe "em nome de": cobrador da carteira ou ele) — botões no detalhe do cliente (Cobranças etc.); migration `20261110000004` aplicada (`check:db` OK); falta teste na tela e push | Alta | Médio |
 | 42 | `CollectionModal` (Cobranças → título → aba "Ações", só cobrador): grava status, recebimento e tentativa direto na tabela, sem as RPCs (sem histórico de pagamento, sem regra de acordo/agendamento) e usa `alert`/`confirm` nativos — avaliar remover ou trocar pelos modais novos | Média | Pequeno/médio |
 
 ## Perguntas em aberto para o financeiro
@@ -233,7 +233,10 @@ nome de cobrador de visita cai no nome do gestor (avisado na tela).
 há lista de retornos do gestor (o agendamento existe e trava agendamento de
 outro no mesmo cliente). Pagamento de parcela de acordo pelo gestor
 continua em nome do gestor (não foi perguntado).
-**Falta:** `db push` + `check:db`, teste na tela, push.
+`0004` aplicada 2026-11-10 (`check:db` OK): versões antigas de
+`registrar_contato`/`criar_acordo` (11 args) removidas, novas só para
+`authenticated`; o `criar_acordo(text,jsonb,jsonb)` legado continua igual.
+**Falta:** teste na tela, push.
 
 ### Item 40 — Fila de Cobrança em lotes (substitui a Agenda) — 2026-11-10
 
