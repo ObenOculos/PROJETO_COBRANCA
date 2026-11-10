@@ -49,7 +49,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 42 | ~~`CollectionModal` grava status/recebimento/tentativa direto, sem RPC~~ — era código morto (nenhuma tela abria); removido com o `addAttempt` do contexto em 2026-11-10 (item 43, etapa 3) | Média | Pequeno/médio |
 | 43 | Ficha do cliente única (`ClientDetailModal`) — 4 etapas feitas 2026-11-10 (sem push, sem teste do usuário) | Média | Médio, em etapas |
 | 44 | Carregamento parcial/inconsistente (precisava de F5 2–3 vezes) — nova tentativa em erro passageiro, sem lista incompleta, caches das derivações por carga, corrida da carga de títulos; feito 2026-11-10, sem teste no navegador (extensão caiu), sem push | Alta | Médio |
-| 45 | Acordo cancelado: juros já pagos passam a abater a dívida original + histórico de acordos/agendamentos cancelados na ficha — migration `20261110000005` aplicada e conferida (OTICA FERNANDA: recebido 500,00); falta teste na tela e push | Alta | Médio |
+| 45 | Acordo cancelado: quem cancela escolhe estornar (refazer) ou manter (desistiu) o valor pago + histórico de acordos/agendamentos cancelados — `0005` aplicada; `0006` (estorna a entrada da OTICA FERNANDA) sem `db push` | Alta | Médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -235,6 +235,21 @@ recebido 500,00 (falta 857,56), `encargos_reimputados` 23,51, histórico com
 a linha `acordo_cancelado` (476,49 → 500,00); função interna sem EXECUTE
 para `anon`/`authenticated`.
 **Falta:** teste na tela e push.
+
+**Revisão no mesmo dia (migration `20261110000006`):** o usuário apontou que,
+cancelado por erro de lançamento, o acordo é refeito e a entrada é digitada
+de novo — manter o pagamento no acordo cancelado contaria o dinheiro duas
+vezes. Decisão: **quem cancela escolhe** (obrigatório quando há pagamento):
+*Estornar* (será refeito / não aconteceu → estorno ligado a cada pagamento
+em `acordo_pagamentos.estorno_de`, títulos voltam ao saldo, inclusive a
+reimputação da 0005) ou *Manter como recebido* (cliente pagou e desistiu →
+regra da 0005). `acordos.destino_pagamentos` guarda a escolha;
+`cancelar_acordo(id, motivo, destino)` (DROP + CREATE pela assinatura);
+funções internas `estornar_pagamentos_acordo_cancelado` e
+`estornar_valor_no_titulo`. A migration estorna a entrada da OTICA FERNANDA
+(pedido do usuário; o título volta a R$ 1.357,56 em aberto). Tela: escolha
+no cancelamento do `AcordoDetailModal`; histórico mostra o destino.
+**Falta:** `db push` (antes do push do front) + `check:db` + conferência.
 
 ### Item 44 — Carregamento confiável — 2026-11-10
 

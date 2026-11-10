@@ -70,6 +70,10 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
   const [showCancelForm, setShowCancelForm] = useState(false);
   const [cancelMotivoKey, setCancelMotivoKey] = useState("");
   const [cancelObservacao, setCancelObservacao] = useState("");
+  // Acordo com pagamento: o que fazer com ele ao cancelar (obrigatorio).
+  const [cancelDestino, setCancelDestino] = useState<
+    "estornar" | "manter" | ""
+  >("");
   const [showQuitadas, setShowQuitadas] = useState(false);
   const [showTitulosOrigem, setShowTitulosOrigem] = useState(false);
   const [baixandoTermo, setBaixandoTermo] = useState(false);
@@ -97,6 +101,10 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acordoId]);
+
+  // Liquido ja pago no acordo (estornos entram negativos).
+  const totalPagoNoAcordo = pagamentos.reduce((s, p) => s + p.valorPago, 0);
+  const acordoTemPagamento = totalPagoNoAcordo > 0.009;
 
   const saldoDaParcela = (parcelaId: string, valorParcela: number) =>
     valorParcela -
@@ -217,6 +225,10 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
       setError("Descreva o motivo do cancelamento.");
       return;
     }
+    if (acordoTemPagamento && !cancelDestino) {
+      setError("Escolha o que fazer com o valor já pago neste acordo.");
+      return;
+    }
     const label = acordoCancelReasonLabel(cancelMotivoKey);
     const motivo =
       cancelMotivoKey === ACORDO_CANCEL_REASON_OTHER
@@ -228,7 +240,11 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
     setSaving(true);
     setError("");
     try {
-      await cancelarAcordo(acordoId, motivo);
+      await cancelarAcordo(
+        acordoId,
+        motivo,
+        acordoTemPagamento && cancelDestino ? cancelDestino : undefined,
+      );
       onClose();
     } catch (err) {
       setError(
@@ -654,6 +670,53 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
                           : "Detalhe adicional, se precisar"
                       }
                     />
+                    {acordoTemPagamento && (
+                      <div className="space-y-1.5 pt-1">
+                        <p className="text-xs font-bold text-gray-400">
+                          Já foi pago {formatCurrency(totalPagoNoAcordo)} neste
+                          acordo. O que fazer com esse valor? (obrigatório)
+                        </p>
+                        {(
+                          [
+                            [
+                              "estornar",
+                              "Estornar",
+                              "O acordo vai ser refeito (a entrada será lançada de novo no acordo novo) ou o pagamento não aconteceu. A dívida volta ao valor de antes.",
+                            ],
+                            [
+                              "manter",
+                              "Manter como recebido",
+                              "O cliente pagou e desistiu do acordo. O valor pago (inclusive os juros) abate a dívida.",
+                            ],
+                          ] as const
+                        ).map(([valor, titulo, explicacao]) => (
+                          <label
+                            key={valor}
+                            className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer text-sm ${
+                              cancelDestino === valor
+                                ? "border-red-300 bg-red-50 dark:bg-red-900/10"
+                                : "border-gray-200 dark:border-dark-border"
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="cancel-destino"
+                              className="mt-1"
+                              checked={cancelDestino === valor}
+                              onChange={() => setCancelDestino(valor)}
+                            />
+                            <span>
+                              <span className="font-bold text-gray-800 dark:text-dark-text">
+                                {titulo}
+                              </span>
+                              <span className="block text-xs text-gray-500">
+                                {explicacao}
+                              </span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                       <button
                         onClick={confirmCancelar}
@@ -667,6 +730,7 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
                           setShowCancelForm(false);
                           setCancelMotivoKey("");
                           setCancelObservacao("");
+                          setCancelDestino("");
                           setError("");
                         }}
                         disabled={saving}

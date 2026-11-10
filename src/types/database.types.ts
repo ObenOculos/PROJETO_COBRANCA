@@ -281,6 +281,8 @@ export type Database = {
           created_at: string;
           created_by_id: string | null;
           desconto_percentual_aplicado: number;
+          // Migration 20261110000006.
+          destino_pagamentos: string | null;
           // Migration 20261110000005.
           encargos_reimputados: number | null;
           forma_pagamento_parcelas: string | null;
@@ -1720,7 +1722,12 @@ export type Database = {
         }[];
       };
       cancelar_acordo: {
-        Args: { p_acordo_id: string; p_motivo: string };
+        // p_destino_pagamentos: migration 20261110000006.
+        Args: {
+          p_acordo_id: string;
+          p_motivo: string;
+          p_destino_pagamentos?: string;
+        };
         Returns: {
           acordo_origem_id: string | null;
           client_document: string;

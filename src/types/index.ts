@@ -562,7 +562,14 @@ export interface CollectionContextType {
     dataPagamento: string;
     notes?: string;
   }) => Promise<AcordoPagamento>;
-  cancelarAcordo: (acordoId: string, motivo: string) => Promise<void>;
+  /** destinoPagamentos: obrigatorio quando o acordo tem pagamento --
+   * "estornar" (sera refeito / nao aconteceu) ou "manter" (cliente pagou e
+   * desistiu). Migration 20261110000006. */
+  cancelarAcordo: (
+    acordoId: string,
+    motivo: string,
+    destinoPagamentos?: "estornar" | "manter",
+  ) => Promise<void>;
   /** Cria o perfil e a conta de login (senha) — RPC criar_usuario_com_login. */
   addUser: (
     user: Pick<User, "name" | "login" | "type">,

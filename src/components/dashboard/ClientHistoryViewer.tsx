@@ -272,11 +272,11 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
       },
       acordo: {
         icon: <Handshake className="h-4 w-4 text-amber-600" />,
-        titulo: "Pagamento de parcela de acordo",
+        titulo: "Acordo: pagamento de parcela ou estorno",
       },
       acordo_cancelado: {
         icon: <Handshake className="h-4 w-4 text-gray-500" />,
-        titulo: "Acordo cancelado: juros já pagos abatidos da dívida",
+        titulo: "Acordo cancelado: ajuste dos juros já pagos",
       },
     }[ev.origem] ?? {
       icon: <History className="h-4 w-4 text-gray-400" />,

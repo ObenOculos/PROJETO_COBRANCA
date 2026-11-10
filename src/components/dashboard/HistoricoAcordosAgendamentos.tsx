@@ -23,6 +23,7 @@ interface AcordoLinha {
   collector_id: string;
   created_by_id: string | null;
   encargos_reimputados: number | null;
+  destino_pagamentos: string | null;
 }
 
 type Evento =
@@ -71,7 +72,7 @@ const HistoricoAcordosAgendamentos: React.FC<Props> = ({
         supabase
           .from("acordos")
           .select(
-            "id, status, valor_negociado, numero_parcelas, created_at, resolved_at, motivo_cancelamento, collector_id, created_by_id, encargos_reimputados",
+            "id, status, valor_negociado, numero_parcelas, created_at, resolved_at, motivo_cancelamento, collector_id, created_by_id, encargos_reimputados, destino_pagamentos",
           )
           .eq("client_document", clientDocument)
           .order("created_at", { ascending: false })
@@ -174,6 +175,12 @@ const HistoricoAcordosAgendamentos: React.FC<Props> = ({
           {a.motivo_cancelamento?.trim() && (
             <p className="text-xs text-gray-700 mt-1 ml-6 whitespace-pre-wrap">
               Motivo: {a.motivo_cancelamento.trim()}
+            </p>
+          )}
+          {a.status === "cancelado" && a.destino_pagamentos === "estornar" && (
+            <p className="text-xs text-gray-500 mt-0.5 ml-6">
+              Valor pago no acordo estornado (a dívida voltou ao valor de
+              antes).
             </p>
           )}
           {a.status === "cancelado" && (a.encargos_reimputados ?? 0) > 0 && (

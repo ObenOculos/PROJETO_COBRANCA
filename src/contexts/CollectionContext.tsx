@@ -2096,10 +2096,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     };
   };
 
-  const cancelarAcordo = async (acordoId: string, motivo: string) => {
+  const cancelarAcordo = async (
+    acordoId: string,
+    motivo: string,
+    destinoPagamentos?: "estornar" | "manter",
+  ) => {
     const { error: rpcError } = await supabase.rpc("cancelar_acordo", {
       p_acordo_id: acordoId,
       p_motivo: motivo,
+      p_destino_pagamentos: destinoPagamentos,
     });
 
     if (rpcError) {
