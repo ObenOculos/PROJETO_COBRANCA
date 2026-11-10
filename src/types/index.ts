@@ -275,7 +275,9 @@ export interface CollectionAttempt {
     | "contact_made"
     | "message_sent"
     | "agreement"
-    | "disputed";
+    | "disputed"
+    // Cliente diz que ja pagou (com ou sem comprovante em maos).
+    | "claims_paid";
   notes?: string;
   nextAction?: string;
   nextActionDate?: string;

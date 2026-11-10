@@ -25,6 +25,7 @@ export const ATTEMPT_RESULT_LABELS: Record<CollectionAttempt["result"], string> 
   message_sent: "Mensagem enviada",
   agreement: "Acordo realizado",
   disputed: "Contestou a dívida (SPC)",
+  claims_paid: "Cliente diz que já pagou",
 };
 
 /**
@@ -44,6 +45,7 @@ const EFFECTIVE_ATTEMPT_RESULTS: ReadonlySet<CollectionAttempt["result"]> =
     "contact_made",
     "agreement",
     "disputed",
+    "claims_paid",
   ]);
 
 export const isEffectiveAttemptResult = (

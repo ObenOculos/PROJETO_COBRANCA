@@ -2340,6 +2340,9 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
   const [versaoRegistros, setVersaoRegistros] = useState(0);
   const [selectedClientForLog, setSelectedClientForLog] = useState<any>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  // Ficha aberta pelo Atender ("diz que ja pagou" com comprovante): ja abre
+  // no registro do pagamento.
+  const [abrirPagamentoNaFicha, setAbrirPagamentoNaFicha] = useState(false);
   const [selectedClientForDetail, setSelectedClientForDetail] =
     useState<any>(null);
   const [isAcordoModalOpen, setIsAcordoModalOpen] = useState(false);
@@ -3603,6 +3606,13 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             setSelectedClientForLog(null);
             setVersaoRegistros((v) => v + 1);
           }}
+          onRegistrarPagamento={() => {
+            // "Cliente diz que ja pagou" com comprovante: abre a ficha ja no
+            // registro do pagamento.
+            setSelectedClientForDetail(selectedClientForLog);
+            setAbrirPagamentoNaFicha(true);
+            setIsDetailModalOpen(true);
+          }}
         />
       )}
 
@@ -3621,9 +3631,11 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
         <ClientDetailModal
           clientGroup={selectedClientForDetail}
           userType={user?.type || "collector"}
+          abrirPagamento={abrirPagamentoNaFicha}
           onClose={() => {
             setIsDetailModalOpen(false);
             setSelectedClientForDetail(null);
+            setAbrirPagamentoNaFicha(false);
             // Pode ter registrado pagamento no detalhe: o lote da fila rele.
             setVersaoRegistros((v) => v + 1);
           }}

@@ -68,6 +68,9 @@ interface ClientDetailModalProps {
   /** Abre ja na lista de vendas com esta venda expandida (ex.: "Ver
    * detalhes da venda" na Cobrancas). */
   vendaInicial?: number;
+  /** Veio do Atender ("Cliente diz que ja pagou" com comprovante): abre
+   * direto o registro do pagamento (do acordo, se houver). */
+  abrirPagamento?: boolean;
 }
 
 // ============================================
@@ -202,6 +205,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   userType,
   onClose,
   vendaInicial,
+  abrirPagamento,
 }) => {
   const {
     getSalesByClient,
@@ -658,6 +662,21 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       ? emNomeDe
       : null;
   const [isAtenderOpen, setIsAtenderOpen] = useState(false);
+  // Pagamento aberto depois do Atender: o contato ja foi registrado la.
+  const [pagamentoSemContato, setPagamentoSemContato] = useState(false);
+  const abrirRegistroDePagamento = () => {
+    if (acordoAtivo) {
+      setAcordoDetalheId(acordoAtivo.id);
+    } else {
+      setPagamentoSemContato(true);
+      setIsGeneralPaymentModalOpen(true);
+    }
+  };
+  useEffect(() => {
+    if (abrirPagamento) abrirRegistroDePagamento();
+    // So ao abrir a ficha.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [isAcordoOpen, setIsAcordoOpen] = useState(false);
   const [acordoDetalheId, setAcordoDetalheId] = useState<string | null>(null);
   // O ClientGroup recebido pode nao trazer todas as vendas: os modais
@@ -2077,6 +2096,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           emNomeDe={emNomeDe}
           onClose={() => setIsAtenderOpen(false)}
           onSuccess={() => setIsAtenderOpen(false)}
+          onRegistrarPagamento={abrirRegistroDePagamento}
         />
       )}
       {isAcordoOpen && (
@@ -2099,8 +2119,15 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         <GeneralPaymentModal
           clientGroup={clientGroup}
           clientSales={clientSales}
-          onClose={() => setIsGeneralPaymentModalOpen(false)}
-          onSuccess={handleGeneralPaymentSuccess}
+          contatoJaRegistrado={pagamentoSemContato}
+          onClose={() => {
+            setIsGeneralPaymentModalOpen(false);
+            setPagamentoSemContato(false);
+          }}
+          onSuccess={async () => {
+            setPagamentoSemContato(false);
+            await handleGeneralPaymentSuccess();
+          }}
         />
       )}
 

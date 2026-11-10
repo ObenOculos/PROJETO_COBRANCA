@@ -54,6 +54,9 @@ interface LogContactModalProps {
    * ficam em nome deste usuario (cobrador da carteira). Ausente = de quem
    * esta logado. */
   emNomeDe?: string | null;
+  /** "Cliente diz que ja pagou" COM comprovante: depois de salvar o
+   * atendimento, quem abriu o modal abre o registro do pagamento. */
+  onRegistrarPagamento?: () => void;
 }
 
 // Motivo do contato -> tipo/resultado de collection_attempts.
@@ -68,6 +71,7 @@ const STATUS_TO_ATTEMPT: Record<
   recusou_pagar: { type: "call", result: "refusal" },
   mensagem_enviada: { type: "whatsapp", result: "message_sent" },
   contestou_divida: { type: "call", result: "disputed" },
+  diz_que_pagou: { type: "call", result: "claims_paid" },
 };
 
 const CHANNEL_LABEL: Record<ScheduledVisitChannel, string> = {
@@ -114,6 +118,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   canalUsado,
   onCancelarAgendamento,
   emNomeDe,
+  onRegistrarPagamento,
 }) => {
   const { user } = useAuth();
   // Em nome de quem fica o registro (o gestor pode escolher o cobrador).
@@ -163,6 +168,8 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   const [nextChannelTouched, setNextChannelTouched] = useState(false);
   const [semProximo, setSemProximo] = useState(false);
   const [scheduleNotes, setScheduleNotes] = useState("");
+  // "Cliente diz que ja pagou": o comprovante ja chegou? (obrigatorio)
+  const [comprovante, setComprovante] = useState<"sim" | "nao" | "">("");
 
   const remarcarReasons = rescheduleReasonsForChannel(linkedChannel);
   const [remarcarReason, setRemarcarReason] = useState(
@@ -173,9 +180,14 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   const releaseSituacao =
     mode === "contato" ? releaseSituacaoForAttemptResult(result) : null;
   const reschedules = attemptReschedulesActiveContact(result);
-  // Resultado que tira o cliente da carteira: nao ha proximo contato a
-  // marcar, salva direto da etapa 1.
-  const skipStep2 = mode === "contato" && !!releaseSituacao;
+  // "Diz que ja pagou" com comprovante: em seguida registra o pagamento, que
+  // e o que resolve o caso -- sem proximo contato.
+  const pagouComComprovante =
+    mode === "contato" && status === "diz_que_pagou" && comprovante === "sim";
+  // Resultado que tira o cliente da carteira (ou que segue para o registro
+  // do pagamento): nao ha proximo contato a marcar, salva direto da etapa 1.
+  const skipStep2 =
+    mode === "contato" && (!!releaseSituacao || pagouComComprovante);
 
   // Sugestao do proximo contato, enquanto o cobrador nao mexeu no campo:
   // nao atendeu/mensagem -> amanha; promessa -> dia seguinte ao prometido
@@ -184,7 +196,12 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
     if (!nextDateTouched) {
       if (mode === "sem_contato") {
         setNextDate(linkedVisit ? addDaysLocalStr(today, 1) : today);
-      } else if (status === "nao_atende" || status === "mensagem_enviada") {
+      } else if (
+        status === "nao_atende" ||
+        status === "mensagem_enviada" ||
+        // Vai enviar o comprovante: cobrar amanha.
+        status === "diz_que_pagou"
+      ) {
         setNextDate(addDaysLocalStr(today, 1));
       } else if (status === "promessa_pagamento" && promiseDate) {
         setNextDate(addDaysLocalStr(promiseDate, 1));
@@ -228,7 +245,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   const effectiveNext =
     mode === "sem_contato"
       ? nextDate
-      : releaseSituacao || semProximo
+      : releaseSituacao || semProximo || pagouComComprovante
         ? ""
         : nextDate;
   // Remarcacao sem contato mantem o canal do agendamento (rescheduleVisit
@@ -245,6 +262,11 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   if (mode === "contato") {
     if (releaseSituacao) {
       preview.push(`O cliente sai da sua carteira (${releaseSituacao}).`);
+    }
+    if (pagouComComprovante) {
+      preview.push(
+        "Depois de salvar, abre o registro do pagamento para lançar o valor do comprovante.",
+      );
     }
     if (linkedVisit) {
       const when = formatDateBR(linkedVisit.scheduledDate);
@@ -289,6 +311,8 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   /** Validacao da etapa 1 (o que aconteceu). */
   const validateStep1 = (): string | null => {
     if (mode === "sem_contato") return null;
+    if (status === "diz_que_pagou" && !comprovante)
+      return "Informe se o cliente já enviou o comprovante.";
     if (!notes.trim()) return "Por favor, adicione uma observação sobre o contato.";
     if (titulosEmAberto.length === 0)
       return "Este cliente não tem título em aberto para registrar o contato.";
@@ -423,6 +447,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
 
       await reload();
       onSuccess();
+      if (pagouComComprovante) onRegistrarPagamento?.();
     } catch (err) {
       console.error("Erro ao registrar contato:", err);
       setError("Falha ao salvar contato: " + errorMessage(err));
@@ -610,6 +635,9 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
                       <option value="promessa_pagamento">
                         Promessa de Pagamento
                       </option>
+                      <option value="diz_que_pagou">
+                        Cliente diz que já pagou
+                      </option>
                       <option value="contato_realizado">
                         Contato Realizado (Sem acordo)
                       </option>
@@ -630,6 +658,40 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
                       </option>
                     </select>
                   </div>
+
+                  {status === "diz_que_pagou" && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-400">
+                        O cliente enviou o comprovante?
+                      </label>
+                      <div className="flex gap-2">
+                        {(
+                          [
+                            ["sim", "Sim — registrar o pagamento"],
+                            ["nao", "Ainda não — vai enviar"],
+                          ] as const
+                        ).map(([valor, rotulo]) => (
+                          <button
+                            key={valor}
+                            type="button"
+                            onClick={() => {
+                              setComprovante(valor);
+                              setError("");
+                            }}
+                            className={toggleClass(comprovante === valor)}
+                          >
+                            {rotulo}
+                          </button>
+                        ))}
+                      </div>
+                      {comprovante === "nao" && (
+                        <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                          Na próxima etapa o retorno já vem sugerido para amanhã,
+                          para cobrar o comprovante.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {status === "promessa_pagamento" && (
                     <div className="space-y-1.5">

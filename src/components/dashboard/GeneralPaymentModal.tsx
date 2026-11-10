@@ -51,6 +51,9 @@ interface GeneralPaymentModalProps {
   clientSales: SaleGroup[];
   onClose: () => void;
   onSuccess: () => void;
+  /** O atendimento ja foi registrado pelo Atender ("Cliente diz que ja
+   * pagou" com comprovante): nao grava um segundo contato. */
+  contatoJaRegistrado?: boolean;
 }
 
 interface SaleDistributionItem {
@@ -63,7 +66,7 @@ interface SaleDistributionItem {
 }
 
 const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
-  ({ clientGroup, clientSales, onClose, onSuccess }) => {
+  ({ clientGroup, clientSales, onClose, onSuccess, contatoJaRegistrado }) => {
     const {
       scheduleVisit,
       processSalePayment,
@@ -517,7 +520,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
       let avisoAcompanhamento: string | null = null;
       try {
-        if (ehCarteira && isOnline) {
+        if (contatoJaRegistrado && ehCarteira) {
+          // Atendimento ja registrado pelo Atender; so o pagamento entra.
+        } else if (ehCarteira && isOnline) {
           const resultado: CollectionAttempt["result"] = precisaAcompanhamento
             ? "partial_payment"
             : "full_payment";
