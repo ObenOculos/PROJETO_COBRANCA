@@ -125,6 +125,10 @@ const UserManagement: React.FC<UserManagementProps> = ({
     login: "",
     type: "collector" as UserRoleType,
   });
+  // Só na criação: senha inicial da conta de login.
+  const [senha, setSenha] = useState("");
+  const [senhaConfirma, setSenhaConfirma] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleToggleActive = async (u: UserType) => {
     const isDeactivating = u.active ?? true; // estado atual ativo => vamos desativar
@@ -162,18 +166,34 @@ const UserManagement: React.FC<UserManagementProps> = ({
       setEditingUser(null);
       setFormData({ name: "", login: "", type: "collector" });
     }
+    setSenha("");
+    setSenhaConfirma("");
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
+    if (isSaving) return;
     setIsModalOpen(false);
     setEditingUser(null);
     setLocalError(null);
+    setSenha("");
+    setSenhaConfirma("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
+    if (!editingUser) {
+      if (senha.length < 6) {
+        setLocalError("A senha precisa ter pelo menos 6 caracteres.");
+        return;
+      }
+      if (senha !== senhaConfirma) {
+        setLocalError("A confirmação não confere com a senha.");
+        return;
+      }
+    }
+    setIsSaving(true);
     try {
       if (editingUser) {
         const updates: Partial<UserType> = {
@@ -183,10 +203,12 @@ const UserManagement: React.FC<UserManagementProps> = ({
         };
         await updateUser(editingUser.id, updates);
       } else {
-        await addUser(formData);
+        await addUser(formData, senha);
       }
+      setIsSaving(false);
       handleCloseModal();
     } catch (err) {
+      setIsSaving(false);
       setLocalError(
         err instanceof Error ? err.message : "Erro ao salvar usuário",
       );
@@ -592,11 +614,40 @@ const UserManagement: React.FC<UserManagementProps> = ({
                 />
               </div>
               {!editingUser && (
-                <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md p-2 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary">
-                  Isto cria só o perfil. O acesso de login (senha) é
-                  provisionado separadamente — avise quem administra o
-                  sistema para liberar o acesso deste usuário.
-                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
+                      Senha
+                    </label>
+                    <input
+                      type="password"
+                      value={senha}
+                      onChange={(e) => setSenha(e.target.value)}
+                      className={inputClass}
+                      autoComplete="new-password"
+                      minLength={6}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
+                      Confirmar senha
+                    </label>
+                    <input
+                      type="password"
+                      value={senhaConfirma}
+                      onChange={(e) => setSenhaConfirma(e.target.value)}
+                      className={inputClass}
+                      autoComplete="new-password"
+                      minLength={6}
+                      required
+                    />
+                  </div>
+                  <p className="sm:col-span-2 text-xs text-gray-500 dark:text-dark-text-secondary">
+                    Mínimo de 6 caracteres. Passe o login e a senha para a
+                    pessoa; ela entra com eles na hora.
+                  </p>
+                </div>
               )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
@@ -623,15 +674,17 @@ const UserManagement: React.FC<UserManagementProps> = ({
                 <button
                   type="button"
                   onClick={handleCloseModal}
+                  disabled={isSaving}
                   className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
+                  disabled={isSaving}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {editingUser ? "Atualizar" : "Criar"}
+                  {isSaving ? "Salvando..." : editingUser ? "Atualizar" : "Criar"}
                 </button>
               </div>
             </form>

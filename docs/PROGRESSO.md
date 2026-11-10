@@ -202,6 +202,18 @@ Sem tela de troca de senha: modelo SQL em `scripts/sql/trocar-senha-usuario.sql`
 (conferência + UPDATE em `auth.users`, rodar no SQL Editor; não commitar com
 senha preenchida).
 
+**Criar usuário já com login** (mesmo dia): a tela Usuários (gestor) pede
+senha + confirmação no "Novo Usuário" e chama a RPC
+`criar_usuario_com_login` (migration `20261110000001`, `SECURITY DEFINER`,
+guard `IS DISTINCT FROM 'manager'`). Numa transação: `auth.users` (bcrypt,
+e-mail confirmado, formato copiado da conta de `jose_focco`) +
+`auth.identities` + `public.users` com `auth_user_id`/`auth_email`. E-mail
+sintético = slug do login `@collectors.internal` (sufixo `-2`… se colidir).
+Login duplicado é recusado sem diferenciar maiúscula. O provisionamento
+manual no SQL Editor deixa de ser necessário para usuário novo.
+**Falta:** `db push` + `check:db`, teste na tela (criar e entrar com o
+login novo). Não feito: gestor redefinir senha pela tela.
+
 ### Item 38 — Carteira: filtro "já entrei em contato" — 2026-11-09
 
 Pedido dos cobradores: cliente contatado hoje continuava na agenda igual aos

@@ -1972,6 +1972,11 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: { collector_id: string; clientes_em_aberto: number }[];
       };
+      // Migration 20261110000001.
+      criar_usuario_com_login: {
+        Args: { p_name: string; p_login: string; p_type: string; p_senha: string };
+        Returns: string;
+      };
       encerrar_regra_carteira: {
         Args: { p_regra_id: string };
         Returns: undefined;

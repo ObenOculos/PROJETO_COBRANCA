@@ -565,7 +565,11 @@ export interface CollectionContextType {
     notes?: string;
   }) => Promise<AcordoPagamento>;
   cancelarAcordo: (acordoId: string, motivo: string) => Promise<void>;
-  addUser: (user: Omit<User, "id" | "createdAt">) => Promise<void>;
+  /** Cria o perfil e a conta de login (senha) — RPC criar_usuario_com_login. */
+  addUser: (
+    user: Pick<User, "name" | "login" | "type">,
+    senha: string,
+  ) => Promise<void>;
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
   setMonthlyGoal: (

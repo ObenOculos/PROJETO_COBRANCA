@@ -2188,19 +2188,26 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     return nova;
   };
 
-  const addUser = async (user: Omit<User, "id" | "createdAt">) => {
+  const addUser = async (
+    user: Pick<User, "name" | "login" | "type">,
+    senha: string,
+  ) => {
     try {
-      // Só cria o perfil (nome/login/tipo). O acesso de login (conta no
-      // Supabase Auth) é provisionado separadamente — ver
-      // scripts/migrate-users-to-auth.ts e docs/PROGRESSO.md.
-      const { error: supabaseError } = await supabase.from("users").insert({
-        name: user.name,
-        login: user.login,
-        type: user.type,
-      });
+      // Cria o perfil e a conta de login (Supabase Auth) numa transação só,
+      // no servidor — só gestor (migration 20261110000001).
+      const { error: supabaseError } = await supabase.rpc(
+        "criar_usuario_com_login",
+        {
+          p_name: user.name,
+          p_login: user.login,
+          p_type: user.type,
+          p_senha: senha,
+        },
+      );
 
       if (supabaseError) {
-        throw supabaseError;
+        // A mensagem vem da função (validação em português).
+        throw new Error(supabaseError.message);
       }
 
       invalidateUsers(); // Invalidate cache before fetching
