@@ -53,7 +53,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 46 | Atender: "Cliente diz que já pagou" (comprovante → registro do pagamento) e "Cliente informa venda cancelada" (parcelas da venda vão para conferência do gestor) — migration `20261110000008` aplicada (`check:db` OK); falta teste na tela | Alta | Médio |
 | 47 | Lentidão/travamento do cobrador — 5 correções de front (`a7d7874`, `33e2278`, `cb749d1`, `3161703`, `af7f311`) + índice `20261111000001` (aplicado), 2026-11-11; sem push, sem teste no navegador | Alta | Pequeno |
 | 48 | Gestor: números errados depois de sair e entrar na mesma aba (só quitados) + travamento ao trocar de aba (Desempenho ~32 s, Lojas, Cobranças) — `831d182`, `96fb4f8`, `c563f22`, `63aaef6`, `87439e5`, 2026-11-11; testado no build de produção, sem push | Alta | Pequeno |
-| 50 | Desempenho do Cedrus (sistema anterior) → app: José importado 2026-11-11 (33 parcelas como `sale_payments` forma "Cedrus" + 3 estornos); falta painel de conferência do gestor e os outros cobradores | Alta | Médio, por cobrador |
+| 50 | Desempenho do Cedrus (sistema anterior) → app: José importado 2026-11-11 (33 parcelas como `sale_payments` forma "Cedrus" + 3 estornos); aba Conferência de recebimentos no Resumo (`af80e81`, migration `20261111000002` sem db push); Monalisa/Jonathan/Aline com prévia pronta, gravação aguardando liberação | Alta | Médio, por cobrador |
 
 ## Perguntas em aberto para o financeiro
 
@@ -238,8 +238,33 @@ desses 3 continuam no original (mesmo comportamento de
 em UTF-8 (`sys.stdin.buffer...decode("utf-8")`); no Windows o padrão cp1252
 corrompe acento ao gravar.
 
-**Falta:** painel de conferência do gestor (base × registrado pelos
-cobradores, mensal); outros cobradores.
+**Venda (`sale_number`) das importadas:** a do título que o Ciclone de fato
+baixou para o cliente perto da data (3 dias antes a 10 depois; depois 30
+dias; mais de uma → valor mais próximo). O título original do acordo no
+Cedrus nem sempre é a venda baixada (acordo renegociado gera título novo; nas
+outras lojas o original nem é número de venda do Ciclone). Sem baixa → vazio.
+6 do José corrigidas depois da gravação (`update` só do vínculo).
+
+**Base do Ciclone guarda só o principal:** `valor_recebido` sem juros
+(`juros_pago` vem vazio). O Cedrus põe os juros do acordo dentro do valor da
+parcela, então "app um pouco maior que a base" é juros, não erro.
+
+**Painel (aba "Conferência de recebimentos" no Resumo por Cobrador,
+`af80e81`):** RPC `conferencia_recebimentos(p_inicio, p_fim)` (SECURITY
+INVOKER, leitura) — por cliente no mês: baixado na base × registrado no app
+(`sale_payments` sem "Ajuste Administrativo", estornos incluídos, +
+`acordo_pagamentos`). Cliente fica com quem registrou; sem registro, com o
+dono da carteira (ou "Sem cobrador"). Situações em
+`filters/conferenciaRecebimentos.ts`: confere (±R$ 1), pagou sem registro,
+registrado sem baixa, app maior, base maior. Migration `20261111000002`
+**sem db push**; depois do push rodar `npm run check:db` e testar a aba.
+
+**Outros cobradores (mesmo relatório):** Monalisa 56 parcelas R$ 7.956,66
+(1 já no app), Jonathan 44 R$ 6.013,79 (4 já no app), Aline 2 R$ 280,00.
+Clientes casam 100% pelo CNPJ. Prévia conferida; a gravação foi barrada pela
+permissão automática — aguardando o usuário liberar.
+
+**Falta:** db push + teste da aba; gravar os outros 3; push.
 
 ### Item 47 — Lentidão do cobrador — 2026-11-11
 
