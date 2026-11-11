@@ -297,6 +297,13 @@ relatório por operador. O "Recebido no período" do Resumo soma só
 `payment_amount` (sem juros e sem `acordo_pagamentos`) — por isso o José
 mostra R$ 29.358 e não R$ 30.058.
 
+**Conferência só da carteira (pedido do usuário, migration
+`20261111000003`, aplicada, `check:db` OK, testada no localhost):** base =
+baixas das parcelas da carteira do cobrador (`BANCO_DADOS.user_id`); app = o
+que ele lançou para clientes da carteira. Saiu "Sem cobrador". Lançamento para
+cliente fora da carteira aparece só como linha informativa ("Fora da
+carteira: N clientes, R$ X — não conferido"); continua contando no Resumo.
+
 **Base guarda só o principal** em todas as fontes (Ciclone e lojas: nenhum
 `juros_pago`).
 
