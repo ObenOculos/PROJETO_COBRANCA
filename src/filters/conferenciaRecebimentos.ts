@@ -1,8 +1,9 @@
-// Fonte unica da regra de conferencia mensal (item 50): o que a base (Ciclone)
-// baixou como recebido x o que o cobrador registrou no app, por cliente.
+// Fonte unica da regra de conferencia mensal (item 50): o que a base do app
+// (BANCO_DADOS, atualizada todo dia pelo Ciclone e pelas lojas) baixou como
+// recebido x o que o cobrador registrou no app, por cliente.
 //
-// A base guarda so o PRINCIPAL em valor_recebido (o Ciclone nao preenche
-// juros_pago); o app registra o que o cliente pagou, as vezes com juros
+// A base guarda so o PRINCIPAL em valor_recebido (nem o Ciclone nem as lojas
+// preenchem juros_pago); o app registra o que o cliente pagou, as vezes com juros
 // dentro do valor (ex.: importacao do Cedrus). Por isso "app maior" pequeno
 // costuma ser juros, e nao erro.
 

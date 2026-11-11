@@ -279,7 +279,10 @@ export interface CollectionAttempt {
     // Cliente diz que ja pagou (com ou sem comprovante em maos).
     | "claims_paid"
     // Cliente informa que a venda foi cancelada (vai para conferencia).
-    | "sale_cancel_reported";
+    | "sale_cancel_reported"
+    // Contato importado de outro sistema (Cedrus) sem o resultado: conta
+    // como cliente atendido, nao como conversa. Nao e opcao do Atender.
+    | "contact_no_result";
   notes?: string;
   nextAction?: string;
   nextActionDate?: string;

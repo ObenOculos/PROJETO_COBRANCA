@@ -27,6 +27,7 @@ export const ATTEMPT_RESULT_LABELS: Record<CollectionAttempt["result"], string> 
   disputed: "Contestou a dívida (SPC)",
   claims_paid: "Cliente diz que já pagou",
   sale_cancel_reported: "Cliente informou venda cancelada",
+  contact_no_result: "Contato sem resultado registrado",
 };
 
 /**

@@ -19,7 +19,8 @@ import {
   CONFERENCIA_SITUACAO_LABEL,
 } from "../../filters/conferenciaRecebimentos";
 
-// Item 50: conferencia mensal do gestor -- base (Ciclone) x registrado pelos
+// Item 50: conferencia mensal do gestor -- base do app (BANCO_DADOS, atualizada
+// todo dia pelo Ciclone e pelas lojas) x registrado pelos
 // cobradores no app. Dados da RPC conferencia_recebimentos (migration
 // 20261111000002), uma linha por cliente.
 
@@ -278,8 +279,9 @@ const ConferenciaRecebimentos: React.FC = () => {
             {infoOpen && (
               <div className="absolute z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-blue-100 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-900/20 px-4 py-3 text-xs font-normal text-blue-700 dark:text-blue-300 shadow-lg space-y-1.5">
                 <p>
-                  <strong>Base</strong>: o que o Ciclone baixou como recebido no
-                  mês (data da baixa). Guarda só o principal, sem juros.
+                  <strong>Base</strong>: o recebido que a base do app registra
+                  no mês (atualizada todo dia pelo Ciclone e pelas lojas), pela
+                  data da baixa. Guarda só o principal, sem juros.
                 </p>
                 <p>
                   <strong>App</strong>: o que o cobrador registrou no mês
