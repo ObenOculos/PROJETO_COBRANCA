@@ -53,7 +53,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 46 | Atender: "Cliente diz que já pagou" (comprovante → registro do pagamento) e "Cliente informa venda cancelada" (parcelas da venda vão para conferência do gestor) — migration `20261110000008` aplicada (`check:db` OK); falta teste na tela | Alta | Médio |
 | 47 | Lentidão/travamento do cobrador — 5 correções de front (`a7d7874`, `33e2278`, `cb749d1`, `3161703`, `af7f311`) + índice `20261111000001` (aplicado), 2026-11-11; sem push, sem teste no navegador | Alta | Pequeno |
 | 48 | Gestor: números errados depois de sair e entrar na mesma aba (só quitados) + travamento ao trocar de aba (Desempenho ~32 s, Lojas, Cobranças) — `831d182`, `96fb4f8`, `c563f22`, `63aaef6`, `87439e5`, 2026-11-11; testado no build de produção, sem push | Alta | Pequeno |
-| 50 | Desempenho do Cedrus (sistema anterior) → app — concluído 2026-11-11: recebido de José/Monalisa/Jonathan/Aline (135 parcelas `sale_payments` "Cedrus") + 2.043 atendimentos (último contato por cliente) + aba Conferência de recebimentos no Resumo (migration `20261111000002` aplicada, `check:db` OK, testada no localhost); sem push | Alta | Médio |
+| 50 | Desempenho do Cedrus → app — 2026-11-11: recebido do período inteiro (4.792 parcelas `sale_payments` "Cedrus", 7 operadores) + log real de 43.387 atendimentos (PROD_OPERADORES; aproximados apagados) + aba Conferência com seletor; publicado (`1c355e2`). Pendente: tela do cobrador carrega 2–4,5 mil atendimentos (ver seção) | Alta | Médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -308,6 +308,31 @@ p_fim, p_so_carteira DEFAULT false)`:
   lançou para esses clientes; lançamento fora da carteira só como linha
   informativa ("não conferido").
 A tela lembra a escolha (localStorage `conferenciaVisao`).
+
+**Exports completos do Cedrus (2026-11-11, à tarde):** `PROD_OPERADORES.xlsx`
+= log de TODOS os contatos (44.118, mai/2025–nov/2026: operador, data,
+resultado, credor; COD_DEVEDOR mapeado para CPF/CNPJ pelos outros arquivos,
+99% casam com o app). `ANALISE_NEGOCIACOES.xlsx` completo (4.691 negociações,
+9 operadores, cancelamentos). Também: `PAGAMENTOS_RECEBIDOS.csv`,
+`ANALISE_CONTATOS (1)` (promessas/agendamentos), `ANALISE_DESEMPENHO`,
+`PREST_CONTAS_ANALITICO`, `ANALISE_CARTEIRA_ANALITICO`.
+- **Recebido:** +4.657 parcelas (R$ 1.664.395,35), total "Cedrus" 4.792:
+  Iara R$ 1,00 mi, José R$ 408,5 mil, Samila R$ 233,6 mil, Monalisa R$ 36,0 mil,
+  Jonathan R$ 11,3 mil, Aline R$ 7,9 mil, Aline Freitas R$ 1,7 mil. Por operador
+  = relatório − o que já estava lançado no app. Valor = `Vl. Pago` (25 parcelas
+  diferem centavos/reais da parcela), mora em `juros_amount`. Fora: "GESTÃO" e
+  Carlos Elton (demitido, sem usuário). Caixa Diário ganha lançamentos desde 2025.
+- **Atendimentos:** apagados os 2.140 aproximados (último contato + acordos,
+  decisão do usuário) e gravado o log real: 43.387 (`notes` "Importado do Cedrus -
+  log de contatos: RESULTADO (tipo), duração X #n"; resultado mapeado; RETORNO
+  efetivo = `contact_made`, senão `message_sent`). Fora: 51 já no app no mesmo
+  dia, 7 sem título, Carlos/GESTÃO.
+- **Janela de 180 dias** no último contato da carteira (`1c355e2`, publicado antes
+  da gravação). **Pendente:** mesmo assim a tela do cobrador carrega
+  2–4,5 mil linhas (antes ~200–600), porque a RLS mostra contatos de qualquer
+  operador nos títulos da carteira (Iara/Samila). Correção recomendada: RPC que
+  devolve só o último contato (e o último efetivo) por título.
+- **Agenda** (promessas em aberto no Cedrus): decidido fazer depois.
 
 **Base guarda só o principal** em todas as fontes (Ciclone e lojas: nenhum
 `juros_pago`).
