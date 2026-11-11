@@ -67,6 +67,11 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
   // Debounce for search term
   React.useEffect(() => {
+    // Busca igual a que ja esta nos filtros: nada a avisar. Sem isto, todo
+    // FilterBar recem-montado devolvia 300 ms depois um objeto de filtros NOVO
+    // com os mesmos valores, e a tela (Lojas, Cobrancas, Desempenho) refazia
+    // todos os calculos sobre a carteira inteira uma segunda vez.
+    if ((searchTerm || undefined) === (filters.search || undefined)) return;
     const handler = setTimeout(() => {
       onFilterChange({ ...filters, search: searchTerm || undefined });
     }, 300); // 300ms delay

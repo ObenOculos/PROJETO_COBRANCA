@@ -112,10 +112,19 @@ const EnhancedStoreManagement: React.FC = () => {
   const storeStats = useMemo((): StoreStats[] => {
     const stats: StoreStats[] = [];
 
+    // Titulos de cada loja numa passada so. Antes cada loja filtrava a
+    // carteira inteira duas vezes (e com o mesmo criterio). Os grupos mantem
+    // a ordem original, entao as somas saem identicas.
+    const byStore = new Map<string, Collection[]>();
+    sourceCollections.forEach((c) => {
+      if (!c.nome_da_loja) return;
+      const list = byStore.get(c.nome_da_loja);
+      if (list) list.push(c);
+      else byStore.set(c.nome_da_loja, [c]);
+    });
+
     availableStores.forEach((storeName) => {
-      const periodCollections = sourceCollections.filter(
-        (c) => c.nome_da_loja === storeName,
-      );
+      const periodCollections = byStore.get(storeName) ?? [];
 
       if (periodCollections.length === 0) return;
 
@@ -191,9 +200,7 @@ const EnhancedStoreManagement: React.FC = () => {
         }
       });
 
-      const allStoreCollections = sourceCollections.filter(
-        (c) => c.nome_da_loja === storeName,
-      );
+      const allStoreCollections = periodCollections;
       const cityCounts = new Map<string, number>();
       allStoreCollections.forEach((c) => {
         if (c.cidade)
