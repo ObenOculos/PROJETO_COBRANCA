@@ -69,6 +69,7 @@ import {
 import {
   ATTEMPT_RESULT_LABELS,
   SEM_CONTATO_DIAS,
+  ULTIMO_CONTATO_JANELA_DIAS,
   countsTowardVisitsGoal,
   isEffectiveAttemptResult,
 } from "../../config/collectionAttempts";
@@ -104,7 +105,11 @@ const WhatsAppIcon: React.FC<{ className?: string }> = ({ className }) => (
     <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.48 1.32 5L2 22l5.25-1.38a9.88 9.88 0 0 0 4.79 1.22h.01c5.46 0 9.9-4.45 9.9-9.91C21.96 6.47 17.5 2 12.04 2zm5.84 14.19c-.25.7-1.45 1.33-2 1.42-.52.08-1.17.11-1.89-.12-.44-.14-1-.32-1.72-.63-3.03-1.31-5-4.37-5.15-4.57-.15-.2-1.23-1.63-1.23-3.11 0-1.48.78-2.21 1.06-2.51.27-.3.6-.37.8-.37.2 0 .4 0 .57.01.18.01.43-.07.67.51.25.6.86 2.08.93 2.23.08.15.13.33.03.53-.1.2-.15.33-.3.5-.15.18-.31.4-.45.54-.15.15-.3.31-.13.6.17.3.76 1.25 1.63 2.02 1.12 1 2.06 1.31 2.36 1.46.3.15.47.13.65-.08.18-.2.76-.88.96-1.18.2-.3.4-.25.68-.15.28.1 1.77.84 2.07.99.3.15.5.22.57.35.08.13.08.73-.17 1.43z" />
   </svg>
 );
-import { todayLocalStr, isVisitOverdue } from "../../config/visitStatus";
+import {
+  todayLocalStr,
+  addDaysLocalStr,
+  isVisitOverdue,
+} from "../../config/visitStatus";
 
 const toDate = (dateInput: string | Date | null | undefined): Date | null => {
   if (!dateInput) return null;
@@ -491,6 +496,8 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       // sistema, entao continua pedindo por id.
       const porCobrador = !!user?.type && user.type !== "manager";
       const idsEmAberto = new Set(ids);
+      // `date` e text YYYY-MM-DD: comparacao de string serve.
+      const desde = addDaysLocalStr(todayLocalStr(), -ULTIMO_CONTATO_JANELA_DIAS);
       const lotes: (string[] | null)[] = porCobrador ? [null] : chunk(ids, 300);
       for (const batch of lotes) {
         const { data, error } =
@@ -499,6 +506,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                 supabase
                   .from("collection_attempts")
                   .select(colunas)
+                  .gte("date", desde)
                   .order("created_at", { ascending: false })
                   .order("id", { ascending: false })
                   .range(from, to),
@@ -514,6 +522,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                   .from("collection_attempts")
                   .select(colunas)
                   .in("collection_id", batch)
+                  .gte("date", desde)
                   .order("created_at", { ascending: false }),
               );
         if (error) {

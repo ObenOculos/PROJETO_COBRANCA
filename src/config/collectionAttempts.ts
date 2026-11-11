@@ -6,6 +6,12 @@ import { CollectionAttempt, ScheduledVisit } from "../types";
  * contato" da agenda priorizada da carteira (CollectorDashboard.tsx). */
 export const SEM_CONTATO_DIAS = 7;
 
+/** Quantos dias para tras a carteira do cobrador busca o "ultimo contato" de
+ * cada titulo. Sem limite, o historico importado do Cedrus (dezenas de
+ * milhares de contatos desde 2025) faria a tela do cobrador carregar tudo.
+ * Contato mais antigo que isso conta como "sem contato recente". */
+export const ULTIMO_CONTATO_JANELA_DIAS = 180;
+
 export const ATTEMPT_TYPE_LABELS: Record<CollectionAttempt["type"], string> = {
   call: "Ligação",
   visit: "Visita",
