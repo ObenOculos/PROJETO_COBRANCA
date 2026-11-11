@@ -53,7 +53,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 46 | Atender: "Cliente diz que já pagou" (comprovante → registro do pagamento) e "Cliente informa venda cancelada" (parcelas da venda vão para conferência do gestor) — migration `20261110000008` aplicada (`check:db` OK); falta teste na tela | Alta | Médio |
 | 47 | Lentidão/travamento do cobrador — 5 correções de front (`a7d7874`, `33e2278`, `cb749d1`, `3161703`, `af7f311`) + índice `20261111000001` (aplicado), 2026-11-11; sem push, sem teste no navegador | Alta | Pequeno |
 | 48 | Gestor: números errados depois de sair e entrar na mesma aba (só quitados) + travamento ao trocar de aba (Desempenho ~32 s, Lojas, Cobranças) — `831d182`, `96fb4f8`, `c563f22`, `63aaef6`, `87439e5`, 2026-11-11; testado no build de produção, sem push | Alta | Pequeno |
-| 50 | Desempenho do Cedrus (sistema anterior) → app: José importado 2026-11-11 (33 parcelas como `sale_payments` forma "Cedrus" + 3 estornos); aba Conferência de recebimentos no Resumo (`af80e81`, migration `20261111000002` sem db push); Monalisa/Jonathan/Aline com prévia pronta, gravação aguardando liberação | Alta | Médio, por cobrador |
+| 50 | Desempenho do Cedrus (sistema anterior) → app — concluído 2026-11-11: recebido de José/Monalisa/Jonathan/Aline (135 parcelas `sale_payments` "Cedrus") + 2.043 atendimentos (último contato por cliente) + aba Conferência de recebimentos no Resumo (migration `20261111000002` aplicada, `check:db` OK, testada no localhost); sem push | Alta | Médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -259,12 +259,31 @@ dono da carteira (ou "Sem cobrador"). Situações em
 registrado sem baixa, app maior, base maior. Migration `20261111000002`
 **sem db push**; depois do push rodar `npm run check:db` e testar a aba.
 
-**Outros cobradores (mesmo relatório):** Monalisa 56 parcelas R$ 7.956,66
-(1 já no app), Jonathan 44 R$ 6.013,79 (4 já no app), Aline 2 R$ 280,00.
-Clientes casam 100% pelo CNPJ. Prévia conferida; a gravação foi barrada pela
-permissão automática — aguardando o usuário liberar.
+**Outros cobradores (mesmo relatório), gravados 2026-11-11:** Monalisa 56
+parcelas R$ 7.956,66, Jonathan 44 R$ 6.013,79, Aline 2 R$ 280,00 (as que já
+estavam no app ficaram de fora; nenhum lançamento repetido nem em cliente
+errado). **Nas óticas não há Ciclone: a base é o próprio BANCO_DADOS (upload
+diário das lojas).** Lá o título original do acordo no Cedrus (`Num. Título`)
+**é o `id_parcela`** do app (124 de 125) — vínculo exato; a venda das
+importadas veio daí (16 ajustadas depois da gravação, 1 continua sem venda).
 
-**Falta:** db push + teste da aba; gravar os outros 3; push.
+**Atendimentos (`collection_attempts`), 2.043 gravados:** um por cliente, na
+data do último contato no Cedrus (é o único que os exports guardam), nota
+"Importado do Cedrus…". Base Focco (José, Iara) tem operador e resultado →
+resultado equivalente do app. Arquivos de carteira das outras lojas não têm
+operador nem resultado: só os dos internos (Monalisa, Jonathan, Aline, Aline
+Freitas) e só a partir de 09/2026; Receptivo/Agendado = `contact_made`, o
+resto = `contact_no_result` (novo, "Contato sem resultado registrado": conta
+como atendido, não como conversa; não é opção do Atender). Arquivos do
+Francisco e do Jurídico ficaram de fora (mesmo cliente/data aparece no
+arquivo do interno — arquivos são por faixa de atraso e a data do último
+contato é do cliente). Pulados: mesmo cobrador/cliente/dia já no app, cliente
+fora do app. Novembro: José 138, Monalisa 227, Jonathan 139, Aline 15.
+
+**Base guarda só o principal** em todas as fontes (Ciclone e lojas: nenhum
+`juros_pago`).
+
+**Falta:** push (Vercel) e conferência do gestor no site.
 
 ### Item 47 — Lentidão do cobrador — 2026-11-11
 
