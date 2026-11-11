@@ -1066,6 +1066,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       setAllCollections([]);
       setSettledCollections([]);
       settledCollectionsLoadedRef.current = false;
+      // As travas de "ja carreguei" tambem voltam ao zero. O provider nao
+      // desmonta no logout: sem isto, sair e entrar de novo na mesma aba
+      // deixava collectionsRequestedRef=true (e o escopo em "all"), entao
+      // requestCollections/ensureAllCollections achavam que a carteira ja
+      // estava carregada e nao buscavam nada -- so os quitados (cuja trava
+      // era a unica resetada aqui) apareciam: total menor, todos "Sem
+      // Cobrador", valor em aberto R$ 0. O F5 corrigia porque zera os refs.
+      collectionsRequestedRef.current = false;
+      setCollectionsRequested(false);
+      requestCollectionsPromiseRef.current = null;
+      applyCollectionsScope("active");
       setUsers([]);
       setSalePayments([]);
       setScheduledVisits([]);
