@@ -46,6 +46,7 @@ import { parseAndNormalizeDate } from "../../filters/dates";
 import {
   ATTEMPT_TYPE_LABELS,
   ATTEMPT_RESULT_LABELS,
+  notaContatoExibicao,
 } from "../../config/collectionAttempts";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useClientBirthDate } from "../../hooks/useClientBirthDate";
@@ -1169,7 +1170,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                           </p>
                           {attempt.notes && (
                             <p className="text-xs text-gray-500 whitespace-pre-wrap">
-                              {attempt.notes}
+                              {notaContatoExibicao(attempt.notes)}
                             </p>
                           )}
                           {attempt.nextAction && (

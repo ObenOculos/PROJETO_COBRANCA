@@ -61,6 +61,45 @@ export const isEffectiveAttemptResult = (
   result: CollectionAttempt["result"],
 ): boolean => EFFECTIVE_ATTEMPT_RESULTS.has(result);
 
+// Contatos importados do log do Cedrus (item 50) gravam a observacao como
+// "Importado do Cedrus - log de contatos: NAO ATENDE (tentativa), duração
+// 00:01:50 #1". Na tela isso vira "Cedrus: Não atendeu (1min50s)".
+const CEDRUS_LOG_PREFIXO = "Importado do Cedrus - log de contatos:";
+const CEDRUS_RESULTADO_LABEL: Record<string, string> = {
+  "NAO ATENDE": "Não atendeu",
+  CPC: "Falou com o cliente",
+  "JA PAGOU": "Disse que já pagou",
+  ACORDO: "Acordo",
+  PROMESSA: "Promessa de pagamento",
+  RETORNO: "Pediu retorno",
+  "SEM CONTATO": "Sem contato",
+  INDEVIDO: "Cobrança indevida",
+  "NAO CONCORDA": "Não concorda com a cobrança",
+  "FONE ERRADO": "Telefone errado",
+  OCUPADO: "Ocupado",
+};
+
+/** Observacao de um atendimento pronta para exibir. Contato importado do
+ * Cedrus vira um resumo curto; os demais ficam como foram escritos. */
+export const notaContatoExibicao = (notes: string | null | undefined): string => {
+  if (!notes) return "";
+  if (!notes.startsWith(CEDRUS_LOG_PREFIXO)) return notes;
+  const m = notes
+    .slice(CEDRUS_LOG_PREFIXO.length)
+    .match(/^\s*(.+?)\s*\([^)]*\),\s*dura[cç][aã]o\s*(\d+):(\d+):(\d+)/i);
+  if (!m) return "Contato no Cedrus";
+  const [, resultado, h, min, seg] = m;
+  const rotulo = CEDRUS_RESULTADO_LABEL[resultado.trim()] ?? resultado.trim();
+  const totalMin = Number(h) * 60 + Number(min);
+  const duracao =
+    totalMin > 0
+      ? `${totalMin}min${Number(seg) > 0 ? `${Number(seg)}s` : ""}`
+      : Number(seg) > 0
+        ? `${Number(seg)}s`
+        : "";
+  return `Cedrus: ${rotulo}${duracao ? ` (${duracao})` : ""}`;
+};
+
 /** A mesma lista, para mandar ao banco (RPC ultimos_contatos_titulos). */
 export const EFFECTIVE_ATTEMPT_RESULT_LIST: string[] = Array.from(
   EFFECTIVE_ATTEMPT_RESULTS,

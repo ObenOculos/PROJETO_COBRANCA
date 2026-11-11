@@ -71,6 +71,7 @@ import {
   SEM_CONTATO_DIAS,
   ULTIMO_CONTATO_JANELA_DIAS,
   EFFECTIVE_ATTEMPT_RESULT_LIST,
+  notaContatoExibicao,
   countsTowardVisitsGoal,
 } from "../../config/collectionAttempts";
 
@@ -590,7 +591,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       const current = map[c.documento];
       if (!current || date > current.date) {
         map[c.documento] = {
-          note: attempt.notes || "",
+          note: notaContatoExibicao(attempt.notes),
           date,
           result: attempt.result,
           nextActionDate: attempt.nextActionDate,
