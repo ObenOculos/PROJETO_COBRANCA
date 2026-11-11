@@ -21,12 +21,14 @@ import {
 
 // Item 50: conferencia mensal do gestor -- base do app (BANCO_DADOS, atualizada
 // todo dia pelo Ciclone e pelas lojas) x registrado pelos
-// cobradores no app, SO na carteira de cada cobrador (o que ele controla).
-// Dados da RPC conferencia_recebimentos (migration 20261111000003), uma linha
-// por cobrador x cliente.
+// cobradores no app. Duas visoes (o gestor escolhe): todos os recebimentos
+// (linha fica com quem registrou; sem registro, com o dono da carteira) ou so a
+// carteira de cada cobrador. Dados da RPC conferencia_recebimentos (migration
+// 20261111000004), uma linha por cobrador x cliente.
 
 interface LinhaRpc {
   cobrador_id: string | null;
+  carteira_id: string | null;
   documento: string | null;
   cliente: string | null;
   base_valor: number | string;
@@ -37,8 +39,12 @@ interface LinhaRpc {
   na_carteira: boolean;
 }
 
+type Visao = "todos" | "carteira";
+
 interface LinhaCliente {
   chave: string;
+  cobradorId: string | null;
+  carteiraId: string | null;
   documento: string;
   cliente: string;
   baseValor: number;
@@ -50,7 +56,7 @@ interface LinhaCliente {
 }
 
 interface GrupoCobrador {
-  id: string;
+  id: string; // "" = sem cobrador (so na visao "todos")
   nome: string;
   baseValor: number;
   appValor: number;
@@ -154,6 +160,24 @@ const ConferenciaRecebimentos: React.FC = () => {
   const [aberto, setAberto] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<ConferenciaSituacao | "todas">("todas");
   const [infoOpen, setInfoOpen] = useState(false);
+  const [visao, setVisao] = useState<Visao>(() => {
+    try {
+      return localStorage.getItem("conferenciaVisao") === "carteira"
+        ? "carteira"
+        : "todos";
+    } catch {
+      return "todos";
+    }
+  });
+  const trocarVisao = (v: Visao) => {
+    setVisao(v);
+    setAberto(null);
+    try {
+      localStorage.setItem("conferenciaVisao", v);
+    } catch {
+      // sem storage: so nao lembra a escolha
+    }
+  };
 
   useEffect(() => {
     let cancelado = false;
@@ -164,7 +188,11 @@ const ConferenciaRecebimentos: React.FC = () => {
       try {
         const dados = await fetchAllRows<LinhaRpc>((from, to) =>
           supabase
-            .rpc("conferencia_recebimentos", { p_inicio: inicio, p_fim: fim })
+            .rpc("conferencia_recebimentos", {
+              p_inicio: inicio,
+              p_fim: fim,
+              p_so_carteira: visao === "carteira",
+            })
             // Ordem unica para a paginacao (CLAUDE.md): documento + cobrador.
             .order("documento")
             .order("cobrador_id")
@@ -180,7 +208,7 @@ const ConferenciaRecebimentos: React.FC = () => {
     return () => {
       cancelado = true;
     };
-  }, [mes]);
+  }, [mes, visao]);
 
   const nomePorId = useMemo(() => {
     const m = new Map<string, string>();
@@ -194,13 +222,12 @@ const ConferenciaRecebimentos: React.FC = () => {
     linhas.forEach((l, i) => {
       const baseValor = num(l.base_valor);
       const appValor = num(l.app_valor);
-      if (!l.cobrador_id) return;
-      const id = l.cobrador_id;
+      const id = l.cobrador_id ?? "";
       let g = porCobrador.get(id);
       if (!g) {
         g = {
           id,
-          nome: nomePorId.get(id) ?? "Usuário removido",
+          nome: id ? (nomePorId.get(id) ?? "Usuário removido") : "Sem cobrador",
           baseValor: 0,
           appValor: 0,
           appCedrus: 0,
@@ -223,6 +250,8 @@ const ConferenciaRecebimentos: React.FC = () => {
       g.contagem[situacao]++;
       g.clientes.push({
         chave: `${l.documento ?? ""}:${id}:${i}`,
+        cobradorId: l.cobrador_id,
+        carteiraId: l.carteira_id,
         documento: l.documento ?? "",
         cliente: l.cliente ?? "(sem nome)",
         baseValor,
@@ -240,11 +269,11 @@ const ConferenciaRecebimentos: React.FC = () => {
           Math.abs(b.appValor - b.baseValor) - Math.abs(a.appValor - a.baseValor),
       ),
     );
-    // Pelo maior valor (base ou app).
-    return Array.from(porCobrador.values()).sort(
-      (a, b) =>
-        Math.max(b.baseValor, b.appValor) - Math.max(a.baseValor, a.appValor),
-    );
+    // "Sem cobrador" por ultimo; os demais pelo maior valor (base ou app).
+    return Array.from(porCobrador.values()).sort((a, b) => {
+      if (!a.id !== !b.id) return a.id ? -1 : 1;
+      return Math.max(b.baseValor, b.appValor) - Math.max(a.baseValor, a.appValor);
+    });
   }, [linhas, nomePorId]);
 
   const totais = useMemo(() => {
@@ -278,19 +307,23 @@ const ConferenciaRecebimentos: React.FC = () => {
             {infoOpen && (
               <div className="absolute z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-blue-100 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-900/20 px-4 py-3 text-xs font-normal text-blue-700 dark:text-blue-300 shadow-lg space-y-1.5">
                 <p>
-                  Só a <strong>carteira</strong> de cada cobrador: os clientes e
-                  valores que ele controla.
-                </p>
-                <p>
                   <strong>Base</strong>: o recebido que a base do app registra
-                  no mês nas parcelas da carteira dele (atualizada todo dia pelo
-                  Ciclone e pelas lojas), pela data da baixa. Guarda só o
-                  principal, sem juros.
+                  no mês (atualizada todo dia pelo Ciclone e pelas lojas), pela
+                  data da baixa. Guarda só o principal, sem juros.
                 </p>
                 <p>
-                  <strong>App</strong>: o que o cobrador registrou no mês para
-                  esses clientes (pagamentos, acordos e estornos; inclui o
-                  importado do Cedrus). Lançamento para cliente fora da
+                  <strong>App</strong>: o que o cobrador registrou no mês
+                  (pagamentos, acordos e estornos; inclui o importado do
+                  Cedrus).
+                </p>
+                <p>
+                  <strong>Todos os recebimentos</strong>: cada cliente fica com
+                  quem registrou; se ninguém registrou, com o dono da carteira
+                  (ou "Sem cobrador").
+                </p>
+                <p>
+                  <strong>Só carteira</strong>: só os clientes e valores da
+                  carteira de cada cobrador. Lançamento para cliente fora da
                   carteira aparece à parte e não entra na conferência.
                 </p>
               </div>
@@ -369,7 +402,27 @@ const ConferenciaRecebimentos: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5 mr-1">
+              {(
+                [
+                  ["todos", "Todos os recebimentos"],
+                  ["carteira", "Só carteira"],
+                ] as const
+              ).map(([v, rotulo]) => (
+                <button
+                  key={v}
+                  onClick={() => trocarVisao(v)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                    visao === v
+                      ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+                  }`}
+                >
+                  {rotulo}
+                </button>
+              ))}
+            </div>
             {(["todas", ...SITUACOES] as const).map((s) => (
               <button
                 key={s}
@@ -480,6 +533,13 @@ const ConferenciaRecebimentos: React.FC = () => {
                                   </thead>
                                   <tbody>
                                     {clientes.map((c) => {
+                                      // Visao "todos": registrado por alguem que
+                                      // nao e o dono da carteira do cliente.
+                                      const outraCarteira =
+                                        visao === "todos" &&
+                                        !!c.cobradorId &&
+                                        c.appLancamentos > 0 &&
+                                        c.carteiraId !== c.cobradorId;
                                       return (
                                         <tr
                                           key={c.chave}
@@ -491,6 +551,8 @@ const ConferenciaRecebimentos: React.FC = () => {
                                             </div>
                                             <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
                                               {c.documento}
+                                              {outraCarteira &&
+                                                ` · carteira: ${c.carteiraId ? (nomePorId.get(c.carteiraId) ?? "outro") : "sem cobrador"}`}
                                             </div>
                                           </td>
                                           <td className="px-3 py-1.5">
