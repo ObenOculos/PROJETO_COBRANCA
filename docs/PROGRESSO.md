@@ -256,9 +256,17 @@ desfeita) e no código:
 - Não medido: custo de renderização no celular (derivações sobre 10k+
   parcelas no `CollectionContext`).
 
-**Falta:** teste no navegador como cobrador de carteira (abrir, Atender um
-cliente, conferir que a fila anda e que liberar cliente ainda o tira da
-lista) e push.
+**Push feito 2026-11-11** (`fa190b3`). **Teste no navegador** (dev local,
+mesmo código): José (8.867 parcelas) abre em 1,9–2,7 s; contatos da fila
+em 1 requisição; trocar Fila ↔ Carteira completa não faz requisição
+nenhuma. Cobrador Externo Teste: Atender "não atende" gravou 9 tentativas
++ 1 agendamento, fila foi de 7 para 6 e **a carteira não foi baixada de
+novo** (só agendamentos, contatos e `fila_lote_atual`). Dados do teste
+apagados depois por SQL com os ids exatos.
+**Falta:** conferir "resultado que libera o cliente" ainda o tirar da lista
+(não testado) e o retorno dos cobradores no uso real. Detalhe pequeno
+visto: `fila_lote_atual` é chamado 2x após cada registro (efeito de
+`versaoRegistros` e de `attemptsByCollection`) — inofensivo.
 
 ### Item 46 — "Já pagou" e "venda cancelada" no Atender — 2026-11-10
 
