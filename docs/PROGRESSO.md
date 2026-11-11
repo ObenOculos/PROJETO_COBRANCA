@@ -270,6 +270,23 @@ visto: `fila_lote_atual` é chamado 2x após cada registro (efeito de
 `versaoRegistros` e de `attemptsByCollection`) — inofensivo.
 
 
+### Item 49 — Resumo por Cobrador: atendimentos não apareciam — 2026-11-11
+
+A tela só lia `scheduled_visits`; o que o cobrador de carteira registra no
+Atender/Fila vai para `collection_attempts` (uma linha por título) e só
+virava "Realizada" se havia agendamento aberto — raro desde a Fila (item
+40). Novembro: Jonathan 75 atendimentos × 11 "Realizadas", Monalisa 53 × 0.
+Agora a tela busca `collection_attempts` do período (+ `BANCO_DADOS` para
+título → documento) e mostra **Atendimentos** na Visão geral, nos cards e
+na tabela (coluna ordenável, grupo "Registrados"). Unidade decidida com o
+usuário: **por cliente, nunca por título** — um atendimento = cliente ×
+dia; embaixo, clientes distintos e efetivos (`isEffectiveAttemptResult`).
+"Sem agendamento" mantido para todos os perfis (o gestor quer ver quem
+ainda não tem próximo contato marcado). Só tela, sem migration.
+Conferido na tela (dev, Mês atual): José 27 / Monalisa 53 / Jonathan 75 /
+Terceirizado teste 2 = 157, igual à consulta direta no banco.
+
+
 ### Item 48 — Gestor: números errados após login e travamento entre abas — 2026-11-11
 
 **Números errados após login (`831d182`).** Sair e entrar de novo na mesma

@@ -17,11 +17,20 @@ import {
   Table2,
   Check,
   Gauge,
+  PhoneCall,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
-import { isCollectorType, UserType, ClienteForaDaFaixa } from "../../types";
+import {
+  isCollectorType,
+  UserType,
+  ClienteForaDaFaixa,
+  CollectionAttempt,
+} from "../../types";
+import { isEffectiveAttemptResult } from "../../config/collectionAttempts";
+import { fetchAllRows } from "../../utils/fetchAllRows";
+import { comRetentativa } from "../../utils/supabaseRetry";
 import { USER_TYPE_LABELS, isWalletCollectorType } from "../../config/profiles";
 import {
   isVisitOverdue,
@@ -46,8 +55,17 @@ interface CollectorRow {
   vencidaQtd: number;
   vencidaValor: number;
   emAtrasoVisitas: number;
+  // Clientes da carteira sem proximo contato/visita marcado. Vale para
+  // todos os perfis: na carteira o agendamento continua existindo (passo
+  // "Proximo contato" do Atender e "Agendar em massa" do gestor).
   semAgendamentoClientes: number;
   // No periodo [dateFrom, dateTo].
+  // Atendimentos registrados (collection_attempts: Atender, Fila, pagamento,
+  // venda cancelada). Contados por CLIENTE, nunca por titulo: um
+  // atendimento = cliente x dia (um registro grava uma linha por titulo).
+  atendimentosQtd: number;
+  atendimentosEfetivosQtd: number;
+  atendimentosClientes: number;
   previstaQtd: number;
   previstaValor: number;
   aReceberQtd: number;
@@ -78,6 +96,7 @@ type SortKey =
   | "recebidoPeriodo"
   | "emAtrasoVisitas"
   | "semAgendamentoClientes"
+  | "atendimentosQtd"
   | "agendadasQtd"
   | "realizadasQtd"
   | "reagendadasQtd"
@@ -94,6 +113,7 @@ const SORT_GETTERS: Record<SortKey, (row: CollectorRow) => number | string> =
     recebidoPeriodo: (r) => r.recebidoPeriodo,
     emAtrasoVisitas: (r) => r.emAtrasoVisitas,
     semAgendamentoClientes: (r) => r.semAgendamentoClientes,
+    atendimentosQtd: (r) => r.atendimentosQtd,
     agendadasQtd: (r) => r.agendadasQtd,
     realizadasQtd: (r) => r.realizadasQtd,
     reagendadasQtd: (r) => r.reagendadasQtd,
@@ -112,6 +132,23 @@ const ALL_TIME_TO = "2099-12-31";
 // pra reforcar visualmente a independencia entre eles sem depender so do texto.
 const TONE_FINANCEIRO = "bg-gray-50 dark:bg-white/[0.03]";
 const TONE_AGENDA = "bg-gray-100/80 dark:bg-white/[0.07]";
+// Atendimentos (collection_attempts): o que o cobrador de fato registrou,
+// independente de ter havido agendamento antes.
+const TONE_ATENDIMENTO = "bg-indigo-50/70 dark:bg-indigo-900/10";
+
+/** Atendimentos de um cobrador no periodo, ja agregados por cliente. */
+interface AtendimentosCobrador {
+  qtd: number;
+  efetivos: number;
+  clientes: number;
+}
+
+const ID_CHUNK = 300;
+const chunk = <T,>(arr: T[], size: number): T[][] => {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+};
 
 // Atalhos do filtro de periodo. "Mes atual" e o padrao pedido pelo gestor —
 // cobre a pergunta mais comum sem exigir configuracao. "Tudo" remove o filtro
@@ -448,6 +485,120 @@ const CollectorsSummary: React.FC = () => {
   const inPeriod = (dateStr: string | undefined | null): boolean =>
     !!dateStr && dateStr >= dateFrom && dateStr <= dateTo;
 
+  // Atendimentos do periodo (collection_attempts). O CollectionContext nao
+  // carrega essa tabela, entao a tela busca sozinha a cada troca de periodo.
+  // Sem isto, a coluna "Realizadas" (scheduled_visits) era o unico sinal de
+  // trabalho do cobrador de carteira -- e ela so conta contato que estava
+  // agendado, o que quase nunca acontece na Fila de Cobranca.
+  const [atendimentos, setAtendimentos] = useState<Map<
+    string,
+    AtendimentosCobrador
+  > | null>(null);
+  const [atendimentosErro, setAtendimentosErro] = useState(false);
+  // Titulo -> documento ja conhecido no contexto (evita reconsultar
+  // BANCO_DADOS); lido por ref para a busca nao rodar de novo a cada
+  // recarga de `collections`.
+  const docByParcelaRef = useRef<Map<string, string>>(new Map());
+  useEffect(() => {
+    const m = docByParcelaRef.current;
+    collections.forEach((c) => {
+      if (c.id_parcela != null && c.documento) {
+        m.set(String(c.id_parcela), c.documento);
+      }
+    });
+  }, [collections]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setAtendimentos(null);
+    setAtendimentosErro(false);
+    (async () => {
+      try {
+        const linhas = await fetchAllRows(
+          (from, to) =>
+            supabase
+              .from("collection_attempts")
+              .select("id, collector_id, collection_id, date, result")
+              // `date` e text YYYY-MM-DD (data do atendimento).
+              .gte("date", dateFrom)
+              .lte("date", dateTo)
+              .order("id")
+              .range(from, to),
+          () => cancelled,
+        );
+        if (cancelled) return;
+
+        // collection_attempts guarda o titulo, nao o cliente: resolve o
+        // documento dos titulos que o contexto nao tem (gestor so carrega os
+        // em aberto, e um atendimento pode ser de titulo ja quitado).
+        const docByParcela = docByParcelaRef.current;
+        const faltando = Array.from(
+          new Set(
+            linhas
+              .map((l) => l.collection_id)
+              .filter((id) => !docByParcela.has(id)),
+          ),
+        );
+        for (const ids of chunk(faltando, ID_CHUNK)) {
+          const { data, error } = await comRetentativa(() =>
+            supabase
+              .from("BANCO_DADOS")
+              .select("id_parcela, documento")
+              .in("id_parcela", ids.map(Number)),
+          );
+          if (error) throw error;
+          if (cancelled) return;
+          (data ?? []).forEach((r) => {
+            if (r.documento) docByParcela.set(String(r.id_parcela), r.documento);
+          });
+        }
+
+        // cobrador -> (cliente|dia) -> teve contato efetivo nesse dia?
+        const porCobrador = new Map<
+          string,
+          { dias: Map<string, boolean>; clientes: Set<string> }
+        >();
+        linhas.forEach((l) => {
+          if (!l.collector_id) return;
+          // Sem documento (titulo apagado): o proprio titulo vira a chave,
+          // para nao sumir com o atendimento.
+          const cliente = docByParcela.get(l.collection_id) ?? `t:${l.collection_id}`;
+          const chave = `${cliente}|${l.date}`;
+          const efetivo = isEffectiveAttemptResult(
+            l.result as CollectionAttempt["result"],
+          );
+          let acc = porCobrador.get(l.collector_id);
+          if (!acc) {
+            acc = { dias: new Map(), clientes: new Set() };
+            porCobrador.set(l.collector_id, acc);
+          }
+          acc.dias.set(chave, (acc.dias.get(chave) ?? false) || efetivo);
+          acc.clientes.add(cliente);
+        });
+
+        const resultado = new Map<string, AtendimentosCobrador>();
+        porCobrador.forEach((acc, collectorId) => {
+          let efetivos = 0;
+          acc.dias.forEach((e) => {
+            if (e) efetivos++;
+          });
+          resultado.set(collectorId, {
+            qtd: acc.dias.size,
+            efetivos,
+            clientes: acc.clientes.size,
+          });
+        });
+        if (!cancelled) setAtendimentos(resultado);
+      } catch (err) {
+        console.error("Erro ao buscar atendimentos do período:", err);
+        if (!cancelled) setAtendimentosErro(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dateFrom, dateTo]);
+
   const lastVisitStatus = useMemo(
     () => lastVisitStatusByClient(scheduledVisits),
     [scheduledVisits],
@@ -587,6 +738,8 @@ const CollectorsSummary: React.FC = () => {
           }
         });
 
+        const atend = atendimentos?.get(collector.id);
+
         const reincidentes: ReincidenteCliente[] = Array.from(
           remarcacoesPorCliente.entries(),
         )
@@ -609,6 +762,9 @@ const CollectorsSummary: React.FC = () => {
           aReceberQtd,
           aReceberValor,
           recebidoPeriodo,
+          atendimentosQtd: atend?.qtd ?? 0,
+          atendimentosEfetivosQtd: atend?.efetivos ?? 0,
+          atendimentosClientes: atend?.clientes ?? 0,
           agendadasQtd,
           agendadasValor,
           realizadasQtd,
@@ -635,6 +791,7 @@ const CollectorsSummary: React.FC = () => {
     collections,
     scheduledVisits,
     salePayments,
+    atendimentos,
     lastVisitStatus,
     dateFrom,
     dateTo,
@@ -673,6 +830,13 @@ const CollectorsSummary: React.FC = () => {
           aReceberQtd: acc.aReceberQtd + r.aReceberQtd,
           aReceberValor: acc.aReceberValor + r.aReceberValor,
           recebidoPeriodo: acc.recebidoPeriodo + r.recebidoPeriodo,
+          // Clientes somados por cobrador: o mesmo cliente atendido por dois
+          // cobradores conta para cada um (cada um fez o seu atendimento).
+          atendimentosQtd: acc.atendimentosQtd + r.atendimentosQtd,
+          atendimentosEfetivosQtd:
+            acc.atendimentosEfetivosQtd + r.atendimentosEfetivosQtd,
+          atendimentosClientes:
+            acc.atendimentosClientes + r.atendimentosClientes,
           agendadasQtd: acc.agendadasQtd + r.agendadasQtd,
           agendadasValor: acc.agendadasValor + r.agendadasValor,
           realizadasQtd: acc.realizadasQtd + r.realizadasQtd,
@@ -694,6 +858,9 @@ const CollectorsSummary: React.FC = () => {
           aReceberQtd: 0,
           aReceberValor: 0,
           recebidoPeriodo: 0,
+          atendimentosQtd: 0,
+          atendimentosEfetivosQtd: 0,
+          atendimentosClientes: 0,
           agendadasQtd: 0,
           agendadasValor: 0,
           realizadasQtd: 0,
@@ -759,6 +926,17 @@ const CollectorsSummary: React.FC = () => {
   const previstaPeriodHint =
     activePreset === "all" ? "sem limite" : `${toBr(dateFrom)}–${toBr(dateTo)}`;
 
+  // Atendimentos vem de uma busca a parte: enquanto carrega (ou se falhar)
+  // nao mostra 0, que pareceria "nao atendeu ninguem".
+  const atendimentosValor = (n: number): string =>
+    atendimentosErro ? "erro" : atendimentos === null ? "…" : String(n);
+  const atendimentosSub = (clientes: number, efetivos: number): string =>
+    atendimentos === null || atendimentosErro
+      ? atendimentosErro
+        ? "falha ao carregar"
+        : "carregando"
+      : `${clientes} ${clientes === 1 ? "cliente" : "clientes"} · ${efetivos} efetivos`;
+
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 lg:p-5 space-y-3">
@@ -780,7 +958,12 @@ const CollectorsSummary: React.FC = () => {
                   <strong>Sem agendamento</strong> são a situação de agora; os
                   demais valem só pro período selecionado.{" "}
                   <strong>Financeiro</strong> e <strong>Agenda</strong> são
-                  independentes — parcela e visita não precisam coincidir.
+                  independentes — parcela e visita não precisam coincidir.{" "}
+                  <strong>Atendimentos</strong> são os contatos registrados
+                  (Atender, Fila, pagamento), contados por cliente por dia —
+                  nunca por título; <strong>efetivos</strong> são os em que
+                  houve conversa com o cliente. <strong>Realizadas</strong>{" "}
+                  conta só o que estava agendado.
                 </div>
               )}
             </div>
@@ -1169,6 +1352,28 @@ const CollectorsSummary: React.FC = () => {
 
         <div className="space-y-2">
           <div
+            className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-dark-text-secondary ${TONE_ATENDIMENTO}`}
+          >
+            Atendimentos (registrados)
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <StatTile
+              icon={PhoneCall}
+              label="Atendimentos"
+              value={atendimentosValor(totals.atendimentosQtd)}
+              sub={atendimentosSub(
+                totals.atendimentosClientes,
+                totals.atendimentosEfetivosQtd,
+              )}
+              periodHint={previstaPeriodHint}
+              tone="blue"
+              size="lg"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div
             className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-dark-text-secondary ${TONE_AGENDA}`}
           >
             Agenda (visitas/contatos)
@@ -1334,6 +1539,16 @@ const CollectorsSummary: React.FC = () => {
                     tone="green"
                   />
                 </div>
+                <StatTile
+                  icon={PhoneCall}
+                  label="Atendimentos"
+                  value={atendimentosValor(row.atendimentosQtd)}
+                  sub={atendimentosSub(
+                    row.atendimentosClientes,
+                    row.atendimentosEfetivosQtd,
+                  )}
+                  tone="blue"
+                />
                 <div className="flex flex-wrap gap-2">
                   <Badge
                     icon={CalendarCheck2}
@@ -1418,6 +1633,11 @@ const CollectorsSummary: React.FC = () => {
                   Financeiro (parcelas)
                 </th>
                 <th
+                  className={`px-3 py-1.5 text-center border-l border-gray-200 dark:border-dark-border ${TONE_ATENDIMENTO}`}
+                >
+                  Registrados
+                </th>
+                <th
                   colSpan={7}
                   className={`px-3 py-1.5 text-center border-l border-gray-200 dark:border-dark-border ${TONE_AGENDA}`}
                 >
@@ -1475,6 +1695,14 @@ const CollectorsSummary: React.FC = () => {
                   className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_FINANCEIRO}`}
                 >
                   Recebido
+                </SortTh>
+                <SortTh
+                  active={sortKey === "atendimentosQtd"}
+                  dir={sortDir}
+                  onClick={() => toggleSort("atendimentosQtd")}
+                  className={`px-3 py-2.5 text-right whitespace-nowrap border-l border-gray-200 dark:border-dark-border ${TONE_ATENDIMENTO}`}
+                >
+                  Atendim.
                 </SortTh>
                 <SortTh
                   active={sortKey === "emAtrasoVisitas"}
@@ -1597,6 +1825,17 @@ const CollectorsSummary: React.FC = () => {
                     {formatCurrency(row.recebidoPeriodo, false)}
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
+                    <div className="font-semibold text-indigo-600 dark:text-indigo-400">
+                      {atendimentosValor(row.atendimentosQtd)}
+                    </div>
+                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
+                      {atendimentosSub(
+                        row.atendimentosClientes,
+                        row.atendimentosEfetivosQtd,
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
                     <div className="font-semibold">{row.emAtrasoVisitas}</div>
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
                       {isWalletCollectorType(row.type)
@@ -1651,7 +1890,7 @@ const CollectorsSummary: React.FC = () => {
               {rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={14}
+                    colSpan={15}
                     className="px-3 py-10 text-center text-sm text-gray-400 dark:text-dark-text-secondary"
                   >
                     Nenhum cobrador encontrado para esse filtro.
