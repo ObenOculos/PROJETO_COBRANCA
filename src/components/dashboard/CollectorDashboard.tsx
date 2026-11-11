@@ -87,6 +87,7 @@ import {
 import { AdiamentoDoDia, useFilaAdiamentos } from "../../hooks/useFilaAdiamentos";
 import { useFilaLote } from "../../hooks/useFilaLote";
 import { comRetentativa } from "../../utils/supabaseRetry";
+import { fetchAllRows } from "../../utils/fetchAllRows";
 
 import LogContactModal from "./LogContactModal";
 import CancelContactModal from "./CancelContactModal";
@@ -480,14 +481,41 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         string,
         TentativaResumo & { efetivo: TentativaResumo | null }
       > = {};
-      for (const batch of chunk(ids, 300)) {
-        const { data, error } = await comRetentativa(() =>
-          supabase
-            .from("collection_attempts")
-            .select("collection_id, date, result, notes, next_action_date, created_at")
-            .in("collection_id", batch)
-            .order("created_at", { ascending: false }),
-        );
+      const colunas =
+        "collection_id, date, result, notes, next_action_date, created_at";
+      // Cobrador: a RLS ja devolve so os contatos da carteira dele (poucas
+      // centenas), entao basta UMA leitura paginada, filtrada aqui pelos
+      // titulos em aberto. Antes eram ~30-45 consultas EM SEQUENCIA de 300
+      // ids cada (a cada registro feito, porque versaoRegistros muda) --
+      // segundos de espera no celular. Gestor enxerga todos os contatos do
+      // sistema, entao continua pedindo por id.
+      const porCobrador = !!user?.type && user.type !== "manager";
+      const idsEmAberto = new Set(ids);
+      const lotes: (string[] | null)[] = porCobrador ? [null] : chunk(ids, 300);
+      for (const batch of lotes) {
+        const { data, error } =
+          batch === null
+            ? await fetchAllRows((from, to) =>
+                supabase
+                  .from("collection_attempts")
+                  .select(colunas)
+                  .order("created_at", { ascending: false })
+                  .order("id", { ascending: false })
+                  .range(from, to),
+              ).then(
+                (rows) => ({
+                  data: rows.filter((r) => idsEmAberto.has(r.collection_id)),
+                  error: null,
+                }),
+                (err: unknown) => ({ data: null, error: err }),
+              )
+            : await comRetentativa(() =>
+                supabase
+                  .from("collection_attempts")
+                  .select(colunas)
+                  .in("collection_id", batch)
+                  .order("created_at", { ascending: false }),
+              );
         if (error) {
           // Sem os contatos de um lote nao da para saber quem ja foi
           // contatado: nao libera o lote da fila com dado faltando.
@@ -526,7 +554,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [myCollections, versaoRegistros]);
+  }, [myCollections, versaoRegistros, user?.type]);
 
   // Pagamento de parcela de acordo registrado por ESTE cobrador neste mes.
   // Nao vem de `salePayments` (sale_payments) -- registrar_pagamento_acordo
