@@ -2003,12 +2003,11 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: { collector_id: string; clientes_em_aberto: number }[];
       };
-      // Migration 20261111000002.
+      // Migration 20261111000003 (substitui a 20261111000002).
       conferencia_recebimentos: {
         Args: { p_inicio: string; p_fim: string };
         Returns: {
           cobrador_id: string | null;
-          carteira_id: string | null;
           documento: string | null;
           cliente: string | null;
           base_valor: number;
@@ -2016,6 +2015,7 @@ export type Database = {
           app_valor: number;
           app_lancamentos: number;
           app_cedrus: number;
+          na_carteira: boolean;
         }[];
       };
       // Migration 20261110000001.
