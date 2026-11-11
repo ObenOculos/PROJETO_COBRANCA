@@ -110,7 +110,8 @@ const somarMes = (mes: string, delta: number): string => {
 
 const rotuloMes = (mes: string): string => {
   const [y, m] = mes.split("-").map(Number);
-  return `${MESES[m - 1]} de ${y}`;
+  const nome = MESES[m - 1];
+  return `${nome.charAt(0).toUpperCase()}${nome.slice(1)} de ${y}`;
 };
 
 const num = (v: number | string | null | undefined): number =>
@@ -302,7 +303,7 @@ const ConferenciaRecebimentos: React.FC = () => {
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="min-w-[9.5rem] text-center text-sm font-semibold text-gray-700 dark:text-dark-text capitalize">
+          <span className="min-w-[9.5rem] text-center text-sm font-semibold text-gray-700 dark:text-dark-text">
             {rotuloMes(mes)}
           </span>
           <button
