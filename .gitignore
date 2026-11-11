@@ -36,3 +36,6 @@ dist-ssr
 
 # Exports do Cedrus (dados de cliente)
 Dados_Cedrus/
+
+# Saída do script de cancelados da SSÓtica (dados de cliente)
+scripts/ssotica/saida/

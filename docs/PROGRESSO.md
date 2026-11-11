@@ -55,6 +55,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 48 | Gestor: números errados depois de sair e entrar na mesma aba (só quitados) + travamento ao trocar de aba (Desempenho ~32 s, Lojas, Cobranças) — `831d182`, `96fb4f8`, `c563f22`, `63aaef6`, `87439e5`, 2026-11-11; testado no build de produção, sem push | Alta | Pequeno |
 | 50 | Desempenho do Cedrus → app — 2026-11-11: recebido do período inteiro (4.792 parcelas `sale_payments` "Cedrus", 7 operadores) + log real de 43.387 atendimentos (PROD_OPERADORES; aproximados apagados) + aba Conferência com seletor; publicado (`1c355e2`); carga da carteira do cobrador corrigida (RPC `ultimos_contatos_titulos`, `e97ba81`) | Alta | Médio |
 
+| 51 | Vendas canceladas na SSÓtica → app — 2026-11-11: script sem navegador `scripts/ssotica/cancelados_ssotica.py` (login + filtro Cancelada, 11 lojas, ~5 min) + função `cancelar_parcelas_ssotica` (migration `20261111000006`, sem db push); 1ª leitura: 953 parcelas / 172 vendas / R$ 117,5 mil em cobrança indevida; falta db push, 1ª gravação e agendamento | Alta | Médio |
 ## Perguntas em aberto para o financeiro
 
 Lista viva: o usuário leva ao financeiro (Márcia) e traz as respostas. Ao
@@ -205,6 +206,57 @@ cobrador entre ~61/91 e 365 dias.
 **Falta:** teste na tela do cobrador (aba Ligar intercalada → Depois);
 etapa 3 (supervisão: previstos × trabalhados por faixa; referência é o
 HTML do Cedrus que está na raiz, fora do Git).
+
+### Item 51 — Vendas canceladas na SSÓtica → app — 2026-11-11
+
+Pedido: identificar as vendas canceladas na SSÓtica (sem API) e levar ao
+app sem o passo manual. Antes: nenhuma parcela das lojas SSÓtica estava
+`Cancelado` e `vendas_canceladas` estava vazia. A venda cancelada na loja
+seguia "Em atraso" para o cobrador.
+
+**Leitura (sem Selenium):** a SSÓtica é Laravel com HTML montado no
+servidor. Login = formulário com `_token`, sem captcha; vendas = POST em
+`/movimentacao/vendas/<empresa>/listar` com `filterForm[situacao][]=CANCELADO`
+e período `TUDO`; paginação `?page=N` (18 por página). Cada card traz venda,
+quem/quando/motivo do cancelamento e as parcelas do crediário com a situação
+de cada uma. `requests` + `BeautifulSoup`; credenciais do `.env` dos scripts
+da SSÓtica (`Código_Óticas`). Saída em `scripts/ssotica/saida/` (fora do Git,
+tem dado de cliente).
+
+**Casamento:** loja + `venda_n` + nº da parcela, conferindo vencimento; se o
+vencimento difere mas o valor bate, é a mesma parcela (29 casos: vencimento
+prorrogado na SSÓtica e não reimportado). Empresa `PzBXYZ` = "Messejana" e
+"Oticas Luana Itapipoca Ext" no app (mesma empresa renomeada; numeração
+contínua 1–2189 / 2192+). Exxlab e Amontada: sem parcelas no app.
+
+**Decisões do usuário (2026-11-11):** parcela paga antes do cancelamento fica
+`Pago` (só cancela o que a SSÓtica marcou como Cancelado); 1ª rodada com todo o
+histórico só em relatório; script dentro do repo.
+
+**1ª leitura (19:29):** 2.230 vendas canceladas nas 11 lojas (contagem bate
+com a tela em todas). No app: 953 parcelas / 172 vendas / R$ 117.550,08 a
+cancelar (Em atraso 610, A vencer 347, 2 Pago Parcial; 628 na Cobrança
+Interna, 121 na Jurídica, 65 Em mãos). Nenhuma em acordo ou conferência.
+Fora da gravação: Messejana 2865 (cancelada 16/08, pagamentos do Cedrus em
+02/09 e 05/10 — conferir) e 13 parcelas "Pago" no app que a SSÓtica tem como
+canceladas (não mexer). 1.447 parcelas de vendas canceladas não estão
+Cancelado na SSÓtica (quase todas pagas antes) — mantidas.
+
+**Gravação:** `cancelar_parcelas_ssotica(p_itens jsonb)`, só `service_role`
+(`SECURITY INVOKER`). Cancela só parcela em aberto fora de acordo ativo,
+registra 1 linha por venda em `vendas_canceladas` (motivo "SSÓtica: venda N
+(loja) cancelada em dd/mm/aaaa por X - motivo", `usuario_id` nulo) e cancela as
+visitas de quem fica sem nada em aberto (antes do UPDATE, para não sair com o
+motivo "cliente quitou"). Idempotente: rodar de novo ignora o que já está
+Cancelado.
+
+**A observar:** se a importação manual do contas a receber trouxer de volta
+uma parcela cancelada com outro status, ela sobrescreve o `Cancelado`; a
+próxima rodada cancela de novo e grava outra linha em `vendas_canceladas`.
+
+**Falta:** db push da `20261111000006` + `npm run check:db`; 1ª gravação
+(começar por uma loja: `--gravar --loja PwrbRL`); agendamento no Task
+Scheduler; depois, automatizar a atualização da base (contas a receber).
 
 ### Item 50 — Desempenho do Cedrus → app — 2026-11-11
 
