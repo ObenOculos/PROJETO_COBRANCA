@@ -53,7 +53,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 46 | Atender: "Cliente diz que já pagou" (comprovante → registro do pagamento) e "Cliente informa venda cancelada" (parcelas da venda vão para conferência do gestor) — migration `20261110000008` aplicada (`check:db` OK); falta teste na tela | Alta | Médio |
 | 47 | Lentidão/travamento do cobrador — 5 correções de front (`a7d7874`, `33e2278`, `cb749d1`, `3161703`, `af7f311`) + índice `20261111000001` (aplicado), 2026-11-11; sem push, sem teste no navegador | Alta | Pequeno |
 | 48 | Gestor: números errados depois de sair e entrar na mesma aba (só quitados) + travamento ao trocar de aba (Desempenho ~32 s, Lojas, Cobranças) — `831d182`, `96fb4f8`, `c563f22`, `63aaef6`, `87439e5`, 2026-11-11; testado no build de produção, sem push | Alta | Pequeno |
-| 50 | Desempenho do Cedrus → app — 2026-11-11: recebido do período inteiro (4.792 parcelas `sale_payments` "Cedrus", 7 operadores) + log real de 43.387 atendimentos (PROD_OPERADORES; aproximados apagados) + aba Conferência com seletor; publicado (`1c355e2`). Pendente: tela do cobrador carrega 2–4,5 mil atendimentos (ver seção) | Alta | Médio |
+| 50 | Desempenho do Cedrus → app — 2026-11-11: recebido do período inteiro (4.792 parcelas `sale_payments` "Cedrus", 7 operadores) + log real de 43.387 atendimentos (PROD_OPERADORES; aproximados apagados) + aba Conferência com seletor; publicado (`1c355e2`); carga da carteira do cobrador corrigida (RPC `ultimos_contatos_titulos`, `e97ba81`) | Alta | Médio |
 
 ## Perguntas em aberto para o financeiro
 
@@ -330,8 +330,14 @@ resultado, credor; COD_DEVEDOR mapeado para CPF/CNPJ pelos outros arquivos,
 - **Janela de 180 dias** no último contato da carteira (`1c355e2`, publicado antes
   da gravação). **Pendente:** mesmo assim a tela do cobrador carrega
   2–4,5 mil linhas (antes ~200–600), porque a RLS mostra contatos de qualquer
-  operador nos títulos da carteira (Iara/Samila). Correção recomendada: RPC que
-  devolve só o último contato (e o último efetivo) por título.
+  operador nos títulos da carteira (Iara/Samila). **Corrigido** (`e97ba81`, migration
+  `20261111000005` aplicada, `check:db` OK): RPC `ultimos_contatos_titulos(p_ids,
+  p_desde, p_efetivos)` (SECURITY INVOKER) devolve no máximo 2 linhas por título
+  (`ultimo` e `efetivo`); lista de efetivos vem de `config/collectionAttempts`
+  (`EFFECTIVE_ATTEMPT_RESULT_LIST`). Lotes de 450 ids em paralelo (≤1000 linhas
+  por resposta). Jonathan: 4.381 → 1.306 linhas, último contato igual ao método
+  antigo nos 869 títulos com contato; chamada real pelo PostgREST: 900 títulos,
+  2 lotes, 166 ms.
 - **Agenda** (promessas em aberto no Cedrus): decidido fazer depois.
 
 **Base guarda só o principal** em todas as fontes (Ciclone e lojas: nenhum
