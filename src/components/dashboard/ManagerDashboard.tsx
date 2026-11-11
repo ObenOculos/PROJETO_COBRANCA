@@ -1,5 +1,12 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { DollarSign, FileText, Filter, Search } from "lucide-react";
+import {
+  ClipboardList,
+  DollarSign,
+  FileText,
+  Filter,
+  Scale,
+  Search,
+} from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable } from "./CollectionTable";
 import EnhancedPerformanceChart from "./EnhancedPerformanceChart";
@@ -9,6 +16,7 @@ import DatabaseUpload from "../admin/DatabaseUpload";
 import { ClientAssignment } from "../ClientAssignment";
 import VisitTracking from "./VisitTracking";
 import CollectorsSummary from "./CollectorsSummary";
+import ConferenciaRecebimentos from "./ConferenciaRecebimentos";
 import DailyCashReport from "./DailyCashReport";
 import AuthorizationManager from "./AuthorizationManager";
 import AcordoConfiguracaoPadrao from "./AcordoConfiguracaoPadrao";
@@ -90,6 +98,27 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   };
 
   const [filters, setFilters] = useState<FilterOptions>({});
+  // Aba interna do Resumo por Cobrador (item 50): resumo x conferencia de
+  // recebimentos (base Ciclone x registrado pelos cobradores).
+  const [summaryView, setSummaryView] = useState<"resumo" | "conferencia">(
+    () => {
+      try {
+        return localStorage.getItem("managerSummaryView") === "conferencia"
+          ? "conferencia"
+          : "resumo";
+      } catch {
+        return "resumo";
+      }
+    },
+  );
+  const changeSummaryView = (v: "resumo" | "conferencia") => {
+    setSummaryView(v);
+    try {
+      localStorage.setItem("managerSummaryView", v);
+    } catch {
+      // sem storage: so nao lembra a aba
+    }
+  };
   const [collectionsView, setCollectionsView] = useState<
     "table" | "cash-report"
   >(() => {
@@ -393,7 +422,40 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         return <EnhancedPerformanceChart />;
 
       case "collectors-summary":
-        return <CollectorsSummary />;
+        return (
+          <div className="space-y-4">
+            <div className="flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5 w-full sm:w-fit">
+              <button
+                onClick={() => changeSummaryView("resumo")}
+                className={`flex-1 sm:flex-none px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
+                  summaryView === "resumo"
+                    ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                    : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+                }`}
+              >
+                <ClipboardList className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2 inline" />
+                Resumo
+              </button>
+              <button
+                onClick={() => changeSummaryView("conferencia")}
+                className={`flex-1 sm:flex-none px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
+                  summaryView === "conferencia"
+                    ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                    : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+                }`}
+              >
+                <Scale className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2 inline" />
+                <span className="hidden sm:inline">Conferência de recebimentos</span>
+                <span className="sm:hidden">Conferência</span>
+              </button>
+            </div>
+            {summaryView === "resumo" ? (
+              <CollectorsSummary />
+            ) : (
+              <ConferenciaRecebimentos />
+            )}
+          </div>
+        );
 
       case "stores":
         return <EnhancedStoreManagement />;
