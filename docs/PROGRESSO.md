@@ -337,7 +337,21 @@ resultado, credor; COD_DEVEDOR mapeado para CPF/CNPJ pelos outros arquivos,
   (`EFFECTIVE_ATTEMPT_RESULT_LIST`). Lotes de 450 ids em paralelo (≤1000 linhas
   por resposta). Jonathan: 4.381 → 1.306 linhas, último contato igual ao método
   antigo nos 869 títulos com contato; chamada real pelo PostgREST: 900 títulos,
-  2 lotes, 166 ms.
+  2 lotes, 166 ms. Testado com login de cobrador no localhost: 7 chamadas da
+  RPC em paralelo, nenhuma leitura direta de `collection_attempts`.
+- **Exibição** (`fd73388`): `notaContatoExibicao` (config/collectionAttempts)
+  mostra o contato importado como "Cedrus: Não atendeu (1min50s)" na carteira e
+  na ficha do cliente.
+- **Revisão final (2026-11-11):** 0 pagamentos e 0 atendimentos duplicados, 0
+  aproximados restantes, 0 atendimentos sem título, 0 datas futuras; 113
+  parcelas sem venda. Parcelas pagas por mês = `ANALISE_DESEMPENHO` do Cedrus
+  (set 443, out 413, nov 158 = importadas + já lançadas no app + GESTÃO/Carlos).
+
+**Falta (Cedrus):** push dos commits `9ba1c46`…`fd73388` (bloqueado pela
+permissão automática; usuário publica); agenda das promessas em aberto
+(`ANALISE_CONTATOS (1)` / `ACOMP_GRUPO_CONTATO`), decidido fazer depois.
+Achado à parte: o "Recebido no período" do Resumo não soma `acordo_pagamentos`
+(nem juros) — anterior à importação.
 - **Agenda** (promessas em aberto no Cedrus): decidido fazer depois.
 
 **Base guarda só o principal** em todas as fontes (Ciclone e lojas: nenhum
