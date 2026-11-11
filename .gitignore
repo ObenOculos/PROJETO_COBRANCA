@@ -33,3 +33,6 @@ dist-ssr
 # Windows Mark-of-the-Web metadata (NTFS alternate data streams)
 *:Zone.Identifier
 *Zone.Identifier
+
+# Exports do Cedrus (dados de cliente)
+Dados_Cedrus/

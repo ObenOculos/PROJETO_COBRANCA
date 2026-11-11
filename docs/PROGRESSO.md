@@ -53,6 +53,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 46 | Atender: "Cliente diz que já pagou" (comprovante → registro do pagamento) e "Cliente informa venda cancelada" (parcelas da venda vão para conferência do gestor) — migration `20261110000008` aplicada (`check:db` OK); falta teste na tela | Alta | Médio |
 | 47 | Lentidão/travamento do cobrador — 5 correções de front (`a7d7874`, `33e2278`, `cb749d1`, `3161703`, `af7f311`) + índice `20261111000001` (aplicado), 2026-11-11; sem push, sem teste no navegador | Alta | Pequeno |
 | 48 | Gestor: números errados depois de sair e entrar na mesma aba (só quitados) + travamento ao trocar de aba (Desempenho ~32 s, Lojas, Cobranças) — `831d182`, `96fb4f8`, `c563f22`, `63aaef6`, `87439e5`, 2026-11-11; testado no build de produção, sem push | Alta | Pequeno |
+| 50 | Desempenho do Cedrus (sistema anterior) → app: José importado 2026-11-11 (33 parcelas como `sale_payments` forma "Cedrus" + 3 estornos); falta painel de conferência do gestor e os outros cobradores | Alta | Médio, por cobrador |
 
 ## Perguntas em aberto para o financeiro
 
@@ -204,6 +205,41 @@ cobrador entre ~61/91 e 365 dias.
 **Falta:** teste na tela do cobrador (aba Ligar intercalada → Depois);
 etapa 3 (supervisão: previstos × trabalhados por faixa; referência é o
 HTML do Cedrus que está na raiz, fora do Git).
+
+### Item 50 — Desempenho do Cedrus → app — 2026-11-11
+
+Os cobradores trabalharam no Cedrus antes do app; o usuário quer que o
+recebido de lá conte no desempenho. Exports em `Dados_Cedrus/` (fora do Git:
+tem dado de cliente).
+
+**O que os arquivos permitem:** `COD_DEVEDOR` do Cedrus = `clientes.codigo_cliente_erp`
+(casou ~100%, CNPJ conferido). Contato: só o ÚLTIMO por cliente (sem
+histórico). Recebido com operador: `ANALISE_NEGOCIACOES` (export filtrado
+para pagamentos de 03 a 10/11/2026). O título original do acordo
+(`.:.<n>`) é o número da venda no Ciclone (`BANCO_DADOS.numero_titulo`).
+
+**Decisão (usuário):** vale só o valor recebido; é o mesmo caso do cliente
+que paga na loja e o gestor passa o pagamento para o cobrador — registrar em
+nome dele em `sale_payments`, sem duplicar. Aparece no Caixa Diário.
+
+**Feito para o José (dados direto em produção, não em migration — tem dado
+de cliente):** 33 parcelas como `sale_payments` (`payment_method = 'Cedrus'`,
+data/valor do Cedrus, mora em `juros_amount`, nota com o nº do acordo,
+insert direto: não baixa título — o Ciclone já baixou). As 8 parcelas que ele
+já tinha lançado no app ficaram de fora (cliente + valor com juros + até 10
+dias, ou `NEG-<acordo>` citado na observação). Conferência: 30.056,50 do
+relatório = 22.771,33 importados + o que ele já lançou. 3 estornos (registro
+novo com `estorno_de`, juros 0 — `sale_payments_juros_amount_nao_negativo`):
+1 lançamento no cliente errado, 2 lançamentos repetidos em 11/11. Os juros
+desses 3 continuam no original (mesmo comportamento de
+`registrar_ajuste_recebimento`; o Resumo soma só `payment_amount`).
+
+**Cuidado no script da Management API:** o JSON do SQL tem que ser montado
+em UTF-8 (`sys.stdin.buffer...decode("utf-8")`); no Windows o padrão cp1252
+corrompe acento ao gravar.
+
+**Falta:** painel de conferência do gestor (base × registrado pelos
+cobradores, mensal); outros cobradores.
 
 ### Item 47 — Lentidão do cobrador — 2026-11-11
 
