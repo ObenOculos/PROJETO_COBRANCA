@@ -759,22 +759,41 @@ const EnhancedPerformanceChart: React.FC = () => {
     Map<string, string | null>
   >(new Map());
 
+  // Titulos que caem no periodo, com a data de referencia (vencimento, senao
+  // lancamento) ja em ISO. Calculado UMA vez por fonte/periodo e usado tanto
+  // pela busca do dono historico quanto pelo ranking — antes cada um parseava
+  // as 2 datas dos ~150 mil titulos por conta propria, e o ranking repetia
+  // isso de novo quando a resposta do dono historico chegava. O resultado por
+  // data crua fica num cache: as datas se repetem muito (poucos milhares de
+  // valores distintos), e parseDateSafely e pura, entao o resultado e o mesmo.
+  const periodRefs = useMemo(() => {
+    const isoNoPeriodo = new Map<string, string | null>();
+    const refIso = (raw: string | null | undefined): string | null => {
+      if (!raw) return null;
+      let iso = isoNoPeriodo.get(raw);
+      if (iso === undefined) {
+        const date = parseDateSafely(raw);
+        iso = date && isDateInSelectedMonths(date) ? todayLocalStr(date) : null;
+        isoNoPeriodo.set(raw, iso);
+      }
+      return iso;
+    };
+    const refs: { collection: Collection; iso: string; key: string }[] = [];
+    sourceCollections.forEach((c) => {
+      const iso = refIso(c.data_vencimento) ?? refIso(c.data_lancamento);
+      if (!iso) return;
+      refs.push({ collection: c, iso, key: `${c.documento}|${iso}` });
+    });
+    return refs;
+    // isDateInSelectedMonths deriva so de selectedMonths/selectedYears.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceCollections, selectedMonths, selectedYears]);
+
   useEffect(() => {
     const pares: { documento: string; data: string }[] = [];
     const seen = new Set<string>();
-    sourceCollections.forEach((c) => {
+    periodRefs.forEach(({ collection: c, iso, key }) => {
       if (!c.documento) return;
-      const dateVenc = parseDateSafely(c.data_vencimento);
-      const dateLanc = parseDateSafely(c.data_lancamento);
-      const vencMatches = isDateInSelectedMonths(dateVenc);
-      const refDate = vencMatches
-        ? dateVenc
-        : isDateInSelectedMonths(dateLanc)
-          ? dateLanc
-          : null;
-      if (!refDate) return;
-      const iso = todayLocalStr(refDate);
-      const key = `${c.documento}|${iso}`;
       if (seen.has(key)) return;
       seen.add(key);
       pares.push({ documento: c.documento, data: iso });
@@ -812,8 +831,7 @@ const EnhancedPerformanceChart: React.FC = () => {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceCollections, selectedMonths, selectedYears]);
+  }, [periodRefs]);
 
   const enhancedPerformance = useMemo((): EnhancedCollectorPerformance[] => {
     const collectors = users.filter((u) => isCollectorType(u.type));
@@ -854,18 +872,8 @@ const EnhancedPerformanceChart: React.FC = () => {
     const allByUser = new Map<string, Collection[]>();
     sourceCollections.forEach((c) => {
       if (c.user_id) pushTo(allByUser, c.user_id, c);
-
-      const dateVenc = parseDateSafely(c.data_vencimento);
-      const dateLanc = parseDateSafely(c.data_lancamento);
-      const vencMatches = isDateInSelectedMonths(dateVenc);
-      const refDate = vencMatches
-        ? dateVenc
-        : isDateInSelectedMonths(dateLanc)
-          ? dateLanc
-          : null;
-      if (!refDate) return;
-
-      const key = `${c.documento}|${todayLocalStr(refDate)}`;
+    });
+    periodRefs.forEach(({ collection: c, key }) => {
       const historicalOwner = historicalOwners.has(key)
         ? historicalOwners.get(key)
         : c.user_id; // ainda nao chegou do RPC: nao regride, so nao corrige ainda
@@ -1168,6 +1176,7 @@ const EnhancedPerformanceChart: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     sourceCollections,
+    periodRefs,
     allowedDocs,
     hasSourceFilter,
     historicalOwners,
