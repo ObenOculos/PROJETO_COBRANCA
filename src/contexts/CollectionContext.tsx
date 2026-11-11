@@ -3968,6 +3968,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     },
     [rawCollectionsByDocument, calculateSaleBalance, getSalePayments],
   );
+  // Endereco atual por documento (~15 mil linhas): busca O(1) em vez de
+  // `activeAddressHistory.find` (varredura) por cliente.
+  const activeAddressByDoc = useMemo(() => {
+    const m = new Map<string, (typeof activeAddressHistory)[number]>();
+    for (const h of activeAddressHistory) {
+      if (!m.has(h.cliente_documento)) m.set(h.cliente_documento, h);
+    }
+    return m;
+  }, [activeAddressHistory]);
+
   // NOVO: Função para pré-carregar dados dos clientes em batch
   const prefetchClientsData = React.useCallback(
     async (clientDocuments: string[]) => {
@@ -3992,11 +4002,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         const clientesMap = clientesRegistryRef.current;
 
         const newEntries = new Map();
-        const clientGroups = getClientGroups();
+        // Indice por documento uma vez so: com `.find` dentro do forEach
+        // eram clientes x grupos comparacoes (travava o Agendamento).
+        const groupsByDoc = new Map(
+          getClientGroups().map((g) => [g.document, g] as const),
+        );
 
         clientsToFetch.forEach((doc) => {
           const clienteInfo = clientesMap.get(doc);
-          const clientGroup = clientGroups.find((g) => g.document === doc);
+          const clientGroup = groupsByDoc.get(doc);
 
           if (!clientGroup) {
             newEntries.set(doc, { empty: true });
@@ -4033,9 +4047,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             );
           }, 0);
 
-          const addressHistory = activeAddressHistory.find(
-            (h) => h.cliente_documento === doc,
-          );
+          const addressHistory = activeAddressByDoc.get(doc);
 
           let addressUpdateDays: number | undefined;
           if (addressHistory?.created_at) {
@@ -4108,7 +4120,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         console.error("❌ Erro ao pré-carregar dados dos clientes:", error);
       }
     },
-    [activeAddressHistory, getClientGroups, getSalesByClient, supabase],
+    [activeAddressByDoc, getClientGroups, getSalesByClient, supabase],
   );
 
   const scheduleVisit = async (
@@ -4684,9 +4696,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         );
       }, 0);
 
-      const addressHistory = activeAddressHistory.find(
-        (h) => h.cliente_documento === clientDocument,
-      );
+      const addressHistory = activeAddressByDoc.get(clientDocument);
       let addressUpdateDays: number | undefined;
 
       if (addressHistory?.created_at) {
@@ -4758,7 +4768,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       return result;
     },
-    [getClientGroups, getSalesByClient, activeAddressHistory],
+    [getClientGroups, getSalesByClient, activeAddressByDoc],
   );
 
   // Function to clear client data cache for a specific client
