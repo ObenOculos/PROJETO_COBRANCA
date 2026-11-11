@@ -346,8 +346,17 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
       ? err.message
       : ((err as { message?: string })?.message ?? String(err));
 
-  const reload = async () => {
-    await Promise.all([refreshCollections(), fetchScheduledVisits(false)]);
+  // Recarregar a carteira inteira (milhares de parcelas) so quando o
+  // registro mexeu nela: cliente saiu da carteira ou venda informada como
+  // cancelada. Um contato comum so grava collection_attempts e agenda
+  // (scheduled_visits) -- os contatos a fila rele sozinha (versaoRegistros
+  // no onSuccess). Antes TODO registro baixava a carteira de novo, e era o
+  // "travou depois de salvar" do cobrador.
+  const reload = async (carteiraMudou: boolean) => {
+    await Promise.all([
+      carteiraMudou ? refreshCollections() : Promise.resolve(),
+      fetchScheduledVisits(false),
+    ]);
   };
 
   /** Validacao da etapa 1 (o que aconteceu). */
@@ -464,7 +473,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
           },
         );
         if (vendaError) throw vendaError;
-        await reload();
+        await reload(true);
         onSuccess();
         return;
       }
@@ -514,7 +523,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
 
       if (rpcError) throw rpcError;
 
-      await reload();
+      await reload(!!releaseSituacao);
       onSuccess();
       if (pagouComComprovante) onRegistrarPagamento?.();
     } catch (err) {
