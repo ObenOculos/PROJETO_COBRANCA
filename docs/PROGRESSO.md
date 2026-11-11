@@ -51,7 +51,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 44 | Carregamento parcial/inconsistente (precisava de F5 2–3 vezes) — nova tentativa em erro passageiro, sem lista incompleta, caches das derivações por carga, corrida da carga de títulos; feito 2026-11-10, sem teste no navegador (extensão caiu), sem push | Alta | Médio |
 | 45 | Acordo cancelado: quem cancela escolhe estornar (refazer) ou manter (desistiu) o valor pago + histórico de acordos/agendamentos cancelados — `0005`/`0006` aplicadas (entrada da OTICA FERNANDA estornada); falta teste na tela | Alta | Médio |
 | 46 | Atender: "Cliente diz que já pagou" (comprovante → registro do pagamento) e "Cliente informa venda cancelada" (parcelas da venda vão para conferência do gestor) — migration `20261110000008` aplicada (`check:db` OK); falta teste na tela | Alta | Médio |
-| 47 | Lentidão/travamento do cobrador — 5 correções de front (`a7d7874`, `33e2278`, `cb749d1`, `3161703`, `af7f311`) + índice `20261111000001` (sem db push), 2026-11-11; sem push, sem teste no navegador | Alta | Pequeno |
+| 47 | Lentidão/travamento do cobrador — 5 correções de front (`a7d7874`, `33e2278`, `cb749d1`, `3161703`, `af7f311`) + índice `20261111000001` (aplicado), 2026-11-11; sem push, sem teste no navegador | Alta | Pequeno |
 
 ## Perguntas em aberto para o financeiro
 
@@ -245,7 +245,7 @@ desfeita) e no código:
 6. Migration `20261111000001`: índice `(user_id, id_parcela)` em
    `BANCO_DADOS` (troca o só-`user_id`, que fica redundante) — a página
    da carteira passa a ser leitura direta em vez de ler as ~9–13 mil
-   parcelas do cobrador e ordenar. **Aguarda `db push`.** Independe do
+   parcelas do cobrador e ordenar. **Aplicada 2026-11-11**, `check:db` OK; página de 1000 caiu de ~650 ms (original) para ~6 ms. Independe do
    front (pode ir antes ou depois).
 
 **Próximos passos (medidos, não feitos):**
