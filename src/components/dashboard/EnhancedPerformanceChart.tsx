@@ -838,35 +838,78 @@ const EnhancedPerformanceChart: React.FC = () => {
       }
     });
 
+    // Uma passada por fonte, agrupada por cobrador. Antes cada cobrador
+    // varria de novo a carteira inteira (~111 mil titulos, 2 datas parseadas
+    // por titulo), os pagamentos, as visitas e todos os clientes: com 15
+    // cobradores a aba travava a tela por ~30 s a cada abertura. Os grupos
+    // preservam a ordem original, entao somas e contagens saem identicas.
+    const pushTo = <T,>(map: Map<string, T[]>, key: string, item: T) => {
+      const list = map.get(key);
+      if (list) list.push(item);
+      else map.set(key, [item]);
+    };
+
+    // Titulos do periodo por dono historico; carteira inteira por dono atual.
+    const periodByOwner = new Map<string, Collection[]>();
+    const allByUser = new Map<string, Collection[]>();
+    sourceCollections.forEach((c) => {
+      if (c.user_id) pushTo(allByUser, c.user_id, c);
+
+      const dateVenc = parseDateSafely(c.data_vencimento);
+      const dateLanc = parseDateSafely(c.data_lancamento);
+      const vencMatches = isDateInSelectedMonths(dateVenc);
+      const refDate = vencMatches
+        ? dateVenc
+        : isDateInSelectedMonths(dateLanc)
+          ? dateLanc
+          : null;
+      if (!refDate) return;
+
+      const key = `${c.documento}|${todayLocalStr(refDate)}`;
+      const historicalOwner = historicalOwners.has(key)
+        ? historicalOwners.get(key)
+        : c.user_id; // ainda nao chegou do RPC: nao regride, so nao corrige ainda
+      if (historicalOwner) pushTo(periodByOwner, historicalOwner, c);
+    });
+
+    const receivedByCollector = new Map<string, number>();
+    salePayments.forEach((p) => {
+      if (!p.collectorId || !p.paymentDate) return;
+      // Quando ha filtro ativo, conta apenas pagamentos de clientes no subconjunto filtrado.
+      if (hasSourceFilter && !allowedDocs.has(p.clientDocument)) return;
+      if (!isDateInSelectedMonths(parseDateSafely(p.paymentDate))) return;
+      receivedByCollector.set(
+        p.collectorId,
+        (receivedByCollector.get(p.collectorId) ?? 0) + p.paymentAmount,
+      );
+    });
+
+    // Status de cada cliente calculado uma vez (antes: uma vez por cobrador).
+    const clientStatusByCollector = new Map<
+      string,
+      { paid: number; unpaid: number }
+    >();
+    globalClientsMap.forEach((clientCollections, clientKey) => {
+      const assignedCollectorId = clientCollectorMap.get(clientKey);
+      if (!assignedCollectorId) return;
+      const counts = clientStatusByCollector.get(assignedCollectorId) ?? {
+        paid: 0,
+        unpaid: 0,
+      };
+      if (getClientPaymentStatus(clientCollections) === "pago") counts.paid++;
+      else counts.unpaid++;
+      clientStatusByCollector.set(assignedCollectorId, counts);
+    });
+
+    const visitsByCollector = new Map<string, typeof scheduledVisits>();
+    scheduledVisits.forEach((v) => {
+      if (v.collectorId) pushTo(visitsByCollector, v.collectorId, v);
+    });
+
     return collectors.map((collector) => {
-      const filteredCollections = sourceCollections.filter((c) => {
-        const dateVenc = parseDateSafely(c.data_vencimento);
-        const dateLanc = parseDateSafely(c.data_lancamento);
-        const vencMatches = isDateInSelectedMonths(dateVenc);
-        const refDate = vencMatches
-          ? dateVenc
-          : isDateInSelectedMonths(dateLanc)
-            ? dateLanc
-            : null;
-        if (!refDate) return false;
+      const filteredCollections = periodByOwner.get(collector.id) ?? [];
 
-        const key = `${c.documento}|${todayLocalStr(refDate)}`;
-        const historicalOwner = historicalOwners.has(key)
-          ? historicalOwners.get(key)
-          : c.user_id; // ainda nao chegou do RPC: nao regride, so nao corrige ainda
-        return historicalOwner === collector.id;
-      });
-
-      const receivedAmount = salePayments
-        .filter((p) => {
-          if (p.collectorId !== collector.id || !p.paymentDate) return false;
-          // Quando ha filtro ativo, conta apenas pagamentos de clientes no subconjunto filtrado.
-          if (hasSourceFilter && !allowedDocs.has(p.clientDocument))
-            return false;
-          const paymentDate = parseDateSafely(p.paymentDate);
-          return isDateInSelectedMonths(paymentDate);
-        })
-        .reduce((sum, p) => sum + p.paymentAmount, 0);
+      const receivedAmount = receivedByCollector.get(collector.id) ?? 0;
 
       const totalAmount = filteredCollections.reduce(
         (sum, c) => sum + Number(c.valor_original || 0),
@@ -875,9 +918,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       const pendingAmount = Math.max(0, totalAmount - receivedAmount);
 
       // A receber total: toda a carteira (do subconjunto filtrado), sem filtro de período
-      const allCollectorCollections = sourceCollections.filter(
-        (c) => c.user_id === collector.id,
-      );
+      const allCollectorCollections = allByUser.get(collector.id) ?? [];
       const pendingAmountTotal = allCollectorCollections.reduce((sum, c) => {
         const diff =
           Number(c.valor_original || 0) - Number(c.valor_recebido || 0);
@@ -925,20 +966,9 @@ const EnhancedPerformanceChart: React.FC = () => {
       const pendingSales = salesUnpaidOrPartial;
 
       // Cálculo do status da carteira (Pago, Parcial/Atrasado) usando o mapeamento global por documento/cliente
-      let clientsPaid = 0;
-      let clientsUnpaidOrPartial = 0;
-
-      globalClientsMap.forEach((clientCollections, clientKey) => {
-        const assignedCollectorId = clientCollectorMap.get(clientKey);
-        if (assignedCollectorId === collector.id) {
-          const status = getClientPaymentStatus(clientCollections);
-          if (status === "pago") {
-            clientsPaid++;
-          } else {
-            clientsUnpaidOrPartial++;
-          }
-        }
-      });
+      const clientCounts = clientStatusByCollector.get(collector.id);
+      const clientsPaid = clientCounts?.paid ?? 0;
+      const clientsUnpaidOrPartial = clientCounts?.unpaid ?? 0;
 
       // Total de títulos sem filtro de período
       const allSalesSet = new Set(
@@ -970,9 +1000,7 @@ const EnhancedPerformanceChart: React.FC = () => {
         0,
       );
 
-      const collectorVisits = scheduledVisits.filter(
-        (v) => v.collectorId === collector.id,
-      );
+      const collectorVisits = visitsByCollector.get(collector.id) ?? [];
 
       let visitsRealizadas = 0;
       // Subconjunto de visitsRealizadas que conta como "contato efetivo"
@@ -1085,10 +1113,9 @@ const EnhancedPerformanceChart: React.FC = () => {
 
       const allAssignedClients = clientsPaid + clientsUnpaidOrPartial;
       const visitedClients = new Set(
-        scheduledVisits
+        collectorVisits
           .filter(
             (v) =>
-              v.collectorId === collector.id &&
               v.status === "realizada" &&
               isDateInSelectedMonths(parseDateSafely(visitEffectiveDate(v))),
           )
