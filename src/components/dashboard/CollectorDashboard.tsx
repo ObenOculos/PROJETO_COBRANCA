@@ -70,8 +70,8 @@ import {
   ATTEMPT_RESULT_LABELS,
   SEM_CONTATO_DIAS,
   ULTIMO_CONTATO_JANELA_DIAS,
+  EFFECTIVE_ATTEMPT_RESULT_LIST,
   countsTowardVisitsGoal,
-  isEffectiveAttemptResult,
 } from "../../config/collectionAttempts";
 
 import {
@@ -88,7 +88,6 @@ import {
 import { AdiamentoDoDia, useFilaAdiamentos } from "../../hooks/useFilaAdiamentos";
 import { useFilaLote } from "../../hooks/useFilaLote";
 import { comRetentativa } from "../../utils/supabaseRetry";
-import { fetchAllRows } from "../../utils/fetchAllRows";
 
 import LogContactModal from "./LogContactModal";
 import CancelContactModal from "./CancelContactModal";
@@ -486,45 +485,27 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         string,
         TentativaResumo & { efetivo: TentativaResumo | null }
       > = {};
-      const colunas =
-        "collection_id, date, result, notes, next_action_date, created_at";
-      // Cobrador: a RLS ja devolve so os contatos da carteira dele (poucas
-      // centenas), entao basta UMA leitura paginada, filtrada aqui pelos
-      // titulos em aberto. Antes eram ~30-45 consultas EM SEQUENCIA de 300
-      // ids cada (a cada registro feito, porque versaoRegistros muda) --
-      // segundos de espera no celular. Gestor enxerga todos os contatos do
-      // sistema, entao continua pedindo por id.
-      const porCobrador = !!user?.type && user.type !== "manager";
-      const idsEmAberto = new Set(ids);
+      // O banco devolve, por titulo em aberto, so o ultimo contato e o
+      // ultimo efetivo (RPC ultimos_contatos_titulos, migration
+      // 20261111000005). Antes a tela lia todas as linhas de
+      // collection_attempts da carteira e escolhia aqui -- com o historico
+      // do Cedrus importado eram 2-4,5 mil linhas por cobrador.
       // `date` e text YYYY-MM-DD: comparacao de string serve.
       const desde = addDaysLocalStr(todayLocalStr(), -ULTIMO_CONTATO_JANELA_DIAS);
-      const lotes: (string[] | null)[] = porCobrador ? [null] : chunk(ids, 300);
-      for (const batch of lotes) {
-        const { data, error } =
-          batch === null
-            ? await fetchAllRows((from, to) =>
-                supabase
-                  .from("collection_attempts")
-                  .select(colunas)
-                  .gte("date", desde)
-                  .order("created_at", { ascending: false })
-                  .order("id", { ascending: false })
-                  .range(from, to),
-              ).then(
-                (rows) => ({
-                  data: rows.filter((r) => idsEmAberto.has(r.collection_id)),
-                  error: null,
-                }),
-                (err: unknown) => ({ data: null, error: err }),
-              )
-            : await comRetentativa(() =>
-                supabase
-                  .from("collection_attempts")
-                  .select(colunas)
-                  .in("collection_id", batch)
-                  .gte("date", desde)
-                  .order("created_at", { ascending: false }),
-              );
+      // No maximo 2 linhas por titulo: lotes de 450 ficam abaixo do limite de
+      // 1000 linhas por resposta do PostgREST. Lotes em paralelo.
+      const respostas = await Promise.all(
+        chunk(ids, 450).map((batch) =>
+          comRetentativa(() =>
+            supabase.rpc("ultimos_contatos_titulos", {
+              p_ids: batch,
+              p_desde: desde,
+              p_efetivos: EFFECTIVE_ATTEMPT_RESULT_LIST,
+            }),
+          ),
+        ),
+      );
+      for (const { data, error } of respostas) {
         if (error) {
           // Sem os contatos de um lote nao da para saber quem ja foi
           // contatado: nao libera o lote da fila com dado faltando.
@@ -532,8 +513,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           if (!cancelled) setAttemptsFalharam(true);
           return;
         }
-        // Linhas em ordem do mais recente: a 1a de cada titulo e a ultima
-        // interacao; a 1a efetiva e o ultimo contato efetivo.
         (data || []).forEach((row) => {
           const resumo: TentativaResumo = {
             date: row.date,
@@ -541,17 +520,14 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             notes: row.notes,
             nextActionDate: row.next_action_date,
           };
-          const efetiva = isEffectiveAttemptResult(
-            row.result as Parameters<typeof isEffectiveAttemptResult>[0],
-          );
-          const atual = map[row.collection_id];
-          if (!atual) {
-            map[row.collection_id] = {
-              ...resumo,
-              efetivo: efetiva ? resumo : null,
-            };
-          } else if (!atual.efetivo && efetiva) {
-            atual.efetivo = resumo;
+          const atual = map[row.collection_id] ?? {
+            ...resumo,
+            efetivo: null,
+          };
+          if (row.papel === "ultimo") {
+            map[row.collection_id] = { ...resumo, efetivo: atual.efetivo };
+          } else {
+            map[row.collection_id] = { ...atual, efetivo: resumo };
           }
         });
       }

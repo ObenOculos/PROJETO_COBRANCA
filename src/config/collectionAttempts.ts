@@ -61,6 +61,11 @@ export const isEffectiveAttemptResult = (
   result: CollectionAttempt["result"],
 ): boolean => EFFECTIVE_ATTEMPT_RESULTS.has(result);
 
+/** A mesma lista, para mandar ao banco (RPC ultimos_contatos_titulos). */
+export const EFFECTIVE_ATTEMPT_RESULT_LIST: string[] = Array.from(
+  EFFECTIVE_ATTEMPT_RESULTS,
+);
+
 /**
  * Motivo de reagendamento (config/rescheduleReasons) quando um contato NAO
  * efetivo empurra o agendamento ativo no "Registrar contato" -- o resultado

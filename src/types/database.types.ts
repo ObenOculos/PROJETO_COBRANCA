@@ -2003,6 +2003,18 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: { collector_id: string; clientes_em_aberto: number }[];
       };
+      // Migration 20261111000005.
+      ultimos_contatos_titulos: {
+        Args: { p_ids: string[]; p_desde: string; p_efetivos: string[] };
+        Returns: {
+          collection_id: string;
+          papel: "ultimo" | "efetivo";
+          date: string;
+          result: string;
+          notes: string | null;
+          next_action_date: string | null;
+        }[];
+      };
       // Migration 20261111000004 (substitui a 20261111000002/0003).
       conferencia_recebimentos: {
         Args: { p_inicio: string; p_fim: string; p_so_carteira?: boolean };
