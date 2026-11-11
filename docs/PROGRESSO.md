@@ -280,6 +280,23 @@ arquivo do interno — arquivos são por faixa de atraso e a data do último
 contato é do cliente). Pulados: mesmo cobrador/cliente/dia já no app, cliente
 fora do app. Novembro: José 138, Monalisa 227, Jonathan 139, Aline 15.
 
+**Acordos como atendimento (mesmo dia):** cliente que fecha acordo sai dos
+arquivos de carteira (48 de 57 da Monalisa, 36 de 47 do Jonathan não estavam
+em nenhum), então o acordo do relatório de negociações virou atendimento
+`agreement` na data da negociação, em nome do operador (97 novos; pulados os
+que já tinham atendimento do mesmo cobrador no dia). 2 contatos importados
+"sem resultado" no mesmo dia de um acordo passaram a `agreement`. Novembro:
+Monalisa 305 atendidos/71 conversaram, Jonathan 219/90. Os arquivos mostram
+outros operadores agendando (Carlos, Samila): atribuir "último contato" ao
+dono do arquivo é suposição; o acordo não (operador explícito).
+
+**Conferência do recebido (148 parcelas pagas do relatório):** todas estão no
+app uma única vez — importada (135) ou já lançada pelo cobrador (13); nenhuma
+importada sem parcela no relatório, nenhuma em dobro. Totais batem com o
+relatório por operador. O "Recebido no período" do Resumo soma só
+`payment_amount` (sem juros e sem `acordo_pagamentos`) — por isso o José
+mostra R$ 29.358 e não R$ 30.058.
+
 **Base guarda só o principal** em todas as fontes (Ciclone e lojas: nenhum
 `juros_pago`).
 
