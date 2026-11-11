@@ -52,6 +52,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 45 | Acordo cancelado: quem cancela escolhe estornar (refazer) ou manter (desistiu) o valor pago + histórico de acordos/agendamentos cancelados — `0005`/`0006` aplicadas (entrada da OTICA FERNANDA estornada); falta teste na tela | Alta | Médio |
 | 46 | Atender: "Cliente diz que já pagou" (comprovante → registro do pagamento) e "Cliente informa venda cancelada" (parcelas da venda vão para conferência do gestor) — migration `20261110000008` aplicada (`check:db` OK); falta teste na tela | Alta | Médio |
 | 47 | Lentidão/travamento do cobrador — 5 correções de front (`a7d7874`, `33e2278`, `cb749d1`, `3161703`, `af7f311`) + índice `20261111000001` (aplicado), 2026-11-11; sem push, sem teste no navegador | Alta | Pequeno |
+| 48 | Gestor: números errados depois de sair e entrar na mesma aba (só quitados) + travamento ao trocar de aba (Desempenho ~32 s, Lojas, Cobranças) — `831d182`, `96fb4f8`, `c563f22`, `63aaef6`, 2026-11-11; medido no build de produção, sem push | Alta | Pequeno |
 
 ## Perguntas em aberto para o financeiro
 
@@ -268,6 +269,50 @@ apagados depois por SQL com os ids exatos.
 visto: `fila_lote_atual` é chamado 2x após cada registro (efeito de
 `versaoRegistros` e de `attemptsByCollection`) — inofensivo.
 
+
+### Item 48 — Gestor: números errados após login e travamento entre abas — 2026-11-11
+
+**Números errados após login (`831d182`).** Sair e entrar de novo na mesma
+aba (sem F5) mostrava só os clientes quitados: total menor, todos "Sem
+Cobrador", valor em aberto R$ 0. O provider não desmonta no logout e o
+ramo "usuário não logado" do `CollectionContext` só zerava a trava dos
+quitados; `collectionsRequestedRef`/escopo `all` sobreviviam, então
+`requestCollections`/`ensureAllCollections` achavam a carteira carregada.
+Agora o logout zera todas as travas de carga.
+Caso raro analisado e **não corrigido** (aguardando decisão): carga em voo
+que atravessa logout + login de OUTRA pessoa em segundos pode publicar o
+recorte do usuário anterior. Logout simples é seguro (`anon` não tem SELECT
+em `BANCO_DADOS`/views/`clientes`/`sale_payments` — a carga falha e não
+publica). Também não são cancelados no logout: timer do realtime (8 s) e
+o timeout de 60 s do boot.
+
+**Travamento ao trocar de aba (gestor).** Medido com `PerformanceObserver`
+(long tasks), dados já carregados, ~150 mil títulos. Em dev o `StrictMode`
+dobra cada cálculo — os números finais são do build de produção
+(`vite preview`):
+
+| Aba | Antes | Depois |
+|---|---|---|
+| Desempenho | ~32 s (dev) | 0,4–0,5 s |
+| Lojas | 1,5 s | 0,5–0,6 s |
+| Cobranças | 1,3 s | 0,6–0,7 s |
+
+- `96fb4f8` Desempenho: cada um dos 15 cobradores varria a carteira
+  inteira (2 datas parseadas por título), pagamentos, visitas e clientes →
+  uma passada por fonte agrupada por cobrador.
+- `c563f22` Lojas: 2 filtros iguais da carteira por loja → agrupamento
+  único. `FilterBar` reenviava 300 ms após montar um objeto de filtros novo
+  com os mesmos valores (debounce da busca) → toda tela com a barra
+  recalculava tudo 2x; agora só avisa quando a busca muda.
+- `63aaef6` Desempenho: datas do período convertidas uma vez (cache por
+  data crua) e compartilhadas entre o ranking e a busca do dono histórico.
+
+Conferência: texto da aba comparado caractere a caractere antes/depois
+(Lojas e Desempenho idênticos; numa rodada a única diferença foram 2
+agendamentos criados no meio do teste, confirmados no banco). Busca da
+FilterBar testada (filtra e limpa).
+**Falta:** push e teste do usuário no site. Restante: Cobranças 0,6 s e
+Clientes 0,4 s não investigados.
 ### Item 46 — "Já pagou" e "venda cancelada" no Atender — 2026-11-10
 
 Reclamação dos cobradores: o cliente diz que já pagou (ou que a venda foi
