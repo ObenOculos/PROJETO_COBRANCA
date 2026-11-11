@@ -1194,21 +1194,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // O recorte do cobrador precisa ser reaplicado em CADA requisicao (na
       // contagem e em cada pagina), por isso e uma funcao e nao um builder
       // guardado numa variavel.
-      const applyCollectorFilter = <Q extends { or: (filter: string) => Q }>(
+      //
+      // Vale para TODO perfil que nao e gestor (Externo e os 3 de carteira).
+      // A RLS ja restringe a `user_id = eu`, mas a policy e um OR com o
+      // teste de gestor, e o Postgres nao usa o indice de user_id atras
+      // desse OR: cada pagina varria a tabela pela PK descartando ~130 mil
+      // linhas (~600 ms por pagina). Com o filtro explicito usa
+      // idx_banco_dados_user_id (~50 ms). Mesmo resultado que a RLS ja da.
+      const applyCollectorFilter = <Q extends { eq: (col: "user_id", v: string) => Q }>(
         query: Q,
       ): Q => {
-        if (user?.type !== "collector") return query;
-
-        const assignedStores: string[] = [];
-        console.log(
-          `Cobrador ${user.name} (${user.id}) tem lojas atribuídas:`,
-          assignedStores,
-        );
-
-        // Titulos atribuidos direto ao cobrador OU as lojas dele
-        return query.or(
-          `user_id.eq.${user.id},nome_da_loja.in.(${assignedStores.join(",")})`,
-        );
+        if (!user || user.type === "manager") return query;
+        return query.eq("user_id", user.id);
       };
 
       // Um builder NOVO por chamada. Reaproveitar o mesmo objeto entre
